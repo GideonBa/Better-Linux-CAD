@@ -88,17 +88,6 @@ bool shell_feature_profile_available(const PartDocument& part, const SketchId& s
   return !pending.has_error() && pending.value().has_value();
 }
 
-bool feature_id_exists(const PartDocument& part, const FeatureId& id) {
-  return part.find_feature(id) != nullptr || part.find_revolve_feature(id) != nullptr ||
-         part.find_sweep_feature(id) != nullptr || part.find_loft_feature(id) != nullptr ||
-         part.find_surface_feature(id) != nullptr ||
-         part.find_linear_pattern_feature(id) != nullptr ||
-         part.find_circular_pattern_feature(id) != nullptr ||
-         part.find_mirror_feature(id) != nullptr || part.find_fillet_feature(id) != nullptr ||
-         part.find_chamfer_feature(id) != nullptr || part.find_shell_feature(id) != nullptr ||
-         part.find_draft_feature(id) != nullptr || part.find_body_boolean_feature(id) != nullptr;
-}
-
 bool parameter_name_exists(const PartDocument& part, std::string_view name) {
   return std::any_of(part.parameters().begin(), part.parameters().end(),
                      [name](const Parameter& parameter) { return parameter.name() == name; });
@@ -109,6 +98,8 @@ std::size_t next_extrude_index(const PartDocument& part) {
     const std::string suffix = std::to_string(index);
     if (!part.dependency_graph().has_node("feature.extrusion." + suffix) &&
         !part.dependency_graph().has_node("body." + suffix) &&
+        !part.dependency_graph().has_node("body:body." + suffix) &&
+        part.find_body(BodyId("body." + suffix)) == nullptr &&
         !part.dependency_graph().has_node("parameter.extrusion." + suffix + ".depth") &&
         !part.dependency_graph().has_node("parameter.extrusion." + suffix + ".depth.second") &&
         !parameter_name_exists(part, "Extrusion " + suffix + " Tiefe") &&
@@ -120,7 +111,9 @@ std::size_t next_extrude_index(const PartDocument& part) {
 std::size_t next_revolve_index(const PartDocument& part) {
   for (std::size_t index = 1U;; ++index) {
     const std::string suffix = std::to_string(index);
-    if (!feature_id_exists(part, FeatureId("feature.drehung." + suffix)) &&
+    if (!part.dependency_graph().has_node("feature.drehung." + suffix) &&
+        !part.dependency_graph().has_node("body." + suffix) &&
+        !part.dependency_graph().has_node("body:body." + suffix) &&
         part.find_body(BodyId("body." + suffix)) == nullptr)
       return index;
   }
@@ -284,6 +277,7 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   form->addRow(value_label_, numeric_editor_);
   column->addLayout(form);
   build_extrude_controls(panel);
+  build_revolve_controls(panel);
   build_finishing_controls(panel, *form);
   build_pattern_controls(panel);
   build_body_controls(panel);
@@ -488,26 +482,11 @@ Result<std::size_t> ShellFeatureTools::begin_revolve(std::optional<DatumAxisId> 
   auto plane = sketch_workbench_.plane_view(session_, selected.value().first);
   if (plane.has_error())
     return Result<std::size_t>::failure(plane.error());
-  if (!requested_axis.has_value()) {
-    auto fallback = default_revolve_axis(plane.value());
-    if (fallback.has_error())
-      return Result<std::size_t>::failure(fallback.error());
-    requested_axis = fallback.value();
-  }
+  auto controls = reset_revolve_controls(plane.value(), requested_axis);
+  if (!controls)
+    return controls;
   const auto* part = session_.part_document();
-  const auto* datum = part != nullptr ? part->find_datum_axis(*requested_axis) : nullptr;
-  if (datum == nullptr || datum->kind() != DatumAxisKind::Explicit)
-    return Result<std::size_t>::failure(Error::validation(
-        requested_axis->value(), "Drehachse muss eine vorhandene explizite Bezugsachse sein"));
-  const double direction_offset = std::abs(dot(datum->direction(), plane.value().normal));
-  const double origin_offset =
-      std::abs(dot(displacement(plane.value().origin, datum->origin()), plane.value().normal));
-  if (direction_offset > 1.0e-6 || origin_offset > 1.0e-6)
-    return Result<std::size_t>::failure(Error::validation(
-        requested_axis->value(), "Drehachse muss in der gewählten Profilebene liegen"));
-  auto axis = AxisReference::create_datum_axis(PartFeatureInputRole::RevolveAxis, *requested_axis);
-  if (axis.has_error())
-    return Result<std::size_t>::failure(axis.error());
+  const auto& axis = revolve_axes_.at(static_cast<std::size_t>(revolve_axis_->currentIndex()));
 
   const std::size_t index = next_revolve_index(*part);
   const std::string suffix = std::to_string(index);
@@ -521,14 +500,9 @@ Result<std::size_t> ShellFeatureTools::begin_revolve(std::optional<DatumAxisId> 
   if (!session_.task().begin("part.revolve") || !session_.task().begin_parameter_editing())
     return Result<std::size_t>::failure(
         Error::validation("gui.shell.feature", "Drehungsaufgabe konnte nicht gestartet werden"));
-  Vector3 reference = plane.value().x_axis;
-  if (std::abs(dot(reference, datum->direction())) > 0.99)
-    reference = plane.value().y_axis;
-  GuiFeatureManipulatorFrame frame{datum->origin(), datum->direction(), datum->direction(),
-                                   reference};
   auto begun = coordinator_.begin_revolve_with_new_body(
-      selected.value().first, selected.value().second, feature, "Drehung " + suffix,
-      std::move(axis.value()), std::move(body.value()), frame);
+      selected.value().first, selected.value().second, feature, "Drehung " + suffix, axis.reference,
+      std::move(body.value()), axis.frame);
   if (begun.has_error()) {
     (void)session_.task().cancel();
     return begun;
@@ -546,11 +520,9 @@ Result<std::size_t> ShellFeatureTools::begin_revolve(std::optional<DatumAxisId> 
   }
   show_task_panel(QStringLiteral("Drehung"), QStringLiteral("deg"), 180.0);
   auto preview = preview_and_publish();
-  if (preview.has_error()) {
-    const Error error = preview.error();
-    cancel();
-    return Result<std::size_t>::failure(error);
-  }
+  // Keep an invalid initial profile/axis combination correctable in the task.
+  if (!preview)
+    report(preview.error());
   window_.refresh();
   return begun;
 }
@@ -785,8 +757,9 @@ ShellFeatureTools::accept_manipulator_candidate(const GuiViewportManipulatorCand
 
 Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   preview_valid_ = false;
-  if (command_ == Command::Extrude) {
-    auto configured = configure_extrude_candidate();
+  if (command_ == Command::Extrude || command_ == Command::Revolve) {
+    auto configured = command_ == Command::Extrude ? configure_extrude_candidate()
+                                                   : configure_revolve_candidate();
     if (!configured) {
       viewport_.clear_feature_preview();
       task_summary_->setText(QString::fromStdString(configured.error().message()));
@@ -843,6 +816,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     replacements = body_preview_replacements();
   else if (command_ == Command::Extrude && extrude_operation_->currentIndex() != 0)
     replacements.push_back("body/" + extrude_target_->currentData().toString().toStdString());
+  else if (command_ == Command::Revolve && revolve_operation_->currentIndex() != 0)
+    replacements.push_back("body/" + revolve_target_->currentData().toString().toStdString());
   else if (spatial() && command_ != Command::PathCurve && spatial_mode_->currentIndex() == 1)
     replacements.push_back("body/" + spatial_target_->currentData().toString().toStdString());
   else if (finishing())
@@ -856,15 +831,19 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     synchronize_overlay();
     return Result<GuiPartFeaturePreview>::failure(published.error());
   }
-  const auto summary = surface() ? task_dock_->windowTitle() + QStringLiteral(": Vorschau gültig.")
-                       : command_ == Command::Extrude ? QStringLiteral("%1 · %2: Vorschau gültig.")
-                                                            .arg(extrude_operation_->currentText(),
-                                                                 extrude_extent_->currentText())
-                       : spatial()        ? spatial_summary()
-                       : body_operation() ? body_summary()
-                       : finishing()      ? finishing_summary()
-                       : pattern()        ? pattern_summary()
-                                   : QString::fromStdString(preview.value().semantic_summary);
+  const auto summary =
+      surface() ? task_dock_->windowTitle() + QStringLiteral(": Vorschau gültig.")
+      : command_ == Command::Extrude
+          ? QStringLiteral("%1 · %2: Vorschau gültig.")
+                .arg(extrude_operation_->currentText(), extrude_extent_->currentText())
+      : command_ == Command::Revolve
+          ? QStringLiteral("%1 · %2: Vorschau gültig.")
+                .arg(revolve_operation_->currentText(), revolve_extent_->currentText())
+      : spatial()        ? spatial_summary()
+      : body_operation() ? body_summary()
+      : finishing()      ? finishing_summary()
+      : pattern()        ? pattern_summary()
+                         : QString::fromStdString(preview.value().semantic_summary);
   task_summary_->setText(summary);
   preview_valid_ = true;
   refresh_enablement();
@@ -980,7 +959,7 @@ void ShellFeatureTools::refresh_enablement() {
   bool revolve_available = false;
   if (profile_available) {
     const auto plane = selected_profile_plane();
-    revolve_available = !plane.has_error() && !default_revolve_axis(plane.value()).has_error();
+    revolve_available = !plane.has_error() && !revolve_axis_choices(plane.value()).empty();
   }
   action_revolve_->setEnabled(revolve_available);
   for (const auto& [command, action] : finishing_actions_) {
@@ -1113,6 +1092,8 @@ void ShellFeatureTools::synchronize_numeric_editor(double value) {
 void ShellFeatureTools::synchronize_overlay() {
   if (command_ == Command::Extrude)
     extrude_controls_->setEnabled(layer_.active_handle_id().empty());
+  if (command_ == Command::Revolve)
+    revolve_controls_->setEnabled(layer_.active_handle_id().empty());
   const bool visible = active() && preview_valid_ && !layer_.handles().empty() &&
                        !pattern_reference_picking_ && !body_reference_picking_;
   overlay_->setVisible(visible);
@@ -1170,6 +1151,7 @@ void ShellFeatureTools::handle_escape() {
 
 void ShellFeatureTools::show_task_panel(QString title, QString unit, double value) {
   extrude_controls_->setVisible(command_ == Command::Extrude);
+  revolve_controls_->setVisible(command_ == Command::Revolve);
   finishing_controls_->setVisible(finishing());
   pattern_controls_->setVisible(pattern());
   body_controls_->setVisible(body_operation());
@@ -1195,6 +1177,8 @@ void ShellFeatureTools::show_task_panel(QString title, QString unit, double valu
                                        : label + QStringLiteral(" (") + unit + QStringLiteral(")"));
   numeric_editor_->setPlaceholderText(std::move(unit));
   synchronize_numeric_editor(value);
+  if (command_ == Command::Revolve)
+    update_revolve_controls();
   task_dock_->show();
   task_dock_->raise();
   refresh_presentation();

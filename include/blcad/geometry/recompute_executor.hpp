@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <string_view>
+#include <utility>
 
 namespace blcad::geometry {
 
@@ -34,6 +35,12 @@ struct GeometryRecomputeSummary {
 
 class GeometryRecomputeExecutor {
 public:
+  // The same resolved, transformed axis used by feature execution. Interactive
+  // clients use this frame without introducing a second reference evaluator.
+  [[nodiscard]] Result<std::pair<Point3, Vector3>>
+  resolve_feature_axis(const PartDocument& document, const AxisReference& reference,
+                       const ShapeCache& cache) const;
+
   [[nodiscard]] Result<SurfaceExtensionFrame>
   surface_extension_frame(const PartDocument& document, const SurfaceReference& target,
                           const BoundaryCurveReference& boundary, const ShapeCache& cache) const;

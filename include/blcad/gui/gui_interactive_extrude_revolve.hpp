@@ -634,6 +634,9 @@ public:
   [[nodiscard]] bool active() const noexcept { return active_; }
 
   void set_kind(RevolveFeatureKind kind) noexcept { kind_ = kind; }
+  void set_axis(AxisReference axis) {
+    axis_ = std::move(axis);
+  }
   void set_operation(FeatureBodyOperationMode operation,
                      std::optional<BodyId> target = std::nullopt) {
     operation_ = operation;

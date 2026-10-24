@@ -256,6 +256,20 @@ protected:
   bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
+  struct RevolveAxisChoice {
+    AxisReference reference;
+    GuiFeatureManipulatorFrame frame;
+    std::string label;
+    std::string semantic_id;
+  };
+  [[nodiscard]] std::vector<RevolveAxisChoice>
+  revolve_axis_choices(const GuiSketchPlaneView& plane) const;
+  void build_revolve_controls(QWidget* panel);
+  [[nodiscard]] Result<std::size_t> reset_revolve_controls(const GuiSketchPlaneView& plane,
+                                                           std::optional<DatumAxisId> requested);
+  void update_revolve_controls();
+  void refresh_revolve_preview();
+  [[nodiscard]] Result<std::size_t> configure_revolve_candidate();
   void build_extrude_controls(QWidget* panel);
   void reset_extrude_controls(GuiFeatureManipulatorFrame frame);
   void update_extrude_controls();
@@ -359,6 +373,14 @@ private:
   QLineEdit* extrude_taper_{nullptr};
   std::vector<FaceReference> extrude_faces_;
   GuiFeatureManipulatorFrame extrude_frame_;
+  QWidget* revolve_controls_{nullptr};
+  QFormLayout* revolve_form_{nullptr};
+  QComboBox* revolve_extent_{nullptr};
+  QComboBox* revolve_side_{nullptr};
+  QComboBox* revolve_operation_{nullptr};
+  QComboBox* revolve_target_{nullptr};
+  QComboBox* revolve_axis_{nullptr};
+  std::vector<RevolveAxisChoice> revolve_axes_;
   QPushButton* apply_button_{nullptr};
   QPushButton* cancel_button_{nullptr};
   QAction* action_extrude_{nullptr};

@@ -39,8 +39,8 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Finish thin/open-profile and path Extrude controls, expanded Revolve extent/operation/axis
-   controls and native limit-face collection. All seven bounded Extrude terminations now have
+1. Finish thin/open-profile and path Extrude controls and native viewport limit-face collection.
+   Revolve extent/operation/axis controls and all seven bounded Extrude terminations now have
    explicit shell editors; arbitrary final-Body subshape references remain outside the contract.
 2. Restore contextual commands, selection-filter UI, view cube, view bookmarks and repeat command.
 3. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
@@ -72,7 +72,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -931,3 +931,62 @@ checks account for the assertion-count difference. The six-second startup ends a
 The ordinary inventory audit passes. The opt-in closure gate correctly rejects the unfinished
 acceptance (three cases: two pass, one expected failure; 181 assertions). Six partial families and
 the pending integrated workflows remain recorded; this slice does not close Block 136.
+
+## Expanded Revolve controls — 2026-10-24
+
+The existing Drehung task now exposes Full, directed Angle and total-angle Symmetric extents,
+all four Body operations and explicit compatible typed axes. Cut maps to RevolveCut; the other
+operations use Revolve. Axis choices include explicit/derived DatumAxis, ConstructionLine, eligible
+circular-cut primary axes and supported generated linear edges. The Geometry executor exposes its
+own resolved/transformed axis frame to the shell. Full hides the numeric angle/wheel; inapplicable
+target/direction controls remain visible and disabled. An invalid initial profile/axis combination
+stays correctable. Exact bounds: `docs/gui-interactive-extrude-revolve-mvp9.md`.
+
+Seven `[block136-revolve]` cases cover all extents on XY/XZ/YZ, signed bounds, volume, all four
+operations, typed axis persistence, invalid/corrected initial geometry and numeric input, mode and
+document boundaries, offset planes with construction-only axes, atomic history and mixed-feature
+global identity allocation. Native curved-shape bounds allow 0.05 mm of conservative OCCT
+triangulation expansion; unmeshed bounds retain 1e-6 mm and volumes retain 1e-5 mm³ checks.
+
+`[shell-combined-revolve-controls]` is the seventeenth combined workflow. Actual widget input authors
+a symmetric plate and shared groove sketch, corrects crossing axes/units, applies negative,
+symmetric and full cuts, edits an earlier angle/name through downstream features, checks exact
+four-step Undo/Redo, cancels a mode-switched draft, reopens canonically and exports STEP. Sixteen
+combined workflows have fully UI-authored inputs; the Planar-motion case retains its imported Part.
+
+Two history defects exposed by these workflows are fixed. In Geometry, a generated axis referencing
+an older producer could restore a disjoint 1,200 mm³ cut; `[revolve-axis-history]` failed before the
+fix and now covers full/isolated repeated recomputes. In Core, updating an earlier in-place modifier
+could attach the terminal modifier as its predecessor and create a cycle. The common update command
+now re-adds against the original predecessor and restores the original terminal producer.
+`[revolve-update-history]` covers first/middle/last updates, input rebinds, graph-equivalent reopening
+and atomic rejection. Contracts: `docs/part-revolve-geometry-mvp6.md`, `docs/gui-feature-edit-mvp9.md`.
+
+Mixed Extrude/Revolve allocation also reserves existing Body and Body dependency-node identities,
+including identities occupied by another feature family or unrelated typed records. No persistent
+intent or schema is added. Twelve bounded families remain restored and six partial. Thin/open-profile
+and path Extrude and native viewport limit-face collection remain next; Block 136 stays open and
+numbered completion remains Block 135.
+
+`blcad_gui_tests`, `blcad_app`, `blcad_core_tests` and `blcad_geometry_tests` built with `dev-gui`.
+Final verification:
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 529 | 15,922 | All passed |
+| Full Geometry | 440 | 30,136 | All passed |
+| Focused offscreen feature/edit regressions | 56 | 4,399 | 55 passed; one native-only skip |
+| Focused native Revolve/editor workflow | 8 | 1,294 | All passed; no skips |
+| Full offscreen GUI | 436 | 38,441 | 421 passed; 15 native-only skips |
+| Full combined native shell | 252 | 33,573 | All passed; no skips |
+
+The 1280×800 `revolve-negative-cut-preview.png`, `revolve-symmetric-cut-preview.png` and
+`revolve-full-cut-preview.png` captures in `/tmp/blcad-revolve-native` were inspected. The
+applicable angle/wheel and disabled controls track their modes, axes/targets are readable and
+Apply/Cancel stay pinned. Builds, GUI runs and the separate six-second native startup were serial;
+startup ends at intentional timeout 124. Native logs contain the known medium depth/stencil warning,
+without high-severity, BadDrawable or fatal lifecycle diagnostics. Formatting and diff checks pass.
+
+The ordinary inventory audit passes. The opt-in closure gate correctly rejects the documented
+remaining work (three cases: two pass, one expected failure; 182 assertions). Six partial families
+and pending integrated workflows remain recorded; this does not close Block 136.

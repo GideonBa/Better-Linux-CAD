@@ -59,6 +59,25 @@ template <typename FeatureT>
   return surface_feature_result_body(f);
 }
 
+[[nodiscard]] bool record_produces_body(const PartDocument& part, const std::string& node,
+                                        const BodyId& body) {
+  const auto matches = [&](const auto& records) {
+    return std::any_of(records.begin(), records.end(), [&](const auto& record) {
+      return record_feature_id(record).value() == node && record_result_body(record) == body;
+    });
+  };
+  if (matches(part.features()) || matches(part.revolve_features()) ||
+      matches(part.sweep_features()) || matches(part.loft_features()) ||
+      matches(part.surface_features()) || matches(part.linear_pattern_features()) ||
+      matches(part.circular_pattern_features()) || matches(part.mirror_features()) ||
+      matches(part.fillet_features()) || matches(part.chamfer_features()) ||
+      matches(part.shell_features()) || matches(part.draft_features()) ||
+      matches(part.body_boolean_features()))
+    return true;
+  const auto* transform = part.find_body_transform(BodyTransformId(node));
+  return transform && transform->body() == body;
+}
+
 [[nodiscard]] std::string sketch_ownership_node_id(const SketchId& id) {
   return "sketch_ownership:" + id.value();
 }
@@ -3829,16 +3848,25 @@ PartDocument::update_feature_record(std::vector<FeatureT> PartDocument::*member,
   // when this feature itself modifies a body in place, the upstream producer.
   const BodyId result_body = record_result_body(replacement);
   const std::string result_node = body_dependency_node_id(result_body);
+  const bool same_result = !result_body.empty() && result_body == record_result_body(*found);
+  const auto original_producers = dependency_sources_of(dependency_graph_, result_node);
+  std::string previous_body_producer;
+  if (same_result) {
+    auto order = dependency_graph_.topological_order();
+    if (!order)
+      return Result<std::size_t>::failure(order.error());
+    for (const auto& source : order.value())
+      if (dependency_graph_.has_dependency(source, node_id) &&
+          record_produces_body(*this, source, result_body))
+        previous_body_producer = source;
+  }
   std::vector<std::string> co_producers;
   if (!result_body.empty())
     for (const auto& source : dependency_sources_of(dependency_graph_, result_node))
       if (source != node_id) co_producers.push_back(source);
 
-  // Rebuild the record through the family add. First try without releasing the
-  // body's other producers so an in-place modifier's own chain re-forms
-  // naturally. If the add rejects the body as "already produced" (this feature
-  // is a NewBody producer whose body a downstream feature also modifies), retry
-  // with those producer edges released and restored around the add.
+  // Keep an unchanged result Body in its original history slot. For a different
+  // result Body, retain the direct/released-producer validation paths.
   auto rebuild = [&](bool release_body) -> Result<PartDocument> {
     PartDocument candidate = *this;
     std::vector<FeatureT>& candidate_records = candidate.*member;
@@ -3846,8 +3874,16 @@ PartDocument::update_feature_record(std::vector<FeatureT> PartDocument::*member,
     auto removed = candidate.dependency_graph_.remove_node(node_id);
     if (removed.has_error()) return Result<PartDocument>::failure(removed.error());
     candidate.invalidation_state_.untrack_node(node_id);
-    if (release_body && !result_body.empty())
+    if ((release_body || same_result) && !result_body.empty())
       candidate.dependency_graph_.remove_dependencies_of_dependent(result_node);
+    // Re-add against this feature's original Body predecessor, not the current
+    // terminal modifier. Other input references are rebuilt by the typed adder.
+    if (same_result && !previous_body_producer.empty()) {
+      auto restored = add_dependency_if_missing(candidate.dependency_graph_, previous_body_producer,
+                                                result_node);
+      if (!restored)
+        return Result<PartDocument>::failure(restored.error());
+    }
 
     FeatureT copy = replacement;
     auto added = (candidate.*adder)(std::move(copy));
@@ -3857,12 +3893,22 @@ PartDocument::update_feature_record(std::vector<FeatureT> PartDocument::*member,
     candidate_records.insert(candidate_records.begin() + static_cast<std::ptrdiff_t>(index),
                              std::move(moved));
 
+    if (same_result) {
+      candidate.dependency_graph_.remove_dependencies_of_dependent(result_node);
+      for (const auto& producer : original_producers) {
+        auto restored =
+            add_dependency_if_missing(candidate.dependency_graph_, producer, result_node);
+        if (!restored)
+          return Result<PartDocument>::failure(restored.error());
+      }
+    }
+
     for (const auto& dependent : downstream) {
       if (!candidate.dependency_graph_.has_node(dependent)) continue;
       auto restored = add_dependency_if_missing(candidate.dependency_graph_, node_id, dependent);
       if (restored.has_error()) return Result<PartDocument>::failure(restored.error());
     }
-    if (release_body)
+    if (release_body && !same_result)
       for (const auto& producer : co_producers) {
         if (!candidate.dependency_graph_.has_node(producer)) continue;
         auto restored =
@@ -3881,7 +3927,8 @@ PartDocument::update_feature_record(std::vector<FeatureT> PartDocument::*member,
     *this = std::move(direct.value());
     return Result<std::size_t>::success(index);
   }
-  if (co_producers.empty()) return Result<std::size_t>::failure(direct.error());
+  if (same_result || co_producers.empty())
+    return Result<std::size_t>::failure(direct.error());
   auto released = rebuild(true);
   if (released.has_error()) return Result<std::size_t>::failure(direct.error());
   *this = std::move(released.value());

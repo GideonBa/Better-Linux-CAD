@@ -927,6 +927,24 @@ Contract: `docs/gui-interactive-extrude-revolve-mvp9.md`; evidence:
 and native limit collection remain in the same partial family. Twelve bounded families remain
 restored and six partial. Block 136 and the Block-135 numbered completion boundary are unchanged.
 
+### Block 136 — Expanded Revolve controls — 2026-10-24
+
+The existing Drehung task now authors Full, directed Angle and total-angle Symmetric extents, four
+Body operations and compatible typed axes. Explicit/derived DatumAxis, ConstructionLine, eligible
+circular-cut primary axes and generated linear edges use the same transformed Geometry frame as
+execution. Initial invalid axis/profile combinations stay correctable; only NewBody provisions a
+Body and angles remain literals. Focused shell regressions and a seventeenth combined actual-input
+workflow cover signed bounds, axis identities, mixed-feature allocation, directed/symmetric/full
+grooves, downstream edits, exact history, canonical reopening and STEP. Contracts and evidence:
+`docs/gui-interactive-extrude-revolve-mvp9.md`, `docs/gui-shell-acceptance-mvp9r.md`.
+Shared ordered target resolution preserves earlier cuts when a generated axis references an older
+producer. Core updates preserve the original predecessor and terminal producer when editing an
+in-place chain. Extrude/Revolve ID allocation also reserves existing mixed-family Body identities.
+Thin/open-profile and path Extrude and viewport limit-face collection remain in the same partial
+family. Before a future shell Delete action, separately audit terminal-modifier removal and
+restoration of the preceding Body producer. Twelve bounded families remain restored and six partial.
+Block 136 and the Block-135 numbered completion boundary are unchanged.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -934,9 +952,10 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Continue with thin/open-profile and path Extrude plus expanded Revolve controls and native limit
-collection. All seven bounded Extrude terminations now have explicit shell editors. Dedicated plain
-through-all Hole authoring is available within the retained circular-cut/Core target boundaries.
+Continue with thin/open-profile and path Extrude and native viewport limit-face collection.
+All seven bounded Extrude terminations and the expanded Revolve controls now have explicit shell
+editors. Dedicated plain through-all Hole authoring is available within the retained circular-cut/Core
+target boundaries.
 The bounded standalone Part parameter manager now creates and edits typed literals and Length/Count
 formulas through local batches, complete downstream Preview and one atomic Apply. The Sketch3D/PathCurve surface includes
 typed/shared-point line editing, native collection, constrained grips, anchored pointer/direction
@@ -949,8 +968,8 @@ The bounded repair-open path now supports failed-recompute Parts and missing fac
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with the remaining Extrude/Revolve controls,
-workspace navigation/context, advanced Assembly controls and integrated native Part/Assembly acceptance
+position/direction/frame/new-offset grips. Continue with the remaining Extrude and viewport reference
+controls, workspace navigation/context, advanced Assembly controls and integrated native Part/Assembly acceptance
 in the order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
 workflows are resolved and the closure gate plus full/native regressions pass.

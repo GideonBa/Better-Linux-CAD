@@ -25,6 +25,9 @@ Axis resolution supports:
 Owned workplane/reference transforms are consumed from `ShapeCache`, so transformed profiles and
 reference axes remain associative. No OCCT topology ID becomes persistent input identity.
 
+`GeometryRecomputeExecutor::resolve_feature_axis` exposes this same resolved/transformed frame to
+interactive clients. The replacement-shell axis catalog and wheel do not approximate a second frame.
+
 ## Angle execution
 
 The Block-61 modes map to deterministic OCCT sweeps:
@@ -44,6 +47,10 @@ Full, partial, and symmetric results must contain a valid positive-volume solid.
 NewBody publishes the revolved tool directly. Join, Cut, and Intersect reuse the shared deterministic
 Body Boolean adapter. Modifying operations recover the preceding target-Body producer from graph
 order, so incremental recompute never applies a feature repeatedly to its own old result.
+An axis source may also be an older producer of that Body. In-place Revolve uses the shared ordered
+modifier resolver so a generated edge axis cannot discard intervening cuts. The focused
+`[revolve-axis-history]` regression preserves a disjoint prior cut through full and isolated repeated
+recomputes; before the fix it incorrectly restored 1,200 mm³.
 
 Successful execution publishes both Feature- and Body-scoped cache entries. Single-solid Parts keep
 the compatibility final shape; multi-body Parts clear it. Direct feature execution, plan execution,
