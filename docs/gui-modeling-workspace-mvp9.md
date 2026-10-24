@@ -4,8 +4,8 @@ Status: the Block-122 application authority `GuiModelingWorkspace` is retained. 
 adapter was deleted with the Block-133 shell reset. Block 136 now restores camera navigation through
 `ShellNavigationTools` on `ShellWindow`, as detailed below. Visible selection filters are also
 restored. `ShellRepeatTools` now restores command-repeat presentation through the current command
-owners. `ShellProfileContextTools` now supplies the bounded profile mini-toolbar described below.
-Finishing, pattern, Body, Surface and Assembly context commands stay open; the old catalog adapter
+owners. `ShellContextTools` supplies the shared bounded profile and finishing mini-toolbar described below.
+Pattern, Body, Surface and Assembly context commands stay open; the old catalog adapter
 specifics are historical.
 
 Block 122 introduces the shared application-layer interaction boundary used by the Part, Surface, and
@@ -96,7 +96,7 @@ command-start task is active. It is a presentation product and is never persiste
 
 ### Replacement-shell profile context (Block 136)
 
-`ShellWindow` explicitly owns `ShellProfileContextTools` and the viewport child
+`ShellWindow` explicitly owns `ShellContextTools` and the viewport child
 `blcad.context.toolbar`. It offers Extrude, Revolve, Sweep and Loft in the existing deterministic
 priority order, subject to the normal owner's remaining-input requirements.
 `ShellFeatureTools::profile_context()` resolves current semantic selection or a Finish Sketch/browser
@@ -149,7 +149,42 @@ restoration, raw-region exclusion, three-section atomic Apply, Save and replacem
 combined workflow `[shell-combined-spatial-context]` authors all its Sketch/plane/path inputs through Qt, cancels an
 invalid Sweep, corrects a three-section Loft's order and G2 input, creates a second Sweep, changes its
 twist parameter, edits the earlier Loft, verifies four-step history, reopens and exports STEP.
-Finishing, pattern, Body, Surface and Assembly contexts remain open; the viewport family stays partial.
+Pattern, Body, Surface and Assembly contexts remain open; the viewport family stays partial.
+
+### Replacement-shell finishing contexts (Block 136, 2026-10-24)
+
+The same explicitly owned toolbar offers `context_fillet`/`context_chamfer` for a single verified
+Edge and `context_shell`/`context_draft` for a single verified Face. Idle subshape presentations are
+published only under the explicit **Kanten** or **Flächen** model filter in a fresh standalone Part.
+The All filter retains its existing Body/profile picks. Eligibility rejects multiple selections,
+wrong kinds, hidden or missing Bodies, stale derived results and ambiguous or lost semantic roles.
+`ShellFeatureTools::finishing_context()` resolves the exact selection through the current
+`FinishingSelectionBuilder`; the typed handoff carries Command, BodyId and the builder's semantic
+identity. It does not parse ids or infer topology indices.
+
+The wrapper invokes the original finishing QAction, selects the exact Body even when it is not the
+chooser's first row, then idempotently selects the verified target in that task's freshly built list.
+It consumes complete preselection only after task creation. The task owns its Edge/Face filter and a
+semantic scope restricted to that Body's currently offered targets. Apply and all cancellation routes
+restore the previous filter and scope. Context/task Cancel and Escape also restore the consumed
+session entries, candidate identity and actual viewport selection when their source remains valid.
+Apply uses the normal atomic transaction and repeat record. Ribbon/Repeat keep their ordinary fresh
+selection defaults. There is no new Core intent or persistence field.
+
+The scene cache includes the idle finishing mask as well as presentation revision, so model-filter,
+Sketch and task transitions add/remove these presentations without requiring a Core mutation.
+Unrelated tasks, repair, capture and Sketch focus retain the common toolbar guards. Successful
+replacement resets context; failed Open cancels the local task; cancelled replacement retains it.
+Save during a preview still serializes only committed intent.
+
+Five `[block136-finishing-context]` cases cover both Body identities, kind/multiple-selection guards,
+all four commands and cancellation paths, scope restoration, empty-target rejection, atomic history,
+hidden/removed sources, Save and replacement. The twenty-sixth combined Qt-input workflow
+`[shell-combined-finishing-context]` authors two Bodies, cancels Draft, shells one Body, fillets and
+chamfers the other, changes two upstream parameters in one batch, edits an earlier feature, checks
+five-step exact history, reopens canonically and exports STEP. It requires native OCCT subshape hits
+and explicitly skips offscreen. Pattern, Body, Surface and Assembly contexts remain open; the viewport
+family remains partial and Block 136 stays open.
 
 ## Command lifecycle, cancellation, and repeat
 

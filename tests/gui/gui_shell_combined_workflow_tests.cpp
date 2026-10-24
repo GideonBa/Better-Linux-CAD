@@ -3335,3 +3335,129 @@ TEST_CASE("Combined UI spatial contexts seed chosen profiles recover Loft order 
   CHECK(ui.snapshot() == states.back());
   ui.idle();
 }
+
+TEST_CASE(
+    "Combined native UI finishing contexts machine separate Bodies and propagate a parameter batch",
+    "[gui][integration][shell-combined-workflow][shell-combined-finishing-context]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Idle finishing subshape context workflow requires native Qt/OCCT picking");
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Context vessels and machining");
+  ui.rectangle("datum.xy", {-60, 40}, {-30, 60});
+  const auto machined = ui.extrude(10);
+  ui.rectangle("datum.xy", {0, 0}, {30, 20});
+  const auto vessel = ui.extrude(10);
+  const auto source = ui.window.session().part_document()->features().back().id();
+  const auto depth = ui.window.session().part_document()->find_feature(source)->length_parameter();
+  std::vector<std::string> states{ui.snapshot()};
+  const auto context = [&](const QString& id) {
+    ui.click(ui.widget<QToolButton>("blcad.context." + id));
+  };
+  const auto pick = [&](const BodyId& body, const std::string& role, bool edge,
+                        const QString& view) {
+    ui.command(view, 2);
+    auto& filter = ui.widget<QComboBox>("blcad.selection.filter");
+    ui.data(filter, selection_kind_bit(edge ? GuiSelectionKind::Edge : GuiSelectionKind::Face));
+    ui.tree("datum.xy");
+    REQUIRE_FALSE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
+    const auto targets = checked(geometry::FinishingSelectionBuilder::build(
+        *ui.window.session().part_document(), *ui.window.session().part_shape_cache(), body,
+        edge ? PartFeatureInputRole::FilletEdge : PartFeatureInputRole::ShellRemovalFace));
+    const auto target = std::find_if(targets.begin(), targets.end(), [&](const auto& item) {
+      return item.label.ends_with(" / " + role);
+    });
+    REQUIRE(target != targets.end());
+    const auto point = checked(ui.window.viewport().model_to_screen(target->anchor));
+    ui.click_at(ui.window.viewport(), {point.x, point.y});
+    REQUIRE(ui.window.viewport().selected_semantic());
+    CHECK(ui.window.viewport().selected_semantic()->semantic_id == target->semantic_id);
+    auto& toolbar = ui.widget<QWidget>("blcad.context.toolbar");
+    REQUIRE(toolbar.isVisible());
+    CHECK(ui.window.viewport().rect().contains(toolbar.geometry()));
+  };
+  pick(vessel, "right", false, "view_right");
+  context("draft");
+  CHECK(ui.widget<QComboBox>("blcad.finishing.body").currentData().toString() ==
+        QString::fromStdString(vessel.value()));
+  CHECK(ui.widget<QListWidget>("blcad.finishing.targets").selectedItems().size() == 1);
+  ui.scalar("4 deg");
+  CHECK(ui.snapshot() == states.back());
+  context("cancel");
+  CHECK(ui.window.viewport().selected_semantic());
+  pick(vessel, "top", false, "view_top");
+  context("shell");
+  auto& faces = ui.widget<QListWidget>("blcad.finishing.targets");
+  REQUIRE(faces.selectedItems().size() == 1);
+  const int removal = faces.row(faces.selectedItems().front());
+  ui.list(faces, removal);
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.list(faces, removal);
+  ui.scalar("1 mm");
+  ui.capture("finishing-context-shell-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(vessel).volume_mm3 == Approx(1464).margin(1e-4));
+  CHECK(ui.summary(machined).volume_mm3 == Approx(6000).margin(1e-4));
+  const auto thickness =
+      ui.window.session().part_document()->shell_features().back().thickness_parameter();
+  states.push_back(ui.snapshot());
+  pick(machined, "top_front", true, "view_front");
+  context("fillet");
+  ui.scalar("1.5 mm");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(machined).volume_mm3 < 6000);
+  CHECK(ui.summary(machined).volume_mm3 > 5800);
+  CHECK(ui.summary(vessel).volume_mm3 == Approx(1464).margin(1e-4));
+  states.push_back(ui.snapshot());
+  pick(machined, "bottom_back", true, "view_isometric");
+  context("chamfer");
+  auto& mode = ui.widget<QComboBox>("blcad.finishing.mode");
+  CHECK(mode.height() >= mode.minimumSizeHint().height());
+  ui.choose(mode, 1);
+  auto& secondary = ui.widget<QLineEdit>("blcad.finishing.secondary");
+  CHECK(secondary.height() >= secondary.minimumSizeHint().height());
+  ui.text(ui.widget<QLineEdit>("blcad.finishing.secondary"), "0.8 mm");
+  ui.scalar("1 mm");
+  CHECK(ui.snapshot() == states.back());
+  ui.key(ui.window, Qt::Key_Escape);
+  REQUIRE(ui.window.viewport().selected_semantic());
+  context("chamfer");
+  CHECK(ui.widget<QComboBox>("blcad.finishing.mode").currentIndex() == 0);
+  ui.choose(ui.widget<QComboBox>("blcad.finishing.mode"), 2);
+  ui.text(ui.widget<QLineEdit>("blcad.finishing.secondary"), "30 deg");
+  ui.scalar("1 mm");
+  ui.capture("finishing-context-chamfer-preview");
+  ui.button("blcad.feature.apply");
+  const auto machined_volume = ui.summary(machined).volume_mm3;
+  states.push_back(ui.snapshot());
+  ui.command("parameters");
+  for (const auto& [parameter, value] : {std::pair{thickness, "1.2"}, std::pair{depth, "12"}}) {
+    ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"),
+            QString::fromStdString(parameter.value()));
+    ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), value);
+    ui.button("blcad.parameters.stage");
+  }
+  ui.button("blcad.parameters.preview");
+  ui.button("blcad.parameters.apply");
+  CHECK(ui.summary(vessel).volume_mm3 == Approx(1953.792).margin(1e-3));
+  CHECK(ui.summary(machined).volume_mm3 == Approx(machined_volume).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.tree(source.value(), true);
+  ui.text(ui.widget<QLineEdit>("blcad.feature_edit.field/name"), "Context vessel base");
+  ui.button("blcad.feature_edit.apply");
+  states.push_back(ui.snapshot());
+  CHECK(ui.window.viewport().selection_filter_mask() == selection_kind_bit(GuiSelectionKind::Edge));
+  ui.data(ui.widget<QComboBox>("blcad.selection.filter"), 0xFFFFFFFFU);
+  ui.history(states);
+  pick(vessel, "right", false, "view_right");
+  ui.capture("finishing-context-after-history");
+  ui.roundtrip(directory.filePath("finishing-context.blcad"));
+  CHECK_FALSE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
+  const auto step = directory.filePath("finishing-context.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}

@@ -6,6 +6,7 @@
 #include "blcad/gui/gui_sketch_intent_remap.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_construction_tools.hpp"
+#include "blcad/gui/shell/shell_context_tools.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_hole_tools.hpp"
@@ -14,7 +15,6 @@
 #include "blcad/gui/shell/shell_navigation_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_parameter_tools.hpp"
-#include "blcad/gui/shell/shell_profile_context_tools.hpp"
 #include "blcad/gui/shell/shell_reference_repair_tools.hpp"
 #include "blcad/gui/shell/shell_repeat_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
@@ -290,7 +290,7 @@ ShellWindow::ShellWindow() {
   sketch_3d_tools_ = std::make_unique<ShellSketch3DTools>(*this, *ribbon_, tab_model_);
   parameter_tools_ = std::make_unique<ShellParameterTools>(*this, *ribbon_, tab_model_);
   hole_tools_ = std::make_unique<ShellHoleTools>(*this, *ribbon_, tab_model_);
-  profile_context_tools_ = std::make_unique<ShellProfileContextTools>(*this);
+  context_tools_ = std::make_unique<ShellContextTools>(*this);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
 }
@@ -302,7 +302,7 @@ ShellWindow::~ShellWindow() {
   viewport_->set_view_changed_callback({});
   navigation_tools_.reset();
   repeat_tools_.reset();
-  profile_context_tools_.reset();
+  context_tools_.reset();
   sketch_3d_tools_.reset();
   parameter_tools_.reset();
   hole_tools_.reset();
@@ -533,7 +533,7 @@ void ShellWindow::wire_viewport() {
       construction_tools_->refresh_presentation();
     if (sketch_3d_tools_)
       sketch_3d_tools_->refresh_presentation();
-    refresh_profile_context();
+    refresh_context_toolbar();
   });
   viewport_->set_selection_callback(
       [this](std::optional<GuiSelection> selection) { apply_viewport_selection(selection); });
@@ -609,7 +609,7 @@ bool ShellWindow::new_part(const QString& name) {
   }
   navigation_tools_->reset();
   repeat_tools_->reset();
-  profile_context_tools_->reset();
+  context_tools_->reset();
   reset_selection_filter();
   const auto seeded = seed_origin_geometry(session_);
   if (seeded.has_error())
@@ -632,7 +632,7 @@ bool ShellWindow::new_project(const QString& name) {
   }
   navigation_tools_->reset();
   repeat_tools_->reset();
-  profile_context_tools_->reset();
+  context_tools_->reset();
   reset_selection_filter();
   refresh();
   ribbon_->set_current_tab(tab_assembly_);
@@ -651,7 +651,7 @@ bool ShellWindow::open_path(const QString& path, GuiDocumentOpenMode mode) {
   }
   navigation_tools_->reset();
   repeat_tools_->reset();
-  profile_context_tools_->reset();
+  context_tools_->reset();
   reset_selection_filter();
   refresh();
   viewport_->fit_all();
@@ -1327,17 +1327,17 @@ void ShellWindow::refresh() {
   }
   if (repeat_tools_)
     repeat_tools_->refresh();
-  refresh_profile_context();
+  refresh_context_toolbar();
 }
 
-void ShellWindow::refresh_profile_context() {
-  if (profile_context_tools_)
-    profile_context_tools_->refresh();
+void ShellWindow::refresh_context_toolbar() {
+  if (context_tools_)
+    context_tools_->refresh();
 }
 
-void ShellWindow::finish_profile_context(bool applied) {
-  if (profile_context_tools_)
-    profile_context_tools_->finish(applied);
+void ShellWindow::finish_context_task(bool applied) {
+  if (context_tools_)
+    context_tools_->finish(applied);
 }
 
 void ShellWindow::remember_repeatable_command(QAction& command) {
@@ -1389,9 +1389,12 @@ void ShellWindow::refresh_feature_selection_scene() {
 }
 
 void ShellWindow::refresh_viewport_scene() {
-  if (viewport_revision_ == session_.presentation_revision())
+  const auto finishing_mask = feature_tools_ ? feature_tools_->idle_finishing_selection_mask() : 0U;
+  if (viewport_revision_ == session_.presentation_revision() &&
+      viewport_finishing_mask_ == finishing_mask)
     return;
   viewport_revision_ = session_.presentation_revision();
+  viewport_finishing_mask_ = finishing_mask;
   if (!session_.has_document()) {
     viewport_->clear_scene();
     return;

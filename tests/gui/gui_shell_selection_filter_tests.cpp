@@ -137,17 +137,26 @@ TEST_CASE("Shell selection filters reject each incompatible semantic kind and re
   // These fixture roles are transient and do not invent Core references.
   for (int i = 0; i < 8; ++i)
     scene.push_back({kinds[i], "filter-fixture/" + std::to_string(i), *shape});
-  REQUIRE(window.viewport().set_scene(std::move(scene)));
   for (int selected_filter = 0; selected_filter < 8; ++selected_filter) {
     INFO("Filter " << selected_filter);
     for (int kind = 0; kind < 8; ++kind) {
       INFO("Kind " << kind);
       choose(window, 0);
+      REQUIRE(window.viewport().set_scene(scene));
       const auto id = "filter-fixture/" + std::to_string(kind);
       REQUIRE(window.viewport().select_semantic(id));
       choose(window, selected_filter);
       mask(window, expected[selected_filter]);
       const bool allowed = (expected[selected_filter] & selection_kind_bit(selections[kind])) != 0;
+      if (selected_filter == 3 || selected_filter == 4) {
+        // Edge/Face filters rebuild authoritative idle finishing presentations.
+        // Synthetic roles are absent there and must be evicted. Re-publish the
+        // fixture under the new mask to check the full kind/filter bridge too.
+        CHECK_FALSE(window.viewport().selected_semantic());
+        CHECK(window.session().selection().empty());
+        REQUIRE(window.viewport().set_scene(scene));
+        CHECK(window.viewport().select_semantic(id) == allowed);
+      }
       CHECK(window.viewport().selected_semantic().has_value() == allowed);
       CHECK(window.session().selection().size() == (allowed ? 1 : 0));
       CHECK(window.viewport().select_semantic(id) == allowed);

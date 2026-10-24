@@ -963,11 +963,11 @@ Result<std::size_t> ShellFeatureTools::apply() {
   const bool task_applied = session_.task().apply();
   if (!task_applied && session_.task().active())
     (void)session_.task().cancel();
-  window_.finish_profile_context(true);
+  window_.finish_context_task(true);
   const bool was_finishing = finishing();
   const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
-  const bool restore_scope = spatial() || surface();
+  const bool restore_scope = finishing() || spatial() || surface();
   command_ = Command::None;
   if (restore_scope)
     viewport_.set_selection_semantic_scope(previous_semantic_scope_);
@@ -1011,7 +1011,7 @@ void ShellFeatureTools::cancel() noexcept {
   const bool was_finishing = finishing();
   const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
-  const bool restore_scope = spatial() || surface();
+  const bool restore_scope = finishing() || spatial() || surface();
   command_ = Command::None;
   if (restore_scope)
     viewport_.set_selection_semantic_scope(previous_semantic_scope_);
@@ -1031,7 +1031,7 @@ void ShellFeatureTools::cancel() noexcept {
     restore_extrude_selection();
   hide_task_panel();
   synchronize_overlay();
-  window_.finish_profile_context(false);
+  window_.finish_context_task(false);
   window_.refresh();
   if (was_active)
     window_.statusBar()->showMessage(QStringLiteral("Feature-Befehl abgebrochen"));
@@ -1101,7 +1101,7 @@ void ShellFeatureTools::refresh_enablement() {
                           session_.task().command_id() == expected_command;
   apply_button_->setEnabled(active() && preview_valid_ && task_ready);
   cancel_button_->setEnabled(active());
-  window_.refresh_profile_context();
+  window_.refresh_context_toolbar();
 }
 
 double ShellFeatureTools::current_value() const noexcept {
