@@ -3036,3 +3036,80 @@ TEST_CASE("Combined UI filters constrain model selection while finishing and hol
   CHECK(ui.snapshot() == states.back());
   ui.idle();
 }
+
+TEST_CASE("Combined UI repeats fresh hole tasks then updates finishing and source parameters "
+          "through history",
+          "[gui][integration][shell-combined-workflow][shell-combined-repeat]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Repeated machining");
+  ui.rectangle("datum.xy", {-40, -30}, {40, 30});
+  const auto body = ui.extrude(12);
+  const auto depth = ui.window.session().part_document()->features().back().length_parameter();
+  std::vector<std::string> states{ui.snapshot()};
+  ui.command("hole");
+  ui.text(ui.widget<QLineEdit>("blcad.hole.center_x"), "-15");
+  ui.text(ui.widget<QLineEdit>("blcad.hole.diameter"), "8");
+  ui.button("blcad.hole.preview");
+  ui.button("blcad.hole.apply");
+  states.push_back(ui.snapshot());
+  CHECK(ui.action("repeat_last_command").text() == "Erneut: Bohrungen");
+  ui.command("repeat_last_command");
+  REQUIRE(ui.window.hole_tools().active());
+  CHECK(ui.widget<QLineEdit>("blcad.hole.center_x").text() == "0");
+  CHECK(ui.widget<QLineEdit>("blcad.hole.diameter").text() == "6");
+  CHECK_FALSE(ui.action("repeat_last_command").isEnabled());
+  ui.text(ui.widget<QLineEdit>("blcad.hole.center_x"), "1000");
+  ui.button("blcad.hole.preview");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.hole.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.text(ui.widget<QLineEdit>("blcad.hole.center_x"), "15");
+  ui.button("blcad.hole.preview");
+  ui.reveal(ui.widget<QToolButton>("blcad.repeat.button"));
+  ui.capture("repeat-hole-preview");
+  ui.button("blcad.hole.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(57600 - std::numbers::pi * 25 * 12).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.command("fillet");
+  auto& edges = ui.widget<QListWidget>("blcad.finishing.targets");
+  REQUIRE(edges.count() > 0);
+  ui.list(edges, 0);
+  ui.scalar("1 mm");
+  ui.button("blcad.feature.apply");
+  states.push_back(ui.snapshot());
+  CHECK(ui.action("repeat_last_command").text() == "Erneut: Verrunden");
+  // Exercise the actual window shortcut, including focus outside the ribbon.
+  ui.window.activateWindow();
+  ui.window.setFocus();
+  ui.flush();
+  ui.key(ui.window, Qt::Key_R, {}, Qt::ControlModifier);
+  REQUIRE(ui.window.feature_tools().command() == ShellFeatureTools::Command::Fillet);
+  CHECK(ui.snapshot() == states.back());
+  ui.key(ui.window, Qt::Key_Escape);
+  CHECK_FALSE(ui.window.session().task().active());
+  ui.command("parameters");
+  CHECK_FALSE(ui.action("repeat_last_command").isEnabled());
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"),
+          QString::fromStdString(depth.value()));
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "16");
+  ui.button("blcad.parameters.stage");
+  ui.button("blcad.parameters.preview");
+  ui.button("blcad.parameters.apply");
+  states.push_back(ui.snapshot());
+  CHECK(ui.action("repeat_last_command").text() == "Erneut: Verrunden");
+  ui.history(states);
+  REQUIRE(ui.action("repeat_last_command").isEnabled());
+  auto& repeat_button = ui.widget<QToolButton>("blcad.repeat.button");
+  ui.reveal(repeat_button);
+  CHECK(repeat_button.width() >= repeat_button.sizeHint().width());
+  ui.capture("repeat-after-history");
+  ui.roundtrip(directory.filePath("repeated-machining.blcad"));
+  CHECK_FALSE(ui.action("repeat_last_command").isEnabled());
+  CHECK(ui.action("repeat_last_command").text() == "Befehl wiederholen");
+  const auto step = directory.filePath("repeated-machining.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}

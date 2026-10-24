@@ -39,8 +39,8 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
-1. Restore contextual commands and repeat command. Selection filters, ViewCube, Home and named
-   camera bookmarks now have replacement-shell controls.
+1. Restore contextual commands. Repeat, selection filters, ViewCube, Home and named camera bookmarks
+   now have replacement-shell controls.
 2. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
    sampled Revolute analysis and occurrence-linked result highlighting.
 3. Finish integrated Part and Assembly acceptance using actual ShellWindow input paths, disposable
@@ -75,7 +75,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-selection-filters],[shell-combined-selection-filters],[block136-navigation],[shell-combined-navigation],[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-repeat],[shell-combined-repeat],[block136-selection-filters],[shell-combined-selection-filters],[block136-navigation],[shell-combined-navigation],[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -1268,3 +1268,51 @@ Changed C++ sections and the new test file pass clang-format checks; working/sta
 Builds, GUI runs and the separate native startup were serial. The app stayed running until the
 intentional six-second timeout (124). Native focused/full/startup logs contain only the known medium
 OCCT depth/stencil visual warning, with no high-severity, BadDrawable or fatal lifecycle diagnostics.
+
+## Repeat the last accepted modeling command — 2026-10-24
+
+The explicitly owned `ShellRepeatTools` exposes `blcad.action.repeat_last_command` and Ctrl+R.
+Feature, Hole and Assembly task owners report their concrete action only after successful Apply.
+Repeat invokes that original entry point with current compatible selection and normal fresh-task
+defaults. It records no old dimensions, operation/path choices, references, definitions or drafts.
+Failed/cancelled tasks do not replace the record. Task/Sketch/repair/capture guards run both for
+presentation and triggering; owner action changes also synchronize a late Finish Sketch handoff.
+Redo is separately labelled Wiederherstellen and retains its history behavior. Save/history and
+failed/cancelled replacement retain the transient record; successful document replacement resets it.
+The exact supported owners and excluded editor/file operations are recorded in
+`docs/gui-modeling-workspace-mvp9.md`.
+
+Six focused cases cover accepted-only recording, failed/cancelled commands, a different current
+Extrude profile, fresh Hole defaults, guarded starts, canonical bytes/history, every replacement
+boundary and repeated Assembly insertion with a fresh definition task. The twenty-third combined
+workflow `[shell-combined-repeat]` authors a plate, creates holes of different diameters at different
+locations, rejects invalid repeated placement, applies Fillet, repeats it through Ctrl+R and cancels
+with Escape. An upstream depth edit, four-step exact history, canonical reopening and STEP complete
+the workflow. Twenty-two combined workflows have fully UI-authored inputs; Planar motion retains
+its imported Part boundary. Contextual commands remain open in the viewport family; thirteen families
+remain restored and five partial. Block 136 stays open and numbered completion remains through 135.
+
+Native inspection found that the initial empty action label left the dynamic Repeat button with a
+56-pixel minimum width. The owned `blcad.repeat.button` now tracks its actual label's size hint;
+focused and combined tests require sufficient width and expose the complete control before captures.
+The final two 1280×800 captures in `/tmp/blcad-repeat-native` were inspected: the command name is
+fully readable, disabled during the repeated Hole task and enabled after history. Apply/Cancel remain
+reachable. The final application, GUI, Core and Geometry targets build successfully. Focused
+offscreen checks, including the inventory audit: **10 cases, 844 assertions**, all passed. Focused
+native checks: **7 cases, 644 assertions**, all passed without skips.
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 529 | 15,922 | All passed |
+| Full Geometry | 440 | 30,136 | All passed |
+| Full offscreen GUI | 478 | 46,981 | 462 passed; 16 native-only skips |
+| Full combined native shell | 294 | 42,301 | All passed; no skips |
+
+The ordinary inventory audit passes. The opt-in closure gate intentionally returns 1: three cases,
+two passed and one expected failure, 217 assertions. Contextual commands, the other partial families
+and pending integrated workflows remain recorded; this repeat slice does not close Block 136.
+
+New files and changed C++ sections pass clang-format checks. Working/staged diff checks pass. Builds,
+GUI runs and the separate native startup were serial. The app remained running until the intentional
+six-second timeout (124). Native focused/full/startup logs contain only the known medium OCCT
+depth/stencil visual warning, with no high-severity, BadDrawable or fatal lifecycle diagnostics.

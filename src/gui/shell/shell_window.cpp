@@ -15,6 +15,7 @@
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_parameter_tools.hpp"
 #include "blcad/gui/shell/shell_reference_repair_tools.hpp"
+#include "blcad/gui/shell/shell_repeat_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_3d_tools.hpp"
 #include "blcad/gui/shell/shell_sketch_diagnostics_tools.hpp"
@@ -298,6 +299,7 @@ ShellWindow::~ShellWindow() {
   // before deleting the central viewport and its OCCT GL resources.
   viewport_->set_view_changed_callback({});
   navigation_tools_.reset();
+  repeat_tools_.reset();
   sketch_3d_tools_.reset();
   parameter_tools_.reset();
   hole_tools_.reset();
@@ -393,7 +395,7 @@ void ShellWindow::build_ribbon() {
   action_undo_->setShortcut(QKeySequence::Undo);
   action_undo_->setShortcutContext(Qt::WindowShortcut);
   connect(action_undo_, &QAction::triggered, this, [this] { (void)undo(); });
-  action_redo_ = new QAction(QStringLiteral("Wiederholen"), this);
+  action_redo_ = new QAction(QStringLiteral("Wiederherstellen"), this);
   action_redo_->setObjectName("blcad.action.redo");
   action_redo_->setShortcut(QKeySequence::Redo);
   action_redo_->setShortcutContext(Qt::WindowShortcut);
@@ -403,6 +405,7 @@ void ShellWindow::build_ribbon() {
   // Shortcuts must fire regardless of which ribbon tab is visible.
   addAction(action_undo_);
   addAction(action_redo_);
+  repeat_tools_ = std::make_unique<ShellRepeatTools>(*this, *ribbon_, edit_group);
 
   // 3D-Modell → Skizze
   auto* sketch_group = ribbon_->add_group(tab_model_, QStringLiteral("Skizze"));
@@ -513,6 +516,8 @@ void ShellWindow::wire_viewport() {
   viewport_->set_view_changed_callback([this] {
     synchronize_navigation();
     synchronize_selection_filter();
+    if (repeat_tools_)
+      repeat_tools_->refresh();
     if (feature_tools_)
       feature_tools_->refresh_presentation();
     if (measure_tools_)
@@ -599,6 +604,7 @@ bool ShellWindow::new_part(const QString& name) {
     return false;
   }
   navigation_tools_->reset();
+  repeat_tools_->reset();
   reset_selection_filter();
   const auto seeded = seed_origin_geometry(session_);
   if (seeded.has_error())
@@ -620,6 +626,7 @@ bool ShellWindow::new_project(const QString& name) {
     return false;
   }
   navigation_tools_->reset();
+  repeat_tools_->reset();
   reset_selection_filter();
   refresh();
   ribbon_->set_current_tab(tab_assembly_);
@@ -637,6 +644,7 @@ bool ShellWindow::open_path(const QString& path, GuiDocumentOpenMode mode) {
     return false;
   }
   navigation_tools_->reset();
+  repeat_tools_->reset();
   reset_selection_filter();
   refresh();
   viewport_->fit_all();
@@ -1310,6 +1318,12 @@ void ShellWindow::refresh() {
     feature_tools_->refresh_enablement();
     feature_tools_->refresh_presentation();
   }
+  if (repeat_tools_)
+    repeat_tools_->refresh();
+}
+
+void ShellWindow::remember_repeatable_command(QAction& command) {
+  repeat_tools_->remember(command);
 }
 
 void ShellWindow::report_error(const Error& error) {
