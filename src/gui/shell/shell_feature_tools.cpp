@@ -966,7 +966,7 @@ void ShellFeatureTools::cancel() noexcept {
   if (coordinator_.active())
     coordinator_.cancel();
   if (viewport_.mouseGrabber() == &viewport_)
-    viewport_.releaseMouse();
+    viewport_.release_interaction_mouse();
   viewport_.clear_feature_preview();
   layer_.cancel();
   drag_start_value_.reset();
@@ -1216,7 +1216,7 @@ void ShellFeatureTools::handle_escape() {
   if (!layer_.active_handle_id().empty()) {
     layer_.cancel();
     if (viewport_.mouseGrabber() == &viewport_)
-      viewport_.releaseMouse();
+      viewport_.release_interaction_mouse();
     restore_drag_start_value();
     synchronize_overlay();
     return;
@@ -1289,7 +1289,7 @@ bool ShellFeatureTools::eventFilter(QObject* watched, QEvent* event) {
         if (layer_.begin_drag({mouse->position().x(), mouse->position().y()})) {
           drag_start_handle_ = std::string(layer_.active_handle_id());
           drag_start_value_ = value_for_handle(drag_start_handle_);
-          viewport_.grabMouse();
+          viewport_.grab_interaction_mouse();
           synchronize_overlay();
           return true;
         }
@@ -1308,7 +1308,7 @@ bool ShellFeatureTools::eventFilter(QObject* watched, QEvent* event) {
       }
       layer_.cancel();
       if (viewport_.mouseGrabber() == &viewport_)
-        viewport_.releaseMouse();
+        viewport_.release_interaction_mouse();
       restore_drag_start_value();
       synchronize_overlay();
       return true;
@@ -1317,7 +1317,7 @@ bool ShellFeatureTools::eventFilter(QObject* watched, QEvent* event) {
       const auto* mouse = static_cast<QMouseEvent*>(event);
       if (mouse->button() == Qt::LeftButton && !layer_.active_handle_id().empty()) {
         auto candidate = layer_.end_drag({mouse->position().x(), mouse->position().y()});
-        viewport_.releaseMouse();
+        viewport_.release_interaction_mouse();
         if (candidate.has_value()) {
           drag_start_value_.reset();
           auto accepted = accept_manipulator_candidate(*candidate);
@@ -1346,7 +1346,7 @@ bool ShellFeatureTools::eventFilter(QObject* watched, QEvent* event) {
   } else if (event->type() == QEvent::WindowDeactivate && !layer_.active_handle_id().empty()) {
     layer_.cancel();
     if (viewport_.mouseGrabber() == &viewport_)
-      viewport_.releaseMouse();
+      viewport_.release_interaction_mouse();
     restore_drag_start_value();
     synchronize_overlay();
   }

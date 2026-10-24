@@ -11,6 +11,7 @@
 #include "blcad/gui/shell/shell_hole_tools.hpp"
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
+#include "blcad/gui/shell/shell_navigation_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_parameter_tools.hpp"
 #include "blcad/gui/shell/shell_reference_repair_tools.hpp"
@@ -29,6 +30,7 @@
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QSignalBlocker>
 #include <QStatusBar>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -273,6 +275,7 @@ ShellWindow::~ShellWindow() {
   // still exist. QMainWindow/QWidget teardown otherwise destroys that drawable
   // before deleting the central viewport and its OCCT GL resources.
   viewport_->set_view_changed_callback({});
+  navigation_tools_.reset();
   sketch_3d_tools_.reset();
   parameter_tools_.reset();
   hole_tools_.reset();
@@ -398,33 +401,7 @@ void ShellWindow::build_ribbon() {
   ribbon_->add_button(finish_group, action_finish_sketch_);
   ribbon_->set_tab_enabled(tab_sketch_, false);
 
-  // Ansicht → Navigation
-  auto* navigate_group = ribbon_->add_group(tab_view_, QStringLiteral("Navigation"));
-  action_fit_ = new QAction(QStringLiteral("Einpassen"), this);
-  action_fit_->setObjectName("blcad.action.fit");
-  connect(action_fit_, &QAction::triggered, this, [this] {
-    viewport_->fit_all();
-    if (feature_tools_)
-      feature_tools_->refresh_presentation();
-  });
-  ribbon_->add_button(navigate_group, action_fit_);
-  const struct {
-    const char* label;
-    GuiStandardView view;
-  } standard_views[] = {{"Isometrisch", GuiStandardView::Isometric},
-                        {"Vorne", GuiStandardView::Front},
-                        {"Oben", GuiStandardView::Top},
-                        {"Rechts", GuiStandardView::Right}};
-  for (const auto& definition : standard_views) {
-    auto* action = new QAction(QString::fromUtf8(definition.label), this);
-    const GuiStandardView view = definition.view;
-    connect(action, &QAction::triggered, this, [this, view] {
-      viewport_->set_standard_view(view);
-      if (feature_tools_)
-        feature_tools_->refresh_presentation();
-    });
-    ribbon_->add_button(navigate_group, action);
-  }
+  navigation_tools_ = std::make_unique<ShellNavigationTools>(*this, *ribbon_, tab_view_);
 
   // Ansicht → Darstellung
   auto* display_group = ribbon_->add_group(tab_view_, QStringLiteral("Darstellung"));
@@ -512,6 +489,7 @@ void ShellWindow::build_docks() {
 
 void ShellWindow::wire_viewport() {
   viewport_->set_view_changed_callback([this] {
+    synchronize_navigation();
     if (feature_tools_)
       feature_tools_->refresh_presentation();
     if (measure_tools_)
@@ -529,6 +507,18 @@ void ShellWindow::wire_viewport() {
       [this](std::optional<GuiSelection> selection) { apply_viewport_selection(selection); });
 }
 
+void ShellWindow::synchronize_navigation() {
+  if (navigation_tools_)
+    navigation_tools_->refresh();
+  if (action_perspective_) {
+    const QSignalBlocker blocker(action_perspective_);
+    action_perspective_->setChecked(viewport_->projection() == GuiViewportProjection::Perspective);
+    action_perspective_->setEnabled(session_.has_document() && !active_sketch_ &&
+                                    !viewport_->sketch_focus_active() &&
+                                    QWidget::mouseGrabber() != viewport_);
+  }
+}
+
 bool ShellWindow::new_part(const QString& name) {
   if (!confirm_document_replacement())
     return false;
@@ -540,6 +530,7 @@ bool ShellWindow::new_part(const QString& name) {
     refresh();
     return false;
   }
+  navigation_tools_->reset();
   const auto seeded = seed_origin_geometry(session_);
   if (seeded.has_error())
     show_error(seeded.error());
@@ -559,6 +550,7 @@ bool ShellWindow::new_project(const QString& name) {
     refresh();
     return false;
   }
+  navigation_tools_->reset();
   refresh();
   ribbon_->set_current_tab(tab_assembly_);
   return true;
@@ -574,6 +566,7 @@ bool ShellWindow::open_path(const QString& path, GuiDocumentOpenMode mode) {
     refresh();
     return false;
   }
+  navigation_tools_->reset();
   refresh();
   viewport_->fit_all();
   if (session_.project())
@@ -1217,6 +1210,7 @@ void ShellWindow::refresh() {
 
   refresh_browser();
   refresh_properties();
+  synchronize_navigation();
   if (hole_tools_)
     hole_tools_->refresh();
   if (parameter_tools_)

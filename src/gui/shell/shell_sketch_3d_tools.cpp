@@ -406,7 +406,7 @@ struct ShellSketch3DTools::Impl {
     changed = start.changed;
     pending_point = false;
     if (window.viewport().mouseGrabber() == &window.viewport())
-      window.viewport().releaseMouse();
+      window.viewport().release_interaction_mouse();
     numeric->clear();
     numeric->setReadOnly(true);
     if (current())
@@ -464,7 +464,7 @@ struct ShellSketch3DTools::Impl {
     placement_pressed = false;
     placement_hover.reset();
     if (captured && window.viewport().mouseGrabber() == &window.viewport())
-      window.viewport().releaseMouse();
+      window.viewport().release_interaction_mouse();
     if (!drag)
       apply->setEnabled(current() && previewed);
     if (placement_overlay)
@@ -840,7 +840,7 @@ struct ShellSketch3DTools::Impl {
         update_placement({mouse.position().x(), mouse.position().y()});
         if (placement_hover) {
           placement_pressed = true;
-          viewport.grabMouse();
+          viewport.grab_interaction_mouse();
           apply->setEnabled(false);
         }
         return true;
@@ -876,7 +876,7 @@ struct ShellSketch3DTools::Impl {
         return false;
       }
       drag = Drag{*draft, selected->id(), resolved_point(*selected), changed, previewed};
-      viewport.grabMouse();
+      viewport.grab_interaction_mouse();
       numeric_invalid = false;
       numeric->setReadOnly(false);
       numeric->setText(text(layer.numeric_text()));
@@ -913,7 +913,7 @@ struct ShellSketch3DTools::Impl {
         }
         accept_drag(*candidate);
         drag.reset();
-        viewport.releaseMouse();
+        viewport.release_interaction_mouse();
         numeric->setReadOnly(true);
         apply->setEnabled(previewed);
         refresh_handles();

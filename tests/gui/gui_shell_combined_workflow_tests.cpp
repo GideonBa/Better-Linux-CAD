@@ -121,8 +121,15 @@ public:
   void reveal(QWidget& control) {
     flush();
     for (auto* ancestor = control.parentWidget(); ancestor; ancestor = ancestor->parentWidget())
-      if (auto* scroll = qobject_cast<QScrollArea*>(ancestor))
-        scroll->ensureWidgetVisible(&control, 8, 8);
+      if (auto* scroll = qobject_cast<QScrollArea*>(ancestor)) {
+        // An editable combo can remain partly clipped after a task narrows
+        // the ribbon, even after ensureWidgetVisible.
+        // Scroll the actual control bounds before enforcing the hit check.
+        const auto center = control.mapTo(scroll->widget(), control.rect().center());
+        scroll->ensureVisible(center.x(), center.y(),
+                              std::min(control.width() / 2 + 8, scroll->viewport()->width() / 2),
+                              std::min(control.height() / 2 + 8, scroll->viewport()->height() / 2));
+      }
     flush();
     INFO(control.objectName().toStdString());
     REQUIRE(control.isVisible());
@@ -174,7 +181,10 @@ public:
   void text(QLineEdit& control, const QString& value) {
     click(control);
     key(control, Qt::Key_A, {}, Qt::ControlModifier);
-    key(control, 0, value);
+    if (value.isEmpty())
+      key(control, Qt::Key_Backspace);
+    else
+      key(control, 0, value);
     key(control, Qt::Key_Return);
   }
   void scalar(const QString& value) {
@@ -1087,6 +1097,128 @@ TEST_CASE(
   CHECK(ui.summary(base).volume_mm3 == Approx(44640).margin(1e-5));
   CHECK(ui.summary(wall).volume_mm3 == Approx(2400).margin(1e-5));
   const auto step = directory.filePath("thin-machining.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}
+
+TEST_CASE("Combined UI view navigation preserves Sketch and machining state through history and "
+          "reopening",
+          "[gui][integration][shell-combined-workflow][shell-combined-navigation]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Navigation machining");
+  ui.rectangle("datum.xy", {-30, -20}, {30, 20});
+  const auto body = ui.extrude(20);
+  const auto base_feature = ui.window.session().part_document()->features().back().id();
+  const auto depth =
+      ui.window.session().part_document()->find_feature(base_feature)->length_parameter();
+  const auto pocket = ui.rectangle("datum.xy", {-10, -5}, {10, 5});
+  const auto before = ui.snapshot();
+  ui.command("view_top", 2);
+  ui.command("perspective", 2); // Capture an orthographic model view.
+  REQUIRE(ui.window.viewport().projection() == GuiViewportProjection::Orthographic);
+  const auto home = ui.window.viewport().camera_bookmark();
+  ui.command("capture_home", 2);
+  auto& marks = ui.widget<QComboBox>("blcad.navigation.bookmarks");
+  REQUIRE(marks.lineEdit());
+  ui.text(*marks.lineEdit(), "Oben");
+  ui.command("bookmark_save", 2);
+  ui.command("view_front", 2);
+  ui.text(*marks.lineEdit(), "Vorne");
+  ui.command("bookmark_save", 2);
+  CHECK(marks.count() == 2);
+  ui.command("view_back", 2); // Actual ViewCube popup input.
+  ui.command("view_home", 2);
+  const auto home_restored = ui.window.viewport().camera_bookmark();
+  CHECK(home_restored.eye.x == Approx(home.eye.x).margin(1e-7));
+  CHECK(home_restored.eye.y == Approx(home.eye.y).margin(1e-7));
+  CHECK(home_restored.eye.z == Approx(home.eye.z).margin(1e-7));
+  CHECK(home_restored.scale == Approx(home.scale).margin(1e-7));
+  CHECK_FALSE(ui.action("perspective").isChecked());
+  CHECK(ui.snapshot() == before);
+  ui.tree(pocket.value(), true);
+  REQUIRE(ui.window.active_sketch());
+  CHECK_FALSE(ui.action("view_home").isEnabled());
+  CHECK_FALSE(ui.action("view_front").isEnabled());
+  CHECK_FALSE(ui.action("bookmark_restore").isEnabled());
+  CHECK_FALSE(ui.action("perspective").isEnabled());
+  ui.command("finish_sketch");
+  CHECK(ui.snapshot() == before);
+  CHECK(marks.count() == 2);
+  std::vector<std::string> states{ui.snapshot()};
+
+  ui.tree(pocket.value());
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.scalar("6 mm");
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.taper"), "invalid");
+  ui.window.ribbon().set_current_tab(2);
+  ui.flush();
+  ui.choose(marks, marks.findText("Vorne"));
+  ui.command("bookmark_restore", 2);
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.widget<QLineEdit>("blcad.extrude.taper").text() == "invalid");
+  CHECK(ui.snapshot() == states.back());
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.taper"), "");
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.flush();
+  const auto presentations = ui.window.feature_tools().manipulators().presentations();
+  const auto handle = std::find_if(presentations.begin(), presentations.end(), [](const auto& p) {
+    return p.handle_id == kExtrudeExtentHandleId;
+  });
+  REQUIRE(handle != presentations.end());
+  const QPointF point(handle->endpoint.x, handle->endpoint.y);
+  REQUIRE(ui.window.viewport().rect().contains(point.toPoint()));
+  ui.mouse(ui.window.viewport(), point, QEvent::MouseButtonPress);
+  REQUIRE(ui.window.feature_tools().manipulators().active_handle_id() == kExtrudeExtentHandleId);
+  ui.flush();
+  CHECK_FALSE(ui.action("view_home").isEnabled());
+  CHECK_FALSE(ui.action("bookmark_restore").isEnabled());
+  ui.mouse(ui.window.viewport(), point + QPointF(12, -14), QEvent::MouseMove);
+  ui.key(ui.window, Qt::Key_Escape);
+  REQUIRE(ui.window.feature_tools().active());
+  CHECK(ui.window.feature_tools().manipulators().active_handle_id().empty());
+  CHECK(ui.window.feature_tools().coordinator().extrude().distance() == Approx(6));
+  CHECK(ui.snapshot() == states.back());
+  ui.flush();
+  ui.command("view_home", 2);
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.capture("navigation-machining-preview");
+  const auto cut = ui.window.feature_tools().coordinator().extrude().feature_id();
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(46800).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.command("parameters");
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"),
+          QString::fromStdString(depth.value()));
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "24");
+  ui.button("blcad.parameters.stage");
+  ui.button("blcad.parameters.preview");
+  ui.button("blcad.parameters.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(56400).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.tree(cut.value(), true);
+  ui.text(ui.widget<QLineEdit>("blcad.feature_edit.field/name"), "Navigation checked pocket");
+  ui.button("blcad.feature_edit.apply");
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  CHECK(marks.count() == 2);
+  ui.window.ribbon().set_current_tab(2);
+  ui.flush();
+  ui.choose(marks, marks.findText("Oben"));
+  ui.command("bookmark_restore", 2);
+  ui.command("bookmark_remove", 2);
+  CHECK(marks.count() == 1);
+  ui.capture("navigation-bookmarks-after-history");
+  ui.roundtrip(directory.filePath("navigation.blcad"));
+  CHECK(marks.count() == 0);
+  CHECK_FALSE(ui.action("view_home").isEnabled());
+  CHECK(ui.summary(body).volume_mm3 == Approx(56400).margin(1e-5));
+  const auto step = directory.filePath("navigation.step");
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.snapshot() == states.back());

@@ -29,6 +29,7 @@ public:
                                const QList<QAction*>& actions);
   // Compact text button; stacked two per column inside the group.
   QToolButton* add_small_button(QWidget* group, QAction* action);
+  void add_widget(QWidget* group, QWidget* widget);
 
   void set_current_tab(int index);
   [[nodiscard]] int current_tab() const;

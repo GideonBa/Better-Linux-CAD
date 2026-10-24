@@ -904,7 +904,7 @@ Result<std::size_t> ShellConstructionTools::apply() {
   drag_.reset();
   layer_.cancel();
   if (window_.viewport().mouseGrabber() == &window_.viewport())
-    window_.viewport().releaseMouse();
+    window_.viewport().release_interaction_mouse();
   // Keyboard tracking is disabled for numeric refinement. A click on Apply
   // must consume pending editor text even before native focus-out is delivered.
   updating_ = true;
@@ -932,7 +932,7 @@ void ShellConstructionTools::cancel() {
   drag_.reset();
   layer_.clear_handles();
   if (window_.viewport().mouseGrabber() == &window_.viewport())
-    window_.viewport().releaseMouse();
+    window_.viewport().release_interaction_mouse();
   grip_numeric_->clear();
   grip_numeric_->setReadOnly(true);
   overlay_->hide();

@@ -36,7 +36,7 @@ ShellConstructionTools::~ShellConstructionTools() {
   active_ = false;
   layer_.clear_handles();
   if (window_.viewport().mouseGrabber() == &window_.viewport())
-    window_.viewport().releaseMouse();
+    window_.viewport().release_interaction_mouse();
   delete overlay_;
 }
 
@@ -252,7 +252,7 @@ void ShellConstructionTools::cancel_drag() {
   precise_offset_display_ = start.displayed_offset;
   updating_ = false;
   if (window_.viewport().mouseGrabber() == &window_.viewport())
-    window_.viewport().releaseMouse();
+    window_.viewport().release_interaction_mouse();
   grip_numeric_->clear();
   grip_numeric_->setReadOnly(true);
   update_preview();
@@ -281,7 +281,7 @@ bool ShellConstructionTools::manipulator_event(QObject* watched, QEvent* event) 
                       {read(origin_), read(direction_), read(y_direction_)},
                       offset_value(),
                       offset_->value()};
-    viewport.grabMouse();
+    viewport.grab_interaction_mouse();
     numeric_invalid_ = false;
     grip_numeric_->setReadOnly(false);
     grip_numeric_->setText(QString::fromStdString(std::string(layer_.numeric_text())));
@@ -315,7 +315,7 @@ bool ShellConstructionTools::manipulator_event(QObject* watched, QEvent* event) 
     }
     accept_candidate(*candidate);
     drag_.reset();
-    viewport.releaseMouse();
+    viewport.release_interaction_mouse();
     grip_numeric_->setReadOnly(true);
     refresh_handles();
     return true;

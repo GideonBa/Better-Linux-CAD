@@ -481,7 +481,7 @@ Result<std::size_t> ShellFeatureTools::move_spatial_input(int from, int to) {
 
 Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
   if (viewport_.mouseGrabber() == &viewport_)
-    viewport_.releaseMouse();
+    viewport_.release_interaction_mouse();
   layer_.cancel();
   drag_start_value_.reset();
   coordinator_.cancel();

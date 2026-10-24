@@ -220,3 +220,22 @@ perspective views, checks positive subpixel lengths and distinct directions. It 
 before the correction with a zero-length displacement. The Thin Extrude pointer/Escape regression
 also exercises separate depth/thickness handles in an oblique view. Full/native GUI evidence lives
 in `docs/gui-shell-acceptance-mvp9r.md`.
+
+## Camera restoration and interaction capture — 2026-10-24
+
+Named-view restoration switches the native OCCT projection before restoring eye/target/up/scale.
+`Graphic3d_Camera::SetScale` converts perspective scale to eye distance; applying it under the old
+perspective projection displaced a saved orthographic eye after a projection switch. The navigation
+regression exposed 120→152.0954546225 before the fix and compares all captured fields after resize and
+both projection transitions. Snapshot fields and persistence boundaries are unchanged.
+
+Without a native viewer, standard views now derive their directions from OCCT's +Z-up orientations
+and store a valid orthogonal up vector in the fallback camera. Projection changes notify consumers on
+both backends. Native rendering and picking continue to use OCCT's actual camera mapping.
+
+Shell grips use `OcctViewport::grab_interaction_mouse` / `release_interaction_mouse` to capture the
+widget mouse and notify presentation consumers at both boundaries. Navigation/projection controls
+therefore follow actual capture without timers or discovery. Camera-sensitive consumers still compare
+camera/viewport values before cancelling a drag, so a capture notification itself is not a camera
+change. `[block136-navigation]` and `[shell-combined-navigation]` cover automatic disable/re-enable and
+a real extent drag/Escape after restoring a named view.

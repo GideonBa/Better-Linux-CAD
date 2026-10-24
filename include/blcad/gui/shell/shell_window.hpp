@@ -24,6 +24,7 @@ class QTreeWidgetItem;
 namespace blcad::gui {
 
 class ShellRibbon;
+class ShellNavigationTools;
 class ShellFeatureTools;
 class ShellSketchTools;
 class ShellMeasureTools;
@@ -126,6 +127,7 @@ private:
   void build_ribbon();
   void build_docks();
   void wire_viewport();
+  void synchronize_navigation();
   [[nodiscard]] bool confirm_document_replacement();
   void reset_document_interaction();
   void reconcile_active_sketch();
@@ -177,7 +179,7 @@ private:
   QAction* action_save_as_{nullptr};
   QAction* action_create_sketch_{nullptr};
   QAction* action_finish_sketch_{nullptr};
-  QAction* action_fit_{nullptr};
+  std::unique_ptr<ShellNavigationTools> navigation_tools_;
   QAction* action_perspective_{nullptr};
   QAction* action_shaded_{nullptr};
   QAction* action_shaded_edges_{nullptr};

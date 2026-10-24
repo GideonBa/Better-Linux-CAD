@@ -854,7 +854,7 @@ struct ShellFeatureEditTools::Impl {
     valid = false;
     drag_start.reset();
     if (viewport.mouseGrabber() == &viewport)
-      viewport.releaseMouse();
+      viewport.release_interaction_mouse();
     viewport.clear_feature_preview();
     viewport.set_selection_filter_mask(previous_mask);
     viewport.set_selection_semantic_scope(previous_scope);
@@ -873,7 +873,7 @@ struct ShellFeatureEditTools::Impl {
   void restore_drag() {
     layer.cancel();
     if (viewport.mouseGrabber() == &viewport)
-      viewport.releaseMouse();
+      viewport.release_interaction_mouse();
     if (drag_start) {
       auto found = numbers.find(dynamic->currentData().toString());
       if (found != numbers.end())
@@ -1030,7 +1030,7 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
     if (watched == &p.viewport && !p.layer.active_handle_id().empty()) {
       if (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) {
         auto candidate = p.layer.end_drag(p.last_pointer);
-        p.viewport.releaseMouse();
+        p.viewport.release_interaction_mouse();
         if (candidate)
           (void)p.accept_candidate(*candidate);
         p.drag_start.reset();
@@ -1061,7 +1061,7 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
           p.drag_start = p.numbers.at(p.dynamic->currentData().toString())->value();
           p.buffer.clear();
           p.viewport.setFocus();
-          p.viewport.grabMouse();
+          p.viewport.grab_interaction_mouse();
           p.apply->setEnabled(false);
           return true;
         }
@@ -1077,7 +1077,7 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
     if (event->type() == QEvent::MouseButtonRelease && !p.layer.active_handle_id().empty()) {
       auto* mouse = static_cast<QMouseEvent*>(event);
       auto candidate = p.layer.end_drag({mouse->position().x(), mouse->position().y()});
-      p.viewport.releaseMouse();
+      p.viewport.release_interaction_mouse();
       if (candidate) {
         (void)p.accept_candidate(*candidate);
         p.drag_start.reset();

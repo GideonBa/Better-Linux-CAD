@@ -119,6 +119,10 @@ public:
   void fit_all();
   // Explicit presentation notification for shell-owned model-space overlays.
   void set_view_changed_callback(std::function<void()> callback);
+  // Explicit shell interaction capture also notifies presentation consumers,
+  // so camera controls follow grip begin/end without polling Qt grab state.
+  void grab_interaction_mouse();
+  void release_interaction_mouse();
 
   void set_selection_filter_mask(std::uint32_t mask);
   void set_selection_semantic_scope(std::optional<std::vector<std::string>> scope);

@@ -52,23 +52,45 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-modeling-workspace-mvp9.md",
-        "scope": "Semantic selection synchronizes viewport, browser and session; standard camera controls exist.",
+        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview.",
         "gaps": [
           "Restore contextual commands and selection-filter UI.",
-          "Restore view cube, reusable view bookmarks and repeat-last-command presentation."
+          "Restore repeat-last-command presentation."
         ],
         "proofs": [
           {
             "filter": "[gui][selection-sync]",
             "source": "tests/gui/gui_shell_window_tests.cpp"
+          },
+          {
+            "filter": "[block136-navigation]",
+            "source": "tests/gui/gui_shell_navigation_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-navigation]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
           "fit",
-          "perspective"
+          "perspective",
+          "view_isometric",
+          "view_front",
+          "view_back",
+          "view_left",
+          "view_right",
+          "view_top",
+          "view_bottom",
+          "view_home",
+          "capture_home",
+          "bookmark_save",
+          "bookmark_restore",
+          "bookmark_remove"
         ],
         "widgets": [
-          "blcad.shell.browser"
+          "blcad.shell.browser",
+          "blcad.navigation.view_cube",
+          "blcad.navigation.bookmarks"
         ]
       }
     },
