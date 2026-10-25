@@ -1144,11 +1144,13 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
         (void)hole_tools_->accept_selection(selected);
     if (feature_tools_) {
       // Browser selection suppresses the viewport callback above. Route these
-      // picks to the same Pattern owner explicitly; reference acceptance can
+      // picks to the Pattern/Body owners explicitly; reference acceptance can
       // clear shared selection while restoring Body scope, so keep a snapshot.
       const auto selected = session_.selection().entries();
-      for (const auto& selection : selected)
+      for (const auto& selection : selected) {
         (void)feature_tools_->accept_pattern_selection(selection);
+        (void)feature_tools_->accept_body_selection(selection);
+      }
       if (const auto* part = session_.part_document()) {
         if (const auto profile = feature_profile_for_selection(*part, property_semantic_id_))
           selected_feature_profile =

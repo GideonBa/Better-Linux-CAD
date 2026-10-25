@@ -6,6 +6,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -3957,6 +3958,45 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     root["body_transforms"].push_back(std::move(value));
   }
+  // Family arrays cannot express a transform followed by a Boolean, finishing
+  // operation or another feature family. Persist the executable order only when
+  // it interleaves transforms and features; historical files keep their defaults.
+  std::unordered_set<std::string> executable_ids;
+  const auto collect = [&](const auto& records) {
+    for (const auto& record : records) {
+      if constexpr (requires { record.id(); })
+        executable_ids.insert(record.id().value());
+      else
+        executable_ids.insert(surface_feature_id(record).value());
+    }
+  };
+  collect(document.features());
+  collect(document.revolve_features());
+  collect(document.sweep_features());
+  collect(document.loft_features());
+  collect(document.surface_features());
+  collect(document.linear_pattern_features());
+  collect(document.circular_pattern_features());
+  collect(document.mirror_features());
+  collect(document.fillet_features());
+  collect(document.chamfer_features());
+  collect(document.shell_features());
+  collect(document.draft_features());
+  collect(document.body_boolean_features());
+  collect(document.body_transforms());
+  json feature_order = json::array();
+  bool seen_transform = false, interleaved = false;
+  for (const auto& node : pattern_order.value()) {
+    if (!executable_ids.contains(node))
+      continue;
+    feature_order.push_back(node);
+    if (document.find_body_transform(BodyTransformId(node)))
+      seen_transform = true;
+    else if (seen_transform)
+      interleaved = true;
+  }
+  if (interleaved)
+    root["feature_order"] = std::move(feature_order);
   root["reference_statuses"] = json::array();
   for (const auto& status : document.reference_statuses())
     root["reference_statuses"].push_back(reference_status_to_json(status));
@@ -4505,6 +4545,84 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     restore_order(document.value().derived_workplanes_, derived_workplane_array);
     restore_order(document.value().sketches_, sketch_array);
     restore_order(document.value().features_, feature_array);
+    if (root.contains("feature_order")) {
+      const auto& order = root.at("feature_order");
+      if (!order.is_array())
+        return Result<PartDocument>::failure(json_error("feature_order must be an array"));
+      // Rebuild through validated typed adders, never trust serialized graph
+      // edges. Preserve non-feature consumers and authored collection ordering.
+      const PartDocument saved = document.value();
+      auto& candidate = document.value();
+      std::unordered_map<std::string, std::function<Result<std::size_t>()>> replay;
+      std::vector<std::function<void()>> restore_collections;
+      const auto stage = [&](auto member, auto adder) {
+        for (const auto& record : saved.*member) {
+          const auto id = [&] {
+            if constexpr (requires { record.id(); })
+              return record.id().value();
+            else
+              return surface_feature_id(record).value();
+          }();
+          replay.emplace(id, [&, record, adder] { return (candidate.*adder)(record); });
+        }
+        (candidate.*member).clear();
+        restore_collections.emplace_back([&, member] { candidate.*member = saved.*member; });
+      };
+      stage(&PartDocument::features_, &PartDocument::add_feature);
+      stage(&PartDocument::revolve_features_, &PartDocument::add_revolve_feature);
+      stage(&PartDocument::sweep_features_, &PartDocument::add_sweep_feature);
+      stage(&PartDocument::loft_features_, &PartDocument::add_loft_feature);
+      stage(&PartDocument::surface_features_, &PartDocument::add_surface_feature);
+      stage(&PartDocument::linear_pattern_features_, &PartDocument::add_linear_pattern_feature);
+      stage(&PartDocument::circular_pattern_features_, &PartDocument::add_circular_pattern_feature);
+      stage(&PartDocument::mirror_features_, &PartDocument::add_mirror_feature);
+      stage(&PartDocument::fillet_features_, &PartDocument::add_fillet_feature);
+      stage(&PartDocument::chamfer_features_, &PartDocument::add_chamfer_feature);
+      stage(&PartDocument::shell_features_, &PartDocument::add_shell_feature);
+      stage(&PartDocument::draft_features_, &PartDocument::add_draft_feature);
+      stage(&PartDocument::body_boolean_features_, &PartDocument::add_body_boolean_feature);
+      stage(&PartDocument::body_transforms_, &PartDocument::add_body_transform);
+      if (order.size() != replay.size())
+        return Result<PartDocument>::failure(
+            json_error("feature_order must name every executable exactly once"));
+      std::unordered_set<std::string> seen;
+      for (const auto& entry : order) {
+        if (!entry.is_string() || !replay.contains(entry.get<std::string>()) ||
+            !seen.insert(entry.get<std::string>()).second)
+          return Result<PartDocument>::failure(
+              json_error("feature_order contains an invalid or duplicate executable id"));
+      }
+      std::vector<DependencyGraph::DependencyEdge> consumers;
+      for (const auto& edge : saved.dependency_graph().dependencies())
+        if (replay.contains(edge.first) && !replay.contains(edge.second) &&
+            !edge.second.starts_with("body:"))
+          consumers.push_back(edge);
+      for (const auto& [id, unused] : replay) {
+        auto removed = candidate.dependency_graph_.remove_node(id);
+        if (!removed)
+          return Result<PartDocument>::failure(removed.error());
+        candidate.invalidation_state_.untrack_node(id);
+      }
+      for (const auto& entry : order) {
+        auto added = replay.at(entry.get<std::string>())();
+        if (!added)
+          return Result<PartDocument>::failure(added.error());
+      }
+      for (const auto& [source, dependent] : consumers)
+        if (!candidate.dependency_graph_.has_dependency(source, dependent)) {
+          auto restored = candidate.dependency_graph_.add_dependency(source, dependent);
+          if (!restored)
+            return Result<PartDocument>::failure(restored.error());
+        }
+      if (candidate.dependency_graph_.has_cycle())
+        return Result<PartDocument>::failure(
+            json_error("feature_order creates a dependency cycle"));
+      auto synced = candidate.invalidation_state_.sync_from_graph(candidate.dependency_graph_);
+      if (!synced)
+        return Result<PartDocument>::failure(synced.error());
+      for (const auto& restore : restore_collections)
+        restore();
+    }
     return document;
   } catch (const json::exception& exception) {
     return Result<PartDocument>::failure(

@@ -162,6 +162,68 @@ void ShellFeatureTools::build_body_controls(QWidget* panel) {
   });
 }
 
+QAction* ShellFeatureTools::body_action(Command command) const noexcept {
+  for (const auto& [kind, action] : body_actions_)
+    if (kind == command)
+      return action;
+  return nullptr;
+}
+
+bool ShellFeatureTools::body_context_available(const BodyContext& context) const {
+  if (!body_action(context.command) || session_.document_kind() != GuiDocumentKind::Part ||
+      session_.workspace() != GuiWorkspace::Part || !session_.part_document() ||
+      !session_.part_shape_cache() || !session_.derived_results_fresh())
+    return false;
+  const auto* body = session_.part_document()->find_body(context.body);
+  const auto* shape = session_.part_shape_cache()->find_body_shape(context.body);
+  return body && body->visibility() == BodyVisibility::Visible &&
+         (context.command != Command::BodyBoolean || body->kind() == BodyKind::Solid) && shape &&
+         !shape->empty();
+}
+
+std::optional<ShellFeatureTools::BodyContext>
+ShellFeatureTools::body_context(Command command) const {
+  if (!body_action(command) || active() || session_.task().active() || window_.active_sketch() ||
+      session_.reference_repair_mode() || session_.selection().size() != 1 ||
+      !session_.part_document() || !session_.selection().allows(GuiSelectionKind::Body) ||
+      !(viewport_.selection_filter_mask() & selection_kind_bit(GuiSelectionKind::Body)))
+    return std::nullopt;
+  const auto& selected = session_.selection().entries().front();
+  if (selected.kind != GuiSelectionKind::Body)
+    return std::nullopt;
+  const auto& scope = viewport_.selection_semantic_scope();
+  if (scope && std::find(scope->begin(), scope->end(), selected.semantic_id) == scope->end())
+    return std::nullopt;
+  for (const auto& body : session_.part_document()->bodies())
+    if (selected.semantic_id == "body/" + body.id().value() &&
+        body_context_available({command, body.id()}))
+      return BodyContext{command, body.id()};
+  return std::nullopt;
+}
+
+bool ShellFeatureTools::select_body_context(const BodyContext& context) {
+  if (!body_operation() || command_ != context.command || !session_.task().active() ||
+      session_.task().command_id() != command_id() || !body_context_available(context))
+    return false;
+  const auto id = QString::fromStdString(context.body.value());
+  for (int i = 0; i < body_sources_->count(); ++i)
+    if (body_sources_->item(i)->data(Qt::UserRole).toString() == id) {
+      {
+        const QSignalBlocker sources(body_sources_), target(boolean_target_);
+        body_sources_->clearSelection();
+        if (command_ == Command::BodyBoolean)
+          boolean_target_->setCurrentIndex(boolean_target_->findData(id));
+        else
+          body_sources_->item(i)->setSelected(true);
+      }
+      body_reference_picking_ = false;
+      update_body_pick_mode();
+      refresh_body_preview();
+      return true;
+    }
+  return false;
+}
+
 Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
   const auto fail = [](std::string message) {
     return Result<std::size_t>::failure(Error::validation("gui.shell.body", std::move(message)));
@@ -250,6 +312,7 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
     return fail("Körperaufgabe konnte nicht gestartet werden");
   }
   previous_selection_mask_ = viewport_.selection_filter_mask();
+  previous_semantic_scope_ = viewport_.selection_semantic_scope();
   body_translation_ = {};
   body_scale_center_ = {};
   body_value_ = command == Command::BodyScale ? 1 : 0;
@@ -414,6 +477,19 @@ void ShellFeatureTools::update_body_pick_mode() {
                         ? GuiSelectionKind::Datum
                         : GuiSelectionKind::Body;
   viewport_.set_selection_filter_mask(selection_kind_bit(kind));
+  std::vector<std::string> scope;
+  if (body_reference_picking_ && command_ == Command::BodyRotate) {
+    for (const auto& axis : body_axes_)
+      scope.push_back(axis.semantic_id);
+  } else {
+    for (int i = 0; i < body_sources_->count(); ++i) {
+      const auto id = body_sources_->item(i)->data(Qt::UserRole).toString();
+      if (command_ != Command::BodyBoolean || body_reference_picking_ ||
+          id != boolean_target_->currentData().toString())
+        scope.push_back("body/" + id.toStdString());
+    }
+  }
+  viewport_.set_selection_semantic_scope(std::move(scope));
   synchronize_overlay();
 }
 
@@ -422,7 +498,8 @@ bool ShellFeatureTools::accept_body_selection(const GuiSelection& selection) {
     return false;
   if (body_reference_picking_ && command_ == Command::BodyRotate) {
     for (std::size_t i = 0; i < body_axes_.size(); ++i)
-      if (body_axes_[i].semantic_id == selection.semantic_id) {
+      if (selection.kind == GuiSelectionKind::Datum &&
+          body_axes_[i].semantic_id == selection.semantic_id) {
         const QSignalBlocker block(body_axis_);
         body_axis_->setCurrentIndex(i);
         body_reference_picking_ = false;
@@ -432,7 +509,7 @@ bool ShellFeatureTools::accept_body_selection(const GuiSelection& selection) {
       }
     return false;
   }
-  if (!selection.semantic_id.starts_with("body/"))
+  if (selection.kind != GuiSelectionKind::Body || !selection.semantic_id.starts_with("body/"))
     return false;
   const QString id = QString::fromStdString(selection.semantic_id.substr(5));
   if (body_reference_picking_ && command_ == Command::BodyBoolean) {

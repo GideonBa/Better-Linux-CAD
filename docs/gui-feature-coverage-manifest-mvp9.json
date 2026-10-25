@@ -52,9 +52,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-modeling-workspace-mvp9.md",
-        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus. Accepted Feature/Hole/Assembly commands expose guarded repeat with current inputs and fresh defaults, independent of Redo and persistence. Bounded profile mini-toolbar validates Core profile or single-line sources, limits Sweep/Loft to materialized regions and starts Extrude/Revolve/Sweep/Loft through existing owners, seeds the exact typed Sweep profile or first Loft section, consumes preselection and restores it on cancellation. Explicit Edge/Face model filters publish stable current-Body targets for bounded Fillet/Chamfer/Shell/Draft contexts; typed command/Body/semantic handoffs seed the original task, restrict its scope and restore complete valid preselection on cancellation. Single fresh solid-Body selection offers Linear/Circular pattern and Mirror contexts, seeds the exact typed source through the original owner and restores complete preselection after task-owned Body/reference scope transitions.",
+        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus. Accepted Feature/Hole/Assembly commands expose guarded repeat with current inputs and fresh defaults, independent of Redo and persistence. Bounded profile mini-toolbar validates Core profile or single-line sources, limits Sweep/Loft to materialized regions and starts Extrude/Revolve/Sweep/Loft through existing owners, seeds the exact typed Sweep profile or first Loft section, consumes preselection and restores it on cancellation. Explicit Edge/Face model filters publish stable current-Body targets for bounded Fillet/Chamfer/Shell/Draft contexts; typed command/Body/semantic handoffs seed the original task, restrict its scope and restore complete valid preselection on cancellation. Single fresh solid-Body selection offers Linear/Circular pattern and Mirror contexts, seeds the exact typed source through the original owner and restores complete preselection after task-owned Body/reference scope transitions. Body Boolean/Translate/Rotate/Scale contexts validate exact typed targets or sources, including surface transforms; task-owned Body/tool/axis scopes and browser collection share the original owner and restore prior scope/filter on completion.",
         "gaps": [
-          "Extend contextual commands beyond profile, finishing and pattern tools to Body Boolean/Transform, Surface and Assembly commands."
+          "Extend contextual commands beyond profile, finishing, pattern and Body tools to Surface and Assembly commands."
         ],
         "proofs": [
           {
@@ -116,6 +116,14 @@
           {
             "filter": "[shell-combined-pattern-context]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-body-context]",
+            "source": "tests/gui/gui_shell_body_context_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-body-context]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -145,6 +153,10 @@
           "context_linear_pattern",
           "context_circular_pattern",
           "context_body_mirror",
+          "context_body_boolean",
+          "context_body_translate",
+          "context_body_rotate",
+          "context_body_scale",
           "context_cancel"
         ],
         "widgets": [
@@ -1069,7 +1081,7 @@
       ]
     },
     "acceptance": {
-      "audited_on": "2026-10-24",
+      "audited_on": "2026-10-25",
       "complete": false,
       "blocked_families": [
         "viewport-selection",

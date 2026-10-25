@@ -967,7 +967,7 @@ Result<std::size_t> ShellFeatureTools::apply() {
   const bool was_finishing = finishing();
   const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
-  const bool restore_scope = finishing() || pattern() || spatial() || surface();
+  const bool restore_scope = finishing() || pattern() || body_operation() || spatial() || surface();
   command_ = Command::None;
   if (restore_scope)
     viewport_.set_selection_semantic_scope(previous_semantic_scope_);
@@ -1011,7 +1011,7 @@ void ShellFeatureTools::cancel() noexcept {
   const bool was_finishing = finishing();
   const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
-  const bool restore_scope = finishing() || pattern() || spatial() || surface();
+  const bool restore_scope = finishing() || pattern() || body_operation() || spatial() || surface();
   command_ = Command::None;
   if (restore_scope)
     viewport_.set_selection_semantic_scope(previous_semantic_scope_);

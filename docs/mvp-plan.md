@@ -1124,6 +1124,28 @@ the actual OCCT Body; offscreen uses the browser. Contracts and validation live 
 contexts, then advanced Assembly and integrated acceptance. Thirteen families remain restored and
 five partial; Block 136 stays open and numbered completion remains through Block 135.
 
+### Block 136 — Body Boolean and Transform contexts — 2026-10-25
+
+The shared context toolbar now offers Boolean, Translate, Rotate and Scale for one verified current
+Body. Typed handoff assigns the exact Boolean target with no arbitrary tools, or the sole initial
+Transform source. Surface Bodies support transforms; Boolean retains its solid-only boundary and
+second-solid prerequisite. The original owner keeps preview, Apply and repeat authority. Body tasks
+own their offered source/tool/target/axis scope, restore the previous scope/filter on completion and
+restore complete valid context selection on cancellation. Browser collection reaches the same owner.
+The new combined test also exposed family-grouped loading that moved an earlier translation after a
+Boolean cut during the next transaction. Optional validated `feature_order` preserves interleaved
+executable history without storing derived shapes; Core/Geometry tests cover graph identity, corrupt
+metadata, legacy loading, bounds/volumes and incremental replay. Contract: `docs/file-format.md`.
+
+Five focused cases and the twenty-eighth combined Qt workflow cover exact roles, surface sources,
+reference transitions, invalid input, cancellation, atomic history, Save and replacement. The combined
+Part cancels multi-Body translation, moves the nondefault target into overlap, switches Boolean
+targets, cuts with retained tools, rotates and scales with explicit references/center, checks exact
+four-step Undo/Redo, reopens canonically and exports STEP. Verification is recorded in
+`docs/gui-shell-acceptance-mvp9r.md`. Continue with Surface and Assembly contexts, advanced Assembly
+and integrated acceptance. Thirteen families remain restored and five partial; Block 136 stays open
+and numbered completion remains through Block 135.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -1131,7 +1153,7 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Extend contextual commands to Body Boolean/Transform, Surface and Assembly, then continue the
+Extend contextual commands to Surface and Assembly, then continue the
 remaining advanced Assembly and integrated acceptance workflows. Native `ToFace`/`Between` collection
 now covers the supported semantic source roles. The bounded single-line Thin Extrude editors are available; general curved/open chains remain
 outside that Geometry boundary.
@@ -1151,8 +1173,8 @@ The bounded repair-open path now supports failed-recompute Parts and missing fac
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with the remaining Body/Surface/
-Assembly context commands, advanced Assembly controls and integrated native Part/Assembly acceptance
+position/direction/frame/new-offset grips. Continue with the remaining Surface/Assembly
+context commands, advanced Assembly controls and integrated native Part/Assembly acceptance
 in the order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
 workflows are resolved and the closure gate plus full/native regressions pass.
