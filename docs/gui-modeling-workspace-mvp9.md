@@ -4,9 +4,8 @@ Status: the Block-122 application authority `GuiModelingWorkspace` is retained. 
 adapter was deleted with the Block-133 shell reset. Block 136 now restores camera navigation through
 `ShellNavigationTools` on `ShellWindow`, as detailed below. Visible selection filters are also
 restored. `ShellRepeatTools` now restores command-repeat presentation through the current command
-owners. `ShellContextTools` supplies the shared bounded profile, finishing, pattern, Body and Surface
-mini-toolbar described below. Assembly context commands stay open; the old catalog
-adapter specifics are historical.
+owners. `ShellContextTools` supplies the shared bounded profile, finishing, pattern, Body, Surface
+and Assembly mini-toolbar described below. The old catalog adapter specifics are historical.
 
 Block 122 introduces the shared application-layer interaction boundary used by the Part, Surface, and
 Assembly modeling workspaces. It upgrades the existing MVP-7 form-driven workbenches with
@@ -149,7 +148,7 @@ restoration, raw-region exclusion, three-section atomic Apply, Save and replacem
 combined workflow `[shell-combined-spatial-context]` authors all its Sketch/plane/path inputs through Qt, cancels an
 invalid Sweep, corrects a three-section Loft's order and G2 input, creates a second Sweep, changes its
 twist parameter, edits the earlier Loft, verifies four-step history, reopens and exports STEP.
-Assembly contexts remain open; the viewport family stays partial.
+Assembly contexts are covered by the final handoff section below.
 
 ### Replacement-shell finishing contexts (Block 136, 2026-10-24)
 
@@ -183,8 +182,7 @@ hidden/removed sources, Save and replacement. The twenty-sixth combined Qt-input
 `[shell-combined-finishing-context]` authors two Bodies, cancels Draft, shells one Body, fillets and
 chamfers the other, changes two upstream parameters in one batch, edits an earlier feature, checks
 five-step exact history, reopens canonically and exports STEP. It requires native OCCT subshape hits
-and explicitly skips offscreen. Assembly contexts remain open; the viewport family
-remains partial and Block 136 stays open.
+and explicitly skips offscreen. Assembly contexts are covered by the final handoff section below.
 
 ### Replacement-shell Body pattern contexts (Block 136, 2026-10-24)
 
@@ -212,7 +210,7 @@ history, Save and replacement. The twenty-seventh combined workflow
 Circular pattern and a Linear pattern from the reflected result, stages three upstream parameter
 changes in one batch, edits the earlier Mirror, checks five-step exact history, reopens and exports
 STEP. Offscreen selects the source through the browser; native input hits the actual OCCT Body.
-Assembly contexts remain open; the viewport family and Block 136 remain partial/open.
+Assembly contexts are covered by the final handoff section below.
 
 ### Replacement-shell Body contexts (Block 136, 2026-10-25)
 
@@ -242,8 +240,8 @@ twenty-eighth Qt-input workflow `[shell-combined-body-context]` authors two soli
 translation, moves the nondefault target, switches Boolean targets through the browser, cuts with
 retained tools, rotates using an explicitly picked axis and scales about a typed center. It checks
 bounds/volumes, invalid-input recovery, four-step exact history, canonical reopening and STEP.
-Native input hits actual OCCT Bodies; offscreen input uses the visible browser. Remaining contexts
-are Assembly. The viewport family remains partial and Block 136 stays open.
+Native input hits actual OCCT Bodies; offscreen input uses the visible browser. Assembly contexts
+are covered by the final handoff section below.
 
 ### Replacement-shell Surface contexts (Block 136, 2026-10-25)
 
@@ -269,8 +267,8 @@ routes, scene cleanup, atomic Apply/history, Save and replacement. The twenty-ni
 workflow `[shell-combined-surface-context]` authors a box, closed PathCurves and trim profile, cancels
 Boundary, applies Fill/Trim/Extend, rejects an open shell, sews six surfaces, converts the result to a
 solid and changes upstream depth. It checks bounds/volumes, duplicate/removal/reordering controls,
-six-step exact history, canonical reopening and STEP on both platforms. Assembly contexts remain
-next; the viewport family stays partial and Block 136 stays open.
+six-step exact history, canonical reopening and STEP on both platforms. Assembly contexts are
+covered by the final handoff section below.
 
 ## Command lifecycle, cancellation, and repeat
 
@@ -437,7 +435,8 @@ ViewCube menu and saved views, re-enters Sketch, corrects invalid taper text, ca
 drag with Escape after restoring a camera, applies a cut, changes the source depth, edits an earlier
 feature, verifies three-step exact history, reopens canonically and exports STEP. Native tests execute
 the same controls and validate the actual camera frames. The viewport-selection family remains
-partial for the remaining contextual commands; Block 136 remains open.
+covered together with the subsequent context sections; overall acceptance is recorded in
+`docs/gui-shell-acceptance-mvp9r.md`.
 
 ## Focused proof
 
@@ -462,3 +461,26 @@ and named camera bookmark replacement/removal.
 Block 123 is implemented in `docs/gui-viewport-manipulators-mvp9.md`. Block 124 now consumes the
 selection-first workspace and candidate-only manipulator layer for interactive Extrude, path Extrude,
 and Revolve authoring.
+
+## Assembly context handoff — Block 136, 2026-10-25
+
+The shared context toolbar now dispatches to the existing Assembly owner as well as the Part
+owners. One visible active root component offers Placement and the connected active constraint
+Solve group. Motion is offered only when exactly one active, driven root joint touches that component;
+an ambiguous joint choice remains explicit in the ordinary Motion task. The exact source is checked
+again when starting and seeding the original QAction task.
+
+The explicit Assembly Targets model filter publishes disposable semantic root targets. Selecting
+one offers Relationship and Joint, seeds that exact reference A and leaves B for compatibility-filtered
+collection. The All filter does not publish these additional targets. Filter changes, task completion
+and cancellation rebuild the selection scene so expired task targets cannot remain pickable.
+
+Context tasks preserve the previous filter, semantic scope and complete valid preselection. Apply
+consumes it; task Cancel, context Cancel and Escape restore it. Busy tasks, pointer capture, multiple
+selections, mismatched kinds, hidden/suppressed occurrences and stale source identities reject the
+handoff. Browser component selection uses the same active owner as viewport selection. Nested
+occurrences and cross-hierarchy records use the explicit hierarchy task editors documented in
+`docs/gui-interactive-assembly-mvp9.md`.
+
+Focused proof: `[block136-assembly-context]`; integrated Qt proof:
+`[shell-combined-assembly-context]` in `gui_shell_combined_workflow_tests.cpp`.

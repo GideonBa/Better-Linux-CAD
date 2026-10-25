@@ -1,5 +1,6 @@
 #pragma once
 
+#include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 
 #include <QObject>
@@ -31,9 +32,10 @@ private:
   using Context =
       std::variant<ShellFeatureTools::ProfileContext, ShellFeatureTools::FinishingContext,
                    ShellFeatureTools::PatternContext, ShellFeatureTools::BodyContext,
-                   ShellFeatureTools::SurfaceContext>;
+                   ShellFeatureTools::SurfaceContext, ShellAssemblyTools::Context>;
+  using Command = std::variant<ShellFeatureTools::Command, ShellAssemblyTools::Command>;
   struct Entry {
-    ShellFeatureTools::Command command{ShellFeatureTools::Command::None};
+    Command command{ShellFeatureTools::Command::None};
     QAction* action{nullptr};
     QToolButton* button{nullptr};
   };
@@ -43,13 +45,13 @@ private:
     std::optional<GuiSelection> viewport;
     std::string task_id;
   };
-  void begin(ShellFeatureTools::Command command);
-  [[nodiscard]] QAction* source_action(ShellFeatureTools::Command command) const;
-  [[nodiscard]] std::optional<Context> current_context(ShellFeatureTools::Command command) const;
+  void begin(Command command);
+  [[nodiscard]] QAction* source_action(Command command) const;
+  [[nodiscard]] std::optional<Context> current_context(Command command) const;
   void place();
   ShellWindow& window_;
   QFrame* panel_{nullptr};
-  std::array<Entry, 21> commands_{};
+  std::array<Entry, 26> commands_{};
   QAction* cancel_{nullptr};
   QToolButton* cancel_button_{nullptr};
   QPoint anchor_{16, 16};

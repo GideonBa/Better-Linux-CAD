@@ -84,13 +84,13 @@ dimensions, constraints, patterns, or design tables remain separate future work.
 ## Frozen phase order
 
 ```text
-132 STEP source identity, import modes, JSON, and freshness
-133 OCCT STEP/XDE reader and deterministic imported body definitions
-134 stable imported topology identity, recovery, and target resolution
-135 Reference Part integration with assemblies
-136 EditableBody ImportedBodyFeature and downstream modeling
-137 structured STEP assembly import
-138 integrated import, refresh, edit, assembly, and re-export acceptance
+137 STEP source identity, import modes, JSON, and freshness
+138 OCCT STEP/XDE reader and deterministic imported body definitions
+139 stable imported topology identity, recovery, and target resolution
+140 Reference Part integration with assemblies
+141 EditableBody ImportedBodyFeature and downstream modeling
+142 structured STEP assembly import
+143 integrated import, refresh, edit, assembly, and re-export acceptance
 ```
 
 Do not merge Blocks 137–143 into one importer. Each block crosses a different persistent or Geometry
@@ -100,13 +100,13 @@ The existing GUI grows with the same sequence:
 
 | Import block | GUI extension |
 |---|---|
-| 132 | import-mode/source task, portable-path and freshness diagnostics |
-| 133 | STEP inspection preview with product/body/unit diagnostics |
-| 134 | imported semantic topology display, filtering, and picking |
-| 135 | insert/refresh/convert commands for immutable Reference Parts |
-| 136 | EditableBody creation and downstream Part-workbench integration |
-| 137 | structured product-tree preview and Project import |
-| 138 | end-to-end GUI/headless equivalence and failure-atomicity acceptance |
+| 137 | import-mode/source task, portable-path and freshness diagnostics |
+| 138 | STEP inspection preview with product/body/unit diagnostics |
+| 139 | imported semantic topology display, filtering, and picking |
+| 140 | insert/refresh/convert commands for immutable Reference Parts |
+| 141 | EditableBody creation and downstream Part-workbench integration |
+| 142 | structured product-tree preview and Project import |
+| 143 | end-to-end GUI/headless equivalence and failure-atomicity acceptance |
 
 ## Block 137 — STEP source identity, modes, JSON, and freshness
 
@@ -224,7 +224,7 @@ participate in:
 - contact/interference queries and flattened/structured STEP export.
 
 Part feature additions, parameter edits, body edits, and mode changes fail explicitly in Reference
-mode. Conversion to EditableBody is a separate transactional command that creates the Block-136
+mode. Conversion to EditableBody is a separate transactional command that creates the Block-141
 intent without altering the original source asset.
 
 Focused tags:
@@ -287,7 +287,7 @@ definitions, invalid transforms, and duplicate generated identities fail closed.
 
 The user chooses Reference or EditableBody for imported part definitions. Structured import creates
 no inferred assembly constraints or joints; imported occurrence transforms are initial placement
-only. BLCAD relationships and joints may be authored afterward using Block-134 semantic imported
+only. BLCAD relationships and joints may be authored afterward using Block-139 semantic imported
 targets.
 
 Focused tags:

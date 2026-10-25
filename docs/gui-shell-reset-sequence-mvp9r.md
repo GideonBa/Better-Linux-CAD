@@ -1,7 +1,8 @@
 # GUI Shell Reset Sequence MVP-9R
 
-Status: active after accepted Interactive Modeling MVP-9. Blocks 132–135 are implemented; Block 136
-is the current next technical step. STEP Import MVP-10 shifts to Blocks 137–143.
+Status: Blocks 132–136 implemented and accepted on 2026-10-25. Current completion evidence lives in
+`docs/gui-shell-acceptance-mvp9r.md`; `docs/mvp-plan.md` owns numbered status. STEP Import MVP-10
+follows in planned Blocks 137–143. Dated entries below preserve each slice's historical state.
 
 This document is the canonical numbered implementation sequence for replacing the Qt shell layer.
 It governs what is deleted, what is kept byte-for-byte, and the contracts of the replacement shell.
@@ -448,12 +449,19 @@ The proof covers Sketch-Finish handoff and reselection, stale-selection invalida
 auto-provisioning and name collisions, strict numeric units and drag override/rollback, incompatible
 candidate rejection, recomputed Extrude/Revolve geometry, mutation-free Cancel, and atomic Undo.
 
-### Block 136 — Feature full coverage
+### Block 136 — Feature full coverage — Implemented and accepted
 
-Remaining feature commands in the ribbon (Fillet, Chamfer, Shell, Draft, Pattern, Mirror, Body
+Restored feature commands in the ribbon (Fillet, Chamfer, Shell, Draft, Pattern, Mirror, Body
 Boolean, Body Transform, Sweep, Loft, Surface family, Measure, Assembly tab), feature edit via
 browser double-click (`GuiFeatureEditController`), and acceptance coverage replacing the deleted
 shell acceptance tests (coverage manifest updated).
+
+Final acceptance also covers construction and reference repair, Sketch3D, parameter/extent editors,
+navigation/filter/repeat/context controls, advanced Assembly and analysis. All eighteen families in
+the current v3 shell inventory are restored, without gaps or pending workflows. Full Core/Geometry,
+offscreen and native GUI regression, startup, capture review and the explicit closure gate pass.
+The final evidence is in `docs/gui-shell-acceptance-mvp9r.md`; the subsections below record the
+incremental implementation history.
 
 #### Block 136 first slice — finishing commands
 

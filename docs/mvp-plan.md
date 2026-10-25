@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 135
-current_block: 136
-current_boundary: Feature full coverage in the replacement shell
-current_tag: "[gui][shell-coverage]"
+implemented_through: Block 136
+current_block: 137
+current_boundary: STEP source identity, import modes, JSON, and freshness
+current_tag: "[core][step-import-source]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -18,7 +18,7 @@ phase_status:
   mvp_7: "GUI Feature Validation — Blocks 95–105 implemented; MVP complete"
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 implemented; MVP complete"
-  mvp_9r: "GUI Shell Reset — Blocks 132–135 implemented; Block 136 in progress"
+  mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 planned"
 ---
 
@@ -31,10 +31,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 135
-current block        Block 136
-current phase        GUI Shell Reset MVP-9R
-current boundary     Feature full coverage in the replacement shell
+implemented through  Block 136
+current block        Block 137 (planned)
+current phase        STEP Import MVP-10
+current boundary     STEP source identity, import modes, JSON, and freshness
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
@@ -46,6 +46,10 @@ interactive Surface authoring and surface-to-solid conversion, and Block 129 add
 lifecycle and Core feature-update commands over that infrastructure, and Block 130 adds interactive
 Assembly placement, compatibility-filtered relationships, joint frames, and coordinate motion.
 Block 131 closes MVP-9 with read-only Measure, coverage manifest v2, and integrated acceptance.
+Blocks 132–136 replace the Qt shell and restore all eighteen bounded feature families with current
+ShellWindow proofs. Block 136 is accepted on 2026-10-25; its full regression, native interaction,
+visual and closure evidence is recorded in `docs/gui-shell-acceptance-mvp9r.md`. Dated implementation
+entries below retain the acceptance state at the time of each slice.
 
 ## Phase map
 
@@ -59,7 +63,7 @@ MVP-6   Part Construction                              Blocks 48–94 implemente
 MVP-7   GUI Feature Validation                        Blocks 95–105 implemented
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
 MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 implemented
-MVP-9R  GUI Shell Reset                       Blocks 132–135 implemented; Block 136 in progress
+MVP-9R  GUI Shell Reset                                 Blocks 132–136 implemented
 MVP-10  STEP Import                                            Blocks 137–143 planned
 ```
 
@@ -153,8 +157,8 @@ geometry. Block 112 adds exact full circles, circular arcs and exact rational el
 and line/arc slot profiles through the same interaction and transaction boundary. Shell hardening
 adds reference-based tangent construction, persistent dimension placement and inline editing, open
 Sketch completion, profile-aware splitting/corners and spline continuation. These changes and their
-focused proofs are recorded in the respective contracts; Block 136 remains planned for the remaining
-feature command surface.
+focused proofs are recorded in the respective contracts. Block 136 completes replacement-shell
+feature coverage, with current evidence in `docs/gui-shell-acceptance-mvp9r.md`.
 
 Canonical contracts:
 
@@ -543,9 +547,10 @@ Sequence contract: `docs/gui-shell-reset-sequence-mvp9r.md`.
   adds persistent viewport selection for topology-authored profiles, stale-selection invalidation,
   strict unit parsing, numeric drag override and rollback, collision-safe generated inputs,
   immediate camera remapping, and expanded negative/atomic proofs.
-- Block 136 — Feature full coverage: remaining feature commands (Fillet, Chamfer, Shell, Draft,
-  Pattern, Mirror, Boolean, Transform, Sweep, Loft, Surface, Measure, Assembly), feature edit via
-  browser double-click, acceptance coverage.
+- Block 136 — Feature full coverage — Implemented and accepted: restored feature commands (Fillet,
+  Chamfer, Shell, Draft, Pattern, Mirror, Boolean, Transform, Sweep, Loft, Surface, Measure, Assembly), feature edit via
+  browser double-click, construction/reference repair, Sketch3D, parameters, navigation/filter/repeat
+  and selection contexts, advanced Assembly and analysis, and integrated acceptance coverage.
 
 ### Sketch workflow follow-up — 21 October 2026
 
@@ -1166,41 +1171,42 @@ reopens canonically and exports STEP. Verification and native evidence live in
 integrated acceptance. Thirteen families remain restored and five partial; Block 136 stays open
 and numbered completion remains through Block 135.
 
-## Current next technical step — Block 136
+### Block 136 — Assembly completion implementation — 2026-10-25
 
-The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
-reachable entry points and explicit remaining gaps. The machine check distinguishes inventory validity
-from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
-`docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
+The final implementation slice adds root Assembly selection contexts, hierarchy validation,
+occurrence-qualified relationship/joint create/edit tasks, connected cross-hierarchy solve/application,
+role-addressed joint motion, sampled Revolute analysis and exact occurrence result highlighting.
+New focused regressions accompany two realistic integrated Qt workflows covering repeated child
+Assemblies, history, rejected candidates, persistence and both Assembly STEP modes.
 
-Extend contextual commands to Assembly, then continue the
-remaining advanced Assembly and integrated acceptance workflows. Native `ToFace`/`Between` collection
-now covers the supported semantic source roles. The bounded single-line Thin Extrude editors are available; general curved/open chains remain
-outside that Geometry boundary.
-All seven bounded Extrude terminations and the expanded Revolve controls now have explicit shell
-editors. Path Extrude selects open PathCurves with all four Body operations. Dedicated plain
-through-all Hole authoring is available within the retained circular-cut/Core
-target boundaries.
-The bounded standalone Part parameter manager now creates and edits typed literals and Length/Count
-formulas through local batches, complete downstream Preview and one atomic Apply. The Sketch3D/PathCurve surface includes
-typed/shared-point line editing, native collection, constrained grips, anchored pointer/direction
-placement and explicit planar-point copies.
-Live associative point projection and new arc/spline/helix parameter tools remain extensions of their
-existing bounded contracts.
-Explicit constraint-diagnostic suggestion controls cover the accepted bounded Core diagnostic/repair
-subset.
-The bounded repair-open path now supports failed-recompute Parts and missing face/point/line sources,
-with typed intent, complete atomic publication and failed-state history. Other structural dependency
-failures remain strict loading errors.
-The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with the remaining Assembly
-context commands, advanced Assembly controls and integrated native Part/Assembly acceptance
-in the order recorded in
-`docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
-workflows are resolved and the closure gate plus full/native regressions pass.
+Nineteen new GUI cases include two integrated Qt workflows and native proofs for rotated hierarchy
+target picking and visible occurrence highlighting. A diagnostic-only revision no longer prevents
+correcting an invalid analysis interval. Core/Geometry authority and persistence formats are unchanged.
+The exact contracts remain in the existing Assembly, modeling-workspace and analysis documents.
+
+### Block 136 — Final replacement-shell acceptance — 2026-10-25
+
+All eighteen accepted feature families have restored bounded surfaces and current shell proofs;
+the v3 manifest has no family gaps or pending acceptance workflows. Full Core (530 cases), Geometry
+(441), offscreen GUI (516 passed, 19 native-only skips) and canonical native shell (351 passed,
+no skips) pass. Native captures, visible framebuffer highlighting and separate application startup
+were verified. The explicit `BLCAD_REQUIRE_SHELL_ACCEPTANCE=1` closure gate passes with the completed
+plan and manifest. Full counts and commands live in `docs/gui-shell-acceptance-mvp9r.md`.
+
+GUI Shell Reset MVP-9R is complete through Block 136. Existing feature-specific geometry boundaries
+remain explicit, including discrete Revolute sampling and shared child-definition pose authority.
+Historical Block-131 controller acceptance remains separate from the completed shell evidence.
+
+## Current next technical step — Block 137 (planned)
+
+Start STEP source identity, explicit Reference/EditableBody modes, canonical JSON and freshness
+contracts according to `docs/step-import-sequence-mvp10.md`. Define portable project-relative source
+paths, SHA-256 digests and explicit missing/changed/unreadable-source diagnostics, with transactional
+refresh intent and focused Core tests. The matching source/mode task must consume that authority.
+The OCCT STEP/XDE reader follows in Block 138; Blocks 137–143 remain planned.
 
 ## Later phases
 
 Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R
-runs through Blocks 132–136. STEP Import MVP-10 shifts to Blocks 137–143 (contract unchanged in
+is complete through Block 136. STEP Import MVP-10 follows in Blocks 137–143 (contract unchanged in
 `docs/step-import-sequence-mvp10.md`; only the numbering moves).

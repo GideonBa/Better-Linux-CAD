@@ -10,7 +10,8 @@ validation/failure policy, ordering, and focused proof. `docs/mvp-plan.md` is th
 > `GuiDocumentSession`, `GuiCommandRegistry`, the selection/browser models, the workbenches, and the
 > Qt-free interactive controllers remain the authority. Passages below that name a binder describe
 > the historical Qt presentation layer; Block 135 rehosts Extrude/Revolve and manipulators in
-> `ShellFeatureTools`, while Block 136 owns the remaining surface.
+> `ShellFeatureTools`. Block 136 completes the remaining bounded shell surfaces and their integrated
+> acceptance; current proof is recorded in `docs/gui-shell-acceptance-mvp9r.md`.
 
 ## Goal and authority model
 

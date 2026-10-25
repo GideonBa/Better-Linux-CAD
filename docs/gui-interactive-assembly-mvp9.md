@@ -1,7 +1,8 @@
 # GUI Interactive Assembly Placement, Relationships, Joints, and Motion MVP-9
 
 Status: headless authorities implemented in Block 130; replacement-shell integration restored in
-the Assembly slice of Block 136 (22 October 2026).
+the Assembly slices of Block 136 (22–25 October 2026), including occurrence-qualified hierarchy
+authoring, solving and motion. Whole-block acceptance is tracked in `docs/mvp-plan.md`.
 
 Block 130 upgrades the MVP-7 Assembly validation workbench into direct-manipulation authoring over
 the existing component-instance, relationship, joint-coordinate, solve, and vector-drive contracts.
@@ -104,10 +105,11 @@ live solve/HUD status, atomic coordinate/pose Apply, and Spherical drive rejecti
 ## Scope and deferrals
 
 General constrained free-drag is not introduced. It needs a Geometry drag-objective solve mode that
-does not exist in the current contracts. These direct-manipulation controllers operate on root-Assembly occurrences so one existing local
-solve/application boundary remains atomic. The former MVP-7 cross-hierarchy validation workbench was
-removed by the shell reset; its Core/Geometry contracts remain, but cross-hierarchy authoring is not
-exposed by this replacement shell.
+does not exist in the current contracts. The direct-manipulation controllers operate on root-Assembly
+occurrences so one existing local solve/application boundary remains atomic. The replacement shell
+also exposes the existing occurrence-qualified hierarchy authorities through dedicated author/edit,
+solve and typed-motion tasks, described below. Hierarchy motion uses its coordinate field and slider;
+it does not introduce a cross-hierarchy free-drag solver.
 
 ## Next boundary
 
@@ -150,7 +152,8 @@ passive with no coordinate rows and does not appear in the motion chooser. Motio
 numeric field or one native handle; an invalid requested value restores the last valid candidate.
 Relationships, motion and group solve display actual solved-pose previews and diagnostics. Relationship
 authoring retains the controller's two-component connected-group boundary; group solve requires the
-complete selected connected group. Nested/cross-hierarchy endpoint authoring remains deferred.
+complete selected connected group. The dedicated hierarchy commands below operate on exact rooted
+occurrence paths and their existing shared transform authorities.
 
 Every task records its source Project snapshot. External intent changes, stale geometry, document
 replacement, Undo/Redo or cancellation discard its targets, ghosts and handles. Apply repeats authority
@@ -168,3 +171,70 @@ all five joint families, compatibility-filtered relationships, group solve, limi
 Undo/Redo and Save/Open. Native cases exercise occurrence picking and translate/rotate/motion handles
 with numeric refinement and drag cancellation. Geometry proof checks posed semantic glyphs, unique
 identities, valid OCCT shapes and unchanged authored JSON.
+
+## Hierarchy tasks and shared occurrence authority — 25 October 2026
+
+The same `ShellAssemblyTools` owner exposes five additional ribbon commands. **Hierarchie prüfen**
+validates the complete Project structure through Core and reports the deterministic root/child
+occurrence paths, visibility/suppression and active visible leaf count. The task is read-only;
+Apply is disabled and inspection adds no history entry.
+
+**Hierarchie-Beziehung** and **Hierarchie-Gelenk** offer a New/Edit selector, a name and active state,
+then the same family-specific input controls. Edit loads the existing exact ID, ordered endpoint
+paths, scalar/coordinate values and limits. Apply replaces that record atomically; a new command
+allocates a free Project-level ID. Candidate endpoints contain a typed
+`AssemblyHierarchyConstraintEndpoint`, never a path reconstructed from a display label. Repeated
+occurrences of the same child definition remain separate choices with different rooted paths.
+
+Visible active paths supply the supported semantic faces, edges, vertices, axes, seat frames and
+reference geometry already accepted by `AssemblyInteractionGeometry`. Local glyph geometry is reused
+per definition and transformed through each parent chain; `AssemblyHierarchyConstraintTargetResolver`
+resolves the actual Project endpoint. Presentation IDs encode complete occurrence paths and are
+transient. The second-reference chooser and current native pick scope expose the same compatible
+candidates. Mate/Distance/Angle/Concentric/Insert/Coincident/Parallel/Perpendicular use the hierarchy
+equation builder. Revolute/Prismatic/Cylindrical/Planar use Frame/Frame targets and their existing typed
+coordinate slots; passive Spherical uses Point/Point. Unresolved, hidden or suppressed targets are
+absent, and incompatible inputs or malformed values prevent Apply.
+
+Authoring previews validate geometry and Core structure on a Project copy. Apply stores intent in one
+Project transaction. Explicit **Hierarchie lösen** computes placement: its list contains complete
+deterministic connected groups from `AssemblyCrossHierarchyConstraintGraph`, including their local
+relationships. Exactly one group is selected. Rank/remaining-DOF diagnostics and final RMS accompany
+the posed preview. Only a converged result can be applied through
+`AssemblyCrossHierarchySolveResultApplier` in one transaction.
+
+**Hierarchie bewegen** lists active non-Spherical Project-level joints and their ordered coordinate
+roles. Numeric and slider input drive one selected role through `AssemblyJointDrive` and
+`AssemblyCrossHierarchyJointMotionSolver`; omitted roles retain their authored values. Invalid limits,
+unknown roles or a non-converged result block Apply and leave the source unchanged. Apply passes the
+fresh result through `AssemblyCrossHierarchyJointMotionResultApplier`, updating the selected
+coordinate and resulting poses atomically. No geometric solve, preview, glyph or graph cache is
+serialized.
+
+Both solvers retain the existing shared `ComponentTransformAuthority` contract. A child component's
+internal transform is definition-owned, so all repeated occurrences show that new internal pose.
+Subassembly boundary transforms remain unchanged. The UI states this consequence alongside the
+solve/motion preview. It does not provide independent internal poses for repeated rigid instances or
+remap imported Project-level cross intent into child definitions.
+
+The existing source snapshot, freshness checks and task ownership cover all hierarchy commands.
+Save writes accepted intent while keeping a draft active. Cancel restores the prior selection filter
+and semantic scope; document replacement or external source mutation discards the candidate. Failed
+Apply leaves accepted intent and history unchanged. Targets disappear after task exit unless an
+explicit idle AssemblyTargets filter requests supported root semantic targets.
+
+Five selection-first context actions also enter the same owner: a visible root component seeds
+Placement or its complete connected Solve group; Motion is offered when exactly one active drivable
+root joint touches that component. An explicit root AssemblyTarget seeds Relationship or Joint.
+Consumed preselection is restored on cancellation through the shared context lifecycle.
+
+The focused `[block136-assembly-advanced]` GUI cases exercise hierarchy reporting, exact occurrence
+paths, relationship editing and shared-authority solves, all five joint families, typed motion for
+all four driven families, limit/invalid-text recovery, history, canonical persistence and source
+lifecycle. A multi-step Planar workflow applies U, V and normal rotation separately, rejects an
+out-of-limit intermediate value, preserves all undriven roles, and traverses all three accepted poses
+with Undo/Redo before Save/Open. A native case checks transformed target geometry and an actual viewport pick through a
+translated, rotated repeated parent while retaining the exact endpoint path. The complex workflow
+suite adds actual ribbon, browser, chooser, numeric, Apply and file
+input across repeated child definitions; acceptance evidence is recorded in
+`docs/gui-shell-acceptance-mvp9r.md` after verification.

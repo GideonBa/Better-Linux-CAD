@@ -1,4 +1,5 @@
 #pragma once
+#include "blcad/geometry/assembly_cross_hierarchy_joint_motion_solver.hpp"
 #include "blcad/geometry/assembly_interaction.hpp"
 #include "blcad/gui/gui_interactive_assembly.hpp"
 #include <QObject>
@@ -29,8 +30,32 @@ public:
     Relationship,
     Joint,
     Motion,
-    Solve
+    Solve,
+    ValidateHierarchy,
+    CrossRelationship,
+    CrossJoint,
+    CrossSolve,
+    CrossMotion
   };
+  struct Context {
+    Command command;
+    GuiSelection selection;
+    std::string source;
+  };
+  struct HierarchyTarget {
+    AssemblyHierarchyConstraintEndpoint endpoint;
+    geometry::AssemblyInteractionTarget target;
+  };
+  [[nodiscard]] QAction* context_action(Command) const noexcept;
+  [[nodiscard]] std::optional<Context> context(Command) const;
+  [[nodiscard]] bool context_available(const Context&) const;
+  [[nodiscard]] bool select_context(const Context&);
+  [[nodiscard]] Command command() const noexcept {
+    return command_;
+  }
+  [[nodiscard]] const std::vector<HierarchyTarget>& hierarchy_targets() const noexcept {
+    return hierarchy_targets_;
+  }
   ShellAssemblyTools(ShellWindow&, GuiDocumentSession&, OcctViewport&, ShellRibbon&, int tab);
   ~ShellAssemblyTools() override;
   [[nodiscard]] Result<std::size_t> import_definition(const QString& path);
@@ -110,7 +135,21 @@ protected:
   bool eventFilter(QObject*, QEvent*) override;
 
 private:
+  [[nodiscard]] std::optional<Context> context_for(Command, const GuiSelection&) const;
   [[nodiscard]] bool placement() const noexcept;
+  [[nodiscard]] bool advanced() const noexcept;
+  void create_advanced_controls(QWidget* panel);
+  [[nodiscard]] Result<std::size_t> begin_advanced();
+  [[nodiscard]] Result<std::size_t> build_hierarchy_targets();
+  void load_advanced_record();
+  void load_cross_motion();
+  void synchronize_cross_motion();
+  void update_advanced_second_choices();
+  [[nodiscard]] Result<QString> preview_advanced(Project&);
+  [[nodiscard]] Result<std::size_t> apply_advanced();
+  [[nodiscard]] const HierarchyTarget* hierarchy_selected(QComboBox*) const;
+  [[nodiscard]] Result<AssemblyHierarchyConstraint> cross_relationship() const;
+  [[nodiscard]] Result<AssemblyHierarchyJoint> cross_joint() const;
   [[nodiscard]] Result<std::size_t> rebuild_controller();
   [[nodiscard]] Result<std::size_t> preview();
   [[nodiscard]] Result<std::size_t> candidate(const GuiViewportManipulatorCandidate&);
@@ -136,6 +175,14 @@ private:
   Command command_{Command::None};
   QWidget* overlay_{};
   QDockWidget* dock_{};
+  QWidget* advanced_controls_{};
+  QComboBox* advanced_record_{};
+  QLineEdit* advanced_name_{};
+  QCheckBox* advanced_active_{};
+  std::vector<HierarchyTarget> hierarchy_targets_;
+  std::vector<AssemblyCrossHierarchySolveGroup> cross_groups_;
+  std::optional<geometry::AssemblyCrossHierarchySolveResult> cross_solved_;
+  std::optional<geometry::AssemblyCrossHierarchyJointMotionResult> cross_moved_;
   QWidget* placement_controls_{};
   QWidget* target_controls_{};
   QWidget* motion_controls_{};

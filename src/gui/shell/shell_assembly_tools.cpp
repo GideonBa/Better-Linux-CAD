@@ -55,6 +55,16 @@ QString title(ShellAssemblyTools::Command c) {
     return QStringLiteral("Gelenk bewegen");
   case C::Solve:
     return QStringLiteral("Baugruppe lösen");
+  case C::ValidateHierarchy:
+    return QStringLiteral("Hierarchie prüfen");
+  case C::CrossRelationship:
+    return QStringLiteral("Hierarchie-Beziehung");
+  case C::CrossJoint:
+    return QStringLiteral("Hierarchie-Gelenk");
+  case C::CrossSolve:
+    return QStringLiteral("Hierarchie lösen");
+  case C::CrossMotion:
+    return QStringLiteral("Hierarchie bewegen");
   default:
     return {};
   }
@@ -114,7 +124,12 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
            {Command::Relationship, "assembly_relationship"},
            {Command::Joint, "assembly_joint"},
            {Command::Motion, "assembly_motion"},
-           {Command::Solve, "assembly_solve"}}) {
+           {Command::Solve, "assembly_solve"},
+           {Command::ValidateHierarchy, "assembly_validate_hierarchy"},
+           {Command::CrossRelationship, "assembly_cross_relationship"},
+           {Command::CrossJoint, "assembly_cross_joint"},
+           {Command::CrossSolve, "assembly_cross_solve"},
+           {Command::CrossMotion, "assembly_cross_motion"}}) {
     auto* action = new QAction(title(command), this);
     action->setObjectName(QStringLiteral("blcad.action.") + id);
     connect(action, &QAction::triggered, this, [this, command] {
@@ -145,6 +160,8 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   summary_->setWordWrap(true);
   summary_->setObjectName("blcad.assembly.summary");
   inputs->addWidget(summary_);
+  create_advanced_controls(panel);
+  inputs->addWidget(advanced_controls_);
   placement_controls_ = new QWidget(panel);
   auto* placement_form = new QFormLayout(placement_controls_);
   definition_ = new QComboBox(panel);
@@ -192,10 +209,12 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   target_controls_ = new QWidget(panel);
   auto* target_form = new QFormLayout(target_controls_);
   relationship_type_ = new QComboBox(panel);
+  relationship_type_->setObjectName("blcad.assembly.relationship_type");
   relationship_type_->addItems({"Mate", "Concentric", "Distance", "Insert", "Angle", "Coincident",
                                 "Parallel", "Perpendicular"});
   target_form->addRow(QStringLiteral("Beziehung"), relationship_type_);
   joint_type_ = new QComboBox(panel);
+  joint_type_->setObjectName("blcad.assembly.joint_type");
   joint_type_->addItems({"Revolute", "Prismatic", "Cylindrical", "Planar", "Spherical"});
   target_form->addRow(QStringLiteral("Gelenkart"), joint_type_);
   pick_ = new QComboBox(panel);
@@ -221,6 +240,7 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   joint_ = new QComboBox(panel);
   joint_->setObjectName("blcad.assembly.joint");
   coordinate_ = new QComboBox(panel);
+  coordinate_->setObjectName("blcad.assembly.coordinate");
   motion_form->addRow(QStringLiteral("Gelenk"), joint_);
   motion_form->addRow(QStringLiteral("Koordinate"), coordinate_);
   slider_ = new QSlider(Qt::Horizontal, panel);
@@ -239,6 +259,7 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   inputs->addWidget(value_label_);
   inputs->addWidget(value_);
   solve_group_ = new QListWidget(panel);
+  solve_group_->setObjectName("blcad.assembly.solve_group");
   solve_group_->setSelectionMode(QAbstractItemView::ExtendedSelection);
   solve_group_->setMaximumHeight(180);
   inputs->addWidget(solve_group_);
@@ -303,13 +324,13 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
     }
   });
   connect(relationship_type_, &QComboBox::currentIndexChanged, this, [this] {
-    if (!sync_ && command_ == Command::Relationship) {
+    if (!sync_ && (command_ == Command::Relationship || command_ == Command::CrossRelationship)) {
       update_second_choices();
       changed();
     }
   });
   connect(joint_type_, &QComboBox::currentIndexChanged, this, [this] {
-    if (!sync_ && command_ == Command::Joint) {
+    if (!sync_ && (command_ == Command::Joint || command_ == Command::CrossJoint)) {
       load_slots();
       update_second_choices();
       changed();
@@ -330,16 +351,24 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
       update_pick_scope();
   });
   connect(slots_, &QTableWidget::cellChanged, this, [this] {
-    if (!sync_ && command_ == Command::Joint)
+    if (!sync_ && (command_ == Command::Joint || command_ == Command::CrossJoint))
       changed();
   });
   connect(joint_, &QComboBox::currentIndexChanged, this, [this] {
-    if (!sync_ && command_ == Command::Motion) {
-      load_joint();
+    if (!sync_ && (command_ == Command::Motion || command_ == Command::CrossMotion)) {
+      if (command_ == Command::CrossMotion)
+        load_cross_motion();
+      else
+        load_joint();
       changed();
     }
   });
   connect(coordinate_, &QComboBox::currentIndexChanged, this, [this] {
+    if (!sync_ && command_ == Command::CrossMotion) {
+      synchronize_cross_motion();
+      changed();
+      return;
+    }
     if (!sync_ && command_ == Command::Motion) {
       auto& motion = coordinator_.motion();
       if (motion.active()) {
@@ -369,11 +398,11 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
     }
   });
   connect(slider_, &QSlider::valueChanged, this, [this](int i) {
-    if (!sync_ && command_ == Command::Motion)
+    if (!sync_ && (command_ == Command::Motion || command_ == Command::CrossMotion))
       value_->setValue(slider_lower_ + (slider_upper_ - slider_lower_) * i / 1000.0);
   });
   connect(solve_group_, &QListWidget::itemSelectionChanged, this, [this] {
-    if (!sync_ && command_ == Command::Solve)
+    if (!sync_ && (command_ == Command::Solve || command_ == Command::CrossSolve))
       changed();
   });
   connect(drag_editor_, &QLineEdit::editingFinished, this, [this] {
@@ -485,6 +514,7 @@ Result<std::size_t> ShellAssemblyTools::begin(Command command) {
       joint_->addItem(QString::fromStdString(joint.name()),
                       QString::fromStdString(joint.id().value()));
   targets_.clear();
+  hierarchy_targets_.clear();
   if (command == Command::Relationship || command == Command::Joint) {
     auto targets = geometry::AssemblyInteractionGeometry::targets(*project);
     if (!targets) {
@@ -504,7 +534,9 @@ Result<std::size_t> ShellAssemblyTools::begin(Command command) {
     if (!project->assembly().find_component_instance(component_id_) &&
         !project->assembly().find_subassembly_instance(subassembly_id_) &&
         !project->assembly().find_constraint(relationship_id_) &&
-        !project->assembly().find_joint(joint_id_)) {
+        !project->assembly().find_joint(joint_id_) &&
+        !project->find_cross_hierarchy_constraint(relationship_id_) &&
+        !project->find_cross_hierarchy_joint(joint_id_)) {
       name_->setText(title(command) + " " + QString::fromStdString(suffix));
       break;
     }
@@ -526,13 +558,28 @@ Result<std::size_t> ShellAssemblyTools::begin(Command command) {
   form->setRowVisible(occurrence_, command == Command::Placement);
   name_->setReadOnly(command == Command::Placement);
   placement_controls_->setVisible(placement());
-  target_controls_->setVisible(command == Command::Relationship || command == Command::Joint);
-  motion_controls_->setVisible(command == Command::Motion);
-  solve_group_->setVisible(command == Command::Solve);
+  target_controls_->setVisible(command == Command::Relationship || command == Command::Joint ||
+                               command == Command::CrossRelationship ||
+                               command == Command::CrossJoint);
+  motion_controls_->setVisible(command == Command::Motion || command == Command::CrossMotion);
+  solve_group_->setVisible(command == Command::Solve || command == Command::CrossSolve);
   auto* target_form = static_cast<QFormLayout*>(target_controls_->layout());
-  target_form->setRowVisible(relationship_type_, command == Command::Relationship);
-  target_form->setRowVisible(joint_type_, command == Command::Joint);
-  target_form->setRowVisible(slots_, command == Command::Joint);
+  target_form->setRowVisible(relationship_type_, command == Command::Relationship ||
+                                                     command == Command::CrossRelationship);
+  target_form->setRowVisible(joint_type_,
+                             command == Command::Joint || command == Command::CrossJoint);
+  target_form->setRowVisible(slots_, command == Command::Joint || command == Command::CrossJoint);
+  advanced_controls_->setVisible(command == Command::CrossRelationship ||
+                                 command == Command::CrossJoint);
+  if (advanced()) {
+    auto initialized = begin_advanced();
+    if (!initialized) {
+      command_ = Command::None;
+      sync_ = false;
+      return initialized;
+    }
+  } else
+    solve_group_->setSelectionMode(QAbstractItemView::ExtendedSelection);
   drag_editor_->hide();
   dock_->setWindowTitle(title(command));
   sync_ = false;
@@ -545,7 +592,7 @@ Result<std::size_t> ShellAssemblyTools::begin(Command command) {
   previous_scope_ = viewport_.selection_semantic_scope();
   revision_ = session_.presentation_revision();
   source_json_ = serialize_project_to_json(*project).value();
-  if (command == Command::Joint)
+  if (command == Command::Joint || command == Command::CrossJoint)
     load_slots();
   dock_->show();
   dock_->raise();
@@ -674,6 +721,10 @@ void ShellAssemblyTools::synchronize_values() {
     for (std::size_t i = 0; i < 6; ++i)
       placement_values_[i]->setValue(values[i]);
   }
+  if (command_ == Command::CrossMotion && slider_upper_ > slider_lower_) {
+    slider_->setValue(static_cast<int>(std::clamp(
+        (value_->value() - slider_lower_) / (slider_upper_ - slider_lower_) * 1000, 0.0, 1000.0)));
+  }
   if (command_ == Command::Motion && coordinator_.motion().active())
     for (const auto& c : coordinator_.motion().coordinate_controls(session_))
       if (c.selected) {
@@ -701,6 +752,10 @@ void ShellAssemblyTools::synchronize_values() {
   sync_ = false;
 }
 void ShellAssemblyTools::update_second_choices() {
+  if (advanced()) {
+    update_advanced_second_choices();
+    return;
+  }
   if (command_ != Command::Relationship && command_ != Command::Joint)
     return;
   const auto* a = selected(first_);
@@ -744,6 +799,8 @@ void ShellAssemblyTools::update_second_choices() {
 Result<std::size_t> ShellAssemblyTools::rebuild_controller() {
   coordinator_.cancel();
   solved_.reset();
+  if (advanced())
+    return Result<std::size_t>::success(1);
   if (placement()) {
     Result<std::size_t> begun = fail("Zuerst eine Definition oder ein Vorkommen wählen");
     const auto definition = definition_->currentData().toString().toStdString();
@@ -847,7 +904,17 @@ Result<std::size_t> ShellAssemblyTools::preview() {
   apply_->setEnabled(false);
   Project candidate = *session_.project();
   QString status;
-  if (placement()) {
+  if (advanced()) {
+    auto checked = preview_advanced(candidate);
+    if (!checked)
+      return Result<std::size_t>::failure(checked.error());
+    status = checked.value();
+    if (command_ == Command::ValidateHierarchy) {
+      summary_->setText(status);
+      viewport_.clear_feature_preview();
+      return Result<std::size_t>::success(1);
+    }
+  } else if (placement()) {
     auto checked = coordinator_.placement().preview_project(session_);
     if (!checked)
       return Result<std::size_t>::failure(checked.error());
@@ -983,17 +1050,18 @@ void ShellAssemblyTools::changed() {
   if (!active() || sync_)
     return;
   value_->setVisible(
-      command_ == Command::Motion ||
-      (command_ == Command::Relationship &&
+      command_ == Command::Motion || command_ == Command::CrossMotion ||
+      ((command_ == Command::Relationship || command_ == Command::CrossRelationship) &&
        (relationship_type_->currentIndex() == static_cast<int>(AssemblyConstraintType::Distance) ||
         relationship_type_->currentIndex() == static_cast<int>(AssemblyConstraintType::Angle))));
   value_label_->setVisible(value_->isVisible());
-  value_label_->setText(command_ == Command::Motion ? QStringLiteral("Koordinatenwert")
+  value_label_->setText((command_ == Command::Motion || command_ == Command::CrossMotion)
+                            ? QStringLiteral("Koordinatenwert")
                         : relationship_type_->currentIndex() ==
                                 static_cast<int>(AssemblyConstraintType::Angle)
                             ? QStringLiteral("Winkel (deg)")
                             : QStringLiteral("Abstand (mm)"));
-  if (command_ == Command::Relationship) {
+  if (command_ == Command::Relationship || command_ == Command::CrossRelationship) {
     const QSignalBlocker block(value_);
     value_->setSuffix(relationship_type_->currentIndex() ==
                               static_cast<int>(AssemblyConstraintType::Angle)
@@ -1014,7 +1082,13 @@ void ShellAssemblyTools::changed() {
 }
 void ShellAssemblyTools::update_pick_scope() {
   std::vector<std::string> scope;
-  if (command_ == Command::Relationship || command_ == Command::Joint) {
+  if (command_ == Command::CrossRelationship || command_ == Command::CrossJoint) {
+    auto* input = pick_->currentIndex() == 0 ? first_ : second_;
+    for (int row = 1; row < input->count(); ++row)
+      scope.push_back(
+          hierarchy_targets_.at(input->itemData(row).toInt()).target.presentation.semantic_id);
+    viewport_.set_selection_filter_mask(selection_kind_bit(GuiSelectionKind::AssemblyTarget));
+  } else if (command_ == Command::Relationship || command_ == Command::Joint) {
     auto* input = pick_->currentIndex() == 0 ? first_ : second_;
     for (int row = 1; row < input->count(); ++row)
       scope.push_back(targets_.at(input->itemData(row).toInt()).presentation.semantic_id);
@@ -1032,7 +1106,7 @@ void ShellAssemblyTools::update_pick_scope() {
 bool ShellAssemblyTools::accept_selection(const GuiSelection& selection) {
   if (!active() || !layer_.active_handle_id().empty())
     return false;
-  if (command_ == Command::Placement) {
+  if (command_ == Command::Placement && selection.kind == GuiSelectionKind::Component) {
     for (const auto& c : session_.project()->assembly().component_instances())
       if (selection.semantic_id ==
           "component/" + session_.project()->assembly().id().value() + "/" + c.id().value()) {
@@ -1041,7 +1115,22 @@ bool ShellAssemblyTools::accept_selection(const GuiSelection& selection) {
         return true;
       }
   }
-  if (command_ != Command::Relationship && command_ != Command::Joint)
+  if (command_ == Command::CrossRelationship || command_ == Command::CrossJoint) {
+    if (selection.kind != GuiSelectionKind::AssemblyTarget)
+      return false;
+    auto* input = pick_->currentIndex() == 0 ? first_ : second_;
+    for (int row = 1; row < input->count(); ++row)
+      if (hierarchy_targets_.at(input->itemData(row).toInt()).target.presentation.semantic_id ==
+          selection.semantic_id) {
+        input->setCurrentIndex(row);
+        if (input == first_)
+          pick_->setCurrentIndex(1);
+        return true;
+      }
+    return false;
+  }
+  if ((command_ != Command::Relationship && command_ != Command::Joint) ||
+      selection.kind != GuiSelectionKind::AssemblyTarget)
     return false;
   auto* input = pick_->currentIndex() == 0 ? first_ : second_;
   for (int row = 1; row < input->count(); ++row)
@@ -1056,7 +1145,23 @@ bool ShellAssemblyTools::accept_selection(const GuiSelection& selection) {
 }
 std::vector<geometry::ViewportSceneItem> ShellAssemblyTools::selection_items() const {
   std::vector<geometry::ViewportSceneItem> items;
-  if (command_ == Command::Relationship || command_ == Command::Joint) {
+  if (!active() && !session_.task().active() && session_.project() &&
+      session_.derived_results_fresh() &&
+      viewport_.selection_filter_mask() == selection_kind_bit(GuiSelectionKind::AssemblyTarget)) {
+    auto targets = geometry::AssemblyInteractionGeometry::targets(*session_.project());
+    if (targets)
+      for (auto& target : targets.value())
+        items.push_back(std::move(target.presentation));
+    return items;
+  }
+  if (command_ == Command::CrossRelationship || command_ == Command::CrossJoint) {
+    auto* input = pick_->currentIndex() == 0 ? first_ : second_;
+    for (int row = 1; row < input->count(); ++row)
+      items.push_back(hierarchy_targets_.at(input->itemData(row).toInt()).target.presentation);
+    if (pick_->currentIndex() == 1)
+      if (const auto* a = hierarchy_selected(first_))
+        items.push_back(a->target.presentation);
+  } else if (command_ == Command::Relationship || command_ == Command::Joint) {
     auto* input = pick_->currentIndex() == 0 ? first_ : second_;
     for (int row = 1; row < input->count(); ++row)
       items.push_back(targets_.at(input->itemData(row).toInt()).presentation);
@@ -1138,7 +1243,19 @@ void ShellAssemblyTools::refresh() {
   for (const auto& [command, action] : actions_)
     action->setEnabled(
         idle &&
-        (command == Command::InsertComponent     ? !project->part_documents().empty()
+        (command == Command::ValidateHierarchy ? true
+         : command == Command::CrossRelationship || command == Command::CrossJoint
+             ? project->assembly().subassembly_instance_count() > 0
+
+         : command == Command::CrossSolve ? project->cross_hierarchy_constraint_count() > 0
+         : command == Command::CrossMotion
+             ? std::any_of(project->cross_hierarchy_joints().begin(),
+                           project->cross_hierarchy_joints().end(),
+                           [](const auto& j) {
+                             return j.state() == AssemblyJointState::Active &&
+                                    j.type() != AssemblyJointType::Spherical;
+                           })
+         : command == Command::InsertComponent   ? !project->part_documents().empty()
          : command == Command::InsertSubassembly ? !project->child_assembly_documents().empty()
          : command == Command::Motion
              ? std::any_of(project->assembly().joints().begin(), project->assembly().joints().end(),
@@ -1180,6 +1297,10 @@ void ShellAssemblyTools::end(bool applied) {
   valid_ = false;
   solved_.reset();
   targets_.clear();
+  hierarchy_targets_.clear();
+  cross_groups_.clear();
+  cross_solved_.reset();
+  cross_moved_.reset();
   viewport_.set_selection_semantic_scope(previous_scope_);
   viewport_.set_selection_filter_mask(previous_mask_);
   viewport_.clear_feature_preview();
@@ -1192,6 +1313,7 @@ void ShellAssemblyTools::end(bool applied) {
       (void)session_.task().cancel();
   }
   window_.refresh_feature_selection_scene();
+  window_.finish_context_task(applied);
   window_.refresh();
   window_.statusBar()->showMessage(applied ? QStringLiteral("Baugruppenbefehl angewendet")
                                            : QStringLiteral("Baugruppenbefehl abgebrochen"));
@@ -1213,8 +1335,10 @@ Result<std::size_t> ShellAssemblyTools::apply() {
   checked = preview();
   if (!checked)
     return checked;
-  auto applied = command_ == Command::Solve ? GuiAssemblyWorkbench{}.apply_solve(session_, *solved_)
-                                            : coordinator_.apply();
+  auto applied = advanced() ? apply_advanced()
+                 : command_ == Command::Solve
+                     ? GuiAssemblyWorkbench{}.apply_solve(session_, *solved_)
+                     : coordinator_.apply();
   if (applied) {
     QAction* accepted_action = nullptr;
     for (const auto& [command, action] : actions_)

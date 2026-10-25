@@ -12,7 +12,7 @@
 #include <tuple>
 
 namespace blcad::gui {
-using Command = ShellFeatureTools::Command;
+using FeatureCommand = ShellFeatureTools::Command;
 ShellContextTools::ShellContextTools(ShellWindow& window) : QObject(&window), window_(window) {
   panel_ = new QFrame(&window.viewport());
   panel_->setObjectName(QStringLiteral("blcad.context.toolbar"));
@@ -33,27 +33,38 @@ ShellContextTools::ShellContextTools(ShellWindow& window) : QObject(&window), wi
   };
   std::size_t index = 0;
   for (const auto& [kind, id, label] :
-       {std::tuple{Command::Extrude, "extrude", "Extrusion"},
-        std::tuple{Command::Revolve, "revolve", "Drehung"},
-        std::tuple{Command::Sweep, "sweep", "Sweep"},
-        std::tuple{Command::Loft, "loft", "Loft"},
-        std::tuple{Command::Fillet, "fillet", "Verrunden"},
-        std::tuple{Command::Chamfer, "chamfer", "Fase"},
-        std::tuple{Command::Shell, "shell", "Aushöhlen"},
-        std::tuple{Command::Draft, "draft", "Formschräge"},
-        std::tuple{Command::LinearPattern, "linear_pattern", "Lineares Muster"},
-        std::tuple{Command::CircularPattern, "circular_pattern", "Kreismuster"},
-        std::tuple{Command::BodyMirror, "body_mirror", "Spiegeln"},
-        std::tuple{Command::BodyBoolean, "body_boolean", "Kombinieren"},
-        std::tuple{Command::BodyTranslate, "body_translate", "Verschieben"},
-        std::tuple{Command::BodyRotate, "body_rotate", "Drehen"},
-        std::tuple{Command::BodyScale, "body_scale", "Skalieren"},
-        std::tuple{Command::BoundarySurface, "surface_boundary", "Begrenzungsfläche"},
-        std::tuple{Command::FillSurface, "surface_fill", "Füllfläche"},
-        std::tuple{Command::TrimSurface, "surface_trim", "Trimmen"},
-        std::tuple{Command::ExtendSurface, "surface_extend", "Erweitern"},
-        std::tuple{Command::SurfaceStitch, "surface_stitch", "Vernähen"},
-        std::tuple{Command::ClosedShellToSolid, "surface_to_solid", "Volumen"}}) {
+       {std::tuple{FeatureCommand::Extrude, "extrude", "Extrusion"},
+        std::tuple{FeatureCommand::Revolve, "revolve", "Drehung"},
+        std::tuple{FeatureCommand::Sweep, "sweep", "Sweep"},
+        std::tuple{FeatureCommand::Loft, "loft", "Loft"},
+        std::tuple{FeatureCommand::Fillet, "fillet", "Verrunden"},
+        std::tuple{FeatureCommand::Chamfer, "chamfer", "Fase"},
+        std::tuple{FeatureCommand::Shell, "shell", "Aushöhlen"},
+        std::tuple{FeatureCommand::Draft, "draft", "Formschräge"},
+        std::tuple{FeatureCommand::LinearPattern, "linear_pattern", "Lineares Muster"},
+        std::tuple{FeatureCommand::CircularPattern, "circular_pattern", "Kreismuster"},
+        std::tuple{FeatureCommand::BodyMirror, "body_mirror", "Spiegeln"},
+        std::tuple{FeatureCommand::BodyBoolean, "body_boolean", "Kombinieren"},
+        std::tuple{FeatureCommand::BodyTranslate, "body_translate", "Verschieben"},
+        std::tuple{FeatureCommand::BodyRotate, "body_rotate", "Drehen"},
+        std::tuple{FeatureCommand::BodyScale, "body_scale", "Skalieren"},
+        std::tuple{FeatureCommand::BoundarySurface, "surface_boundary", "Begrenzungsfläche"},
+        std::tuple{FeatureCommand::FillSurface, "surface_fill", "Füllfläche"},
+        std::tuple{FeatureCommand::TrimSurface, "surface_trim", "Trimmen"},
+        std::tuple{FeatureCommand::ExtendSurface, "surface_extend", "Erweitern"},
+        std::tuple{FeatureCommand::SurfaceStitch, "surface_stitch", "Vernähen"},
+        std::tuple{FeatureCommand::ClosedShellToSolid, "surface_to_solid", "Volumen"}}) {
+    const auto [wrapper, button] = action(id, label);
+    commands_.at(index++) = {kind, wrapper, button};
+    connect(wrapper, &QAction::triggered, this, [this, kind] { begin(kind); });
+  }
+  using AssemblyCommand = ShellAssemblyTools::Command;
+  for (const auto& [kind, id, label] :
+       {std::tuple{AssemblyCommand::Placement, "assembly_placement", "Platzierung"},
+        std::tuple{AssemblyCommand::Relationship, "assembly_relationship", "Beziehung"},
+        std::tuple{AssemblyCommand::Joint, "assembly_joint", "Gelenk"},
+        std::tuple{AssemblyCommand::Motion, "assembly_motion", "Bewegen"},
+        std::tuple{AssemblyCommand::Solve, "assembly_solve", "Gruppe lösen"}}) {
     const auto [wrapper, button] = action(id, label);
     commands_.at(index++) = {kind, wrapper, button};
     connect(wrapper, &QAction::triggered, this, [this, kind] { begin(kind); });
@@ -63,8 +74,12 @@ ShellContextTools::ShellContextTools(ShellWindow& window) : QObject(&window), wi
     if (cancel_->isEnabled() && panel_->isVisible() && consumed_ &&
         window_.session().task().active() &&
         window_.session().task().command_id() == consumed_->task_id &&
-        window_.feature_tools().active())
-      window_.feature_tools().cancel();
+        (window_.feature_tools().active() || window_.assembly_tools().active())) {
+      if (std::holds_alternative<ShellAssemblyTools::Context>(consumed_->context))
+        window_.assembly_tools().cancel();
+      else
+        window_.feature_tools().cancel();
+    }
   });
   window.viewport().installEventFilter(this);
   panel_->hide();
@@ -75,7 +90,10 @@ ShellContextTools::~ShellContextTools() {
   delete panel_;
 }
 
-QAction* ShellContextTools::source_action(Command kind) const {
+QAction* ShellContextTools::source_action(Command command) const {
+  if (const auto* assembly = std::get_if<ShellAssemblyTools::Command>(&command))
+    return window_.assembly_tools().context_action(*assembly);
+  const auto kind = std::get<ShellFeatureTools::Command>(command);
   auto& owner = window_.feature_tools();
   if (auto* pattern = owner.pattern_action(kind))
     return pattern;
@@ -83,20 +101,28 @@ QAction* ShellContextTools::source_action(Command kind) const {
     return body;
   if (auto* surface = owner.surface_action(kind))
     return surface;
-  return kind == Command::Extrude   ? &owner.extrude_action()
-         : kind == Command::Revolve ? &owner.revolve_action()
-         : kind == Command::Sweep   ? &owner.sweep_action()
-         : kind == Command::Loft    ? &owner.loft_action()
-                                    : owner.finishing_action(kind);
+  return kind == FeatureCommand::Extrude   ? &owner.extrude_action()
+         : kind == FeatureCommand::Revolve ? &owner.revolve_action()
+         : kind == FeatureCommand::Sweep   ? &owner.sweep_action()
+         : kind == FeatureCommand::Loft    ? &owner.loft_action()
+                                           : owner.finishing_action(kind);
 }
 
-std::optional<ShellContextTools::Context> ShellContextTools::current_context(Command kind) const {
+std::optional<ShellContextTools::Context>
+ShellContextTools::current_context(Command command) const {
+  if (const auto* assembly = std::get_if<ShellAssemblyTools::Command>(&command)) {
+    const auto context = window_.assembly_tools().context(*assembly);
+    return context ? std::optional<Context>(*context) : std::nullopt;
+  }
+  const auto kind = std::get<ShellFeatureTools::Command>(command);
   const auto& owner = window_.feature_tools();
-  if (kind == Command::Extrude || kind == Command::Revolve || kind == Command::Sweep ||
-      kind == Command::Loft) {
+  if (kind == FeatureCommand::Extrude || kind == FeatureCommand::Revolve ||
+      kind == FeatureCommand::Sweep || kind == FeatureCommand::Loft) {
     const auto profile = owner.profile_context();
-    if (profile && (kind == Command::Extrude || (kind == Command::Revolve && profile->profile) ||
-                    ((kind == Command::Sweep || kind == Command::Loft) && profile->materialized)))
+    if (profile &&
+        (kind == FeatureCommand::Extrude || (kind == FeatureCommand::Revolve && profile->profile) ||
+         ((kind == FeatureCommand::Sweep || kind == FeatureCommand::Loft) &&
+          profile->materialized)))
       return *profile;
   } else if (const auto finishing = owner.finishing_context(kind))
     return *finishing;
@@ -110,13 +136,14 @@ std::optional<ShellContextTools::Context> ShellContextTools::current_context(Com
   return std::nullopt;
 }
 
-void ShellContextTools::begin(Command kind) {
+void ShellContextTools::begin(Command command) {
   refresh();
   auto& owner = window_.feature_tools();
-  const auto entry = std::find_if(commands_.begin(), commands_.end(),
-                                  [kind](const auto& command) { return command.command == kind; });
-  const auto context = current_context(kind);
-  auto* source = source_action(kind);
+  const auto entry = std::find_if(commands_.begin(), commands_.end(), [command](const auto& entry) {
+    return entry.command == command;
+  });
+  const auto context = current_context(command);
+  auto* source = source_action(command);
   if (!panel_->isVisible() || entry == commands_.end() || !entry->action->isEnabled() || !source ||
       !source->isEnabled() || !context)
     return;
@@ -125,12 +152,21 @@ void ShellContextTools::begin(Command kind) {
                              window_.viewport().selected_semantic(),
                              {}};
   source->trigger();
-  if (owner.active() && owner.command() == kind && window_.session().task().active()) {
+  const auto* assembly = std::get_if<ShellAssemblyTools::Command>(&command);
+  const auto kind =
+      assembly ? ShellFeatureTools::Command::None : std::get<ShellFeatureTools::Command>(command);
+  const bool active = assembly ? window_.assembly_tools().active() &&
+                                     window_.assembly_tools().command() == *assembly
+                               : owner.active() && owner.command() == kind;
+  if (active && window_.session().task().active()) {
     previous.task_id = std::string(window_.session().task().command_id());
     consumed_ = std::move(previous);
     bool seeded = true;
-    if (const auto* profile = std::get_if<ShellFeatureTools::ProfileContext>(&*context)) {
-      if (kind == Command::Sweep || kind == Command::Loft)
+    if (assembly)
+      seeded =
+          window_.assembly_tools().select_context(std::get<ShellAssemblyTools::Context>(*context));
+    else if (const auto* profile = std::get_if<ShellFeatureTools::ProfileContext>(&*context)) {
+      if (kind == FeatureCommand::Sweep || kind == FeatureCommand::Loft)
         seeded =
             profile->profile && owner.select_spatial_profile(profile->sketch, *profile->profile);
     } else if (const auto* finishing = std::get_if<ShellFeatureTools::FinishingContext>(&*context))
@@ -142,7 +178,10 @@ void ShellContextTools::begin(Command kind) {
     else
       seeded = owner.select_surface_context(std::get<ShellFeatureTools::SurfaceContext>(*context));
     if (!seeded) {
-      owner.cancel();
+      if (assembly)
+        window_.assembly_tools().cancel();
+      else
+        owner.cancel();
       return;
     }
     window_.session().selection().clear();
@@ -166,8 +205,10 @@ void ShellContextTools::finish(bool applied) {
     const auto* finishing = std::get_if<ShellFeatureTools::FinishingContext>(&previous.context);
     const auto* pattern = std::get_if<ShellFeatureTools::PatternContext>(&previous.context);
     const auto* body = std::get_if<ShellFeatureTools::BodyContext>(&previous.context);
+    const auto* assembly = std::get_if<ShellAssemblyTools::Context>(&previous.context);
     const bool restored =
-        profile     ? restore_profile()
+        assembly    ? window_.assembly_tools().context_available(*assembly)
+        : profile   ? restore_profile()
         : finishing ? window_.feature_tools().finishing_context_available(*finishing)
         : pattern   ? window_.feature_tools().pattern_context_available(*pattern)
         : body      ? window_.feature_tools().body_context_available(*body)
@@ -203,7 +244,7 @@ void ShellContextTools::refresh() {
                        QWidget::mouseGrabber() == &window_.viewport();
   const bool cancelling = !guarded && consumed_ && window_.session().task().active() &&
                           window_.session().task().command_id() == consumed_->task_id &&
-                          window_.feature_tools().active();
+                          (window_.feature_tools().active() || window_.assembly_tools().active());
   // Hidden QActions are effectively disabled. Derive visibility from owner
   // eligibility rather than the wrapper's previous effective enabled state.
   bool visible = cancelling;

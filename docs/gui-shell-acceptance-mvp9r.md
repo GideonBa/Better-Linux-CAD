@@ -1,7 +1,10 @@
 # Replacement shell acceptance — MVP-9R
 
-Status: Block 136 in progress; inventory updated 2026-10-25. Numbered completion remains owned by
-`docs/mvp-plan.md`. STEP Import remains Blocks 137–143.
+Status: Block 136 implemented and accepted on 2026-10-25. All eighteen bounded families are restored;
+no family gaps or integrated acceptance workflows remain. Numbered completion is owned by
+`docs/mvp-plan.md`, now through Block 136. STEP Import remains planned in Blocks 137–143.
+The final acceptance evidence is recorded at the end of this document; earlier dated entries retain
+the state and results of each implementation slice.
 
 ## Current evidence and historical acceptance
 
@@ -36,17 +39,14 @@ remain useful independent authority checks.
 Negative controls deliberately remove/duplicate families, use a deleted tag, substitute a headless
 source, hide a missing tag behind OR and claim completion with gaps. They must all be rejected.
 
-## Remaining acceptance work
+## Accepted bounded coverage
 
-The machine-readable details live in `families[].shell.gaps`; this is the execution order:
-
-1. Extend context commands beyond profile Extrude/Revolve/Sweep/Loft, single-line Thin Extrude,
-   bounded Edge/Face finishing, Body patterns, Boolean/Transform and Surface to Assembly.
-   Repeat, selection filters, ViewCube, Home and named camera bookmarks have replacement-shell controls.
-2. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
-   sampled Revolute analysis and occurrence-linked result highlighting.
-3. Finish integrated Part and Assembly acceptance using actual ShellWindow input paths, disposable
-   previews, invalid-input rejection, history, canonical save/load and native presentation.
+The machine-readable details live in `shell_reset_progress.acceptance`: `complete` is true,
+`blocked_families` and `pending_workflows` are empty. All eighteen bounded family surfaces have
+implementation and current shell proofs. Full Core/Geometry/GUI regressions, the canonical native
+shell suite, startup and capture review pass, including the Assembly contexts, hierarchy, sampled
+analysis and realistic repeated-subassembly workflows. The explicit closure gate passes against
+the completed plan and manifest.
 
 The bounded Sketch3D/PathCurve surface includes typed/shared-point editing, native collection and
 grips, anchored pointer/direction placement and explicit independent planar-point copies with visible
@@ -61,7 +61,8 @@ lives in `docs/gui-sketch-workbench-mvp7.md`.
 The bounded Extrude/Revolve/Hole surface now includes native role-based source-plane collection for
 face extents, all seven terminations, four Body operations, path Extrude, single-line Thin Extrude,
 expanded Revolve and dedicated plain through-all holes. Arbitrary final-Body subshape references
-remain outside its contract. Thirteen families are restored and five remain partial.
+remain outside its contract. All eighteen bounded families have restored shell surfaces and completed
+integrated/native acceptance.
 
 Current finishing/pattern, Body, spatial, Surface, Measure, Assembly, Feature Edit and STEP/analysis
 slices retain their individual documented bounds. The new Part Sketch/Extrude/STEP regression and
@@ -77,20 +78,20 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-surface-context],[shell-combined-surface-context],[block136-body-context],[shell-combined-body-context],[block136-pattern-context],[shell-combined-pattern-context],[block136-finishing-context],[shell-combined-finishing-context],[block136-spatial-context],[shell-combined-spatial-context],[block136-profile-context],[shell-combined-profile-context],[block136-repeat],[shell-combined-repeat],[block136-selection-filters],[shell-combined-selection-filters],[block136-navigation],[shell-combined-navigation],[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-assembly-context],[block136-assembly-advanced],[block136-assembly-analysis],[block136-surface-context],[shell-combined-surface-context],[block136-body-context],[shell-combined-body-context],[block136-pattern-context],[shell-combined-pattern-context],[block136-finishing-context],[shell-combined-finishing-context],[block136-spatial-context],[shell-combined-spatial-context],[block136-profile-context],[shell-combined-profile-context],[block136-repeat],[shell-combined-repeat],[block136-selection-filters],[shell-combined-selection-filters],[block136-navigation],[shell-combined-navigation],[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
-The regular inventory audit passes while it accurately records unfinished work. For closure,
-`BLCAD_REQUIRE_SHELL_ACCEPTANCE=1` additionally requires computed readiness. The following command
-is expected to fail while Block 136 has gaps; it is a closure gate, not the everyday regression run:
+The regular inventory audit checks consistency. `BLCAD_REQUIRE_SHELL_ACCEPTANCE=1` additionally
+requires computed readiness and now passes for the accepted Block-136 state. This explicit closure
+gate also rejects future regressions that claim completion while leaving gaps or pending workflows:
 
 ```bash
 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-feature-coverage]"
 ```
 
-Close Block 136 only after the gaps and pending workflows are resolved with actual shell proofs,
-full Core/Geometry/GUI regression and native Qt/OCCT checks pass, and plan/manifest/documentation are
-updated together. A green inventory audit alone does not permit advancing the numbered boundary.
+Closure requires actual shell proofs, passing full Core/Geometry/GUI regression and native Qt/OCCT
+checks, with plan/manifest/documentation updated together. These requirements are fulfilled in the
+final acceptance below. A green inventory audit alone does not establish whole-block acceptance.
 
 ## Audit verification — 2026-10-22
 
@@ -1634,3 +1635,66 @@ Builds, GUI suites and the separate native startup were serial. The app remained
 intentional six-second timeout (124). Final native focused/full/startup logs contain only the known
 medium OCCT depth/stencil visual warning, with no high-severity, BadDrawable or fatal lifecycle
 errors. No source changes followed the successful regression runs.
+
+## Final Assembly completion and Block 136 acceptance — 2026-10-25
+
+All eighteen accepted feature families have restored bounded replacement-shell surfaces. The final
+slice adds five root Assembly context commands, occurrence-qualified hierarchy validation and
+relationship/joint create/edit tasks, connected cross-hierarchy solving, typed coordinate motion,
+sampled root/cross Revolute analysis and exact occurrence-linked result highlighting. Core/Geometry
+solvers, shared definition authority, transaction boundaries and persistence formats remain unchanged.
+
+Nineteen new GUI cases comprise four context cases, seven advanced Assembly cases, six analysis cases
+and two integrated Qt workflows. They cover complete selection/filter/scope restoration, cancellation
+and stale-source guards, all five joint families, four driven joint families, three sequential Planar
+coordinate changes, invalid-input recovery, shared repeated-child poses, exact Undo/Redo, Save during active drafts,
+canonical reopen and both Assembly STEP modes. Analysis now tolerates diagnostic-only presentation
+revisions when canonical source intent is unchanged, allowing correction of an invalid sample interval.
+
+The combined-workflow tag now covers 31 realistic workflows. The two new workflows author, place and
+drive root components through context controls, and import an authored child Assembly, repeat it,
+create/edit occurrence-qualified relationships and joints, solve/move shared component authority,
+inspect repeated-occurrence results and export flattened/structured STEP. The dedicated mixed-path
+Loft workflow additionally exercises five differently oriented profiles, a line/spline/arc path,
+section reordering, edits and history. All run in the complete suites below.
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 530 | 16,174 | All passed |
+| Full Geometry | 441 | 30,227 | All passed |
+| Full offscreen GUI | 535 | 69,283 | 516 passed; 19 native-only skips |
+| Full canonical native shell | 351 | 65,703 | All passed; no skips |
+| Explicit completion gate | 3 | 296 | All passed |
+
+The focused native Assembly/inventory run passed 39 cases with 4,493 assertions. The subsequently
+added framebuffer proof passed separately (one case, 84 assertions with captures) and again in the
+full native suite. It waits for completed GL frames, checks actual changed model pixels for the exact
+repeated occurrence, verifies clearing restores the baseline, and checks reselecting the same cell
+and input-change cleanup. The native suite also covers the 19 deliberately skipped offscreen cases,
+including real OCCT picks, grips, native task layout and file dialogs.
+
+Captures in `/tmp/blcad-136-completion-native` were inspected at 1280×800, including
+`hierarchy-rotated-target-preview`, `combined-assembly-hierarchy-validation`,
+`combined-assembly-context-motion`, `combined-assembly-context-sweep`, `combined-assembly-cross-sweep`,
+`combined-assembly-repeated-occurrence-highlight` and `assembly-analysis-highlight-{before,selected,cleared}`.
+Controls remain reachable, rotated parent targets resolve to the correct occurrence, and result links
+select the intended repeated component. Sample links display the authored current pose; the UI states
+that discrete sampling does not inspect intermediate positions.
+
+All four application/GUI/Core/Geometry targets build. Builds, GUI runs and separate startup were
+serial; no production or test sources changed after the successful full regressions. The app remained
+running until the intentional six-second timeout (124). Native focused/full/startup logs contain only
+the known medium OCCT incomplete-visual depth/stencil warning, with no high-severity, BadDrawable or
+fatal lifecycle errors. Changed C++ formatting and working/staged whitespace checks pass.
+
+Local evidence logs use `/tmp/blcad-136-completion-` with suffixes `core.log`, `geometry.log`,
+`offscreen-full.log`, `native-full.log`, `closure.log` and `startup.log`. The earlier failed development
+runs are superseded by these completed successful runs.
+
+The v3 inventory retains historical `implemented_through: 131` and its controller acceptance record.
+Its separate shell progress is now completed through 136, current block 137, acceptance complete,
+with no family gaps or pending workflows. `docs/mvp-plan.md` advances only after the full evidence
+above and the explicit completion gate pass. GUI Shell Reset MVP-9R is complete; STEP Import
+Blocks 137–143 remain planned. Existing feature-specific bounds, including shared child-component
+placement authority, discrete Revolute sampling and the absence of constrained free-drag or imported
+cross-intent remapping, are unchanged.
