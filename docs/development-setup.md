@@ -495,7 +495,10 @@ Interactive Sketcher MVP-8 (Blocks 106–121) and Interactive Part & Assembly Mo
 122–131) are implemented and accepted. GUI Shell Reset MVP-9R replaces the Qt shell those phases grew:
 Blocks 132 (QOpenGLWidget viewport), 133 (`ShellWindow` + `ShellRibbon`, origin seeding), 134
 (`ShellSketchTools`), and 135 (`ShellFeatureTools`, Extrude/Revolve, manipulator overlay) are
-implemented; Block 136 restores full feature and acceptance coverage.
+implemented; Block 136 restores full bounded feature coverage and is accepted with full offscreen,
+native Qt/OCCT and closure checks. All Blocks through 136 are complete. STEP Import starts at planned
+Block 137; the latest evidence lives in `docs/gui-shell-acceptance-mvp9r.md`. Dated proof sections
+below retain their original incremental status.
 
 ## GUI Shell Reset focused proof
 
@@ -1368,10 +1371,11 @@ BLCAD_UI_CAPTURE_DIR=/tmp/blcad-assembly-acceptance-native QT_QPA_PLATFORM=xcb .
 ```
 
 The context cases exercise exact occurrence/target handoffs, all cancellation paths, guards, history
-and disposable saved drafts. Advanced cases cover hierarchy validation, occurrence-qualified create/edit
+and Save during disposable active drafts. Advanced cases cover hierarchy validation, occurrence-qualified create/edit
 and solve, all five joint families, four driven families and repeated definition authority. Analysis
-cases cover local/cross Revolute samples, occurrence links, repeated clicks, read-only lifecycle and
-preselection restoration. Two new integrated Qt workflows combine these surfaces with real file
+cases cover local/cross Revolute samples, occurrence links, repeated clicks, read-only lifecycle,
+preselection restoration and actual native framebuffer highlight/clear/reselect transitions.
+Two new integrated Qt workflows combine these surfaces with real file
 import, invalid candidates, branching history, canonical reopening and flat/structured STEP.
 
 The canonical full/native command and final closure gate live in

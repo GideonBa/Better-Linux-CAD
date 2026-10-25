@@ -1,7 +1,7 @@
 # Interactive Modeling MVP-9 Acceptance
 
-Status: historical acceptance through Block 131. Replacement-shell Block 136 remains in progress.
-Current shell evidence and closure requirements: `docs/gui-shell-acceptance-mvp9r.md`.
+Status: historical acceptance through Block 131. Replacement-shell Block 136 is accepted separately
+on 2026-10-25. Current shell evidence and closure gate: `docs/gui-shell-acceptance-mvp9r.md`.
 
 The integrated test below exercises the retained controller APIs; it does not operate the replacement
 ShellWindow. Historical proof descriptions must not be used as current shell interaction coverage.

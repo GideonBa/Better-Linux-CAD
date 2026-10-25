@@ -1052,8 +1052,8 @@
     }
   ],
   "shell_reset_progress": {
-    "completed_through": 135,
-    "current_block": 136,
+    "completed_through": 136,
+    "current_block": 137,
     "finishing_slice": {
       "status": "implemented",
       "contract": "docs/gui-interactive-finishing-mvp9.md",
@@ -1066,10 +1066,7 @@
       ],
       "selection_scope": "Unambiguous current-body semantic box edges and planar faces, including four-line Sketch rectangles."
     },
-    "remaining": [
-      "Complete shell_reset_progress.acceptance.pending_workflows.",
-      "Require manifest readiness plus passing full suites before closing Block 136."
-    ],
+    "remaining": [],
     "pattern_mirror_slice": {
       "status": "implemented",
       "contract": "docs/gui-interactive-pattern-body-mvp9.md",
@@ -1187,12 +1184,9 @@
     },
     "acceptance": {
       "audited_on": "2026-10-25",
-      "complete": false,
+      "complete": true,
       "blocked_families": [],
-      "pending_workflows": [
-        "Verify the complete current Core, Geometry and offscreen GUI suites, including the new actual-Qt Assembly contexts, repeated hierarchy, typed motion and sampled analysis workflows.",
-        "Complete whole-shell native Qt/OCCT acceptance and inspect native captures for the restored Part and advanced Assembly surfaces before enabling the closure gate."
-      ]
+      "pending_workflows": []
     }
   },
   "current_shell_acceptance_contract": "docs/gui-shell-acceptance-mvp9r.md"
