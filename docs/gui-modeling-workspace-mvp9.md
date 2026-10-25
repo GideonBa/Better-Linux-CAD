@@ -4,8 +4,8 @@ Status: the Block-122 application authority `GuiModelingWorkspace` is retained. 
 adapter was deleted with the Block-133 shell reset. Block 136 now restores camera navigation through
 `ShellNavigationTools` on `ShellWindow`, as detailed below. Visible selection filters are also
 restored. `ShellRepeatTools` now restores command-repeat presentation through the current command
-owners. `ShellContextTools` supplies the shared bounded profile, finishing, pattern and Body
-mini-toolbar described below. Surface and Assembly context commands stay open; the old catalog
+owners. `ShellContextTools` supplies the shared bounded profile, finishing, pattern, Body and Surface
+mini-toolbar described below. Assembly context commands stay open; the old catalog
 adapter specifics are historical.
 
 Block 122 introduces the shared application-layer interaction boundary used by the Part, Surface, and
@@ -149,7 +149,7 @@ restoration, raw-region exclusion, three-section atomic Apply, Save and replacem
 combined workflow `[shell-combined-spatial-context]` authors all its Sketch/plane/path inputs through Qt, cancels an
 invalid Sweep, corrects a three-section Loft's order and G2 input, creates a second Sweep, changes its
 twist parameter, edits the earlier Loft, verifies four-step history, reopens and exports STEP.
-Surface and Assembly contexts remain open; the viewport family stays partial.
+Assembly contexts remain open; the viewport family stays partial.
 
 ### Replacement-shell finishing contexts (Block 136, 2026-10-24)
 
@@ -183,7 +183,7 @@ hidden/removed sources, Save and replacement. The twenty-sixth combined Qt-input
 `[shell-combined-finishing-context]` authors two Bodies, cancels Draft, shells one Body, fillets and
 chamfers the other, changes two upstream parameters in one batch, edits an earlier feature, checks
 five-step exact history, reopens canonically and exports STEP. It requires native OCCT subshape hits
-and explicitly skips offscreen. Surface and Assembly contexts remain open; the viewport family
+and explicitly skips offscreen. Assembly contexts remain open; the viewport family
 remains partial and Block 136 stays open.
 
 ### Replacement-shell Body pattern contexts (Block 136, 2026-10-24)
@@ -212,7 +212,7 @@ history, Save and replacement. The twenty-seventh combined workflow
 Circular pattern and a Linear pattern from the reflected result, stages three upstream parameter
 changes in one batch, edits the earlier Mirror, checks five-step exact history, reopens and exports
 STEP. Offscreen selects the source through the browser; native input hits the actual OCCT Body.
-Surface and Assembly contexts remain open; the viewport family and Block 136 remain partial/open.
+Assembly contexts remain open; the viewport family and Block 136 remain partial/open.
 
 ### Replacement-shell Body contexts (Block 136, 2026-10-25)
 
@@ -243,7 +243,34 @@ translation, moves the nondefault target, switches Boolean targets through the b
 retained tools, rotates using an explicitly picked axis and scales about a typed center. It checks
 bounds/volumes, invalid-input recovery, four-step exact history, canonical reopening and STEP.
 Native input hits actual OCCT Bodies; offscreen input uses the visible browser. Remaining contexts
-are Surface and Assembly. The viewport family remains partial and Block 136 stays open.
+are Assembly. The viewport family remains partial and Block 136 stays open.
+
+### Replacement-shell Surface contexts (Block 136, 2026-10-25)
+
+The shared toolbar exposes `context_surface_boundary` and `context_surface_fill` for one verified
+PathCurve or supported stable semantic edge. `context_surface_trim`, `context_surface_extend` and
+`context_surface_stitch` accept a visible recomputed Surface Body or supported stable semantic face.
+`context_surface_to_solid` accepts only a Surface Body; the original preview diagnoses open shells.
+Current standalone Part, fresh cache, selection kind, active filter/scope and typed reference keys
+validate the handoff. Unsupported, hidden, missing, multiple or foreign selections fail closed.
+Stable solid subshapes use the existing explicit Edge/Face model filters and Geometry builder.
+
+The original QAction owns command startup. An idempotent typed handoff seeds exactly one ordered
+Boundary/Fill curve or Stitch surface, or the exact target for Trim/Extend/solid conversion. Trim and
+Extend switch to their remaining contour/edge role. Other inputs stay explicit. Browser picks reach
+the same Surface owner as viewport picks, with selection snapshots across scope transitions.
+Apply/Cancel restore the prior filter and scope; all three cancellation routes restore complete
+still-valid consumed preselection. Cancel removes task-only subshape presentations, so All cannot
+pick expired task targets. Save/New/Open retain the existing disposable-draft lifecycle.
+
+Wrapped Surface guidance stays outside dynamic form rows. Six `[block136-surface-context]` cases
+cover typed source identity, stable solid roles, idempotence, scope restoration, all cancellation
+routes, scene cleanup, atomic Apply/history, Save and replacement. The twenty-ninth combined Qt
+workflow `[shell-combined-surface-context]` authors a box, closed PathCurves and trim profile, cancels
+Boundary, applies Fill/Trim/Extend, rejects an open shell, sews six surfaces, converts the result to a
+solid and changes upstream depth. It checks bounds/volumes, duplicate/removal/reordering controls,
+six-step exact history, canonical reopening and STEP on both platforms. Assembly contexts remain
+next; the viewport family stays partial and Block 136 stays open.
 
 ## Command lifecycle, cancellation, and repeat
 

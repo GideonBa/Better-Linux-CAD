@@ -1009,6 +1009,7 @@ void ShellFeatureTools::cancel() noexcept {
   if (command_ != Command::None && session_.task().active())
     (void)session_.task().cancel();
   const bool was_finishing = finishing();
+  const bool was_surface = surface();
   const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
   const bool restore_scope = finishing() || pattern() || body_operation() || spatial() || surface();
@@ -1026,6 +1027,8 @@ void ShellFeatureTools::cancel() noexcept {
     window_.refresh_feature_selection_scene();
   }
   surface_targets_.clear();
+  if (was_surface)
+    window_.refresh_feature_selection_scene();
   preview_valid_ = false;
   if (was_extrude)
     restore_extrude_selection();

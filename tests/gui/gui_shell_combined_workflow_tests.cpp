@@ -3730,3 +3730,164 @@ TEST_CASE("Combined UI Body contexts collect roles and preserve a Boolean Transf
   CHECK(ui.snapshot() == states.back());
   ui.idle();
 }
+
+TEST_CASE("Combined UI Surface contexts fill trim extend sew and convert a shell through history",
+          "[gui][integration][shell-combined-workflow][shell-combined-surface-context]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Surface context workflow");
+  const auto boundary_sketch = ui.rectangle("datum.xy", {20, 20}, {40, 40});
+  const auto base = ui.extrude(10);
+  const auto base_feature = ui.window.session().part_document()->features().front();
+  const auto trim_sketch = ui.rectangle("datum.xy", {25, 25}, {35, 35}, Point2{50, 50});
+  const auto make_path = [&](const SketchId& id) {
+    const auto sketch = *ui.window.session().part_document()->find_sketch(id);
+    ui.command("path_curve");
+    for (const auto& line : sketch.line_segments()) {
+      auto& source = ui.widget<QComboBox>("blcad.spatial.source");
+      ui.choose(source,
+                source.findText(QString::fromStdString(sketch.name() + " / " + line.id().value())));
+      ui.button("blcad.spatial.add");
+    }
+    ui.click(ui.window.feature_tools().spatial_closed_editor());
+    ui.button("blcad.feature.apply");
+    return ui.window.session().part_document()->path_curves().back().id();
+  };
+  const auto path = make_path(boundary_sketch);
+  const auto trim_path = make_path(trim_sketch);
+  std::vector<std::string> states{ui.snapshot()};
+  const auto context = [&](const QString& id) {
+    ui.click(ui.widget<QToolButton>("blcad.context." + id));
+  };
+  const auto pick = [&](const std::string& id) {
+    ui.tree(id);
+    REQUIRE(ui.window.session().selection().size() == 1);
+    auto& toolbar = ui.widget<QWidget>("blcad.context.toolbar");
+    REQUIRE(toolbar.isVisible());
+    CHECK(ui.window.viewport().rect().contains(toolbar.geometry()));
+  };
+  auto& order = ui.widget<QListWidget>("blcad.surface.order");
+  auto& source = ui.widget<QComboBox>("blcad.surface.source");
+  auto& target = ui.widget<QComboBox>("blcad.surface.target");
+  pick(path.value());
+  context("surface_boundary");
+  REQUIRE(order.count() == 1);
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  context("cancel");
+  CHECK(ui.snapshot() == states.back());
+  REQUIRE(ui.window.session().selection().size() == 1);
+  CHECK(ui.window.session().selection().entries().front().semantic_id == "path/" + path.value());
+  context("surface_fill");
+  REQUIRE(order.count() == 1);
+  ui.button("blcad.surface.add");
+  CHECK(order.count() == 1);
+  ui.list(order, 0);
+  ui.button("blcad.surface.remove");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.button("blcad.surface.add");
+  ui.capture("surface-context-fill-preview");
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.feature.apply");
+  const auto filled =
+      surface_feature_result_body(ui.window.session().part_document()->surface_features().back());
+  CHECK(ui.bounds(filled).maximum.x == Approx(40).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  pick(filled.value());
+  context("surface_trim");
+  CHECK(ui.widget<QComboBox>("blcad.surface.pick_role").currentIndex() == 1);
+  CHECK(target.currentText() ==
+        QString::fromStdString(ui.window.session().part_document()->find_body(filled)->name()));
+  ui.tree(trim_path.value());
+  CHECK(source.currentText() ==
+        QString::fromStdString(
+            ui.window.session().part_document()->find_path_curve(trim_path)->name()));
+  ui.capture("surface-context-trim-preview");
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.feature.apply");
+  const auto trimmed =
+      surface_feature_result_body(ui.window.session().part_document()->surface_features().back());
+  CHECK(ui.bounds(trimmed).minimum.x == Approx(25).margin(1e-5));
+  CHECK(ui.bounds(trimmed).maximum.y == Approx(35).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  pick(filled.value());
+  context("surface_extend");
+  ui.choose(source,
+            source.findText(QString::fromStdString(base_feature.name() + " / bottom_back")));
+  ui.scalar("-3 mm");
+  CHECK(ui.snapshot() == states.back());
+  ui.scalar("5 mm");
+  ui.capture("surface-context-extend-preview");
+  ui.button("blcad.feature.apply");
+  const auto extended =
+      surface_feature_result_body(ui.window.session().part_document()->surface_features().back());
+  CHECK(ui.bounds(extended).minimum.y == Approx(15).margin(1e-5));
+  CHECK(ui.bounds(extended).maximum.y == Approx(40).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  pick(filled.value());
+  context("surface_to_solid");
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  context("cancel");
+  CHECK(ui.snapshot() == states.back());
+  context("surface_stitch");
+  REQUIRE(order.count() == 1);
+  ui.tree(extended.value());
+  REQUIRE(order.count() == 2);
+  ui.list(order, 1);
+  ui.button("blcad.surface.remove");
+  REQUIRE(order.count() == 1);
+  for (const auto face : {"top", "front", "back", "left", "right"}) {
+    ui.choose(target, target.findText(QString::fromStdString(base_feature.name() + " / " + face)));
+    ui.button("blcad.surface.add");
+  }
+  REQUIRE(order.count() == 6);
+  ui.button("blcad.surface.add");
+  CHECK(order.count() == 6);
+  ui.list(order, 5);
+  ui.button("blcad.surface.move_up");
+  ui.button("blcad.surface.move_down");
+  ui.scalar("0.001 mm");
+  ui.capture("surface-context-stitch-preview");
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.feature.apply");
+  const auto shell =
+      surface_feature_result_body(ui.window.session().part_document()->surface_features().back());
+  CHECK(ui.summary(shell).solid_count == 0);
+  states.push_back(ui.snapshot());
+
+  pick(shell.value());
+  context("surface_to_solid");
+  ui.capture("surface-context-solid-preview");
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.feature.apply");
+  const auto solid =
+      surface_feature_result_body(ui.window.session().part_document()->surface_features().back());
+  CHECK(ui.summary(solid).solid_count == 1);
+  CHECK(ui.summary(solid).volume_mm3 == Approx(4000).margin(1e-5));
+  CHECK(ui.summary(base).volume_mm3 == Approx(4000).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  ui.command("parameters");
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"),
+          QString::fromStdString(base_feature.length_parameter().value()));
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "12");
+  ui.button("blcad.parameters.stage");
+  ui.button("blcad.parameters.preview");
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.parameters.apply");
+  CHECK(ui.summary(solid).volume_mm3 == Approx(4800).margin(1e-5));
+  CHECK(ui.summary(base).volume_mm3 == Approx(4800).margin(1e-5));
+  CHECK(ui.bounds(trimmed).maximum.x == Approx(35).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.roundtrip(directory.filePath("surface-context.blcad"));
+  const auto step = directory.filePath("surface-context.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}

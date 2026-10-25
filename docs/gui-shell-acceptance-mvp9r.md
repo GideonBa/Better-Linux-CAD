@@ -41,7 +41,7 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 The machine-readable details live in `families[].shell.gaps`; this is the execution order:
 
 1. Extend context commands beyond profile Extrude/Revolve/Sweep/Loft, single-line Thin Extrude,
-   bounded Edge/Face finishing, Body patterns and Boolean/Transform to Surface and Assembly.
+   bounded Edge/Face finishing, Body patterns, Boolean/Transform and Surface to Assembly.
    Repeat, selection filters, ViewCube, Home and named camera bookmarks have replacement-shell controls.
 2. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
    sampled Revolute analysis and occurrence-linked result highlighting.
@@ -77,7 +77,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-body-context],[shell-combined-body-context],[block136-pattern-context],[shell-combined-pattern-context],[block136-finishing-context],[shell-combined-finishing-context],[block136-spatial-context],[shell-combined-spatial-context],[block136-profile-context],[shell-combined-profile-context],[block136-repeat],[shell-combined-repeat],[block136-selection-filters],[shell-combined-selection-filters],[block136-navigation],[shell-combined-navigation],[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-surface-context],[shell-combined-surface-context],[block136-body-context],[shell-combined-body-context],[block136-pattern-context],[shell-combined-pattern-context],[block136-finishing-context],[shell-combined-finishing-context],[block136-spatial-context],[shell-combined-spatial-context],[block136-profile-context],[shell-combined-profile-context],[block136-repeat],[shell-combined-repeat],[block136-selection-filters],[shell-combined-selection-filters],[block136-navigation],[shell-combined-navigation],[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,
@@ -1584,3 +1584,53 @@ Builds, GUI runs and the separate native startup were serial. The app remained r
 intentional six-second timeout (124). Final native focused/full/startup logs contain only the known
 medium OCCT depth/stencil visual warning, with no high-severity, BadDrawable or fatal lifecycle
 diagnostics.
+
+## Surface context verification — 2026-10-25
+
+The shared toolbar exposes all six Surface commands through their original owners. Typed reference
+keys seed one exact PathCurve/stable edge for Boundary/Fill, a Surface Body/stable face for Trim/
+Extend/Stitch, or a Surface Body for shell-to-solid. Trim/Extend collect the remaining contour/edge.
+The original preview diagnoses incompatible boundaries and open shells. Native and browser
+collection share the same typed-kind checks and role scope; all context cancellation routes restore
+valid consumed selection and the previous filter/scope.
+
+Six focused cases and the twenty-ninth combined Qt-input workflow cover source identity, stable solid
+roles, key/kind/scope guards, idempotence, invalid input, cancellation, scene cleanup, atomic history,
+Save and replacement. The combined Part authors its box, trim profile and two closed PathCurves,
+cancels Boundary, applies Fill/Trim/Extend, rejects open-shell conversion, sews six surfaces and
+converts to solid. Active browser picks collect the trim path and an additional Surface Body. It
+checks duplicate/removal/reordering controls, upstream depth changes, bounds/volumes, six-step exact
+Undo/Redo, canonical reopening and STEP on both platforms. Existing native Surface proof also hits
+actual targets/edges and drags/refines the extension handle.
+
+Cancel now rebuilds the idle scene after removing task-only Surface targets, even when the previous
+All filter did not change. A focused regression proves that expired semantic solid subshapes cannot
+be selected afterwards, while the explicit Edge/Face idle surfaces remain available. Wrapped guidance
+stays outside dynamic form rows across Boundary/Fill, Trim/Extend and Stitch/conversion switches.
+
+Focused offscreen regression: **27 cases, 26 passed and one expected native-only skip, 19,101
+assertions**. Focused native regression: **14 cases, 16,691 assertions**, all passed without skips.
+Five 1280×800 captures in `/tmp/blcad-surface-context-native` were inspected: exact first Fill curve,
+browser-picked Trim path, matching Extend edge/outward arrow, six Stitch inputs with tolerance and
+conversion of the closed stitched shell. Role/source/target fields, ordering controls and Apply/Cancel
+remain complete and reachable. Tests also assert that the context toolbar fits inside the viewport.
+
+All four application/GUI/Core/Geometry targets build. Changed C++ sections and the new test source
+pass clang-format checks; working/staged diffs are checked before publication.
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 530 | 16,174 | All passed |
+| Full Geometry | 441 | 30,227 | All passed |
+| Full offscreen GUI | 516 | 66,053 | 499 passed; 17 native-only skips |
+| Full combined native shell | 332 | 62,264 | All passed; no skips |
+
+The ordinary inventory audit passes. The opt-in closure gate intentionally returns 1: three cases,
+two passed and one expected failure, 266 assertions. Assembly contexts, advanced Assembly and pending
+integrated acceptance continue to prevent closing Block 136. Thirteen families remain restored and
+five partial; numbered completion remains through Block 135.
+
+Builds, GUI suites and the separate native startup were serial. The app remained running until the
+intentional six-second timeout (124). Final native focused/full/startup logs contain only the known
+medium OCCT depth/stencil visual warning, with no high-severity, BadDrawable or fatal lifecycle
+errors. No source changes followed the successful regression runs.

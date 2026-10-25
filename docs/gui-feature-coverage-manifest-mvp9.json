@@ -52,9 +52,9 @@
         "owner": 136,
         "status": "partial",
         "contract": "docs/gui-modeling-workspace-mvp9.md",
-        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus. Accepted Feature/Hole/Assembly commands expose guarded repeat with current inputs and fresh defaults, independent of Redo and persistence. Bounded profile mini-toolbar validates Core profile or single-line sources, limits Sweep/Loft to materialized regions and starts Extrude/Revolve/Sweep/Loft through existing owners, seeds the exact typed Sweep profile or first Loft section, consumes preselection and restores it on cancellation. Explicit Edge/Face model filters publish stable current-Body targets for bounded Fillet/Chamfer/Shell/Draft contexts; typed command/Body/semantic handoffs seed the original task, restrict its scope and restore complete valid preselection on cancellation. Single fresh solid-Body selection offers Linear/Circular pattern and Mirror contexts, seeds the exact typed source through the original owner and restores complete preselection after task-owned Body/reference scope transitions. Body Boolean/Translate/Rotate/Scale contexts validate exact typed targets or sources, including surface transforms; task-owned Body/tool/axis scopes and browser collection share the original owner and restore prior scope/filter on completion.",
+        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus. Accepted Feature/Hole/Assembly commands expose guarded repeat with current inputs and fresh defaults, independent of Redo and persistence. Bounded profile mini-toolbar validates Core profile or single-line sources, limits Sweep/Loft to materialized regions and starts Extrude/Revolve/Sweep/Loft through existing owners, seeds the exact typed Sweep profile or first Loft section, consumes preselection and restores it on cancellation. Explicit Edge/Face model filters publish stable current-Body targets for bounded Fillet/Chamfer/Shell/Draft contexts; typed command/Body/semantic handoffs seed the original task, restrict its scope and restore complete valid preselection on cancellation. Single fresh solid-Body selection offers Linear/Circular pattern and Mirror contexts, seeds the exact typed source through the original owner and restores complete preselection after task-owned Body/reference scope transitions. Body Boolean/Translate/Rotate/Scale contexts validate exact typed targets or sources, including surface transforms; task-owned Body/tool/axis scopes and browser collection share the original owner and restore prior scope/filter on completion. Boundary/Fill contexts seed one verified PathCurve or stable semantic edge; Trim/Extend seed a surface target and collect its remaining boundary, Stitch seeds one surface and shell-to-solid seeds a Surface Body. Typed reference keys, role scopes, browser collection and cancellation restore the original owner contract; task-only Surface subshape presentations are discarded on Cancel.",
         "gaps": [
-          "Extend contextual commands beyond profile, finishing, pattern and Body tools to Surface and Assembly commands."
+          "Extend contextual commands beyond profile, finishing, pattern, Body and Surface tools to Assembly commands."
         ],
         "proofs": [
           {
@@ -124,6 +124,14 @@
           {
             "filter": "[shell-combined-body-context]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-surface-context]",
+            "source": "tests/gui/gui_shell_surface_context_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-surface-context]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -157,6 +165,12 @@
           "context_body_translate",
           "context_body_rotate",
           "context_body_scale",
+          "context_surface_boundary",
+          "context_surface_fill",
+          "context_surface_trim",
+          "context_surface_extend",
+          "context_surface_stitch",
+          "context_surface_to_solid",
           "context_cancel"
         ],
         "widgets": [
@@ -722,6 +736,14 @@
           },
           {
             "filter": "[shell-combined-surface-solid]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-surface-context]",
+            "source": "tests/gui/gui_shell_surface_context_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-surface-context]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],

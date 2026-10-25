@@ -11,6 +11,7 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QVBoxLayout>
 
 #include <algorithm>
 #include <array>
@@ -48,6 +49,117 @@ bool ShellFeatureTools::surface() const noexcept {
 }
 bool ShellFeatureTools::surface_scalar() const noexcept {
   return command_ == Command::ExtendSurface || command_ == Command::SurfaceStitch;
+}
+
+QAction* ShellFeatureTools::surface_action(Command command) const noexcept {
+  for (const auto& [kind, action] : surface_actions_)
+    if (kind == command)
+      return action;
+  return nullptr;
+}
+
+GuiSelectionKind ShellFeatureTools::surface_input_kind(const SurfaceInput& input) {
+  if (input.surface)
+    return input.surface->source_kind() == SurfaceReferenceSourceKind::Body
+               ? GuiSelectionKind::Body
+               : GuiSelectionKind::Face;
+  if (input.boundary && input.boundary->source_kind() == BoundaryCurveSourceKind::SemanticEdge)
+    return GuiSelectionKind::Edge;
+  return GuiSelectionKind::SketchEntity;
+}
+
+std::optional<ShellFeatureTools::SurfaceContext>
+ShellFeatureTools::surface_context_for(Command command, const GuiSelection& selection) const {
+  if (!surface_action(command) || session_.document_kind() != GuiDocumentKind::Part ||
+      session_.workspace() != GuiWorkspace::Part || !session_.part_document() ||
+      !session_.part_shape_cache() || !session_.derived_results_fresh())
+    return std::nullopt;
+  const bool curves = command == Command::BoundarySurface || command == Command::FillSurface;
+  if (curves ? selection.kind != GuiSelectionKind::SketchEntity &&
+                   selection.kind != GuiSelectionKind::Edge
+             : selection.kind != GuiSelectionKind::Body && selection.kind != GuiSelectionKind::Face)
+    return std::nullopt;
+  if (selection.kind == GuiSelectionKind::Body) {
+    // Reject ordinary solid-Body preselection before resolving all subshape inputs.
+    // A Surface Body is already a complete typed source for these target roles.
+    for (const auto& body : session_.part_document()->bodies())
+      if (body.kind() == BodyKind::Surface && body.visibility() == BodyVisibility::Visible &&
+          selection.semantic_id == "body/" + body.id().value()) {
+        const auto* shape = session_.part_shape_cache()->find_body_shape(body.id());
+        if (shape && !shape->empty())
+          return SurfaceContext{command, selection,
+                                SurfaceReference::create_body(body.id()).value()};
+      }
+    return std::nullopt;
+  }
+  for (const auto& input : surface_inputs()) {
+    if (input.semantic_id != selection.semantic_id || surface_input_kind(input) != selection.kind)
+      continue;
+    if (curves && input.boundary)
+      return SurfaceContext{command, selection, *input.boundary};
+    if (!curves && input.surface &&
+        (command != Command::ClosedShellToSolid ||
+         input.surface->source_kind() == SurfaceReferenceSourceKind::Body))
+      return SurfaceContext{command, selection, *input.surface};
+  }
+  return std::nullopt;
+}
+
+std::optional<ShellFeatureTools::SurfaceContext>
+ShellFeatureTools::surface_context(Command command) const {
+  if (active() || session_.task().active() || window_.active_sketch() ||
+      session_.reference_repair_mode() || session_.selection().size() != 1)
+    return std::nullopt;
+  const auto& selection = session_.selection().entries().front();
+  if (!session_.selection().allows(selection.kind) ||
+      !(viewport_.selection_filter_mask() & selection_kind_bit(selection.kind)))
+    return std::nullopt;
+  const auto& scope = viewport_.selection_semantic_scope();
+  if (scope && std::find(scope->begin(), scope->end(), selection.semantic_id) == scope->end())
+    return std::nullopt;
+  return surface_context_for(command, selection);
+}
+
+bool ShellFeatureTools::surface_context_available(const SurfaceContext& context) const {
+  const auto current = surface_context_for(context.command, context.selection);
+  const auto key = [](const auto& source) {
+    return std::visit([](const auto& reference) { return reference.stable_key(); }, source);
+  };
+  return current && current->source.index() == context.source.index() &&
+         key(current->source) == key(context.source);
+}
+
+bool ShellFeatureTools::select_surface_context(const SurfaceContext& context) {
+  if (!surface() || command_ != context.command || !session_.task().active() ||
+      session_.task().command_id() != command_id() || !surface_context_available(context))
+    return false;
+  const bool curves = command_ == Command::BoundarySurface || command_ == Command::FillSurface;
+  auto* combo = curves ? surface_source_ : surface_target_;
+  for (int row = 1; row < combo->count(); ++row) {
+    const int index = combo->itemData(row).toInt();
+    if (surface_inputs_.at(index).semantic_id != context.selection.semantic_id)
+      continue;
+    {
+      const QSignalBlocker source(surface_source_), target(surface_target_), pick(surface_pick_),
+          order(surface_order_);
+      surface_source_->setCurrentIndex(0);
+      surface_target_->setCurrentIndex(0);
+      surface_order_->clear();
+      combo->setCurrentIndex(row);
+      surface_pick_->setCurrentIndex(
+          command_ == Command::TrimSurface || command_ == Command::ExtendSurface ? 1 : 0);
+      if (curves || command_ == Command::SurfaceStitch) {
+        auto* item = new QListWidgetItem(QString::fromStdString(surface_inputs_[index].label),
+                                         surface_order_);
+        item->setData(Qt::UserRole, index);
+        surface_order_->setCurrentItem(item);
+      }
+    }
+    update_surface_pick_scope();
+    refresh_surface_preview();
+    return true;
+  }
+  return false;
 }
 
 std::vector<ShellFeatureTools::SurfaceInput>
@@ -127,7 +239,12 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
 
 void ShellFeatureTools::build_surface_controls(QWidget* panel) {
   surface_controls_ = new QWidget(panel);
-  auto* form = new QFormLayout(surface_controls_);
+  surface_controls_->setMinimumWidth(280);
+  auto* column = new QVBoxLayout(surface_controls_);
+  column->setContentsMargins(0, 0, 0, 0);
+  auto* form = new QFormLayout;
+  surface_form_ = form;
+  column->addLayout(form);
   surface_pick_ = new QComboBox(surface_controls_);
   surface_pick_->setObjectName("blcad.surface.pick_role");
   form->addRow(QStringLiteral("Modellklick wählt"), surface_pick_);
@@ -178,7 +295,7 @@ void ShellFeatureTools::build_surface_controls(QWidget* panel) {
   form->addRow(surface_order_buttons_);
   surface_hint_ = new QLabel(surface_controls_);
   surface_hint_->setWordWrap(true);
-  form->addRow(surface_hint_);
+  column->addWidget(surface_hint_);
   panel->layout()->addWidget(surface_controls_);
   surface_controls_->hide();
   for (auto* combo : {surface_source_, surface_target_})
@@ -290,7 +407,7 @@ Result<std::size_t> ShellFeatureTools::begin_surface(Command command) {
   surface_value_ = stitch ? 0.001 : 5;
   previous_selection_mask_ = viewport_.selection_filter_mask();
   previous_semantic_scope_ = viewport_.selection_semantic_scope();
-  auto* form = static_cast<QFormLayout*>(surface_controls_->layout());
+  auto* form = surface_form_;
   form->setRowVisible(surface_target_, !curves);
   form->setRowVisible(surface_source_, curves || command == Command::TrimSurface ||
                                            command == Command::ExtendSurface);
@@ -466,6 +583,8 @@ bool ShellFeatureTools::accept_surface_selection(const GuiSelection& selection) 
   for (int row = 1; row < combo->count(); ++row) {
     const int index = combo->itemData(row).toInt();
     const auto& input = surface_inputs_.at(index);
+    if (surface_input_kind(input) != selection.kind)
+      continue;
     bool match = input.semantic_id == selection.semantic_id;
     if (!match && input.trimming &&
         input.trimming->source_kind() == TrimmingReferenceSourceKind::ProfileRegion) {

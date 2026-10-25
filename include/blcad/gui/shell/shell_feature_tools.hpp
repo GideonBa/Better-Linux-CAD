@@ -136,6 +136,15 @@ public:
   [[nodiscard]] std::optional<BodyContext> body_context(Command command) const;
   [[nodiscard]] bool body_context_available(const BodyContext& context) const;
   [[nodiscard]] bool select_body_context(const BodyContext& context);
+  struct SurfaceContext {
+    Command command;
+    GuiSelection selection;
+    std::variant<BoundaryCurveReference, SurfaceReference> source;
+  };
+  [[nodiscard]] QAction* surface_action(Command command) const noexcept;
+  [[nodiscard]] std::optional<SurfaceContext> surface_context(Command command) const;
+  [[nodiscard]] bool surface_context_available(const SurfaceContext& context) const;
+  [[nodiscard]] bool select_surface_context(const SurfaceContext& context);
   [[nodiscard]] bool select_profile(SketchId sketch, ProfileId profile);
   [[nodiscard]] bool select_open_line(SketchId sketch);
   void clear_profile_selection() noexcept;
@@ -338,6 +347,9 @@ private:
   };
   [[nodiscard]] std::vector<SurfaceInput>
   surface_inputs(std::vector<geometry::FinishingSelectionTarget>* targets = nullptr) const;
+  [[nodiscard]] static GuiSelectionKind surface_input_kind(const SurfaceInput& input);
+  [[nodiscard]] std::optional<SurfaceContext>
+  surface_context_for(Command command, const GuiSelection& selection) const;
   [[nodiscard]] bool spatial() const noexcept;
   [[nodiscard]] QString spatial_summary() const;
   void build_spatial_controls(QWidget* panel);
@@ -555,6 +567,7 @@ private:
   std::vector<geometry::FinishingSelectionTarget> surface_targets_;
   std::vector<std::pair<Command, QAction*>> surface_actions_;
   QWidget* surface_controls_{nullptr};
+  QFormLayout* surface_form_{nullptr};
   QComboBox* surface_source_{nullptr};
   QComboBox* surface_target_{nullptr};
   QComboBox* surface_pick_{nullptr};
