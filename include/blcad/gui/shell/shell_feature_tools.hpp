@@ -128,6 +128,14 @@ public:
   [[nodiscard]] std::optional<PatternContext> pattern_context() const;
   [[nodiscard]] bool pattern_context_available(const PatternContext& context) const;
   [[nodiscard]] bool select_pattern_context(const PatternContext& context);
+  struct BodyContext {
+    Command command;
+    BodyId body; // Boolean target or sole initial Transform source.
+  };
+  [[nodiscard]] QAction* body_action(Command command) const noexcept;
+  [[nodiscard]] std::optional<BodyContext> body_context(Command command) const;
+  [[nodiscard]] bool body_context_available(const BodyContext& context) const;
+  [[nodiscard]] bool select_body_context(const BodyContext& context);
   [[nodiscard]] bool select_profile(SketchId sketch, ProfileId profile);
   [[nodiscard]] bool select_open_line(SketchId sketch);
   void clear_profile_selection() noexcept;

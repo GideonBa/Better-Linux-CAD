@@ -3608,3 +3608,125 @@ TEST_CASE("Combined UI pattern contexts chain reflected sources through upstream
   CHECK(ui.snapshot() == states.back());
   ui.idle();
 }
+
+TEST_CASE("Combined UI Body contexts collect roles and preserve a Boolean Transform chain",
+          "[gui][integration][shell-combined-workflow][shell-combined-body-context]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Body context machining");
+  ui.rectangle("datum.xy", {0, 0}, {10, 10}, Point2{20, 20});
+  const auto tool = ui.extrude(10);
+  ui.rectangle("datum.xy", {20, 0}, {30, 10}, Point2{40, 20});
+  const auto target = ui.extrude(10);
+  std::vector<std::string> states{ui.snapshot()};
+  const auto context = [&](const QString& id) {
+    ui.click(ui.widget<QToolButton>("blcad.context." + id));
+  };
+  const auto pick = [&](const BodyId& body) {
+    ui.command("view_isometric", 2);
+    ui.data(ui.widget<QComboBox>("blcad.selection.filter"),
+            selection_kind_bit(GuiSelectionKind::Body));
+    ui.tree("datum.xy");
+    if (QApplication::platformName() == "xcb") {
+      const auto bounds = ui.bounds(body);
+      const auto point = checked(ui.window.viewport().model_to_screen(
+          {(bounds.minimum.x + bounds.maximum.x) / 2, (bounds.minimum.y + bounds.maximum.y) / 2,
+           bounds.maximum.z}));
+      ui.click_at(ui.window.viewport(), {point.x, point.y});
+    } else
+      ui.tree(body.value());
+    REQUIRE(ui.window.session().selection().size() == 1);
+    CHECK(ui.window.session().selection().entries().front().semantic_id == "body/" + body.value());
+    auto& toolbar = ui.widget<QWidget>("blcad.context.toolbar");
+    REQUIRE(toolbar.isVisible());
+    CHECK(ui.window.viewport().rect().contains(toolbar.geometry()));
+  };
+  auto& sources = ui.widget<QListWidget>("blcad.body.sources");
+  const auto exact = [&](const BodyId& body) {
+    REQUIRE(sources.selectedItems().size() == 1);
+    CHECK(sources.selectedItems().front()->data(Qt::UserRole).toString() ==
+          QString::fromStdString(body.value()));
+  };
+  pick(target);
+  context("body_translate");
+  exact(target);
+  ui.tree(tool.value());
+  REQUIRE(sources.selectedItems().size() == 2);
+  ui.scalar("4 mm");
+  context("cancel");
+  CHECK(ui.snapshot() == states.back());
+  REQUIRE(ui.window.session().selection().size() == 1);
+  CHECK(ui.window.session().selection().entries().front().semantic_id == "body/" + target.value());
+  context("body_translate");
+  exact(target);
+  ui.scalar("-15 mm");
+  ui.text(ui.widget<QLineEdit>("blcad.body.translation.1"), "0 mm");
+  ui.capture("body-context-translate-preview");
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.feature.apply");
+  CHECK(ui.bounds(target).minimum.x == Approx(5).margin(1e-5));
+  CHECK(ui.bounds(tool).minimum.x == Approx(0).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  pick(target);
+  context("body_boolean");
+  auto& target_editor = ui.widget<QComboBox>("blcad.boolean.target");
+  CHECK(target_editor.currentData().toString() == QString::fromStdString(target.value()));
+  CHECK(sources.selectedItems().empty());
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.button("blcad.body.pick_reference");
+  ui.tree(tool.value());
+  CHECK(target_editor.currentData().toString() == QString::fromStdString(tool.value()));
+  ui.button("blcad.body.pick_reference");
+  ui.tree(target.value());
+  ui.choose(ui.widget<QComboBox>("blcad.boolean.operation"), 1);
+  ui.click(ui.widget<QCheckBox>("blcad.boolean.keep_tools"));
+  ui.tree(tool.value());
+  exact(tool);
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.capture("body-context-boolean-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(target).volume_mm3 == Approx(500).margin(1e-5));
+  CHECK(ui.summary(tool).volume_mm3 == Approx(1000).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  pick(target);
+  context("body_rotate");
+  exact(target);
+  ui.button("blcad.body.pick_reference");
+  ui.tree("datum.axis.z");
+  ui.scalar("90 deg");
+  CHECK(ui.snapshot() == states.back());
+  ui.capture("body-context-rotate-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.bounds(target).minimum.x == Approx(-10).margin(1e-5));
+  CHECK(ui.bounds(target).minimum.y == Approx(10).margin(1e-5));
+  states.push_back(ui.snapshot());
+
+  pick(target);
+  context("body_scale");
+  exact(target);
+  ui.scalar("-1");
+  CHECK(ui.snapshot() == states.back());
+  ui.text(ui.widget<QLineEdit>("blcad.body.center.0"), "-10 mm");
+  ui.text(ui.widget<QLineEdit>("blcad.body.center.1"), "10 mm");
+  ui.scalar("2");
+  ui.capture("body-context-scale-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(target).volume_mm3 == Approx(4000).margin(1e-5));
+  CHECK(ui.summary(tool).volume_mm3 == Approx(1000).margin(1e-5));
+  CHECK(ui.bounds(target).maximum.y == Approx(20).margin(1e-5));
+  REQUIRE(ui.window.session().part_document()->body_transforms().size() == 3);
+  for (const auto& transform : ui.window.session().part_document()->body_transforms())
+    CHECK(transform.body() == target);
+  states.push_back(ui.snapshot());
+  ui.data(ui.widget<QComboBox>("blcad.selection.filter"), 0xFFFFFFFFU);
+  ui.history(states);
+  ui.roundtrip(directory.filePath("body-context.blcad"));
+  const auto step = directory.filePath("body-context.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}

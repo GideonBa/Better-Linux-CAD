@@ -120,7 +120,38 @@ Switching Mirror → Circular → Linear keeps count, distribution and direction
 reachable. Five focused `[block136-pattern-context]` cases plus the Qt-authored
 `[shell-combined-pattern-context]` cover this bounded workflow and its lifecycle. Reproducible commands
 and captures live in `docs/development-setup.md`; evidence and remaining gaps live in
-`docs/gui-shell-acceptance-mvp9r.md`. Body Boolean/Transform contexts remain the next work.
+`docs/gui-shell-acceptance-mvp9r.md`. Body Boolean/Transform contexts are described below; Surface and
+Assembly contexts remain open.
+
+## Replacement-shell Body contexts — 2026-10-25
+
+A single verified fresh visible Body offers Verschieben, Drehen and Skalieren through
+`ShellContextTools`; Kombinieren additionally requires a solid target and the original owner's
+second-solid prerequisite. Surface Bodies remain valid transform sources. Typed command/BodyId
+handoff seeds the exact target with no tools for Boolean, or exactly one source for transforms,
+independent of chooser order and without toggling an already selected source. Ribbon and Repeat
+retain their existing fresh defaults.
+
+Body tasks now own their offered semantic scope: all eligible transform sources, only non-target
+Boolean tools, all offered targets during target collection, or offered datum/construction axes
+during rotation-reference collection. Browser Body/reference picks explicitly reach the same
+acceptance path as viewport picks; the bridge copies shared selection before scope changes.
+Apply/Cancel restore the previous filter and scope. All three cancellation routes additionally
+restore complete still-valid context preselection. Invalid/hidden/missing sources, foreign tasks,
+mouse capture and mismatched selection kinds cannot authorize context starts.
+
+Save retains active disposable drafts while persisting only accepted intent. New/Open clear them
+through the common replacement lifecycle. The five `[block136-body-context]` cases and combined
+`[shell-combined-body-context]` exercise these contracts, exact Boolean target/tool identity,
+surface transforms, multi-Body collection, history, reopening and STEP. Reproduction and native
+verification live in `docs/development-setup.md` and `docs/gui-shell-acceptance-mvp9r.md`.
+
+The combined bounds/volume checks exposed family-grouped deserialization reordering an earlier
+Translate after its Boolean cut on the next transaction. Optional `feature_order` now preserves
+interleaved executable order through validated typed replay, including previews, Undo/Redo and
+canonical reopening. Existing files keep historical defaults; transient context state is not stored.
+Core/Geometry regression and malformed-order checks accompany the GUI proof. Exact persistence
+contract: `docs/file-format.md` and `docs/part-body-transform-ownership-mvp6.md`.
 
 ## Body Boolean and Body Transform authoring
 

@@ -1310,3 +1310,25 @@ native pattern-handle case skips explicitly offscreen. Inspect four 1280×800 ca
 `pattern-context-linear-preview.png` and `pattern-context-after-history.png` in the capture directory.
 Include both new tags in the canonical native filter in `docs/gui-shell-acceptance-mvp9r.md`.
 Block 136 remains open.
+
+## Replacement-shell Body contexts — 2026-10-25
+
+After building the four targets above, run GUI suites serially with builds and native startup:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-body-context],[shell-combined-body-context],[block136-body],[block136-pattern-context],[block136-finishing-context],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-body-context-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-body-context],[shell-combined-body-context],[block136-body]"
+```
+
+Core and Geometry `[feature-order]` regressions cover interleaved producer graph/JSON restoration,
+corrupt metadata, legacy compatibility and incremental geometry. Five focused cases verify typed
+Boolean target/Transform source handoff, solid versus surface eligibility, idempotence, task-owned
+role scopes, cancellation restoration, atomic Apply/history, Save and New/Open replacement. The twenty-eighth combined Qt-input workflow authors two solids,
+cancels multi-Body translation, translates the nondefault target into overlap, switches Boolean
+targets through the browser, cuts with retained tools, rotates using a picked axis and scales about
+an explicit center. It checks unchanged previews, invalid-input recovery, bounds/volumes, exact
+four-step history, canonical reopening and STEP. Native runs click actual OCCT Bodies; offscreen
+uses browser selection. Inspect `body-context-translate-preview`, `body-context-boolean-preview`,
+`body-context-rotate-preview` and `body-context-scale-preview` at 1280×800. Existing native Body
+manipulator cases skip explicitly offscreen. Full-suite and native evidence live in
+`docs/gui-shell-acceptance-mvp9r.md`. Surface/Assembly contexts remain next; Block 136 stays open.

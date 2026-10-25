@@ -4,10 +4,9 @@ Status: the Block-122 application authority `GuiModelingWorkspace` is retained. 
 adapter was deleted with the Block-133 shell reset. Block 136 now restores camera navigation through
 `ShellNavigationTools` on `ShellWindow`, as detailed below. Visible selection filters are also
 restored. `ShellRepeatTools` now restores command-repeat presentation through the current command
-owners. `ShellContextTools` supplies the shared bounded profile, finishing and pattern mini-toolbar
-described below.
-Body Boolean/Transform, Surface and Assembly context commands stay open; the old catalog adapter
-specifics are historical.
+owners. `ShellContextTools` supplies the shared bounded profile, finishing, pattern and Body
+mini-toolbar described below. Surface and Assembly context commands stay open; the old catalog
+adapter specifics are historical.
 
 Block 122 introduces the shared application-layer interaction boundary used by the Part, Surface, and
 Assembly modeling workspaces. It upgrades the existing MVP-7 form-driven workbenches with
@@ -150,7 +149,7 @@ restoration, raw-region exclusion, three-section atomic Apply, Save and replacem
 combined workflow `[shell-combined-spatial-context]` authors all its Sketch/plane/path inputs through Qt, cancels an
 invalid Sweep, corrects a three-section Loft's order and G2 input, creates a second Sweep, changes its
 twist parameter, edits the earlier Loft, verifies four-step history, reopens and exports STEP.
-Body Boolean/Transform, Surface and Assembly contexts remain open; the viewport family stays partial.
+Surface and Assembly contexts remain open; the viewport family stays partial.
 
 ### Replacement-shell finishing contexts (Block 136, 2026-10-24)
 
@@ -184,8 +183,8 @@ hidden/removed sources, Save and replacement. The twenty-sixth combined Qt-input
 `[shell-combined-finishing-context]` authors two Bodies, cancels Draft, shells one Body, fillets and
 chamfers the other, changes two upstream parameters in one batch, edits an earlier feature, checks
 five-step exact history, reopens canonically and exports STEP. It requires native OCCT subshape hits
-and explicitly skips offscreen. Body Boolean/Transform, Surface and Assembly contexts remain open;
-the viewport family remains partial and Block 136 stays open.
+and explicitly skips offscreen. Surface and Assembly contexts remain open; the viewport family
+remains partial and Block 136 stays open.
 
 ### Replacement-shell Body pattern contexts (Block 136, 2026-10-24)
 
@@ -213,8 +212,38 @@ history, Save and replacement. The twenty-seventh combined workflow
 Circular pattern and a Linear pattern from the reflected result, stages three upstream parameter
 changes in one batch, edits the earlier Mirror, checks five-step exact history, reopens and exports
 STEP. Offscreen selects the source through the browser; native input hits the actual OCCT Body.
-Body Boolean/Transform, Surface and Assembly contexts remain open; the viewport family and Block 136
-remain partial/open.
+Surface and Assembly contexts remain open; the viewport family and Block 136 remain partial/open.
+
+### Replacement-shell Body contexts (Block 136, 2026-10-25)
+
+Exactly one verified visible Body with a fresh nonempty cache offers `context_body_translate`,
+`context_body_rotate` and `context_body_scale`. Solid Bodies also offer `context_body_boolean`
+when the original command has at least two eligible solids. Surface Bodies support transforms but
+never Boolean targets. Eligibility respects the current standalone Part, workspace, selection kind,
+filter and semantic scope; multiple, hidden, missing and stale sources fail closed.
+
+The shared wrapper starts the original QAction and passes a typed command/BodyId to
+`select_body_context()`. Boolean receives the exact target with an empty tool set; transforms receive
+exactly that source. Repeated seeding is idempotent. Additional sources/tools remain explicit. The
+original owner handles numeric values, references, preview, atomic Apply and repeat defaults.
+Browser Body/axis picks now reach that same owner using a snapshot across scope transitions.
+
+The task owns the offered Body scope, excludes the current Boolean target from tool picking and
+switches to all offered targets or resolvable rotation axes for reference collection. Apply and
+Cancel restore the prior filter/scope; context Cancel, task Cancel and Escape also restore the
+complete still-valid consumed selection. Save persists accepted intent while leaving drafts active;
+New/Open use the existing replacement lifecycle. Context state remains transient. Interleaved
+Body operations preserve executable order with optional `feature_order` as specified in
+`docs/file-format.md`.
+
+Five focused `[block136-body-context]` cases cover role separation, surface eligibility, exact
+handoff, idempotence, all cancellation routes, atomic Apply/history, Save and replacement. The
+twenty-eighth Qt-input workflow `[shell-combined-body-context]` authors two solids, cancels multi-Body
+translation, moves the nondefault target, switches Boolean targets through the browser, cuts with
+retained tools, rotates using an explicitly picked axis and scales about a typed center. It checks
+bounds/volumes, invalid-input recovery, four-step exact history, canonical reopening and STEP.
+Native input hits actual OCCT Bodies; offscreen input uses the visible browser. Remaining contexts
+are Surface and Assembly. The viewport family remains partial and Block 136 stays open.
 
 ## Command lifecycle, cancellation, and repeat
 
