@@ -340,3 +340,54 @@ TEST_CASE("BodyTransform and SketchOwnership JSON reject malformed intent",
         {"association", "automatic"}}});
   CHECK(deserialize_part_document_from_json(bad_association.dump()).has_error());
 }
+
+TEST_CASE(
+    "Interleaved Boolean and Transform JSON preserves producer order and rejects corrupt order",
+    "[core][body-transform][feature-order]") {
+  auto document = transform_document();
+  REQUIRE(document.add_body(Body::create(BodyId("body.tool"), "Tool", BodyKind::Solid).value()));
+  auto tool = Feature::create_additive_extrude(FeatureId("feature.tool"), "Tool",
+                                               SketchId("sketch.base"), ParameterId("part.depth"));
+  REQUIRE(tool);
+  auto context = FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody, std::nullopt,
+                                                  BodyId("body.tool"));
+  REQUIRE(context);
+  REQUIRE(document.add_feature(tool.value().with_body_result_context(context.value()).value()));
+  REQUIRE(document.add_body_transform(translate("transform.before", false)));
+  auto cut = BodyBooleanFeature::create(FeatureId("boolean.middle"), BodyBooleanOperation::Subtract,
+                                        BodyId("body.base"), {BodyId("body.tool")},
+                                        BodyBooleanResultMode::ModifyTarget, std::nullopt, true);
+  REQUIRE(cut);
+  REQUIRE(document.add_body_boolean_feature(cut.value()));
+  REQUIRE(document.add_body_transform(rotate("transform.after", false)));
+  const auto serialized = serialize_part_document_to_json(document);
+  REQUIRE(serialized);
+  auto root = nlohmann::json::parse(serialized.value());
+  REQUIRE(root.contains("feature_order"));
+  const auto restored = deserialize_part_document_from_json(serialized.value());
+  REQUIRE(restored);
+  CHECK(restored.value().dependency_graph().has_dependency("transform.before", "boolean.middle"));
+  CHECK(restored.value().dependency_graph().has_dependency("boolean.middle", "transform.after"));
+  CHECK(serialize_part_document_to_json(restored.value()).value() == serialized.value());
+  SECTION("unknown executable") {
+    root["feature_order"][0] = "unknown";
+  }
+  SECTION("duplicate executable") {
+    root["feature_order"][0] = root["feature_order"][1];
+  }
+  SECTION("missing executable") {
+    root["feature_order"].erase(0);
+  }
+  SECTION("wrong container") {
+    root["feature_order"] = nlohmann::json::object();
+  }
+  SECTION("wrong element type") {
+    root["feature_order"][0] = 42;
+  }
+  SECTION("legacy grouped history") {
+    root.erase("feature_order");
+    CHECK(deserialize_part_document_from_json(root.dump()));
+    return;
+  }
+  CHECK_FALSE(deserialize_part_document_from_json(root.dump()));
+}

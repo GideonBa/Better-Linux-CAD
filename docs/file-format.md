@@ -12,6 +12,22 @@ Sketch `line_segments[]` optionally stores `role`: `geometry` (default when miss
 sketch entities for constraints and transformations, and are excluded from automatic profile
 inference. The role survives save/open, solver materialization, splitting and copying.
 
+## Interleaved Part feature order — 2026-10-25
+
+Part JSON optionally includes `feature_order`, an ordered array of executable Feature and
+BodyTransform IDs. The writer emits it when a transform precedes another feature family in the
+dependency order, because family-specific arrays alone cannot preserve that interleaving. It names
+every executable exactly once; unknown, duplicate, missing and non-string IDs or a non-array value
+fail loading. Files without it retain historical family ordering and their existing schema marker.
+
+After typed record loading, the reader rebuilds executable dependencies through the validated
+family adders in this order, restores non-feature reference consumers and rejects cycles. Authored
+collection ordering remains intact. No OCCT shape or arbitrary dependency edge is stored. Existing
+forward-reference loading boundaries still apply. For example, Translate → Boolean cut → Rotate →
+Scale now survives preview cloning, subsequent transactions, history, save/open and incremental
+recompute with the cut geometry intact. `[core][feature-order]` and `[geometry][feature-order]`
+cover exact graph/JSON restoration, malformed metadata, legacy compatibility and bounds/volumes.
+
 ## Project structure
 
 ```text

@@ -1,3 +1,4 @@
+#include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -229,5 +230,62 @@ TEST_CASE("Body boolean failures identify feature or body and preserve the cache
     CHECK(failed.error().object_id() == "boolean.combine");
     CHECK(cache.body_shape_count() == 0U);
     CHECK(cache.feature_shape_count() == 0U);
+  }
+}
+
+TEST_CASE("Interleaved translated cut rotate and scale retain geometry across JSON and incremental "
+          "replay",
+          "[geometry][body-boolean][body-transform][feature-order]") {
+  auto created = PartDocument::create(DocumentId("part.interleaved"), "Interleaved body history");
+  REQUIRE(created);
+  auto document = created.value();
+  REQUIRE(document.add_datum_plane(DatumPlane::xy().value()));
+  add_box(document, "a", 20, 10, 5, {25, 0});
+  add_box(document, "b", 20, 10, 5, {5, 0});
+  auto translated = BodyTransform::create_translate(BodyTransformId("translate"), BodyId("body.a"),
+                                                    BodyTransformCoordinateSpace::World,
+                                                    std::nullopt, {-15, 0, 0}, false, false);
+  REQUIRE(translated);
+  REQUIRE(document.add_body_transform(translated.value()));
+  auto cut = BodyBooleanFeature::create(FeatureId("cut"), BodyBooleanOperation::Subtract,
+                                        BodyId("body.a"), {BodyId("body.b")},
+                                        BodyBooleanResultMode::ModifyTarget, std::nullopt, true);
+  REQUIRE(cut);
+  REQUIRE(document.add_body_boolean_feature(cut.value()));
+  auto axis = BodyTransformRotationAxis::create_explicit({}, {0, 0, 1});
+  REQUIRE(axis);
+  auto rotated = BodyTransform::create_rotate(BodyTransformId("rotate"), BodyId("body.a"),
+                                              BodyTransformCoordinateSpace::World, std::nullopt,
+                                              axis.value(), 90, false, false);
+  REQUIRE(rotated);
+  REQUIRE(document.add_body_transform(rotated.value()));
+  auto scaled = BodyTransform::create_uniform_scale(BodyTransformId("scale"), BodyId("body.a"),
+                                                    BodyTransformCoordinateSpace::World,
+                                                    std::nullopt, 2, {}, false, false);
+  REQUIRE(scaled);
+  REQUIRE(document.add_body_transform(scaled.value()));
+  const auto serialized = serialize_part_document_to_json(document);
+  REQUIRE(serialized);
+  auto restored = deserialize_part_document_from_json(serialized.value());
+  REQUIRE(restored);
+  for (auto* state : {&document, &restored.value()}) {
+    auto cache = make_cache();
+    REQUIRE(GeometryRecomputeExecutor{}.execute_document(*state, cache));
+    const auto check = [&] {
+      CHECK(body_volume(cache, "body.a") == Catch::Approx(2000));
+      CHECK(body_volume(cache, "body.b") == Catch::Approx(1000));
+      auto bounds = BodyTransformAdapter{}.bounds(*cache.find_body_shape(BodyId("body.a")));
+      REQUIRE(bounds);
+      CHECK(bounds.value().minimum.y == Catch::Approx(30).margin(1e-5));
+      CHECK(bounds.value().maximum.y == Catch::Approx(40).margin(1e-5));
+    };
+    check();
+    state->mark_all_clean();
+    REQUIRE(state->mark_body_transform_changed(BodyTransformId("translate")));
+    const auto plan = state->create_recompute_plan();
+    REQUIRE(plan);
+    REQUIRE(GeometryRecomputeExecutor{}.execute_plan(*state, plan.value(), cache));
+    check();
+    CHECK(serialize_part_document_to_json(*state).value() == serialized.value());
   }
 }
