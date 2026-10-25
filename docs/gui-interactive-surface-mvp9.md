@@ -1,7 +1,8 @@
 # GUI Interactive Surface Authoring and Surface-to-Solid MVP-9
 
 Status: headless authority implemented in Block 128; replacement-shell integration implemented as a
-Block-136 slice. Block 136 remains open for Measure, Assembly, browser feature editing and acceptance.
+Block-136 slice, including selection-first contexts. Block 136 remains open for Assembly contexts,
+advanced Assembly controls and integrated acceptance.
 
 ## Authority and transaction boundary
 
@@ -49,6 +50,38 @@ Extend's path chooser admits only single linear segments; Trim admits closed pat
 Selection masks and an explicit semantic whitelist restrict native picking to the active input role,
 then restore the previous viewport context on Apply/Cancel. The result is a new Body; source Bodies
 remain under the existing Surface feature contract.
+
+## Replacement-shell Surface contexts — 2026-10-25
+
+Exactly one verified PathCurve or stable semantic edge exposes Boundary and Fill. A visible fresh
+Surface Body or supported stable semantic solid face exposes Trim, Extend and Stitch; only a Surface
+Body exposes shell-to-solid. Capability comes from current typed Surface inputs and reference keys,
+selection kind/filter/scope and the standalone Part/cache, never from parsing an ID or chooser order.
+The original action retains remaining-input prerequisites and Geometry suitability checks. In
+particular, an open Surface Body may start conversion but its invalid preview blocks Apply.
+
+Typed handoff idempotently seeds the exact first ordered curve/surface or target. Trim/Extend switch
+to contour/edge collection with no arbitrary default boundary. Additional list inputs remain explicit;
+duplicate insertion is rejected. Browser curve/surface/profile picks reach the same active owner as
+viewport selection. Role scopes and prior filter/scope restoration use the existing Surface task.
+Context Cancel, task Cancel and Escape restore complete still-valid consumed selection. Save writes
+accepted intent without closing drafts; New/Open follow the common replacement lifecycle. All context
+state remains transient and this slice adds no save-format field.
+
+Cancel now rebuilds the idle scene after clearing Surface targets, removing temporary solid Edge/Face
+presentations even when the previous All filter did not change. Stable idle targets remain available
+under the explicit Edge/Face filters. Wrapped guidance lives outside dynamic form rows to keep
+Boundary/Fill, Trim/Extend and Stitch/conversion controls usable across task switches.
+
+Six focused `[block136-surface-context]` cases cover exact handoff, kind/key guards, nondefault
+sources, stable solid roles, idempotence, all cancellation routes, scene cleanup, atomic Apply/history,
+Save and replacement. The twenty-ninth combined Qt-input workflow chains Fill, Trim, Extend, Stitch
+and solid conversion, cancels Boundary and an invalid open-shell conversion, rejects duplicates,
+removes/reorders list entries, edits upstream depth, checks six-step history, reopens canonically and
+exports STEP. Active browser curve and Surface Body collection is exercised as well. Existing native
+Surface tests additionally cover actual target/edge mouse picking and extension dragging.
+Reproduction: `docs/development-setup.md`; current full/native evidence and remaining work:
+`docs/gui-shell-acceptance-mvp9r.md` and `docs/mvp-plan.md`.
 
 ## Geometric limits and diagnostics
 

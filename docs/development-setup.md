@@ -1332,3 +1332,25 @@ uses browser selection. Inspect `body-context-translate-preview`, `body-context-
 `body-context-rotate-preview` and `body-context-scale-preview` at 1280×800. Existing native Body
 manipulator cases skip explicitly offscreen. Full-suite and native evidence live in
 `docs/gui-shell-acceptance-mvp9r.md`. Surface/Assembly contexts remain next; Block 136 stays open.
+
+## Replacement-shell Surface contexts — 2026-10-25
+
+Build the four targets above before running GUI suites and native startup serially:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-surface-context],[shell-combined-surface-context],[block136-surface],[block136-body-context],[block136-finishing-context],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-surface-context-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-surface-context],[shell-combined-surface-context],[block136-surface]"
+```
+
+Six focused cases cover exact typed path/edge/surface handoff, all six commands, stable solid roles,
+key/kind/scope guards, idempotence, cancellation selection/filter restoration, task-only subshape
+cleanup, atomic Apply/history, Save and New/Open. The twenty-ninth combined Qt workflow authors its
+box, closed PathCurves and trim profile through input events, cancels Boundary, applies Fill/Trim/
+Extend, rejects an open shell, sews six surfaces and converts to solid. It checks duplicate/removal/
+reordering controls, upstream depth edits, bounds/volumes, six-step exact history, canonical reopening
+and STEP. Browser selections use the actual widgets on both platforms. Existing native Surface
+regressions also hit actual surfaces/edges and drag/refine the extension handle; their offscreen
+skip is explicit. Inspect `surface-context-fill-preview`, `surface-context-trim-preview`,
+`surface-context-extend-preview`, `surface-context-stitch-preview` and `surface-context-solid-preview`
+at 1280×800. Full evidence and remaining acceptance: `docs/gui-shell-acceptance-mvp9r.md`. Assembly
+contexts remain next; Block 136 stays open.

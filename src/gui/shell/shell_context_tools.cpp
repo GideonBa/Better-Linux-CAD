@@ -35,7 +35,8 @@ ShellContextTools::ShellContextTools(ShellWindow& window) : QObject(&window), wi
   for (const auto& [kind, id, label] :
        {std::tuple{Command::Extrude, "extrude", "Extrusion"},
         std::tuple{Command::Revolve, "revolve", "Drehung"},
-        std::tuple{Command::Sweep, "sweep", "Sweep"}, std::tuple{Command::Loft, "loft", "Loft"},
+        std::tuple{Command::Sweep, "sweep", "Sweep"},
+        std::tuple{Command::Loft, "loft", "Loft"},
         std::tuple{Command::Fillet, "fillet", "Verrunden"},
         std::tuple{Command::Chamfer, "chamfer", "Fase"},
         std::tuple{Command::Shell, "shell", "Aushöhlen"},
@@ -46,7 +47,13 @@ ShellContextTools::ShellContextTools(ShellWindow& window) : QObject(&window), wi
         std::tuple{Command::BodyBoolean, "body_boolean", "Kombinieren"},
         std::tuple{Command::BodyTranslate, "body_translate", "Verschieben"},
         std::tuple{Command::BodyRotate, "body_rotate", "Drehen"},
-        std::tuple{Command::BodyScale, "body_scale", "Skalieren"}}) {
+        std::tuple{Command::BodyScale, "body_scale", "Skalieren"},
+        std::tuple{Command::BoundarySurface, "surface_boundary", "Begrenzungsfläche"},
+        std::tuple{Command::FillSurface, "surface_fill", "Füllfläche"},
+        std::tuple{Command::TrimSurface, "surface_trim", "Trimmen"},
+        std::tuple{Command::ExtendSurface, "surface_extend", "Erweitern"},
+        std::tuple{Command::SurfaceStitch, "surface_stitch", "Vernähen"},
+        std::tuple{Command::ClosedShellToSolid, "surface_to_solid", "Volumen"}}) {
     const auto [wrapper, button] = action(id, label);
     commands_.at(index++) = {kind, wrapper, button};
     connect(wrapper, &QAction::triggered, this, [this, kind] { begin(kind); });
@@ -74,6 +81,8 @@ QAction* ShellContextTools::source_action(Command kind) const {
     return pattern;
   if (auto* body = owner.body_action(kind))
     return body;
+  if (auto* surface = owner.surface_action(kind))
+    return surface;
   return kind == Command::Extrude   ? &owner.extrude_action()
          : kind == Command::Revolve ? &owner.revolve_action()
          : kind == Command::Sweep   ? &owner.sweep_action()
@@ -96,6 +105,8 @@ std::optional<ShellContextTools::Context> ShellContextTools::current_context(Com
       return *pattern;
   if (const auto body = owner.body_context(kind))
     return *body;
+  if (const auto surface = owner.surface_context(kind))
+    return *surface;
   return std::nullopt;
 }
 
@@ -126,8 +137,10 @@ void ShellContextTools::begin(Command kind) {
       seeded = owner.select_finishing_context(*finishing);
     else if (const auto* pattern = std::get_if<ShellFeatureTools::PatternContext>(&*context))
       seeded = owner.select_pattern_context(*pattern);
+    else if (const auto* body = std::get_if<ShellFeatureTools::BodyContext>(&*context))
+      seeded = owner.select_body_context(*body);
     else
-      seeded = owner.select_body_context(std::get<ShellFeatureTools::BodyContext>(*context));
+      seeded = owner.select_surface_context(std::get<ShellFeatureTools::SurfaceContext>(*context));
     if (!seeded) {
       owner.cancel();
       return;
@@ -152,12 +165,14 @@ void ShellContextTools::finish(bool applied) {
     };
     const auto* finishing = std::get_if<ShellFeatureTools::FinishingContext>(&previous.context);
     const auto* pattern = std::get_if<ShellFeatureTools::PatternContext>(&previous.context);
+    const auto* body = std::get_if<ShellFeatureTools::BodyContext>(&previous.context);
     const bool restored =
         profile     ? restore_profile()
         : finishing ? window_.feature_tools().finishing_context_available(*finishing)
         : pattern   ? window_.feature_tools().pattern_context_available(*pattern)
-                    : window_.feature_tools().body_context_available(
-                        std::get<ShellFeatureTools::BodyContext>(previous.context));
+        : body      ? window_.feature_tools().body_context_available(*body)
+                    : window_.feature_tools().surface_context_available(
+                     std::get<ShellFeatureTools::SurfaceContext>(previous.context));
     if (restored) {
       if (previous.viewport)
         (void)window_.viewport().select_semantic(previous.viewport->semantic_id);

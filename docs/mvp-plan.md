@@ -1146,6 +1146,26 @@ four-step Undo/Redo, reopens canonically and exports STEP. Verification is recor
 and integrated acceptance. Thirteen families remain restored and five partial; Block 136 stays open
 and numbered completion remains through Block 135.
 
+### Block 136 — Surface contexts and task selection cleanup — 2026-10-25
+
+The shared toolbar now offers all six Surface commands through their original task owners.
+Verified PathCurves/stable edges seed Boundary/Fill; Surface Bodies/stable faces seed Trim/Extend
+and Stitch; shell-to-solid accepts a Surface Body and keeps Geometry closure diagnostics. Typed
+reference keys, exact kind/filter/scope checks and idempotent first-input handoff avoid arbitrary
+chooser defaults. Trim/Extend collect the remaining boundary explicitly. Browser picks reach the
+same owner, cancellation restores valid preselection and removes temporary subshape presentations.
+Wrapped guidance stays outside dynamic rows to preserve controls across command switches.
+
+Six focused cases and the twenty-ninth combined Qt workflow cover all six contexts, stable solid
+roles, source/key guards, cancellation, scope/scene cleanup, atomic history, Save and replacement.
+The combined Part authors its box, closed paths and trim profile through Qt, chains Fill/Trim/Extend/
+Stitch and solid conversion, rejects an open shell, changes upstream depth, checks six-step history,
+reopens canonically and exports STEP. Verification and native evidence live in
+`docs/gui-shell-acceptance-mvp9r.md`; contracts live in `docs/gui-interactive-surface-mvp9.md` and
+`docs/gui-modeling-workspace-mvp9.md`. Continue with Assembly contexts, then advanced Assembly and
+integrated acceptance. Thirteen families remain restored and five partial; Block 136 stays open
+and numbered completion remains through Block 135.
+
 ## Current next technical step — Block 136
 
 The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
@@ -1153,7 +1173,7 @@ reachable entry points and explicit remaining gaps. The machine check distinguis
 from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
 `docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
 
-Extend contextual commands to Surface and Assembly, then continue the
+Extend contextual commands to Assembly, then continue the
 remaining advanced Assembly and integrated acceptance workflows. Native `ToFace`/`Between` collection
 now covers the supported semantic source roles. The bounded single-line Thin Extrude editors are available; general curved/open chains remain
 outside that Geometry boundary.
@@ -1173,7 +1193,7 @@ The bounded repair-open path now supports failed-recompute Parts and missing fac
 with typed intent, complete atomic publication and failed-state history. Other structural dependency
 failures remain strict loading errors.
 The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with the remaining Surface/Assembly
+position/direction/frame/new-offset grips. Continue with the remaining Assembly
 context commands, advanced Assembly controls and integrated native Part/Assembly acceptance
 in the order recorded in
 `docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending

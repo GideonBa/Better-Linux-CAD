@@ -631,6 +631,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_finishing_context_tests.cpp
       tests/gui/gui_shell_pattern_context_tests.cpp
       tests/gui/gui_shell_body_context_tests.cpp
+      tests/gui/gui_shell_surface_context_tests.cpp
       tests/gui/gui_shell_window_tests.cpp
       tests/gui/gui_shell_sketch_tools_tests.cpp
       tests/gui/gui_shell_sketch_operations_tests.cpp
