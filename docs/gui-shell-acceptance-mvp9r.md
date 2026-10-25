@@ -38,15 +38,12 @@ source, hide a missing tag behind OR and claim completion with gaps. They must a
 
 ## Remaining acceptance work
 
-The machine-readable details live in `families[].shell.gaps`; this is the execution order:
-
-1. Extend context commands beyond profile Extrude/Revolve/Sweep/Loft, single-line Thin Extrude,
-   bounded Edge/Face finishing, Body patterns, Boolean/Transform and Surface to Assembly.
-   Repeat, selection filters, ViewCube, Home and named camera bookmarks have replacement-shell controls.
-2. Restore the supported hierarchy validation, cross-hierarchy relationship/joint/solve controls,
-   sampled Revolute analysis and occurrence-linked result highlighting.
-3. Finish integrated Part and Assembly acceptance using actual ShellWindow input paths, disposable
-   previews, invalid-input rejection, history, canonical save/load and native presentation.
+The machine-readable details live in `shell_reset_progress.acceptance.pending_workflows`.
+All eighteen bounded family surfaces now have implementation and current shell proofs. The remaining
+work is verification: complete the full Core/Geometry/GUI regressions, canonical native shell suite,
+startup and capture review, including the new Assembly context, hierarchy, sampled analysis and
+realistic repeated-subassembly workflows. Resolve every failure before running the closure gate and
+advancing numbered completion.
 
 The bounded Sketch3D/PathCurve surface includes typed/shared-point editing, native collection and
 grips, anchored pointer/direction placement and explicit independent planar-point copies with visible
@@ -61,7 +58,8 @@ lives in `docs/gui-sketch-workbench-mvp7.md`.
 The bounded Extrude/Revolve/Hole surface now includes native role-based source-plane collection for
 face extents, all seven terminations, four Body operations, path Extrude, single-line Thin Extrude,
 expanded Revolve and dedicated plain through-all holes. Arbitrary final-Body subshape references
-remain outside its contract. Thirteen families are restored and five remain partial.
+remain outside its contract. All eighteen bounded families now have restored shell surfaces; final integrated/native acceptance
+remains pending.
 
 Current finishing/pattern, Body, spatial, Surface, Measure, Assembly, Feature Edit and STEP/analysis
 slices retain their individual documented bounds. The new Part Sketch/Extrude/STEP regression and
@@ -77,7 +75,7 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-fea
 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
 ./build/dev-gui/blcad_core_tests
 ./build/dev-gui/blcad_geometry_tests
-QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-surface-context],[shell-combined-surface-context],[block136-body-context],[shell-combined-body-context],[block136-pattern-context],[shell-combined-pattern-context],[block136-finishing-context],[shell-combined-finishing-context],[block136-spatial-context],[shell-combined-spatial-context],[block136-profile-context],[shell-combined-profile-context],[block136-repeat],[shell-combined-repeat],[block136-selection-filters],[shell-combined-selection-filters],[block136-navigation],[shell-combined-navigation],[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
+QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-assembly-context],[block136-assembly-advanced],[block136-assembly-analysis],[block136-surface-context],[shell-combined-surface-context],[block136-body-context],[shell-combined-body-context],[block136-pattern-context],[shell-combined-pattern-context],[block136-finishing-context],[shell-combined-finishing-context],[block136-spatial-context],[shell-combined-spatial-context],[block136-profile-context],[shell-combined-profile-context],[block136-repeat],[shell-combined-repeat],[block136-selection-filters],[shell-combined-selection-filters],[block136-navigation],[shell-combined-navigation],[block136-extrude-limit-picking],[shell-combined-extrude-limit-picking],[block136-thin-extrude],[shell-combined-thin-extrude],[block136-path-extrude],[shell-combined-path-extrude],[block136-revolve],[shell-combined-revolve-controls],[block136-extrude-extents],[shell-combined-extrude-extents],[block136-holes],[shell-combined-holes],[block136-parameters],[shell-combined-parameters],[block136-sketch3d-projection],[shell-combined-projected-sweep],[block136-sketch3d-direction],[shell-sketch3d-direction-workflow],[block136-sketch3d-placement],[shell-sketch3d-placement-workflow],[block136-sketch3d-grips],[shell-sketch3d-grips-workflow],[block136-sketch3d],[shell-combined-sketch3d],[block136-sketch-diagnostics],[missing-reference-session],[block136-missing-reference],[repair-open-session],[block136-repair-open],[block136-reference-repair-batches],[block136-reference-repair],[block136-construction-manipulators],[block136-construction-picking],[shell-mixed-path-loft],[block136-construction-relations],[block136-construction-edit],[shell-combined-workflow],[gui][shell-coverage],[block136-construction],[block136-inspect-export],[block136-feature-edit],[block136-assembly],[block136-measure],[block136-surface],[block136-spatial],[block136-body],[block136-patterns],[block136-finishing],[sketch-ui-review],[gui][viewport],[native-viewer-lifecycle],[shell-features]"
 ```
 
 The regular inventory audit passes while it accurately records unfinished work. For closure,

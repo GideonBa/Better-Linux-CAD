@@ -50,12 +50,10 @@
       },
       "shell": {
         "owner": 136,
-        "status": "partial",
+        "status": "restored",
         "contract": "docs/gui-modeling-workspace-mvp9.md",
-        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus. Accepted Feature/Hole/Assembly commands expose guarded repeat with current inputs and fresh defaults, independent of Redo and persistence. Bounded profile mini-toolbar validates Core profile or single-line sources, limits Sweep/Loft to materialized regions and starts Extrude/Revolve/Sweep/Loft through existing owners, seeds the exact typed Sweep profile or first Loft section, consumes preselection and restores it on cancellation. Explicit Edge/Face model filters publish stable current-Body targets for bounded Fillet/Chamfer/Shell/Draft contexts; typed command/Body/semantic handoffs seed the original task, restrict its scope and restore complete valid preselection on cancellation. Single fresh solid-Body selection offers Linear/Circular pattern and Mirror contexts, seeds the exact typed source through the original owner and restores complete preselection after task-owned Body/reference scope transitions. Body Boolean/Translate/Rotate/Scale contexts validate exact typed targets or sources, including surface transforms; task-owned Body/tool/axis scopes and browser collection share the original owner and restore prior scope/filter on completion. Boundary/Fill contexts seed one verified PathCurve or stable semantic edge; Trim/Extend seed a surface target and collect its remaining boundary, Stitch seeds one surface and shell-to-solid seeds a Surface Body. Typed reference keys, role scopes, browser collection and cancellation restore the original owner contract; task-only Surface subshape presentations are discarded on Cancel.",
-        "gaps": [
-          "Extend contextual commands beyond profile, finishing, pattern, Body and Surface tools to Assembly commands."
-        ],
+        "scope": "Semantic selection synchronizes viewport, browser and session; seven OCCT standard views, captured Home and named session-local camera bookmarks, Sketch/grip guards and camera restoration during feature preview. Eight visible model filters synchronize session/viewport selection, reject hidden browser fallbacks and restore after task-owned reference collection and Sketch focus. Accepted Feature/Hole/Assembly commands expose guarded repeat with current inputs and fresh defaults, independent of Redo and persistence. Bounded profile mini-toolbar validates Core profile or single-line sources, limits Sweep/Loft to materialized regions and starts Extrude/Revolve/Sweep/Loft through existing owners, seeds the exact typed Sweep profile or first Loft section, consumes preselection and restores it on cancellation. Explicit Edge/Face model filters publish stable current-Body targets for bounded Fillet/Chamfer/Shell/Draft contexts; typed command/Body/semantic handoffs seed the original task, restrict its scope and restore complete valid preselection on cancellation. Single fresh solid-Body selection offers Linear/Circular pattern and Mirror contexts, seeds the exact typed source through the original owner and restores complete preselection after task-owned Body/reference scope transitions. Body Boolean/Translate/Rotate/Scale contexts validate exact typed targets or sources, including surface transforms; task-owned Body/tool/axis scopes and browser collection share the original owner and restore prior scope/filter on completion. Boundary/Fill contexts seed one verified PathCurve or stable semantic edge; Trim/Extend seed a surface target and collect its remaining boundary, Stitch seeds one surface and shell-to-solid seeds a Surface Body. Typed reference keys, role scopes, browser collection and cancellation restore the original owner contract; task-only Surface subshape presentations are discarded on Cancel. Root component contexts seed exact Placement, an unambiguous active joint for Motion, or its connected root solve group; explicit AssemblyTarget filtering publishes current semantic references for Relationship/Joint contexts. Original task owners consume the selection, seed exact identities, collect compatible references and restore still-valid preselection, filters and scopes on cancellation.",
+        "gaps": [],
         "proofs": [
           {
             "filter": "[gui][selection-sync]",
@@ -132,6 +130,14 @@
           {
             "filter": "[shell-combined-surface-context]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-assembly-context]",
+            "source": "tests/gui/gui_shell_assembly_context_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly-context]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -171,7 +177,12 @@
           "context_surface_extend",
           "context_surface_stitch",
           "context_surface_to_solid",
-          "context_cancel"
+          "context_cancel",
+          "context_assembly_placement",
+          "context_assembly_relationship",
+          "context_assembly_joint",
+          "context_assembly_motion",
+          "context_assembly_solve"
         ],
         "widgets": [
           "blcad.shell.browser",
@@ -769,12 +780,10 @@
       },
       "shell": {
         "owner": 136,
-        "status": "partial",
+        "status": "restored",
         "contract": "docs/gui-interactive-assembly-mvp9.md",
-        "scope": "Project creation, definition loading and root component/rigid-subassembly placement.",
-        "gaps": [
-          "Restore the former hierarchy-validation controls for supported nested/cross-hierarchy authoring."
-        ],
+        "scope": "Project creation, definition loading and root component/rigid-subassembly placement, including occurrence state editing and exact occurrence context starts. Read-only hierarchy validation reports rooted paths and visible active leaves. Repeated nested definitions retain distinct occurrence paths and rigid boundaries while sharing internal component transform authority. Definition import retains the existing rejection of Projects carrying cross-hierarchy intent that would require remapping.",
+        "gaps": [],
         "proofs": [
           {
             "filter": "[block136-assembly]",
@@ -787,6 +796,22 @@
           {
             "filter": "[shell-combined-planar-motion]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-assembly-context]",
+            "source": "tests/gui/gui_shell_assembly_context_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly-context]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-assembly-advanced]",
+            "source": "tests/gui/gui_shell_assembly_advanced_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly-hierarchy]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -794,7 +819,8 @@
           "assembly_import",
           "assembly_insert_component",
           "assembly_insert_subassembly",
-          "assembly_placement"
+          "assembly_placement",
+          "assembly_validate_hierarchy"
         ],
         "widgets": []
       }
@@ -810,12 +836,10 @@
       },
       "shell": {
         "owner": 136,
-        "status": "partial",
+        "status": "restored",
         "contract": "docs/gui-interactive-assembly-mvp9.md",
-        "scope": "Compatibility-filtered root relationship/joint authoring and typed bounded coordinate slots.",
-        "gaps": [
-          "Restore supported cross-hierarchy relationship/joint editing surfaces removed with the old workbench."
-        ],
+        "scope": "Compatibility-filtered root relationship/joint authoring and typed bounded coordinate slots; root semantic contexts seed the exact first endpoint. Project-level cross-hierarchy relationships and all five joint families can be created and edited through occurrence-qualified endpoints, names, active state and typed coordinates, preserving record identity. Cross authoring validates a disposable Project without moving occurrences; explicit solve or motion applies poses. Spherical joints remain passive.",
+        "gaps": [],
         "proofs": [
           {
             "filter": "[block136-assembly]",
@@ -828,13 +852,35 @@
           {
             "filter": "[shell-combined-planar-motion]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-assembly-context]",
+            "source": "tests/gui/gui_shell_assembly_context_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly-context]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-assembly-advanced]",
+            "source": "tests/gui/gui_shell_assembly_advanced_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly-hierarchy]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
           "assembly_relationship",
-          "assembly_joint"
+          "assembly_joint",
+          "assembly_cross_relationship",
+          "assembly_cross_joint"
         ],
-        "widgets": []
+        "widgets": [
+          "blcad.assembly.cross_record",
+          "blcad.assembly.cross_name",
+          "blcad.assembly.cross_active"
+        ]
       }
     },
     {
@@ -848,12 +894,10 @@
       },
       "shell": {
         "owner": 136,
-        "status": "partial",
+        "status": "restored",
         "contract": "docs/gui-interactive-assembly-mvp9.md",
-        "scope": "Root component-group solve and selected joint-coordinate motion with candidate poses.",
-        "gaps": [
-          "Restore supported cross-hierarchy solve/application controls."
-        ],
+        "scope": "Root component-group solve and selected joint-coordinate motion with candidate poses and exact component context starts. Complete mixed local/cross geometric groups containing Project-level cross relationships expose converged preview and atomic authority-qualified application. Cross Revolute, Prismatic, Cylindrical and Planar motion drives one typed role while retaining other authored coordinates. Repeated child occurrences share internal direct transforms; rigid hierarchy boundaries remain unchanged. Freshness, limits and nonconvergence reject publication.",
+        "gaps": [],
         "proofs": [
           {
             "filter": "[block136-assembly]",
@@ -866,13 +910,34 @@
           {
             "filter": "[shell-combined-planar-motion]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-assembly-context]",
+            "source": "tests/gui/gui_shell_assembly_context_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly-context]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-assembly-advanced]",
+            "source": "tests/gui/gui_shell_assembly_advanced_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly-hierarchy]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
           "assembly_solve",
-          "assembly_motion"
+          "assembly_motion",
+          "assembly_cross_solve",
+          "assembly_cross_motion"
         ],
-        "widgets": []
+        "widgets": [
+          "blcad.assembly.solve_group",
+          "blcad.assembly.coordinate"
+        ]
       }
     },
     {
@@ -884,13 +949,10 @@
       },
       "shell": {
         "owner": 136,
-        "status": "partial",
+        "status": "restored",
         "contract": "docs/gui-analysis-step-export-workbench-mvp7.md",
-        "scope": "Read-only interference, clearance, contact and exact root-constraint-group DOF inspection.",
-        "gaps": [
-          "Restore bounded sampled Revolute sweep controls.",
-          "Restore occurrence-linked result highlighting."
-        ],
+        "scope": "Read-only interference, clearance, contact and exact root-constraint-group DOF inspection, plus bounded inclusive sampled Revolute intervals for root-local or Project cross-hierarchy joints. Exact rooted result identities select the corresponding current occurrence, including repeated children; input changes and lifecycle transitions discard results/highlights and restore prior selection scope. Sampling validates limits and count, reports sample failures without partial results, and leaves authored coordinates, placements, dirty state and history unchanged. Sampling is discrete and does not promise continuous collision detection.",
+        "gaps": [],
         "proofs": [
           {
             "filter": "[shell-assembly-analysis]",
@@ -903,12 +965,30 @@
           {
             "filter": "[shell-combined-planar-motion]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block136-assembly-analysis]",
+            "source": "tests/gui/gui_shell_assembly_analysis_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly-analysis]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[shell-combined-assembly-hierarchy]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
           "assembly_analysis"
         ],
-        "widgets": []
+        "widgets": [
+          "blcad.inspect.sweep_joint",
+          "blcad.inspect.sweep_start",
+          "blcad.inspect.sweep_end",
+          "blcad.inspect.sweep_samples",
+          "blcad.inspect.results"
+        ]
       }
     },
     {
@@ -987,7 +1067,6 @@
       "selection_scope": "Unambiguous current-body semantic box edges and planar faces, including four-line Sketch rectangles."
     },
     "remaining": [
-      "Resolve each families[].shell.gaps entry.",
       "Complete shell_reset_progress.acceptance.pending_workflows.",
       "Require manifest readiness plus passing full suites before closing Block 136."
     ],
@@ -1067,9 +1146,14 @@
         "Relationship",
         "Joint",
         "Joint coordinate motion",
-        "Root group solve"
+        "Root group solve",
+        "Validate hierarchy",
+        "Cross-hierarchy relationship create/edit",
+        "Cross-hierarchy joint create/edit",
+        "Cross-hierarchy group solve",
+        "Cross-hierarchy typed coordinate motion"
       ],
-      "selection_scope": "Visible active root component semantic references with compatibility-filtered A/B picks; root component and rigid-subassembly placement; ordered bounded joint coordinates. Nested/cross-hierarchy endpoint authoring and constrained free-drag remain deferred."
+      "selection_scope": "Visible active root component and exact occurrence-qualified nested semantic references with compatibility-filtered A/B picks; root component and rigid-subassembly placement; ordered typed joint coordinates and current selection contexts. Cross authoring retains endpoint paths and persistent record identities; converged solve/motion applies shared internal component authority while preserving hierarchy boundaries. General constrained free-drag and occurrence-local internal pose overrides remain outside the existing authority."
     },
     "feature_edit_slice": {
       "status": "implemented",
@@ -1095,26 +1179,19 @@
         "Interference",
         "Clearance",
         "Contact",
-        "Root-group DOF"
+        "Root-group DOF",
+        "Sampled root-local and cross-hierarchy Revolute sweep",
+        "Exact occurrence-linked result highlighting"
       ],
-      "remaining": [
-        "Sampled Revolute sweep controls",
-        "Occurrence-linked result highlighting"
-      ]
+      "remaining": []
     },
     "acceptance": {
       "audited_on": "2026-10-25",
       "complete": false,
-      "blocked_families": [
-        "viewport-selection",
-        "assembly-project-hierarchy",
-        "assembly-relationships-joints",
-        "assembly-solve-motion",
-        "assembly-analysis"
-      ],
+      "blocked_families": [],
       "pending_workflows": [
-        "Restore equivalent-or-better integrated Part and Assembly workflows using actual ShellWindow interactions, including history and persistence.",
-        "Complete whole-shell native acceptance, including restored workspace, construction, repair, Sketch3D and advanced Assembly surfaces."
+        "Verify the complete current Core, Geometry and offscreen GUI suites, including the new actual-Qt Assembly contexts, repeated hierarchy, typed motion and sampled analysis workflows.",
+        "Complete whole-shell native Qt/OCCT acceptance and inspect native captures for the restored Part and advanced Assembly surfaces before enabling the closure gate."
       ]
     }
   },

@@ -1142,6 +1142,11 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
     if (hole_tools_)
       for (const auto& selected : session_.selection().entries())
         (void)hole_tools_->accept_selection(selected);
+    if (assembly_tools_) {
+      const auto selected = session_.selection().entries();
+      for (const auto& selection : selected)
+        (void)assembly_tools_->accept_selection(selection);
+    }
     if (feature_tools_) {
       // Browser selection suppresses the viewport callback above. Route these
       // picks to the Pattern/Body/Surface owners explicitly; reference acceptance can
@@ -1398,12 +1403,18 @@ void ShellWindow::refresh_feature_selection_scene() {
 }
 
 void ShellWindow::refresh_viewport_scene() {
-  const auto finishing_mask = feature_tools_ ? feature_tools_->idle_finishing_selection_mask() : 0U;
+  const auto selection_targets_mask =
+      (feature_tools_ ? feature_tools_->idle_finishing_selection_mask() : 0U) |
+      (session_.project() && !session_.task().active() &&
+               viewport_->selection_filter_mask() ==
+                   selection_kind_bit(GuiSelectionKind::AssemblyTarget)
+           ? selection_kind_bit(GuiSelectionKind::AssemblyTarget)
+           : 0U);
   if (viewport_revision_ == session_.presentation_revision() &&
-      viewport_finishing_mask_ == finishing_mask)
+      viewport_selection_targets_mask_ == selection_targets_mask)
     return;
   viewport_revision_ = session_.presentation_revision();
-  viewport_finishing_mask_ = finishing_mask;
+  viewport_selection_targets_mask_ = selection_targets_mask;
   if (!session_.has_document()) {
     viewport_->clear_scene();
     return;

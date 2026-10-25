@@ -201,6 +201,9 @@ TEST_CASE(
   reject([](auto& candidate) {
     auto progress = candidate["shell_reset_progress"].toObject();
     auto acceptance = progress["acceptance"].toObject();
+    // Keep this control invalid after the real manifest reaches completion.
+    // An outstanding workflow must never coexist with a completion claim.
+    acceptance["pending_workflows"] = QJsonArray{"Unverified integrated shell workflow"};
     acceptance["complete"] = true;
     progress["acceptance"] = acceptance;
     candidate["shell_reset_progress"] = progress;

@@ -121,7 +121,8 @@ reachable. Five focused `[block136-pattern-context]` cases plus the Qt-authored
 `[shell-combined-pattern-context]` cover this bounded workflow and its lifecycle. Reproducible commands
 and captures live in `docs/development-setup.md`; evidence and remaining gaps live in
 `docs/gui-shell-acceptance-mvp9r.md`. Body Boolean/Transform contexts are described below. Surface
-contexts live in `docs/gui-interactive-surface-mvp9.md`; Assembly contexts remain open.
+contexts live in `docs/gui-interactive-surface-mvp9.md`; Assembly contexts are documented in
+`docs/gui-interactive-assembly-mvp9.md`.
 
 ## Replacement-shell Body contexts — 2026-10-25
 

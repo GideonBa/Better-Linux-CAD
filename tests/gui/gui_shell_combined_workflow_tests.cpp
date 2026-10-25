@@ -1,4 +1,5 @@
 #include "../support/mixed_path_loft_fixture.hpp"
+#include "blcad/core/assembly_leaf_occurrence.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
@@ -3889,5 +3890,417 @@ TEST_CASE("Combined UI Surface contexts fill trim extend sew and convert a shell
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}
+
+TEST_CASE(
+    "Combined UI Assembly contexts place and drive a plate through sampled analysis and history",
+    "[gui][integration][shell-combined-workflow][shell-combined-assembly-context]"
+    "[shell-combined-assembly-analysis]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto source =
+      QStringLiteral(BLCAD_SOURCE_DIR) + "/examples/revolute_joint.blcad.project.json";
+  const auto original_source = ui.bytes(source);
+  ui.new_document("Plate motion and inspection", true);
+  ui.file("assembly_import", source);
+  const auto part = ui.window.session().project()->part_documents().front().id();
+  std::vector<ComponentInstanceId> components;
+  for (int index = 0; index < 2; ++index) {
+    ui.command("assembly_insert_component");
+    ui.data(ui.window.assembly_tools().definition_editor(), QString::fromStdString(part.value()));
+    ui.text(ui.widget<QLineEdit>("blcad.assembly.name"), index ? "Moving leaf" : "Fixed leaf");
+    ui.number(ui.window.assembly_tools().placement_editor(0), QString::number(index * 30));
+    ui.number(ui.window.assembly_tools().placement_editor(2), QString::number(index * 12));
+    if (!index)
+      ui.click(ui.window.assembly_tools().grounding_editor());
+    ui.button("blcad.assembly.apply");
+    components.push_back(
+        ui.window.session().project()->assembly().component_instances().back().id());
+  }
+  const auto context = [&](const QString& command) {
+    auto& toolbar = ui.widget<QWidget>("blcad.context.toolbar");
+    REQUIRE(toolbar.isVisible());
+    CHECK(ui.window.viewport().rect().contains(toolbar.geometry()));
+    ui.click(ui.widget<QToolButton>("blcad.context." + command));
+  };
+  std::vector<std::string> states{ui.snapshot()};
+  ui.tree(components[1].value());
+  const auto selection = ui.window.session().selection().entries();
+  context("assembly_placement");
+  ui.number(ui.window.assembly_tools().placement_editor(0), "55");
+  CHECK(ui.snapshot() == states.back());
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  context("cancel");
+  CHECK(ui.snapshot() == states.back());
+  CHECK(ui.window.session().selection().entries() == selection);
+  context("assembly_placement");
+  ui.number(ui.window.assembly_tools().placement_editor(0), "0");
+  ui.number(ui.window.assembly_tools().placement_editor(2), "0");
+  ui.button("blcad.assembly.apply");
+  CHECK(ui.window.session()
+            .project()
+            ->assembly()
+            .find_component_instance(components[1])
+            ->transform() == identity_rigid_transform());
+  states.push_back(ui.snapshot());
+
+  ui.command("assembly_joint");
+  ui.choose(ui.window.assembly_tools().joint_type_editor(),
+            static_cast<int>(AssemblyJointType::Revolute));
+  const auto seat = [&](QComboBox& input, const ComponentInstanceId& component) {
+    const auto& targets = ui.window.assembly_tools().targets();
+    const auto found = std::find_if(targets.begin(), targets.end(), [&](const auto& target) {
+      return target.reference.component_instance() == component &&
+             target.reference.semantic_reference() == "feature.hole.seat";
+    });
+    REQUIRE(found != targets.end());
+    ui.data(input, static_cast<int>(found - targets.begin()));
+  };
+  seat(ui.window.assembly_tools().first_editor(), components[0]);
+  seat(ui.window.assembly_tools().second_editor(), components[1]);
+  auto& joint_slots = ui.window.assembly_tools().slots_editor();
+  REQUIRE(joint_slots.rowCount() == 1);
+  ui.cell(joint_slots, 0, 2, "-60");
+  ui.cell(joint_slots, 0, 3, "60");
+  ui.button("blcad.assembly.apply");
+  const auto joint = ui.window.session().project()->assembly().joints().back().id();
+  states.push_back(ui.snapshot());
+  const auto motion = [&](const QString& angle) {
+    ui.tree(components[1].value());
+    context("assembly_motion");
+    CHECK(ui.window.assembly_tools().joint_editor().currentData().toString() ==
+          QString::fromStdString(joint.value()));
+    ui.number(ui.window.assembly_tools().value_editor(), angle);
+    REQUIRE(ui.window.viewport().feature_preview_active());
+    CHECK(ui.snapshot() == states.back());
+  };
+  motion("30");
+  ui.capture("combined-assembly-context-motion");
+  ui.button("blcad.assembly.apply");
+  CHECK(ui.window.session().project()->assembly().find_joint(joint)->coordinate_deg() == 30);
+  CHECK(ui.window.session()
+            .project()
+            ->assembly()
+            .find_component_instance(components[1])
+            ->transform()
+            .rotation_deg.z == Approx(30).margin(1e-5));
+  states.push_back(ui.snapshot());
+  motion("-25");
+  ui.key(ui.window, Qt::Key_Escape);
+  CHECK(ui.snapshot() == states.back());
+  ui.history(states);
+  ui.command("undo");
+  states.pop_back();
+  motion("-45");
+  ui.button("blcad.assembly.apply");
+  CHECK_FALSE(ui.window.session().can_redo());
+  states.push_back(ui.snapshot());
+  ui.roundtrip(directory.filePath("plate-motion.blcad.project.json"));
+  const auto persisted = ui.snapshot();
+  const auto saved = ui.bytes(directory.filePath("plate-motion.blcad.project.json"));
+  ui.command("assembly_analysis");
+  ui.choose(ui.widget<QComboBox>("blcad.inspect.kind"), 2);
+  ui.button("blcad.inspect.run");
+  auto& results = ui.widget<QTableWidget>("blcad.inspect.results");
+  REQUIRE(results.rowCount() == 1);
+  CHECK(results.item(0, 2)->text().startsWith("Kollision:"));
+  const auto highlight = [&](int row, int column) {
+    auto* item = results.item(row, column);
+    REQUIRE(item);
+    const auto semantic = item->data(Qt::UserRole + 1).toString().toStdString();
+    REQUIRE_FALSE(semantic.empty());
+    ui.reveal(results);
+    results.scrollToItem(item);
+    ui.flush();
+    ui.click_at(*results.viewport(), results.visualItemRect(item).center());
+    REQUIRE(ui.window.viewport().selected_semantic());
+    CHECK(ui.window.viewport().selected_semantic()->semantic_id == semantic);
+    REQUIRE(ui.window.session().selection().size() == 1);
+    CHECK(ui.window.session().selection().entries().front().semantic_id == semantic);
+  };
+  highlight(0, 0);
+  highlight(0, 1);
+  ui.choose(ui.widget<QComboBox>("blcad.inspect.kind"), 4);
+  CHECK(results.rowCount() == 0);
+  CHECK_FALSE(ui.window.viewport().selected_semantic());
+  auto& sweep_joint = ui.widget<QComboBox>("blcad.inspect.sweep_joint");
+  ui.choose(sweep_joint,
+            sweep_joint.findData(QString::fromStdString(joint.value()), Qt::UserRole + 1));
+  CHECK(sweep_joint.currentData(Qt::UserRole + 2).toInt() == 0);
+  ui.number(ui.widget<QSpinBox>("blcad.inspect.sweep_samples"), "3");
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.inspect.sweep_start"), "-90");
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.inspect.sweep_end"), "45");
+  ui.button("blcad.inspect.run");
+  CHECK(results.rowCount() == 0);
+  CHECK_FALSE(ui.widget<QLabel>("blcad.inspect.summary").text().isEmpty());
+  CHECK(ui.snapshot() == persisted);
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.inspect.sweep_start"), "-45");
+  REQUIRE(ui.widget<QDoubleSpinBox>("blcad.inspect.sweep_start").value() == -45);
+  REQUIRE(ui.widget<QDoubleSpinBox>("blcad.inspect.sweep_end").value() == 45);
+  REQUIRE(ui.widget<QSpinBox>("blcad.inspect.sweep_samples").value() == 3);
+  ui.button("blcad.inspect.run");
+  INFO(ui.widget<QLabel>("blcad.inspect.summary").text().toStdString());
+  REQUIRE(results.rowCount() == 3);
+  for (int row = 0; row < 3; ++row)
+    CHECK(results.item(row, 2)->data(Qt::UserRole).toDouble() == -45 + row * 45);
+  highlight(1, 1);
+  ui.capture("combined-assembly-context-sweep");
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.inspect.sweep_end"), "30");
+  CHECK(results.rowCount() == 0);
+  CHECK_FALSE(ui.window.viewport().selected_semantic());
+  ui.button("blcad.inspect.close");
+  CHECK(ui.snapshot() == persisted);
+  CHECK_FALSE(ui.window.session().dirty());
+  CHECK_FALSE(ui.window.session().can_undo());
+  CHECK_FALSE(ui.window.session().can_redo());
+  for (const auto& [command, filename] : std::vector<std::pair<QString, QString>>{
+           {"export_assembly_flat_step", "plate-motion-flat.step"},
+           {"export_assembly_structured_step", "plate-motion-structured.step"}}) {
+    ui.file(command, directory.filePath(filename));
+    CHECK(ui.bytes(directory.filePath(filename)).startsWith("ISO-10303-21;"));
+    CHECK(ui.snapshot() == persisted);
+  }
+  CHECK(ui.bytes(directory.filePath("plate-motion.blcad.project.json")) == saved);
+  CHECK(ui.bytes(source) == original_source);
+  ui.idle();
+}
+
+TEST_CASE("Combined UI repeated subassemblies share solved motion through qualified references and "
+          "exports",
+          "[gui][integration][shell-combined-workflow][shell-combined-assembly-hierarchy]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Reusable moving cartridge", true);
+  ui.file("assembly_import",
+          QStringLiteral(BLCAD_SOURCE_DIR) + "/examples/revolute_joint.blcad.project.json");
+  const auto part = ui.window.session().project()->part_documents().front().id();
+  const auto child = ui.window.session().project()->assembly().id();
+  ui.command("assembly_insert_component");
+  ui.data(ui.window.assembly_tools().definition_editor(), QString::fromStdString(part.value()));
+  ui.text(ui.widget<QLineEdit>("blcad.assembly.name"), "Shared moving plate");
+  ui.number(ui.window.assembly_tools().placement_editor(0), "30");
+  ui.number(ui.window.assembly_tools().placement_editor(2), "12");
+  ui.button("blcad.assembly.apply");
+  const auto internal =
+      ui.window.session().project()->assembly().component_instances().front().id();
+  const auto child_file = directory.filePath("cartridge.blcad.project.json");
+  ui.file("save_as", child_file);
+  const auto saved_child = ui.bytes(child_file);
+
+  ui.new_document("Repeated cartridges", true);
+  ui.file("assembly_import", child_file);
+  ui.command("assembly_insert_component");
+  ui.data(ui.window.assembly_tools().definition_editor(), QString::fromStdString(part.value()));
+  ui.text(ui.widget<QLineEdit>("blcad.assembly.name"), "Grounded reference plate");
+  ui.click(ui.window.assembly_tools().grounding_editor());
+  ui.button("blcad.assembly.apply");
+  const auto fixed = ui.window.session().project()->assembly().component_instances().front().id();
+  std::vector<SubassemblyInstanceId> occurrences;
+  std::vector<RigidTransform> boundaries;
+  for (int index = 0; index < 2; ++index) {
+    ui.command("assembly_insert_subassembly");
+    ui.data(ui.window.assembly_tools().definition_editor(), QString::fromStdString(child.value()));
+    ui.text(ui.widget<QLineEdit>("blcad.assembly.name"),
+            index ? "Rear cartridge" : "Front cartridge");
+    ui.number(ui.window.assembly_tools().placement_editor(1), QString::number(index * 60));
+    ui.button("blcad.assembly.apply");
+    const auto& occurrence =
+        ui.window.session().project()->assembly().subassembly_instances().back();
+    occurrences.push_back(occurrence.id());
+    boundaries.push_back(occurrence.transform());
+  }
+  std::vector<std::string> states{ui.snapshot()};
+  ui.command("assembly_validate_hierarchy");
+  CHECK(ui.widget<QLabel>("blcad.assembly.summary").text().contains("3 sichtbare aktive"));
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.assembly.apply").isEnabled());
+  ui.capture("combined-assembly-hierarchy-validation");
+  ui.button("blcad.assembly.cancel");
+  CHECK(ui.snapshot() == states.back());
+  const auto endpoint = [&](QComboBox& input, const std::vector<SubassemblyInstanceId>& path,
+                            const ComponentInstanceId& component, const char* semantic) {
+    const auto& targets = ui.window.assembly_tools().hierarchy_targets();
+    const auto found = std::find_if(targets.begin(), targets.end(), [&](const auto& target) {
+      return target.endpoint.occurrence_path() == path &&
+             target.endpoint.component_instance() == component &&
+             target.endpoint.semantic_reference() == semantic;
+    });
+    REQUIRE(found != targets.end());
+    ui.data(input, static_cast<int>(found - targets.begin()));
+  };
+  const auto shared_transform = [&] {
+    const auto* assembly = ui.window.session().project()->find_assembly_document(child);
+    REQUIRE(assembly);
+    const auto* component = assembly->find_component_instance(internal);
+    REQUIRE(component);
+    return component->transform();
+  };
+  ui.command("assembly_cross_relationship");
+  ui.choose(ui.window.assembly_tools().relationship_editor(),
+            static_cast<int>(AssemblyConstraintType::Mate));
+  ui.text(ui.widget<QLineEdit>("blcad.assembly.cross_name"), "Assembly seating check");
+  endpoint(ui.window.assembly_tools().first_editor(), {}, fixed, "feature.base_extrude.top");
+  endpoint(ui.window.assembly_tools().second_editor(), {occurrences[0]}, internal,
+           "feature.base_extrude.bottom");
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.assembly.apply");
+  const auto relationship =
+      ui.window.session().project()->cross_hierarchy_constraints().back().id();
+  CHECK(shared_transform().translation_mm.z == 12);
+  states.push_back(ui.snapshot());
+  ui.command("assembly_cross_solve");
+  auto& groups = ui.widget<QListWidget>("blcad.assembly.solve_group");
+  REQUIRE(groups.count() == 1);
+  ui.list(groups, 0);
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == states.back());
+  ui.capture("combined-assembly-hierarchy-solve");
+  ui.button("blcad.assembly.apply");
+  CHECK(shared_transform().translation_mm.z == Approx(2).margin(1e-5));
+  CHECK(shared_transform().translation_mm.x == Approx(30).margin(1e-5));
+  states.push_back(ui.snapshot());
+  // Release the seating check before installing a frame-based rotary joint.
+  // Editing preserves the relationship identity and its qualified endpoints.
+  const auto seated = *ui.window.session().project()->find_cross_hierarchy_constraint(relationship);
+  ui.command("assembly_cross_relationship");
+  ui.data(ui.widget<QComboBox>("blcad.assembly.cross_record"),
+          QString::fromStdString(relationship.value()));
+  ui.click(ui.widget<QCheckBox>("blcad.assembly.cross_active"));
+  ui.text(ui.widget<QLineEdit>("blcad.assembly.cross_name"), "Seating check retained inactive");
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.assembly.apply");
+  const auto* inactive =
+      ui.window.session().project()->find_cross_hierarchy_constraint(relationship);
+  REQUIRE(inactive);
+  CHECK(inactive->state() == AssemblyConstraintState::Inactive);
+  CHECK(inactive->target_a() == seated.target_a());
+  CHECK(inactive->target_b() == seated.target_b());
+  CHECK(ui.window.session().project()->cross_hierarchy_constraint_count() == 1);
+  states.push_back(ui.snapshot());
+
+  ui.command("assembly_cross_joint");
+  ui.choose(ui.window.assembly_tools().joint_type_editor(),
+            static_cast<int>(AssemblyJointType::Revolute));
+  ui.text(ui.widget<QLineEdit>("blcad.assembly.cross_name"), "Shared cartridge hinge");
+  endpoint(ui.window.assembly_tools().first_editor(), {}, fixed, "feature.hole.seat");
+  endpoint(ui.window.assembly_tools().second_editor(), {occurrences[0]}, internal,
+           "feature.hole.seat");
+  auto& joint_slots = ui.window.assembly_tools().slots_editor();
+  REQUIRE(joint_slots.rowCount() == 1);
+  ui.cell(joint_slots, 0, 2, "-60");
+  ui.cell(joint_slots, 0, 3, "60");
+  ui.button("blcad.assembly.apply");
+  const auto joint = ui.window.session().project()->cross_hierarchy_joints().back().id();
+  CHECK(shared_transform().translation_mm.z == Approx(2).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.command("assembly_cross_motion");
+  ui.data(ui.window.assembly_tools().joint_editor(), QString::fromStdString(joint.value()));
+  ui.data(ui.window.assembly_tools().coordinate_editor(),
+          static_cast<int>(AssemblyJointCoordinateRole::Rotation));
+  ui.number(ui.window.assembly_tools().value_editor(), "30");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == states.back());
+  ui.capture("combined-assembly-hierarchy-motion");
+  ui.button("blcad.assembly.apply");
+  const auto moved = shared_transform();
+  CHECK(moved.translation_mm.x == Approx(0).margin(1e-5));
+  CHECK(moved.translation_mm.z == Approx(0).margin(1e-5));
+  CHECK(moved.rotation_deg.z == Approx(30).margin(1e-5));
+  CHECK(ui.window.session().project()->find_cross_hierarchy_joint(joint)->coordinate_deg() == 30);
+  for (std::size_t index = 0; index < occurrences.size(); ++index)
+    CHECK(ui.window.session()
+              .project()
+              ->assembly()
+              .find_subassembly_instance(occurrences[index])
+              ->transform() == boundaries[index]);
+  const auto leaves =
+      checked(AssemblyLeafOccurrenceResolver{}.resolve(*ui.window.session().project()));
+  REQUIRE(leaves.size() == 3);
+  for (const auto& path : occurrences) {
+    const auto found = std::find_if(leaves.begin(), leaves.end(), [&](const auto& leaf) {
+      return leaf.subassembly_path == std::vector<SubassemblyInstanceId>{path} &&
+             leaf.component_instance == internal;
+    });
+    REQUIRE(found != leaves.end());
+    REQUIRE_FALSE(found->transforms_inner_to_outer.empty());
+    CHECK(found->transforms_inner_to_outer.front() == moved);
+  }
+  states.push_back(ui.snapshot());
+  ui.command("assembly_cross_joint");
+  ui.data(ui.widget<QComboBox>("blcad.assembly.cross_record"),
+          QString::fromStdString(joint.value()));
+  ui.cell(joint_slots, 0, 3, "10");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.assembly.apply").isEnabled());
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == states.back());
+  ui.cell(joint_slots, 0, 3, "60");
+  ui.text(ui.widget<QLineEdit>("blcad.assembly.cross_name"), "Shared cartridge hinge reviewed");
+  ui.button("blcad.assembly.apply");
+  CHECK(ui.window.session().project()->cross_hierarchy_joint_count() == 1);
+  CHECK(ui.window.session().project()->find_cross_hierarchy_joint(joint)->coordinate_deg() == 30);
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.roundtrip(directory.filePath("repeated-cartridges.blcad.project.json"));
+  const auto persisted = ui.snapshot();
+
+  ui.command("assembly_analysis");
+  ui.choose(ui.widget<QComboBox>("blcad.inspect.kind"), 2);
+  ui.button("blcad.inspect.run");
+  auto& results = ui.widget<QTableWidget>("blcad.inspect.results");
+  REQUIRE(results.rowCount() == 3);
+  const auto nested_semantic = [&](std::size_t index) {
+    return "component/" + child.value() + "/" + occurrences[index].value() + "/" + internal.value();
+  };
+  int repeated_pair = -1;
+  for (int row = 0; row < results.rowCount(); ++row) {
+    const auto first = results.item(row, 0)->data(Qt::UserRole + 1).toString().toStdString();
+    const auto second = results.item(row, 1)->data(Qt::UserRole + 1).toString().toStdString();
+    if ((first == nested_semantic(0) && second == nested_semantic(1)) ||
+        (first == nested_semantic(1) && second == nested_semantic(0)))
+      repeated_pair = row;
+  }
+  REQUIRE(repeated_pair >= 0);
+  CHECK(results.item(repeated_pair, 2)->text().startsWith("Getrennt:"));
+  std::vector<std::string> highlighted;
+  for (int column = 0; column < 2; ++column) {
+    auto* item = results.item(repeated_pair, column);
+    const auto semantic = item->data(Qt::UserRole + 1).toString().toStdString();
+    ui.reveal(results);
+    results.scrollToItem(item);
+    ui.flush();
+    ui.click_at(*results.viewport(), results.visualItemRect(item).center());
+    REQUIRE(ui.window.viewport().selected_semantic());
+    CHECK(ui.window.viewport().selected_semantic()->semantic_id == semantic);
+    highlighted.push_back(semantic);
+  }
+  CHECK(highlighted[0] != highlighted[1]);
+  ui.capture("combined-assembly-repeated-occurrence-highlight");
+  ui.choose(ui.widget<QComboBox>("blcad.inspect.kind"), 4);
+  auto& sweep = ui.widget<QComboBox>("blcad.inspect.sweep_joint");
+  ui.choose(sweep, sweep.findData(QString::fromStdString(joint.value()), Qt::UserRole + 1));
+  CHECK(sweep.currentData(Qt::UserRole + 2).toInt() == 1);
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.inspect.sweep_start"), "0");
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.inspect.sweep_end"), "30");
+  ui.number(ui.widget<QSpinBox>("blcad.inspect.sweep_samples"), "2");
+  ui.button("blcad.inspect.run");
+  REQUIRE(results.rowCount() == 6);
+  for (int row = 0; row < results.rowCount(); ++row)
+    CHECK(results.item(row, 2)->data(Qt::UserRole).toDouble() == (row < 3 ? 0 : 30));
+  ui.capture("combined-assembly-cross-sweep");
+  ui.button("blcad.inspect.close");
+  CHECK(ui.snapshot() == persisted);
+  CHECK_FALSE(ui.window.session().dirty());
+  CHECK_FALSE(ui.window.session().can_undo());
+  CHECK_FALSE(ui.window.session().can_redo());
+  for (const auto& [command, filename] : std::vector<std::pair<QString, QString>>{
+           {"export_assembly_flat_step", "cartridges-flat.step"},
+           {"export_assembly_structured_step", "cartridges-structured.step"}}) {
+    ui.file(command, directory.filePath(filename));
+    CHECK(ui.bytes(directory.filePath(filename)).startsWith("ISO-10303-21;"));
+    CHECK(ui.snapshot() == persisted);
+  }
+  CHECK(ui.bytes(child_file) == saved_child);
   ui.idle();
 }

@@ -38,7 +38,7 @@ Collision volumes and non-interfering clearance distances remain separate result
 distinguish separated, touching and interfering pairs. Component names include the named occurrence
 path; tooltips and item data retain the derived rooted identity, including repeated nested instances.
 DOF inspection reports consistency and whether remaining freedom was actually determined; it does
-not apply a solver proposal. Input changes clear old results. Model revision/freshness changes,
+not apply a solver proposal. Input changes clear old results. Model intent/freshness changes,
 Undo/Redo, document replacement, Escape and dock close dispose the analysis task and its results.
 
 Export uses the existing visible-Body / visible-active posed-occurrence inclusion and naming contracts.
@@ -51,9 +51,45 @@ another path. Completion
 reports actual exported item and byte counts, including nested assembly leaves. Neither consumer
 changes document bytes, dirty state, history, placements or joint coordinates.
 
-This bounded restoration does **not** complete Block 136: sampled Revolute sweep controls,
-occurrence-linked result highlighting and the remaining shell acceptance audit are still open.
-The headless sweep API above remains available and is not a shell UI proof.
+### Sampled Revolute analysis and occurrence links — 2026-10-25
+
+The fifth analysis mode, **Drehgelenk-Abtastung**, exposes the existing bounded sampler through
+an explicit active Revolute joint chooser. Root-local and Project cross-hierarchy joints retain
+their typed scope and exact JointId; inactive joints and other joint families are omitted. The
+start/end degree editors initially use the selected joint's authored limits. The sample count
+is bounded to 2–1001, inclusive; reverse intervals preserve the requested direction. Out-of-limit
+intervals and solver/contact failures produce diagnostics and no partial result rows. Every sample
+starts from the same source Project copy. The source placements, coordinates, dirty state, history
+and canonical document bytes remain unchanged.
+
+Each sampled contact row displays its sample number, exact angle and contact classification; the
+summary reports the actual sample and evaluated-pair counts. Both the input hint and result summary
+state that intermediate positions are not checked. This is discrete sampling, with no claim of
+continuous collision detection or support for richer joint families.
+
+The A/B cells of interference, clearance, contact and sampled-contact results are occurrence links.
+Mouse clicks (including a repeated click on the current cell) and keyboard cell navigation select
+the exact existing Component presentation through the normal shell selection callback. The link
+is derived from the typed rooted subassembly path and local ComponentInstanceId; repeated instances
+of one child definition remain distinct. The browser follows where it exposes that occurrence.
+Sample-result highlighting always shows the selected occurrence in the current authored model pose,
+as stated in the UI; analysis does not install sampled poses in the source viewport.
+
+While the analysis task is active it owns a temporary Component filter and the visible-active leaf
+scope. Closing or cancelling restores the previous filter/scope and any still-valid preselection.
+Input changes and reruns clear the analysis-owned highlight and results. Source-intent/freshness changes,
+Undo/Redo and document replacement discard them, without restoring a stale preselection.
+Diagnostic-only presentation revisions preserve the active task and results when canonical Project
+intent is unchanged, so an invalid interval can be corrected and rerun without reopening analysis.
+
+Focused shell proof: `[block136-assembly-analysis]` covers root-local bounds and reverse sampling,
+inactive-joint exclusion, cross-hierarchy sampling, exact repeated-occurrence links, repeated-cell
+clicks, input invalidation, read-only persistence/history and Escape/dock/stale/Undo/New cleanup.
+`[native-assembly-analysis-highlight]` also compares completed OCCT framebuffer images for an
+isolated repeated occurrence: selecting a result changes model pixels, clearing restores them,
+clicking the same cell selects it again, and changed input removes the highlight. Captures preserve
+the before/selected/cleared states at 1280×800.
+The integrated acceptance audit remains a separate requirement for closing Block 136.
 
 Shell proof: `[block136-inspect-export]`, including Part creation through Sketch/Extrude and export,
 flat/structured nested occurrence output, read-only results, positive clearance/contact boundaries,

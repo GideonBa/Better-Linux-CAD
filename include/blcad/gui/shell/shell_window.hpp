@@ -212,7 +212,7 @@ private:
   std::string property_semantic_id_;
   std::size_t browser_revision_{std::numeric_limits<std::size_t>::max()};
   std::size_t viewport_revision_{std::numeric_limits<std::size_t>::max()};
-  std::uint32_t viewport_finishing_mask_{0};
+  std::uint32_t viewport_selection_targets_mask_{0};
   bool synchronizing_selection_{false};
 };
 

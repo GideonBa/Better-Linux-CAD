@@ -1354,3 +1354,25 @@ skip is explicit. Inspect `surface-context-fill-preview`, `surface-context-trim-
 `surface-context-extend-preview`, `surface-context-stitch-preview` and `surface-context-solid-preview`
 at 1280×800. Full evidence and remaining acceptance: `docs/gui-shell-acceptance-mvp9r.md`. Assembly
 contexts remain next; Block 136 stays open.
+
+
+## Final Assembly shell and acceptance proof — Block 136
+
+Build all four GUI-preset targets before running these suites. Keep source edits, builds, GUI runs
+and separate native startup serial. The Core/Geometry binaries may run alongside one GUI suite.
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests -j6
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-assembly-context],[block136-assembly-advanced],[block136-assembly-analysis],[shell-combined-assembly-context],[shell-combined-assembly-hierarchy],[block136-assembly],[block136-inspect-export],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-assembly-acceptance-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-assembly-context],[block136-assembly-advanced],[block136-assembly-analysis],[shell-combined-assembly-context],[shell-combined-assembly-hierarchy],[block136-assembly],[block136-inspect-export]"
+```
+
+The context cases exercise exact occurrence/target handoffs, all cancellation paths, guards, history
+and disposable saved drafts. Advanced cases cover hierarchy validation, occurrence-qualified create/edit
+and solve, all five joint families, four driven families and repeated definition authority. Analysis
+cases cover local/cross Revolute samples, occurrence links, repeated clicks, read-only lifecycle and
+preselection restoration. Two new integrated Qt workflows combine these surfaces with real file
+import, invalid candidates, branching history, canonical reopening and flat/structured STEP.
+
+The canonical full/native command and final closure gate live in
+`docs/gui-shell-acceptance-mvp9r.md`. Use its latest evidence section for actual results and omissions.

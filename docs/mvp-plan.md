@@ -1166,38 +1166,31 @@ reopens canonically and exports STEP. Verification and native evidence live in
 integrated acceptance. Thirteen families remain restored and five partial; Block 136 stays open
 and numbered completion remains through Block 135.
 
+### Block 136 — Assembly completion implementation — 2026-10-25
+
+The final implementation slice adds root Assembly selection contexts, hierarchy validation,
+occurrence-qualified relationship/joint create/edit tasks, connected cross-hierarchy solve/application,
+role-addressed joint motion, sampled Revolute analysis and exact occurrence result highlighting.
+New focused regressions accompany two realistic integrated Qt workflows covering repeated child
+Assemblies, history, rejected candidates, persistence and both Assembly STEP modes.
+
+Implementation is undergoing focused and full/native verification. Numbered completion remains
+through Block 135 until every family gap and integrated acceptance requirement is evidenced and the
+explicit closure gate passes. The exact contracts remain in the existing Assembly, modeling-workspace
+and analysis documents; final suite counts belong to `docs/gui-shell-acceptance-mvp9r.md`.
+
 ## Current next technical step — Block 136
 
-The current v3 coverage inventory records all eighteen accepted families, current shell proof sources,
-reachable entry points and explicit remaining gaps. The machine check distinguishes inventory validity
-from closure readiness; historical controller proofs cannot close a shell gap. Acceptance contract:
-`docs/gui-shell-acceptance-mvp9r.md`, `[integration][gui-feature-coverage]` / `[gui][shell-coverage]`.
+Complete the final focused/native and whole-shell acceptance gates for the implemented Assembly
+contexts, hierarchy controls, solve/motion and analysis. The v3 coverage inventory now records all
+bounded surfaces; historical controller proofs remain separate from current ShellWindow evidence.
+Run the full Core/Geometry/GUI regressions, canonical native shell suite and application startup,
+inspect the new captures, and resolve every failure before changing the numbered completion boundary.
 
-Extend contextual commands to Assembly, then continue the
-remaining advanced Assembly and integrated acceptance workflows. Native `ToFace`/`Between` collection
-now covers the supported semantic source roles. The bounded single-line Thin Extrude editors are available; general curved/open chains remain
-outside that Geometry boundary.
-All seven bounded Extrude terminations and the expanded Revolve controls now have explicit shell
-editors. Path Extrude selects open PathCurves with all four Body operations. Dedicated plain
-through-all Hole authoring is available within the retained circular-cut/Core
-target boundaries.
-The bounded standalone Part parameter manager now creates and edits typed literals and Length/Count
-formulas through local batches, complete downstream Preview and one atomic Apply. The Sketch3D/PathCurve surface includes
-typed/shared-point line editing, native collection, constrained grips, anchored pointer/direction
-placement and explicit planar-point copies.
-Live associative point projection and new arc/spline/helix parameter tools remain extensions of their
-existing bounded contracts.
-Explicit constraint-diagnostic suggestion controls cover the accepted bounded Core diagnostic/repair
-subset.
-The bounded repair-open path now supports failed-recompute Parts and missing face/point/line sources,
-with typed intent, complete atomic publication and failed-state history. Other structural dependency
-failures remain strict loading errors.
-The construction task now has fourteen bounded create/edit modes, native reference collection and
-position/direction/frame/new-offset grips. Continue with the remaining Assembly
-context commands, advanced Assembly controls and integrated native Part/Assembly acceptance
-in the order recorded in
-`docs/gui-shell-acceptance-mvp9r.md`. Block 136 remains in progress until all recorded gaps and pending
-workflows are resolved and the closure gate plus full/native regressions pass.
+The explicit closure gate is `BLCAD_REQUIRE_SHELL_ACCEPTANCE=1` with
+`[integration][gui-feature-coverage]`. The final audit must update the plan, manifest and
+`docs/gui-shell-acceptance-mvp9r.md` together. Block 136 remains in progress until the pending
+integrated/native acceptance requirements are discharged. STEP Import starts at Block 137.
 
 ## Later phases
 
