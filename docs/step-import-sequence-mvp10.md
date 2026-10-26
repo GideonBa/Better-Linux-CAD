@@ -1,6 +1,6 @@
 # STEP Import Sequence MVP-10
 
-Status: Block 137 in progress; Blocks 138–143 planned. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
+Status: Block 137 complete; Blocks 138–143 planned. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
 `docs/gui-shell-reset-sequence-mvp9r.md`); `docs/mvp-plan.md` is the status authority. An earlier
 revision numbered these blocks 132–138, before MVP-9R took that range; only the numbering moved,
 never the content or the ordering.
@@ -208,9 +208,53 @@ whose owner cannot survive that operation. Embedded Part registries remain intac
 same target-root check. No source is silently retargeted.
 
 Focused GUI tags: `[step-import-workbench]`, `[block137-step-import]`,
-`[shell-step-import-workflow]`, `[native-shell-step-import]`. Full regression, native Qt dialog/layout
-checks and existing-shell interaction proof are required before advancing the block; actual results
-are recorded here after verification. `docs/mvp-plan.md` owns numbered completion.
+`[shell-step-import-workflow]`, `[native-shell-step-import]`. `docs/mvp-plan.md` owns numbered completion.
+
+### Block 137 acceptance — 2026-10-26
+
+All twenty-one new cases pass: nine Core cases, seven headless GUI cases and five shell cases. The
+shell workflows combine authored Sketch/Extrude geometry with both source modes, supplier byte
+changes, stale Apply rejection, exact Undo/Redo, removal and canonical reopen; a nested Project
+workflow relocates the complete directory and recovers missing/unreadable files without changing
+occurrence or definition identity. Lifecycle cases cover Save during drafts, Save As, New/Open,
+Escape, task close, busy Sketch guards and real Undo/Redo actions. Ownership cases include equal
+Project/Part ids, equal source ids and slash-containing ids. Native input covers file chooser accept
+and Escape, long paths, full fingerprint display and reachable controls at 1280×800.
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Focused Core | 9 | 405 | All passed |
+| Focused GUI and shell inventory | 15 | 2,158 | 14 passed; one native-only skip |
+| Focused native source workflows | 5 | 1,569 | All passed; no skips |
+| Full Core | 539 | 16,579 | All passed |
+| Full Geometry | 441 | 30,227 | All passed |
+| Full offscreen GUI | 547 | 71,155 | 527 passed; 20 native-only skips |
+| Full canonical native shell plus Block 137 | 356 | 67,620 | All passed; no skips |
+| Shell closure gate after advancing the plan | 3 | 299 | All passed |
+
+Build all four `dev-gui` targets, then use the focused commands in `docs/development-setup.md` and
+the canonical native filter in `docs/gui-shell-acceptance-mvp9r.md` with `[block137-step-import]`
+appended. Full Core/Geometry binaries and the unfiltered offscreen GUI binary establish broad
+regression coverage. Native coverage includes the twenty intentionally skipped offscreen cases.
+Production/test sources remained frozen during completed final runs. Separate native application
+startup stayed running until the intentional six-second timeout (124).
+
+Native captures under `/tmp/blcad137-native-focused` and `/tmp/blcad137-native-full` were inspected,
+including source registration, changed-source refresh, relocated Project recovery, wrapped SHA fields,
+registry inspection and the existing combined Loft workflow. No high-severity graphics error,
+BadDrawable or fatal lifecycle error occurred; the known medium OCCT incomplete-visual depth/stencil
+warning remains. Changed C++ formatting and working/staged whitespace checks pass. Evidence logs
+use `/tmp/blcad137-` with `core-focused.log`, `gui-focused.log`, `native-focused.log`, `core-full.log`,
+`geometry-full.log`, `gui-full.log`, `native-full.log`, `startup.log`, `closure.log` and `build-final.log`.
+Earlier development failures are superseded by these completed final runs.
+
+Block 137 is complete. The Block-136 manifest remains a historical accepted milestone; the closure
+gate checks that later plan progress still covers it. STEP geometry reading, units, imported topology,
+Reference Part immutability and ImportedBodyFeature consumers remain explicitly outside this block.
+
+The closure command is `BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 QT_QPA_PLATFORM=offscreen
+./build/dev-gui/blcad_gui_tests "[integration][gui-feature-coverage]"`. It passed after setting
+`implemented_through: Block 137` and `current_block: 138`; the historical manifest was not rewritten.
 
 ## Block 138 — OCCT STEP/XDE reader and imported body definitions
 

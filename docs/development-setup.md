@@ -497,10 +497,11 @@ Interactive Sketcher MVP-8 (Blocks 106–121) and Interactive Part & Assembly Mo
 Blocks 132 (QOpenGLWidget viewport), 133 (`ShellWindow` + `ShellRibbon`, origin seeding), 134
 (`ShellSketchTools`), and 135 (`ShellFeatureTools`, Extrude/Revolve, manipulator overlay) are
 implemented; Block 136 restores full bounded feature coverage and is accepted with full offscreen,
-native Qt/OCCT and closure checks. All Blocks through 136 are complete. STEP Import Block 137 is in
-progress; source contracts live in `docs/step-import-sequence-mvp10.md` and shell acceptance evidence
-lives in `docs/gui-shell-acceptance-mvp9r.md`. Dated proof sections
-below retain their original incremental status.
+native Qt/OCCT and closure checks. Block 137 adds verified STEP source intent, freshness and shell
+management. All Blocks through 137 are complete; Block 138 (STEP/XDE reader) is next. Source contracts
+and acceptance evidence live in `docs/step-import-sequence-mvp10.md`; the completed shell milestone
+lives in `docs/gui-shell-acceptance-mvp9r.md`. Dated proof sections below retain their original
+incremental status.
 
 ## GUI Shell Reset focused proof
 
