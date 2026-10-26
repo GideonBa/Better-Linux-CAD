@@ -9,6 +9,7 @@
 #include <QApplication>
 #include <QMouseEvent>
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -29,7 +30,16 @@ void enter_sketch(ShellWindow& window) {
   REQUIRE(sketch != nullptr);
   auto topology = SketchTopology::migrate_legacy(*sketch);
   REQUIRE(topology);
-  return std::move(topology.value());
+  // These legacy tool tests inspect authored entities; selectable immutable
+  // origin references are verified by the dedicated reference workflow tests.
+  auto points = topology.value().points();
+  auto entities = topology.value().entities();
+  std::erase_if(points,
+                [](const auto& point) { return point.id().value().starts_with("reference/"); });
+  std::erase_if(entities, [](const auto& entity) { return entity.id().starts_with("reference/"); });
+  return SketchTopology::create(sketch->id(), std::move(points), std::move(entities),
+                                topology.value().dependencies())
+      .value();
 }
 
 // Click a plane point through the real viewport hit path.

@@ -9,6 +9,8 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
+#include <BRepGProp.hxx>
+#include <GProp_GProps.hxx>
 #include <GeomAbs_SurfaceType.hxx>
 #include <Standard_Failure.hxx>
 #include <TopAbs_ShapeEnum.hxx>
@@ -84,6 +86,28 @@ select_distance_face(const PartDocument& document, const TopoDS_Shape& target,
     const TopoDS_Face face = TopoDS::Face(iterator.Value());
     if (BRepAdaptor_Surface(face).GetType() == GeomAbs_Plane)
       planar_faces.push_back(face);
+  }
+  if (std::holds_alternative<ResultEdgeReference>(reference.source())) {
+    // Distance modes use a deterministic geometric side, preferring a planar
+    // face. The witness prevents silently rebinding after the selected curve
+    // changes. Equal-distance mode does not need a side at all.
+    std::vector<TopoDS_Face> faces = planar_faces;
+    if (faces.empty())
+      for (TopTools_ListIteratorOfListOfShape it(edge_faces.FindFromKey(edge)); it.More();
+           it.Next())
+        faces.push_back(TopoDS::Face(it.Value()));
+    const auto key = [](const TopoDS_Face& face) {
+      GProp_GProps properties;
+      BRepGProp::SurfaceProperties(face, properties);
+      auto center = properties.CentreOfMass();
+      return std::array<double, 4>{center.X(), center.Y(), center.Z(), properties.Mass()};
+    };
+    std::sort(faces.begin(), faces.end(),
+              [&](const auto& a, const auto& b) { return key(a) < key(b); });
+    if (faces.empty() || (faces.size() > 1 && key(faces[0]) == key(faces[1])))
+      return Result<TopoDS_Face>::failure(
+          chamfer_error(id, "result edge reference face is ambiguous"));
+    return Result<TopoDS_Face>::success(faces.front());
   }
   if (planar_faces.empty())
     return Result<TopoDS_Face>::failure(

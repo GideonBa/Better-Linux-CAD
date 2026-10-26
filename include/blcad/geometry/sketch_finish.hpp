@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -217,9 +218,22 @@ public:
       }
       return inside;
     };
-    for (const auto& region : analysis.regions)
-      if (contains(region.vertices)) return region.id;
-    return std::nullopt;
+    std::optional<ProfileId> selected;
+    double smallest_area = std::numeric_limits<double>::infinity();
+    for (const auto& region : analysis.regions) {
+      if (!contains(region.vertices))
+        continue;
+      double area = 0;
+      for (std::size_t i = 0; i < region.vertices.size(); ++i) {
+        const auto a = region.vertices[i], b = region.vertices[(i + 1) % region.vertices.size()];
+        area += a.x * b.y - a.y * b.x;
+      }
+      if (std::abs(area) < smallest_area) {
+        selected = region.id;
+        smallest_area = std::abs(area);
+      }
+    }
+    return selected;
   }
 
   [[nodiscard]] static Result<SketchFinishResult>

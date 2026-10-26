@@ -104,7 +104,7 @@ struct ShellParameterTools::Impl {
     const auto& session = window.session();
     return active && session.part_document() && session.derived_results_fresh() &&
            !session.reference_repair_mode() && !window.active_sketch() &&
-           session.task().command_id() == task_id && session.presentation_revision() == revision;
+           session.task().command_id() == task_id && session.model_revision() == revision;
   }
   const Parameter* selected() const {
     return draft ? draft->find_parameter(
@@ -120,10 +120,10 @@ struct ShellParameterTools::Impl {
   }
   void update_controls() {
     const auto parameter_type = static_cast<ParameterType>(type->currentData().toInt());
-    input_label->setText(mode->currentData().toBool()              ? QStringLiteral("Formel")
-                         : parameter_type == ParameterType::Length ? QStringLiteral("Wert (mm)")
-                         : parameter_type == ParameterType::Angle  ? QStringLiteral("Wert (°)")
-                                                                   : QStringLiteral("Anzahl"));
+    input_label->setText(mode->currentData().toBool()              ? QStringLiteral("Formula")
+                         : parameter_type == ParameterType::Length ? QStringLiteral("Value (mm)")
+                         : parameter_type == ParameterType::Angle  ? QStringLiteral("Value (°)")
+                                                                   : QStringLiteral("Count"));
     stage_button->setEnabled(active && pending);
     preview_button->setEnabled(active && !pending && !changes.empty());
   }
@@ -133,8 +133,7 @@ struct ShellParameterTools::Impl {
     invalidate();
     pending = true;
     update_controls();
-    summary->setText(
-        QStringLiteral("Eingabe zuerst lokal übernehmen oder durch Auswahl verwerfen."));
+    summary->setText(QStringLiteral("Accept input locally first or discard by selecting again."));
   }
   void select() {
     loading = true;
@@ -158,21 +157,21 @@ struct ShellParameterTools::Impl {
     if (parameter)
       for (const auto& id : draft->dependency_graph().direct_dependents(parameter->id().value()))
         consumers << text(id);
-    usage->setText(
-        parameter ? QStringLiteral("Direkte Verbraucher: %1")
-                        .arg(consumers.empty() ? QStringLiteral("keine") : consumers.join(", "))
-                  : QStringLiteral("Neuer Parameter im aktuellen Bauteil."));
+    usage->setText(parameter
+                       ? QStringLiteral("Direct Consumers: %1")
+                             .arg(consumers.empty() ? QStringLiteral("none") : consumers.join(", "))
+                       : QStringLiteral("New parameter in the current part."));
     pending = false;
     loading = false;
     update_controls();
-    summary->setText(QStringLiteral("%1 lokale Änderungen. Vorschau prüft das vollständige Modell.")
-                         .arg(changes.size()));
+    summary->setText(
+        QStringLiteral("%1 local changes. Preview checks the complete model.").arg(changes.size()));
   }
   void populate(const QString& selected_id = {}) {
     QSignalBlocker combo_blocker(parameters);
     QSignalBlocker table_blocker(catalog);
     parameters->clear();
-    parameters->addItem(QStringLiteral("Neuer Parameter"), QString());
+    parameters->addItem(QStringLiteral("New Parameter"), QString());
     catalog->setRowCount(draft ? static_cast<int>(draft->parameters().size()) : 0);
     if (draft) {
       int row = 0;
@@ -202,7 +201,7 @@ struct ShellParameterTools::Impl {
     select();
   }
   Result<std::size_t> commit(GuiDocumentSession& session) const {
-    return session.commit_part_transaction("Parameter verwalten", [&](PartDocument& part) {
+    return session.commit_part_transaction("Manage Parameters", [&](PartDocument& part) {
       for (const auto& change : changes) {
         const auto result = change_part(part, change);
         if (!result)
@@ -216,7 +215,7 @@ struct ShellParameterTools::Impl {
 ShellParameterTools::ShellParameterTools(ShellWindow& window, ShellRibbon& ribbon, int model_tab)
     : QObject(&window), impl_(std::make_unique<Impl>(window)) {
   auto& ui = *impl_;
-  ui.action = new QAction(QStringLiteral("Parameter verwalten"), this);
+  ui.action = new QAction(QStringLiteral("Manage Parameters"), this);
   ui.action->setObjectName("blcad.action.parameters");
   ribbon.add_button(ribbon.add_group(model_tab, QStringLiteral("Parameter")), ui.action);
   connect(ui.action, &QAction::triggered, this, [this] {
@@ -224,7 +223,7 @@ ShellParameterTools::ShellParameterTools(ShellWindow& window, ShellRibbon& ribbo
     if (!result)
       impl_->window.report_error(result.error());
   });
-  ui.dock = new QDockWidget(QStringLiteral("Parameter verwalten"), &window);
+  ui.dock = new QDockWidget(QStringLiteral("Manage Parameters"), &window);
   ui.dock->setObjectName("blcad.shell.parameters_task");
   auto* panel = new QWidget(ui.dock);
   auto* layout = new QVBoxLayout(panel);
@@ -234,16 +233,16 @@ ShellParameterTools::ShellParameterTools(ShellWindow& window, ShellRibbon& ribbo
   auto* content_layout = new QVBoxLayout(content);
   auto* hint = new QLabel(
       QStringLiteral(
-          "Werte und Formeln lokal sammeln, dann gemeinsam prüfen und anwenden. Formeln verwenden "
-          "Parameternamen, + − * /, Klammern und mm. Winkelformeln, Umbenennen, Löschen und "
-          "Wechsel zwischen Wert und Formel sind nicht verfügbar."),
+          "Stage values and formulas locally, then check and apply together. Formulas use "
+          "parameter names, + − * /, parentheses, and mm. Angle formulas, renaming, deleting, and "
+          "switching between value and formula are unavailable."),
       content);
   hint->setWordWrap(true);
   content_layout->addWidget(hint);
   ui.catalog = new QTableWidget(content);
   ui.catalog->setObjectName("blcad.parameters.catalog");
   ui.catalog->setColumnCount(6);
-  ui.catalog->setHorizontalHeaderLabels({"Name", "Typ", "Wert", "Formel", "ID", "Scope"});
+  ui.catalog->setHorizontalHeaderLabels({"Name", "Type", "Value", "Formula", "ID", "Scope"});
   ui.catalog->setEditTriggers(QAbstractItemView::NoEditTriggers);
   ui.catalog->setSelectionBehavior(QAbstractItemView::SelectRows);
   ui.catalog->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -259,20 +258,20 @@ ShellParameterTools::ShellParameterTools(ShellWindow& window, ShellRibbon& ribbo
   form->addRow(QStringLiteral("Parameter"), ui.parameters);
   ui.name = new QLineEdit(content);
   ui.name->setObjectName("blcad.parameters.name");
-  ui.name->setPlaceholderText(QStringLiteral("z. B. wall_thickness"));
+  ui.name->setPlaceholderText(QStringLiteral("e.g. wall_thickness"));
   form->addRow(QStringLiteral("Name"), ui.name);
   ui.type = new QComboBox(content);
   ui.type->setObjectName("blcad.parameters.type");
-  for (const auto& [label, type] : {std::pair{"Länge", ParameterType::Length},
-                                    {"Anzahl", ParameterType::Count},
-                                    {"Winkel", ParameterType::Angle}})
+  for (const auto& [label, type] : {std::pair{"Length", ParameterType::Length},
+                                    {"Count", ParameterType::Count},
+                                    {"Angle", ParameterType::Angle}})
     ui.type->addItem(QString::fromUtf8(label), static_cast<int>(type));
-  form->addRow(QStringLiteral("Typ"), ui.type);
+  form->addRow(QStringLiteral("Type"), ui.type);
   ui.mode = new QComboBox(content);
   ui.mode->setObjectName("blcad.parameters.mode");
-  ui.mode->addItem(QStringLiteral("Wert"), false);
-  ui.mode->addItem(QStringLiteral("Formel"), true);
-  form->addRow(QStringLiteral("Eingabe"), ui.mode);
+  ui.mode->addItem(QStringLiteral("Value"), false);
+  ui.mode->addItem(QStringLiteral("Formula"), true);
+  form->addRow(QStringLiteral("Input"), ui.mode);
   ui.input = new QLineEdit(content);
   ui.input->setObjectName("blcad.parameters.input");
   ui.input_label = new QLabel(content);
@@ -293,17 +292,16 @@ ShellParameterTools::ShellParameterTools(ShellWindow& window, ShellRibbon& ribbo
     return result;
   };
   auto* local_buttons = new QHBoxLayout;
-  ui.stage_button = button(content, local_buttons, "stage", QStringLiteral("Lokal übernehmen"));
-  auto* reset =
-      button(content, local_buttons, "reset", QStringLiteral("Lokale Änderungen verwerfen"));
+  ui.stage_button = button(content, local_buttons, "stage", QStringLiteral("Accept Locally"));
+  auto* reset = button(content, local_buttons, "reset", QStringLiteral("Discard Local Changes"));
   content_layout->addLayout(local_buttons);
   content_layout->addStretch();
   scroll->setWidget(content);
   layout->addWidget(scroll);
   auto* buttons = new QHBoxLayout;
-  ui.preview_button = button(panel, buttons, "preview", QStringLiteral("Vorschau"));
-  ui.apply_button = button(panel, buttons, "apply", QStringLiteral("Anwenden"));
-  auto* cancel_button = button(panel, buttons, "cancel", QStringLiteral("Abbrechen"));
+  ui.preview_button = button(panel, buttons, "preview", QStringLiteral("Preview"));
+  ui.apply_button = button(panel, buttons, "apply", QStringLiteral("Apply"));
+  auto* cancel_button = button(panel, buttons, "cancel", QStringLiteral("Cancel"));
   layout->addLayout(buttons);
   ui.dock->setWidget(panel);
   window.addDockWidget(Qt::RightDockWidgetArea, ui.dock);
@@ -347,11 +345,11 @@ Result<std::size_t> ShellParameterTools::begin() {
   auto& ui = *impl_;
   if (!ui.available())
     return Result<std::size_t>::failure(
-        error("Parameter benötigen ein aktuelles Bauteil ohne aktiven Befehl oder Skizzeneditor"));
+        error("Parameters require a current part without an active command or sketch editor"));
   (void)ui.window.session().task().begin(std::string(task_id));
   (void)ui.window.session().task().begin_parameter_editing();
   ui.active = true;
-  ui.revision = ui.window.session().presentation_revision();
+  ui.revision = ui.window.session().model_revision();
   ui.draft = *ui.window.session().part_document();
   ui.changes.clear();
   ui.populate();
@@ -364,23 +362,22 @@ Result<std::size_t> ShellParameterTools::stage() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
-    return Result<std::size_t>::failure(
-        error("Modell oder Befehl geändert. Parameter neu öffnen."));
+    return Result<std::size_t>::failure(error("Model or command changed. Reopen parameters."));
   }
   ui.invalidate();
   if (!ui.pending)
-    return Result<std::size_t>::failure(error("Zuerst einen Wert oder eine Formel eingeben"));
+    return Result<std::size_t>::failure(error("Enter a value or formula first"));
   const auto* existing = ui.selected();
   const auto name = ui.name->text().toStdString();
   if (!existing && !QRegularExpression(QStringLiteral("\\A[A-Za-z_][A-Za-z0-9_]*\\z"))
                         .match(ui.name->text())
                         .hasMatch())
-    return Result<std::size_t>::failure(error("Name muss mit Buchstabe oder _ beginnen und nur "
-                                              "ASCII-Buchstaben, Ziffern und _ enthalten"));
+    return Result<std::size_t>::failure(error("Name must start with a letter or _ and contain only "
+                                              "ASCII letters, digits, and _"));
   const auto type = static_cast<ParameterType>(ui.type->currentData().toInt());
   const bool formula = ui.mode->currentData().toBool();
   if (formula && type == ParameterType::Angle)
-    return Result<std::size_t>::failure(error("Winkelformeln werden nicht unterstützt"));
+    return Result<std::size_t>::failure(error("Angle formulas are not supported"));
   std::string id = existing ? existing->id().value() : std::string();
   if (!existing) {
     for (std::size_t index = 1;; ++index) {
@@ -405,8 +402,7 @@ Result<std::size_t> ShellParameterTools::stage() {
     const auto conversion = std::from_chars(parsed.data(), parsed.data() + parsed.size(), value);
     if (conversion.ec != std::errc() || conversion.ptr != parsed.data() + parsed.size() ||
         !std::isfinite(value))
-      return Result<std::size_t>::failure(
-          error("Einen endlichen Zahlenwert ohne Einheit eingeben"));
+      return Result<std::size_t>::failure(error("Enter a finite numeric value without a unit"));
     auto quantity = type == ParameterType::Length  ? Quantity::length_mm(value, id)
                     : type == ParameterType::Count ? Quantity::count(value, id)
                                                    : Quantity::angle_deg(value, id);
@@ -416,7 +412,7 @@ Result<std::size_t> ShellParameterTools::stage() {
   }
   if (existing && (formula ? existing->formula() == std::optional<std::string>(change.formula)
                            : existing->value() == *change.value))
-    return Result<std::size_t>::failure(error("Parameter ist unverändert"));
+    return Result<std::size_t>::failure(error("Parameter is unchanged"));
   auto candidate = *ui.draft;
   const auto result = change_part(candidate, change);
   if (!result)
@@ -430,13 +426,12 @@ Result<std::size_t> ShellParameterTools::preview() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
-    return Result<std::size_t>::failure(
-        error("Modell oder Befehl geändert. Parameter neu öffnen."));
+    return Result<std::size_t>::failure(error("Model or command changed. Reopen parameters."));
   }
   ui.invalidate();
   if (ui.pending || ui.changes.empty())
-    return Result<std::size_t>::failure(error(
-        "Zuerst Änderungen lokal übernehmen oder die offene Eingabe durch Auswahl verwerfen"));
+    return Result<std::size_t>::failure(
+        error("Accept changes locally first or discard the open input by selecting again"));
   auto candidate = ui.window.session();
   const auto result = ui.commit(candidate);
   if (!result)
@@ -469,10 +464,8 @@ Result<std::size_t> ShellParameterTools::preview() {
   ui.previewed = true;
   (void)ui.window.session().task().show_preview();
   ui.apply_button->setEnabled(true);
-  ui.summary->setText(
-      QStringLiteral(
-          "Vollständige Modellvorschau gültig. Anwenden übernimmt %1 Änderungen gemeinsam.")
-          .arg(ui.changes.size()));
+  ui.summary->setText(QStringLiteral("Full model preview valid. Apply commits %1 changes together.")
+                          .arg(ui.changes.size()));
   return result;
 }
 Result<std::size_t> ShellParameterTools::apply() {
@@ -480,7 +473,7 @@ Result<std::size_t> ShellParameterTools::apply() {
   if (!ui.current() || !ui.previewed || ui.pending) {
     if (!ui.current())
       cancel();
-    return Result<std::size_t>::failure(error("Zuerst eine aktuelle vollständige Vorschau prüfen"));
+    return Result<std::size_t>::failure(error("Check a current complete preview first"));
   }
   const auto checked = preview();
   if (!checked)

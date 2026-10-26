@@ -93,8 +93,9 @@ cycles fail closed through the normal validated construction APIs.
 
 ### Interleaving with other feature families — 2026-10-25
 
-When a transform precedes another feature family, optional Part `feature_order` preserves the
-executable sequence across family arrays. Loading replays validated typed adders and restores
+When a transform precedes another feature family, or another cross-family dependency would be
+reversed by historical loading, optional Part `feature_order` preserves the executable sequence
+across family arrays. The latter also covers finishing followed by Boolean operations. Loading replays validated typed adders and restores
 reference consumers and authored collection order. Older files without this field keep historical
 family ordering. Strict metadata validation, exact roundtrip and Translate → Boolean → Rotate →
 Scale Geometry regression are documented in `docs/file-format.md`. This fixes previews and subsequent

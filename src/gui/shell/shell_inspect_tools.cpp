@@ -73,7 +73,7 @@ QTableWidgetItem* leaf_item(const Project& project, const geometry::AssemblyLeaf
 }
 QTableWidgetItem* contact_item(const Project& project,
                                const AssemblyExchangeComponentOccurrenceIdentity& identity) {
-  QString path = QStringLiteral("Wurzel");
+  QString path = QStringLiteral("Root");
   for (const auto& item : identity.containing_assembly_occurrence.occurrence_path)
     path += QStringLiteral(" / ") + QString::fromStdString(item.value());
   return occurrence_item(
@@ -83,11 +83,11 @@ QTableWidgetItem* contact_item(const Project& project,
 QString contact_text(const geometry::AssemblyContactRecord& record) {
   switch (record.classification) {
   case geometry::AssemblyContactClassification::Interfering:
-    return QStringLiteral("Kollision: %1 mm³").arg(number(record.overlap_volume_mm3));
+    return QStringLiteral("Interference: %1 mm³").arg(number(record.overlap_volume_mm3));
   case geometry::AssemblyContactClassification::Touching:
-    return QStringLiteral("Berührung: %1 mm").arg(number(record.minimum_distance_mm.value_or(0)));
+    return QStringLiteral("Contact: %1 mm").arg(number(record.minimum_distance_mm.value_or(0)));
   case geometry::AssemblyContactClassification::Separated:
-    return QStringLiteral("Getrennt: %1 mm").arg(number(record.minimum_distance_mm.value_or(0)));
+    return QStringLiteral("Separated: %1 mm").arg(number(record.minimum_distance_mm.value_or(0)));
   }
   return {};
 }
@@ -96,13 +96,13 @@ QString contact_text(const geometry::AssemblyContactRecord& record) {
 ShellInspectTools::ShellInspectTools(ShellWindow& window, ShellRibbon& ribbon, int model_tab,
                                      int assembly_tab)
     : QObject(&window), window_(window) {
-  auto* part_export = ribbon.add_group(model_tab, QStringLiteral("Austausch"));
-  auto* assembly_export = ribbon.add_group(assembly_tab, QStringLiteral("Prüfen und exportieren"));
+  auto* part_export = ribbon.add_group(model_tab, QStringLiteral("Exchange"));
+  auto* assembly_export = ribbon.add_group(assembly_tab, QStringLiteral("Inspect and Export"));
   for (auto [mode, id, label] :
-       {std::tuple{GuiStepExportMode::PartMultiBody, "export_part_step", "Bauteil als STEP"},
-        std::tuple{GuiStepExportMode::AssemblyFlattened, "export_assembly_flat_step", "STEP flach"},
+       {std::tuple{GuiStepExportMode::PartMultiBody, "export_part_step", "Part to STEP"},
+        std::tuple{GuiStepExportMode::AssemblyFlattened, "export_assembly_flat_step", "Flat STEP"},
         std::tuple{GuiStepExportMode::AssemblyStructured, "export_assembly_structured_step",
-                   "STEP strukturiert"}}) {
+                   "Structured STEP"}}) {
     auto* action = new QAction(QString::fromUtf8(label), this);
     action->setObjectName(QStringLiteral("blcad.action.") + id);
     connect(action, &QAction::triggered, this, [this, mode] { choose_export(mode); });
@@ -110,7 +110,7 @@ ShellInspectTools::ShellInspectTools(ShellWindow& window, ShellRibbon& ribbon, i
         mode == GuiStepExportMode::PartMultiBody ? part_export : assembly_export, action);
     export_actions_.emplace_back(mode, action);
   }
-  analysis_action_ = new QAction(QStringLiteral("Baugruppe analysieren"), this);
+  analysis_action_ = new QAction(QStringLiteral("Analyze Assembly"), this);
   analysis_action_->setObjectName("blcad.action.assembly_analysis");
   connect(analysis_action_, &QAction::triggered, this, [this] {
     auto result = begin_analysis();
@@ -119,7 +119,7 @@ ShellInspectTools::ShellInspectTools(ShellWindow& window, ShellRibbon& ribbon, i
   });
   ribbon.add_small_button(assembly_export, analysis_action_);
 
-  dock_ = new QDockWidget(QStringLiteral("Baugruppenanalyse"), &window);
+  dock_ = new QDockWidget(QStringLiteral("Assembly Analysis"), &window);
   dock_->setObjectName("blcad.shell.inspect_task");
   dock_->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
   auto* panel = new QWidget(dock_);
@@ -133,10 +133,10 @@ ShellInspectTools::ShellInspectTools(ShellWindow& window, ShellRibbon& ribbon, i
   form_ = new QFormLayout;
   kind_ = new QComboBox(inputs);
   kind_->setObjectName("blcad.inspect.kind");
-  kind_->addItems({QStringLiteral("Kollisionen"), QStringLiteral("Mindestabstand"),
-                   QStringLiteral("Kontakte"), QStringLiteral("Freiheitsgrade (Wurzelgruppe)"),
-                   QStringLiteral("Drehgelenk-Abtastung")});
-  form_->addRow(QStringLiteral("Analyse"), kind_);
+  kind_->addItems({QStringLiteral("Interferences"), QStringLiteral("Minimum Clearance"),
+                   QStringLiteral("Contacts"), QStringLiteral("Degrees of Freedom (Root Group)"),
+                   QStringLiteral("Revolute Joint Sweep")});
+  form_->addRow(QStringLiteral("Analysis"), kind_);
   clearance_ = new QDoubleSpinBox(inputs);
   clearance_->setObjectName("blcad.inspect.clearance");
   clearance_->setRange(0.000001, 1e6);
@@ -144,10 +144,10 @@ ShellInspectTools::ShellInspectTools(ShellWindow& window, ShellRibbon& ribbon, i
   clearance_->setValue(1);
   clearance_->setSuffix(QStringLiteral(" mm"));
   clearance_->setKeyboardTracking(false);
-  form_->addRow(QStringLiteral("Mindestabstand"), clearance_);
+  form_->addRow(QStringLiteral("Minimum Clearance"), clearance_);
   sweep_joint_ = new QComboBox(inputs);
   sweep_joint_->setObjectName("blcad.inspect.sweep_joint");
-  form_->addRow(QStringLiteral("Drehgelenk"), sweep_joint_);
+  form_->addRow(QStringLiteral("Revolute Joint"), sweep_joint_);
   const auto angle_editor = [inputs](const char* name) {
     auto* editor = new QDoubleSpinBox(inputs);
     editor->setObjectName(QStringLiteral("blcad.inspect.") + name);
@@ -159,25 +159,26 @@ ShellInspectTools::ShellInspectTools(ShellWindow& window, ShellRibbon& ribbon, i
   };
   sweep_start_ = angle_editor("sweep_start");
   sweep_end_ = angle_editor("sweep_end");
-  form_->addRow(QStringLiteral("Startwinkel"), sweep_start_);
-  form_->addRow(QStringLiteral("Endwinkel"), sweep_end_);
+  form_->addRow(QStringLiteral("Start Angle"), sweep_start_);
+  form_->addRow(QStringLiteral("End Angle"), sweep_end_);
   sweep_samples_ = new QSpinBox(inputs);
   sweep_samples_->setObjectName("blcad.inspect.sweep_samples");
   sweep_samples_->setRange(2, static_cast<int>(geometry::kAssemblyRevoluteSweepMaximumSampleCount));
   sweep_samples_->setValue(5);
   sweep_samples_->setKeyboardTracking(false);
-  form_->addRow(QStringLiteral("Stützstellen"), sweep_samples_);
+  form_->addRow(QStringLiteral("Samples"), sweep_samples_);
   layout->addLayout(form_);
   sweep_hint_ = new QLabel(inputs);
   sweep_hint_->setObjectName("blcad.inspect.sweep_hint");
   sweep_hint_->setWordWrap(true);
   layout->addWidget(sweep_hint_);
   auto* hint = new QLabel(
-      QStringLiteral("Kollisionen, Abstände und Kontakte prüfen sichtbare, aktive Vorkommen in "
-                     "ihrer aktuellen "
-                     "Position. Für Freiheitsgrade eine zusammenhängende Wurzelgruppe auswählen. "
-                     "Ergebniszelle A oder B anklicken, um das genaue Vorkommen in seiner "
-                     "aktuellen Position hervorzuheben. Die Analyse verändert keine Positionen."),
+      QStringLiteral(
+          "Interference, clearance, and contact checks inspect visible active occurrences in "
+          "their current "
+          "position. For degrees of freedom, select a connected root group. "
+          "Click result cell A or B to highlight the exact occurrence in its "
+          "current position. Analysis does not change placements."),
       inputs);
   hint->setWordWrap(true);
   layout->addWidget(hint);
@@ -194,7 +195,7 @@ ShellInspectTools::ShellInspectTools(ShellWindow& window, ShellRibbon& ribbon, i
   results_ = new QTableWidget(0, 3, inputs);
   results_->setObjectName("blcad.inspect.results");
   results_->setHorizontalHeaderLabels(
-      {QStringLiteral("Vorkommen A"), QStringLiteral("Vorkommen B"), QStringLiteral("Ergebnis")});
+      {QStringLiteral("Occurrence A"), QStringLiteral("Occurrence B"), QStringLiteral("Result")});
   results_->setEditTriggers(QAbstractItemView::NoEditTriggers);
   results_->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
   results_->setMinimumHeight(180);
@@ -203,9 +204,9 @@ ShellInspectTools::ShellInspectTools(ShellWindow& window, ShellRibbon& ribbon, i
   scroll->setWidget(inputs);
   column->addWidget(scroll);
   auto* buttons = new QHBoxLayout;
-  auto* run = new QPushButton(QStringLiteral("Analysieren"), panel);
+  auto* run = new QPushButton(QStringLiteral("Analyze"), panel);
   run->setObjectName("blcad.inspect.run");
-  auto* close = new QPushButton(QStringLiteral("Schließen"), panel);
+  auto* close = new QPushButton(QStringLiteral("Close"), panel);
   close->setObjectName("blcad.inspect.close");
   buttons->addWidget(run);
   buttons->addWidget(close);
@@ -260,7 +261,7 @@ Result<std::size_t> ShellInspectTools::begin_analysis() {
   auto& session = window_.session();
   if (!idle_and_fresh() || !session.project())
     return Result<std::size_t>::failure(
-        error("Analyse benötigt eine aktuelle Baugruppe ohne aktiven Befehl"));
+        error("Analysis requires a current assembly without an active command"));
   group_->clear();
   for (const auto& component : session.project()->assembly().component_instances()) {
     auto* item = new QListWidgetItem(QString::fromStdString(component.name()), group_);
@@ -286,10 +287,10 @@ Result<std::size_t> ShellInspectTools::begin_analysis() {
     };
     for (const auto& joint : session.project()->assembly().joints())
       add_joint(joint, geometry::AssemblyRevoluteSweepJointScope::RootAssemblyLocal,
-                QStringLiteral("Wurzel / "));
+                QStringLiteral("Root / "));
     for (const auto& joint : session.project()->cross_hierarchy_joints())
       add_joint(joint, geometry::AssemblyRevoluteSweepJointScope::ProjectCrossHierarchy,
-                QStringLiteral("Hierarchie / "));
+                QStringLiteral("Hierarchy / "));
   }
   auto leaves = AssemblyLeafOccurrenceResolver{}.resolve(*session.project());
   if (!leaves)
@@ -298,7 +299,7 @@ Result<std::size_t> ShellInspectTools::begin_analysis() {
   if (!source)
     return Result<std::size_t>::failure(source.error());
   if (!session.task().begin(std::string(task_id)) || !session.task().begin_parameter_editing())
-    return Result<std::size_t>::failure(error("Analyse konnte nicht gestartet werden"));
+    return Result<std::size_t>::failure(error("Could not start analysis"));
   active_ = true;
   revision_ = session.presentation_revision();
   source_json_ = std::move(source.value());
@@ -327,7 +328,7 @@ void ShellInspectTools::clear_result() {
       window_.viewport().selected_semantic()->semantic_id == highlighted)
     window_.viewport().clear_selection();
   results_->setRowCount(0);
-  summary_->setText(QStringLiteral("Analyse wählen und Analysieren klicken."));
+  summary_->setText(QStringLiteral("Choose an analysis and click Analyze."));
 }
 void ShellInspectTools::update_inputs() {
   clearance_->setEnabled(kind_->currentIndex() == 1);
@@ -347,7 +348,7 @@ void ShellInspectTools::update_sweep_joint() {
   const bool selected = project && sweep_joint_->currentIndex() >= 0 && index >= 0 &&
                         static_cast<std::size_t>(index) < sweep_joints_.size();
   if (!selected) {
-    sweep_hint_->setText(QStringLiteral("Kein aktives Drehgelenk vorhanden."));
+    sweep_hint_->setText(QStringLiteral("No active revolute joint available."));
     return;
   }
   const auto& reference = sweep_joints_[static_cast<std::size_t>(index)];
@@ -363,9 +364,9 @@ void ShellInspectTools::update_sweep_joint() {
   sweep_start_->setValue(limits->lower_deg);
   sweep_end_->setValue(limits->upper_deg);
   sweep_hint_->setText(
-      QStringLiteral("Grenzen: %1° bis %2°. Gleichmäßig verteilte Stützstellen einschließlich "
-                     "Start und Ende; Zwischenpositionen werden nicht geprüft. Hervorhebung zeigt "
-                     "das Vorkommen in der aktuellen Modellposition.")
+      QStringLiteral("Limits: %1° to %2°. Uniform samples including "
+                     "start and end; intermediate positions are not checked. Highlight shows "
+                     "the occurrence at the current model position.")
           .arg(number(limits->lower_deg), number(limits->upper_deg)));
 }
 void ShellInspectTools::highlight_result(QTableWidgetItem* item) {
@@ -392,15 +393,15 @@ Result<std::size_t> ShellInspectTools::run_analysis() {
   if (!active_ || session.task().command_id() != task_id || !session.project() ||
       !source_unchanged())
     return Result<std::size_t>::failure(
-        error("Analyse ist nicht aktiv oder das Modell wurde geändert. Neu öffnen."));
+        error("Analysis is inactive or the model changed. Reopen."));
   const auto overlap = [this, &session](const auto& records) {
     for (const auto& pair : records)
       add_row(leaf_item(*session.project(), pair.leaf_a),
               leaf_item(*session.project(), pair.leaf_b),
-              QStringLiteral("Kollision: %1 mm³").arg(number(pair.overlap_volume_mm3)));
+              QStringLiteral("Interference: %1 mm³").arg(number(pair.overlap_volume_mm3)));
   };
   const auto summary = [this](std::size_t leaves, std::size_t pairs) {
-    summary_->setText(QStringLiteral("%1 Vorkommen, %2 geprüfte Paare, %3 Einträge.")
+    summary_->setText(QStringLiteral("%1 occurrences, %2 checked pairs, %3 entries.")
                           .arg(leaves)
                           .arg(pairs)
                           .arg(results_->rowCount()));
@@ -424,7 +425,7 @@ Result<std::size_t> ShellInspectTools::run_analysis() {
     for (const auto& pair : result.value().clearance_violations)
       add_row(leaf_item(*session.project(), pair.leaf_a),
               leaf_item(*session.project(), pair.leaf_b),
-              QStringLiteral("Abstand: %1 mm").arg(number(pair.minimum_distance_mm)));
+              QStringLiteral("Distance: %1 mm").arg(number(pair.minimum_distance_mm)));
     summary(result.value().leaf_count, result.value().evaluated_pair_count);
     break;
   }
@@ -443,7 +444,7 @@ Result<std::size_t> ShellInspectTools::run_analysis() {
     const int index = sweep_joint_->currentData().toInt();
     if (sweep_joint_->currentIndex() < 0 || index < 0 ||
         static_cast<std::size_t>(index) >= sweep_joints_.size())
-      return Result<std::size_t>::failure(error("Aktives Drehgelenk wählen"));
+      return Result<std::size_t>::failure(error("Select Active Revolute Joint"));
     const auto start = Quantity::angle_deg(sweep_start_->value(), "gui.shell.inspect.sweep");
     const auto end = Quantity::angle_deg(sweep_end_->value(), "gui.shell.inspect.sweep");
     if (!start)
@@ -467,8 +468,8 @@ Result<std::size_t> ShellInspectTools::run_analysis() {
         results_->item(results_->rowCount() - 1, 2)->setData(Qt::UserRole, sample.coordinate_deg);
       }
     }
-    summary_->setText(QStringLiteral("%1 Stützstellen, %2 geprüfte Paare. "
-                                     "Zwischenpositionen wurden nicht geprüft.")
+    summary_->setText(QStringLiteral("%1 samples, %2 checked pairs. "
+                                     "Intermediate positions were not checked.")
                           .arg(result.value().samples.size())
                           .arg(evaluated_pairs));
     break;
@@ -484,46 +485,46 @@ Result<std::size_t> ShellInspectTools::run_analysis() {
     QString state;
     switch (diagnostics.dof_classification) {
     case geometry::AssemblyDofClassification::NotEvaluated:
-      state = QStringLiteral("Freiheitsgrade nicht ermittelt");
+      state = QStringLiteral("Degrees of freedom not evaluated");
       break;
     case geometry::AssemblyDofClassification::NoVariableDof:
-      state = QStringLiteral("Keine beweglichen Komponenten");
+      state = QStringLiteral("No movable components");
       break;
     case geometry::AssemblyDofClassification::Underconstrained:
-      state = QStringLiteral("Unterbestimmt");
+      state = QStringLiteral("Underconstrained");
       break;
     case geometry::AssemblyDofClassification::LocallyFullyConstrained:
-      state = QStringLiteral("Lokal vollständig bestimmt");
+      state = QStringLiteral("Locally Fully Constrained");
       break;
     }
     QString consistency;
     switch (diagnostics.consistency_classification) {
     case geometry::AssemblyConstraintConsistencyClassification::LocallyConsistent:
-      consistency = QStringLiteral("Beziehungen lokal konsistent");
+      consistency = QStringLiteral("Relationships Locally Consistent");
       break;
     case geometry::AssemblyConstraintConsistencyClassification::FixedGeometryInconsistent:
-      consistency = QStringLiteral("Fixierte Geometrie widerspricht den Beziehungen");
+      consistency = QStringLiteral("Grounded geometry conflicts with relationships");
       break;
     case geometry::AssemblyConstraintConsistencyClassification::SolverDidNotConverge:
-      consistency = QStringLiteral("Lösung nicht konvergiert");
+      consistency = QStringLiteral("Solution did not converge");
       break;
     }
     const auto remaining = diagnostics.rank_summary.rank_evaluated
                                ? QString::number(diagnostics.rank_summary.remaining_dof)
-                               : QStringLiteral("nicht ermittelt");
-    summary_->setText(QStringLiteral("%1; %2\nVerbleibende Freiheitsgrade: %3")
+                               : QStringLiteral("not evaluated");
+    summary_->setText(QStringLiteral("%1; %2\nRemaining degrees of freedom: %3")
                           .arg(state, consistency, remaining));
     break;
   }
   default:
-    return Result<std::size_t>::failure(error("Unbekannte Analyse"));
+    return Result<std::size_t>::failure(error("Unknown analysis"));
   }
   return Result<std::size_t>::success(static_cast<std::size_t>(results_->rowCount()));
 }
 void ShellInspectTools::choose_export(GuiStepExportMode mode) {
   if (!idle_and_fresh())
     return;
-  const auto path = QFileDialog::getSaveFileName(&window_, QStringLiteral("STEP exportieren"), {},
+  const auto path = QFileDialog::getSaveFileName(&window_, QStringLiteral("Export STEP"), {},
                                                  QStringLiteral("STEP (*.step *.stp)"));
   if (path.isEmpty())
     return;
@@ -531,14 +532,14 @@ void ShellInspectTools::choose_export(GuiStepExportMode mode) {
   if (!result)
     window_.report_error(result.error());
   else
-    window_.statusBar()->showMessage(QStringLiteral("STEP exportiert: %1 Elemente, %2 Bytes")
+    window_.statusBar()->showMessage(QStringLiteral("STEP exported: %1 elements, %2 bytes")
                                          .arg(result.value().exported_item_count)
                                          .arg(result.value().written_bytes));
 }
 Result<GuiStepExportResult> ShellInspectTools::export_step(const GuiStepExportRequest& request) {
   if (!idle_and_fresh())
     return Result<GuiStepExportResult>::failure(
-        error("STEP benötigt aktuelle Geometrie ohne aktiven Befehl"));
+        error("STEP requires current geometry without an active command"));
   auto preflight = workbench_.preflight_step_export(window_.session(), request);
   if (!preflight)
     return Result<GuiStepExportResult>::failure(preflight.error());
@@ -555,12 +556,12 @@ Result<GuiStepExportResult> ShellInspectTools::export_step(const GuiStepExportRe
       !canonical_source.isEmpty() && target_info.canonicalFilePath() == canonical_source;
   if (!document_path.isEmpty() && (same_path || same_existing_file))
     return Result<GuiStepExportResult>::failure(
-        error("STEP darf die BLCAD-Quelldatei nicht ersetzen"));
+        error("STEP must not replace the BLCAD source file"));
   // Kernel writers write synchronously. Stage their output beside the target,
   // then publish with QSaveFile so a failed export preserves an existing file.
   QTemporaryDir staging(QFileInfo(target).absolutePath() + QStringLiteral("/.blcad-step-XXXXXX"));
   if (!staging.isValid())
-    return Result<GuiStepExportResult>::failure(error("STEP-Zielordner ist nicht beschreibbar"));
+    return Result<GuiStepExportResult>::failure(error("STEP output directory is not writable"));
   auto result = workbench_.export_step(
       window_.session(), {request.mode, staging.filePath("export.step").toStdString()});
   if (!result)
@@ -568,16 +569,14 @@ Result<GuiStepExportResult> ShellInspectTools::export_step(const GuiStepExportRe
   QFile source(staging.filePath("export.step"));
   QSaveFile output(target);
   if (!source.open(QIODevice::ReadOnly) || !output.open(QIODevice::WriteOnly))
-    return Result<GuiStepExportResult>::failure(error("STEP-Datei konnte nicht geöffnet werden"));
+    return Result<GuiStepExportResult>::failure(error("Could not open STEP file"));
   while (!source.atEnd()) {
     const auto bytes = source.read(64 * 1024);
     if (source.error() != QFileDevice::NoError || output.write(bytes) != bytes.size())
-      return Result<GuiStepExportResult>::failure(
-          error("STEP-Datei konnte nicht geschrieben werden"));
+      return Result<GuiStepExportResult>::failure(error("Could not write STEP file"));
   }
   if (!output.commit())
-    return Result<GuiStepExportResult>::failure(
-        error("STEP-Datei konnte nicht veröffentlicht werden"));
+    return Result<GuiStepExportResult>::failure(error("Could not publish STEP file"));
   return result;
 }
 void ShellInspectTools::cancel() {

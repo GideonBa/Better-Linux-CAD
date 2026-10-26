@@ -199,6 +199,16 @@ composite_inner_contours_from_json(const json& values) {
 }
 
 [[nodiscard]] json edge_treatment_edge_to_json(const EdgeReference& edge) {
+  if (const auto* source = std::get_if<ResultEdgeReference>(&edge.source())) {
+    json samples = json::array();
+    for (auto p : source->samples())
+      samples.push_back(point3_to_json(p));
+    return json{{"source_kind", "result_edge"},
+                {"source_feature", source->source_feature().value()},
+                {"curve_type", source->curve_type()},
+                {"length_mm", source->length_mm()},
+                {"samples", std::move(samples)}};
+  }
   if (edge.source_kind() == PartFeatureInputSourceKind::SemanticLinearEdge) {
     const auto& source = std::get<SemanticEdgeReference>(edge.source());
     return json{{"source_kind", "semantic_linear_edge"},
@@ -217,6 +227,30 @@ composite_inner_contours_from_json(const json& values) {
   if (!value.is_object() || !value.contains("source_kind") || !value.at("source_kind").is_string())
     return Result<EdgeReference>::failure(json_error("edge treatment edge requires source_kind"));
   const std::string kind = value.at("source_kind").get<std::string>();
+  if (kind == "result_edge" && value.size() == 5U && value.contains("source_feature") &&
+      value.at("source_feature").is_string() && value.contains("curve_type") &&
+      value.at("curve_type").is_number_integer() && value.at("curve_type") >= 0 &&
+      value.at("curve_type") <= 8 && value.contains("length_mm") &&
+      value.at("length_mm").is_number() && value.contains("samples") &&
+      value.at("samples").is_array() &&
+      value.at("samples").size() == ResultEdgeReference::sample_count) {
+    std::array<Point3, ResultEdgeReference::sample_count> samples;
+    for (std::size_t i = 0; i < samples.size(); ++i) {
+      const auto& point = value.at("samples").at(i);
+      if (!point.is_object() || point.size() != 3U || !point.contains("x") ||
+          !point.contains("y") || !point.contains("z") || !point.at("x").is_number() ||
+          !point.at("y").is_number() || !point.at("z").is_number())
+        return Result<EdgeReference>::failure(
+            json_error("result edge sample must be a finite point"));
+      samples[i] = point3_from_json(point);
+    }
+    auto reference = ResultEdgeReference::create(
+        FeatureId(value.at("source_feature").get<std::string>()), value.at("curve_type").get<int>(),
+        value.at("length_mm").get<double>(), samples);
+    if (!reference)
+      return Result<EdgeReference>::failure(reference.error());
+    return EdgeReference::create_result(role, std::move(reference.value()));
+  }
   if (kind == "semantic_linear_edge" && value.size() == 3U && value.contains("source_feature") &&
       value.at("source_feature").is_string() && value.contains("edge") &&
       value.at("edge").is_string()) {
@@ -3999,6 +4033,32 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     else if (seen_transform)
       interleaved = true;
   }
+  // The historical reader inserts feature families in this fixed order.
+  // Persist authored execution whenever a dependency crosses that order in
+  // reverse (for example Fillet -> Union), including Body alias nodes between
+  // producer and consumer. Independent families need no extra order metadata.
+  std::unordered_map<std::string, std::size_t> historical_positions;
+  for (const auto* family :
+       {"features", "revolve_features", "sweep_features", "loft_features", "surface_features",
+        "body_booleans", "part_patterns", "mirror_features", "edge_treatments", "shell_features",
+        "draft_features", "body_transforms"})
+    for (const auto& feature : root.at(family))
+      historical_positions.emplace(feature.at("id").get<std::string>(),
+                                   historical_positions.size() + 1U);
+  std::unordered_map<std::string, std::vector<std::string>> predecessors;
+  for (const auto& [producer, consumer] : document.dependency_graph().dependencies())
+    predecessors[consumer].push_back(producer);
+  std::unordered_map<std::string, std::size_t> latest_ancestor_position;
+  for (const auto& node : pattern_order.value()) {
+    std::size_t latest = 0U;
+    for (const auto& producer : predecessors[node])
+      latest = std::max(latest, latest_ancestor_position[producer]);
+    if (const auto found = historical_positions.find(node); found != historical_positions.end()) {
+      interleaved = interleaved || latest > found->second;
+      latest = std::max(latest, found->second);
+    }
+    latest_ancestor_position[node] = latest;
+  }
   if (interleaved)
     root["feature_order"] = std::move(feature_order);
   root["reference_statuses"] = json::array();
@@ -4451,16 +4511,33 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     if (!edge_treatment_array.is_array())
       return Result<PartDocument>::failure(
           json_error("edge_treatments must be an array in part document json"));
+    std::vector<ParsedEdgeTreatment> pending_edge_treatments;
+    const auto add_treatment = [&document](const ParsedEdgeTreatment& treatment) {
+      return std::holds_alternative<FilletFeature>(treatment)
+                 ? document.value().add_fillet_feature(std::get<FilletFeature>(treatment))
+                 : document.value().add_chamfer_feature(std::get<ChamferFeature>(treatment));
+    };
+    const auto result_sources_ready = [&document](const ParsedEdgeTreatment& treatment) {
+      return std::visit(
+          [&document](const auto& feature) {
+            return std::all_of(
+                feature.edges().begin(), feature.edges().end(), [&document](const auto& edge) {
+                  return edge.source_kind() != PartFeatureInputSourceKind::ResultEdge ||
+                         bool(validate_part_feature_input_reference(document.value(), edge));
+                });
+          },
+          treatment);
+    };
     for (const auto& treatment_json : edge_treatment_array) {
       auto treatment = edge_treatment_from_json(treatment_json);
-      if (treatment.has_error())
+      if (!treatment)
         return Result<PartDocument>::failure(treatment.error());
-      Result<std::size_t> added = std::holds_alternative<FilletFeature>(treatment.value())
-                                      ? document.value().add_fillet_feature(
-                                            std::move(std::get<FilletFeature>(treatment.value())))
-                                      : document.value().add_chamfer_feature(
-                                            std::move(std::get<ChamferFeature>(treatment.value())));
-      if (added.has_error())
+      if (!result_sources_ready(treatment.value())) {
+        pending_edge_treatments.push_back(std::move(treatment.value()));
+        continue;
+      }
+      auto added = add_treatment(treatment.value());
+      if (!added)
         return Result<PartDocument>::failure(added.error());
     }
     const json shell_array = root.value("shell_features", json::array());
@@ -4510,6 +4587,26 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       auto added = document.value().add_body_transform(std::move(transform.value()));
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
+    }
+    // Current-result edges may be produced by Shell, Draft or BodyTransform,
+    // whose legacy arrays are loaded later. Resolve these references before
+    // restoring the authored cross-family feature order.
+    while (!pending_edge_treatments.empty()) {
+      bool progress = false;
+      for (auto it = pending_edge_treatments.begin(); it != pending_edge_treatments.end();) {
+        if (!result_sources_ready(*it)) {
+          ++it;
+          continue;
+        }
+        auto added = add_treatment(*it);
+        if (!added)
+          return Result<PartDocument>::failure(added.error());
+        it = pending_edge_treatments.erase(it);
+        progress = true;
+      }
+      if (!progress)
+        return Result<PartDocument>::failure(
+            json_error("result edge producer is missing or cyclic"));
     }
     for (const auto& status_json : root.value("reference_statuses", json::array())) {
       auto status = reference_status_from_json(status_json);

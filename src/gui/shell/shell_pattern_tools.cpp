@@ -23,10 +23,10 @@ namespace blcad::gui {
 namespace {
 QString pattern_title(ShellFeatureTools::Command command) {
   if (command == ShellFeatureTools::Command::LinearPattern)
-    return QStringLiteral("Lineares Muster");
+    return QStringLiteral("Linear Pattern");
   if (command == ShellFeatureTools::Command::CircularPattern)
-    return QStringLiteral("Kreismuster");
-  return QStringLiteral("Körper spiegeln");
+    return QStringLiteral("Circular Pattern");
+  return QStringLiteral("Mirror Bodies");
 }
 } // namespace
 
@@ -92,9 +92,8 @@ bool ShellFeatureTools::select_pattern_context(const PatternContext& context) {
 QString ShellFeatureTools::pattern_summary() const {
   const auto sources = pattern_sources_->selectedItems().size();
   return command_ == Command::BodyMirror
-             ? QStringLiteral("%1 Körper ausgewählt. Spiegelvorschau gültig.").arg(sources)
-             : QStringLiteral(
-                   "%1 Körper, %2 Instanzen einschließlich Ausgangslage. Vorschau gültig.")
+             ? QStringLiteral("%1 bodies selected. Mirror preview valid.").arg(sources)
+             : QStringLiteral("%1 bodies, %2 instances including source. Preview valid.")
                    .arg(sources)
                    .arg(coordinator_.pattern_mirror().count());
 }
@@ -107,22 +106,21 @@ void ShellFeatureTools::build_pattern_controls(QWidget* panel) {
   column->addLayout(form);
   pattern_reference_ = new QComboBox(pattern_controls_);
   pattern_reference_->setObjectName(QStringLiteral("blcad.pattern.reference"));
-  form->addRow(QStringLiteral("Achse / Ebene"), pattern_reference_);
+  form->addRow(QStringLiteral("Axis / Plane"), pattern_reference_);
   pattern_reference_button_ =
-      new QPushButton(QStringLiteral("Referenz im Modell wählen"), pattern_controls_);
+      new QPushButton(QStringLiteral("Pick Reference in Model"), pattern_controls_);
   pattern_reference_button_->setObjectName(QStringLiteral("blcad.pattern.pick_reference"));
   pattern_reference_button_->setCheckable(true);
   form->addRow(pattern_reference_button_);
-  form->addRow(new QLabel(QStringLiteral("Ausgangskörper auswählen"), pattern_controls_));
+  form->addRow(new QLabel(QStringLiteral("Select Source Bodies"), pattern_controls_));
   pattern_sources_ = new QListWidget(pattern_controls_);
   pattern_sources_->setObjectName(QStringLiteral("blcad.pattern.sources"));
   pattern_sources_->setSelectionMode(QAbstractItemView::MultiSelection);
   pattern_sources_->setMinimumHeight(110);
   form->addRow(pattern_sources_);
   auto* hint = new QLabel(
-      QStringLiteral(
-          "Körper im Modell oder in der Liste anklicken. "
-          "Weitere Klicks ergänzen oder entfernen Körper. Das Ergebnis entsteht als neuer Körper."),
+      QStringLiteral("Click bodies in the model or list. "
+                     "Click again to add or remove bodies. The result is created as a new body."),
       pattern_controls_);
   hint->setWordWrap(true);
   // Keep wrapped guidance outside dynamic form rows, as in the Body task.
@@ -131,16 +129,17 @@ void ShellFeatureTools::build_pattern_controls(QWidget* panel) {
   pattern_count_editor_->setObjectName(QStringLiteral("blcad.pattern.count"));
   pattern_count_editor_->setRange(2, 1000);
   pattern_count_editor_->setKeyboardTracking(false);
-  form->addRow(QStringLiteral("Anzahl"), pattern_count_editor_);
+  form->addRow(QStringLiteral("Count"), pattern_count_editor_);
   pattern_extent_ = new QComboBox(pattern_controls_);
   pattern_extent_->setObjectName(QStringLiteral("blcad.pattern.extent"));
-  pattern_extent_->addItems({QStringLiteral("Abstand je Instanz"), QStringLiteral("Gesamtlänge")});
-  form->addRow(QStringLiteral("Verteilung"), pattern_extent_);
+  pattern_extent_->addItems(
+      {QStringLiteral("Spacing per Instance"), QStringLiteral("Overall Length")});
+  form->addRow(QStringLiteral("Distribution"), pattern_extent_);
   pattern_direction_ = new QComboBox(pattern_controls_);
   pattern_direction_->setObjectName(QStringLiteral("blcad.pattern.direction"));
   pattern_direction_->addItems(
-      {QStringLiteral("Positive Richtung"), QStringLiteral("Negative Richtung")});
-  form->addRow(QStringLiteral("Richtung"), pattern_direction_);
+      {QStringLiteral("Positive Direction"), QStringLiteral("Negative Direction")});
+  form->addRow(QStringLiteral("Direction"), pattern_direction_);
   panel->layout()->addWidget(pattern_controls_);
   pattern_controls_->hide();
   connect(pattern_sources_, &QListWidget::itemSelectionChanged, this, [this] {
@@ -183,10 +182,10 @@ Result<std::size_t> ShellFeatureTools::begin_pattern(Command command) {
   const auto* part = session_.part_document();
   if (active() || session_.task().active() || window_.active_sketch() || !part ||
       session_.workspace() != GuiWorkspace::Part || !session_.part_shape_cache())
-    return fail("Muster benötigen ein Bauteil ohne aktiven Befehl");
+    return fail("Patterns require a part without an active command");
   if (command != Command::LinearPattern && command != Command::CircularPattern &&
       command != Command::BodyMirror)
-    return fail("Unbekannter Musterbefehl");
+    return fail("Unknown pattern command");
   const auto& cache = *session_.part_shape_cache();
   const QSignalBlocker reference_block(pattern_reference_), sources_block(pattern_sources_),
       count_block(pattern_count_editor_), extent_block(pattern_extent_),
@@ -206,7 +205,7 @@ Result<std::size_t> ShellFeatureTools::begin_pattern(Command command) {
           item->setSelected(true);
     }
   if (pattern_sources_->count() == 0)
-    return fail("Keine sichtbaren, berechneten Volumenkörper vorhanden");
+    return fail("No visible recomputed solid bodies available");
   if (command == Command::BodyMirror) {
     const auto add_plane = [&](auto reference, const std::string& semantic,
                                const std::string& name) {
@@ -256,7 +255,7 @@ Result<std::size_t> ShellFeatureTools::begin_pattern(Command command) {
         pattern_reference_->setCurrentIndex(static_cast<int>(i));
   }
   if (pattern_reference_->count() == 0)
-    return fail("Zuerst eine passende Achse oder Spiegelebene erstellen");
+    return fail("First create a suitable axis or mirror plane");
   const auto title = pattern_title(command);
   for (std::size_t n = 1;; ++n) {
     const std::string suffix = std::to_string(n), base = "pattern." + suffix;
@@ -274,7 +273,7 @@ Result<std::size_t> ShellFeatureTools::begin_pattern(Command command) {
         part->find_parameter(ParameterId("parameter." + base + ".extent")) ||
         std::any_of(part->parameters().begin(), part->parameters().end(),
                     [&](const auto& p) {
-                      return p.name() == name + " Anzahl" || p.name() == name + " Abstand";
+                      return p.name() == name + " Count" || p.name() == name + " Spacing";
                     }) ||
         std::any_of(part->bodies().begin(), part->bodies().end(),
                     [&](const auto& b) { return b.name() == name; }))
@@ -292,7 +291,7 @@ Result<std::size_t> ShellFeatureTools::begin_pattern(Command command) {
     command_ = Command::None;
     if (session_.task().active())
       (void)session_.task().cancel();
-    return fail("Musteraufgabe konnte nicht gestartet werden");
+    return fail("Could not start pattern task");
   }
   previous_selection_mask_ = viewport_.selection_filter_mask();
   previous_semantic_scope_ = viewport_.selection_semantic_scope();
@@ -327,17 +326,17 @@ Result<std::size_t> ShellFeatureTools::rebuild_pattern_controller() {
   Result<std::size_t> begun = Result<std::size_t>::success(1);
   if (command_ == Command::BodyMirror) {
     if (index >= pattern_planes_.size())
-      return Result<std::size_t>::failure(Error::validation("pattern", "Spiegelebene auswählen"));
+      return Result<std::size_t>::failure(Error::validation("pattern", "Select Mirror Plane"));
     begun = coordinator_.pattern_mirror().begin_mirror(session_, pattern_feature_, pattern_name_,
                                                        pattern_planes_[index].reference,
                                                        pattern_result_, body.value());
   } else {
     if (index >= pattern_axes_.size())
-      return Result<std::size_t>::failure(Error::validation("pattern", "Musterachse auswählen"));
+      return Result<std::size_t>::failure(Error::validation("pattern", "Select Pattern Axis"));
     auto quantity = Quantity::count(pattern_count_);
     if (!quantity)
       return Result<std::size_t>::failure(quantity.error());
-    auto count = Parameter::create_count(pattern_count_parameter_, pattern_name_ + " Anzahl",
+    auto count = Parameter::create_count(pattern_count_parameter_, pattern_name_ + " Count",
                                          quantity.value());
     if (!count)
       return Result<std::size_t>::failure(count.error());
@@ -346,7 +345,7 @@ Result<std::size_t> ShellFeatureTools::rebuild_pattern_controller() {
       auto length = Quantity::length_mm(pattern_value_);
       if (!length)
         return Result<std::size_t>::failure(length.error());
-      auto extent = Parameter::create_length(pattern_extent_parameter_, pattern_name_ + " Abstand",
+      auto extent = Parameter::create_length(pattern_extent_parameter_, pattern_name_ + " Spacing",
                                              length.value());
       if (!extent)
         return Result<std::size_t>::failure(extent.error());
@@ -426,7 +425,7 @@ void ShellFeatureTools::synchronize_pattern_editors() {
 Result<GuiPartFeaturePreview> ShellFeatureTools::set_pattern_count(int value) {
   if (!pattern() || command_ == Command::BodyMirror || value < 2 || value > 1000)
     return Result<GuiPartFeaturePreview>::failure(
-        Error::validation("pattern", "Anzahl muss zwischen 2 und 1000 liegen"));
+        Error::validation("pattern", "Count must be between 2 and 1000"));
   GuiViewportManipulatorCandidate candidate;
   candidate.handle_id = std::string(kPatternCountHandleId);
   candidate.value_kind = GuiViewportManipulatorValueKind::Count;
@@ -437,7 +436,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_pattern_count(int value) {
     if (layer_.active_handle_id() != candidate.handle_id ||
         !layer_.set_numeric_input(std::to_string(value)) || !layer_.candidate())
       return Result<GuiPartFeaturePreview>::failure(
-          Error::validation("pattern", "zuerst den aktiven Manipulatorzug abschließen"));
+          Error::validation("pattern", "finish the active manipulator drag first"));
     candidate = *layer_.candidate();
   }
   return accept_manipulator_candidate(candidate);

@@ -53,8 +53,7 @@ Error save_transaction_error(const std::filesystem::path& path, std::string mess
 }
 
 struct SaveTransactionFile {
-  SaveTransactionFile(std::filesystem::path target_path,
-                      std::optional<std::string> file_content)
+  SaveTransactionFile(std::filesystem::path target_path, std::optional<std::string> file_content)
       : target(std::move(target_path)), content(std::move(file_content)) {}
 
   std::filesystem::path target;
@@ -66,19 +65,19 @@ struct SaveTransactionFile {
   bool installed{false};
 };
 
-std::filesystem::path transaction_path(const std::filesystem::path& target,
-                                       std::string_view role) {
+std::filesystem::path transaction_path(const std::filesystem::path& target, std::string_view role) {
   static std::atomic<std::uint64_t> sequence{0U};
   const auto timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
   const auto nonce = sequence.fetch_add(1U, std::memory_order_relaxed);
-  const auto directory = target.has_parent_path() ? target.parent_path()
-                                                   : std::filesystem::path(".");
-  return directory / (".blcad-save-" + std::string(role) + "-" +
-                      std::to_string(timestamp) + "-" + std::to_string(nonce));
+  const auto directory =
+      target.has_parent_path() ? target.parent_path() : std::filesystem::path(".");
+  return directory / (".blcad-save-" + std::string(role) + "-" + std::to_string(timestamp) + "-" +
+                      std::to_string(nonce));
 }
 
 void remove_if_present(const std::filesystem::path& path) noexcept {
-  if (path.empty()) return;
+  if (path.empty())
+    return;
   std::error_code ignored;
   std::filesystem::remove(path, ignored);
 }
@@ -86,33 +85,36 @@ void remove_if_present(const std::filesystem::path& path) noexcept {
 std::string rollback_save_transaction(std::vector<SaveTransactionFile>& files) noexcept {
   std::string failures;
   for (auto& file : files) {
-    if (!file.installed) continue;
+    if (!file.installed)
+      continue;
     std::error_code error;
     std::filesystem::remove(file.target, error);
     if (error) {
-      if (!failures.empty()) failures += "; ";
-      failures += "could not remove replacement " + file.target.string() + ": " +
-                  error.message();
+      if (!failures.empty())
+        failures += "; ";
+      failures += "could not remove replacement " + file.target.string() + ": " + error.message();
     }
     file.installed = false;
   }
   for (auto file = files.rbegin(); file != files.rend(); ++file) {
-    if (!file->backed_up) continue;
+    if (!file->backed_up)
+      continue;
     std::error_code error;
     std::filesystem::rename(file->backup, file->target, error);
     if (error) {
-      if (!failures.empty()) failures += "; ";
+      if (!failures.empty())
+        failures += "; ";
       failures += "could not restore " + file->target.string() + ": " + error.message();
     } else {
       file->backed_up = false;
     }
   }
-  for (const auto& file : files) remove_if_present(file.staged);
+  for (const auto& file : files)
+    remove_if_present(file.staged);
   return failures;
 }
 
-Result<std::uintmax_t>
-write_save_transaction(std::vector<SaveTransactionFile> files) {
+Result<std::uintmax_t> write_save_transaction(std::vector<SaveTransactionFile> files) {
   if (files.empty())
     return Result<std::uintmax_t>::failure(
         save_transaction_error({}, "save transaction requires at least one file"));
@@ -126,25 +128,28 @@ write_save_transaction(std::vector<SaveTransactionFile> files) {
     std::error_code error;
     const auto status = std::filesystem::symlink_status(file.target, error);
     if (error && status.type() != std::filesystem::file_type::not_found)
-      return Result<std::uintmax_t>::failure(save_transaction_error(
-          file.target, "could not inspect save target: " + error.message()));
+      return Result<std::uintmax_t>::failure(
+          save_transaction_error(file.target, "could not inspect save target: " + error.message()));
     if (status.type() != std::filesystem::file_type::not_found &&
         status.type() != std::filesystem::file_type::regular)
-      return Result<std::uintmax_t>::failure(save_transaction_error(
-          file.target, "save target exists but is not a regular file"));
+      return Result<std::uintmax_t>::failure(
+          save_transaction_error(file.target, "save target exists but is not a regular file"));
     if (status.type() == std::filesystem::file_type::regular &&
         status.permissions() != std::filesystem::perms::unknown)
       file.original_permissions = status.permissions();
 
     file.backup = transaction_path(file.target, "backup");
-    if (file.content) file.staged = transaction_path(file.target, "staged");
+    if (file.content)
+      file.staged = transaction_path(file.target, "staged");
   }
 
   for (auto& file : files) {
-    if (!file.content) continue;
+    if (!file.content)
+      continue;
     std::ofstream stream(file.staged, std::ios::binary | std::ios::trunc);
     if (!stream) {
-      for (const auto& staged_file : files) remove_if_present(staged_file.staged);
+      for (const auto& staged_file : files)
+        remove_if_present(staged_file.staged);
       return Result<std::uintmax_t>::failure(
           save_transaction_error(file.target, "could not stage save transaction"));
     }
@@ -152,26 +157,28 @@ write_save_transaction(std::vector<SaveTransactionFile> files) {
     stream.flush();
     if (!stream) {
       stream.close();
-      for (const auto& staged_file : files) remove_if_present(staged_file.staged);
+      for (const auto& staged_file : files)
+        remove_if_present(staged_file.staged);
       return Result<std::uintmax_t>::failure(
           save_transaction_error(file.target, "could not write staged save transaction"));
     }
     stream.close();
     if (!stream) {
-      for (const auto& staged_file : files) remove_if_present(staged_file.staged);
+      for (const auto& staged_file : files)
+        remove_if_present(staged_file.staged);
       return Result<std::uintmax_t>::failure(
           save_transaction_error(file.target, "could not close staged save transaction"));
     }
     if (file.original_permissions) {
       std::error_code permission_error;
       std::filesystem::permissions(file.staged, *file.original_permissions,
-                                   std::filesystem::perm_options::replace,
-                                   permission_error);
+                                   std::filesystem::perm_options::replace, permission_error);
       if (permission_error) {
-        for (const auto& staged_file : files) remove_if_present(staged_file.staged);
-        return Result<std::uintmax_t>::failure(save_transaction_error(
-            file.target, "could not preserve save-target permissions: " +
-                             permission_error.message()));
+        for (const auto& staged_file : files)
+          remove_if_present(staged_file.staged);
+        return Result<std::uintmax_t>::failure(
+            save_transaction_error(file.target, "could not preserve save-target permissions: " +
+                                                    permission_error.message()));
       }
     }
     total += static_cast<std::uintmax_t>(file.content->size());
@@ -182,17 +189,20 @@ write_save_transaction(std::vector<SaveTransactionFile> files) {
     const auto status = std::filesystem::symlink_status(file.target, status_error);
     if (status_error && status.type() != std::filesystem::file_type::not_found) {
       const auto rollback = rollback_save_transaction(files);
-      std::string message = "could not inspect save target before commit: " +
-                            status_error.message();
-      if (!rollback.empty()) message += "; rollback incomplete: " + rollback;
+      std::string message =
+          "could not inspect save target before commit: " + status_error.message();
+      if (!rollback.empty())
+        message += "; rollback incomplete: " + rollback;
       return Result<std::uintmax_t>::failure(
           save_transaction_error(file.target, std::move(message)));
     }
-    if (status.type() == std::filesystem::file_type::not_found) continue;
+    if (status.type() == std::filesystem::file_type::not_found)
+      continue;
     if (status.type() != std::filesystem::file_type::regular) {
       const auto rollback = rollback_save_transaction(files);
       std::string message = "save target changed to a non-regular file before commit";
-      if (!rollback.empty()) message += "; rollback incomplete: " + rollback;
+      if (!rollback.empty())
+        message += "; rollback incomplete: " + rollback;
       return Result<std::uintmax_t>::failure(
           save_transaction_error(file.target, std::move(message)));
     }
@@ -201,7 +211,8 @@ write_save_transaction(std::vector<SaveTransactionFile> files) {
     if (rename_error) {
       const auto rollback = rollback_save_transaction(files);
       std::string message = "could not back up save target: " + rename_error.message();
-      if (!rollback.empty()) message += "; rollback incomplete: " + rollback;
+      if (!rollback.empty())
+        message += "; rollback incomplete: " + rollback;
       return Result<std::uintmax_t>::failure(
           save_transaction_error(file.target, std::move(message)));
     }
@@ -209,13 +220,15 @@ write_save_transaction(std::vector<SaveTransactionFile> files) {
   }
 
   for (auto& file : files) {
-    if (!file.content) continue;
+    if (!file.content)
+      continue;
     std::error_code error;
     std::filesystem::rename(file.staged, file.target, error);
     if (error) {
       const auto rollback = rollback_save_transaction(files);
       std::string message = "could not commit staged save transaction: " + error.message();
-      if (!rollback.empty()) message += "; rollback incomplete: " + rollback;
+      if (!rollback.empty())
+        message += "; rollback incomplete: " + rollback;
       return Result<std::uintmax_t>::failure(
           save_transaction_error(file.target, std::move(message)));
     }
@@ -223,21 +236,115 @@ write_save_transaction(std::vector<SaveTransactionFile> files) {
     file.staged.clear();
   }
 
-  for (const auto& file : files) remove_if_present(file.backup);
+  for (const auto& file : files)
+    remove_if_present(file.backup);
   return Result<std::uintmax_t>::success(total);
 }
 
-template <typename Catalog>
-void sort_catalogs(std::vector<Catalog>& catalogs) {
+template <typename Catalog> void sort_catalogs(std::vector<Catalog>& catalogs) {
   std::sort(catalogs.begin(), catalogs.end(), [](const auto& left, const auto& right) {
     return left.sketch().value() < right.sketch().value();
   });
 }
 
+// Sidecars predate shared fitted-spline junctions. Remap only aliases explicitly
+// reported by topology migration; arbitrary missing references must still fail
+// before replacing the active document.
+Result<std::size_t> migrate_sketch_sidecar_points(const PartDocument& document,
+                                                  std::vector<SketchConstraintCatalog>& constraints,
+                                                  std::vector<SketchDimensionCatalog>& dimensions) {
+  const auto migrate_targets = [](const SketchTopology& topology,
+                                  const SketchTopologyMigrationReport& migration,
+                                  std::vector<SketchConstraintIntentTarget> targets)
+      -> Result<std::vector<SketchConstraintIntentTarget>> {
+    for (auto& target : targets) {
+      if (target.kind() != SketchConstraintIntentTargetKind::Point ||
+          topology.find_point(SketchPointId(target.id())) != nullptr)
+        continue;
+      const auto found = std::find_if(
+          migration.identity_changes().begin(), migration.identity_changes().end(),
+          [&target](const auto& change) { return change.previous_identity == target.id(); });
+      if (found == migration.identity_changes().end() ||
+          topology.find_point(SketchPointId(found->canonical_identity)) == nullptr)
+        return Result<std::vector<SketchConstraintIntentTarget>>::failure(
+            Error::validation(target.id(), "Sketch sidecar references an unknown point"));
+      auto canonical =
+          SketchConstraintIntentTarget::point(SketchPointId(found->canonical_identity));
+      if (!canonical)
+        return Result<std::vector<SketchConstraintIntentTarget>>::failure(canonical.error());
+      target = std::move(canonical.value());
+    }
+    return Result<std::vector<SketchConstraintIntentTarget>>::success(std::move(targets));
+  };
+  std::size_t migrated = 0U;
+  for (auto& catalog : constraints) {
+    const auto* sketch = document.find_sketch(catalog.sketch());
+    if (sketch == nullptr)
+      return Result<std::size_t>::failure(
+          Error::validation(catalog.sketch().value(), "Sketch sidecar target does not exist"));
+    SketchTopologyMigrationReport migration;
+    auto topology = SketchTopology::migrate_legacy(*sketch, &migration);
+    if (!topology)
+      return Result<std::size_t>::failure(topology.error());
+    std::vector<SketchConstraintIntent> remapped;
+    for (const auto& intent : catalog.constraints()) {
+      auto targets = migrate_targets(topology.value(), migration, intent.targets());
+      if (!targets)
+        return Result<std::size_t>::failure(targets.error());
+      const bool changed = targets.value() != intent.targets();
+      migrated += changed;
+      // A formerly explicit join is now guaranteed by shared topology. Other
+      // degenerate intents must be rejected rather than silently discarded.
+      if (changed && intent.kind() == SketchSolverConstraintKind::Coincident &&
+          targets.value()[0] == targets.value()[1])
+        continue;
+      auto replacement = SketchConstraintIntent::create(
+          intent.id(), intent.kind(), std::move(targets.value()), intent.source());
+      if (!replacement)
+        return Result<std::size_t>::failure(replacement.error());
+      remapped.push_back(std::move(replacement.value()));
+    }
+    auto replacement =
+        SketchConstraintCatalog::create(catalog.document(), catalog.sketch(), std::move(remapped));
+    if (!replacement)
+      return Result<std::size_t>::failure(replacement.error());
+    catalog = std::move(replacement.value());
+  }
+  for (auto& catalog : dimensions) {
+    const auto* sketch = document.find_sketch(catalog.sketch());
+    if (sketch == nullptr)
+      return Result<std::size_t>::failure(
+          Error::validation(catalog.sketch().value(), "Sketch sidecar target does not exist"));
+    SketchTopologyMigrationReport migration;
+    auto topology = SketchTopology::migrate_legacy(*sketch, &migration);
+    if (!topology)
+      return Result<std::size_t>::failure(topology.error());
+    std::vector<SketchDimensionIntent> remapped;
+    for (const auto& intent : catalog.dimensions()) {
+      auto targets = migrate_targets(topology.value(), migration, intent.targets());
+      if (!targets)
+        return Result<std::size_t>::failure(targets.error());
+      migrated += targets.value() != intent.targets();
+      auto replacement = SketchDimensionIntent::create(intent.id(), intent.kind(), intent.mode(),
+                                                       std::move(targets.value()),
+                                                       intent.parameter(), intent.label_offset());
+      if (!replacement)
+        return Result<std::size_t>::failure(replacement.error());
+      remapped.push_back(std::move(replacement.value()));
+    }
+    auto replacement =
+        SketchDimensionCatalog::create(catalog.document(), catalog.sketch(), std::move(remapped));
+    if (!replacement)
+      return Result<std::size_t>::failure(replacement.error());
+    catalog = std::move(replacement.value());
+  }
+  return Result<std::size_t>::success(migrated);
+}
+
 } // namespace
 
 Result<std::size_t> GuiDocumentSession::create_part(DocumentId id, std::string name,
-                                                     bool discard_dirty) {
+                                                    bool discard_dirty) {
   if (const auto allowed = reject_replacement_if_needed(discard_dirty); allowed.has_error())
     return allowed;
   auto created = PartDocument::create(std::move(id), std::move(name));
@@ -252,15 +359,17 @@ Result<std::size_t> GuiDocumentSession::create_part(DocumentId id, std::string n
   file_path_.clear();
   workspace_ = GuiWorkspace::Part;
   auto recomputed = recompute();
-  if (recomputed.has_error()) return recomputed;
+  if (recomputed.has_error())
+    return recomputed;
   const auto json = serialize_current();
-  if (json.has_error()) return Result<std::size_t>::failure(json.error());
+  if (json.has_error())
+    return Result<std::size_t>::failure(json.error());
   initialize_history(json.value(), "New Part", false);
   return Result<std::size_t>::success(1U);
 }
 
 Result<std::size_t> GuiDocumentSession::create_project(DocumentId id, std::string name,
-                                                        bool discard_dirty) {
+                                                       bool discard_dirty) {
   if (const auto allowed = reject_replacement_if_needed(discard_dirty); allowed.has_error())
     return allowed;
   const auto assembly_id = DocumentId(id.value() + ".assembly");
@@ -281,9 +390,11 @@ Result<std::size_t> GuiDocumentSession::create_project(DocumentId id, std::strin
   file_path_.clear();
   workspace_ = GuiWorkspace::Assembly;
   auto recomputed = recompute();
-  if (recomputed.has_error()) return recomputed;
+  if (recomputed.has_error())
+    return recomputed;
   const auto json = serialize_current();
-  if (json.has_error()) return Result<std::size_t>::failure(json.error());
+  if (json.has_error())
+    return Result<std::size_t>::failure(json.error());
   initialize_history(json.value(), "New Project", false);
   return Result<std::size_t>::success(1U);
 }
@@ -352,6 +463,12 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
   std::optional<geometry::ShapeCache> part_cache;
   std::vector<ProjectPartCache> project_caches;
   if (auto* part = std::get_if<PartDocument>(&candidate)) {
+    auto migrated =
+        migrate_sketch_sidecar_points(*part, candidate_constraints, candidate_dimensions);
+    if (!migrated) {
+      record_error(migrated.error());
+      return migrated;
+    }
     auto valid_constraints = validate_constraint_catalogs(*part, candidate_constraints);
     if (valid_constraints.has_error()) {
       record_error(valid_constraints.error());
@@ -363,7 +480,8 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
       return valid_dimensions;
     }
     auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.part." + part->id().value()));
-    if (cache.has_error()) return Result<std::size_t>::failure(cache.error());
+    if (cache.has_error())
+      return Result<std::size_t>::failure(cache.error());
     auto result = recompute_part(*part, cache.value());
     if (result.has_error()) {
       if (mode != GuiDocumentOpenMode::ReferenceRepair) {
@@ -382,7 +500,8 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
       record_error(caches.error());
       return Result<std::size_t>::failure(caches.error());
     }
-    for (auto& part : active_project->part_documents()) part.mark_all_clean();
+    for (auto& part : active_project->part_documents())
+      part.mark_all_clean();
     project_caches = std::move(caches.value());
   }
 
@@ -403,7 +522,8 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
     workspace_ = GuiWorkspace::Assembly;
   }
   const auto json = serialize_current();
-  if (json.has_error()) return Result<std::size_t>::failure(json.error());
+  if (json.has_error())
+    return Result<std::size_t>::failure(json.error());
   initialize_history(json.value(), "Open", true);
   record_information(path.string(), "document opened");
   diagnose_step_import_sources();
@@ -453,8 +573,8 @@ Result<std::uintmax_t> GuiDocumentSession::save_as(const std::filesystem::path& 
       return Result<std::uintmax_t>::failure(valid_dimensions.error());
     }
     if (!sketch_constraint_catalogs_.empty()) {
-      auto serialized = serialize_sketch_constraint_catalogs_to_json(
-          part->id(), sketch_constraint_catalogs_);
+      auto serialized =
+          serialize_sketch_constraint_catalogs_to_json(part->id(), sketch_constraint_catalogs_);
       if (serialized.has_error()) {
         record_error(serialized.error());
         return Result<std::uintmax_t>::failure(serialized.error());
@@ -462,8 +582,8 @@ Result<std::uintmax_t> GuiDocumentSession::save_as(const std::filesystem::path& 
       constraint_json = std::move(serialized.value());
     }
     if (!sketch_dimension_catalogs_.empty()) {
-      auto serialized = serialize_sketch_dimension_catalogs_to_json(
-          part->id(), sketch_dimension_catalogs_);
+      auto serialized =
+          serialize_sketch_dimension_catalogs_to_json(part->id(), sketch_dimension_catalogs_);
       if (serialized.has_error()) {
         record_error(serialized.error());
         return Result<std::uintmax_t>::failure(serialized.error());
@@ -537,11 +657,13 @@ Result<std::size_t> GuiDocumentSession::recompute() {
       return Result<std::size_t>::failure(caches.error());
     }
     std::size_t executed = 0U;
-    for (const auto& cache : caches.value()) executed += cache.cache.feature_shape_count();
+    for (const auto& cache : caches.value())
+      executed += cache.cache.feature_shape_count();
     project_part_caches_ = std::move(caches.value());
     part_shape_cache_.reset();
     reference_repair_mode_ = false;
-    for (auto& part : active_project->part_documents()) part.mark_all_clean();
+    for (auto& part : active_project->part_documents())
+      part.mark_all_clean();
     recompute_status_ = GuiRecomputeStatus::Fresh;
     ++presentation_revision_;
     return Result<std::size_t>::success(executed);
@@ -551,8 +673,8 @@ Result<std::size_t> GuiDocumentSession::recompute() {
   return Result<std::size_t>::failure(error);
 }
 
-Result<std::size_t> GuiDocumentSession::commit_part_transaction(
-    std::string label, const GuiPartMutation& mutation) {
+Result<std::size_t> GuiDocumentSession::commit_part_transaction(std::string label,
+                                                                const GuiPartMutation& mutation) {
   if (reference_repair_mode_)
     return Result<std::size_t>::failure(session_error("complete reference repair before modeling"));
   return commit_part_repair_transaction(std::move(label), mutation);
@@ -564,11 +686,13 @@ GuiDocumentSession::commit_part_repair_transaction(std::string label,
   if (!part_document() || !mutation || label.empty())
     return Result<std::size_t>::failure(session_error("invalid Part transaction"));
   const auto serialized = serialize_current();
-  if (serialized.has_error()) return Result<std::size_t>::failure(serialized.error());
+  if (serialized.has_error())
+    return Result<std::size_t>::failure(serialized.error());
   auto cloned = deserialize_part_document_from_json(
       serialized.value(), reference_repair_mode_ ? PartDocumentReadMode::ReferenceRepair
                                                  : PartDocumentReadMode::Strict);
-  if (cloned.has_error()) return Result<std::size_t>::failure(cloned.error());
+  if (cloned.has_error())
+    return Result<std::size_t>::failure(cloned.error());
   auto changed = mutation(cloned.value());
   if (changed.has_error()) {
     record_error(changed.error());
@@ -578,17 +702,20 @@ GuiDocumentSession::commit_part_repair_transaction(std::string label,
                             sketch_dimension_catalogs_, std::move(label), changed.value());
 }
 
-Result<std::size_t> GuiDocumentSession::commit_part_constraint_transaction(
-    std::string label, const GuiPartConstraintMutation& mutation) {
+Result<std::size_t>
+GuiDocumentSession::commit_part_constraint_transaction(std::string label,
+                                                       const GuiPartConstraintMutation& mutation) {
   if (reference_repair_mode_)
     return Result<std::size_t>::failure(session_error("complete reference repair before modeling"));
   if (!part_document() || !mutation || label.empty())
     return Result<std::size_t>::failure(
         session_error("invalid Part/Sketch-constraint transaction"));
   const auto serialized = serialize_current();
-  if (serialized.has_error()) return Result<std::size_t>::failure(serialized.error());
+  if (serialized.has_error())
+    return Result<std::size_t>::failure(serialized.error());
   auto cloned = deserialize_part_document_from_json(serialized.value());
-  if (cloned.has_error()) return Result<std::size_t>::failure(cloned.error());
+  if (cloned.has_error())
+    return Result<std::size_t>::failure(cloned.error());
   auto constraints = sketch_constraint_catalogs_;
   auto changed = mutation(cloned.value(), constraints);
   if (changed.has_error()) {
@@ -599,17 +726,19 @@ Result<std::size_t> GuiDocumentSession::commit_part_constraint_transaction(
                             sketch_dimension_catalogs_, std::move(label), changed.value());
 }
 
-Result<std::size_t> GuiDocumentSession::commit_part_dimension_transaction(
-    std::string label, const GuiPartDimensionMutation& mutation) {
+Result<std::size_t>
+GuiDocumentSession::commit_part_dimension_transaction(std::string label,
+                                                      const GuiPartDimensionMutation& mutation) {
   if (reference_repair_mode_)
     return Result<std::size_t>::failure(session_error("complete reference repair before modeling"));
   if (!part_document() || !mutation || label.empty())
-    return Result<std::size_t>::failure(
-        session_error("invalid Part/Sketch-dimension transaction"));
+    return Result<std::size_t>::failure(session_error("invalid Part/Sketch-dimension transaction"));
   const auto serialized = serialize_current();
-  if (serialized.has_error()) return Result<std::size_t>::failure(serialized.error());
+  if (serialized.has_error())
+    return Result<std::size_t>::failure(serialized.error());
   auto cloned = deserialize_part_document_from_json(serialized.value());
-  if (cloned.has_error()) return Result<std::size_t>::failure(cloned.error());
+  if (cloned.has_error())
+    return Result<std::size_t>::failure(cloned.error());
   auto dimensions = sketch_dimension_catalogs_;
   auto changed = mutation(cloned.value(), dimensions);
   if (changed.has_error()) {
@@ -625,12 +754,13 @@ Result<std::size_t> GuiDocumentSession::commit_part_sketch_intent_transaction(
   if (reference_repair_mode_)
     return Result<std::size_t>::failure(session_error("complete reference repair before modeling"));
   if (!part_document() || !mutation || label.empty())
-    return Result<std::size_t>::failure(
-        session_error("invalid Part/Sketch-intent transaction"));
+    return Result<std::size_t>::failure(session_error("invalid Part/Sketch-intent transaction"));
   const auto serialized = serialize_current();
-  if (serialized.has_error()) return Result<std::size_t>::failure(serialized.error());
+  if (serialized.has_error())
+    return Result<std::size_t>::failure(serialized.error());
   auto cloned = deserialize_part_document_from_json(serialized.value());
-  if (cloned.has_error()) return Result<std::size_t>::failure(cloned.error());
+  if (cloned.has_error())
+    return Result<std::size_t>::failure(cloned.error());
   auto constraints = sketch_constraint_catalogs_;
   auto dimensions = sketch_dimension_catalogs_;
   auto changed = mutation(cloned.value(), constraints, dimensions);
@@ -644,13 +774,15 @@ Result<std::size_t> GuiDocumentSession::commit_part_sketch_intent_transaction(
 
 Result<std::size_t>
 GuiDocumentSession::commit_project_transaction(std::string label,
-                                                const GuiProjectMutation& mutation) {
+                                               const GuiProjectMutation& mutation) {
   if (!project() || !mutation || label.empty())
     return Result<std::size_t>::failure(session_error("invalid Project transaction"));
   const auto serialized = serialize_current();
-  if (serialized.has_error()) return Result<std::size_t>::failure(serialized.error());
+  if (serialized.has_error())
+    return Result<std::size_t>::failure(serialized.error());
   auto cloned = deserialize_project_from_json(serialized.value());
-  if (cloned.has_error()) return Result<std::size_t>::failure(cloned.error());
+  if (cloned.has_error())
+    return Result<std::size_t>::failure(cloned.error());
   auto changed = mutation(cloned.value());
   if (changed.has_error()) {
     record_error(changed.error());
@@ -662,9 +794,11 @@ GuiDocumentSession::commit_project_transaction(std::string label,
     record_error(caches.error());
     return Result<std::size_t>::failure(caches.error());
   }
-  for (auto& part : cloned.value().part_documents()) part.mark_all_clean();
+  for (auto& part : cloned.value().part_documents())
+    part.mark_all_clean();
   const auto json = serialize_project_to_json(cloned.value());
-  if (json.has_error()) return Result<std::size_t>::failure(json.error());
+  if (json.has_error())
+    return Result<std::size_t>::failure(json.error());
   document_ = std::move(cloned.value());
   sketch_constraint_catalogs_.clear();
   sketch_dimension_catalogs_.clear();
@@ -679,23 +813,27 @@ GuiDocumentSession::commit_project_transaction(std::string label,
 }
 
 Result<std::size_t> GuiDocumentSession::undo() {
-  if (!can_undo()) return Result<std::size_t>::failure(session_error("nothing to undo"));
+  if (!can_undo())
+    return Result<std::size_t>::failure(session_error("nothing to undo"));
   return restore_history(history_index_ - 1U);
 }
 
 Result<std::size_t> GuiDocumentSession::redo() {
-  if (!can_redo()) return Result<std::size_t>::failure(session_error("nothing to redo"));
+  if (!can_redo())
+    return Result<std::size_t>::failure(session_error("nothing to redo"));
   return restore_history(history_index_ + 1U);
 }
 
 bool GuiDocumentSession::close(bool discard_dirty) noexcept {
-  if (task_.active() || (dirty() && !discard_dirty)) return false;
+  if (task_.active() || (dirty() && !discard_dirty))
+    return false;
   reset_document();
   return true;
 }
 
 bool GuiDocumentSession::set_workspace(GuiWorkspace workspace) noexcept {
-  if (task_.active()) return false;
+  if (task_.active())
+    return false;
   workspace_ = workspace;
   return true;
 }
@@ -706,35 +844,46 @@ void GuiDocumentSession::set_derived_results_fresh(bool fresh) noexcept {
   recompute_status_ = fresh ? GuiRecomputeStatus::Fresh : GuiRecomputeStatus::Stale;
 }
 
-void GuiDocumentSession::report_error(const Error& error) { record_error(error); }
+void GuiDocumentSession::report_error(const Error& error) {
+  record_error(error);
+}
 
 void GuiDocumentSession::clear_diagnostics() noexcept {
-  if (diagnostics_.empty()) return;
+  if (diagnostics_.empty())
+    return;
   diagnostics_.clear();
   ++presentation_revision_;
 }
 
 GuiDocumentKind GuiDocumentSession::document_kind() const noexcept {
-  if (std::holds_alternative<PartDocument>(document_)) return GuiDocumentKind::Part;
-  if (std::holds_alternative<Project>(document_)) return GuiDocumentKind::Project;
+  if (std::holds_alternative<PartDocument>(document_))
+    return GuiDocumentKind::Part;
+  if (std::holds_alternative<Project>(document_))
+    return GuiDocumentKind::Project;
   return GuiDocumentKind::None;
 }
 
-std::string_view GuiDocumentSession::display_name() const noexcept { return display_name_; }
+std::string_view GuiDocumentSession::display_name() const noexcept {
+  return display_name_;
+}
 
-const std::filesystem::path& GuiDocumentSession::file_path() const noexcept { return file_path_; }
+const std::filesystem::path& GuiDocumentSession::file_path() const noexcept {
+  return file_path_;
+}
 
-GuiWorkspace GuiDocumentSession::workspace() const noexcept { return workspace_; }
+GuiWorkspace GuiDocumentSession::workspace() const noexcept {
+  return workspace_;
+}
 
 bool GuiDocumentSession::has_document() const noexcept {
   return document_kind() != GuiDocumentKind::None;
 }
 
 bool GuiDocumentSession::dirty() const noexcept {
-  if (!has_document() || history_.empty()) return false;
+  if (!has_document() || history_.empty())
+    return false;
   const auto& current = history_[history_index_];
-  return !saved_json_ || current.json != *saved_json_ ||
-         !saved_sketch_constraint_catalogs_ ||
+  return !saved_json_ || current.json != *saved_json_ || !saved_sketch_constraint_catalogs_ ||
          current.sketch_constraints != *saved_sketch_constraint_catalogs_ ||
          !saved_sketch_dimension_catalogs_ ||
          current.sketch_dimensions != *saved_sketch_dimension_catalogs_;
@@ -782,7 +931,9 @@ const PartDocument* GuiDocumentSession::part_document() const noexcept {
   return std::get_if<PartDocument>(&document_);
 }
 
-Project* GuiDocumentSession::project() noexcept { return std::get_if<Project>(&document_); }
+Project* GuiDocumentSession::project() noexcept {
+  return std::get_if<Project>(&document_);
+}
 
 const Project* GuiDocumentSession::project() const noexcept {
   return std::get_if<Project>(&document_);
@@ -800,6 +951,10 @@ std::size_t GuiDocumentSession::presentation_revision() const noexcept {
   return presentation_revision_;
 }
 
+std::size_t GuiDocumentSession::model_revision() const noexcept {
+  return presentation_revision_ - visibility_revision_;
+}
+
 Result<SketchConstraintCatalog>
 GuiDocumentSession::sketch_constraint_catalog(SketchId sketch) const {
   const auto* part = part_document();
@@ -809,9 +964,9 @@ GuiDocumentSession::sketch_constraint_catalog(SketchId sketch) const {
   if (part->find_sketch(sketch) == nullptr)
     return Result<SketchConstraintCatalog>::failure(
         Error::validation(sketch.value(), "Sketch constraint catalog target does not exist"));
-  const auto found = std::find_if(
-      sketch_constraint_catalogs_.begin(), sketch_constraint_catalogs_.end(),
-      [&sketch](const auto& catalog) { return catalog.sketch() == sketch; });
+  const auto found =
+      std::find_if(sketch_constraint_catalogs_.begin(), sketch_constraint_catalogs_.end(),
+                   [&sketch](const auto& catalog) { return catalog.sketch() == sketch; });
   if (found != sketch_constraint_catalogs_.end())
     return Result<SketchConstraintCatalog>::success(*found);
   return SketchConstraintCatalog::create(part->id(), std::move(sketch));
@@ -822,8 +977,7 @@ GuiDocumentSession::sketch_constraint_catalogs() const noexcept {
   return sketch_constraint_catalogs_;
 }
 
-Result<SketchDimensionCatalog>
-GuiDocumentSession::sketch_dimension_catalog(SketchId sketch) const {
+Result<SketchDimensionCatalog> GuiDocumentSession::sketch_dimension_catalog(SketchId sketch) const {
   const auto* part = part_document();
   if (part == nullptr)
     return Result<SketchDimensionCatalog>::failure(
@@ -831,9 +985,9 @@ GuiDocumentSession::sketch_dimension_catalog(SketchId sketch) const {
   if (part->find_sketch(sketch) == nullptr)
     return Result<SketchDimensionCatalog>::failure(
         Error::validation(sketch.value(), "Sketch dimension catalog target does not exist"));
-  const auto found = std::find_if(
-      sketch_dimension_catalogs_.begin(), sketch_dimension_catalogs_.end(),
-      [&sketch](const auto& catalog) { return catalog.sketch() == sketch; });
+  const auto found =
+      std::find_if(sketch_dimension_catalogs_.begin(), sketch_dimension_catalogs_.end(),
+                   [&sketch](const auto& catalog) { return catalog.sketch() == sketch; });
   if (found != sketch_dimension_catalogs_.end())
     return Result<SketchDimensionCatalog>::success(*found);
   return SketchDimensionCatalog::create(part->id(), std::move(sketch));
@@ -844,24 +998,35 @@ GuiDocumentSession::sketch_dimension_catalogs() const noexcept {
   return sketch_dimension_catalogs_;
 }
 
-GuiSelectionModel& GuiDocumentSession::selection() noexcept { return selection_; }
+GuiSelectionModel& GuiDocumentSession::selection() noexcept {
+  return selection_;
+}
 
-const GuiSelectionModel& GuiDocumentSession::selection() const noexcept { return selection_; }
+const GuiSelectionModel& GuiDocumentSession::selection() const noexcept {
+  return selection_;
+}
 
-GuiTaskState& GuiDocumentSession::task() noexcept { return task_; }
+GuiTaskState& GuiDocumentSession::task() noexcept {
+  return task_;
+}
 
-const GuiTaskState& GuiDocumentSession::task() const noexcept { return task_; }
+const GuiTaskState& GuiDocumentSession::task() const noexcept {
+  return task_;
+}
 
 Result<std::string> GuiDocumentSession::serialize_current() const {
-  if (const auto* part = part_document()) return serialize_part_document_to_json(*part);
-  if (const auto* active_project = project()) return serialize_project_to_json(*active_project);
+  if (const auto* part = part_document())
+    return serialize_part_document_to_json(*part);
+  if (const auto* active_project = project())
+    return serialize_project_to_json(*active_project);
   return Result<std::string>::failure(session_error("no active document"));
 }
 
-Result<std::size_t> GuiDocumentSession::recompute_part(
-    PartDocument& document, geometry::ShapeCache& cache) const {
+Result<std::size_t> GuiDocumentSession::recompute_part(PartDocument& document,
+                                                       geometry::ShapeCache& cache) const {
   const auto summary = geometry::GeometryRecomputeExecutor{}.execute_document(document, cache);
-  if (summary.has_error()) return Result<std::size_t>::failure(summary.error());
+  if (summary.has_error())
+    return Result<std::size_t>::failure(summary.error());
   return Result<std::size_t>::success(summary.value().executed_feature_count);
 }
 
@@ -888,11 +1053,14 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
     auto part = deserialize_part_document_from_json(
         entry.json, entry.allow_failed_recompute ? PartDocumentReadMode::ReferenceRepair
                                                  : PartDocumentReadMode::Strict);
-    if (part.has_error()) return Result<std::size_t>::failure(part.error());
+    if (part.has_error())
+      return Result<std::size_t>::failure(part.error());
     auto valid_constraints = validate_constraint_catalogs(part.value(), entry.sketch_constraints);
-    if (valid_constraints.has_error()) return valid_constraints;
+    if (valid_constraints.has_error())
+      return valid_constraints;
     auto valid_dimensions = validate_dimension_catalogs(part.value(), entry.sketch_dimensions);
-    if (valid_dimensions.has_error()) return valid_dimensions;
+    if (valid_dimensions.has_error())
+      return valid_dimensions;
     restored = std::move(part.value());
   } else {
     auto active_project = deserialize_project_from_json(entry.json);
@@ -962,20 +1130,16 @@ void GuiDocumentSession::diagnose_step_import_sources() {
     }
 }
 
-Result<std::size_t>
-GuiDocumentSession::reject_replacement_if_needed(bool discard_dirty) const {
+Result<std::size_t> GuiDocumentSession::reject_replacement_if_needed(bool discard_dirty) const {
   if (task_.active())
-    return Result<std::size_t>::failure(
-        session_error("active task must be applied or cancelled"));
+    return Result<std::size_t>::failure(session_error("active task must be applied or cancelled"));
   if (dirty() && !discard_dirty)
-    return Result<std::size_t>::failure(
-        session_error("dirty document requires save or discard"));
+    return Result<std::size_t>::failure(session_error("dirty document requires save or discard"));
   return Result<std::size_t>::success(0U);
 }
 
 Result<std::size_t> GuiDocumentSession::validate_constraint_catalogs(
-    const PartDocument& document,
-    const std::vector<SketchConstraintCatalog>& catalogs) const {
+    const PartDocument& document, const std::vector<SketchConstraintCatalog>& catalogs) const {
   std::vector<std::string> sketches;
   sketches.reserve(catalogs.size());
   for (const auto& catalog : catalogs) {
@@ -987,9 +1151,11 @@ Result<std::size_t> GuiDocumentSession::validate_constraint_catalogs(
       return Result<std::size_t>::failure(Error::validation(
           catalog.sketch().value(), "Sketch constraint catalog target Sketch does not exist"));
     auto topology = SketchTopology::migrate_legacy(*sketch);
-    if (topology.has_error()) return Result<std::size_t>::failure(topology.error());
+    if (topology.has_error())
+      return Result<std::size_t>::failure(topology.error());
     auto system = SketchConstraintCatalogSystemBuilder::build(document, topology.value(), catalog);
-    if (system.has_error()) return Result<std::size_t>::failure(system.error());
+    if (system.has_error())
+      return Result<std::size_t>::failure(system.error());
     sketches.push_back(catalog.sketch().value());
   }
   std::sort(sketches.begin(), sketches.end());
@@ -1000,8 +1166,7 @@ Result<std::size_t> GuiDocumentSession::validate_constraint_catalogs(
 }
 
 Result<std::size_t> GuiDocumentSession::validate_dimension_catalogs(
-    const PartDocument& document,
-    const std::vector<SketchDimensionCatalog>& catalogs) const {
+    const PartDocument& document, const std::vector<SketchDimensionCatalog>& catalogs) const {
   std::vector<std::string> sketches;
   sketches.reserve(catalogs.size());
   for (const auto& catalog : catalogs) {
@@ -1013,9 +1178,11 @@ Result<std::size_t> GuiDocumentSession::validate_dimension_catalogs(
       return Result<std::size_t>::failure(Error::validation(
           catalog.sketch().value(), "Sketch dimension catalog target Sketch does not exist"));
     auto topology = SketchTopology::migrate_legacy(*sketch);
-    if (topology.has_error()) return Result<std::size_t>::failure(topology.error());
+    if (topology.has_error())
+      return Result<std::size_t>::failure(topology.error());
     for (const auto& dimension : catalog.dimensions()) {
-      auto measurement = SketchDimensionMeasurementEvaluator::measure(topology.value(), dimension);
+      auto measurement =
+          SketchDimensionMeasurementEvaluator::measure(topology.value(), dimension, &document);
       if (measurement.has_error())
         return Result<std::size_t>::failure(measurement.error());
       if (dimension.driving()) {
@@ -1036,8 +1203,7 @@ Result<std::size_t> GuiDocumentSession::validate_dimension_catalogs(
 
 Result<std::size_t> GuiDocumentSession::publish_part_state(
     PartDocument document, std::vector<SketchConstraintCatalog> constraints,
-    std::vector<SketchDimensionCatalog> dimensions, std::string label,
-    std::size_t changed_count) {
+    std::vector<SketchDimensionCatalog> dimensions, std::string label, std::size_t changed_count) {
   sort_catalogs(constraints);
   sort_catalogs(dimensions);
   auto valid_constraints = validate_constraint_catalogs(document, constraints);
@@ -1050,9 +1216,9 @@ Result<std::size_t> GuiDocumentSession::publish_part_state(
     record_error(valid_dimensions.error());
     return valid_dimensions;
   }
-  auto cache = geometry::ShapeCache::create(
-      ShapeCacheId("gui.part." + document.id().value()));
-  if (cache.has_error()) return Result<std::size_t>::failure(cache.error());
+  auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.part." + document.id().value()));
+  if (cache.has_error())
+    return Result<std::size_t>::failure(cache.error());
   auto executed = recompute_part(document, cache.value());
   if (executed.has_error()) {
     record_error(executed.error());
@@ -1060,7 +1226,8 @@ Result<std::size_t> GuiDocumentSession::publish_part_state(
   }
   document.mark_all_clean();
   auto json = serialize_part_document_to_json(document);
-  if (json.has_error()) return Result<std::size_t>::failure(json.error());
+  if (json.has_error())
+    return Result<std::size_t>::failure(json.error());
 
   document_ = std::move(document);
   sketch_constraint_catalogs_ = std::move(constraints);
@@ -1076,17 +1243,17 @@ Result<std::size_t> GuiDocumentSession::publish_part_state(
 }
 
 void GuiDocumentSession::initialize_history(std::string json, std::string label, bool saved) {
+  hidden_presentations_.clear();
   history_ = {{document_kind(), std::move(json), sketch_constraint_catalogs_,
                sketch_dimension_catalogs_, std::move(label), reference_repair_mode_}};
   history_index_ = 0U;
   saved_json_ = saved ? std::optional<std::string>(history_.front().json) : std::nullopt;
   saved_sketch_constraint_catalogs_ =
-      saved ? std::optional<std::vector<SketchConstraintCatalog>>(
-                  history_.front().sketch_constraints)
-            : std::nullopt;
+      saved
+          ? std::optional<std::vector<SketchConstraintCatalog>>(history_.front().sketch_constraints)
+          : std::nullopt;
   saved_sketch_dimension_catalogs_ =
-      saved ? std::optional<std::vector<SketchDimensionCatalog>>(
-                  history_.front().sketch_dimensions)
+      saved ? std::optional<std::vector<SketchDimensionCatalog>>(history_.front().sketch_dimensions)
             : std::nullopt;
   selection_.clear();
 }
@@ -1130,6 +1297,61 @@ void GuiDocumentSession::reset_document() noexcept {
   saved_sketch_dimension_catalogs_.reset();
   diagnostics_.clear();
   selection_.clear();
+  hidden_presentations_.clear();
+}
+
+Result<std::size_t> GuiDocumentSession::set_presentation_visible(std::string semantic_id,
+                                                                 bool visible) {
+  if (!has_document() || semantic_id.empty() || semantic_id.find('\0') != std::string::npos)
+    return Result<std::size_t>::failure(Error::validation(
+        "gui.visibility", "presentation visibility requires a document and a semantic identity"));
+  if (visible) {
+    const auto count = std::erase_if(hidden_presentations_, [&semantic_id](const auto& hidden) {
+      return semantic_id == hidden ||
+             (semantic_id.starts_with(hidden) && semantic_id.size() > hidden.size() &&
+              semantic_id[hidden.size()] == '/');
+    });
+    if (count != 0U) {
+      ++presentation_revision_;
+      ++visibility_revision_;
+    }
+    return Result<std::size_t>::success(count);
+  }
+  const auto found =
+      std::find(hidden_presentations_.begin(), hidden_presentations_.end(), semantic_id);
+  if (found != hidden_presentations_.end())
+    return Result<std::size_t>::success(0U);
+  hidden_presentations_.push_back(std::move(semantic_id));
+  std::sort(hidden_presentations_.begin(), hidden_presentations_.end());
+  selection_.clear();
+  ++presentation_revision_;
+  ++visibility_revision_;
+  return Result<std::size_t>::success(1U);
+}
+
+bool GuiDocumentSession::presentation_visible(std::string_view semantic_id) const noexcept {
+  if (const auto role = semantic_id.find(kGuiSketchHitRoleMarker); role != std::string_view::npos)
+    semantic_id = semantic_id.substr(0U, role);
+  return std::none_of(hidden_presentations_.begin(), hidden_presentations_.end(),
+                      [semantic_id](const auto& hidden) {
+                        return semantic_id == hidden || (semantic_id.starts_with(hidden) &&
+                                                         semantic_id.size() > hidden.size() &&
+                                                         semantic_id[hidden.size()] == '/');
+                      });
+}
+
+std::size_t GuiDocumentSession::show_all_presentations() noexcept {
+  const std::size_t count = hidden_presentations_.size();
+  hidden_presentations_.clear();
+  if (count != 0U) {
+    ++presentation_revision_;
+    ++visibility_revision_;
+  }
+  return count;
+}
+
+const std::vector<std::string>& GuiDocumentSession::hidden_presentations() const noexcept {
+  return hidden_presentations_;
 }
 
 } // namespace blcad::gui

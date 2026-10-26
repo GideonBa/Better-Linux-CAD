@@ -92,11 +92,18 @@ constexpr double kPivotTolerance = 1.0e-14;
 
 [[nodiscard]] double characteristic_length(const SketchTopology& topology) noexcept {
   if (topology.points().empty()) return 1.0;
-  double min_x = topology.points().front().position().x;
+  const auto first =
+      std::find_if(topology.points().begin(), topology.points().end(),
+                   [](const auto& point) { return !point.id().value().starts_with("reference/"); });
+  if (first == topology.points().end())
+    return 1.0;
+  double min_x = first->position().x;
   double max_x = min_x;
-  double min_y = topology.points().front().position().y;
+  double min_y = first->position().y;
   double max_y = min_y;
   for (const auto& point : topology.points()) {
+    if (point.id().value().starts_with("reference/"))
+      continue;
     min_x = std::min(min_x, point.position().x);
     max_x = std::max(max_x, point.position().x);
     min_y = std::min(min_y, point.position().y);

@@ -40,7 +40,7 @@ Result<std::string> source_json(const GuiDocumentSession& session) {
     return serialize_part_document_to_json(*session.part_document());
   if (session.project())
     return serialize_project_to_json(*session.project());
-  return Result<std::string>::failure(error("Kein Dokument geöffnet"));
+  return Result<std::string>::failure(error("No document open"));
 }
 std::filesystem::path document_path(const GuiDocumentSession& session) {
   return session.file_path().empty()
@@ -52,19 +52,19 @@ const std::vector<StepImportSource>& sources(const GuiDocumentSession& session) 
                                  : session.project()->step_import_sources();
 }
 QString mode_text(StepImportMode mode) {
-  return mode == StepImportMode::Reference ? QStringLiteral("Referenz")
-                                           : QStringLiteral("Editierbarer Körper");
+  return mode == StepImportMode::Reference ? QStringLiteral("Reference")
+                                           : QStringLiteral("Editable Body");
 }
 QString state_text(StepImportFreshness state) {
   switch (state) {
   case StepImportFreshness::Available:
-    return QStringLiteral("Aktuell");
+    return QStringLiteral("Current");
   case StepImportFreshness::Missing:
-    return QStringLiteral("Datei fehlt");
+    return QStringLiteral("File Missing");
   case StepImportFreshness::Changed:
-    return QStringLiteral("Datei geändert");
+    return QStringLiteral("File Changed");
   case StepImportFreshness::Unreadable:
-    return QStringLiteral("Nicht lesbar");
+    return QStringLiteral("Unreadable");
   }
   return {};
 }
@@ -135,10 +135,10 @@ struct ShellStepImportTools::Impl {
       return;
     invalidate();
     status->setProperty("freshness", -1);
-    status->setText(QStringLiteral("Noch nicht geprüft"));
+    status->setText(QStringLiteral("Not Inspected"));
     expected->clear();
     observed->clear();
-    summary->setText(QStringLiteral("Datei prüfen und die gewünschte Änderung vorbereiten."));
+    summary->setText(QStringLiteral("Inspect the file and prepare the desired change."));
   }
   void select() {
     if (loading || !active)
@@ -182,7 +182,7 @@ struct ShellStepImportTools::Impl {
           embedded ? session.project()->find_part_document(value.owner_document) : nullptr;
       const auto label = embedded
                              ? text(part ? part->name() : value.owner_document.value()) + " / " +
-                                   text(entry.name()) + QStringLiteral(" (nur Anzeige)")
+                                   text(entry.name()) + QStringLiteral(" (Display Only)")
                              : text(entry.name());
       const int row = catalog->rowCount();
       catalog->insertRow(row);
@@ -209,18 +209,18 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
                                            int assembly_tab)
     : QObject(&window), impl_(std::make_unique<Impl>(window)) {
   auto& ui = *impl_;
-  ui.action = new QAction(QStringLiteral("STEP-Quellen"), this);
+  ui.action = new QAction(QStringLiteral("STEP Sources"), this);
   ui.action->setObjectName("blcad.action.step_sources");
   ui.action->setToolTip(
-      QStringLiteral("Quelldateien und Importmodus verwalten; Dokument zuerst speichern."));
+      QStringLiteral("Manage source files and import mode; save the document first."));
   for (const auto tab : {model_tab, assembly_tab})
-    ribbon.add_button(ribbon.add_group(tab, QStringLiteral("STEP-Quellen")), ui.action);
+    ribbon.add_button(ribbon.add_group(tab, QStringLiteral("STEP Sources")), ui.action);
   connect(ui.action, &QAction::triggered, this, [this] {
     auto result = begin();
     if (!result)
       impl_->window.report_error(result.error());
   });
-  ui.dock = new QDockWidget(QStringLiteral("STEP-Quellen verwalten"), &window);
+  ui.dock = new QDockWidget(QStringLiteral("Manage STEP Sources"), &window);
   ui.dock->setObjectName("blcad.step_import.task");
   auto* panel = new QWidget(ui.dock);
   auto* layout = new QVBoxLayout(panel);
@@ -231,10 +231,10 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   auto* content_layout = new QVBoxLayout(content);
   auto* hint = new QLabel(
       QStringLiteral(
-          "Eine STEP-Datei im Dokumentordner oder einem Unterordner verknüpfen. Importmodus "
-          "bewusst wählen. "
-          "Quelldateien bleiben unverändert; Geometrie wird hier noch nicht eingelesen. "
-          "Geänderte Dateien zuerst prüfen und ihre neue Prüfsumme ausdrücklich übernehmen."),
+          "Link a STEP file in the document directory or a subdirectory. Choose the import mode "
+          "explicitly. "
+          "Source files are preserved; geometry is not read here yet. "
+          "Inspect changed files first and explicitly accept their new checksum."),
       content);
   hint->setWordWrap(true);
   hint->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
@@ -243,7 +243,7 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   ui.catalog = new QTableWidget(content);
   ui.catalog->setObjectName("blcad.step_import.catalog");
   ui.catalog->setColumnCount(4);
-  ui.catalog->setHorizontalHeaderLabels({"Quelle", "Modus", "Relativer Pfad", "Status"});
+  ui.catalog->setHorizontalHeaderLabels({"Source", "Mode", "Relative Path", "Status"});
   ui.catalog->setEditTriggers(QAbstractItemView::NoEditTriggers);
   ui.catalog->setSelectionBehavior(QAbstractItemView::SelectRows);
   ui.catalog->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -259,12 +259,12 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   ui.source->setObjectName("blcad.step_import.source");
   ui.source->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
   ui.source->setMinimumContentsLength(14);
-  form->addRow(QStringLiteral("Quelle"), ui.source);
+  form->addRow(QStringLiteral("Source"), ui.source);
   ui.operation = new QComboBox(content);
   ui.operation->setObjectName("blcad.step_import.operation");
-  ui.operation->addItems({QStringLiteral("Registrieren"), QStringLiteral("Prüfsumme aktualisieren"),
-                          QStringLiteral("Quelle entfernen")});
-  form->addRow(QStringLiteral("Änderung"), ui.operation);
+  ui.operation->addItems({QStringLiteral("Register"), QStringLiteral("Update Checksum"),
+                          QStringLiteral("Remove Source")});
+  form->addRow(QStringLiteral("Change"), ui.operation);
   ui.name = new QLineEdit(content);
   ui.name->setObjectName("blcad.step_import.name");
   form->addRow(QStringLiteral("Name"), ui.name);
@@ -275,17 +275,17 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   ui.path->setObjectName("blcad.step_import.path");
   ui.path->setPlaceholderText("assets/bauteil.step");
   path_layout->addWidget(ui.path);
-  ui.browse = new QPushButton(QStringLiteral("Datei wählen…"), path_row);
+  ui.browse = new QPushButton(QStringLiteral("Choose File…"), path_row);
   ui.browse->setObjectName("blcad.step_import.browse");
   path_layout->addWidget(ui.browse);
-  form->addRow(QStringLiteral("Relativer Pfad"), path_row);
+  form->addRow(QStringLiteral("Relative Path"), path_row);
   ui.mode = new QComboBox(content);
   ui.mode->setObjectName("blcad.step_import.mode");
   for (auto mode : {StepImportMode::Reference, StepImportMode::EditableBody})
     ui.mode->addItem(mode_text(mode), static_cast<int>(mode));
-  ui.mode->setPlaceholderText(QStringLiteral("Importmodus wählen"));
+  ui.mode->setPlaceholderText(QStringLiteral("Choose Import Mode"));
   ui.mode->setCurrentIndex(-1);
-  form->addRow(QStringLiteral("Importmodus"), ui.mode);
+  form->addRow(QStringLiteral("Import Mode"), ui.mode);
   content_layout->addLayout(form);
   const auto label = [content, content_layout](const char* name) {
     auto* value = new QLabel(content);
@@ -297,11 +297,11 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
     content_layout->addWidget(value);
     return value;
   };
-  content_layout->addWidget(new QLabel(QStringLiteral("Dateistatus"), content));
+  content_layout->addWidget(new QLabel(QStringLiteral("File Status"), content));
   ui.status = label("status");
   for (auto [target, name, caption] :
-       {std::tuple{&ui.expected, "expected_digest", "Gespeicherte SHA-256"},
-        std::tuple{&ui.observed, "observed_digest", "Gelesene SHA-256"}}) {
+       {std::tuple{&ui.expected, "expected_digest", "Saved SHA-256"},
+        std::tuple{&ui.observed, "observed_digest", "Read SHA-256"}}) {
     content_layout->addWidget(new QLabel(QString::fromUtf8(caption), content));
     auto* value = new QPlainTextEdit(content);
     value->setObjectName(QStringLiteral("blcad.step_import.") + name);
@@ -325,10 +325,10 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
     buttons->addWidget(value);
     return value;
   };
-  auto* inspect_button = button("inspect", QStringLiteral("Datei prüfen"));
-  auto* preview_button = button("preview", QStringLiteral("Vorbereiten"));
-  ui.apply = button("apply", QStringLiteral("Anwenden"));
-  auto* cancel_button = button("cancel", QStringLiteral("Schließen"));
+  auto* inspect_button = button("inspect", QStringLiteral("Inspect File"));
+  auto* preview_button = button("preview", QStringLiteral("Prepare"));
+  ui.apply = button("apply", QStringLiteral("Apply"));
+  auto* cancel_button = button("cancel", QStringLiteral("Close"));
   layout->addLayout(buttons);
   ui.dock->setWidget(panel);
   window.addDockWidget(Qt::RightDockWidgetArea, ui.dock);
@@ -357,9 +357,9 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
     if (!item || !impl_->current() || (item->flags() & Qt::ItemIsSelectable))
       return;
     impl_->invalidate();
-    impl_->summary->setText(QStringLiteral(
-        "Diese Quelle gehört zu einem eingebetteten Bauteil und wird hier nur angezeigt. "
-        "Die vorbereitete Änderung wurde verworfen."));
+    impl_->summary->setText(
+        QStringLiteral("This source belongs to an embedded part and is displayed here only. "
+                       "The prepared change was discarded."));
   });
   connect(ui.browse, &QPushButton::clicked, this, [this] {
     auto& ui = *impl_;
@@ -367,8 +367,8 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
       return;
     const QDir root(QString::fromStdString(ui.original_path.parent_path().string()));
     const auto selected = QFileDialog::getOpenFileName(
-        &ui.window, QStringLiteral("STEP-Quelldatei wählen"), root.path(),
-        QStringLiteral("STEP (*.step *.stp);;Alle Dateien (*)"));
+        &ui.window, QStringLiteral("Choose STEP Source File"), root.path(),
+        QStringLiteral("STEP (*.step *.stp);;All Files (*)"));
     if (selected.isEmpty() || !ui.current())
       return;
     ui.path->setText(root.relativeFilePath(selected));
@@ -397,8 +397,7 @@ bool ShellStepImportTools::can_redo_after_cancel() const noexcept {
 Result<std::size_t> ShellStepImportTools::begin() {
   auto& ui = *impl_;
   if (!ui.available())
-    return Result<std::size_t>::failure(
-        error("Dokument zuerst speichern und aktive Bearbeitung schließen"));
+    return Result<std::size_t>::failure(error("Save the document first and close active editing"));
   const auto json = source_json(ui.window.session());
   if (!json)
     return Result<std::size_t>::failure(json.error());
@@ -409,11 +408,11 @@ Result<std::size_t> ShellStepImportTools::begin() {
   ui.redo_available = ui.window.session().can_redo();
   if (!ui.window.session().task().begin(std::string(task_id)) ||
       !ui.window.session().task().begin_parameter_editing())
-    return Result<std::size_t>::failure(error("Quellenverwaltung konnte nicht gestartet werden"));
+    return Result<std::size_t>::failure(error("Could not start source management"));
   ui.active = true;
   ui.loading = true;
   ui.source->clear();
-  ui.source->addItem(QStringLiteral("Neue Quelle"), QString());
+  ui.source->addItem(QStringLiteral("New Source"), QString());
   for (const auto& entry : sources(ui.window.session()))
     ui.source->addItem(text(entry.name()), text(entry.id().value()));
   ui.loading = false;
@@ -430,7 +429,7 @@ Result<std::size_t> ShellStepImportTools::inspect() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
-    return Result<std::size_t>::failure(error("Dokument geändert. Quellenverwaltung neu öffnen."));
+    return Result<std::size_t>::failure(error("Document changed. Reopen source management."));
   }
   ui.invalidate();
   const auto catalog = ui.catalog_status();
@@ -441,11 +440,11 @@ Result<std::size_t> ShellStepImportTools::inspect() {
     if (!report)
       return Result<std::size_t>::failure(report.error());
     ui.report(report.value());
-    ui.summary->setText(QStringLiteral("Dateistatus geprüft; gespeicherte Prüfsumme unverändert."));
+    ui.summary->setText(QStringLiteral("File status inspected; saved checksum unchanged."));
     return Result<std::size_t>::success(1);
   }
   if (ui.mode->currentIndex() < 0)
-    return Result<std::size_t>::failure(error("Importmodus ausdrücklich wählen"));
+    return Result<std::size_t>::failure(error("Choose the import mode explicitly"));
   const auto result = ui.workbench.prepare_register(
       ui.window.session(), ui.name->text().trimmed().toStdString(), ui.path->text().toStdString(),
       static_cast<StepImportMode>(ui.mode->currentData().toInt()));
@@ -454,21 +453,21 @@ Result<std::size_t> ShellStepImportTools::inspect() {
   ui.report(result.value().report);
   ui.expected->clear();
   ui.summary->setText(
-      QStringLiteral("Datei lesbar. Registrieren zum Speichern der Quellenangaben vorbereiten."));
+      QStringLiteral("File readable. Prepare Register to save the source information."));
   return Result<std::size_t>::success(1);
 }
 Result<std::size_t> ShellStepImportTools::preview() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
-    return Result<std::size_t>::failure(error("Dokument geändert. Quellenverwaltung neu öffnen."));
+    return Result<std::size_t>::failure(error("Document changed. Reopen source management."));
   }
   ui.invalidate();
   const auto prepare = [&]() -> Result<GuiStepImportPreview> {
     const auto* source = ui.selected();
     if (!source) {
       if (ui.operation->currentIndex() != 0 || ui.mode->currentIndex() < 0)
-        return Result<GuiStepImportPreview>::failure(error("Importmodus ausdrücklich wählen"));
+        return Result<GuiStepImportPreview>::failure(error("Choose the import mode explicitly"));
       return ui.workbench.prepare_register(
           ui.window.session(), ui.name->text().trimmed().toStdString(),
           ui.path->text().toStdString(),
@@ -478,7 +477,7 @@ Result<std::size_t> ShellStepImportTools::preview() {
       return ui.workbench.prepare_refresh(ui.window.session(), source->id());
     if (ui.operation->currentIndex() == 2)
       return ui.workbench.prepare_remove(ui.window.session(), source->id());
-    return Result<GuiStepImportPreview>::failure(error("Aktualisieren oder Entfernen wählen"));
+    return Result<GuiStepImportPreview>::failure(error("Choose Update or Remove"));
   };
   const auto result = prepare();
   if (!result)
@@ -489,19 +488,19 @@ Result<std::size_t> ShellStepImportTools::preview() {
   (void)ui.window.session().task().show_preview();
   ui.summary->setText(
       ui.operation->currentIndex() == 2
-          ? QStringLiteral("Anwenden entfernt nur den Verweis; die Quelldatei bleibt erhalten.")
-          : QStringLiteral("Prüfung erfolgreich. Anwenden übernimmt die angezeigte Quelle und "
-                           "Prüfsumme in einem Schritt."));
+          ? QStringLiteral("Apply removes only the reference; the source file is preserved.")
+          : QStringLiteral("Inspection successful. Apply accepts the displayed source and "
+                           "checksum in one step."));
   return Result<std::size_t>::success(1);
 }
 Result<std::size_t> ShellStepImportTools::apply() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
-    return Result<std::size_t>::failure(error("Dokument geändert. Quellenverwaltung neu öffnen."));
+    return Result<std::size_t>::failure(error("Document changed. Reopen source management."));
   }
   if (!ui.candidate)
-    return Result<std::size_t>::failure(error("Änderung zuerst vorbereiten"));
+    return Result<std::size_t>::failure(error("Prepare the change first"));
   const auto result = ui.workbench.apply(ui.window.session(), *ui.candidate);
   if (!result) {
     ui.invalidate();

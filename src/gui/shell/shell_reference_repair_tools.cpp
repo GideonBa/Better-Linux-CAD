@@ -33,14 +33,7 @@ template <typename T> std::string source_id(const T& reference) {
   return reference.node_id();
 }
 QString role_label(std::string_view role) {
-  return QString::fromUtf8(role.data(), static_cast<int>(role.size()))
-      .replace("top", "oben")
-      .replace("bottom", "unten")
-      .replace("front", "vorn")
-      .replace("back", "hinten")
-      .replace("right", "rechts")
-      .replace("left", "links")
-      .replace('_', ' ');
+  return QString::fromUtf8(role.data(), static_cast<int>(role.size())).replace('_', ' ');
 }
 QString text(const std::string& value) {
   return QString::fromStdString(value);
@@ -93,7 +86,7 @@ struct ShellReferenceRepairTools::Impl {
   bool current() const {
     const auto& session = window.session();
     return active && session.part_document() && !window.active_sketch() &&
-           session.task().command_id() == task_id && session.presentation_revision() == revision;
+           session.task().command_id() == task_id && session.model_revision() == revision;
   }
   const PartDocument& selection_part() const {
     return prepared ? *prepared : *window.session().part_document();
@@ -157,8 +150,8 @@ struct ShellReferenceRepairTools::Impl {
       (void)window.session().task().return_to_editing();
     summary->setText(
         pending.empty()
-            ? QStringLiteral("Ersatz auswählen und Vorschau prüfen.")
-            : QStringLiteral("%1 Änderung(en) vorgemerkt. Gesamte Reparatur mit Vorschau prüfen.")
+            ? QStringLiteral("Select a replacement and check the preview.")
+            : QStringLiteral("%1 change(s) staged. Check the entire repair with Preview.")
                   .arg(pending.size()));
   }
   void inspect() {
@@ -166,15 +159,15 @@ struct ShellReferenceRepairTools::Impl {
     const auto& part = *window.session().part_document();
     const auto& cache = *selection_cache;
     const auto status = [](const auto& result) {
-      return result ? QStringLiteral("Aufgelöst")
-                    : QStringLiteral("Verloren: ") + text(result.error().message());
+      return result ? QStringLiteral("Resolved")
+                    : QStringLiteral("Missing: ") + text(result.error().message());
     };
     for (const auto& plane : part.derived_workplanes())
       entries.push_back({Kind::Plane,
                          plane.id().value(),
                          {},
                          source_id(plane.face_reference()),
-                         text(plane.name()) + QStringLiteral(" / Fläche"),
+                         text(plane.name()) + QStringLiteral(" / Face"),
                          status(geometry::WorkplaneResolver{}.resolve(part, plane.id()))});
     for (const auto& sketch : part.sketches()) {
       for (const auto& point : sketch.projected_points())
@@ -217,7 +210,7 @@ struct ShellReferenceRepairTools::Impl {
                        [id = sketch->id(), replacement](PartDocument& candidate) {
                          auto* original = candidate.find_sketch(id);
                          if (!original)
-                           return Result<std::size_t>::failure(error("Skizze fehlt"));
+                           return Result<std::size_t>::failure(error("Sketch missing"));
                          auto sketch_copy = *original;
                          auto changed = sketch_copy.replace_reference(replacement);
                          if (!changed)
@@ -231,7 +224,7 @@ struct ShellReferenceRepairTools::Impl {
     QSignalBlocker blocker(replacements);
     replacements->clear();
     if (!current() || references->currentIndex() < 0) {
-      diagnostic->setText(QStringLiteral("Keine unterstützten Referenzen vorhanden."));
+      diagnostic->setText(QStringLiteral("No supported references available."));
       update_buttons();
       return;
     }
@@ -242,10 +235,10 @@ struct ShellReferenceRepairTools::Impl {
       return;
     }
     const auto& entry = entries.at(references->currentIndex());
-    QString detail = entry.diagnostic + QStringLiteral("\nQuelle: ") + text(entry.source);
+    QString detail = entry.diagnostic + QStringLiteral("\nSource: ") + text(entry.source);
     for (const auto& item : pending)
       if (same_reference(item.reference, entry))
-        detail += QStringLiteral("\nVorgemerkt: ") + item.choice.label;
+        detail += QStringLiteral("\nStaged: ") + item.choice.label;
     diagnostic->setText(detail);
     const auto& part = selection_part();
     if (entry.kind == Kind::Point)
@@ -274,7 +267,7 @@ struct ShellReferenceRepairTools::Impl {
               const auto* producer = part.find_feature(target.source_feature());
               QString label = text(producer ? producer->name() : target.source_feature().value());
               if constexpr (std::is_same_v<T, SemanticFaceReference>) {
-                label += QStringLiteral(" / Fläche ") + role_label(to_string(target.face()));
+                label += QStringLiteral(" / Face ") + role_label(to_string(target.face()));
                 if (entry.kind != Kind::Plane || source_id(target) == entry.source)
                   return;
                 const auto* plane = part.find_derived_workplane(DatumPlaneId(entry.owner));
@@ -286,7 +279,7 @@ struct ShellReferenceRepairTools::Impl {
                                        return candidate.update_derived_workplane(replacement);
                                      }});
               } else if constexpr (std::is_same_v<T, SemanticVertexReference>) {
-                label += QStringLiteral(" / Ecke ") + role_label(to_string(target.vertex()));
+                label += QStringLiteral(" / Vertex ") + role_label(to_string(target.vertex()));
                 if (entry.kind == Kind::Point) {
                   auto replacement = ProjectedSketchPoint::create_from_semantic_vertex(
                       SketchEntityId(entry.entity), target);
@@ -294,7 +287,7 @@ struct ShellReferenceRepairTools::Impl {
                     add_projection(entry, replacement.value(), label, source_id(target));
                 }
               } else if (entry.kind == Kind::Line) {
-                label += QStringLiteral(" / Kante ") + role_label(to_string(target.edge()));
+                label += QStringLiteral(" / Edge ") + role_label(to_string(target.edge()));
                 auto replacement = ProjectedSketchLine::create_from_semantic_edge(
                     SketchEntityId(entry.entity), target);
                 if (replacement)
@@ -317,23 +310,22 @@ ShellReferenceRepairTools::ShellReferenceRepairTools(ShellWindow& window, ShellR
                                                      int model_tab)
     : QObject(&window), impl_(std::make_unique<Impl>(window)) {
   auto& ui = *impl_;
-  ui.action = new QAction(QStringLiteral("Referenzen reparieren"), this);
+  ui.action = new QAction(QStringLiteral("Repair References"), this);
   ui.action->setObjectName("blcad.action.repair_references");
-  auto* group = ribbon.add_group(model_tab, QStringLiteral("Referenzen"));
+  auto* group = ribbon.add_group(model_tab, QStringLiteral("References"));
   ribbon.add_small_button(group, ui.action);
   connect(ui.action, &QAction::triggered, this, [this] {
     auto result = begin();
     if (!result)
       impl_->window.report_error(result.error());
   });
-  ui.dock = new QDockWidget(QStringLiteral("Referenzen reparieren"), &window);
+  ui.dock = new QDockWidget(QStringLiteral("Repair References"), &window);
   ui.dock->setObjectName("blcad.shell.reference_repair_task");
   auto* panel = new QWidget(ui.dock);
   auto* layout = new QVBoxLayout(panel);
   auto* hint = new QLabel(
-      QStringLiteral(
-          "Punkte, Linien und Flächenarbeitsebenen gemeinsam reparieren. "
-          "Änderungen sammeln und gesamte Liste prüfen. Erst Anwenden übernimmt die Reparatur."),
+      QStringLiteral("Repair points, lines, and face workplanes together. "
+                     "Stage changes and check the entire list. Apply commits the repair."),
       panel);
   hint->setWordWrap(true);
   layout->addWidget(hint);
@@ -346,8 +338,8 @@ ShellReferenceRepairTools::ShellReferenceRepairTools(ShellWindow& window, ShellR
     form->addRow(label, result);
     return result;
   };
-  ui.references = combo("reference", QStringLiteral("Referenz"));
-  ui.replacements = combo("replacement", QStringLiteral("Ersatz"));
+  ui.references = combo("reference", QStringLiteral("Reference"));
+  ui.replacements = combo("replacement", QStringLiteral("Replacement"));
   layout->addLayout(form);
   for (auto [target, id] : {std::pair{&ui.diagnostic, "diagnostic"}, {&ui.summary, "summary"}}) {
     *target = new QLabel(panel);
@@ -356,7 +348,7 @@ ShellReferenceRepairTools::ShellReferenceRepairTools(ShellWindow& window, ShellR
     (*target)->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(*target);
   }
-  auto* queue_label = new QLabel(QStringLiteral("Vorgemerkte Änderungen"), panel);
+  auto* queue_label = new QLabel(QStringLiteral("Staged Changes"), panel);
   layout->addWidget(queue_label);
   ui.pending_list = new QListWidget(panel);
   ui.pending_list->setObjectName("blcad.reference_repair.pending");
@@ -370,9 +362,9 @@ ShellReferenceRepairTools::ShellReferenceRepairTools(ShellWindow& window, ShellR
     queue_buttons->addWidget(result);
     return result;
   };
-  ui.stage_button = queue_button("stage", QStringLiteral("Hinzufügen"));
-  ui.remove_button = queue_button("remove", QStringLiteral("Entfernen"));
-  ui.clear_button = queue_button("clear", QStringLiteral("Liste leeren"));
+  ui.stage_button = queue_button("stage", QStringLiteral("Add"));
+  ui.remove_button = queue_button("remove", QStringLiteral("Remove"));
+  ui.clear_button = queue_button("clear", QStringLiteral("Clear List"));
   layout->addLayout(queue_buttons);
   layout->addStretch();
   auto* buttons = new QHBoxLayout;
@@ -382,9 +374,9 @@ ShellReferenceRepairTools::ShellReferenceRepairTools(ShellWindow& window, ShellR
     buttons->addWidget(result);
     return result;
   };
-  ui.preview_button = button("preview", QStringLiteral("Gesamtvorschau"));
-  ui.apply_button = button("apply", QStringLiteral("Anwenden"));
-  auto* close = button("cancel", QStringLiteral("Abbrechen"));
+  ui.preview_button = button("preview", QStringLiteral("Full Preview"));
+  ui.apply_button = button("apply", QStringLiteral("Apply"));
+  auto* close = button("cancel", QStringLiteral("Cancel"));
   layout->addLayout(buttons);
   ui.dock->setWidget(panel);
   window.addDockWidget(Qt::RightDockWidgetArea, ui.dock);
@@ -431,11 +423,11 @@ Result<std::size_t> ShellReferenceRepairTools::begin() {
       (!session.part_shape_cache() && !session.reference_repair_mode()) ||
       session.task().active() || ui.window.active_sketch())
     return Result<std::size_t>::failure(
-        error("Referenzreparatur benötigt ein Bauteil ohne aktiven Befehl"));
+        error("Reference repair requires a part without an active command"));
   if (!session.task().begin(std::string(task_id)) || !session.task().begin_parameter_editing())
-    return Result<std::size_t>::failure(error("Referenzreparatur konnte nicht gestartet werden"));
+    return Result<std::size_t>::failure(error("Could not start reference repair"));
   ui.active = true;
-  ui.revision = session.presentation_revision();
+  ui.revision = session.model_revision();
   ui.pending.clear();
   ui.prepared.reset();
   ui.show_pending();
@@ -455,13 +447,12 @@ Result<std::size_t> ShellReferenceRepairTools::stage() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
-    return Result<std::size_t>::failure(
-        error("Modell oder Befehl geändert. Reparatur neu öffnen."));
+    return Result<std::size_t>::failure(error("Model or command changed. Reopen repair."));
   }
   ui.invalidate();
   const auto index = ui.replacements->currentIndex();
   if (index < 0 || index >= static_cast<int>(ui.choices.size()))
-    return Result<std::size_t>::failure(error("Einen gültigen Ersatz auswählen"));
+    return Result<std::size_t>::failure(error("Select a valid replacement"));
   const auto& reference = ui.entries.at(ui.references->currentIndex());
   auto proposed = ui.pending;
   const auto found = std::find_if(proposed.begin(), proposed.end(), [&](const auto& item) {
@@ -485,13 +476,12 @@ Result<std::size_t> ShellReferenceRepairTools::remove_staged() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
-    return Result<std::size_t>::failure(
-        error("Modell oder Befehl geändert. Reparatur neu öffnen."));
+    return Result<std::size_t>::failure(error("Model or command changed. Reopen repair."));
   }
   ui.invalidate();
   const auto row = ui.pending_list->currentRow();
   if (row < 0 || row >= static_cast<int>(ui.pending.size()))
-    return Result<std::size_t>::failure(error("Eine vorgemerkte Änderung auswählen"));
+    return Result<std::size_t>::failure(error("Select a staged change"));
   auto proposed = ui.pending;
   proposed.erase(proposed.begin() + row);
   auto candidate = ui.candidate(proposed);
@@ -518,8 +508,7 @@ Result<std::size_t> ShellReferenceRepairTools::preview() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
-    return Result<std::size_t>::failure(
-        error("Modell oder Befehl geändert. Reparatur neu öffnen."));
+    return Result<std::size_t>::failure(error("Model or command changed. Reopen repair."));
   }
   ui.invalidate();
   if (ui.replacements->currentIndex() >= 0) {
@@ -528,7 +517,7 @@ Result<std::size_t> ShellReferenceRepairTools::preview() {
       return staged;
   }
   if (ui.pending.empty())
-    return Result<std::size_t>::failure(error("Mindestens eine Referenzänderung vormerken"));
+    return Result<std::size_t>::failure(error("Stage at least one reference change"));
   auto prepared = ui.candidate(ui.pending);
   if (!prepared)
     return Result<std::size_t>::failure(prepared.error());
@@ -565,27 +554,25 @@ Result<std::size_t> ShellReferenceRepairTools::preview() {
       shapes.push_back(std::move(item.shape));
     }
   if (shapes.empty())
-    return Result<std::size_t>::failure(error("Reparatur hat keine darstellbare Geometrie"));
+    return Result<std::size_t>::failure(error("Repair has no displayable geometry"));
   auto shown = ui.window.viewport().set_feature_previews(std::move(shapes), std::move(replaced));
   if (!shown)
     return shown;
   (void)ui.window.session().task().show_preview();
   ui.previewed = true;
   ui.apply_button->setEnabled(true);
-  ui.summary->setText(
-      QStringLiteral("Gesamtvorschau gültig. Anwenden übernimmt %1 Änderung(en) gemeinsam.")
-          .arg(ui.pending.size()));
+  ui.summary->setText(QStringLiteral("Full preview valid. Apply commits %1 change(s) together.")
+                          .arg(ui.pending.size()));
   return Result<std::size_t>::success(ui.pending.size());
 }
 Result<std::size_t> ShellReferenceRepairTools::apply() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
-    return Result<std::size_t>::failure(
-        error("Modell oder Befehl geändert. Reparatur neu öffnen."));
+    return Result<std::size_t>::failure(error("Model or command changed. Reopen repair."));
   }
   if (!ui.previewed)
-    return Result<std::size_t>::failure(error("Zuerst eine aktuelle Reparaturvorschau prüfen"));
+    return Result<std::size_t>::failure(error("Check a current repair preview first"));
   auto valid = preview();
   if (!valid)
     return valid;

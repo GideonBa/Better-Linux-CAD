@@ -145,7 +145,7 @@ TEST_CASE("Measure distance selects displayed faces and leaves document history 
   CHECK(tools.result()->overlay_points[0].z == Catch::Approx(0));
   CHECK(tools.result()->overlay_points[1].z == Catch::Approx(20));
   button(window, "copy").click();
-  CHECK(QApplication::clipboard()->text() == "Abstand: 20 mm");
+  CHECK(QApplication::clipboard()->text() == "Distance: 20 mm");
   CHECK(snapshot(window) == before);
 
   CHECK_FALSE(window.session().dirty());

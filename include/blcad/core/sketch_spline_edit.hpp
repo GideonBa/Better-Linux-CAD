@@ -175,33 +175,40 @@ public:
       return Result<std::size_t>::failure(
           Error::validation(sketch_.value(), "invalid spline control-point edit target"));
 
-    auto points = control_points(segments_[segment_index]);
+    auto candidate_segments = segments_;
+    const bool closed =
+        same_point(candidate_segments.front().start(), candidate_segments.back().end());
+    auto points = control_points(candidate_segments[segment_index]);
     points[point_index] = position;
     auto replacement = SplineSegment::create_cubic_bezier(
-        segments_[segment_index].id(), points[0], points[1], points[2], points[3],
-        segments_[segment_index].weights());
+        candidate_segments[segment_index].id(), points[0], points[1], points[2], points[3],
+        candidate_segments[segment_index].weights());
     if (replacement.has_error()) return Result<std::size_t>::failure(replacement.error());
-    segments_[segment_index] = std::move(replacement.value());
+    candidate_segments[segment_index] = std::move(replacement.value());
 
     // Preserve explicit chain connectivity when an endpoint is moved.
-    if (point_index == 0U && segment_index > 0U) {
-      auto previous = control_points(segments_[segment_index - 1U]);
+    if (point_index == 0U && (segment_index > 0U || closed)) {
+      const auto previous_index =
+          segment_index > 0U ? segment_index - 1U : candidate_segments.size() - 1U;
+      auto previous = control_points(candidate_segments[previous_index]);
       previous[3] = position;
       auto updated = SplineSegment::create_cubic_bezier(
-          segments_[segment_index - 1U].id(), previous[0], previous[1], previous[2], previous[3],
-          segments_[segment_index - 1U].weights());
+          candidate_segments[previous_index].id(), previous[0], previous[1], previous[2],
+          previous[3], candidate_segments[previous_index].weights());
       if (updated.has_error()) return Result<std::size_t>::failure(updated.error());
-      segments_[segment_index - 1U] = std::move(updated.value());
+      candidate_segments[previous_index] = std::move(updated.value());
     }
-    if (point_index == 3U && segment_index + 1U < segments_.size()) {
-      auto next = control_points(segments_[segment_index + 1U]);
+    if (point_index == 3U && (segment_index + 1U < candidate_segments.size() || closed)) {
+      const auto next_index = (segment_index + 1U) % candidate_segments.size();
+      auto next = control_points(candidate_segments[next_index]);
       next[0] = position;
-      auto updated = SplineSegment::create_cubic_bezier(
-          segments_[segment_index + 1U].id(), next[0], next[1], next[2], next[3],
-          segments_[segment_index + 1U].weights());
+      auto updated = SplineSegment::create_cubic_bezier(candidate_segments[next_index].id(),
+                                                        next[0], next[1], next[2], next[3],
+                                                        candidate_segments[next_index].weights());
       if (updated.has_error()) return Result<std::size_t>::failure(updated.error());
-      segments_[segment_index + 1U] = std::move(updated.value());
+      candidate_segments[next_index] = std::move(updated.value());
     }
+    segments_ = std::move(candidate_segments);
     return Result<std::size_t>::success(segment_index);
   }
 
@@ -216,7 +223,12 @@ public:
         (index + 1U < fit_points_.size() && same_point(position, fit_points_[index + 1U])))
       return Result<std::size_t>::failure(
           Error::validation(sketch_.value(), "consecutive fit spline points must be distinct"));
+    const bool closed = same_point(fit_points_.front(), fit_points_.back());
     fit_points_[index] = position;
+    if (closed && index == 0U)
+      fit_points_.back() = position;
+    if (closed && index + 1U == fit_points_.size())
+      fit_points_.front() = position;
     return rebuild_from_fit_points();
   }
 

@@ -62,6 +62,8 @@ struct GuiBrowserNode {
   std::vector<GuiPropertyValue> properties;
   std::vector<GuiBrowserNode> children;
   std::string viewport_semantic_id;
+  std::string visibility_semantic_id;
+  bool presentation_visible{true};
 };
 
 class GuiDocumentBrowser {
@@ -74,6 +76,13 @@ public:
 private:
   std::vector<GuiBrowserNode> roots_;
 };
+
+// Uses persistent occurrence visibility where hierarchy traversal requires it;
+// ordinary Part presentation toggles remain transient. Showing a Core-hidden
+// Body also enables its existing persistent visibility flag.
+[[nodiscard]] Result<std::size_t> set_browser_presentation_visible(GuiDocumentSession& session,
+                                                                   const GuiBrowserNode& node,
+                                                                   bool visible);
 
 // Validates and commits only edits explicitly supported by current Core contracts.
 // The same function powers Preview (commit=false) and Apply (commit=true).

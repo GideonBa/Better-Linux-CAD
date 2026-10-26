@@ -11,13 +11,17 @@ derived recompute products.
 
 `ChamferAdapter` resolves each authored linear or circular edge against the current target solid
 using the same endpoint or circle/profile/axis invariants as Fillet Geometry. Missing or ambiguous
-topology fails explicitly.
+topology fails explicitly. Current-result curved and post-finishing edges also accept the
+producer-anchored witness contract in `docs/part-edge-treatment-intent-mvp6.md`; changed geometry
+requires reselection rather than an incidental edge ordinal.
 
 `EqualDistance` is symmetric and requires no side identity. The asymmetric modes use a stable
 derived reference-side convention:
 
 - linear edge names prioritize their semantic Top, Bottom, Front, or Back face;
-- circular hole rims require the uniquely adjacent planar face.
+- circular hole rims require the uniquely adjacent planar face;
+- current-result witnesses prefer adjacent planar faces, then order eligible sides by surface
+  centroid and area; a tied geometric key rejects ambiguous side selection.
 
 The first distance, or the distance in `DistanceAngle`, is measured on that reference face. The
 angle is converted from persistent degrees to OCCT radians only at execution. No traversal index,

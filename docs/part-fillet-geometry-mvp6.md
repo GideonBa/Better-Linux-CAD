@@ -16,8 +16,10 @@ source/opposite offset. Unique OCCT edges are collected in authored order and pa
 
 Missing and ambiguous matches fail explicitly. The adapter also rejects an empty target, a
 non-positive/non-finite radius, an incomplete OCCT operation, and an invalid or non-solid result.
-Variable radii, setbacks, corner-management policies, and arbitrary raw edge picks remain
-deferred.
+Current-result picks use producer-anchored `ResultEdgeReference` witnesses, including curved and
+post-finishing edges. The complete curve witness must identify exactly one edge on the current Body;
+changed or ambiguous geometry asks for reselection. Witnesses retain no traversal ordinal or BRep.
+Variable radii, setbacks and corner-management policies remain deferred.
 
 ## Recompute and transaction boundary
 
@@ -40,3 +42,8 @@ broken-reference failure, excessive-radius failure, and transactional cache pres
 
 Block 70 Chamfer Geometry is implemented in `docs/part-chamfer-geometry-mvp6.md`. Block 71
 ShellFeature Core intent and JSON is the next boundary.
+
+The October 2026 `[curved-finishing]` / `[curved-union-workflow]` regressions cover a circular
+extrusion rim, subsequent finishing, translated-producer JSON replay, exact history and Save/Open.
+The same witness authority supports eligible spline boundary edges; OCCT still rejects infeasible
+radii or invalid corner geometry without publishing a partial result.

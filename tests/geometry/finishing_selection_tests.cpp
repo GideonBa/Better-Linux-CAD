@@ -1,3 +1,4 @@
+#include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
@@ -6,6 +7,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <set>
 
 using namespace blcad;
@@ -106,7 +109,119 @@ TEST_CASE("Finishing selection omits edges removed by a later feature on the cur
                                                   PartFeatureInputRole::FilletEdge);
   REQUIRE(targets);
   CHECK_FALSE(targets.value().empty());
-  CHECK(targets.value().size() < 12U);
+  CHECK(std::any_of(targets.value().begin(), targets.value().end(), [](const auto& target) {
+    return std::get<EdgeReference>(target.reference).source_kind() ==
+           PartFeatureInputSourceKind::ResultEdge;
+  }));
   for (const auto& target : targets.value())
     CHECK_FALSE(target.semantic_id.ends_with("top_front"));
+}
+
+TEST_CASE(
+    "Curved current-result rims support fillet then chamfer and fail closed after shape changes",
+    "[geometry][finishing-selection][result-edge][curved-finishing]") {
+  auto part = PartDocument::create(DocumentId("cylinder"), "Cylinder").value();
+  REQUIRE(part.add_datum_plane(DatumPlane::xy().value()));
+  for (const auto& [id, value] : {std::pair{"diameter", 20.0}, {"depth", 8.0}, {"radius", 1.0}})
+    REQUIRE(part.add_parameter(
+        Parameter::create_length(ParameterId(id), id, Quantity::length_mm(value).value()).value()));
+  auto sketch = Sketch::create(SketchId("circle"), "Circle", DatumPlaneId("datum.xy")).value();
+  REQUIRE(sketch.add_profile(
+      CircleProfile::create(ProfileId("profile"), ParameterId("diameter")).value()));
+  REQUIRE(part.add_sketch(sketch));
+  REQUIRE(part.add_body(Body::create(BodyId("body"), "Body", BodyKind::Solid).value()));
+  REQUIRE(part.add_feature(Feature::create_additive_extrude(FeatureId("extrude"), "Cylinder",
+                                                            sketch.id(), ParameterId("depth"))
+                               .value()
+                               .with_profile(ProfileId("profile"))
+                               .value()
+                               .with_body_result_context(FeatureBodyResultContext::create(
+                                                             FeatureBodyOperationMode::NewBody,
+                                                             std::nullopt, BodyId("body"))
+                                                             .value())
+                               .value()));
+  auto cache = ShapeCache::create(ShapeCacheId("cylinder.cache")).value();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  SECTION("original cylinder result") {}
+  SECTION("translated cylinder result") {
+    REQUIRE(part.add_body_transform(
+        BodyTransform::create_translate(BodyTransformId("translate"), BodyId("body"),
+                                        BodyTransformCoordinateSpace::World, std::nullopt,
+                                        {3, 2, 0}, false, false)
+            .value()));
+    REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  }
+  auto targets = FinishingSelectionBuilder::build(part, cache, BodyId("body"),
+                                                  PartFeatureInputRole::FilletEdge);
+  REQUIRE(targets);
+  auto top = std::find_if(targets.value().begin(), targets.value().end(), [](const auto& target) {
+    const auto* witness =
+        std::get_if<ResultEdgeReference>(&std::get<EdgeReference>(target.reference).source());
+    return witness && witness->curve_type() == 1 && target.anchor.z > 7;
+  });
+  REQUIRE(top != targets.value().end());
+  REQUIRE(part.add_fillet_feature(
+      FilletFeature::create(FeatureId("fillet"), "Round rim", BodyId("body"),
+                            {std::get<EdgeReference>(top->reference)}, ParameterId("radius"))
+          .value()));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  targets = FinishingSelectionBuilder::build(part, cache, BodyId("body"),
+                                             PartFeatureInputRole::ChamferEdge);
+  REQUIRE(targets);
+  auto bottom =
+      std::find_if(targets.value().begin(), targets.value().end(), [](const auto& target) {
+        const auto* witness =
+            std::get_if<ResultEdgeReference>(&std::get<EdgeReference>(target.reference).source());
+        return witness && witness->curve_type() == 1 && target.anchor.z < 0.1;
+      });
+  REQUIRE(bottom != targets.value().end());
+  CHECK(std::get<EdgeReference>(bottom->reference).source_node_id() == "fillet");
+  REQUIRE(part.add_chamfer_feature(
+      ChamferFeature::create_equal_distance(FeatureId("chamfer"), "Bevel rim", BodyId("body"),
+                                            {std::get<EdgeReference>(bottom->reference)},
+                                            ParameterId("radius"))
+          .value()));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  const auto volume =
+      RectangleExtrusionAdapter{}.summarize(*cache.find_body_shape(BodyId("body"))).volume_mm3;
+  CHECK(volume < 800 * std::acos(-1.0));
+  CHECK(volume > 700 * std::acos(-1.0));
+  double final_volume = volume;
+  SECTION("finished result alone") {}
+  SECTION("Union consumes the finished result") {
+    REQUIRE(part.add_body(Body::create(BodyId("tool"), "Union tool", BodyKind::Solid).value()));
+    REQUIRE(part.add_feature(
+        Feature::create_additive_extrude(FeatureId("tool.extrude"), "Tool cylinder", sketch.id(),
+                                         ParameterId("depth"))
+            .value()
+            .with_profile(ProfileId("profile"))
+            .value()
+            .with_body_result_context(
+                FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody, std::nullopt,
+                                                 BodyId("tool"))
+                    .value())
+            .value()));
+    REQUIRE(part.add_body_boolean_feature(
+        BodyBooleanFeature::create(FeatureId("union"), BodyBooleanOperation::Add, BodyId("body"),
+                                   {BodyId("tool")}, BodyBooleanResultMode::ModifyTarget,
+                                   std::nullopt, false)
+            .value()));
+    REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+    const auto summary =
+        RectangleExtrusionAdapter{}.summarize(*cache.find_body_shape(BodyId("body")));
+    CHECK(summary.solid_count == 1);
+    CHECK(summary.volume_mm3 > volume);
+    final_volume = summary.volume_mm3;
+  }
+  const auto json = serialize_part_document_to_json(part).value();
+  auto restored = deserialize_part_document_from_json(json);
+  REQUIRE(restored);
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(restored.value(), cache));
+  CHECK(RectangleExtrusionAdapter{}.summarize(*cache.find_body_shape(BodyId("body"))).volume_mm3 ==
+        Catch::Approx(final_volume));
+  REQUIRE(restored.value().set_parameter_value(ParameterId("diameter"),
+                                               Quantity::length_mm(22).value()));
+  auto changed = GeometryRecomputeExecutor{}.execute_document(restored.value(), cache);
+  REQUIRE_FALSE(changed);
+  CHECK(changed.error().message().find("select the edge again") != std::string::npos);
 }

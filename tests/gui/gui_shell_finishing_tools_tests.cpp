@@ -339,3 +339,178 @@ TEST_CASE("Changing a finishing Body clears old picks and applies only to the ne
   REQUIRE(window.undo());
   CHECK(snapshot(window) == before);
 }
+
+TEST_CASE("Circular rim finishing and overlapping Body Union form a reversible saved workflow",
+          "[gui][shell-finishing][shell-body][curved-finishing][curved-union-workflow]") {
+  ShellWindow window;
+  REQUIRE(window.new_part(QStringLiteral("Rounded union")));
+  window.resize(1380, 900);
+  window.show();
+  const auto cylinder = [&](Point2 center, double radius) {
+    REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
+    REQUIRE(window.create_sketch_on_selection());
+    REQUIRE(window.sketch_tools().begin_tool(GuiSketchCreateTool::CenterRadiusCircle));
+    REQUIRE(window.sketch_tools().add_pick(center));
+    REQUIRE(window.sketch_tools().add_pick({center.x + radius, center.y}));
+    REQUIRE(window.finish_active_sketch());
+    REQUIRE(window.feature_tools().begin_extrude());
+    REQUIRE(window.feature_tools().set_numeric_value(8));
+    REQUIRE(window.feature_tools().apply());
+    window.viewport().fit_all();
+    qApp->processEvents();
+  };
+  cylinder({20, 0}, 10);
+  auto& tools = window.feature_tools();
+  const auto pick_circle = [&](double z, bool native) {
+    const auto built = geometry::FinishingSelectionBuilder::build(
+        *window.session().part_document(), *window.session().part_shape_cache(), BodyId("body.1"),
+        tools.command() == Command::Fillet ? PartFeatureInputRole::FilletEdge
+                                           : PartFeatureInputRole::ChamferEdge);
+    REQUIRE(built);
+    const auto& targets = built.value();
+    const auto found = std::find_if(targets.begin(), targets.end(), [&](const auto& target) {
+      const auto* witness =
+          std::get_if<ResultEdgeReference>(&std::get<EdgeReference>(target.reference).source());
+      return witness && witness->curve_type() == 1 && std::abs(target.anchor.z - z) < 0.01;
+    });
+    REQUIRE(found != targets.end());
+    if (native && QApplication::platformName() == QStringLiteral("xcb")) {
+      const auto screen = window.viewport().model_to_screen({20, 10, z});
+      REQUIRE(screen);
+      const QPointF local(screen.value().x, screen.value().y);
+      for (const auto type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
+        QMouseEvent event(
+            type, local, window.viewport().mapToGlobal(local.toPoint()), Qt::LeftButton,
+            type == QEvent::MouseButtonPress ? Qt::LeftButton : Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(&window.viewport(), &event);
+        qApp->processEvents();
+      }
+      REQUIRE(tools.finishing_target_editor().selectedItems().size() == 1);
+    } else
+      REQUIRE(window.viewport().select_semantic(found->semantic_id));
+  };
+  const auto before_round = snapshot(window);
+  REQUIRE(tools.begin_finishing(Command::Fillet));
+  pick_circle(8, true);
+  REQUIRE(tools.set_numeric_value(1));
+  REQUIRE(window.viewport().feature_preview_active());
+  CHECK(snapshot(window) == before_round);
+  capture(window, QStringLiteral("curved-rim-fillet-preview"));
+  REQUIRE(tools.apply());
+  const auto rounded = snapshot(window);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before_round);
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == rounded);
+  REQUIRE(tools.begin_finishing(Command::Chamfer));
+  pick_circle(0, false);
+  REQUIRE(tools.set_numeric_value(0.5));
+  REQUIRE(tools.apply());
+  REQUIRE(window.session().part_document()->fillet_features().size() == 1);
+  REQUIRE(window.session().part_document()->chamfer_features().size() == 1);
+  cylinder({30, 0}, 6);
+  const auto before_union = snapshot(window);
+  REQUIRE(tools.begin_body_operation(Command::BodyBoolean));
+  REQUIRE(tools.boolean_operation_editor().currentIndex() == 0);
+  tools.boolean_target_editor().setCurrentIndex(tools.boolean_target_editor().findData("body.1"));
+  REQUIRE(window.viewport().select_semantic("body/body.2"));
+  REQUIRE(window.viewport().feature_preview_active());
+  CHECK(snapshot(window) == before_union);
+  capture(window, QStringLiteral("curved-bodies-union-preview"));
+  REQUIRE(tools.apply());
+  const auto* shape = window.session().part_shape_cache()->find_body_shape(BodyId("body.1"));
+  REQUIRE(shape);
+  const auto summary = geometry::RectangleExtrusionAdapter{}.summarize(*shape);
+  CHECK(summary.solid_count == 1);
+  CHECK(summary.volume_mm3 > 2500);
+  CHECK(summary.volume_mm3 < 3450);
+  CHECK_FALSE(window.session().part_shape_cache()->find_body_shape(BodyId("body.2")));
+  const auto united = snapshot(window);
+  auto restored_union = deserialize_part_document_from_json(united);
+  INFO((restored_union ? "Union history is readable" : restored_union.error().message()));
+  REQUIRE(restored_union);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before_union);
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == united);
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  REQUIRE(window.save_to(directory.filePath("rounded-union.blcad.json")));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(directory.filePath("rounded-union.blcad.json").toStdString()));
+  CHECK(serialize_part_document_to_json(*reopened.part_document()).value() == united);
+  CHECK(geometry::RectangleExtrusionAdapter{}
+            .summarize(*reopened.part_shape_cache()->find_body_shape(BodyId("body.1")))
+            .volume_mm3 == Catch::Approx(summary.volume_mm3));
+}
+
+TEST_CASE(
+    "A rectangle around an editable rational ellipse extrudes only the selected outer material",
+    "[gui][shell-finishing][sketch-curved-regions][nested-spline-region]") {
+  ShellWindow window;
+  REQUIRE(window.new_part(QStringLiteral("Spline aperture")));
+  REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
+  REQUIRE(window.create_sketch_on_selection());
+  auto& sketch_tools = window.sketch_tools();
+  REQUIRE(sketch_tools.begin_tool(GuiSketchCreateTool::CornerRectangle));
+  REQUIRE(sketch_tools.add_pick({-20, -15}));
+  REQUIRE(sketch_tools.add_pick({20, 15}));
+  REQUIRE(sketch_tools.begin_tool(GuiSketchCreateTool::Ellipse));
+  REQUIRE(sketch_tools.add_pick({0, 0}));
+  REQUIRE(sketch_tools.add_pick({8, 0}));
+  REQUIRE(sketch_tools.add_pick({0, 4}));
+  const auto sketch_id = *window.active_sketch();
+  const auto authored = *window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(authored.closed_profiles().size() == 1);
+  REQUIRE(authored.arc_closed_profiles().size() == 1);
+  const auto outer_id = authored.closed_profiles().front().id();
+  const auto inner_id = authored.arc_closed_profiles().front().id();
+  REQUIRE(window.finish_active_sketch());
+  window.resize(1360, 900);
+  window.show();
+  window.viewport().fit_all();
+  qApp->processEvents();
+  const auto before = snapshot(window);
+  auto& tools = window.feature_tools();
+  REQUIRE(tools.select_profile(sketch_id, inner_id));
+  REQUIRE(tools.begin_extrude());
+  REQUIRE(tools.set_numeric_value(6));
+  REQUIRE(window.viewport().feature_preview_active());
+  tools.cancel();
+  CHECK(snapshot(window) == before);
+  REQUIRE(tools.select_profile(sketch_id, outer_id));
+  REQUIRE(tools.begin_extrude());
+  REQUIRE(tools.set_numeric_value(6));
+  REQUIRE(window.viewport().feature_preview_active());
+  capture(window, QStringLiteral("nested-spline-outer-material-preview"));
+  CHECK(snapshot(window) == before);
+  REQUIRE(tools.apply());
+  const auto& part = *window.session().part_document();
+  const auto* shape =
+      window.session().part_shape_cache()->find_body_shape(part.bodies().front().id());
+  REQUIRE(shape);
+  const auto volume = geometry::RectangleExtrusionAdapter{}.summarize(*shape).volume_mm3;
+  CHECK(volume == Catch::Approx((40 * 30 - std::acos(-1.0) * 8 * 4) * 6).epsilon(1e-8));
+  const auto* unchanged = part.find_sketch(sketch_id);
+  REQUIRE(unchanged);
+  for (const auto& spline : authored.spline_segments()) {
+    const auto* actual = unchanged->find_spline_segment(spline.id());
+    REQUIRE(actual);
+    CHECK(actual->curve().poles == spline.curve().poles);
+    CHECK(actual->weights() == spline.weights());
+  }
+  const auto after = snapshot(window);
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == after);
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  REQUIRE(window.save_to(directory.filePath("spline-aperture.blcad.json")));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(directory.filePath("spline-aperture.blcad.json").toStdString()));
+  CHECK(serialize_part_document_to_json(*reopened.part_document()).value() == after);
+  CHECK(geometry::RectangleExtrusionAdapter{}
+            .summarize(*reopened.part_shape_cache()->find_body_shape(part.bodies().front().id()))
+            .volume_mm3 == Catch::Approx(volume));
+}

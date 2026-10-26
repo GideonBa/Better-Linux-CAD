@@ -153,14 +153,27 @@ Candidates are processed in lexicographic topology-id order.
 
 ### Connectivity-derived point sharing
 
-Migration derives shared point identity only from existing explicit ordered profile connectivity:
+Migration derives shared point identity from explicit ordered profile connectivity and the persisted
+numbered segment family of one fitted spline:
 
 ```text
 ClosedProfile
 ArcClosedProfile
 CompositeClosedProfile outer contour
 CompositeClosedProfile each inner contour
+Fitted spline <base>, <base>.fit.2, ... (or <base>.fit.1, <base>.fit.2, ...)
 ```
+
+Fitted-family junctions share an identity only when consecutive persisted endpoints agree within
+`1e-9`. Unrelated coincident curves retain independent identities. These shared junctions survive
+legacy materialization and Save/Open, so dragging an internal fit point cannot tear the chain.
+
+Every migrated sketch also includes immutable `reference/origin` and `reference/axis/x|y` topology.
+The origin has position `(0,0)`; each axis is a reference Line between fixed unit endpoints.
+Reference flags keep them out of solver variables and drag handles. They can be semantic targets
+for coincidence, point-on-object, parallel, symmetry and distance without creating authored
+construction geometry. They are regenerated on materialization and are excluded from characteristic
+length estimation, preserving conditioning for sketches far from the origin.
 
 For each supported editable curve in an ordered contour, current traversal end is paired with next
 traversal start, including last-to-first closure. `resolve_sketch_contour` derives traversal direction
@@ -379,6 +392,22 @@ Block-109 consumer proof is documented in `docs/sketch-planar-constraint-solver-
 ## Next boundary
 
 Block 111 is implemented (`docs/gui-sketch-basic-creation-mvp8.md`). Basic creation expands into
-ordinary lines plus explicit ordered closed profiles, so shared corner identity still derives only
-from profile connectivity under this contract; snap positions seed coordinates, never identity.
+ordinary lines plus explicit ordered closed profiles, so their shared corner identity derives
+from authored profile connectivity; snap positions seed coordinates, never identity. Canonical
+fitted-spline family connectivity is additionally recognized as described below.
 Block 112 extends the entity kinds for circles, arcs, ellipses, and slots.
+
+Raw closed fitted families share their closing point even before Finish Sketch has materialized a
+profile. This requires canonical consecutive segment numbering, one unambiguous first segment,
+connected internal junctions and coincident final/first endpoints. Gaps, disconnected numbered chains
+and unrelated coincident curves do not acquire an inferred seam. Generic solver-backed dragging,
+materialization and migration retain that shared identity.
+
+When opening older constraint/dimension sidecars, the session uses the explicit migration report to
+replace missing legacy point usages with their canonical point IDs. It preserves intent identity,
+family, source, mode, parameter and annotation placement. A Coincident whose two point usages now
+refer to the same topological point is already satisfied by connectivity and can be removed; other
+invalid or unknown references still fail atomically. Saving writes the canonical sidecars without a
+new schema version. `[closed-spline-seam-regression]` and `[spline-sidecar-migration]` cover these
+compatibility boundaries; the native-capable raw closed-spline workflow exercises the actual seam
+before Finish and after Save/Open/re-entry.

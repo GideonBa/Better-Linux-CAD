@@ -22,17 +22,17 @@ QString title(ShellFeatureTools::Command command) {
   using C = ShellFeatureTools::Command;
   switch (command) {
   case C::BoundarySurface:
-    return QStringLiteral("Begrenzungsfläche");
+    return QStringLiteral("Boundary Surface");
   case C::FillSurface:
-    return QStringLiteral("Füllfläche");
+    return QStringLiteral("Fill Surface");
   case C::TrimSurface:
-    return QStringLiteral("Fläche trimmen");
+    return QStringLiteral("Trim Surface");
   case C::ExtendSurface:
-    return QStringLiteral("Fläche erweitern");
+    return QStringLiteral("Extend Surface");
   case C::SurfaceStitch:
-    return QStringLiteral("Flächen vernähen");
+    return QStringLiteral("Stitch Surfaces");
   case C::ClosedShellToSolid:
-    return QStringLiteral("Hülle zu Volumen");
+    return QStringLiteral("Shell to Solid");
   default:
     return {};
   }
@@ -247,14 +247,14 @@ void ShellFeatureTools::build_surface_controls(QWidget* panel) {
   column->addLayout(form);
   surface_pick_ = new QComboBox(surface_controls_);
   surface_pick_->setObjectName("blcad.surface.pick_role");
-  form->addRow(QStringLiteral("Modellklick wählt"), surface_pick_);
+  form->addRow(QStringLiteral("Viewport Click Selects"), surface_pick_);
   surface_target_ = new QComboBox(surface_controls_);
   surface_target_->setObjectName("blcad.surface.target");
-  form->addRow(QStringLiteral("Fläche / Hülle"), surface_target_);
+  form->addRow(QStringLiteral("Surface / Shell"), surface_target_);
   surface_source_ = new QComboBox(surface_controls_);
   surface_source_->setObjectName("blcad.surface.source");
-  form->addRow(QStringLiteral("Kurve / Kontur"), surface_source_);
-  surface_add_ = new QPushButton(QStringLiteral("Zur Liste hinzufügen"), surface_controls_);
+  form->addRow(QStringLiteral("Curve / Contour"), surface_source_);
+  surface_add_ = new QPushButton(QStringLiteral("Add to List"), surface_controls_);
   surface_add_->setObjectName("blcad.surface.add");
   form->addRow(surface_add_);
   surface_order_ = new QListWidget(surface_controls_);
@@ -267,9 +267,9 @@ void ShellFeatureTools::build_surface_controls(QWidget* panel) {
   auto* buttons = new QHBoxLayout(surface_order_buttons_);
   buttons->setContentsMargins(0, 0, 0, 0);
   for (int direction : {-1, 1, 0}) {
-    auto* button = new QPushButton(direction < 0   ? QStringLiteral("Hoch")
-                                   : direction > 0 ? QStringLiteral("Runter")
-                                                   : QStringLiteral("Entfernen"),
+    auto* button = new QPushButton(direction < 0   ? QStringLiteral("Up")
+                                   : direction > 0 ? QStringLiteral("Down")
+                                                   : QStringLiteral("Remove"),
                                    surface_order_buttons_);
     button->setObjectName(direction < 0   ? "blcad.surface.move_up"
                           : direction > 0 ? "blcad.surface.move_down"
@@ -328,7 +328,7 @@ Result<std::size_t> ShellFeatureTools::begin_surface(Command command) {
   if (active() || session_.task().active() || window_.active_sketch() || !part ||
       session_.workspace() != GuiWorkspace::Part || !session_.part_shape_cache() ||
       title(command).isEmpty())
-    return fail("Flächenbefehl benötigt ein Bauteil ohne aktiven Befehl");
+    return fail("Surface command requires a part without an active command");
   surface_targets_.clear();
   surface_inputs_ = surface_inputs(&surface_targets_);
   const QSignalBlocker source(surface_source_), target(surface_target_), pick(surface_pick_),
@@ -337,8 +337,8 @@ Result<std::size_t> ShellFeatureTools::begin_surface(Command command) {
   surface_target_->clear();
   surface_order_->clear();
   surface_pick_->clear();
-  surface_source_->addItem(QStringLiteral("Bitte wählen"), -1);
-  surface_target_->addItem(QStringLiteral("Bitte wählen"), -1);
+  surface_source_->addItem(QStringLiteral("Select"), -1);
+  surface_target_->addItem(QStringLiteral("Select"), -1);
   for (std::size_t i = 0; i < surface_inputs_.size(); ++i) {
     const auto& input = surface_inputs_[i];
     if (input.surface && (command != Command::ClosedShellToSolid ||
@@ -372,14 +372,14 @@ Result<std::size_t> ShellFeatureTools::begin_surface(Command command) {
        surface_source_->count() < 2) ||
       (stitch && surface_target_->count() < 3)) {
     surface_targets_.clear();
-    return fail("Zuerst passende Pfade, Flächen oder eine geschlossene Hülle erstellen");
+    return fail("First create suitable paths, surfaces, or a closed shell");
   }
-  surface_pick_->addItem(curves   ? QStringLiteral("Kurve hinzufügen")
-                         : stitch ? QStringLiteral("Fläche hinzufügen")
-                                  : QStringLiteral("Zielfläche / Hülle"));
+  surface_pick_->addItem(curves   ? QStringLiteral("Add Curve")
+                         : stitch ? QStringLiteral("Add Surface")
+                                  : QStringLiteral("Target Surface / Shell"));
   if (command == Command::TrimSurface || command == Command::ExtendSurface)
-    surface_pick_->addItem(command == Command::TrimSurface ? QStringLiteral("Trimmkontur")
-                                                           : QStringLiteral("Außenkante"));
+    surface_pick_->addItem(command == Command::TrimSurface ? QStringLiteral("Trim Contour")
+                                                           : QStringLiteral("Outer Edge"));
   for (std::size_t n = 1;; ++n) {
     const auto suffix = std::to_string(n);
     surface_feature_ = FeatureId("feature.surface." + suffix);
@@ -391,7 +391,7 @@ Result<std::size_t> ShellFeatureTools::begin_surface(Command command) {
         std::any_of(part->bodies().begin(), part->bodies().end(),
                     [&](const auto& b) { return b.name() == surface_name_; }) ||
         std::any_of(part->parameters().begin(), part->parameters().end(),
-                    [&](const auto& p) { return p.name() == surface_name_ + " Maß"; }))
+                    [&](const auto& p) { return p.name() == surface_name_ + " Size"; }))
       continue;
     break;
   }
@@ -402,7 +402,7 @@ Result<std::size_t> ShellFeatureTools::begin_surface(Command command) {
     surface_targets_.clear();
     if (session_.task().active())
       (void)session_.task().cancel();
-    return fail("Flächenaufgabe konnte nicht gestartet werden");
+    return fail("Could not start surface task");
   }
   surface_value_ = stitch ? 0.001 : 5;
   previous_selection_mask_ = viewport_.selection_filter_mask();
@@ -416,22 +416,22 @@ Result<std::size_t> ShellFeatureTools::begin_surface(Command command) {
     form->setRowVisible(widget, curves || stitch);
   surface_hint_->setText(
       command == Command::BoundarySurface
-          ? QStringLiteral("Zwei Kurven verbinden oder drei bis vier zusammenhängende Randkurven "
-                           "schließen. Liste ziehen oder mit Hoch/Runter ordnen.")
+          ? QStringLiteral("Connect two curves or close three to four connected boundary curves. "
+                           "Drag the list or use Up/Down to reorder.")
       : command == Command::FillSurface
-          ? QStringLiteral("Einen geschlossenen Rand aus Pfaden oder Kanten in zusammenhängender "
-                           "Reihenfolge auswählen. Liste ziehen oder mit Hoch/Runter ordnen.")
+          ? QStringLiteral("Select a closed boundary of paths or edges in connected "
+                           "order. Drag the list or use Up/Down to reorder.")
       : command == Command::TrimSurface
-          ? QStringLiteral("Zielfläche und geschlossene Kontur wählen. Erhalten bleibt die Fläche "
-                           "innerhalb der Kontur.")
+          ? QStringLiteral("Select the target surface and closed contour. The surface "
+                           "inside the contour is retained.")
       : command == Command::ExtendSurface
-          ? QStringLiteral("Zielfläche und eine lineare Außenkante wählen. Den Abstand am Pfeil "
-                           "ziehen oder als Maß eingeben.")
+          ? QStringLiteral("Select the target surface and a linear outer edge. Drag the distance "
+                           "arrow or enter a value.")
       : command == Command::SurfaceStitch
-          ? QStringLiteral("Angrenzende Flächen hinzufügen und die Spalttoleranz eingeben. Eine "
-                           "geschlossene Hülle lässt sich anschließend in Volumen umwandeln.")
-          : QStringLiteral("Eine geschlossene Hülle auswählen. Offene oder mehrdeutige Hüllen "
-                           "zeigen eine Fehlermeldung vor dem Anwenden."));
+          ? QStringLiteral("Add adjacent surfaces and enter the gap tolerance. A "
+                           "closed shell can then be converted to a solid.")
+          : QStringLiteral("Select a closed shell. Open or ambiguous shells "
+                           "show an error before Apply."));
   show_task_panel(title(command), QStringLiteral("mm"), surface_value_);
   window_.refresh_feature_selection_scene();
   update_surface_pick_scope();
@@ -445,10 +445,10 @@ Result<std::size_t> ShellFeatureTools::append_surface_input(int choice) {
   if (!surface() || (!curves && command_ != Command::SurfaceStitch) || choice < 0 ||
       static_cast<std::size_t>(choice) >= surface_inputs_.size() ||
       (curves ? !surface_inputs_[choice].boundary : !surface_inputs_[choice].surface))
-    return fail("Ungültiges Flächenelement");
+    return fail("Invalid surface element");
   for (int row = 0; row < surface_order_->count(); ++row)
     if (surface_order_->item(row)->data(Qt::UserRole).toInt() == choice)
-      return fail("Element ist bereits in der Liste");
+      return fail("Element is already in the list");
   auto* item =
       new QListWidgetItem(QString::fromStdString(surface_inputs_[choice].label), surface_order_);
   item->setData(Qt::UserRole, choice);
@@ -475,14 +475,14 @@ Result<std::size_t> ShellFeatureTools::rebuild_surface_controller() {
                : nullptr;
   };
   const auto *target = input(surface_target_), *source = input(surface_source_);
-  Result<std::size_t> begun = fail("Passende Zielfläche und Kontur auswählen");
+  Result<std::size_t> begun = fail("Select a suitable target surface and contour");
   std::vector<Parameter> parameters;
   if (surface_scalar()) {
     auto quantity = Quantity::length_mm(surface_value_, surface_parameter_.value());
     if (!quantity)
       return Result<std::size_t>::failure(quantity.error());
     auto parameter =
-        Parameter::create_length(surface_parameter_, surface_name_ + " Maß", quantity.value());
+        Parameter::create_length(surface_parameter_, surface_name_ + " Size", quantity.value());
     if (!parameter)
       return Result<std::size_t>::failure(parameter.error());
     parameters.push_back(std::move(parameter.value()));

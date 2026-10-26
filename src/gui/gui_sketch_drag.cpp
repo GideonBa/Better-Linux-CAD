@@ -121,6 +121,8 @@ build_handles(const Sketch& sketch, const SketchTopology& topology) {
   };
 
   for (const auto& entity : topology.entities()) {
+    if (entity.id().starts_with("reference/axis/"))
+      continue;
     if (entity.kind() == SketchTopologyEntityKind::Point) {
       append_endpoint(entity.points()[0]); // free sketch point: draggable like an endpoint
     } else if (entity.kind() == SketchTopologyEntityKind::Line) {

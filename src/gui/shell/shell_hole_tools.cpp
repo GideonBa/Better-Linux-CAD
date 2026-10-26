@@ -42,7 +42,7 @@ Result<double> number(const QLineEdit& field) {
   const auto parsed = std::from_chars(source.data(), source.data() + source.size(), value);
   if (parsed.ec != std::errc() || parsed.ptr != source.data() + source.size() ||
       !std::isfinite(value))
-    return Result<double>::failure(error("Endliche Zahlen ohne Einheit eingeben (Dezimalpunkt)."));
+    return Result<double>::failure(error("Enter finite numbers without units (decimal point)."));
   return Result<double>::success(value);
 }
 // The retained SubtractiveExtrude contract requires a Feature from the Extrude
@@ -119,7 +119,7 @@ struct ShellHoleTools::Impl {
     const auto& session = window.session();
     return active && session.part_document() && session.derived_results_fresh() &&
            !session.reference_repair_mode() && !window.active_sketch() &&
-           session.task().command_id() == task_id && session.presentation_revision() == revision;
+           session.task().command_id() == task_id && session.model_revision() == revision;
   }
   std::string id(std::string_view kind, std::string_view suffix = {}) const {
     return std::string(kind) + ".hole." + std::to_string(index) + std::string(suffix);
@@ -142,7 +142,7 @@ struct ShellHoleTools::Impl {
     }
     angle->setEnabled(circular);
     summary->setText(
-        QStringLiteral("Durch alles entlang der Ebenennormalen. Vorschau prüfen, dann anwenden."));
+        QStringLiteral("Through all along the plane normal. Check the preview, then apply."));
   }
   void select_binding(Input& input) {
     if (input.was_local)
@@ -159,7 +159,7 @@ struct ShellHoleTools::Impl {
                    : QString::number(parameter->value().millimeters(), 'g', 17))
             : input.local);
     input.value->setToolTip(
-        parameter && parameter->formula() ? "Formel: " + text(*parameter->formula()) : QString());
+        parameter && parameter->formula() ? "Formula: " + text(*parameter->formula()) : QString());
     loading = false;
     edited();
   }
@@ -170,16 +170,16 @@ struct ShellHoleTools::Impl {
           window.session().part_document()->find_parameter(ParameterId(selected.toStdString()));
       if (!parameter || parameter->type() != input.type)
         return Result<ParameterId>::failure(
-            error("Parameter muss existieren und den angezeigten Typ besitzen."));
+            error("Parameter must exist and have the displayed type."));
       if (input.type == ParameterType::Count && parameter->value().count_value() > 1000)
-        return Result<ParameterId>::failure(error("Lochkreis unterstützt 1 bis 1000 Bohrungen."));
+        return Result<ParameterId>::failure(error("Bolt circle supports 1 to 1000 holes."));
       return Result<ParameterId>::success(parameter->id());
     }
     const auto parsed = number(*input.value);
     if (!parsed)
       return Result<ParameterId>::failure(parsed.error());
     if (input.type == ParameterType::Count && parsed.value() > 1000)
-      return Result<ParameterId>::failure(error("Lochkreis unterstützt 1 bis 1000 Bohrungen."));
+      return Result<ParameterId>::failure(error("Bolt circle supports 1 to 1000 holes."));
     const ParameterId parameter_id(id("parameter", "." + input.suffix));
     const auto quantity = input.type == ParameterType::Count ? Quantity::count(parsed.value())
                                                              : Quantity::length_mm(parsed.value());
@@ -199,12 +199,12 @@ struct ShellHoleTools::Impl {
     const BodyId body_id(target->currentData().toString().toStdString());
     const auto* body = part.find_body(body_id);
     if (!body || !target_available(window.session(), *body) || plane->currentIndex() < 0)
-      return Result<Candidate>::failure(error(
-          "Gültigen sichtbaren Solid-Zielkörper mit Extrude-Historie und Arbeitsebene auswählen."));
+      return Result<Candidate>::failure(
+          error("Select a valid visible solid target body with extrude history and a workplane."));
     const auto feature = target_feature(part, body_id);
     const auto title = name->text().trimmed().toStdString();
     if (title.empty())
-      return Result<Candidate>::failure(error("Einen Namen eingeben."));
+      return Result<Candidate>::failure(error("Enter a name."));
     const auto x = number(*center[0]), y = number(*center[1]);
     if (!x || !y)
       return Result<Candidate>::failure(!x ? x.error() : y.error());
@@ -212,7 +212,7 @@ struct ShellHoleTools::Impl {
     const auto diameter = resolve_input(inputs[0], parameters);
     if (!diameter)
       return Result<Candidate>::failure(diameter.error());
-    auto sketch = Sketch::create(SketchId(id("sketch")), title + " Positionen",
+    auto sketch = Sketch::create(SketchId(id("sketch")), title + " Positions",
                                  DatumPlaneId(plane->currentData().toString().toStdString()));
     if (!sketch)
       return Result<Candidate>::failure(sketch.error());
@@ -261,15 +261,15 @@ struct ShellHoleTools::Impl {
 ShellHoleTools::ShellHoleTools(ShellWindow& window, ShellRibbon& ribbon, int model_tab)
     : QObject(&window), impl_(std::make_unique<Impl>(window)) {
   auto& ui = *impl_;
-  ui.action = new QAction(QStringLiteral("Bohrungen"), this);
+  ui.action = new QAction(QStringLiteral("Holes"), this);
   ui.action->setObjectName("blcad.action.hole");
-  ribbon.add_button(ribbon.add_group(model_tab, QStringLiteral("Bohrungen")), ui.action);
+  ribbon.add_button(ribbon.add_group(model_tab, QStringLiteral("Holes")), ui.action);
   connect(ui.action, &QAction::triggered, this, [this] {
     const auto result = begin();
     if (!result)
       impl_->window.report_error(result.error());
   });
-  ui.dock = new QDockWidget(QStringLiteral("Durchgangsbohrungen"), &window);
+  ui.dock = new QDockWidget(QStringLiteral("Through Holes"), &window);
   ui.dock->setObjectName("blcad.shell.hole_task");
   auto* panel = new QWidget(ui.dock);
   auto* column = new QVBoxLayout(panel);
@@ -277,11 +277,11 @@ ShellHoleTools::ShellHoleTools(ShellWindow& window, ShellRibbon& ribbon, int mod
   scroll->setWidgetResizable(true);
   auto* content = new QWidget(scroll);
   auto* layout = new QVBoxLayout(content);
-  auto* hint = new QLabel(
-      QStringLiteral("Einzelbohrung oder vollständiger Lochkreis durch den Zielkörper. "
-                     "Positionen sind lokale X/Y-Koordinaten der Arbeitsebene. Parameter bleiben "
-                     "gebunden; neue Werte werden erst mit Anwenden angelegt."),
-      content);
+  auto* hint =
+      new QLabel(QStringLiteral("Single hole or complete bolt circle through the target body. "
+                                "Positions are local workplane X/Y coordinates. Parameters remain "
+                                "bound; new values are created only on Apply."),
+                 content);
   hint->setWordWrap(true);
   layout->addWidget(hint);
   auto* form = new QFormLayout;
@@ -303,24 +303,24 @@ ShellHoleTools::ShellHoleTools(ShellWindow& window, ShellRibbon& ribbon, int mod
     return field;
   };
   ui.name = line("name", QStringLiteral("Name"));
-  ui.target = combo("target", QStringLiteral("Zielkörper"));
-  ui.plane = combo("plane", QStringLiteral("Arbeitsebene"));
-  ui.placement = combo("placement", QStringLiteral("Anordnung"));
-  ui.placement->addItem(QStringLiteral("Einzelbohrung"), false);
-  ui.placement->addItem(QStringLiteral("Lochkreis"), true);
-  ui.center[0] = line("center_x", QStringLiteral("Zentrum X (mm)"));
-  ui.center[1] = line("center_y", QStringLiteral("Zentrum Y (mm)"));
+  ui.target = combo("target", QStringLiteral("Target Body"));
+  ui.plane = combo("plane", QStringLiteral("Workplane"));
+  ui.placement = combo("placement", QStringLiteral("Layout"));
+  ui.placement->addItem(QStringLiteral("Single Hole"), false);
+  ui.placement->addItem(QStringLiteral("Bolt Circle"), true);
+  ui.center[0] = line("center_x", QStringLiteral("Center X (mm)"));
+  ui.center[1] = line("center_y", QStringLiteral("Center Y (mm)"));
   for (std::size_t i = 0; i < ui.inputs.size(); ++i) {
     auto& input = ui.inputs[i];
     input.suffix = i == 0 ? "diameter" : i == 1 ? "radius" : "count";
     input.type = i == 2 ? ParameterType::Count : ParameterType::Length;
-    const auto label = i == 0   ? QStringLiteral("Durchmesser")
-                       : i == 1 ? QStringLiteral("Lochkreisradius")
-                                : QStringLiteral("Anzahl");
+    const auto label = i == 0   ? QStringLiteral("Diameter")
+                       : i == 1 ? QStringLiteral("Bolt Circle Radius")
+                                : QStringLiteral("Count");
     input.binding = combo((input.suffix + "_binding").c_str(), label);
-    input.value = line(input.suffix.c_str(), i == 0   ? QStringLiteral("Durchmesser (mm)")
+    input.value = line(input.suffix.c_str(), i == 0   ? QStringLiteral("Diameter (mm)")
                                              : i == 1 ? QStringLiteral("Radius (mm)")
-                                                      : QStringLiteral("Anzahl (1–1000)"));
+                                                      : QStringLiteral("Count (1–1000)"));
     connect(input.binding, &QComboBox::currentIndexChanged, this, [this, i] {
       if (!impl_->loading && impl_->active) {
         if (!impl_->current()) {
@@ -331,7 +331,7 @@ ShellHoleTools::ShellHoleTools(ShellWindow& window, ShellRibbon& ribbon, int mod
       }
     });
   }
-  ui.angle = line("angle", QStringLiteral("Startwinkel (°)"));
+  ui.angle = line("angle", QStringLiteral("Start Angle (°)"));
   layout->addLayout(form);
   ui.summary = new QLabel(content);
   ui.summary->setObjectName("blcad.hole.summary");
@@ -348,9 +348,9 @@ ShellHoleTools::ShellHoleTools(ShellWindow& window, ShellRibbon& ribbon, int mod
     buttons->addWidget(result);
     return result;
   };
-  auto* preview_button = button("preview", QStringLiteral("Vorschau"));
-  ui.apply_button = button("apply", QStringLiteral("Anwenden"));
-  auto* cancel_button = button("cancel", QStringLiteral("Abbrechen"));
+  auto* preview_button = button("preview", QStringLiteral("Preview"));
+  ui.apply_button = button("apply", QStringLiteral("Apply"));
+  auto* cancel_button = button("cancel", QStringLiteral("Cancel"));
   column->addLayout(buttons);
   ui.dock->setWidget(panel);
   window.addDockWidget(Qt::RightDockWidgetArea, ui.dock);
@@ -372,8 +372,8 @@ Result<std::size_t> ShellHoleTools::begin() {
   auto& ui = *impl_;
   if (!ui.available())
     return Result<std::size_t>::failure(
-        error("Bohrungen benötigen einen aktuellen sichtbaren Solid-Körper mit Extrude-Historie "
-              "ohne aktiven Befehl/Skizzeneditor."));
+        error("Holes require a current visible solid body with extrude history "
+              "without an active command or sketch editor."));
   const auto& part = *ui.window.session().part_document();
   for (ui.index = 1;; ++ui.index) {
     bool used = false;
@@ -393,9 +393,9 @@ Result<std::size_t> ShellHoleTools::begin() {
   ui.previous_scope = ui.window.viewport().selection_semantic_scope();
   ui.previous_selection = ui.window.viewport().selected_semantic();
   ui.active = true;
-  ui.revision = ui.window.session().presentation_revision();
+  ui.revision = ui.window.session().model_revision();
   ui.loading = true;
-  ui.name->setText(QStringLiteral("Bohrungen %1").arg(ui.index));
+  ui.name->setText(QStringLiteral("Holes %1").arg(ui.index));
   ui.target->clear();
   for (const auto& body : part.bodies())
     if (target_available(ui.window.session(), body))
@@ -423,7 +423,7 @@ Result<std::size_t> ShellHoleTools::begin() {
   for (std::size_t i = 0; i < ui.inputs.size(); ++i) {
     auto& input = ui.inputs[i];
     input.binding->clear();
-    input.binding->addItem(QStringLiteral("Neuer Wert"), QString());
+    input.binding->addItem(QStringLiteral("New Value"), QString());
     for (const auto& parameter : part.parameters())
       if (parameter.type() == input.type)
         input.binding->addItem(text(parameter.name()) + " / " + text(parameter.id().value()),
@@ -450,32 +450,29 @@ Result<std::size_t> ShellHoleTools::preview() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
-    return Result<std::size_t>::failure(
-        error("Modell oder Befehl geändert. Bohrungen neu öffnen."));
+    return Result<std::size_t>::failure(error("Model or command changed. Reopen holes."));
   }
   ui.invalidate();
   const auto definition = ui.candidate();
   if (!definition)
     return Result<std::size_t>::failure(definition.error());
   auto candidate = ui.window.session();
-  const auto changed =
-      candidate.commit_part_transaction("Durchgangsbohrungen", [&](PartDocument& part) {
-        return add_candidate(part, definition.value());
-      });
+  const auto changed = candidate.commit_part_transaction(
+      "Through Holes", [&](PartDocument& part) { return add_candidate(part, definition.value()); });
   if (!changed)
     return changed;
   const auto* before =
       ui.window.session().part_shape_cache()->find_body_shape(definition.value().body);
   const auto* after = candidate.part_shape_cache()->find_body_shape(definition.value().body);
   if (!before || !after)
-    return Result<std::size_t>::failure(error("Zielkörper hat kein aktuelles Ergebnis."));
+    return Result<std::size_t>::failure(error("Target body has no current result."));
   const auto original = geometry::RectangleExtrusionAdapter{}.summarize(*before);
   const auto result = geometry::RectangleExtrusionAdapter{}.summarize(*after);
   const auto tolerance = std::max(1e-9, std::abs(original.volume_mm3) * 1e-10);
   if (result.solid_count == 0 || !std::isfinite(result.volume_mm3) ||
       result.volume_mm3 <= tolerance || result.volume_mm3 >= original.volume_mm3 - tolerance)
     return Result<std::size_t>::failure(
-        error("Bohrungen müssen Material entfernen und einen Solid-Körper erhalten."));
+        error("Holes must remove material and preserve a solid body."));
   std::vector<geometry::GeometryShape> shapes;
   std::vector<std::string> replaced;
   // Validate the complete presentation, then shade the candidate Body results.
@@ -502,8 +499,8 @@ Result<std::size_t> ShellHoleTools::preview() {
   ui.previewed = true;
   (void)ui.window.session().task().show_preview();
   ui.apply_button->setEnabled(true);
-  ui.summary->setText(QStringLiteral("Vorschau gültig. Entfernt: %1 mm³. Anwenden übernimmt "
-                                     "Skizze, neue Parameter und Schnitt gemeinsam.")
+  ui.summary->setText(QStringLiteral("Preview valid. Removed: %1 mm³. Apply commits "
+                                     "the sketch, new parameters, and cut together.")
                           .arg(original.volume_mm3 - result.volume_mm3, 0, 'g', 12));
   return changed;
 }
@@ -512,7 +509,7 @@ Result<std::size_t> ShellHoleTools::apply() {
   if (!ui.current() || !ui.previewed) {
     if (!ui.current())
       cancel();
-    return Result<std::size_t>::failure(error("Zuerst eine aktuelle Bohrungsvorschau prüfen."));
+    return Result<std::size_t>::failure(error("Check a current hole preview first."));
   }
   const auto checked = preview();
   if (!checked)
@@ -520,10 +517,8 @@ Result<std::size_t> ShellHoleTools::apply() {
   const auto definition = ui.candidate();
   if (!definition)
     return Result<std::size_t>::failure(definition.error());
-  const auto changed =
-      ui.window.session().commit_part_transaction("Durchgangsbohrungen", [&](PartDocument& part) {
-        return add_candidate(part, definition.value());
-      });
+  const auto changed = ui.window.session().commit_part_transaction(
+      "Through Holes", [&](PartDocument& part) { return add_candidate(part, definition.value()); });
   if (changed) {
     cancel();
     ui.window.remember_repeatable_command(*ui.action);

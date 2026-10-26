@@ -38,7 +38,10 @@ manipulator layer and folds viewport candidates back into the candidate.
 Fillet and Chamfer collect an ordered chain of `EdgeReference`s; Shell and Draft collect
 `FaceReference`s. `add_edge`/`add_face` reject a duplicate using the same stable per-edge / per-face
 identity the Core edge/face-treatment contracts use, so pick-time rejection agrees with feature
-validation. Edges and faces without stable semantic identity are unpickable at the selection layer
+validation. The edge picker retains supported producer-owned roles and exposes remaining finite edges of the
+current Body through producer-anchored geometric witnesses (`ResultEdgeReference`), including
+curved rims and subsequent finishing results. Edges without a finite unambiguous witness and
+faces without stable semantic identity are unpickable at the selection layer
 (`docs/assembly-generated-topology-reference-mvp5.md`, `docs/semantic-references.md`) and never reach
 these controllers as references; lost or ambiguous recovered topology enters the existing
 reference-recovery/repair workflow rather than being approximated.
@@ -179,3 +182,11 @@ Bounded here and not introduced implicitly by this block:
 
 Block 126 adds interactive Pattern, Mirror, Body Boolean, and Body Transform authoring with ghost
 previews over the same manipulator layer.
+
+## Curved current-result workflow
+
+`[curved-finishing]` exercises circular rim selection, a real OCCT fillet, a subsequent chamfer on
+the current result and strict saved-reference replay. `[curved-union-workflow]` extends the GUI
+sequence with radius refinement, cancel/preview isolation, Undo/Redo, a second overlapping cylinder,
+Union, consumed-tool checks and Save/Open. Under native xcb it selects the first circular edge through
+real viewport mouse events. Kernel-invalid radii/distances still reject Apply without mutation.

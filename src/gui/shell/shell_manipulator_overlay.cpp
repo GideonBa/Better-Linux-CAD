@@ -39,6 +39,7 @@ protected:
         draw_arrow_head(painter, anchor, endpoint);
         painter.drawEllipse(endpoint, 4.5, 4.5);
       }
+      painter.setPen(Qt::white);
       if (!presentation.value_text.empty())
         painter.drawText(endpoint + QPointF(9.0, 16.0),
                          QString::fromStdString(presentation.value_text));

@@ -1725,6 +1725,17 @@ contained_hole_curves(const WorkplaneResolver& resolver, const ResolvedWorkplane
                       const ContainedProfileHole& hole) {
   if (hole.kind == ContainedProfileHoleKind::Circle)
     return circle_profile_curves(resolver, workplane, hole.center, hole.radius_mm);
+  if (hole.kind == ContainedProfileHoleKind::Curves) {
+    auto curves = hole.curves;
+    const auto map = [&](Point3 p) { return resolver.evaluate_point(workplane, {p.x, p.y}); };
+    for (auto& curve : curves) {
+      curve.start = map(curve.start);
+      curve.mid = map(curve.mid);
+      curve.end = map(curve.end);
+      curve.control2 = map(curve.control2);
+    }
+    return curves;
+  }
 
   std::vector<Point3> vertices;
   vertices.reserve(hole.vertices.size());
@@ -1783,6 +1794,7 @@ contained_hole_curves(const WorkplaneResolver& resolver, const ResolvedWorkplane
       curve.start = translated_along(curve.start, axis, start_distance_mm);
       curve.mid = translated_along(curve.mid, axis, start_distance_mm);
       curve.end = translated_along(curve.end, axis, start_distance_mm);
+      curve.control2 = translated_along(curve.control2, axis, start_distance_mm);
     }
     auto tool = profile_adapter.make_extruded_profile_from_curves(curves, axis, depth.value());
     if (tool.has_error())
@@ -3169,11 +3181,24 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
       if (curves.has_error())
         return Result<std::size_t>::failure(curves.error());
 
-      auto shape = closed_profile_adapter_.make_extruded_profile_from_curves(
+      auto outer = closed_profile_adapter_.make_extruded_profile_from_curves(
           curves.value(), direction, thickness->value());
-      if (shape.has_error())
+      if (!outer)
+        return Result<std::size_t>::failure(outer.error());
+      auto contour =
+          resolve_curved_profile_hole(document, *sketch, arc->id(), arc->curve_segments());
+      if (!contour)
+        return Result<std::size_t>::failure(contour.error());
+      auto holes =
+          classify_contained_profile_holes(document, *sketch, arc->id(), contour.value().vertices);
+      if (!holes)
+        return Result<std::size_t>::failure(holes.error());
+      auto shape = subtract_contained_profile_holes(
+          feature->id(), workplane_resolver_, resolved_workplane.value(), holes.value(), direction,
+          thickness->value(), std::move(outer.value()), closed_profile_adapter_,
+          body_boolean_adapter_);
+      if (!shape)
         return Result<std::size_t>::failure(shape.error());
-
       return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
     }
 

@@ -48,12 +48,11 @@ void ShellRepeatTools::remember(QAction& accepted_command) {
 }
 
 void ShellRepeatTools::refresh() {
-  repeat_->setText(command_ ? QStringLiteral("Erneut: %1").arg(command_->text())
-                            : QStringLiteral("Befehl wiederholen"));
+  repeat_->setText(command_ ? QStringLiteral("Repeat: %1").arg(command_->text())
+                            : QStringLiteral("Repeat Command"));
   repeat_->setToolTip(
-      command_
-          ? QStringLiteral("%1 mit aktuellen Eingaben neu starten (Strg+R)").arg(command_->text())
-          : QStringLiteral("Zuerst einen Modellierungsbefehl anwenden"));
+      command_ ? QStringLiteral("Restart %1 with current inputs (Ctrl+R)").arg(command_->text())
+               : QStringLiteral("Apply a modeling command first"));
   repeat_->setEnabled(available());
   // Ribbon rows can shrink to button minimum widths. Track the changing
   // action label so the command name remains readable on both backends.

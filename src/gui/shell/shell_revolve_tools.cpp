@@ -57,7 +57,7 @@ ShellFeatureTools::revolve_axis_choices(const GuiSketchPlaneView& plane) const {
       if (semantic)
         append(AxisReference::create_semantic_axis(PartFeatureInputRole::RevolveAxis,
                                                    semantic.value()),
-               feature.name() + " / Achse", "feature-axis/" + feature.id().value());
+               feature.name() + " / Axis", "feature-axis/" + feature.id().value());
     }
   auto sources = geometry::ViewportSceneBuilder{}.build_construction_sources(*part, *cache);
   if (sources)
@@ -88,21 +88,20 @@ void ShellFeatureTools::build_revolve_controls(QWidget* panel) {
     revolve_form_->addRow(label, field);
     return field;
   };
-  revolve_extent_ = combo("blcad.revolve.extent", QStringLiteral("Drehumfang"));
+  revolve_extent_ = combo("blcad.revolve.extent", QStringLiteral("Revolve Extent"));
   revolve_extent_->addItems(
-      {QStringLiteral("Volle Drehung"), QStringLiteral("Winkel"), QStringLiteral("Symmetrisch")});
-  revolve_side_ = combo("blcad.revolve.side", QStringLiteral("Drehrichtung"));
-  revolve_side_->addItems({QStringLiteral("Positiv"), QStringLiteral("Negativ")});
+      {QStringLiteral("Full Revolution"), QStringLiteral("Angle"), QStringLiteral("Symmetric")});
+  revolve_side_ = combo("blcad.revolve.side", QStringLiteral("Rotation Direction"));
+  revolve_side_->addItems({QStringLiteral("Positive"), QStringLiteral("Negative")});
   revolve_operation_ = combo("blcad.revolve.operation", QStringLiteral("Operation"));
-  revolve_operation_->addItems({QStringLiteral("Neuer Körper"), QStringLiteral("Vereinigen"),
-                                QStringLiteral("Ausschneiden"), QStringLiteral("Schnittmenge")});
-  revolve_target_ = combo("blcad.revolve.target", QStringLiteral("Zielkörper"));
-  revolve_axis_ = combo("blcad.revolve.axis", QStringLiteral("Drehachse"));
+  revolve_operation_->addItems({QStringLiteral("New Body"), QStringLiteral("Union"),
+                                QStringLiteral("Cut"), QStringLiteral("Intersect")});
+  revolve_target_ = combo("blcad.revolve.target", QStringLiteral("Target Body"));
+  revolve_axis_ = combo("blcad.revolve.axis", QStringLiteral("Rotation Axis"));
   auto* hint = new QLabel(
-      QStringLiteral(
-          "Achsen müssen in der Profilebene liegen. Das Profil darf die Achse nicht kreuzen. "
-          "Symmetrisch verwendet den gesamten eingeschlossenen Winkel. "
-          "Alle Eingaben bleiben bis Anwenden lokal."),
+      QStringLiteral("Axes must lie in the profile plane. The profile must not cross the axis. "
+                     "Symmetric uses the total included angle. "
+                     "All input remains local until Apply."),
       revolve_controls_);
   hint->setWordWrap(true);
   column->addWidget(hint);
@@ -140,11 +139,11 @@ ShellFeatureTools::reset_revolve_controls(const GuiSketchPlaneView& plane,
       revolve_axis_->setCurrentIndex(row);
     else if (requested)
       return Result<std::size_t>::failure(Error::validation(
-          preferred->value(), "Drehachse muss vorhanden sein und in der Profilebene liegen."));
+          preferred->value(), "Rotation axis must exist and lie in the profile plane."));
   }
   if (revolve_axis_->count() == 0)
     return Result<std::size_t>::failure(
-        Error::validation("revolve", "Zuerst eine Achse in der Profilebene erstellen."));
+        Error::validation("revolve", "Create an axis in the profile plane first."));
   const auto& part = *session_.part_document();
   for (const auto& body : part.bodies())
     if (body.kind() == BodyKind::Solid && body.visibility() == BodyVisibility::Visible &&
@@ -178,10 +177,10 @@ Result<std::size_t> ShellFeatureTools::configure_revolve_candidate() {
   if (!layer_.active_handle_id().empty())
     return Result<std::size_t>::success(0);
   if (revolve_axis_->currentIndex() < 0)
-    return fail("Eine passende Drehachse auswählen.");
+    return fail("Select a suitable rotation axis.");
   const auto operation = static_cast<FeatureBodyOperationMode>(revolve_operation_->currentIndex());
   if (operation != FeatureBodyOperationMode::NewBody && revolve_target_->currentIndex() < 0)
-    return fail("Einen sichtbaren Volumenkörper als Ziel auswählen.");
+    return fail("Select a visible solid body as the target.");
   auto& controller = coordinator_.revolve();
   if (revolve_extent_->currentIndex() != 0) {
     const auto text = numeric_editor_->text().trimmed().toStdString();
@@ -191,7 +190,7 @@ Result<std::size_t> ShellFeatureTools::configure_revolve_candidate() {
         QString::fromStdString(std::string(end, text.data() + text.size())).trimmed();
     if (end == text.data() || error != std::errc() || !std::isfinite(value) || value <= 0 ||
         value >= 360 || (!suffix.isEmpty() && suffix != QStringLiteral("deg")))
-      return fail("Drehwinkel muss zwischen 0 und 360 Grad liegen.");
+      return fail("Revolve angle must be between 0 and 360 degrees.");
   }
   const auto& axis = revolve_axes_.at(static_cast<std::size_t>(revolve_axis_->currentIndex()));
   controller.set_axis(axis.reference);

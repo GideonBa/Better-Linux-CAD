@@ -29,6 +29,7 @@ struct ViewportSceneItem {
   std::string semantic_id;
   GeometryShape shape;
   SketchLineRole line_role{SketchLineRole::Geometry};
+  std::string owner_body_id{};
 };
 
 struct ConstructionSelectionTarget {

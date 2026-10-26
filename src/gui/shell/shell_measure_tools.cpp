@@ -75,7 +75,9 @@ protected:
         painter.drawEllipse(point, 4, 4);
       const auto middle = (projected[0] + projected[1]) / 2;
       const QRectF label(middle + QPointF(8, -26), QSizeF(210, 24));
-      painter.fillRect(label, QColor(20, 25, 32, 220));
+      painter.fillRect(label, Qt::black);
+      painter.setPen(Qt::white);
+      painter.drawRect(label);
       painter.drawText(label, Qt::AlignLeft | Qt::AlignVCenter, value);
     }
     for (const auto& [label, point] : markers) {
@@ -84,6 +86,7 @@ protected:
         continue;
       const QPointF p(screen.value().x, screen.value().y);
       painter.drawEllipse(p, 6, 6);
+      painter.setPen(Qt::white);
       painter.drawText(p + QPointF(8, 16), label);
     }
   }
@@ -95,12 +98,12 @@ private:
 ShellMeasureTools::ShellMeasureTools(ShellWindow& window, GuiDocumentSession& session,
                                      OcctViewport& viewport, ShellRibbon& ribbon, int model_tab)
     : QObject(&window), window_(window), session_(session), viewport_(viewport) {
-  auto* group = ribbon.add_group(model_tab, QStringLiteral("Prüfen"));
+  auto* group = ribbon.add_group(model_tab, QStringLiteral("Inspect"));
   for (const auto& [kind, label, id] :
-       {std::tuple{GuiMeasureKind::Distance, "Abstand", "measure_distance"},
-        std::tuple{GuiMeasureKind::Angle, "Winkel", "measure_angle"},
-        std::tuple{GuiMeasureKind::RadiusDiameter, "Radius / Durchmesser", "measure_radius"},
-        std::tuple{GuiMeasureKind::BodySummary, "Körperdaten", "measure_body"}}) {
+       {std::tuple{GuiMeasureKind::Distance, "Distance", "measure_distance"},
+        std::tuple{GuiMeasureKind::Angle, "Angle", "measure_angle"},
+        std::tuple{GuiMeasureKind::RadiusDiameter, "Radius / Diameter", "measure_radius"},
+        std::tuple{GuiMeasureKind::BodySummary, "Body Summary", "measure_body"}}) {
     auto* action = new QAction(QString::fromUtf8(label), this);
     action->setObjectName(QStringLiteral("blcad.action.") + id);
     connect(action, &QAction::triggered, this, [this, kind] {
@@ -111,7 +114,7 @@ ShellMeasureTools::ShellMeasureTools(ShellWindow& window, GuiDocumentSession& se
     ribbon.add_small_button(group, action);
     actions_.emplace_back(kind, action);
   }
-  dock_ = new QDockWidget(QStringLiteral("Messen"), &window);
+  dock_ = new QDockWidget(QStringLiteral("Measure"), &window);
   dock_->setObjectName("blcad.shell.measure_task");
   dock_->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
   auto* panel = new QWidget(dock_);
@@ -121,18 +124,18 @@ ShellMeasureTools::ShellMeasureTools(ShellWindow& window, GuiDocumentSession& se
   auto* form = form_;
   kind_ = new QComboBox(panel);
   kind_->setObjectName("blcad.measure.kind");
-  kind_->addItems({QStringLiteral("Abstand"), QStringLiteral("Winkel"),
-                   QStringLiteral("Radius / Durchmesser"), QStringLiteral("Körperdaten")});
-  form->addRow(QStringLiteral("Messung"), kind_);
+  kind_->addItems({QStringLiteral("Distance"), QStringLiteral("Angle"),
+                   QStringLiteral("Radius / Diameter"), QStringLiteral("Body Summary")});
+  form->addRow(QStringLiteral("Measurement"), kind_);
   pick_ = new QComboBox(panel);
   pick_->setObjectName("blcad.measure.pick_role");
   pick_->addItems({QStringLiteral("Element A"), QStringLiteral("Element B")});
-  form->addRow(QStringLiteral("Modellklick wählt"), pick_);
+  form->addRow(QStringLiteral("Viewport Click Selects"), pick_);
   filter_ = new QComboBox(panel);
   filter_->setObjectName("blcad.measure.filter");
-  filter_->addItems({QStringLiteral("Alle passenden Elemente"), QStringLiteral("Punkte"),
-                     QStringLiteral("Kanten"), QStringLiteral("Flächen")});
-  form->addRow(QStringLiteral("Auswahlfilter"), filter_);
+  filter_->addItems({QStringLiteral("All Compatible Elements"), QStringLiteral("Points"),
+                     QStringLiteral("Edges"), QStringLiteral("Faces")});
+  form->addRow(QStringLiteral("Selection Filter"), filter_);
   first_ = new QComboBox(panel);
   second_ = new QComboBox(panel);
   first_->setObjectName("blcad.measure.first");
@@ -150,11 +153,11 @@ ShellMeasureTools::ShellMeasureTools(ShellWindow& window, GuiDocumentSession& se
   column->addWidget(readout_);
   column->addStretch();
   auto* buttons = new QHBoxLayout;
-  auto* clear = new QPushButton(QStringLiteral("Neu auswählen"), panel);
+  auto* clear = new QPushButton(QStringLiteral("Select Again"), panel);
   clear->setObjectName("blcad.measure.clear");
-  copy_ = new QPushButton(QStringLiteral("Kopieren"), panel);
+  copy_ = new QPushButton(QStringLiteral("Copy"), panel);
   copy_->setObjectName("blcad.measure.copy");
-  auto* close = new QPushButton(QStringLiteral("Schließen"), panel);
+  auto* close = new QPushButton(QStringLiteral("Close"), panel);
   close->setObjectName("blcad.measure.close");
   for (auto* button : {clear, copy_, close})
     buttons->addWidget(button);
@@ -171,7 +174,7 @@ ShellMeasureTools::ShellMeasureTools(ShellWindow& window, GuiDocumentSession& se
   connect(clear, &QPushButton::clicked, this, [this] { clear_inputs(); });
   connect(copy_, &QPushButton::clicked, this, [this] {
     if (active() && result_ && session_.derived_results_fresh() &&
-        revision_ == session_.presentation_revision())
+        revision_ == session_.model_revision())
       QApplication::clipboard()->setText(readout_->text());
   });
   connect(kind_, &QComboBox::currentIndexChanged, this, [this] {
@@ -198,7 +201,7 @@ ShellMeasureTools::~ShellMeasureTools() {
 Result<std::size_t> ShellMeasureTools::begin(GuiMeasureKind kind) {
   if (active() || session_.task().active() || window_.active_sketch() || !session_.has_document() ||
       !session_.derived_results_fresh())
-    return fail("Messen benötigt ein Dokument mit aktueller Geometrie ohne aktiven Befehl");
+    return fail("Measure requires a document with current geometry without an active command");
   auto built = rebuild_catalogue();
   if (!built)
     return built;
@@ -215,10 +218,10 @@ Result<std::size_t> ShellMeasureTools::begin(GuiMeasureKind kind) {
         }
         return false;
       }))
-    return fail("Keine passenden messbaren Elemente vorhanden");
+    return fail("No compatible measurable elements available");
   if (!session_.task().begin(std::string(task_id)) || !session_.task().begin_parameter_editing() ||
       !session_.task().show_preview())
-    return fail("Messaufgabe konnte nicht gestartet werden");
+    return fail("Could not start measure task");
   auto begun = controller_.begin(session_, kind);
   if (!begun) {
     (void)session_.task().cancel();
@@ -243,10 +246,10 @@ Result<std::size_t> ShellMeasureTools::begin(GuiMeasureKind kind) {
 }
 Result<std::size_t> ShellMeasureTools::rebuild_catalogue() {
   targets_.clear();
-  revision_ = session_.presentation_revision();
+  revision_ = session_.model_revision();
   fresh_ = session_.derived_results_fresh();
   if (!fresh_)
-    return fail("Geometrie ist nicht aktuell. Neu berechnen und erneut auswählen.");
+    return fail("Geometry is stale. Recompute and select again.");
   if (session_.project()) {
     auto catalogue =
         geometry::MeasureSelectionBuilder::build_project(*session_.project(), ++generation_);
@@ -303,8 +306,8 @@ void ShellMeasureTools::populate_inputs() {
     const QSignalBlocker first(first_), second(second_), pick(pick_);
     first_->clear();
     second_->clear();
-    first_->addItem(QStringLiteral("Bitte wählen"), -1);
-    second_->addItem(QStringLiteral("Bitte wählen"), -1);
+    first_->addItem(QStringLiteral("Select"), -1);
+    second_->addItem(QStringLiteral("Select"), -1);
     for (std::size_t i = 0; i < targets_.size(); ++i)
       if (accepts(targets_[i].kind)) {
         first_->addItem(QString::fromStdString(targets_[i].label), static_cast<int>(i));
@@ -321,14 +324,14 @@ void ShellMeasureTools::populate_inputs() {
   hint_->setText(
       controller_.kind() == GuiMeasureKind::Distance
           ? QStringLiteral(
-                "Zwei Punkte, gerade Kanten oder ebene Flächen wählen. Gemessen wird zwischen den "
-                "zugrunde liegenden Geraden bzw. Ebenen, auch außerhalb der begrenzten Elemente.")
+                "Select two points, straight edges, or planar faces. Measurement uses the "
+                "underlying lines or planes, including beyond the bounded elements.")
       : controller_.kind() == GuiMeasureKind::Angle
-          ? QStringLiteral("Zwei gerade Kanten oder ebene Flächen wählen. Angezeigt wird der "
-                           "kleinere Winkel von 0° bis 90°.")
+          ? QStringLiteral("Select two straight edges or planar faces. The smaller angle "
+                           "from 0° to 90° is displayed.")
       : controller_.kind() == GuiMeasureKind::RadiusDiameter
-          ? QStringLiteral("Eine Kreiskante oder Zylinderfläche wählen.")
-          : QStringLiteral("Einen Bauteilkörper wählen. Die Messung ändert das Modell nicht."));
+          ? QStringLiteral("Select a circular edge or cylindrical face.")
+          : QStringLiteral("Select a part body. Measurement does not change the model."));
   update_pick_scope();
   update_result();
 }
@@ -359,11 +362,11 @@ void ShellMeasureTools::update_result() {
   window_.statusBar()->clearMessage();
   result_.reset();
   copy_->setEnabled(false);
-  readout_->setText(QStringLiteral("Messelemente auswählen."));
+  readout_->setText(QStringLiteral("Select measurement elements."));
   const auto kind = static_cast<GuiMeasureKind>(kind_->currentIndex());
   (void)controller_.begin(session_, kind);
-  if (!session_.derived_results_fresh() || revision_ != session_.presentation_revision()) {
-    readout_->setText(QStringLiteral("Geometrie geändert oder nicht aktuell. Neu auswählen."));
+  if (!session_.derived_results_fresh() || revision_ != session_.model_revision()) {
+    readout_->setText(QStringLiteral("Geometry changed or is stale. Select again."));
     refresh_presentation();
     return;
   }
@@ -375,7 +378,7 @@ void ShellMeasureTools::update_result() {
     return;
   }
   if (pair && first == second) {
-    readout_->setText(QStringLiteral("Zwei unterschiedliche Elemente auswählen."));
+    readout_->setText(QStringLiteral("Select two distinct elements."));
     refresh_presentation();
     return;
   }
@@ -393,13 +396,13 @@ void ShellMeasureTools::update_result() {
     result_ = std::move(measured.value());
     readout_->setText(
         kind == GuiMeasureKind::Distance
-            ? QStringLiteral("Abstand: %1 mm").arg(number(result_->primary_value))
+            ? QStringLiteral("Distance: %1 mm").arg(number(result_->primary_value))
         : kind == GuiMeasureKind::Angle
-            ? QStringLiteral("Winkel: %1°").arg(number(result_->primary_value))
+            ? QStringLiteral("Angle: %1°").arg(number(result_->primary_value))
         : kind == GuiMeasureKind::RadiusDiameter
-            ? QStringLiteral("Radius: %1 mm\nDurchmesser: %2 mm")
+            ? QStringLiteral("Radius: %1 mm\nDiameter: %2 mm")
                   .arg(number(result_->primary_value), number(*result_->secondary_value))
-            : QStringLiteral("Volumen: %1 mm³\nVolumenkörper: %2")
+            : QStringLiteral("Volume: %1 mm³\nSolids: %2")
                   .arg(number(result_->volume_mm3))
                   .arg(result_->solid_count));
     copy_->setEnabled(true);
@@ -415,8 +418,7 @@ void ShellMeasureTools::clear_inputs() {
   update_result();
 }
 bool ShellMeasureTools::accept_selection(const GuiSelection& selection) {
-  if (!active() || !session_.derived_results_fresh() ||
-      revision_ != session_.presentation_revision())
+  if (!active() || !session_.derived_results_fresh() || revision_ != session_.model_revision())
     return false;
   auto* input = pick_->currentIndex() == 1 ? second_ : first_;
   for (int row = 1; row < input->count(); ++row) {
@@ -436,7 +438,9 @@ std::vector<geometry::ViewportSceneItem> ShellMeasureTools::selection_items() co
   if (active())
     for (const auto& target : targets_)
       if (target.descriptor)
-        items.push_back({scene_kind(target.kind), target.semantic_id, target.shape});
+        items.push_back({scene_kind(target.kind), target.semantic_id, target.shape,
+                         SketchLineRole::Geometry,
+                         target.body ? target.body->value() : std::string{}});
   return items;
 }
 void ShellMeasureTools::refresh_presentation() {
@@ -445,7 +449,7 @@ void ShellMeasureTools::refresh_presentation() {
   overlay->witnesses.clear();
   overlay->value.clear();
   const bool fresh =
-      active() && session_.derived_results_fresh() && revision_ == session_.presentation_revision();
+      active() && session_.derived_results_fresh() && revision_ == session_.model_revision();
   if (fresh) {
     for (auto* input : {first_, second_})
       if (const auto* target = selected(input); target && target->descriptor)
@@ -479,13 +483,13 @@ void ShellMeasureTools::refresh() {
     finish(false);
     return;
   }
-  if (revision_ != session_.presentation_revision() || fresh_ != session_.derived_results_fresh()) {
+  if (revision_ != session_.model_revision() || fresh_ != session_.derived_results_fresh()) {
     auto rebuilt = rebuild_catalogue();
     populate_inputs();
     if (!rebuilt)
       readout_->setText(QString::fromStdString(rebuilt.error().message()));
     else
-      readout_->setText(QStringLiteral("Modell geändert. Messelemente neu auswählen."));
+      readout_->setText(QStringLiteral("Model changed. Select measurement elements again."));
     window_.refresh_feature_selection_scene();
   }
   refresh_presentation();

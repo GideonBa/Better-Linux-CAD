@@ -60,6 +60,9 @@ produce an invented closing edge or extrusion face.
 The authoring preview exposes semantic endpoint and control-point handles plus one control polygon per
 segment. Moving an internal control point replaces only that cubic segment. Moving a shared endpoint
 updates the adjacent segment endpoint as part of the same candidate so the chain cannot tear.
+For closed chains this includes the last/first seam in both control-point and fit-point editing.
+The solver drag path shares numbered fitted-family endpoint identities, including open chains,
+and keeps unrelated coincident splines independent. Regression: `[spline-junction-regression]`.
 
 Reference geometry is not accepted as an editable spline source. The GUI controller snapshots the
 selected source segments when the editor opens and rechecks them at commit. A stale editor therefore
@@ -208,3 +211,9 @@ built-in vector-font fallback.
 Block 114 constraint authoring and glyph interaction is implemented in
 `docs/gui-sketch-constraint-authoring-mvp8.md`. Block 115 owns driving/reference dimensions and
 in-canvas parameter/expression editing.
+
+A freshly closed fitted spline also keeps its first/last junction shared before a profile exists.
+The raw closed-spline GUI regression drags that seam, reopens/re-enters the saved sketch, drags again,
+checks exact Undo/Redo and finishes the resulting region. Old sidecar point IDs are remapped only
+through the explicit shared-topology migration report described in
+`docs/sketch-shared-topology-mvp8.md`.

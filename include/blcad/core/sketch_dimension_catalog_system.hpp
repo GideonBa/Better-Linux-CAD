@@ -62,7 +62,7 @@ public:
                         double relative_tolerance = 1.0e-7) {
     for (const auto& dimension : dimensions.dimensions()) {
       if (!dimension.driving()) continue;
-      auto measured = SketchDimensionMeasurementEvaluator::measure(topology, dimension);
+      auto measured = SketchDimensionMeasurementEvaluator::measure(topology, dimension, &document);
       if (measured.has_error()) return Result<std::size_t>::failure(measured.error());
       auto expected = SketchDimensionSolverAdapter::parameter_value(document, dimension);
       if (expected.has_error()) return Result<std::size_t>::failure(expected.error());
@@ -213,8 +213,8 @@ public:
     std::optional<SketchDimensionMeasurement> measurement;
     SketchDimensionCatalog published_catalog = dimensions;
     if (solved.value().accepted) {
-      auto measured = SketchDimensionMeasurementEvaluator::measure(
-          solved.value().solve.topology, candidate);
+      auto measured = SketchDimensionMeasurementEvaluator::measure(solved.value().solve.topology,
+                                                                   candidate, &document);
       if (measured.has_error())
         return Result<SketchDimensionAuthoringPreview>::failure(measured.error());
       measurement = std::move(measured.value());

@@ -852,7 +852,7 @@ TEST_CASE("Embedded STEP source catalog rows cannot apply a prepared Project sou
   CHECK_FALSE(embedded->flags().testFlag(Qt::ItemIsSelectable));
   CHECK(root->flags().testFlag(Qt::ItemIsSelectable));
   CHECK(embedded->text().contains(child_name));
-  CHECK(embedded->text().contains("nur Anzeige"));
+  CHECK(embedded->text().contains("Display Only"));
   ui.reveal(catalog);
   catalog.scrollToItem(embedded);
   ui.flush();
@@ -861,7 +861,7 @@ TEST_CASE("Embedded STEP source catalog rows cannot apply a prepared Project sou
   ui.click_at(*catalog.viewport(), embedded_center);
   CHECK_FALSE(embedded->isSelected());
   CHECK_FALSE(ui.field<QPushButton>("apply").isEnabled());
-  CHECK(ui.field<QLabel>("summary").text().contains("nur angezeigt"));
+  CHECK(ui.field<QLabel>("summary").text().contains("here only"));
   CHECK(ui.snapshot() == before);
   CHECK_FALSE(ui.window.session().dirty());
   CHECK_FALSE(ui.window.session().can_undo());

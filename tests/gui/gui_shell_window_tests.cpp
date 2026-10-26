@@ -122,10 +122,10 @@ TEST_CASE("Block 133 shell window builds ribbon browser and diagnostics",
           "[gui][shell][gui][ribbon]") {
   ShellWindow window;
   CHECK(window.ribbon().tab_count() == 4);
-  CHECK(window.ribbon().tab_title(3) == QStringLiteral("Baugruppe"));
-  CHECK(window.ribbon().tab_title(0) == QStringLiteral("3D-Modell"));
-  CHECK(window.ribbon().tab_title(1) == QStringLiteral("Skizze"));
-  CHECK(window.ribbon().tab_title(2) == QStringLiteral("Ansicht"));
+  CHECK(window.ribbon().tab_title(3) == QStringLiteral("Assembly"));
+  CHECK(window.ribbon().tab_title(0) == QStringLiteral("3D Model"));
+  CHECK(window.ribbon().tab_title(1) == QStringLiteral("Sketch"));
+  CHECK(window.ribbon().tab_title(2) == QStringLiteral("View"));
   CHECK(window.ribbon().current_tab() == 0);
   CHECK_FALSE(window.ribbon().tab_enabled(1));
   CHECK_FALSE(window.session().has_document());
@@ -144,7 +144,7 @@ TEST_CASE("Block 133 new part seeds origin planes axes and Ursprung folder",
   CHECK(part->find_datum_plane(DatumPlaneId("datum.yz")) != nullptr);
   CHECK(part->find_datum_axis(DatumAxisId("datum.axis.z")) != nullptr);
 
-  const auto* origin = find_group(window.browser_model(), "Ursprung");
+  const auto* origin = find_group(window.browser_model(), "Origin");
   REQUIRE(origin != nullptr);
   CHECK(origin->children.size() == 6U);
 
@@ -224,7 +224,7 @@ TEST_CASE("Block 133 save and open round-trip preserves the seeded origin",
     REQUIRE(part != nullptr);
     CHECK(part->datum_plane_count() == 3);
     CHECK(part->datum_axis_count() == 3);
-    const auto* origin = find_group(window.browser_model(), "Ursprung");
+    const auto* origin = find_group(window.browser_model(), "Origin");
     REQUIRE(origin != nullptr);
     CHECK(origin->children.size() == 6U);
     CHECK(window.viewport().presentation_count() == 6U);
@@ -323,7 +323,7 @@ TEST_CASE("Undoing Sketch creation leaves no stale Sketch workspace",
 TEST_CASE("Shell errors survive refresh and appear in browser diagnostics",
           "[gui][shell][gui][diagnostics]") {
   ShellWindow window;
-  REQUIRE(window.new_part(QStringLiteral("Diagnose")));
+  REQUIRE(window.new_part(QStringLiteral("Diagnostics")));
   const auto revision = window.session().presentation_revision();
   const auto diagnostic_count = window.session().diagnostics().size();
 

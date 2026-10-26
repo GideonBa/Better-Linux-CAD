@@ -66,7 +66,9 @@ Diagnostics do not mutate the Sketch and can be mapped directly to repair select
 
 ## Profile selection
 
-`select_region_at(...)` performs deterministic point-in-polygon selection over recognized candidates. Selection is transient and represented by the candidate `ProfileId`. Multiple valid regions require an explicit selection before finishing; a single valid region is selected automatically.
+`select_region_at(...)` performs deterministic point-in-polygon selection over recognized candidates. For nested loops, the smallest containing contour wins, so a pick inside an enclosed spline selects
+that inner region and a pick outside it selects the surrounding material. Selection is transient and
+represented by the candidate `ProfileId`. Multiple valid regions require an explicit selection before finishing; a single valid region is selected automatically.
 
 ## Finish Sketch
 
@@ -104,9 +106,13 @@ selection, cancel isolation, dimension preservation, one-step Undo/Redo and Save
 
 ## Next boundary
 
-Block 120 owns interactive Sketch3D creation and direct manipulation. Automatic nested curved
-contour/hole classification, splitting intersecting components into multiple cells, and geometric
-repair beyond deterministic diagnostics remain extensions. Component recognition is not a planar
+Block 120 owns interactive Sketch3D creation and direct manipulation. Nested line/arc/polynomial or rational spline loops now participate in the existing immediate-child
+hole classifier. Both raw and materialized contours produce exact OCCT hole wires in profile
+presentations and exact swept subtraction tools during additive extrusion. Sampling serves only
+containment and picking; source poles, weights and authored profile identities remain unchanged.
+Nested islands remain independently selectable; only immediate child loops are removed from a
+selected outer region. Crossing/touching contours are excluded from inferred holes. Splitting
+intersecting components into multiple cells and geometric repair remain extensions. Component recognition is not a planar
 arrangement solver. Parameter-backed Circle/Rectangle profiles remain existing materialized profiles;
 projected/reference curves do not enter automatic raw-region recognition.
 
@@ -127,3 +133,10 @@ when unrelated open geometry remains in the Sketch.
 
 Proof: `[gui][shell-sketch][sketch-finish]` covers open completion, exact geometry/history preservation,
 re-entry, profile handoff beside open geometry, and rejection of invalid closed topology.
+
+## Nested curved-region regression coverage
+
+`[nested-spline-region]` checks a rectangle around a rational ellipse before and after outer-only
+materialization, exact viewport face area, exact extrusion volume, independent inner/outer selection,
+cancel isolation, source pole/weight preservation, Undo/Redo and Save/Open. The GUI workflow draws
+the rectangle and ellipse through the existing authoring tools and previews both selected regions.

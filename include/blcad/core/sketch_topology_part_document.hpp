@@ -61,6 +61,9 @@ public:
     };
 
     for (const auto& current : topology.entities()) {
+      if (current.reference() &&
+          (current.id() == "reference/axis/x" || current.id() == "reference/axis/y"))
+        continue;
       if (current.kind() == SketchTopologyEntityKind::Point) {
         auto id = sketch_entity_id(current);
         if (id.has_error()) return Result<Sketch>::failure(id.error());

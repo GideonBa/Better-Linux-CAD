@@ -161,8 +161,8 @@ TEST_CASE("Shell Revolute sampling validates limits preserves direction and keep
   REQUIRE(table.rowCount() == 3);
   for (int row = 0; row < 3; ++row)
     CHECK(table.item(row, 2)->data(Qt::UserRole).toDouble() == 60 - row * 60);
-  CHECK(control<QLabel>(window, "summary").text().contains("3 Stützstellen"));
-  CHECK(control<QLabel>(window, "summary").text().contains("Zwischenpositionen"));
+  CHECK(control<QLabel>(window, "summary").text().contains("3 samples"));
+  CHECK(control<QLabel>(window, "summary").text().contains("Intermediate positions"));
   cell(window, 1, 1);
   const auto linked = window.viewport().selected_semantic()->semantic_id;
   window.report_error(Error::validation("test.analysis", "A diagnostic does not change geometry"));
@@ -328,7 +328,7 @@ TEST_CASE("Sweep without an active supported joint fails cleanly and keeps the d
   REQUIRE(control<QComboBox>(window, "sweep_joint").count() == 0);
   run(window);
   CHECK(control<QTableWidget>(window, "results").rowCount() == 0);
-  CHECK(control<QLabel>(window, "summary").text().contains("Drehgelenk wählen"));
+  CHECK(control<QLabel>(window, "summary").text().contains("Select Active Revolute Joint"));
   CHECK(snapshot(window) == before);
   control<QPushButton>(window, "close").click();
   CHECK_FALSE(window.session().task().active());

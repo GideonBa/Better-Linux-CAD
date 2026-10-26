@@ -21,7 +21,7 @@ ShellNavigationTools::ShellNavigationTools(ShellWindow& window, ShellRibbon& rib
     return result;
   };
   auto* navigation = ribbon.add_group(view_tab, QStringLiteral("Navigation"));
-  fit_ = action("fit", "Einpassen");
+  fit_ = action("fit", "Fit");
   connect(fit_, &QAction::triggered, this, [this] {
     // Fit remains available in a planar Sketch, whose camera owns orientation.
     if (window_.session().has_document() && QWidget::mouseGrabber() != &window_.viewport()) {
@@ -35,13 +35,13 @@ ShellNavigationTools::ShellNavigationTools(ShellWindow& window, ShellRibbon& rib
     const char* label;
     GuiViewCubeTarget target;
     bool direct;
-  } definitions[] = {{"view_isometric", "Isometrisch", GuiViewCubeTarget::Isometric, true},
-                     {"view_front", "Vorne", GuiViewCubeTarget::Front, true},
-                     {"view_top", "Oben", GuiViewCubeTarget::Top, true},
-                     {"view_right", "Rechts", GuiViewCubeTarget::Right, true},
-                     {"view_back", "Hinten", GuiViewCubeTarget::Back, false},
-                     {"view_left", "Links", GuiViewCubeTarget::Left, false},
-                     {"view_bottom", "Unten", GuiViewCubeTarget::Bottom, false}};
+  } definitions[] = {{"view_isometric", "Isometric", GuiViewCubeTarget::Isometric, true},
+                     {"view_front", "Front", GuiViewCubeTarget::Front, true},
+                     {"view_top", "Top", GuiViewCubeTarget::Top, true},
+                     {"view_right", "Right", GuiViewCubeTarget::Right, true},
+                     {"view_back", "Back", GuiViewCubeTarget::Back, false},
+                     {"view_left", "Left", GuiViewCubeTarget::Left, false},
+                     {"view_bottom", "Bottom", GuiViewCubeTarget::Bottom, false}};
   QList<QAction*> cube;
   for (const auto& definition : definitions) {
     auto* view = action(definition.id, definition.label);
@@ -60,48 +60,48 @@ ShellNavigationTools::ShellNavigationTools(ShellWindow& window, ShellRibbon& rib
       restored(workspace_.activate_view_cube_target(window_.viewport(), GuiViewCubeTarget::Home));
   });
   cube.push_back(home_);
-  auto* cube_button = ribbon.add_menu_button(navigation, QStringLiteral("Ansichtswürfel"), cube);
+  auto* cube_button = ribbon.add_menu_button(navigation, QStringLiteral("View Cube"), cube);
   cube_button->setObjectName(QStringLiteral("blcad.navigation.view_cube"));
   ribbon.add_small_button(navigation, home_);
-  capture_home_ = action("capture_home", "Home setzen");
+  capture_home_ = action("capture_home", "Set Home");
   connect(capture_home_, &QAction::triggered, this, [this] {
     if (!available())
       return;
     workspace_.capture_home_view(window_.viewport());
     has_home_ = true;
     refresh();
-    window_.statusBar()->showMessage(QStringLiteral("Home-Ansicht gespeichert"));
+    window_.statusBar()->showMessage(QStringLiteral("Home view saved"));
   });
   ribbon.add_small_button(navigation, capture_home_);
 
-  auto* marks = ribbon.add_group(view_tab, QStringLiteral("Ansichtsmarken (Sitzung)"));
+  auto* marks = ribbon.add_group(view_tab, QStringLiteral("View Bookmarks (Session)"));
   bookmarks_ = new QComboBox(marks);
   bookmarks_->setObjectName(QStringLiteral("blcad.navigation.bookmarks"));
   bookmarks_->setEditable(true);
   bookmarks_->setInsertPolicy(QComboBox::NoInsert);
   bookmarks_->setMinimumWidth(170);
   bookmarks_->setMaximumWidth(220);
-  bookmarks_->lineEdit()->setPlaceholderText(QStringLiteral("Name der Ansicht"));
-  bookmarks_->setToolTip(QStringLiteral("Ansicht wählen oder einen Namen zum Speichern eingeben"));
+  bookmarks_->lineEdit()->setPlaceholderText(QStringLiteral("View Name"));
+  bookmarks_->setToolTip(QStringLiteral("Choose a view or enter a name to save"));
   ribbon.add_widget(marks, bookmarks_);
   connect(bookmarks_, &QComboBox::editTextChanged, this, [this] { refresh(); });
-  save_ = action("bookmark_save", "Speichern");
+  save_ = action("bookmark_save", "Save");
   connect(save_, &QAction::triggered, this, [this] {
     if (!available())
       return;
     const auto name = bookmarks_->currentText().trimmed();
     if (workspace_.save_camera_bookmark(name.toStdString(), window_.viewport())) {
       reload_bookmarks(name);
-      window_.statusBar()->showMessage(QStringLiteral("Ansichtsmarke gespeichert: %1").arg(name));
+      window_.statusBar()->showMessage(QStringLiteral("View bookmark saved: %1").arg(name));
     }
   });
-  restore_ = action("bookmark_restore", "Aufrufen");
+  restore_ = action("bookmark_restore", "Recall");
   connect(restore_, &QAction::triggered, this, [this] {
     if (available())
       restored(workspace_.restore_camera_bookmark(bookmarks_->currentText().trimmed().toStdString(),
                                                   window_.viewport()));
   });
-  remove_ = action("bookmark_remove", "Entfernen");
+  remove_ = action("bookmark_remove", "Remove");
   connect(remove_, &QAction::triggered, this, [this] {
     if (available() &&
         workspace_.remove_camera_bookmark(bookmarks_->currentText().trimmed().toStdString()))
@@ -120,8 +120,7 @@ bool ShellNavigationTools::available() const {
 
 void ShellNavigationTools::restored(bool success) {
   if (!success)
-    window_.statusBar()->showMessage(
-        QStringLiteral("Ansicht konnte nicht wiederhergestellt werden"));
+    window_.statusBar()->showMessage(QStringLiteral("Could not restore view"));
   window_.refresh();
 }
 

@@ -371,7 +371,7 @@ TEST_CASE("Block 107 scene builder publishes explicit curve snap and annotation 
   REQUIRE(stored != nullptr);
   const auto scene = GuiSketchInteractionSceneBuilder{}.build(part, *stored);
   REQUIRE(scene);
-  CHECK(scene.value().curves.size() == 4U);
+  CHECK(scene.value().curves.size() == 6U);
   CHECK(scene.value().annotations.size() == 2U);
   CHECK(scene.value().unresolved_reference_count == 0U);
   CHECK(std::any_of(scene.value().points.begin(), scene.value().points.end(),

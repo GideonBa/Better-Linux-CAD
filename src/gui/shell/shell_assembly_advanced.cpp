@@ -54,9 +54,9 @@ void ShellAssemblyTools::create_advanced_controls(QWidget* panel) {
   advanced_record_->setMinimumContentsLength(12);
   advanced_name_ = new QLineEdit(advanced_controls_);
   advanced_name_->setObjectName("blcad.assembly.cross_name");
-  advanced_active_ = new QCheckBox(QStringLiteral("Aktiv"), advanced_controls_);
+  advanced_active_ = new QCheckBox(QStringLiteral("Active"), advanced_controls_);
   advanced_active_->setObjectName("blcad.assembly.cross_active");
-  form->addRow(QStringLiteral("Neu / Bearbeiten"), advanced_record_);
+  form->addRow(QStringLiteral("New / Edit"), advanced_record_);
   form->addRow(QStringLiteral("Name"), advanced_name_);
   form->addRow(advanced_active_);
   connect(advanced_record_, &QComboBox::currentIndexChanged, this, [this] {
@@ -85,7 +85,7 @@ Result<std::size_t> ShellAssemblyTools::build_hierarchy_targets() {
       continue;
     const auto* assembly = project.find_assembly_document(occurrence.assembly_document);
     if (!assembly)
-      return Result<std::size_t>::failure(invalid("Baugruppendefinition fehlt"));
+      return Result<std::size_t>::failure(invalid("Assembly definition missing"));
     auto found = local_targets.find(assembly->id().value());
     if (found == local_targets.end()) {
       auto local = Project::create(DocumentId("gui.hierarchy.targets"), "Targets", *assembly);
@@ -154,7 +154,7 @@ Result<std::size_t> ShellAssemblyTools::begin_advanced() {
   cross_moved_.reset();
   cross_groups_.clear();
   advanced_record_->clear();
-  advanced_record_->addItem(QStringLiteral("Neu erstellen"), QString());
+  advanced_record_->addItem(QStringLiteral("Create New"), QString());
   advanced_active_->setChecked(true);
   advanced_name_->setText(name_->text());
   if (command_ == Command::CrossRelationship || command_ == Command::CrossJoint) {
@@ -179,7 +179,7 @@ Result<std::size_t> ShellAssemblyTools::begin_advanced() {
       return Result<std::size_t>::failure(graph.error());
     cross_groups_ = graph.value().solve_groups();
     for (std::size_t i = 0; i < cross_groups_.size(); ++i) {
-      QString label = QStringLiteral("Gruppe %1: ").arg(i + 1);
+      QString label = QStringLiteral("Group %1: ").arg(i + 1);
       for (const auto& authority : cross_groups_[i].authorities)
         label += QString::fromStdString(authority.assembly_document.value() + "/" +
                                         authority.component_instance.value()) +
@@ -191,7 +191,7 @@ Result<std::size_t> ShellAssemblyTools::begin_advanced() {
   }
   if (command_ == Command::CrossMotion) {
     joint_->clear();
-    joint_->addItem(QStringLiteral("Bitte wählen"), QString());
+    joint_->addItem(QStringLiteral("Select"), QString());
     for (const auto& joint : project.cross_hierarchy_joints())
       if (joint.state() == AssemblyJointState::Active &&
           joint.type() != AssemblyJointType::Spherical)
@@ -211,7 +211,7 @@ Result<AssemblyHierarchyConstraint> ShellAssemblyTools::cross_relationship() con
   const auto* b = hierarchy_selected(second_);
   if (!a || !b)
     return Result<AssemblyHierarchyConstraint>::failure(
-        invalid("Zwei kompatible Vorkommensreferenzen wählen"));
+        invalid("Select two compatible occurrence references"));
   const auto type = static_cast<AssemblyConstraintType>(relationship_type_->currentIndex());
   std::optional<Quantity> distance, angle;
   if (type == AssemblyConstraintType::Distance || type == AssemblyConstraintType::Angle) {
@@ -237,7 +237,7 @@ Result<AssemblyHierarchyJoint> ShellAssemblyTools::cross_joint() const {
   const auto* b = hierarchy_selected(second_);
   if (!a || !b)
     return Result<AssemblyHierarchyJoint>::failure(
-        invalid("Zwei kompatible Gelenkreferenzen wählen"));
+        invalid("Select two compatible joint references"));
   const auto type = static_cast<AssemblyJointType>(joint_type_->currentIndex());
   auto compatible = geometry::AssemblyJointTargetCompatibilityResolver{}.resolve(
       type, a->target.resolved, b->target.resolved);
@@ -261,7 +261,7 @@ void ShellAssemblyTools::update_advanced_second_choices() {
   const int previous = second_->currentData().toInt();
   const QSignalBlocker block(second_);
   second_->clear();
-  second_->addItem(QStringLiteral("Passende Referenz B wählen"), -1);
+  second_->addItem(QStringLiteral("Select a compatible reference B"), -1);
   if (!a)
     return;
   for (std::size_t i = 0; i < hierarchy_targets_.size(); ++i) {
@@ -387,11 +387,10 @@ void ShellAssemblyTools::synchronize_cross_motion() {
                                                    (slider_upper_ - slider_lower_),
                                                0.0, 1.0))
           : 0);
-  slider_label_->setText(
-      QStringLiteral("Regler: %1 bis %2%3; offene Grenzen erlauben direkte Werteingabe.")
-          .arg(slider_lower_)
-          .arg(slider_upper_)
-          .arg(value_->suffix()));
+  slider_label_->setText(QStringLiteral("Slider: %1 to %2%3; open limits allow direct value input.")
+                             .arg(slider_lower_)
+                             .arg(slider_upper_)
+                             .arg(value_->suffix()));
   sync_ = false;
 }
 Result<QString> ShellAssemblyTools::preview_advanced(Project& candidate) {
@@ -409,14 +408,14 @@ Result<QString> ShellAssemblyTools::preview_advanced(Project& candidate) {
       return Result<QString>::failure(leaves.error());
     QString text =
         QStringLiteral(
-            "Hierarchie gültig: %1 Baugruppenvorkommen, %2 sichtbare aktive Bauteilvorkommen.\n")
+            "Hierarchy valid: %1 assembly occurrences, %2 visible active part occurrences.\n")
             .arg(hierarchy.value().occurrence_count())
             .arg(leaves.value().size());
     for (const auto& occurrence : hierarchy.value().occurrences())
       text += QString::fromStdString(path_text(occurrence.occurrence_path) + " → " +
                                      occurrence.assembly_document.value()) +
-              (occurrence.active_path ? QString() : QStringLiteral(" [unterdrückt]")) +
-              (occurrence.visible_path ? QString() : QStringLiteral(" [ausgeblendet]")) + "\n";
+              (occurrence.active_path ? QString() : QStringLiteral(" [Suppressed]")) +
+              (occurrence.visible_path ? QString() : QStringLiteral(" [Hidden]")) + "\n";
     return Result<QString>::success(text);
   }
   if (command_ == Command::CrossRelationship) {
@@ -451,8 +450,7 @@ Result<QString> ShellAssemblyTools::preview_advanced(Project& candidate) {
   } else if (command_ == Command::CrossSolve) {
     const auto selected = solve_group_->selectedItems();
     if (selected.size() != 1)
-      return Result<QString>::failure(
-          invalid("Eine vollständige verbundene Hierarchiegruppe wählen"));
+      return Result<QString>::failure(invalid("Select a complete connected hierarchy group"));
     const auto& group = cross_groups_.at(selected.front()->data(Qt::UserRole).toInt());
     auto diagnostics =
         geometry::AssemblyCrossHierarchySolveDiagnosticsAnalyzer{}.analyze(candidate, group);
@@ -462,26 +460,27 @@ Result<QString> ShellAssemblyTools::preview_advanced(Project& candidate) {
     if (!solved)
       return Result<QString>::failure(solved.error());
     if (!solved.value().converged())
-      return Result<QString>::failure(invalid("Hierarchiegruppe konvergiert nicht"));
+      return Result<QString>::failure(invalid("Hierarchy group did not converge"));
     auto applied =
         geometry::AssemblyCrossHierarchySolveResultApplier{}.apply(candidate, solved.value());
     if (!applied)
       return Result<QString>::failure(applied.error());
     cross_solved_ = std::move(solved.value());
     return Result<QString>::success(
-        QStringLiteral("Hierarchiegruppe gelöst. Rest-Freiheitsgrade: %1; RMS: %2. Wiederholte "
-                       "Definitionen teilen ihre interne Platzierung.")
+        QStringLiteral(
+            "Hierarchy group solved. Remaining degrees of freedom: %1; RMS: %2. Repeated "
+            "definitions share their internal placement.")
             .arg(diagnostics.value().rank_summary.remaining_dof)
             .arg(cross_solved_->residual_summary.final_rms, 0, 'g', 4));
   } else if (command_ == Command::CrossMotion) {
     const auto* joint = candidate.find_cross_hierarchy_joint(
         AssemblyJointId(joint_->currentData().toString().toStdString()));
     if (!joint)
-      return Result<QString>::failure(invalid("Ein aktives Hierarchiegelenk wählen"));
+      return Result<QString>::failure(invalid("Select an active hierarchy joint"));
     const auto role = static_cast<AssemblyJointCoordinateRole>(coordinate_->currentData().toInt());
     const auto* slot = joint->find_coordinate_slot(role);
     if (!slot)
-      return Result<QString>::failure(invalid("Eine bewegliche Koordinate wählen"));
+      return Result<QString>::failure(invalid("Select a movable coordinate"));
     auto q = slot->kind() == AssemblyJointCoordinateKind::Angular
                  ? Quantity::angle_deg(value_->value())
                  : Quantity::linear_displacement_mm(value_->value());
@@ -492,23 +491,23 @@ Result<QString> ShellAssemblyTools::preview_advanced(Project& candidate) {
     if (!moved)
       return Result<QString>::failure(moved.error());
     if (!moved.value().converged())
-      return Result<QString>::failure(invalid("Hierarchiebewegung konvergiert nicht"));
+      return Result<QString>::failure(invalid("Hierarchy motion did not converge"));
     auto applied =
         geometry::AssemblyCrossHierarchyJointMotionResultApplier{}.apply(candidate, moved.value());
     if (!applied)
       return Result<QString>::failure(applied.error());
     cross_moved_ = std::move(moved.value());
     return Result<QString>::success(
-        QStringLiteral("Hierarchiebewegung konvergiert. RMS: %1. Nur die gewählte Koordinate wird "
-                       "übernommen; Unterbaugruppen-Grenzen bleiben erhalten.")
+        QStringLiteral("Hierarchy motion converged. RMS: %1. Only the chosen coordinate is "
+                       "accepted; subassembly boundaries are preserved.")
             .arg(cross_moved_->residual_summary.final_rms, 0, 'g', 4));
   }
   structure = candidate.validate_assembly_structure();
   if (!structure)
     return Result<QString>::failure(structure.error());
   return Result<QString>::success(
-      QStringLiteral("Vorkommensreferenzen und Eingaben gültig. Anwenden speichert die Beziehung; "
-                     "Hierarchie lösen beziehungsweise bewegen berechnet die Platzierung."));
+      QStringLiteral("Occurrence references and inputs valid. Apply saves the relationship; "
+                     "Solve Hierarchy or Move Hierarchy computes the placement."));
 }
 Result<std::size_t> ShellAssemblyTools::apply_advanced() {
   if (command_ == Command::CrossSolve && cross_solved_) {
@@ -551,6 +550,6 @@ Result<std::size_t> ShellAssemblyTools::apply_advanced() {
           return project.add_cross_hierarchy_joint(record);
         });
   }
-  return Result<std::size_t>::failure(invalid("Hierarchieprüfung ist schreibgeschützt"));
+  return Result<std::size_t>::failure(invalid("Hierarchy inspection is read-only"));
 }
 } // namespace blcad::gui

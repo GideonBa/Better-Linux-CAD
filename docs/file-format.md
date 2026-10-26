@@ -15,8 +15,10 @@ inference. The role survives save/open, solver materialization, splitting and co
 ## Interleaved Part feature order — 2026-10-25
 
 Part JSON optionally includes `feature_order`, an ordered array of executable Feature and
-BodyTransform IDs. The writer emits it when a transform precedes another feature family in the
-dependency order, because family-specific arrays alone cannot preserve that interleaving. It names
+BodyTransform IDs. The writer emits it when a transform precedes another feature family, or any
+executable dependency would be reversed by historical family-array loading (for example
+Fillet → Chamfer → Union). Detection follows executable ancestors through Body aliases as well.
+Family-specific arrays alone cannot preserve that interleaving. It names
 every executable exactly once; unknown, duplicate, missing and non-string IDs or a non-array value
 fail loading. Files without it retain historical family ordering and their existing schema marker.
 
@@ -24,8 +26,8 @@ After typed record loading, the reader rebuilds executable dependencies through 
 family adders in this order, restores non-feature reference consumers and rejects cycles. Authored
 collection ordering remains intact. No OCCT shape or arbitrary dependency edge is stored. Existing
 forward-reference loading boundaries still apply. For example, Translate → Boolean cut → Rotate →
-Scale now survives preview cloning, subsequent transactions, history, save/open and incremental
-recompute with the cut geometry intact. `[core][feature-order]` and `[geometry][feature-order]`
+Scale and curved Fillet → Chamfer → Union survive preview cloning, subsequent transactions,
+history, save/open and incremental recompute with the authored geometry intact. `[core][feature-order]` and `[geometry][feature-order]`
 cover exact graph/JSON restoration, malformed metadata, legacy compatibility and bounds/volumes.
 
 ## Project structure

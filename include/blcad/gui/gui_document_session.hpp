@@ -38,16 +38,15 @@ using GuiPartConstraintMutation =
 using GuiPartDimensionMutation =
     std::function<Result<std::size_t>(PartDocument&, std::vector<SketchDimensionCatalog>&)>;
 using GuiPartSketchIntentMutation = std::function<Result<std::size_t>(
-    PartDocument&, std::vector<SketchConstraintCatalog>&,
-    std::vector<SketchDimensionCatalog>&)>;
+    PartDocument&, std::vector<SketchConstraintCatalog>&, std::vector<SketchDimensionCatalog>&)>;
 using GuiProjectMutation = std::function<Result<std::size_t>(Project&)>;
 
 class GuiDocumentSession {
 public:
   [[nodiscard]] Result<std::size_t> create_part(DocumentId id, std::string name,
-                                                  bool discard_dirty = false);
+                                                bool discard_dirty = false);
   [[nodiscard]] Result<std::size_t> create_project(DocumentId id, std::string name,
-                                                     bool discard_dirty = false);
+                                                   bool discard_dirty = false);
   [[nodiscard]] Result<std::size_t>
   open_file(const std::filesystem::path& path, bool discard_dirty = false,
             GuiDocumentOpenMode mode = GuiDocumentOpenMode::Normal);
@@ -55,20 +54,18 @@ public:
   [[nodiscard]] Result<std::uintmax_t> save_as(const std::filesystem::path& path);
   [[nodiscard]] Result<std::size_t> recompute();
   [[nodiscard]] Result<std::size_t> commit_part_transaction(std::string label,
-                                                              const GuiPartMutation& mutation);
+                                                            const GuiPartMutation& mutation);
   [[nodiscard]] Result<std::size_t> commit_part_repair_transaction(std::string label,
                                                                    const GuiPartMutation& mutation);
   [[nodiscard]] Result<std::size_t>
-  commit_part_constraint_transaction(std::string label,
-                                      const GuiPartConstraintMutation& mutation);
+  commit_part_constraint_transaction(std::string label, const GuiPartConstraintMutation& mutation);
   [[nodiscard]] Result<std::size_t>
-  commit_part_dimension_transaction(std::string label,
-                                     const GuiPartDimensionMutation& mutation);
+  commit_part_dimension_transaction(std::string label, const GuiPartDimensionMutation& mutation);
   [[nodiscard]] Result<std::size_t>
   commit_part_sketch_intent_transaction(std::string label,
-                                         const GuiPartSketchIntentMutation& mutation);
+                                        const GuiPartSketchIntentMutation& mutation);
   [[nodiscard]] Result<std::size_t> commit_project_transaction(std::string label,
-                                                                 const GuiProjectMutation& mutation);
+                                                               const GuiProjectMutation& mutation);
   [[nodiscard]] Result<std::size_t> undo();
   [[nodiscard]] Result<std::size_t> redo();
 
@@ -77,6 +74,12 @@ public:
   void set_derived_results_fresh(bool fresh) noexcept;
   void report_error(const Error& error);
   void clear_diagnostics() noexcept;
+  // Presentation-only visibility is independent of feature suppression and
+  // does not alter document geometry, dirty state, or modeling history.
+  [[nodiscard]] Result<std::size_t> set_presentation_visible(std::string semantic_id, bool visible);
+  [[nodiscard]] bool presentation_visible(std::string_view semantic_id) const noexcept;
+  [[nodiscard]] std::size_t show_all_presentations() noexcept;
+  [[nodiscard]] const std::vector<std::string>& hidden_presentations() const noexcept;
 
   [[nodiscard]] GuiDocumentKind document_kind() const noexcept;
   [[nodiscard]] std::string_view display_name() const noexcept;
@@ -100,12 +103,13 @@ public:
   [[nodiscard]] const geometry::ShapeCache* part_shape_cache() const noexcept;
   [[nodiscard]] const std::vector<GuiDiagnostic>& diagnostics() const noexcept;
   [[nodiscard]] std::size_t presentation_revision() const noexcept;
-  [[nodiscard]] Result<SketchConstraintCatalog>
-  sketch_constraint_catalog(SketchId sketch) const;
+  // Excludes transient presentation visibility changes while preserving all
+  // existing document, authoring, recompute and workspace invalidation behavior.
+  [[nodiscard]] std::size_t model_revision() const noexcept;
+  [[nodiscard]] Result<SketchConstraintCatalog> sketch_constraint_catalog(SketchId sketch) const;
   [[nodiscard]] const std::vector<SketchConstraintCatalog>&
   sketch_constraint_catalogs() const noexcept;
-  [[nodiscard]] Result<SketchDimensionCatalog>
-  sketch_dimension_catalog(SketchId sketch) const;
+  [[nodiscard]] Result<SketchDimensionCatalog> sketch_dimension_catalog(SketchId sketch) const;
   [[nodiscard]] const std::vector<SketchDimensionCatalog>&
   sketch_dimension_catalogs() const noexcept;
 
@@ -133,7 +137,7 @@ private:
 
   [[nodiscard]] Result<std::string> serialize_current() const;
   [[nodiscard]] Result<std::size_t> recompute_part(PartDocument& document,
-                                                     geometry::ShapeCache& cache) const;
+                                                   geometry::ShapeCache& cache) const;
   [[nodiscard]] Result<std::vector<ProjectPartCache>> recompute_project(Project& project) const;
   [[nodiscard]] Result<std::size_t> restore_history(std::size_t index);
   [[nodiscard]] Result<std::size_t> reject_replacement_if_needed(bool discard_dirty) const;
@@ -144,10 +148,9 @@ private:
   validate_dimension_catalogs(const PartDocument& document,
                               const std::vector<SketchDimensionCatalog>& catalogs) const;
   [[nodiscard]] Result<std::size_t>
-  publish_part_state(PartDocument document,
-                     std::vector<SketchConstraintCatalog> constraints,
-                     std::vector<SketchDimensionCatalog> dimensions,
-                     std::string label, std::size_t changed_count);
+  publish_part_state(PartDocument document, std::vector<SketchConstraintCatalog> constraints,
+                     std::vector<SketchDimensionCatalog> dimensions, std::string label,
+                     std::size_t changed_count);
   void initialize_history(std::string json, std::string label, bool saved);
   void append_history(std::string json, std::string label);
   void record_error(const Error& error);
@@ -173,7 +176,9 @@ private:
   std::vector<GuiDiagnostic> diagnostics_;
   GuiSelectionModel selection_;
   GuiTaskState task_;
+  std::vector<std::string> hidden_presentations_;
   std::size_t presentation_revision_{0};
+  std::size_t visibility_revision_{0};
 };
 
 } // namespace blcad::gui

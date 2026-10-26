@@ -143,10 +143,10 @@ private:
   symmetry(const PartDocument& document, const Sketch& source, const GuiSketchOperationRequest& r,
            const SketchConstraintCatalog& constraints, const SketchDimensionCatalog& dimensions) {
     if (!r.axis || r.entities.empty())
-      return fail(source.id().value(), "Symmetrieachse und Elemente auswählen");
+      return fail(source.id().value(), "Select the symmetry axis and elements");
     const auto* axis = source.find_line_segment(*r.axis);
     if (!axis)
-      return fail(r.axis->value(), "Symmetrieachse muss eine Skizzenlinie sein");
+      return fail(r.axis->value(), "Symmetry axis must be a sketch line");
     auto topology = SketchTopology::migrate_legacy(source);
     if (!topology)
       return Result<GuiSketchOperationPreview>::failure(topology.error());
@@ -157,13 +157,12 @@ private:
           (e->kind() != SketchTopologyEntityKind::Line &&
            e->kind() != SketchTopologyEntityKind::Arc &&
            e->kind() != SketchTopologyEntityKind::Spline))
-        return fail(id.value(), "Bearbeitbare Linien, Bögen oder Splines auswählen");
+        return fail(id.value(), "Select editable lines, arcs, or splines");
       if (std::find(entities.begin(), entities.end(), e) == entities.end())
         entities.push_back(e);
     }
     if (entities.size() != 1U && entities.size() % 2U != 0U)
-      return fail(source.id().value(),
-                  "Eine einzelne Linie oder eine gerade Anzahl von Kurven auswählen");
+      return fail(source.id().value(), "Select a single line or an even number of curves");
     auto authored = constraints.constraints();
     std::vector<std::pair<SketchPointId, SketchPointId>> pairs;
     const auto append = [&](SketchPointId a, SketchPointId b) {
@@ -174,7 +173,7 @@ private:
     };
     if (entities.size() == 1U) {
       if (entities.front()->kind() != SketchTopologyEntityKind::Line)
-        return fail(source.id().value(), "Einzelsymmetrie benötigt eine Linie");
+        return fail(source.id().value(), "Single-entity symmetry requires a line");
       append(entities.front()->points().front(), entities.front()->points().back());
     } else {
       const Point2 d{axis->end().x - axis->start().x, axis->end().y - axis->start().y};
@@ -214,7 +213,7 @@ private:
           }
         }
         if (best == 0)
-          return fail(a->id(), "Passende Kurvenpaare gleichen Typs auswählen");
+          return fail(a->id(), "Select matching curve pairs of the same type");
         const auto* b = entities[best];
         for (std::size_t k = 0; k < a->points().size(); ++k)
           append(a->points()[k], b->points()[reverse ? b->points().size() - 1 - k : k]);
@@ -274,7 +273,7 @@ private:
         !std::isfinite(solve.value().residuals.final_rms) ||
         solve.value().residuals.final_rms > 1e-8)
       return fail(source.id().value(),
-                  "Symmetrie widerspricht vorhandenen Abhängigkeiten oder Bemaßungen");
+                  "Symmetry conflicts with existing constraints or dimensions");
     auto materialized =
         SketchTopologyLegacyMaterializer{}.materialize(source, solve.value().topology);
     if (!materialized)
@@ -293,7 +292,7 @@ private:
       return symmetry(document, *source, r, constraints, dimensions);
     if (r.kind == GuiSketchOperationKind::ProjectGeometry) {
       if (r.projected_curves.empty() && r.projected_splines.empty())
-        return fail(id.value(), "Keine projizierbare Skizzengeometrie ausgewählt");
+        return fail(id.value(), "No projectable sketch geometry selected");
       Sketch candidate = *source;
       std::vector<SketchEntityId> created;
       for (const auto& curve : r.projected_curves) {

@@ -2,6 +2,7 @@
 
 #include "blcad/core/sketch_edit_commands.hpp"
 #include "blcad/core/sketch_topology_part_document.hpp"
+#include "blcad/gui/gui_presentation_visibility.hpp"
 #include "blcad/gui/gui_sketch_constraints.hpp"
 #include "blcad/gui/gui_sketch_dimensions.hpp"
 #include "blcad/gui/gui_sketch_interaction.hpp"
@@ -61,57 +62,57 @@ GuiSketchCreatePick create_pointer_pick(const GuiSketchCreateController& control
 // The headless Polyline tool stays available programmatically but has no
 // separate ribbon entry.
 constexpr std::array<ToolDescriptor, 3> kLineTools{{
-    {"sketch.create.line", "Linie", GuiSketchCreateTool::Line,
-     "Punkte wählen; jede weitere Linie setzt am Ende an, Esc beendet"},
-    {"sketch.create.centerline", "Mittellinie", GuiSketchCreateTool::Centerline,
-     "Strichpunktlinie: Start und Ende wählen"},
-    {"sketch.create.construction_line", "Konstruktionslinie", GuiSketchCreateTool::ConstructionLine,
-     "Gestrichelte Hilfslinie: Start und Ende wählen"},
+    {"sketch.create.line", "Line", GuiSketchCreateTool::Line,
+     "Pick points; each new line continues from the endpoint, Esc finishes"},
+    {"sketch.create.centerline", "Centerline", GuiSketchCreateTool::Centerline,
+     "Dash-dot line: pick start and end"},
+    {"sketch.create.construction_line", "Construction Line", GuiSketchCreateTool::ConstructionLine,
+     "Dashed construction line: pick start and end"},
 }};
 constexpr std::array<ToolDescriptor, 5> kRectangleTools{{
-    {"sketch.create.corner_rectangle", "Rechteck (2 Punkte)",
-     GuiSketchCreateTool::CornerRectangle, "Zwei gegenüberliegende Ecken wählen"},
-    {"sketch.create.center_rectangle", "Rechteck (Mitte)", GuiSketchCreateTool::CenterRectangle,
-     "Mittelpunkt und eine Ecke wählen"},
-    {"sketch.create.three_point_rectangle", "Rechteck (3 Punkte)",
-     GuiSketchCreateTool::ThreePointRectangle, "Basiskante und Höhenpunkt wählen"},
-    {"sketch.create.parallelogram", "Parallelogramm", GuiSketchCreateTool::Parallelogram,
-     "Drei Ecken wählen"},
+    {"sketch.create.corner_rectangle", "Rectangle (2 Points)", GuiSketchCreateTool::CornerRectangle,
+     "Pick two opposite corners"},
+    {"sketch.create.center_rectangle", "Rectangle (Center)", GuiSketchCreateTool::CenterRectangle,
+     "Pick center and one corner"},
+    {"sketch.create.three_point_rectangle", "Rectangle (3 Points)",
+     GuiSketchCreateTool::ThreePointRectangle, "Pick base edge and height point"},
+    {"sketch.create.parallelogram", "Parallelogram", GuiSketchCreateTool::Parallelogram,
+     "Pick three corners"},
     {"sketch.create.polygon", "Polygon", GuiSketchCreateTool::RegularPolygon,
-     "Seitenzahl tippen, dann Mitte und Eckpunkt wählen"},
+     "Enter the number of sides, then pick center and vertex"},
 }};
 constexpr std::array<ToolDescriptor, 6> kCircleTools{{
-    {"sketch.create.center_radius_circle", "Kreis (Mitte/Radius)",
-     GuiSketchCreateTool::CenterRadiusCircle, "Mittelpunkt und Radiuspunkt wählen"},
-    {"sketch.create.center_diameter_circle", "Kreis (Mitte/Durchmesser)",
-     GuiSketchCreateTool::CenterDiameterCircle, "Mittelpunkt und Durchmesserpunkt wählen"},
-    {"sketch.create.two_point_circle", "Kreis (2 Punkte)", GuiSketchCreateTool::TwoPointCircle,
-     "Beide Durchmesser-Endpunkte wählen"},
-    {"sketch.create.three_point_circle", "Kreis (3 Punkte)",
-     GuiSketchCreateTool::ThreePointCircle, "Drei Kreispunkte wählen"},
-    {"sketch.create.tangent_circle", "Kreis (tangential)", GuiSketchCreateTool::TangentCircle,
-     "Berührpunkt auf Kurve, dann Kreispunkt wählen"},
+    {"sketch.create.center_radius_circle", "Circle (Center/Radius)",
+     GuiSketchCreateTool::CenterRadiusCircle, "Pick center and radius point"},
+    {"sketch.create.center_diameter_circle", "Circle (Center/Diameter)",
+     GuiSketchCreateTool::CenterDiameterCircle, "Pick center and diameter point"},
+    {"sketch.create.two_point_circle", "Circle (2 Points)", GuiSketchCreateTool::TwoPointCircle,
+     "Pick both diameter endpoints"},
+    {"sketch.create.three_point_circle", "Circle (3 Points)", GuiSketchCreateTool::ThreePointCircle,
+     "Pick three circle points"},
+    {"sketch.create.tangent_circle", "Circle (Tangent)", GuiSketchCreateTool::TangentCircle,
+     "Pick a tangent point on a curve, then a circle point"},
     {"sketch.create.ellipse", "Ellipse", GuiSketchCreateTool::Ellipse,
-     "Mitte, Hauptachse und Nebenradius wählen"},
+     "Pick center, major axis, and minor radius"},
 }};
 constexpr std::array<ToolDescriptor, 4> kArcTools{{
-    {"sketch.create.center_start_end_arc", "Bogen (Mitte/Start/Ende)",
-     GuiSketchCreateTool::CenterStartEndArc, "Mitte, Start und Endrichtung wählen"},
-    {"sketch.create.three_point_arc", "Bogen (3 Punkte)", GuiSketchCreateTool::ThreePointArc,
-     "Start, Zwischenpunkt und Ende wählen"},
-    {"sketch.create.tangent_arc", "Bogen (tangential)", GuiSketchCreateTool::TangentArc,
-     "Endpunkt einer Kurve, dann Bogenende wählen"},
+    {"sketch.create.center_start_end_arc", "Arc (Center/Start/End)",
+     GuiSketchCreateTool::CenterStartEndArc, "Pick center, start, and end direction"},
+    {"sketch.create.three_point_arc", "Arc (3 Points)", GuiSketchCreateTool::ThreePointArc,
+     "Pick start, intermediate point, and end"},
+    {"sketch.create.tangent_arc", "Arc (Tangent)", GuiSketchCreateTool::TangentArc,
+     "Pick a curve endpoint, then the arc end"},
     {"sketch.create.spline", "Spline", GuiSketchCreateTool::Spline,
-     "Stützpunkte fortlaufend anklicken; Rechtsklick beendet die Spline"},
+     "Click fit points in order; right-click finishes the spline"},
 }};
 constexpr std::array<ToolDescriptor, 2> kSlotTools{{
-    {"sketch.create.center_slot", "Langloch (Mitte–Mitte)", GuiSketchCreateTool::CenterSlot,
-     "Beide Kappenmitten und halbe Breite wählen"},
-    {"sketch.create.overall_slot", "Langloch (Gesamtlänge)", GuiSketchCreateTool::OverallSlot,
-     "Gesamt-Endpunkte und halbe Breite wählen"},
+    {"sketch.create.center_slot", "Slot (Center–Center)", GuiSketchCreateTool::CenterSlot,
+     "Pick both cap centers and half-width"},
+    {"sketch.create.overall_slot", "Slot (Overall Length)", GuiSketchCreateTool::OverallSlot,
+     "Pick overall endpoints and half-width"},
 }};
-constexpr ToolDescriptor kPointTool{"sketch.create.point", "Punkt", GuiSketchCreateTool::Point,
-                                    "Position des Konstruktionspunkts wählen"};
+constexpr ToolDescriptor kPointTool{"sketch.create.point", "Point", GuiSketchCreateTool::Point,
+                                    "Pick the construction point position"};
 
 struct ConstraintDescriptor {
   SketchSolverConstraintKind kind;
@@ -123,19 +124,19 @@ struct ConstraintDescriptor {
 // curve/circle maps to point-on-object, Koinzident with a clicked line
 // midpoint maps to Midpoint (Inventor semantics).
 constexpr std::array<ConstraintDescriptor, 11> kConstraints{{
-    {SketchSolverConstraintKind::Coincident, "Koinzident",
-     "Punkte verbinden oder Punkt auf Kurve/Kreis setzen"},
-    {SketchSolverConstraintKind::Fixed, "Fixiert", "Punkt oder Kurve fixieren"},
-    {SketchSolverConstraintKind::Horizontal, "Horizontal", "Linie horizontal ausrichten"},
-    {SketchSolverConstraintKind::Vertical, "Vertikal", "Linie vertikal ausrichten"},
-    {SketchSolverConstraintKind::Parallel, "Parallel", "Zwei Linien parallel setzen"},
-    {SketchSolverConstraintKind::Perpendicular, "Senkrecht", "Zwei Linien senkrecht setzen"},
-    {SketchSolverConstraintKind::Collinear, "Kollinear", "Zwei Linien kollinear setzen"},
-    {SketchSolverConstraintKind::Equal, "Gleich", "Zwei Linien/Bögen gleich groß setzen"},
-    {SketchSolverConstraintKind::Tangent, "Tangential", "Zwei verbundene Kurven tangential"},
-    {SketchSolverConstraintKind::Concentric, "Konzentrisch", "Zwei Mittelpunkte vereinen"},
-    {SketchSolverConstraintKind::Symmetric, "Symmetrisch",
-     "Symmetrieachse wählen, dann die symmetrischen Elemente auswählen"},
+    {SketchSolverConstraintKind::Coincident, "Coincident",
+     "Connect points or place a point on a curve/circle"},
+    {SketchSolverConstraintKind::Fixed, "Grounded", "Fix a point or curve"},
+    {SketchSolverConstraintKind::Horizontal, "Horizontal", "Make a line horizontal"},
+    {SketchSolverConstraintKind::Vertical, "Vertical", "Make a line vertical"},
+    {SketchSolverConstraintKind::Parallel, "Parallel", "Make two lines parallel"},
+    {SketchSolverConstraintKind::Perpendicular, "Perpendicular", "Make two lines perpendicular"},
+    {SketchSolverConstraintKind::Collinear, "Collinear", "Make two lines collinear"},
+    {SketchSolverConstraintKind::Equal, "Equal", "Make two lines/arcs equal in size"},
+    {SketchSolverConstraintKind::Tangent, "Tangent", "Make two connected curves tangent"},
+    {SketchSolverConstraintKind::Concentric, "Concentric", "Make two centers coincident"},
+    {SketchSolverConstraintKind::Symmetric, "Symmetric",
+     "Pick the symmetry axis, then select the symmetric elements"},
 }};
 
 struct DimensionDescriptor {
@@ -144,15 +145,15 @@ struct DimensionDescriptor {
 };
 
 constexpr std::array<DimensionDescriptor, 9> kDimensions{{
-    {SketchDimensionKind::HorizontalDistance, "Horizontaler Abstand"},
-    {SketchDimensionKind::VerticalDistance, "Vertikaler Abstand"},
-    {SketchDimensionKind::AlignedDistance, "Ausgerichteter Abstand"},
-    {SketchDimensionKind::PointToPointDistance, "Punkt-zu-Punkt"},
-    {SketchDimensionKind::Length, "Länge"},
+    {SketchDimensionKind::HorizontalDistance, "Horizontal Distance"},
+    {SketchDimensionKind::VerticalDistance, "Vertical Distance"},
+    {SketchDimensionKind::AlignedDistance, "Aligned Distance"},
+    {SketchDimensionKind::PointToPointDistance, "Point to Point"},
+    {SketchDimensionKind::Length, "Length"},
     {SketchDimensionKind::Radius, "Radius"},
-    {SketchDimensionKind::Diameter, "Durchmesser"},
-    {SketchDimensionKind::Angle, "Winkel"},
-    {SketchDimensionKind::ArcLength, "Bogenlänge"},
+    {SketchDimensionKind::Diameter, "Diameter"},
+    {SketchDimensionKind::Angle, "Angle"},
+    {SketchDimensionKind::ArcLength, "Arc Length"},
 }};
 
 [[nodiscard]] bool sketch_idle_stage(GuiSketchInteractionStage stage) noexcept {
@@ -172,14 +173,19 @@ constexpr std::array<DimensionDescriptor, 9> kDimensions{{
 
 [[nodiscard]] std::string solve_status_text(SketchSolveStatus status) {
   switch (status) {
-  case SketchSolveStatus::FullyConstrained: return "Voll bestimmt";
-  case SketchSolveStatus::UnderConstrained: return "Unterbestimmt";
+  case SketchSolveStatus::FullyConstrained:
+    return "Fully Constrained";
+  case SketchSolveStatus::UnderConstrained:
+    return "Underconstrained";
   case SketchSolveStatus::Redundant: return "Redundant";
-  case SketchSolveStatus::Conflicting: return "Widersprüchlich";
-  case SketchSolveStatus::NonConvergent: return "Nicht konvergent";
-  case SketchSolveStatus::InvalidReference: return "Ungültige Referenz";
+  case SketchSolveStatus::Conflicting:
+    return "Conflicting";
+  case SketchSolveStatus::NonConvergent:
+    return "Not Converged";
+  case SketchSolveStatus::InvalidReference:
+    return "Invalid Reference";
   }
-  return "Nicht ausgewertet";
+  return "Not Evaluated";
 }
 
 [[nodiscard]] bool numeric_character(QChar character) noexcept {
@@ -304,7 +310,7 @@ delete_sketch_entities(PartDocument& document, const SketchId& sketch,
   const Sketch* source = document.find_sketch(sketch);
   if (source == nullptr)
     return Result<std::size_t>::failure(
-        Error::validation(sketch.value(), "aktive Skizze existiert nicht mehr"));
+        Error::validation(sketch.value(), "active sketch no longer exists"));
   const Sketch snapshot = *source;
   auto topology = SketchTopology::migrate_legacy(snapshot);
   if (topology.has_error())
@@ -316,7 +322,7 @@ delete_sketch_entities(PartDocument& document, const SketchId& sketch,
     const SketchTopologyEntity* target = current.find_entity(entity_id);
     if (target == nullptr)
       return Result<std::size_t>::failure(
-          Error::validation(entity_id, "Skizzengeometrie existiert nicht"));
+          Error::validation(entity_id, "sketch geometry does not exist"));
     owned_points.insert(owned_points.end(), target->points().begin(), target->points().end());
     auto remove_entity = SketchEditCommand::remove_entity(entity_id);
     if (remove_entity.has_error())
@@ -352,7 +358,7 @@ delete_sketch_entities(PartDocument& document, const SketchId& sketch,
   if (representable.value() != current)
     return Result<std::size_t>::failure(Error::validation(
         sketch.value(),
-        "Löschen verletzt referenzierte Bemaßungen/Abhängigkeiten – diese zuerst entfernen"));
+        "Deletion violates referenced dimensions/constraints – remove these first"));
   return document.update_sketch(std::move(materialized.value()));
 }
 
@@ -400,7 +406,7 @@ ShellSketchTools::ShellSketchTools(ShellWindow& window, GuiDocumentSession& sess
       workspace_(workspace), viewport_(viewport), ribbon_(ribbon), sketch_tab_(sketch_tab) {
   dimension_editor_ = new QLineEdit(&viewport_);
   dimension_editor_->setObjectName(QStringLiteral("sketch.dimension.editor"));
-  dimension_editor_->setPlaceholderText(QStringLiteral("Wert oder =Formel"));
+  dimension_editor_->setPlaceholderText(QStringLiteral("Value or =Formula"));
   dimension_editor_->hide();
   dimension_editor_->installEventFilter(this);
   connect(dimension_editor_, &QLineEdit::returnPressed, this, [this] {
@@ -440,16 +446,15 @@ void ShellSketchTools::build_ribbon_groups() {
     return actions;
   };
 
-  auto* draw_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Zeichnen"));
-  ribbon_.add_menu_button(draw_group, QStringLiteral("Linie"), make_tool_menu(kLineTools));
-  ribbon_.add_menu_button(draw_group, QStringLiteral("Rechteck"),
-                          make_tool_menu(kRectangleTools));
-  ribbon_.add_menu_button(draw_group, QStringLiteral("Kreis"), make_tool_menu(kCircleTools));
-  ribbon_.add_menu_button(draw_group, QStringLiteral("Bogen"), make_tool_menu(kArcTools));
-  ribbon_.add_menu_button(draw_group, QStringLiteral("Langloch"), make_tool_menu(kSlotTools));
+  auto* draw_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Draw"));
+  ribbon_.add_menu_button(draw_group, QStringLiteral("Line"), make_tool_menu(kLineTools));
+  ribbon_.add_menu_button(draw_group, QStringLiteral("Rectangle"), make_tool_menu(kRectangleTools));
+  ribbon_.add_menu_button(draw_group, QStringLiteral("Circle"), make_tool_menu(kCircleTools));
+  ribbon_.add_menu_button(draw_group, QStringLiteral("Arc"), make_tool_menu(kArcTools));
+  ribbon_.add_menu_button(draw_group, QStringLiteral("Slot"), make_tool_menu(kSlotTools));
   ribbon_.add_button(draw_group, make_tool_action(kPointTool));
 
-  auto* constrain_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Abhängigkeiten"));
+  auto* constrain_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Constraints"));
   for (const auto& descriptor : kConstraints) {
     auto* action = new QAction(QString::fromUtf8(descriptor.label), this);
     action->setToolTip(QString::fromUtf8(descriptor.description));
@@ -466,9 +471,9 @@ void ShellSketchTools::build_ribbon_groups() {
     ribbon_.add_small_button(constrain_group, action);
     constraint_actions_.push_back(action);
   }
-  delete_constraint_action_ = new QAction(QStringLiteral("Löschen (Entf)"), this);
-  delete_constraint_action_->setToolTip(QStringLiteral(
-      "Ausgewählte Abhängigkeit, Bemaßung oder Skizzengeometrie löschen"));
+  delete_constraint_action_ = new QAction(QStringLiteral("Delete (Del)"), this);
+  delete_constraint_action_->setToolTip(
+      QStringLiteral("Delete selected constraint, dimension, or sketch geometry"));
   delete_constraint_action_->setShortcuts(
       {QKeySequence(QKeySequence::Delete), QKeySequence(Qt::Key_Backspace)});
   connect(delete_constraint_action_, &QAction::triggered, this, [this] {
@@ -481,19 +486,17 @@ void ShellSketchTools::build_ribbon_groups() {
 
   // Ändern-Gruppe (Block 116): Trim/Extend/Split are modal pick tools; Fillet
   // and Chamfer act on exactly two selected curves with a numeric prompt.
-  auto* modify_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Ändern"));
+  auto* modify_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Modify"));
   struct ModifyToolButton {
     const char* label;
     const char* tip;
     SketchModifyKind kind;
   };
   static constexpr std::array<ModifyToolButton, 3> kModifyTools{{
-      {"Trimmen",
-       "Kurve anklicken oder mit gedrückter linker Maustaste über Kurven streichen",
+      {"Trim", "Click a curve or hold the left mouse button and stroke across curves",
        SketchModifyKind::Trim},
-      {"Verlängern", "Kurve zum Verlängern anklicken (bis zur nächsten Kreuzung)",
-       SketchModifyKind::Extend},
-      {"Teilen", "Kurve an der Klickstelle teilen", SketchModifyKind::Split},
+      {"Extend", "Click a curve to extend it to the next intersection", SketchModifyKind::Extend},
+      {"Split", "Split the curve at the clicked position", SketchModifyKind::Split},
   }};
   for (const auto& button : kModifyTools) {
     auto* action = new QAction(QString::fromUtf8(button.label), this);
@@ -503,14 +506,13 @@ void ShellSketchTools::build_ribbon_groups() {
     ribbon_.add_small_button(modify_group, action);
     modify_actions_.push_back(action);
   }
-  fillet_action_ = new QAction(QStringLiteral("Verrundung"), this);
-  fillet_action_->setToolTip(
-      QStringLiteral("Zwei verbundene Kurven verrunden (Radius abfragen)"));
+  fillet_action_ = new QAction(QStringLiteral("Fillet"), this);
+  fillet_action_->setToolTip(QStringLiteral("Fillet two connected curves (enter radius)"));
   connect(fillet_action_, &QAction::triggered, this, [this] {
     bool accepted = false;
-    const double radius = QInputDialog::getDouble(
-        &window_, QStringLiteral("Verrundung"), QStringLiteral("Radius (mm):"), 5.0, 0.001,
-        1.0e6, 3, &accepted);
+    const double radius =
+        QInputDialog::getDouble(&window_, QStringLiteral("Fillet"), QStringLiteral("Radius (mm):"),
+                                5.0, 0.001, 1.0e6, 3, &accepted);
     if (!accepted)
       return;
     const auto applied = apply_fillet(radius);
@@ -519,13 +521,13 @@ void ShellSketchTools::build_ribbon_groups() {
     window_.refresh();
   });
   ribbon_.add_small_button(modify_group, fillet_action_);
-  chamfer_action_ = new QAction(QStringLiteral("Fase"), this);
-  chamfer_action_->setToolTip(QStringLiteral("Zwei verbundene Kurven fasen (Abstand abfragen)"));
+  chamfer_action_ = new QAction(QStringLiteral("Chamfer"), this);
+  chamfer_action_->setToolTip(QStringLiteral("Chamfer two connected curves (enter distance)"));
   connect(chamfer_action_, &QAction::triggered, this, [this] {
     bool accepted = false;
-    const double distance = QInputDialog::getDouble(
-        &window_, QStringLiteral("Fase"), QStringLiteral("Abstand (mm):"), 5.0, 0.001, 1.0e6, 3,
-        &accepted);
+    const double distance =
+        QInputDialog::getDouble(&window_, QStringLiteral("Chamfer"),
+                                QStringLiteral("Distance (mm):"), 5.0, 0.001, 1.0e6, 3, &accepted);
     if (!accepted)
       return;
     const auto applied = apply_chamfer(distance);
@@ -536,7 +538,26 @@ void ShellSketchTools::build_ribbon_groups() {
   ribbon_.add_small_button(modify_group, chamfer_action_);
   build_operation_group();
 
-  auto* dimension_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Bemaßung"));
+  auto* dimension_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Dimension"));
+  rapid_dimension_action_ = new QAction(QStringLiteral("Rapid Dimension"), this);
+  rapid_dimension_action_->setObjectName(QStringLiteral("sketch.dimension.rapid"));
+  rapid_dimension_action_->setCheckable(true);
+  rapid_dimension_action_->setShortcut(QKeySequence(Qt::Key_D));
+  rapid_dimension_action_->setToolTip(
+      QStringLiteral("Hover a curve or pick two points, then click to place. D switches "
+                     "radius/diameter; Escape cancels."));
+  connect(rapid_dimension_action_, &QAction::triggered, this, [this] {
+    if (rapid_dimension_active_) {
+      rapid_alternate_radial_ = !rapid_alternate_radial_;
+      if (viewport_.sketch_snap_result())
+        update_rapid_dimension(viewport_.sketch_snap_result()->raw_point,
+                               viewport_.hovered_sketch_hit());
+    } else
+      (void)begin_rapid_dimension();
+    rapid_dimension_action_->setChecked(rapid_dimension_active_);
+  });
+  window_.addAction(rapid_dimension_action_);
+  ribbon_.add_small_button(dimension_group, rapid_dimension_action_);
   QList<QAction*> dimension_menu;
   for (const auto& descriptor : kDimensions) {
     auto* action = new QAction(QString::fromUtf8(descriptor.label), this);
@@ -553,24 +574,24 @@ void ShellSketchTools::build_ribbon_groups() {
     dimension_menu.push_back(action);
     dimension_actions_.push_back(action);
   }
-  ribbon_.add_menu_button(dimension_group, QStringLiteral("Bemaßung"), dimension_menu);
-  reference_dimension_action_ = new QAction(QStringLiteral("Referenz"), this);
+  ribbon_.add_menu_button(dimension_group, QStringLiteral("Dimension"), dimension_menu);
+  reference_dimension_action_ = new QAction(QStringLiteral("Reference"), this);
   reference_dimension_action_->setCheckable(true);
   reference_dimension_action_->setToolTip(
-      QStringLiteral("Neue Bemaßungen als Referenz (nicht treibend) anlegen"));
+      QStringLiteral("Create new dimensions as reference dimensions (not driving)"));
   ribbon_.add_small_button(dimension_group, reference_dimension_action_);
-  edit_dimension_action_ = new QAction(QStringLiteral("Bearbeiten"), this);
+  edit_dimension_action_ = new QAction(QStringLiteral("Modify"), this);
   edit_dimension_action_->setToolTip(
-      QStringLiteral("Wert der ausgewählten Bemaßung ändern (oder Doppelklick)"));
+      QStringLiteral("Edit selected dimension value (or double-click)"));
   connect(edit_dimension_action_, &QAction::triggered, this,
           [this] { (void)edit_selected_dimension_interactive(); });
   ribbon_.add_small_button(dimension_group, edit_dimension_action_);
 
-  auto* grid_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Raster"));
-  grid_action_ = new QAction(QStringLiteral("Raster"), this);
+  auto* grid_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Grid"));
+  grid_action_ = new QAction(QStringLiteral("Grid"), this);
   grid_action_->setCheckable(true);
   grid_action_->setChecked(true);
-  grid_snap_action_ = new QAction(QStringLiteral("Fang"), this);
+  grid_snap_action_ = new QAction(QStringLiteral("Snap"), this);
   grid_snap_action_->setCheckable(true);
   grid_snap_action_->setChecked(true);
   connect(grid_action_, &QAction::toggled, this, [this] { apply_grid_config(); });
@@ -615,7 +636,7 @@ void ShellSketchTools::wire_viewport_callbacks() {
       return;
     if (workspace_.stage() == GuiSketchInteractionStage::SelectedHandle &&
         !workspace_.show_drag_candidate(session_)) {
-      cancel_drag(true, "Sketch-Drag konnte die Live-Vorschau nicht starten");
+      cancel_drag(true, "Sketch drag could not start live preview");
       return;
     }
     auto queued = drag_controller_->queue_pointer(snap.snapped_point);
@@ -643,6 +664,11 @@ void ShellSketchTools::wire_viewport_callbacks() {
   viewport_.set_sketch_pointer_phase_callback(
       [this](GuiSketchPointerPhase phase, GuiSketchScreenPoint screen, Point2 raw,
              const GuiSketchSnapResult& snap, const std::optional<GuiSketchHit>& hit) {
+        if (rapid_dimension_active_) {
+          if (phase == GuiSketchPointerPhase::Press)
+            rapid_dimension_press(raw, hit);
+          return;
+        }
         if (operation_phase_) {
           operation_phase_(phase, snap.snapped_point, hit);
           return;
@@ -797,6 +823,7 @@ void ShellSketchTools::publish_scene_for(const Sketch& sketch, bool include_anno
     }
   }
 
+  filter_presentation_visibility(session_, scene.value());
   auto plane = workbench_.plane_view(session_, sketch.id());
   if (plane.has_error()) {
     report(plane.error());
@@ -814,6 +841,9 @@ void ShellSketchTools::publish_scene_for(const Sketch& sketch, bool include_anno
 
 void ShellSketchTools::refresh_enablement() {
   const bool active = sketch_context_ready() && !session_.task().active();
+  if (rapid_dimension_action_)
+    rapid_dimension_action_->setEnabled(sketch_context_ready() &&
+                                        (!session_.task().active() || rapid_dimension_active_));
   std::vector<SketchSolverConstraintKind> compatible_constraints;
   std::vector<SketchDimensionKind> compatible_dimensions;
   if (active && sketch_idle_stage(workspace_.stage())) {
@@ -898,11 +928,11 @@ void ShellSketchTools::refresh_enablement() {
 Result<SketchTopology> ShellSketchTools::active_topology() const {
   if (!window_.active_sketch() || session_.part_document() == nullptr)
     return Result<SketchTopology>::failure(
-        Error::validation("gui.shell.sketch", "keine aktive Skizze"));
+        Error::validation("gui.shell.sketch", "no active sketch"));
   const Sketch* sketch = session_.part_document()->find_sketch(*window_.active_sketch());
   if (sketch == nullptr)
     return Result<SketchTopology>::failure(
-        Error::validation(window_.active_sketch()->value(), "aktive Skizze existiert nicht mehr"));
+        Error::validation(window_.active_sketch()->value(), "active sketch no longer exists"));
   return SketchTopology::migrate_legacy(*sketch);
 }
 
@@ -934,7 +964,7 @@ ShellSketchTools::selected_targets(const SketchTopology& topology, bool resolve_
     auto target = selection_target(topology, selection.semantic_id);
     if (!target)
       return Result<std::vector<SketchConstraintIntentTarget>>::failure(Error::validation(
-          selection.semantic_id, "Auswahl ist kein stabiles Punkt- oder Kurvenziel"));
+          selection.semantic_id, "Selection is not a stable point or curve target"));
     // A free-standing sketch point selects as an entity but constrains and
     // dimensions through its single underlying topology point.
     if (target->kind() == SketchConstraintIntentTargetKind::Entity) {
@@ -1014,11 +1044,11 @@ bool ShellSketchTools::begin_tool(GuiSketchCreateTool tool) {
     return false;
   }
   const char* hint = tool == GuiSketchCreateTool::Spline
-                         ? "Spline: Stützpunkte wählen, zum Schließen den Startpunkt anklicken; "
-                           "Rechtsklick beendet"
-                         : "Punkte im Viewport wählen";
+                         ? "Spline: pick fit points; click the start point to close; "
+                           "right-click finishes"
+                         : "Pick points in the viewport";
   if (!workspace_.begin_command(session_, "sketch.create", hint)) {
-    report_message("Skizzenwerkzeug konnte den Workspace-Lebenszyklus nicht starten");
+    report_message("Sketch tool could not start the workspace lifecycle");
     return false;
   }
   auto controller =
@@ -1058,8 +1088,9 @@ bool ShellSketchTools::add_pick(Point2 point, GuiSketchSnapKind kind,
         }
       }
     }
-    if (!tangent_reference) return Result<std::size_t>::failure(
-        Error::validation("tangent", "Bitte eine Ausgangskurve am Berührpunkt wählen"));
+    if (!tangent_reference)
+      return Result<std::size_t>::failure(
+          Error::validation("tangent", "Select a source curve at the tangent point"));
     return create_controller_->add_tangent_reference(*session_.part_document(), *tangent_reference, point);
   }();
   if (added.has_error()) {
@@ -1141,6 +1172,15 @@ bool ShellSketchTools::finish_tool() {
 
 void ShellSketchTools::cancel_tool() {
   cancel_operation_preview();
+  if (rapid_dimension_active_) {
+    rapid_dimension_active_ = false;
+    rapid_dimension_action_->setChecked(false);
+    rapid_targets_.clear();
+    rapid_candidate_.reset();
+    viewport_.set_sketch_dimension_preview(std::nullopt);
+    (void)workspace_.escape(session_);
+    refresh_enablement();
+  }
   cancel_label_drag();
   chain_anchor_.reset();
   modify_tool_.reset(); // switching/cancelling any tool ends a modal modify tool
@@ -1218,7 +1258,7 @@ void ShellSketchTools::update_preview() {
   const auto preview = create_controller_->preview(hover);
   viewport_.set_sketch_preview_polyline(preview.rubber_band, preview.closed);
   if (!preview.constraints.empty())
-    workspace_.set_snap_inference("Abhängigkeits-Vorschau: " + preview.constraints.back().kind);
+    workspace_.set_snap_inference("Constraint preview: " + preview.constraints.back().kind);
 }
 
 void ShellSketchTools::apply_numeric_buffer() {
@@ -1330,7 +1370,7 @@ Result<std::size_t> ShellSketchTools::apply_constraint(SketchSolverConstraintKin
       GuiSketchConstraintController::compatible_kinds(topology.value(), targets.value());
   if (std::find(compatible.begin(), compatible.end(), kind) == compatible.end())
     return Result<std::size_t>::failure(Error::validation(
-        "gui.shell.sketch", "aktuelle Auswahl ist mit dieser Abhängigkeit unvereinbar"));
+        "gui.shell.sketch", "current selection is incompatible with this constraint"));
   auto catalog = session_.sketch_constraint_catalog(topology.value().sketch());
   if (catalog.has_error())
     return Result<std::size_t>::failure(catalog.error());
@@ -1345,7 +1385,7 @@ Result<std::size_t> ShellSketchTools::apply_constraint(SketchSolverConstraintKin
   if (!controller.value().preview().authoring.accepted) {
     const auto& preview = controller.value().preview().authoring;
     std::string message =
-        "Abhängigkeits-Vorschau abgelehnt: " + std::string(to_string(preview.solve.status));
+        "Constraint preview rejected: " + std::string(to_string(preview.solve.status));
     if (!preview.conflict_ids.empty()) {
       message += " [";
       for (std::size_t index = 0U; index < preview.conflict_ids.size(); ++index) {
@@ -1378,8 +1418,8 @@ Result<std::size_t> ShellSketchTools::apply_constraint(SketchSolverConstraintKin
 Result<std::size_t> ShellSketchTools::remove_selected_constraint() {
   const auto selected = selected_accepted_constraint();
   if (!selected)
-    return Result<std::size_t>::failure(Error::validation(
-        "gui.shell.sketch", "genau eine akzeptierte Abhängigkeits-Glyphe auswählen"));
+    return Result<std::size_t>::failure(
+        Error::validation("gui.shell.sketch", "select exactly one accepted constraint glyph"));
   auto removed =
       GuiSketchConstraintController::remove_accepted(session_, *window_.active_sketch(), *selected);
   if (removed.has_error())
@@ -1486,8 +1526,8 @@ Result<std::vector<SketchEntityId>> ShellSketchTools::selected_operation_entitie
     return Result<std::vector<SketchEntityId>>::failure(topology.error());
   const auto reject = [](const std::string& id) {
     return Result<std::vector<SketchEntityId>>::failure(
-        Error::validation(id, "Die gesamte Auswahl muss aus bearbeitbaren Linien, Bögen, Splines "
-                              "oder deren geschlossenen Profilen bestehen"));
+        Error::validation(id, "The entire selection must contain editable lines, arcs, splines, "
+                              "or their closed profiles"));
   };
   const auto append = [&](const SketchTopologyEntity* entity) {
     if (!entity ||
@@ -1527,14 +1567,13 @@ Result<std::vector<SketchEntityId>> ShellSketchTools::selected_operation_entitie
 Result<std::size_t> ShellSketchTools::apply_modify_pick(SketchModifyKind kind,
                                                         const std::string& entity_id, Point2 pick) {
   if (!sketch_context_ready())
-    return Result<std::size_t>::failure(
-        Error::validation("gui.shell.sketch", "keine aktive Skizze"));
+    return Result<std::size_t>::failure(Error::validation("gui.shell.sketch", "no active sketch"));
   auto controller = GuiSketchModifyController::create(session_, *window_.active_sketch());
   if (controller.has_error())
     return Result<std::size_t>::failure(controller.error());
   const SketchEntityId target(entity_id);
   Result<GuiSketchModifyPreview> preview = Result<GuiSketchModifyPreview>::failure(
-      Error::validation("gui.shell.sketch", "unbekannte Änderungsart"));
+      Error::validation("gui.shell.sketch", "unknown modification type"));
   switch (kind) {
   case SketchModifyKind::Trim:
     preview = controller.value().trim(target, pick);
@@ -1561,11 +1600,10 @@ Result<std::size_t> ShellSketchTools::apply_modify_profile_pick(SketchModifyKind
                                                                 const ProfileId& profile_id,
                                                                 Point2 pick) {
   if (!sketch_context_ready())
-    return Result<std::size_t>::failure(
-        Error::validation("gui.shell.sketch", "keine aktive Skizze"));
+    return Result<std::size_t>::failure(Error::validation("gui.shell.sketch", "no active sketch"));
   if (kind != SketchModifyKind::Trim)
     return Result<std::size_t>::failure(
-        Error::validation(profile_id.value(), "Kreisprofile können nur getrimmt werden"));
+        Error::validation(profile_id.value(), "circle profiles can only be trimmed"));
   auto controller = GuiSketchModifyController::create(session_, *window_.active_sketch());
   if (controller.has_error())
     return Result<std::size_t>::failure(controller.error());
@@ -1583,12 +1621,11 @@ Result<std::size_t> ShellSketchTools::apply_modify_profile_pick(SketchModifyKind
 
 Result<std::size_t> ShellSketchTools::apply_fillet(double radius) {
   if (!sketch_context_ready())
-    return Result<std::size_t>::failure(
-        Error::validation("gui.shell.sketch", "keine aktive Skizze"));
+    return Result<std::size_t>::failure(Error::validation("gui.shell.sketch", "no active sketch"));
   const auto ids = selected_sketch_entity_ids();
   if (ids.size() != 2U || session_.selection().size() != 2U)
-    return Result<std::size_t>::failure(Error::validation(
-        "gui.shell.sketch", "genau zwei verbundene Kurven für die Verrundung wählen"));
+    return Result<std::size_t>::failure(
+        Error::validation("gui.shell.sketch", "select exactly two connected curves for fillet"));
   auto controller = GuiSketchModifyController::create(session_, *window_.active_sketch());
   if (controller.has_error())
     return Result<std::size_t>::failure(controller.error());
@@ -1606,12 +1643,11 @@ Result<std::size_t> ShellSketchTools::apply_fillet(double radius) {
 
 Result<std::size_t> ShellSketchTools::apply_chamfer(double distance) {
   if (!sketch_context_ready())
-    return Result<std::size_t>::failure(
-        Error::validation("gui.shell.sketch", "keine aktive Skizze"));
+    return Result<std::size_t>::failure(Error::validation("gui.shell.sketch", "no active sketch"));
   const auto ids = selected_sketch_entity_ids();
   if (ids.size() != 2U || session_.selection().size() != 2U)
     return Result<std::size_t>::failure(
-        Error::validation("gui.shell.sketch", "genau zwei verbundene Kurven für die Fase wählen"));
+        Error::validation("gui.shell.sketch", "select exactly two connected curves for chamfer"));
   auto controller = GuiSketchModifyController::create(session_, *window_.active_sketch());
   if (controller.has_error())
     return Result<std::size_t>::failure(controller.error());
@@ -1632,15 +1668,14 @@ void ShellSketchTools::begin_modify_tool(SketchModifyKind kind) {
     return;
   cancel_tool(); // drop any armed create tool (and clears modify_tool_)
   modify_tool_ = kind;
-  const char* verb = kind == SketchModifyKind::Trim     ? "Trimmen"
-                     : kind == SketchModifyKind::Extend ? "Verlängern"
-                                                        : "Teilen";
+  const char* verb = kind == SketchModifyKind::Trim     ? "Trim"
+                     : kind == SketchModifyKind::Extend ? "Extend"
+                                                        : "Split";
   if (kind == SketchModifyKind::Trim) {
-    report_message(
-        "Ändern: Kurve oder Kreis anklicken oder mit gedrückter linker Maustaste trimmen "
-        "(Esc beendet)");
+    report_message("Modify: click a curve or circle, or hold the left mouse button to trim "
+                   "(Esc finishes)");
   } else {
-    report_message(std::string("Ändern: Kurve zum ") + verb + " anklicken (Esc beendet)");
+    report_message(std::string("Modify: click a curve to ") + verb + " (Esc finishes)");
   }
   // A modify press owns the pointer gesture. In particular, pressing empty
   // space while starting a Trim stroke must not start box selection beneath it.
@@ -1657,9 +1692,8 @@ void ShellSketchTools::handle_modify_press(SketchModifyKind kind,
   }
   const auto target = resolve_modify_hit(topology.value(), kind, hit);
   if (!target) {
-    report_message(kind == SketchModifyKind::Trim
-                       ? "Ändern: bitte eine Kurve oder einen Kreis anklicken"
-                       : "Ändern: bitte eine Kurve anklicken");
+    report_message(kind == SketchModifyKind::Trim ? "Modify: click a curve or circle"
+                                                  : "Modify: click a curve");
     return;
   }
   const auto applied = target->entity
@@ -1742,7 +1776,7 @@ void ShellSketchTools::handle_trim_stroke_hit(const std::optional<GuiSketchHit>&
   const auto target = resolve_modify_hit(topology.value(), SketchModifyKind::Trim, hit);
   if (!target) {
     if (report_miss)
-      report_message("Ändern: bitte eine Kurve oder einen Kreis anklicken");
+      report_message("Modify: click a curve or circle");
     return;
   }
   // Insert before executing. A rejected trim must not emit the same error on
@@ -1778,8 +1812,7 @@ void ShellSketchTools::cancel_trim_stroke() noexcept {
 
 Result<std::size_t> ShellSketchTools::delete_selection() {
   if (!sketch_context_ready())
-    return Result<std::size_t>::failure(
-        Error::validation("gui.shell.sketch", "keine aktive Skizze"));
+    return Result<std::size_t>::failure(Error::validation("gui.shell.sketch", "no active sketch"));
   const SketchId sketch = *window_.active_sketch();
 
   // Collect EVERYTHING selected: constraint glyphs, dimensions, entities.
@@ -1806,21 +1839,20 @@ Result<std::size_t> ShellSketchTools::delete_selection() {
       entity_ids.push_back(target->id());
   }
   if (constraint_ids.empty() && dimension_ids.empty() && entity_ids.empty())
-    return Result<std::size_t>::failure(
-        Error::validation("gui.shell.sketch",
-                          "nichts Löschbares ausgewählt (Abhängigkeit, Bemaßung oder Geometrie)"));
+    return Result<std::size_t>::failure(Error::validation(
+        "gui.shell.sketch", "nothing deletable selected (constraint, dimension, or geometry)"));
 
   // One transaction: drop the selected intents, then every intent referencing
   // a doomed entity (or its points), then the entities plus orphaned points.
   auto removed = session_.commit_part_sketch_intent_transaction(
-      "Auswahl löschen",
+      "Delete selection",
       [sketch, constraint_ids, dimension_ids,
        entity_ids](PartDocument& part, std::vector<SketchConstraintCatalog>& constraint_catalogs,
                    std::vector<SketchDimensionCatalog>& dimension_catalogs) -> Result<std::size_t> {
         const Sketch* source = part.find_sketch(sketch);
         if (source == nullptr)
           return Result<std::size_t>::failure(
-              Error::validation(sketch.value(), "aktive Skizze existiert nicht mehr"));
+              Error::validation(sketch.value(), "active sketch no longer exists"));
         auto topology = SketchTopology::migrate_legacy(*source);
         if (topology.has_error())
           return Result<std::size_t>::failure(topology.error());
@@ -1854,7 +1886,7 @@ Result<std::size_t> ShellSketchTools::delete_selection() {
           const auto* target = topology.value().find_entity(entity_id);
           if (target == nullptr)
             return Result<std::size_t>::failure(
-                Error::validation(entity_id, "Skizzengeometrie existiert nicht"));
+                Error::validation(entity_id, "sketch geometry does not exist"));
           doomed_points.insert(doomed_points.end(), target->points().begin(),
                                target->points().end());
         }
@@ -1934,10 +1966,18 @@ bool ShellSketchTools::edit_selected_dimension_interactive() {
     if (!screen) return false;
     cancel_label_drag();
     dimension_editor_id_ = *id;
-    dimension_editor_->setText(parameter->is_expression()
-        ? QString::fromStdString(*parameter->formula())
-        : QString::number(dimension->kind() == SketchDimensionKind::Angle
-                              ? parameter->value().degrees() : parameter->value().millimeters(), 'g', 12));
+    const bool circle_radius =
+        dimension->kind() == SketchDimensionKind::Radius &&
+        dimension_circle_profile(*session_.part_document(), *dimension, *window_.active_sketch());
+    const auto measured_value =
+        SketchDimensionSolverAdapter::parameter_value(*session_.part_document(), *dimension);
+    if (!measured_value)
+      return false;
+    dimension_editor_->setText(
+        parameter->is_expression()
+            ? QString::fromStdString(circle_radius ? "(" + *parameter->formula() + ") / 2"
+                                                   : *parameter->formula())
+            : QString::number(measured_value.value(), 'g', 12));
     dimension_editor_->setToolTip({});
     const int width = std::min(220, viewport_.width());
     dimension_editor_->setFixedWidth(width);
@@ -1962,16 +2002,35 @@ Result<std::size_t> ShellSketchTools::apply_dimension(SketchDimensionKind kind, 
   auto targets = selected_targets(topology.value(), true);
   if (targets.has_error())
     return Result<std::size_t>::failure(targets.error());
+  return commit_dimension(kind, reference, parameter, std::move(targets.value()));
+}
+
+Result<std::size_t> ShellSketchTools::commit_dimension(
+    SketchDimensionKind kind, bool reference, std::optional<ParameterId> parameter,
+    std::vector<SketchConstraintIntentTarget> selected, std::optional<Point2> label_position) {
+  auto topology = active_topology();
+  if (!topology)
+    return Result<std::size_t>::failure(topology.error());
+  auto targets = Result<std::vector<SketchConstraintIntentTarget>>::success(std::move(selected));
   const auto compatible =
       GuiSketchDimensionController::compatible_kinds(topology.value(), targets.value());
   if (std::find(compatible.begin(), compatible.end(), kind) == compatible.end())
     return Result<std::size_t>::failure(
-        Error::validation("gui.shell.sketch", "Auswahl ist mit dieser Bemaßung unvereinbar"));
+        Error::validation("gui.shell.sketch", "selection is incompatible with this dimension"));
   canonicalize_order(topology.value(), kind, targets.value());
   auto catalog = session_.sketch_dimension_catalog(topology.value().sketch());
   if (catalog.has_error())
     return Result<std::size_t>::failure(catalog.error());
   std::optional<Parameter> pending_parameter;
+  if (!reference && !parameter) {
+    auto probe = SketchDimensionIntent::create(next_dimension_id(catalog.value(), kind), kind,
+                                               SketchDimensionMode::Reference, targets.value(),
+                                               std::nullopt);
+    if (probe)
+      if (const auto* circle = dimension_circle_profile(*session_.part_document(), probe.value(),
+                                                        topology.value().sketch()))
+        parameter = circle->diameter_parameter();
+  }
   if (!reference && !parameter) {
     // Inventor-style: auto-create a dN parameter carrying the CURRENT measured
     // value, so committing the driving dimension does not move geometry.
@@ -1981,8 +2040,8 @@ Result<std::size_t> ShellSketchTools::apply_dimension(SketchDimensionKind kind, 
                                                         std::move(measure_targets), std::nullopt);
     if (measure_intent.has_error())
       return Result<std::size_t>::failure(measure_intent.error());
-    auto measured =
-        SketchDimensionMeasurementEvaluator::measure(topology.value(), measure_intent.value());
+    auto measured = SketchDimensionMeasurementEvaluator::measure(
+        topology.value(), measure_intent.value(), session_.part_document());
     if (measured.has_error())
       return Result<std::size_t>::failure(measured.error());
     std::size_t number = 1;
@@ -2004,6 +2063,21 @@ Result<std::size_t> ShellSketchTools::apply_dimension(SketchDimensionKind kind, 
                                               std::move(targets.value()), parameter);
   if (intent.has_error())
     return Result<std::size_t>::failure(intent.error());
+  if (label_position) {
+    auto measurement = SketchDimensionMeasurementEvaluator::measure(
+        topology.value(), intent.value(), session_.part_document());
+    if (!measurement)
+      return Result<std::size_t>::failure(measurement.error());
+    auto glyph = geometry::SketchDimensionGlyphLayoutResolver{}.resolve(
+        topology.value(), intent.value(), measurement.value());
+    if (!glyph)
+      return Result<std::size_t>::failure(glyph.error());
+    auto placed = intent.value().with_label_offset(
+        {label_position->x - glyph.value().anchor.x, label_position->y - glyph.value().anchor.y});
+    if (!placed)
+      return Result<std::size_t>::failure(placed.error());
+    intent = std::move(placed);
+  }
   auto committed = GuiSketchDimensionController::add(
       session_, topology.value().sketch(), std::move(intent.value()), std::move(pending_parameter));
   if (committed.has_error())
@@ -2014,27 +2088,147 @@ Result<std::size_t> ShellSketchTools::apply_dimension(SketchDimensionKind kind, 
   return committed;
 }
 
+bool ShellSketchTools::begin_rapid_dimension() {
+  if (!sketch_context_ready() || session_.task().active())
+    return false;
+  cancel_tool();
+  if (!workspace_.begin_command(session_, "sketch.dimension.rapid",
+                                "Pick geometry, then click to place a dimension"))
+    return false;
+  rapid_dimension_active_ = true;
+  rapid_dimension_action_->setChecked(true);
+  rapid_alternate_radial_ = false;
+  rapid_targets_.clear();
+  rapid_candidate_.reset();
+  viewport_.set_sketch_selection_enabled(false);
+  viewport_.set_sketch_drag_handles({});
+  window_.statusBar()->showMessage(
+      QStringLiteral("Rapid Dimension: hover a curve or pick two points; click empty space to "
+                     "place. D switches radius/diameter."));
+  return true;
+}
+
+std::optional<SketchConstraintIntentTarget>
+ShellSketchTools::rapid_target(const SketchTopology& topology,
+                               const std::optional<GuiSketchHit>& hit, Point2 pointer) const {
+  if (!hit || hit->kind == GuiSketchHitKind::Dimension || hit->kind == GuiSketchHitKind::Glyph)
+    return std::nullopt;
+  const GuiSelection selected{GuiSelectionKind::SketchEntity, hit->semantic_id};
+  auto target = selection_target(topology, selected.semantic_id);
+  if (!target)
+    return std::nullopt;
+  if (target->kind() == SketchConstraintIntentTargetKind::Entity) {
+    const auto* entity = topology.find_entity(target->id());
+    if (entity) {
+      // A large endpoint tolerance can cover an entire small arc or circle.
+      // Preserve precise point picks, but prefer the curve actually under the
+      // pointer when it is appreciably closer than a nearby fit point.
+      if (hit->kind == GuiSketchHitKind::Point && hit->screen_distance_dip > 3.0) {
+        auto screen = viewport_.sketch_plane_to_screen(pointer);
+        if (screen) {
+          auto curves = viewport_.sketch_curve_hits_along(screen.value(), screen.value());
+          if (curves)
+            for (const auto& curve : curves.value()) {
+              const GuiSelection curve_selection{GuiSelectionKind::SketchEntity, curve.semantic_id};
+              if (curve_selection.semantic_id == selected.semantic_id &&
+                  curve.screen_distance_dip <= 3.0)
+                return target;
+            }
+        }
+      }
+      if (const auto point = resolve_point_role(topology, *entity, hit->candidate_id))
+        return SketchConstraintIntentTarget::point(*point).value();
+      if (entity->kind() == SketchTopologyEntityKind::Point)
+        return SketchConstraintIntentTarget::point(entity->points()[0]).value();
+    }
+  }
+  return target;
+}
+
+void ShellSketchTools::update_rapid_dimension(Point2 pointer,
+                                              const std::optional<GuiSketchHit>& hit) {
+  auto topology = active_topology();
+  if (!topology)
+    return;
+  auto targets = rapid_targets_;
+  const auto hovered = rapid_target(topology.value(), hit, pointer);
+  if (hovered && std::find(targets.begin(), targets.end(), *hovered) == targets.end() &&
+      targets.size() < 2U)
+    targets.push_back(*hovered);
+  auto inferred =
+      GuiRapidDimensionInference::infer(*session_.part_document(), topology.value(),
+                                        std::move(targets), pointer, rapid_alternate_radial_);
+  rapid_candidate_ = inferred ? std::move(inferred.value()) : std::nullopt;
+  if (rapid_candidate_) {
+    const auto& glyph = rapid_candidate_->glyph;
+    viewport_.set_sketch_dimension_preview(GuiSketchAnnotationPrimitive{
+        glyph.semantic_id, glyph.candidate_id, glyph.anchor, GuiSketchHitKind::Dimension,
+        GuiSketchDimensionController::annotation_label(glyph), glyph.leader});
+    window_.statusBar()->showMessage(
+        QStringLiteral(
+            "Rapid Dimension: %1 — %2. Click empty space to place; D switches radius/diameter.")
+            .arg(QString::fromUtf8(to_string(rapid_candidate_->intent.kind()).data()),
+                 QString::fromStdString(glyph.value_text)));
+  } else {
+    viewport_.set_sketch_dimension_preview(std::nullopt);
+    window_.statusBar()->showMessage(QStringLiteral(
+        "Rapid Dimension: pick a curve or two points, then click empty space to place."));
+  }
+}
+
+void ShellSketchTools::rapid_dimension_press(Point2 pointer,
+                                             const std::optional<GuiSketchHit>& hit) {
+  auto topology = active_topology();
+  if (!topology)
+    return;
+  const auto target = rapid_target(topology.value(), hit, pointer);
+  if (target) {
+    if (rapid_targets_.size() >= 2U)
+      rapid_targets_.clear();
+    if (std::find(rapid_targets_.begin(), rapid_targets_.end(), *target) == rapid_targets_.end())
+      rapid_targets_.push_back(*target);
+    update_rapid_dimension(pointer, std::nullopt);
+    return;
+  }
+  if (!rapid_candidate_ || rapid_targets_.empty())
+    return;
+  const auto candidate = *rapid_candidate_;
+  const bool reference = reference_dimension_action_ && reference_dimension_action_->isChecked();
+  auto committed = commit_dimension(candidate.intent.kind(), reference, std::nullopt,
+                                    candidate.intent.targets(), pointer);
+  if (!committed) {
+    report(committed.error());
+    return;
+  }
+  rapid_targets_.clear();
+  rapid_candidate_.reset();
+  viewport_.set_sketch_dimension_preview(std::nullopt);
+  viewport_.set_sketch_selection_enabled(false);
+  viewport_.set_sketch_drag_handles({});
+  window_.refresh();
+}
+
 Result<std::size_t> ShellSketchTools::edit_selected_dimension(const std::string& text) {
   const auto id = selected_dimension();
   if (!id || session_.part_document() == nullptr)
     return Result<std::size_t>::failure(
-        Error::validation("gui.shell.sketch", "genau eine Bemaßungs-Annotation auswählen"));
+        Error::validation("gui.shell.sketch", "select exactly one dimension annotation"));
   return edit_dimension(*id, text);
 }
 
 Result<std::size_t> ShellSketchTools::edit_dimension(SketchDimensionId id, const std::string& text) {
   if (!sketch_context_ready())
-    return Result<std::size_t>::failure(Error::validation(id.value(), "keine aktive Skizze"));
+    return Result<std::size_t>::failure(Error::validation(id.value(), "no active sketch"));
   auto catalog = session_.sketch_dimension_catalog(*window_.active_sketch());
   if (catalog.has_error()) return Result<std::size_t>::failure(catalog.error());
   const auto* dimension = catalog.value().find(id);
   if (dimension == nullptr || !dimension->driving() || !dimension->parameter())
     return Result<std::size_t>::failure(
-        Error::validation(id.value(), "ausgewählte Bemaßung hat keinen treibenden Wert"));
+        Error::validation(id.value(), "selected dimension has no driving value"));
   const Parameter* parameter = session_.part_document()->find_parameter(*dimension->parameter());
   if (parameter == nullptr)
     return Result<std::size_t>::failure(
-        Error::validation(id.value(), "Bemaßungsparameter existiert nicht"));
+        Error::validation(id.value(), "dimension parameter does not exist"));
   Result<std::size_t> edited = [&] {
     const QString input = QString::fromStdString(text).trimmed();
     if (parameter->is_expression() || input.startsWith('=')) {
@@ -2060,7 +2254,7 @@ Result<std::size_t> ShellSketchTools::edit_dimension(SketchDimensionId id, const
     const double value = literal.trimmed().toDouble(&valid);
     if (!valid || !std::isfinite(value) || value <= 0.0)
       return Result<std::size_t>::failure(
-          Error::validation(id.value(), "Bemaßungswert muss positiv und endlich sein"));
+          Error::validation(id.value(), "dimension value must be positive and finite"));
     auto quantity = dimension->kind() == SketchDimensionKind::Angle
                         ? Quantity::angle_deg(value, id.value())
                         : Quantity::length_mm(value, id.value());
@@ -2107,6 +2301,8 @@ void ShellSketchTools::begin_drag(GuiSketchScreenPoint screen) {
   std::optional<GuiSketchDragHandle> nearest;
   double nearest_distance = kHandleToleranceDip;
   for (const auto& handle : handles) {
+    if (!drag_handle_visible(handle))
+      continue;
     auto handle_screen = viewport_.sketch_plane_to_screen(handle.position);
     if (handle_screen.has_error())
       continue;
@@ -2125,7 +2321,7 @@ void ShellSketchTools::begin_drag(GuiSketchScreenPoint screen) {
   }
   if (!workspace_.select_handle(session_, nearest->id)) {
     drag_controller_->cancel();
-    report_message("Skizzen-Handle konnte den Drag-Lebenszyklus nicht starten");
+    report_message("Sketch handle could not start the drag lifecycle");
     return;
   }
   viewport_.set_sketch_selection_enabled(false);
@@ -2148,7 +2344,7 @@ void ShellSketchTools::release_drag(Point2 final_pointer) {
   }
   if (workspace_.stage() == GuiSketchInteractionStage::SelectedHandle &&
       !workspace_.show_drag_candidate(session_)) {
-    cancel_drag(true, "Sketch-Drag konnte die Freigabe-Vorschau nicht starten");
+    cancel_drag(true, "Sketch drag could not start release preview");
     return;
   }
   auto preview = drag_controller_->flush(final_pointer);
@@ -2164,7 +2360,7 @@ void ShellSketchTools::release_drag(Point2 final_pointer) {
     return;
   }
   if (!workspace_.commit_drag(session_))
-    report_message("Drag übernommen, aber der Workspace-Lebenszyklus schloss nicht sauber");
+    report_message("Drag committed, but workspace lifecycle did not close cleanly");
   viewport_.set_sketch_inference_anchor(std::nullopt);
   viewport_.set_sketch_selection_enabled(true);
   drag_controller_.reset();
@@ -2199,11 +2395,45 @@ void ShellSketchTools::publish_drag_preview(const GuiSketchDragPreview& preview)
   show_workspace_status();
 }
 
+bool ShellSketchTools::drag_handle_visible(const GuiSketchDragHandle& handle) const {
+  if (!window_.active_sketch())
+    return false;
+  const std::string prefix = "sketch/" + window_.active_sketch()->value();
+  if (!session_.presentation_visible(prefix))
+    return false;
+  if (handle.dimension_id &&
+      !session_.presentation_visible(prefix + "/dimension/" + handle.dimension_id->value()))
+    return false;
+  if (!handle.entity_id.empty() && !session_.presentation_visible(prefix + "/" + handle.entity_id))
+    return false;
+  if (handle.point_id) {
+    if (handle.entity_id.empty() && drag_controller_) {
+      // Endpoint handles are deduplicated across joined entities. Keep the
+      // shared point draggable if at least one visible owner still uses it.
+      bool owned = false;
+      for (const auto& entity : drag_controller_->source_topology().entities()) {
+        if (std::find(entity.points().begin(), entity.points().end(), *handle.point_id) ==
+            entity.points().end())
+          continue;
+        owned = true;
+        if (session_.presentation_visible(prefix + "/" + entity.id()))
+          return true;
+      }
+      if (owned)
+        return false;
+    }
+    if (!session_.presentation_visible(prefix + "/" + handle.point_id->value()))
+      return false;
+  }
+  return true;
+}
+
 void ShellSketchTools::publish_handles(const std::vector<GuiSketchDragHandle>& handles) {
   std::vector<Point2> positions;
   positions.reserve(handles.size());
   for (const auto& handle : handles)
-    positions.push_back(handle.position);
+    if (drag_handle_visible(handle))
+      positions.push_back(handle.position);
   viewport_.set_sketch_drag_handles(std::move(positions));
 }
 
@@ -2219,7 +2449,10 @@ void ShellSketchTools::handle_pointer(Point2 raw_point, const GuiSketchSnapResul
     candidate_by_semantic_[hit->semantic_id] = hit->candidate_id;
   if (sketch_idle_stage(workspace_.stage()))
     (void)workspace_.set_hover(hit.has_value());
-  show_workspace_status();
+  if (rapid_dimension_active_)
+    update_rapid_dimension(raw_point, hit);
+  else
+    show_workspace_status();
 }
 
 void ShellSketchTools::synchronize_sketch_selection(const std::vector<GuiSelection>& selections) {
@@ -2242,6 +2475,17 @@ void ShellSketchTools::synchronize_sketch_selection(const std::vector<GuiSelecti
 }
 
 bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
+  if (rapid_dimension_active_ && (watched == &viewport_ || watched == &window_) &&
+      event->type() == QEvent::KeyPress &&
+      static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
+    if (!rapid_targets_.empty()) {
+      rapid_targets_.clear();
+      rapid_candidate_.reset();
+      viewport_.set_sketch_dimension_preview(std::nullopt);
+    } else
+      cancel_tool();
+    return true;
+  }
   if (watched == dimension_editor_) {
     if (event->type() == QEvent::FocusOut ||
         (event->type() == QEvent::KeyPress &&
@@ -2334,7 +2578,7 @@ bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
     if (trim_stroke_active_ || trim_stroke_pending_ > 0U)
       cancel_trim_stroke();
     if (drag_controller_ && drag_controller_->active() && drag_stage(workspace_.stage()))
-      cancel_drag(true, "Sketch-Drag abgebrochen: Zeigererfassung verloren");
+      cancel_drag(true, "Sketch drag cancelled: pointer capture lost");
   } else if (watched == &window_ && event->type() == QEvent::KeyPress) {
     auto* key = static_cast<QKeyEvent*>(event);
     if (tool_active()) {
@@ -2379,7 +2623,7 @@ bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
       }
     } else if (modify_tool_ && key->key() == Qt::Key_Escape) {
       cancel_tool();
-      report_message("Ändern beendet");
+      report_message("Modify finished");
       refresh_enablement();
       return true;
     } else if (key->key() == Qt::Key_Escape && drag_controller_ && drag_controller_->active() &&
@@ -2409,13 +2653,13 @@ void ShellSketchTools::show_workspace_status() const {
                    .arg(status.cursor_coordinates->x, 0, 'f', 2)
                    .arg(status.cursor_coordinates->y, 0, 'f', 2);
   if (!status.snap_inference.empty())
-    message += QStringLiteral("   |   Fang: %1").arg(QString::fromStdString(status.snap_inference));
+    message += QStringLiteral("   |   Snap: %1").arg(QString::fromStdString(status.snap_inference));
   if (status.remaining_dof)
     message += QStringLiteral("   |   DOF: %1").arg(*status.remaining_dof);
   if (!status.solve_status.empty())
     message += QStringLiteral("   |   Solver: %1").arg(QString::fromStdString(status.solve_status));
   if (!numeric_buffer_.empty())
-    message += QStringLiteral("   |   Eingabe: %1").arg(QString::fromStdString(numeric_buffer_));
+    message += QStringLiteral("   |   Input: %1").arg(QString::fromStdString(numeric_buffer_));
   window_.statusBar()->showMessage(message);
 }
 

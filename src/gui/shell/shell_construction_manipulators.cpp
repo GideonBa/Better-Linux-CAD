@@ -95,11 +95,11 @@ void ShellConstructionTools::update_manipulator_mode() {
     if (kind == Kind::Point || kind == Kind::Line || kind == Kind::Axis || kind == Kind::Plane)
       manipulation_->addItem(QStringLiteral("Position (XYZ)"), 0);
     if (kind == Kind::Line || kind == Kind::Axis || kind == Kind::Plane)
-      manipulation_->addItem(kind == Kind::Plane ? QStringLiteral("Ebenenrahmen drehen")
-                                                 : QStringLiteral("Richtung drehen"),
+      manipulation_->addItem(kind == Kind::Plane ? QStringLiteral("Rotate Plane Frame")
+                                                 : QStringLiteral("Rotate Direction"),
                              1);
     if (kind == Kind::OffsetPlane && parameter_->currentData().toString().isEmpty())
-      manipulation_->addItem(QStringLiteral("Versatz"), 2);
+      manipulation_->addItem(QStringLiteral("Offset"), 2);
     const int retained = manipulation_->findData(previous);
     if (retained >= 0)
       manipulation_->setCurrentIndex(retained);
@@ -225,7 +225,7 @@ void ShellConstructionTools::edit_grip_numeric() {
   if (numeric_invalid_) {
     apply_->setEnabled(false);
     summary_->setText(
-        QStringLiteral("Ungültiger Griffwert. Zahl in mm bzw. deg eingeben oder Escape drücken."));
+        QStringLiteral("Invalid handle value. Enter a number in mm or deg, or press Escape."));
     return;
   }
   accept_candidate(*layer_.candidate());

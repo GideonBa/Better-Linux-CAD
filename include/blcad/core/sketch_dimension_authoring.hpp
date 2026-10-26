@@ -262,10 +262,33 @@ struct SketchDimensionMeasurement {
                          const SketchDimensionMeasurement&) = default;
 };
 
+// Full circles already have an authoritative diameter parameter. Dimensions
+// expose that same parameter (radius uses a factor of one half), rather than
+// inventing sampled solver points or a second competing size constraint.
+[[nodiscard]] inline const CircleProfile*
+dimension_circle_profile(const PartDocument& document, const SketchDimensionIntent& dimension,
+                         std::optional<SketchId> scope = std::nullopt) {
+  if ((dimension.kind() != SketchDimensionKind::Radius &&
+       dimension.kind() != SketchDimensionKind::Diameter) ||
+      dimension.targets().size() != 1U ||
+      dimension.targets()[0].kind() != SketchConstraintIntentTargetKind::Entity ||
+      !dimension.targets()[0].id().starts_with("profile/"))
+    return nullptr;
+  const ProfileId profile(dimension.targets()[0].id().substr(8U));
+  for (const auto& sketch : document.sketches()) {
+    if (scope && sketch.id() != *scope)
+      continue;
+    if (const auto* circle = sketch.find_circle_profile(profile))
+      return circle;
+  }
+  return nullptr;
+}
+
 class SketchDimensionMeasurementEvaluator {
 public:
   [[nodiscard]] static Result<SketchDimensionMeasurement>
-  measure(const SketchTopology& topology, const SketchDimensionIntent& dimension) {
+  measure(const SketchTopology& topology, const SketchDimensionIntent& dimension,
+          const PartDocument* document = nullptr) {
     constexpr double kPi = 3.141592653589793238462643383279502884;
     const auto point = [&topology, &dimension](std::size_t index) -> Result<Point2> {
       const auto* found = topology.find_point(SketchPointId(dimension.targets()[index].id()));
@@ -355,6 +378,17 @@ public:
     auto selected = entity(0U);
     if (selected.has_error())
       return Result<SketchDimensionMeasurement>::failure(selected.error());
+    if (selected.value()->kind() == SketchTopologyEntityKind::CircleProfile) {
+      const auto* circle =
+          document ? dimension_circle_profile(*document, dimension, topology.sketch()) : nullptr;
+      const auto* diameter =
+          circle ? document->find_parameter(circle->diameter_parameter()) : nullptr;
+      if (!diameter || diameter->type() != ParameterType::Length)
+        return Result<SketchDimensionMeasurement>::failure(Error::validation(
+            dimension.id().value(), "circle dimension requires its Part diameter parameter"));
+      return length_quantity(diameter->value().millimeters() *
+                             (dimension.kind() == SketchDimensionKind::Radius ? 0.5 : 1.0));
+    }
     auto arc = arc_geometry(topology, *selected.value(), dimension.id().value());
     if (arc.has_error())
       return Result<SketchDimensionMeasurement>::failure(arc.error());
@@ -426,6 +460,12 @@ public:
     auto value = parameter_value(document, dimension);
     if (value.has_error())
       return Result<std::optional<SketchSolverConstraint>>::failure(value.error());
+    if (const auto* circle = dimension_circle_profile(document, dimension, topology.sketch())) {
+      if (!dimension.parameter() || *dimension.parameter() != circle->diameter_parameter())
+        return Result<std::optional<SketchSolverConstraint>>::failure(Error::validation(
+            dimension.id().value(), "circle dimension must bind its existing diameter parameter"));
+      return Result<std::optional<SketchSolverConstraint>>::success(std::nullopt);
+    }
 
     std::vector<SketchSolverTarget> targets;
     SketchSolverConstraintKind kind = SketchSolverConstraintKind::AlignedDistance;
@@ -514,9 +554,11 @@ public:
     if (parameter->type() != expected)
       return Result<double>::failure(Error::validation(
           dimension.id().value(), "dimension parameter type does not match its family"));
-    const double value = expected == ParameterType::Angle
-                             ? parameter->value().degrees()
-                             : parameter->value().millimeters();
+    double value = expected == ParameterType::Angle ? parameter->value().degrees()
+                                                    : parameter->value().millimeters();
+    if (dimension.kind() == SketchDimensionKind::Radius &&
+        dimension_circle_profile(document, dimension))
+      value *= 0.5;
     if (!std::isfinite(value) || value <= 0.0)
       return Result<double>::failure(Error::validation(
           dimension.id().value(), "driving dimension value must be finite and positive"));
@@ -548,6 +590,13 @@ public:
         (expected == ParameterType::Length && value.kind() != QuantityKind::LengthMm))
       return Result<std::size_t>::failure(Error::validation(
           dimension_id.value(), "literal edit quantity type does not match the dimension"));
+    if (dimension->kind() == SketchDimensionKind::Radius &&
+        dimension_circle_profile(document, *dimension, catalog.sketch())) {
+      auto diameter = Quantity::length_mm(2.0 * value.millimeters(), dimension_id.value());
+      if (!diameter)
+        return Result<std::size_t>::failure(diameter.error());
+      value = diameter.value();
+    }
     auto affected = document.set_parameter_value(*dimension->parameter(), value);
     if (affected.has_error()) return Result<std::size_t>::failure(affected.error());
     return Result<std::size_t>::success(affected.value().size());
@@ -567,6 +616,12 @@ public:
     if (parameter == nullptr)
       return Result<std::size_t>::failure(Error::validation(
           dimension_id.value(), "dimension parameter does not exist"));
+    const auto* circle = dimension_circle_profile(document, dimension, catalog.sketch());
+    if (circle && dimension.kind() == SketchDimensionKind::Radius)
+      formula = "2 * (" + formula + ")";
+    if (circle && !parameter->is_expression())
+      return Result<std::size_t>::failure(Error::validation(
+          dimension_id.value(), "edit the circle's diameter parameter to introduce an expression"));
     if (parameter->is_expression()) {
       auto affected = document.set_parameter_formula(parameter->id(), std::move(formula));
       if (affected.has_error()) return Result<std::size_t>::failure(affected.error());
@@ -598,6 +653,10 @@ public:
     if (stored == nullptr || !stored->driving())
       return Result<std::size_t>::failure(Error::validation(
           dimension_id.value(), "parameter rebinding requires a driving dimension"));
+    if (const auto* circle = dimension_circle_profile(document, *stored, catalog.sketch());
+        circle && parameter_id != circle->diameter_parameter())
+      return Result<std::size_t>::failure(Error::validation(
+          dimension_id.value(), "circle dimensions share the circle's diameter parameter"));
     const Parameter* parameter = document.find_parameter(parameter_id);
     if (parameter == nullptr)
       return Result<std::size_t>::failure(Error::validation(

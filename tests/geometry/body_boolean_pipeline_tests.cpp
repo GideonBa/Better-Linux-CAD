@@ -1,5 +1,7 @@
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include <TopExp_Explorer.hxx>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -287,5 +289,37 @@ TEST_CASE("Interleaved translated cut rotate and scale retain geometry across JS
     REQUIRE(GeometryRecomputeExecutor{}.execute_plan(*state, plan.value(), cache));
     check();
     CHECK(serialize_part_document_to_json(*state).value() == serialized.value());
+  }
+}
+
+TEST_CASE("Overlapping Union removes shared coplanar seams and replays one solid boundary",
+          "[geometry][body-boolean][union-boundary]") {
+  auto part = PartDocument::create(DocumentId("union.boundary"), "Union boundary").value();
+  REQUIRE(part.add_datum_plane(DatumPlane::xy().value()));
+  add_box(part, "a", 20, 10, 5);
+  add_box(part, "b", 20, 10, 5, {10, 0});
+  REQUIRE(part.add_body_boolean_feature(
+      BodyBooleanFeature::create(FeatureId("union"), BodyBooleanOperation::Add, BodyId("body.a"),
+                                 {BodyId("body.b")}, BodyBooleanResultMode::ModifyTarget,
+                                 std::nullopt, false)
+          .value()));
+  const auto serialized = serialize_part_document_to_json(part).value();
+  auto restored = deserialize_part_document_from_json(serialized);
+  REQUIRE(restored);
+  auto cache = make_cache();
+  for (auto* state : {&part, &restored.value()}) {
+    REQUIRE(GeometryRecomputeExecutor{}.execute_document(*state, cache));
+    CHECK(body_volume(cache, "body.a") == Catch::Approx(1500));
+    CHECK_FALSE(cache.find_body_shape(BodyId("body.b")));
+    const auto* shape = OcctShapeView::get(*cache.find_body_shape(BodyId("body.a")));
+    REQUIRE(shape);
+    std::size_t faces = 0;
+    for (TopExp_Explorer face(*shape, TopAbs_FACE); face.More(); face.Next())
+      ++faces;
+    CHECK(faces == 6);
+    CHECK(RectangleExtrusionAdapter{}
+              .summarize(*cache.find_body_shape(BodyId("body.a")))
+              .solid_count == 1);
+    CHECK(serialize_part_document_to_json(*state).value() == serialized);
   }
 }

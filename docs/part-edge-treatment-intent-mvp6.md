@@ -16,8 +16,16 @@ ChamferFeature: target_body, ordered edges[], mode, one or two parameters
 `DistanceAngle` owns one Length and one Angle parameter; its angle is strictly between 0 and 90
 degrees. Block 68 adds persistent `ParameterType::Angle`/`deg`; angle expressions remain deferred.
 
-Edges accept Block-35/36 semantic linear or circular generated-edge identity. Empty lists,
-duplicate identities, incorrect roles, missing or unsupported producers, missing Bodies, and wrong
+Edges accept Block-35/36 semantic linear or circular generated-edge identity and a producer-anchored
+`ResultEdgeReference` for edges on the actual current Body boundary, including circular/spline rims
+and edges created by preceding finishing, pattern, transform or Boolean operations. A result witness
+stores its source feature, curve family, arc length and seventeen exact curve samples in canonical
+direction. It stores no BRep, traversal ordinal or transient viewer identifier. Geometry recovery
+requires exactly one current edge matching the entire witness within `1e-6 mm`; incompatible
+upstream geometry edits and ambiguous matches fail closed and ask the user to select again.
+This is a conservative selection contract, not automatic topology remapping across shape changes.
+
+Empty lists, duplicate identities, incorrect roles, missing or unsupported producers, missing Bodies, and wrong
 parameter types fail before document state is published. Variable-radius fillets and
 setback/corner-management intent remain deferred.
 
@@ -28,7 +36,9 @@ treatment, which becomes the new producer of the same Body. Edge producers and d
 parameters are explicit dependencies.
 
 Part JSON uses one additive ordered `edge_treatments[]` array with strict `fillet`/`chamfer` and
-`semantic_linear_edge`/`semantic_circular_edge` spellings. Missing arrays deserialize as empty;
+`semantic_linear_edge`/`semantic_circular_edge`/`result_edge` spellings. Result-edge payloads reject
+unknown fields, invalid curve families, missing producers, nonpositive lengths and malformed or
+nonfinite sample points. Missing arrays deserialize as empty;
 unknown fields and malformed mode/parameter combinations fail closed.
 
 ```text
@@ -38,3 +48,6 @@ unknown fields and malformed mode/parameter combinations fail closed.
 Fillet and Chamfer execution plus semantic OCCT-edge recovery are canonical in
 `docs/part-fillet-geometry-mvp6.md` and `docs/part-chamfer-geometry-mvp6.md`. Block 71 ShellFeature
 Core intent and JSON is the next boundary.
+
+`[result-edge]` covers canonical orientation, strict JSON, valid producer dependencies, circular-rim
+fillet followed by chamfer, fresh recompute/JSON replay and fail-closed diameter edits.

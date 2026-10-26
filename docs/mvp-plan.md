@@ -1235,6 +1235,56 @@ separate application startup are verified. Exact evidence and remaining geometri
 `docs/gui-interactive-path-sweep-loft-mvp9.md` and the Part Loft Geometry documents. This improves
 the existing Loft boundary; Block 138 and later STEP import work remain planned.
 
+## English desktop and modeling usability follow-up — 2026-10-26
+
+User-reported desktop and modeling issues are tracked as a follow-up to the accepted Sketcher and
+Modeling surfaces. Numbered progress remains through Block 137; this work does not implement the
+Block-138 STEP reader.
+
+Implemented and verified:
+
+- English desktop labels and defaults, square monochrome controls, black viewport background;
+- exact nested curved profile holes for selection and extrusion;
+- current-result curved edge Fillet/Chamfer references, preserved cross-family execution order and
+  simplified, validated Union boundaries with isolated immutable input caches;
+- fixed, selectable Sketch origin/axes, connected fitted-spline drag including raw closed seams,
+  conservative older-sidecar point migration and per-element visibility;
+- Rapid Dimension hover/placement, projected/aligned point distances, arc/full-circle size annotations,
+  exact placement history and full-circle diameter parameter authority.
+
+Verification covers focused Core/Geometry checks, complex Qt workflows, full Core/Geometry/
+offscreen GUI regression, native xcb captures and separate startup. Current-result edge witnesses
+support unchanged recompute and persistence; geometrically changed edges require explicit reselection.
+The detailed contracts live in the existing region, finishing, Boolean, topology, browser, modeling
+workspace and dimension authoring documents.
+
+| Verification | Result |
+| --- | --- |
+| GUI preset: application, Core, Geometry, GUI tests and STEP exporter | All five targets build |
+| Full Core | 545 cases, 17,037 assertions passed |
+| Full Geometry | 452 cases, 31,557 assertions passed |
+| Full offscreen GUI | 545 passed, 20 native-only skips; 72,769 assertions passed |
+| Shell coverage closure gate | 3 cases, 299 assertions passed |
+| Focused native appearance, Rapid Dimension and closed-spline seam | 8 cases, 350 assertions passed |
+| Native combined hierarchy after popup synchronization correction | 1 case, 792 assertions passed; offscreen counterpart: 747 assertions |
+| Complete native acceptance plus follow-up workflows | 374 cases, 69,278 assertions passed; no skips |
+| Separate native application startup | Starts and remains alive until the six-second smoke timeout |
+
+The follow-up adds 17 GUI test cases, including combined authoring, editing, visibility, invalid-input
+recovery, history and Save/Open workflows. Appearance checks cover white square frames, solid black
+fills, enabled/disabled arrows and opaque white placeholder text. Native popup helpers retain exact
+cursor/row/click assertions while allowing a bounded retry after delayed desktop pointer restoration.
+Screen-space placement tolerances account for native pixel rounding; committed dimensions must retain
+their preview anchor exactly.
+
+Native acceptance combines the canonical shell filter in `docs/gui-shell-acceptance-mvp9r.md`
+with Block-137, automatic Loft subdivision and the follow-up tags in `docs/development-setup.md`.
+The final production/test source freeze is unchanged throughout the successful native run. Captures
+under `/tmp/blcad-ui-modeling-native/` verify the English monochrome ribbon, visible dropdown arrows,
+white placeholders, Rapid Dimension labels, connected spline seams, nested material selection and
+the curved-body Union preview. The available X11 visual emits OCCT's known Medium depth/stencil
+warning; no High-severity, BadDrawable or BadWindow errors occurred. No required check is unavailable.
+
 ## Current next technical step — Block 138 (planned)
 
 Implement the OCCT STEP/XDE reader and deterministic product/body definitions over the verified

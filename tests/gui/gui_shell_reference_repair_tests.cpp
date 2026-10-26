@@ -219,7 +219,7 @@ TEST_CASE("Lost projected references require explicit preview and keep constrain
   const auto before = snapshot(window);
   const auto revision = window.session().presentation_revision();
   begin(window);
-  CHECK(control<QLabel>(window, "diagnostic").text().startsWith("Verloren:"));
+  CHECK(control<QLabel>(window, "diagnostic").text().startsWith("Missing:"));
   CHECK(window.reference_repair_tools().apply().has_error());
   CHECK(control<QComboBox>(window, "replacement").currentIndex() == -1);
   choose(window, "replacement", "feature.new.vertex.top_front_right");
@@ -270,7 +270,7 @@ TEST_CASE("Lost projected references require explicit preview and keep constrain
   REQUIRE(reopened.save_to({}));
   CHECK(bytes(directory.filePath("repaired.blcad.json")) == saved);
   begin(window);
-  CHECK(control<QLabel>(window, "diagnostic").text().startsWith("Aufgelöst"));
+  CHECK(control<QLabel>(window, "diagnostic").text().startsWith("Resolved"));
   CHECK(control<QComboBox>(window, "replacement").findData("point.fallback") == -1);
   window.reference_repair_tools().cancel();
 }
@@ -377,7 +377,7 @@ TEST_CASE("Lost face workplane repair preserves its identity and undoable placem
   load(window, directory, true, true);
   const auto before = snapshot(window);
   begin(window, "plane/");
-  CHECK(control<QLabel>(window, "diagnostic").text().startsWith("Verloren:"));
+  CHECK(control<QLabel>(window, "diagnostic").text().startsWith("Missing:"));
   auto& replacements = control<QComboBox>(window, "replacement");
   CHECK(replacements.count() == 6);
   choose(window, "replacement", "feature.new.face.top");
@@ -600,7 +600,7 @@ TEST_CASE("Repair list edits upsert scoped identities remove individual entries 
   queue_repair(window, "sketch.b/point", "feature.new.vertex.top_front_left");
   auto& pending = control<QListWidget>(window, "pending");
   REQUIRE(pending.count() == 4);
-  CHECK(pending.item(0)->text().contains("new / Fläche oben"));
+  CHECK(pending.item(0)->text().contains("new / Face top"));
   queue_repair(window, "sketch.a/point", "feature.new.vertex.top_back_right");
   REQUIRE(pending.count() == 4);
   CHECK(pending.item(2)->toolTip() == "feature.new.vertex.top_back_right");
@@ -1045,7 +1045,7 @@ TEST_CASE(
   CHECK(snapshot(window) == previous);
   REQUIRE(window.open_path(path, GuiDocumentOpenMode::ReferenceRepair));
   CHECK(window.session().reference_repair_mode());
-  CHECK(window.windowTitle().contains("[Reparatur]"));
+  CHECK(window.windowTitle().contains("[Repair]"));
   CHECK(window.session().part_shape_cache() == nullptr);
   CHECK(window.viewport().presentation_count() == 0);
   REQUIRE(window.reference_repair_tools().active());
@@ -1081,7 +1081,7 @@ TEST_CASE(
   apply(window);
   const auto after = snapshot(window);
   CHECK_FALSE(window.session().reference_repair_mode());
-  CHECK_FALSE(window.windowTitle().contains("[Reparatur]"));
+  CHECK_FALSE(window.windowTitle().contains("[Repair]"));
   CHECK(window.session().derived_results_fresh());
   REQUIRE(window.session().part_shape_cache());
   CHECK(window.session().part_shape_cache()->feature_shape_count() == 4);

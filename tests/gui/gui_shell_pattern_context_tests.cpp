@@ -101,7 +101,7 @@ TEST_CASE("Pattern contexts require exactly one current solid Body and accept cu
   const auto finishing = reference_checked(geometry::FinishingSelectionBuilder::build(
       *window.session().part_document(), *window.session().part_shape_cache(), source.body,
       PartFeatureInputRole::FilletEdge));
-  CHECK(finishing.empty()); // Cylinder eligibility does not depend on rectangular roles.
+  CHECK_FALSE(finishing.empty()); // Curved finishing and pattern sources share the current solid.
   for (const auto id : {"linear_pattern", "circular_pattern", "body_mirror"})
     CHECK(action(window, id).isEnabled());
   CHECK_FALSE(action(window, "fillet").isVisible());

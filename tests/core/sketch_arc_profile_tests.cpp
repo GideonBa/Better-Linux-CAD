@@ -103,7 +103,7 @@ TEST_CASE("Curved profiles traverse reversed source curves without changing endp
   REQUIRE(top);
   CHECK(base->points().front() == top->points().front());
   CHECK(base->points().back() == top->points().back());
-  CHECK(topology.value().points().size() == 3U);
+  CHECK(topology.value().points().size() == 8U);
   auto restored = SketchTopologyLegacyMaterializer{}.materialize(sketch, topology.value());
   REQUIRE(restored);
   CHECK(restored.value().find_arc_segment(SketchEntityId("top"))->start().x == original.start().x);

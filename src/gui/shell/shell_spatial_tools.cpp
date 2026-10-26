@@ -23,7 +23,7 @@ namespace blcad::gui {
 namespace {
 QString title(ShellFeatureTools::Command command) {
   using C = ShellFeatureTools::Command;
-  return command == C::PathCurve ? QStringLiteral("Pfad erstellen")
+  return command == C::PathCurve ? QStringLiteral("Create Path")
          : command == C::Sweep   ? QStringLiteral("Sweep")
                                  : QStringLiteral("Loft");
 }
@@ -49,12 +49,11 @@ bool ShellFeatureTools::spatial_scalar() const noexcept {
 }
 QString ShellFeatureTools::spatial_summary() const {
   if (command_ == Command::PathCurve)
-    return QStringLiteral("%1 verbundene Segmente. Pfadvorschau gültig.")
+    return QStringLiteral("%1 connected segments. Path preview valid.")
         .arg(spatial_order_->count());
   if (command_ == Command::Loft)
-    return QStringLiteral("%1 Schnitte in Listenreihenfolge. Vorschau gültig.")
-        .arg(spatial_order_->count());
-  return QStringLiteral("Profil entlang %1. Vorschau gültig.").arg(spatial_path_->currentText());
+    return QStringLiteral("%1 sections in list order. Preview valid.").arg(spatial_order_->count());
+  return QStringLiteral("Profile along %1. Preview valid.").arg(spatial_path_->currentText());
 }
 
 std::vector<ShellFeatureTools::SpatialInput>
@@ -125,7 +124,7 @@ ShellFeatureTools::spatial_inputs_for(Command command) const {
     for (const auto& path : part->path_curves())
       if (path.closure() == PathClosure::Open)
         choices.push_back(
-            {path.name() + " (offener Pfad)", "path/" + path.id().value(), {}, {}, path.id()});
+            {path.name() + " (Open Path)", "path/" + path.id().value(), {}, {}, path.id()});
   }
   return choices;
 }
@@ -136,19 +135,18 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   auto* form = new QFormLayout(spatial_controls_);
   spatial_mode_ = new QComboBox(spatial_controls_);
   spatial_mode_->setObjectName("blcad.spatial.mode");
-  spatial_mode_->addItems(
-      {QStringLiteral("Volumenkörper"), QStringLiteral("Schnitt"), QStringLiteral("Fläche")});
-  form->addRow(QStringLiteral("Ergebnis"), spatial_mode_);
+  spatial_mode_->addItems({QStringLiteral("Solid"), QStringLiteral("Cut"), QStringLiteral("Face")});
+  form->addRow(QStringLiteral("Result"), spatial_mode_);
   spatial_target_ = new QComboBox(spatial_controls_);
   spatial_target_->setObjectName("blcad.spatial.target");
-  form->addRow(QStringLiteral("Zielkörper"), spatial_target_);
+  form->addRow(QStringLiteral("Target Body"), spatial_target_);
   spatial_pick_ = new QComboBox(spatial_controls_);
   spatial_pick_->setObjectName("blcad.spatial.pick_role");
-  form->addRow(QStringLiteral("Modellklick wählt"), spatial_pick_);
+  form->addRow(QStringLiteral("Viewport Click Selects"), spatial_pick_);
   spatial_source_ = new QComboBox(spatial_controls_);
   spatial_source_->setObjectName("blcad.spatial.source");
-  form->addRow(QStringLiteral("Profil / Element"), spatial_source_);
-  spatial_add_ = new QPushButton(QStringLiteral("Zur Liste hinzufügen"), spatial_controls_);
+  form->addRow(QStringLiteral("Profile / Element"), spatial_source_);
+  spatial_add_ = new QPushButton(QStringLiteral("Add to List"), spatial_controls_);
   spatial_add_->setObjectName("blcad.spatial.add");
   form->addRow(spatial_add_);
   spatial_order_ = new QListWidget(spatial_controls_);
@@ -164,9 +162,9 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   ordering->addLayout(buttons);
   buttons->setContentsMargins(0, 0, 0, 0);
   for (int direction : {-1, 1, 0}) {
-    auto* button = new QPushButton(direction < 0   ? QStringLiteral("Hoch")
-                                   : direction > 0 ? QStringLiteral("Runter")
-                                                   : QStringLiteral("Entfernen"),
+    auto* button = new QPushButton(direction < 0   ? QStringLiteral("Up")
+                                   : direction > 0 ? QStringLiteral("Down")
+                                                   : QStringLiteral("Remove"),
                                    spatial_order_buttons_);
     button->setObjectName(direction < 0   ? "blcad.spatial.order.up"
                           : direction > 0 ? "blcad.spatial.order.down"
@@ -185,8 +183,8 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   }
   form->addRow(spatial_order_buttons_);
   spatial_order_hint_ =
-      new QLabel(QStringLiteral("Liste ziehen oder Hoch/Runter verwenden. Häkchen kehren "
-                                "Segmentrichtung bzw. Schnittnormalen um."),
+      new QLabel(QStringLiteral("Drag the list or use Up/Down. Checkmarks reverse "
+                                "segment direction or section normals."),
                  spatial_order_buttons_);
   spatial_order_hint_->setWordWrap(true);
   spatial_order_hint_->setMinimumHeight(64);
@@ -195,11 +193,11 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   ordering->addWidget(spatial_order_hint_);
   spatial_path_ = new QComboBox(spatial_controls_);
   spatial_path_->setObjectName("blcad.spatial.path");
-  form->addRow(QStringLiteral("Pfad / Leitpfad"), spatial_path_);
+  form->addRow(QStringLiteral("Path / Spine"), spatial_path_);
   spatial_guide_ = new QComboBox(spatial_controls_);
   spatial_guide_->setObjectName("blcad.spatial.guide");
-  form->addRow(QStringLiteral("Führung"), spatial_guide_);
-  spatial_add_guide_ = new QPushButton(QStringLiteral("Führung hinzufügen"), spatial_controls_);
+  form->addRow(QStringLiteral("Guide"), spatial_guide_);
+  spatial_add_guide_ = new QPushButton(QStringLiteral("Add Guide"), spatial_controls_);
   spatial_add_guide_->setObjectName("blcad.spatial.add_guide");
   form->addRow(spatial_add_guide_);
   spatial_guides_ = new QListWidget(spatial_controls_);
@@ -207,22 +205,21 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   spatial_guides_->setDragDropMode(QAbstractItemView::InternalMove);
   spatial_guides_->setMaximumHeight(75);
   form->addRow(spatial_guides_);
-  spatial_remove_guide_ = new QPushButton(QStringLiteral("Führung entfernen"), spatial_controls_);
+  spatial_remove_guide_ = new QPushButton(QStringLiteral("Remove Guide"), spatial_controls_);
   form->addRow(spatial_remove_guide_);
-  spatial_closed_ = new QCheckBox(QStringLiteral("Pfad geschlossen"), spatial_controls_);
+  spatial_closed_ = new QCheckBox(QStringLiteral("Closed Path"), spatial_controls_);
   form->addRow(spatial_closed_);
   spatial_orientation_ = new QComboBox(spatial_controls_);
-  spatial_orientation_->addItems({QStringLiteral("Profilnormal"),
-                                  QStringLiteral("Minimale Verdrehung"),
-                                  QStringLiteral("Fester Oben-Vektor")});
-  form->addRow(QStringLiteral("Orientierung"), spatial_orientation_);
+  spatial_orientation_->addItems({QStringLiteral("Profile Normal"), QStringLiteral("Minimum Twist"),
+                                  QStringLiteral("Fixed Up Vector")});
+  form->addRow(QStringLiteral("Orientation"), spatial_orientation_);
   for (std::size_t i = 0; i < spatial_up_.size(); ++i) {
     auto* input = new QDoubleSpinBox(spatial_controls_);
     input->setRange(-1e6, 1e6);
     input->setDecimals(6);
     input->setKeyboardTracking(false);
     spatial_up_[i] = input;
-    form->addRow(QStringLiteral("Oben %1").arg(QStringLiteral("XYZ").at(i)), input);
+    form->addRow(QStringLiteral("Up %1").arg(QStringLiteral("XYZ").at(i)), input);
     connect(input, &QDoubleSpinBox::valueChanged, this, [this] {
       if (spatial())
         refresh_spatial_preview();
@@ -231,8 +228,8 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   spatial_continuity_ = new QComboBox(spatial_controls_);
   spatial_continuity_->setObjectName("blcad.spatial.continuity");
   spatial_continuity_->addItems({QStringLiteral("C0"), QStringLiteral("G1"), QStringLiteral("G2")});
-  form->addRow(QStringLiteral("Stetigkeit"), spatial_continuity_);
-  sweep_twist_ = new QCheckBox(QStringLiteral("Verdrehung aktiv"), spatial_controls_);
+  form->addRow(QStringLiteral("Continuity"), spatial_continuity_);
+  sweep_twist_ = new QCheckBox(QStringLiteral("Enable Twist"), spatial_controls_);
   form->addRow(sweep_twist_);
   panel->layout()->addWidget(spatial_controls_);
   spatial_controls_->hide();
@@ -307,9 +304,9 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
   const auto* part = session_.part_document();
   if (active() || session_.task().active() || window_.active_sketch() || !part ||
       session_.workspace() != GuiWorkspace::Part || !session_.part_shape_cache())
-    return fail("Räumliche Operation benötigt ein Bauteil ohne aktiven Befehl");
+    return fail("Spatial operation requires a part without an active command");
   if (command != Command::PathCurve && command != Command::Sweep && command != Command::Loft)
-    return fail("Unbekannter räumlicher Befehl");
+    return fail("Unknown spatial command");
   spatial_inputs_ = spatial_inputs_for(command);
   const auto profiles = std::count_if(spatial_inputs_.begin(), spatial_inputs_.end(),
                                       [](const auto& input) { return input.profile.has_value(); });
@@ -319,7 +316,7 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
   if ((command == Command::PathCurve && spatial_inputs_.empty()) ||
       (command == Command::Sweep && (paths < 1 || (profiles < 1 && paths < 2))) ||
       (command == Command::Loft && profiles < 2 && paths < 2))
-    return fail("Zuerst passende Profile und verbundene Pfade erstellen");
+    return fail("Create suitable profiles and connected paths first");
   const QSignalBlocker source(spatial_source_), mode(spatial_mode_), target(spatial_target_),
       path(spatial_path_), guide(spatial_guide_), order(spatial_order_), guides(spatial_guides_),
       closed(spatial_closed_), orientation(spatial_orientation_), continuity(spatial_continuity_),
@@ -334,8 +331,8 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
   for (std::size_t i = 0; i < spatial_inputs_.size(); ++i)
     spatial_source_->addItem(QString::fromStdString(spatial_inputs_[i].label), static_cast<int>(i));
   if (command == Command::Loft)
-    spatial_path_->addItem(QStringLiteral("Keiner"), QString());
-  spatial_guide_->addItem(QStringLiteral("Keine"), QString());
+    spatial_path_->addItem(QStringLiteral("None"), QString());
+  spatial_guide_->addItem(QStringLiteral("None"), QString());
   for (const auto& item : part->path_curves())
     if (item.closure() == PathClosure::Open) {
       spatial_path_->addItem(QString::fromStdString(item.name()),
@@ -350,10 +347,10 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
                                QString::fromStdString(body.id().value()));
   if (command == Command::Sweep)
     spatial_pick_->addItems(
-        {QStringLiteral("Profil"), QStringLiteral("Pfad"), QStringLiteral("Führung")});
+        {QStringLiteral("Profile"), QStringLiteral("Path"), QStringLiteral("Guide")});
   else
-    spatial_pick_->addItems({QStringLiteral("Schnitt / Segment hinzufügen"),
-                             QStringLiteral("Leitpfad"), QStringLiteral("Führung hinzufügen")});
+    spatial_pick_->addItems({QStringLiteral("Add Section / Segment"), QStringLiteral("Spine"),
+                             QStringLiteral("Add Guide")});
   for (std::size_t n = 1;; ++n) {
     const auto suffix = std::to_string(n);
     spatial_feature_ = FeatureId("feature.spatial." + suffix);
@@ -365,7 +362,7 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
         part->dependency_graph().has_node(spatial_path_id_.value()) ||
         part->find_body(spatial_result_) || part->find_parameter(spatial_twist_parameter_) ||
         std::any_of(part->parameters().begin(), part->parameters().end(),
-                    [&](const auto& p) { return p.name() == spatial_name_ + " Verdrehung"; }) ||
+                    [&](const auto& p) { return p.name() == spatial_name_ + " Twist"; }) ||
         std::any_of(part->bodies().begin(), part->bodies().end(),
                     [&](const auto& b) { return b.name() == spatial_name_; }))
       continue;
@@ -391,16 +388,16 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
   spatial_order_hint_->setText(
       command == Command::Loft
           ? QStringLiteral(
-                "Schnitte mit Hoch/Runter ordnen. Häkchen kehren Normalen um. "
-                "Profilsegmente werden automatisch angepasst; Skizzen bleiben unverändert.")
-          : QStringLiteral("Liste ziehen oder Hoch/Runter verwenden. Häkchen kehren "
-                           "Segmentrichtung bzw. Schnittnormalen um."));
+                "Order sections with Up/Down. Checkmarks reverse normals. "
+                "Profile segments are adjusted automatically; sketches remain unchanged.")
+          : QStringLiteral("Drag the list or use Up/Down. Checkmarks reverse "
+                           "segment direction or section normals."));
   if (!session_.task().begin(std::string(command_id())) ||
       !session_.task().begin_parameter_editing() || !session_.task().show_preview()) {
     command_ = Command::None;
     if (session_.task().active())
       (void)session_.task().cancel();
-    return fail("Räumliche Aufgabe konnte nicht gestartet werden");
+    return fail("Could not start spatial task");
   }
   previous_selection_mask_ = viewport_.selection_filter_mask();
   previous_semantic_scope_ = viewport_.selection_semantic_scope();
@@ -470,11 +467,11 @@ void ShellFeatureTools::update_spatial_pick_scope() {
 Result<std::size_t> ShellFeatureTools::append_spatial_input(int choice) {
   if (!spatial() || command_ == Command::Sweep || choice < 0 ||
       static_cast<std::size_t>(choice) >= spatial_inputs_.size())
-    return Result<std::size_t>::failure(Error::validation("spatial", "Ungültiges Listenelement"));
+    return Result<std::size_t>::failure(Error::validation("spatial", "Invalid list element"));
   for (int i = 0; i < spatial_order_->count(); ++i)
     if (spatial_order_->item(i)->data(Qt::UserRole).toInt() == choice)
       return Result<std::size_t>::failure(
-          Error::validation("spatial", "Element ist bereits in der Liste"));
+          Error::validation("spatial", "Element is already in the list"));
   {
     const QSignalBlocker block(spatial_order_);
     auto* item =
@@ -490,7 +487,7 @@ Result<std::size_t> ShellFeatureTools::append_spatial_input(int choice) {
 Result<std::size_t> ShellFeatureTools::move_spatial_input(int from, int to) {
   if (!spatial() || from < 0 || to < 0 || from >= spatial_order_->count() ||
       to >= spatial_order_->count())
-    return Result<std::size_t>::failure(Error::validation("spatial", "Ungültige Listenposition"));
+    return Result<std::size_t>::failure(Error::validation("spatial", "Invalid list position"));
   auto* item = spatial_order_->takeItem(from);
   spatial_order_->insertItem(to, item);
   spatial_order_->setCurrentItem(item);
@@ -549,9 +546,8 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
         return Result<std::size_t>::failure(profile.error());
       std::optional<Parameter> twist;
       if (sweep_twist_->isChecked()) {
-        auto parameter =
-            Parameter::create_angle(spatial_twist_parameter_, spatial_name_ + " Verdrehung",
-                                    Quantity::angle_deg(spatial_twist_).value());
+        auto parameter = Parameter::create_angle(spatial_twist_parameter_, spatial_name_ + " Twist",
+                                                 Quantity::angle_deg(spatial_twist_).value());
         if (!parameter)
           return Result<std::size_t>::failure(parameter.error());
         twist = parameter.value();

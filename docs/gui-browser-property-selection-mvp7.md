@@ -59,3 +59,31 @@ families, and recomputes downstream Geometry before Apply. Sketch activation ret
 route; read-only nodes and Project definition context do not become editable by this route.
 Transform-stack records retain their explicit non-goal. Contract and proof:
 `docs/gui-feature-edit-mvp9.md`, `[block136-feature-edit]`.
+
+## Presentation visibility and sketch references (October 2026)
+
+Browser checkboxes and the Hide/Show/Show all hidden presentations context menu control presentation visibility for
+datums, construction geometry, whole sketches, individual sketch entities/profiles/annotations,
+paths, feature results and bodies. Feature rows operate on their result body, including the
+current body after downstream operations. Sketches expose selectable Origin, X axis and Y axis
+reference rows. The same references can be picked in the sketch viewport; they are immutable
+constraint targets rather than authored sketch geometry.
+
+`GuiDocumentSession` owns the hidden semantic identities. Hiding a parent excludes its complete
+semantic subtree from rendering, hit tests and drag handles. Hidden body owners also exclude
+transient edge/face/vertex targets, including construction sources, Extrude face limits and Surface
+selection. The cached current producer mask applies to body-owned targets as well. Visibility is session presentation state: it does not
+suppress features, change model JSON, mark a document dirty, or add modeling history entries;
+opening/replacing a document resets it. Presentation revisions refresh rendering; authoring freshness
+excludes these transient masks, so Hide/Show does not cancel an active construction, dimension,
+parameter, hole or Sketch3D workflow. Real document changes retain their existing stale-input guards.
+Occurrence checkboxes use existing persistent Core
+visibility transactions so nested component/subassembly definitions affect the complete hierarchy.
+Showing a Body that is hidden by its persistent Core flag explicitly enables that flag, including
+Undo/Redo. Checkboxes reflect both Core and transient visibility. Show all hidden presentations
+clears transient masks and preserves independently stored Core visibility flags.
+
+`[shell-reference-visibility]` exercises actual point/axis hits, origin coincidence, a spline
+junction drag, history, browser checkbox toggles and Save/Open in one workflow; it runs with the
+Qt offscreen adapter and the native Qt/OCCT viewer. `[presentation-visibility]` checks semantic
+subtree boundaries and body-owned selection filtering.

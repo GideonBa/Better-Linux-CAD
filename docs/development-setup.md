@@ -1430,3 +1430,26 @@ Body translation, history, canonical Save/Open and STEP export. Run the full Cor
 offscreen GUI binaries after the focused proof, plus separate native startup. Keep source edits,
 builds and GUI runs serial. Actual follow-up results live in
 `docs/gui-interactive-path-sweep-loft-mvp9.md`.
+
+## English desktop and modeling usability follow-up
+
+Build all five GUI-preset targets, then keep source changes, builds, GUI runs and separate native
+startup serial. Core/Geometry tests may run alongside one GUI suite.
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests blcad_export_step -j6
+./build/dev-gui/blcad_core_tests "[edge-treatment],[part-feature-input-reference],[spline-junction-regression],[closed-spline-seam-regression],[sketch-topology]"
+./build/dev-gui/blcad_geometry_tests "[nested-spline-region],[curved-finishing],[union-boundary],[boolean-cache-isolation],[finishing-selection],[body-boolean]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[appearance],[rapid-dimension],[shell-reference-visibility],[presentation-visibility],[nested-spline-region],[curved-union-workflow],[spline-sidecar-migration],[shell-construction-lifecycle]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-ui-modeling-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[appearance],[rapid-dimension],[shell-reference-visibility],[presentation-visibility],[nested-spline-region],[curved-union-workflow],[spline-sidecar-migration],[shell-construction-lifecycle]"
+```
+
+The combined workflows exercise curve hover, projected dimensions, full-circle size editing and arc
+radius, invalid-input recovery, preview cancellation, origin/axis constraints, fitted-spline junction
+drag (including the closed seam before Finish Sketch), browser visibility, nested spline holes,
+circular-edge Fillet/Chamfer, Union, exact history and Save/Open. Older fitted-spline sidecars remap
+only explicitly migrated point aliases; unknown or degenerate references reject opening atomically.
+Visibility checks also keep active Hole/construction tasks and their pick scopes intact while hiding
+and restoring source geometry; real model edits still invalidate stale tasks. Inspect monochrome controls and the model/annotation state in native captures. Run full
+Core, Geometry and offscreen GUI regression plus the shell coverage closure gate after focused proof.
+Actual results belong to the dated follow-up entry in `docs/mvp-plan.md`.

@@ -315,7 +315,7 @@ TEST_CASE("Sketch topology migration shares profile-connected points determinist
       make_triangle({"line.c", "line.a", "line.b"}), &first_report);
   REQUIRE(first);
   CHECK(first_report.migrated());
-  CHECK(first.value().points().size() == 3U);
+  CHECK(first.value().points().size() == 8U);
   CHECK(first_report.identity_changes().size() == 3U);
   CHECK(first_report.identity_changes().front().reason ==
         "legacy profile connectivity now shares one canonical Sketch point");
@@ -351,7 +351,7 @@ TEST_CASE("Sketch topology preserves unrelated coincident point identities",
   SketchTopologyMigrationReport report;
   auto topology = SketchTopology::migrate_legacy(sketch.value(), &report);
   REQUIRE(topology);
-  CHECK(topology.value().points().size() == 4U);
+  CHECK(topology.value().points().size() == 9U);
   CHECK(report.identity_changes().empty());
 
   const auto* line_a = topology.value().find_entity("entity/line.a");
@@ -546,7 +546,7 @@ TEST_CASE("Legacy Part Sketch JSON migrates to canonical topology JSON",
       legacy_json.value(), SketchId("sketch.legacy"));
   REQUIRE(migrated);
   CHECK(migrated.value().report.migrated());
-  CHECK(migrated.value().topology.points().size() == 3U);
+  CHECK(migrated.value().topology.points().size() == 8U);
   CHECK(migrated.value().topology.find_entity("entity/line.a") != nullptr);
   CHECK(migrated.value().topology.find_entity("profile/profile.triangle") != nullptr);
 
