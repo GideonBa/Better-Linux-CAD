@@ -2,6 +2,7 @@
 
 #include "blcad/core/assembly_document.hpp"
 #include "blcad/core/sketch_diagnostics.hpp"
+#include "blcad/core/step_import_freshness.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -107,6 +108,44 @@ GuiBrowserNode part_node(const PartDocument& part, const T& object, GuiBrowserNo
 
 GuiBrowserNode group(std::string label) {
   return {GuiBrowserNodeKind::Group, {}, {}, std::move(label)};
+}
+
+void append_step_sources(GuiBrowserNode& root, const std::vector<StepImportSource>& sources,
+                         const GuiDocumentSession& session, bool project_owner = false) {
+  if (sources.empty())
+    return;
+  auto folder = group("STEP sources");
+  for (const auto& source : sources) {
+    std::string freshness = "save document before inspection";
+    if (!session.file_path().empty()) {
+      std::error_code error;
+      const auto path = std::filesystem::absolute(session.file_path(), error);
+      if (!error) {
+        const auto inspected = inspect_step_import_source(source, path.parent_path());
+        freshness = inspected ? std::string(to_string(inspected.value().state()))
+                              : inspected.error().message();
+      }
+    }
+    const auto segment = [](const std::string& value) {
+      return std::to_string(value.size()) + ":" + value;
+    };
+    GuiBrowserNode node{GuiBrowserNodeKind::ExternalSource,
+                        std::string("step-source/") + (project_owner ? "project/" : "part/") +
+                            segment(root.owner_document_id) + "/" + segment(source.id().value()),
+                        root.owner_document_id, source.name()};
+    node.properties = {
+        property("id", "Source identifier", source.id().value(), GuiPropertyKind::Identifier),
+        property("name", "Name", source.name()),
+        property("path", "Relative asset path", source.project_relative_asset_path(),
+                 GuiPropertyKind::Reference),
+        property("mode", "Import mode", std::string(to_string(source.mode())),
+                 GuiPropertyKind::Enumeration),
+        property("digest", "Accepted SHA-256", source.sha256_digest()),
+        property("freshness", "Source freshness", freshness, GuiPropertyKind::Status),
+    };
+    folder.children.push_back(std::move(node));
+  }
+  root.children.push_back(std::move(folder));
 }
 
 void append_session_diagnostics(GuiBrowserNode& root, const GuiDocumentSession& session) {
@@ -215,7 +254,7 @@ void append_planar_sketches(GuiBrowserNode& parent, const PartDocument& part) {
   }
 }
 
-GuiBrowserNode build_part(const PartDocument& part) {
+GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& session) {
   GuiBrowserNode root{GuiBrowserNodeKind::Document, part.id().value(), part.id().value(), part.name()};
   root.properties = {
       property("id", "Identifier", part.id().value(), GuiPropertyKind::Identifier, false, {},
@@ -331,6 +370,7 @@ GuiBrowserNode build_part(const PartDocument& part) {
   append_part_nodes(analysis, part, part.reference_statuses(), GuiBrowserNodeKind::Analysis);
   append_part_nodes(analysis, part, part.reference_remaps(), GuiBrowserNodeKind::Analysis);
   root.children.push_back(std::move(analysis));
+  append_step_sources(root, part.step_import_sources(), session);
   return root;
 }
 
@@ -448,7 +488,7 @@ Result<std::size_t> unsupported(std::string_view id, std::string_view key) {
 GuiDocumentBrowser GuiDocumentBrowser::build(const GuiDocumentSession& session) {
   GuiDocumentBrowser browser;
   if (const auto* part = session.part_document()) {
-    browser.roots_.push_back(build_part(*part));
+    browser.roots_.push_back(build_part(*part, session));
     for (auto& field : browser.roots_.back().properties)
       if (field.key == "status")
         field.value = recompute_status(session.recompute_status());
@@ -465,7 +505,7 @@ GuiDocumentBrowser GuiDocumentBrowser::build(const GuiDocumentSession& session) 
     project_root.children.push_back(std::move(children));
     auto parts = group("Part documents");
     for (const auto& part : project->part_documents())
-      parts.children.push_back(build_part(part));
+      parts.children.push_back(build_part(part, session));
     project_root.children.push_back(std::move(parts));
     auto analysis = group("Cross-hierarchy analysis");
     for (const auto& constraint : project->cross_hierarchy_constraints())
@@ -473,6 +513,7 @@ GuiDocumentBrowser GuiDocumentBrowser::build(const GuiDocumentSession& session) 
     for (const auto& joint : project->cross_hierarchy_joints())
       analysis.children.push_back({GuiBrowserNodeKind::Joint, joint.id().value(), project->id().value(), joint.id().value(), GuiSelectionKind::AssemblyTarget});
     project_root.children.push_back(std::move(analysis));
+    append_step_sources(project_root, project->step_import_sources(), session, true);
     append_session_diagnostics(project_root, session);
     browser.roots_.push_back(std::move(project_root));
   }

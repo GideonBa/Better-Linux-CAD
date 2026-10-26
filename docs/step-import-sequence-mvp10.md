@@ -1,6 +1,6 @@
 # STEP Import Sequence MVP-10
 
-Status: planned, Blocks 137–143. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
+Status: Block 137 in progress; Blocks 138–143 planned. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
 `docs/gui-shell-reset-sequence-mvp9r.md`); `docs/mvp-plan.md` is the status authority. An earlier
 revision numbered these blocks 132–138, before MVP-9R took that range; only the numbering moved,
 never the content or the ordering.
@@ -148,6 +148,69 @@ Focused tags:
 [core][step-import-json]
 [core][step-import-freshness]
 ```
+
+### Block 137 source and GUI contract — 2026-10-26
+
+`StepImportSource` stores exactly an id, name, canonical relative file path, lowercase SHA-256
+digest and explicit `Reference` or `EditableBody` mode. Both standalone `PartDocument` and `Project`
+own an ordered registry; embedded Parts keep separate registries. Ids and canonical paths must be
+unique within a registry. Names, equal file content and hardlink aliases do not establish identity.
+Refresh preserves identity, path, mode and position, replacing only the accepted digest after another
+file inspection.
+
+Paths use `/` separators. Constructors normalize harmless `.` components and repeated separators;
+parent traversal, absolute/drive paths, backslashes, controls and nonportable filename spellings are
+rejected. Digest constructors normalize hexadecimal case. JSON requires canonical path and lowercase
+digest spelling, exact lowercase mode strings, and exactly five source fields. Optional
+`step_import_sources` arrays are omitted when empty, preserving legacy canonical output. Unknown
+source fields, malformed records and duplicates fail closed. See `docs/file-format.md`.
+
+All paths resolve relative to the containing saved BLCAD document directory, including embedded Part
+sources. Absolute filesystem roots remain runtime context. Inspection streams the complete file
+through OpenSSL SHA-256 and distinguishes `available`, `missing`, `changed` and `unreadable`.
+It requires regular files and real directories: symlinks in the root or asset traversal are rejected,
+including links inside the root. File identity, size and timestamps are checked before/after reading
+and against a newly opened path. A file changing during inspection yields no accepted fingerprint.
+STEP format validation, units and geometry transfer follow in later blocks.
+
+`GuiStepImportWorkbench` prepares disposable registration, refresh or removal evidence and applies
+one Part/Project transaction. Evidence binds canonical document intent, saved path, original source,
+availability and observed digest. Apply rereads and rejects changed evidence without partial mutation;
+a new inspection can recover. Unchanged refresh adds no history and preserves Redo. Removing an
+inspected missing/unreadable source is allowed and deletes only intent, never the file.
+
+Documents with unavailable assets remain openable for recovery. Open, Save and history restoration
+report freshness diagnostics without accepting a new digest or claiming imported geometry. Existing
+authored geometry remains usable because Block 137 has no source-consuming feature yet. Future
+consumers must require matching source evidence. Ordinary Save retains the registered digest even
+when bytes changed. Save As into another directory requires matching assets at every new relative
+location; it neither copies files nor silently rebases references. Document, Sketch-sidecar and STEP
+outputs cannot overwrite registered assets, including missing paths, canonical aliases and hardlinks.
+
+The browser exposes source identity, name, mode, path, digest and inspected state. **STEP-Quellen**
+on the model/Assembly ribbon opens one shell-owned task. Save first, choose an explicit mode, inspect
+the file, prepare a change, then Apply. Existing fields stay read-only; refresh changes only the digest.
+Embedded Part entries show their owner and are read-only; the source chooser addresses only the
+current document's registry. Derived owner scope distinguishes root and embedded registries even
+when Project and Part ids are equal. Browser keys include owner kind and length-encoded ids, so
+slashes within legal ids cannot alias another source. Input changes discard preview evidence. Save
+during a draft writes only accepted intent; Save As, changed model intent, Undo/Redo, New/Open, Escape
+and task close discard drafts. Undo/Redo remain reachable during a source draft when the corresponding
+history step exists; cancellation precedes history restoration. Escape inside the file chooser
+dismisses only that chooser. At 1280×800 the task and source table fit without horizontal scrolling;
+full paths remain available in tooltips, and read-only SHA fields wrap without changing copied text.
+Action identity:
+`blcad.action.step_sources`; task/widget prefix: `blcad.step_import.`.
+
+Loading a Part definition into an Assembly requires matching registered assets at the saved target
+document's relative paths. Loading a Project as a child Assembly rejects Project-owned sources,
+whose owner cannot survive that operation. Embedded Part registries remain intact and undergo the
+same target-root check. No source is silently retargeted.
+
+Focused GUI tags: `[step-import-workbench]`, `[block137-step-import]`,
+`[shell-step-import-workflow]`, `[native-shell-step-import]`. Full regression, native Qt dialog/layout
+checks and existing-shell interaction proof are required before advancing the block; actual results
+are recorded here after verification. `docs/mvp-plan.md` owns numbered completion.
 
 ## Block 138 — OCCT STEP/XDE reader and imported body definitions
 

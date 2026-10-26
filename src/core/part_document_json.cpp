@@ -1,4 +1,5 @@
 #include "blcad/core/part_document_json.hpp"
+#include "step_import_json.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -3643,6 +3644,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   root["schema"] = k_schema;
   root["version"] = k_version;
   root["document"] = json{{"id", document.id().value()}, {"name", document.name()}};
+  if (!document.step_import_sources().empty())
+    root["step_import_sources"] =
+        detail::step_import_sources_to_json(document.step_import_sources());
   root["bodies"] = json::array();
   for (const auto& body : document.bodies())
     root["bodies"].push_back(json{{"id", body.id().value()},
@@ -4039,6 +4043,9 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
                                          document_json.at("name").get<std::string>());
     if (document.has_error())
       return document;
+    auto sources = detail::load_step_import_sources(root, document.value());
+    if (!sources)
+      return Result<PartDocument>::failure(sources.error());
     const json body_array = root.value("bodies", json::array());
     if (!body_array.is_array())
       return Result<PartDocument>::failure(

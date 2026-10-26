@@ -26,8 +26,9 @@
 #include "blcad/core/sketch.hpp"
 #include "blcad/core/sketch_3d.hpp"
 #include "blcad/core/sketch_ownership.hpp"
-#include "blcad/core/sweep_feature.hpp"
+#include "blcad/core/step_import_source.hpp"
 #include "blcad/core/surface_feature.hpp"
+#include "blcad/core/sweep_feature.hpp"
 
 #include <cstddef>
 #include <string>
@@ -150,6 +151,30 @@ public:
                                                                        std::string formula);
   [[nodiscard]] Result<RecomputePlan> create_recompute_plan() const;
   void mark_all_clean() noexcept;
+
+  [[nodiscard]] const std::vector<StepImportSource>& step_import_sources() const noexcept {
+    return step_import_sources_.sources();
+  }
+  [[nodiscard]] std::size_t step_import_source_count() const noexcept {
+    return step_import_sources_.sources().size();
+  }
+  [[nodiscard]] const StepImportSource*
+  find_step_import_source(StepImportSourceId id) const noexcept {
+    return step_import_sources_.find(std::move(id));
+  }
+  [[nodiscard]] Result<std::size_t> add_step_import_source(StepImportSource source) {
+    return step_import_sources_.add(std::move(source));
+  }
+  [[nodiscard]] Result<std::size_t> remove_step_import_source(StepImportSourceId id) {
+    return step_import_sources_.remove(std::move(id));
+  }
+  [[nodiscard]] Result<std::size_t> remove_step_import_source(const StepImportSource& expected) {
+    return step_import_sources_.remove(expected);
+  }
+  [[nodiscard]] Result<std::size_t> refresh_step_import_source(const StepImportSource& expected,
+                                                               std::string digest) {
+    return step_import_sources_.refresh(expected, std::move(digest));
+  }
 
   [[nodiscard]] const DocumentId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
@@ -321,6 +346,7 @@ private:
   [[nodiscard]] Result<std::size_t>
   remove_feature_record(std::vector<FeatureT> PartDocument::*member, const FeatureId& id);
 
+  StepImportSourceRegistry step_import_sources_;
   DocumentId id_;
   std::string name_;
   std::vector<Parameter> parameters_;

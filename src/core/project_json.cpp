@@ -3,6 +3,7 @@
 #include "assembly_joint_json.hpp"
 #include "blcad/core/assembly_document_json.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "step_import_json.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -373,6 +374,9 @@ Result<std::string> serialize_project_to_json(const Project& project) {
             {"cross_hierarchy_constraints", std::move(cross_hierarchy_constraints)},
             {"cross_hierarchy_joints", std::move(cross_hierarchy_joints)},
             {"parts", std::move(parts)}};
+  if (!project.step_import_sources().empty())
+    root["step_import_sources"] =
+        detail::step_import_sources_to_json(project.step_import_sources());
   return Result<std::string>::success(root.dump(2));
 }
 
@@ -399,6 +403,9 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
                                    std::move(assembly.value()));
     if (project.has_error())
       return project;
+    auto sources = detail::load_step_import_sources(root, project.value());
+    if (!sources)
+      return Result<Project>::failure(sources.error());
 
     for (const auto& assembly_json : root.value("assemblies", json::array())) {
       auto child_assembly = assembly_from_json(assembly_json);

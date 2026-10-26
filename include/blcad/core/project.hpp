@@ -6,6 +6,7 @@
 #include "blcad/core/part_document.hpp"
 #include "blcad/core/recompute_plan.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/core/step_import_source.hpp"
 
 #include <cstddef>
 #include <string>
@@ -77,6 +78,30 @@ public:
   set_cross_hierarchy_joint_coordinate_value(AssemblyJointId id, AssemblyJointCoordinateRole role,
                                              Quantity coordinate);
 
+  [[nodiscard]] const std::vector<StepImportSource>& step_import_sources() const noexcept {
+    return step_import_sources_.sources();
+  }
+  [[nodiscard]] std::size_t step_import_source_count() const noexcept {
+    return step_import_sources_.sources().size();
+  }
+  [[nodiscard]] const StepImportSource*
+  find_step_import_source(StepImportSourceId id) const noexcept {
+    return step_import_sources_.find(std::move(id));
+  }
+  [[nodiscard]] Result<std::size_t> add_step_import_source(StepImportSource source) {
+    return step_import_sources_.add(std::move(source));
+  }
+  [[nodiscard]] Result<std::size_t> remove_step_import_source(StepImportSourceId id) {
+    return step_import_sources_.remove(std::move(id));
+  }
+  [[nodiscard]] Result<std::size_t> remove_step_import_source(const StepImportSource& expected) {
+    return step_import_sources_.remove(expected);
+  }
+  [[nodiscard]] Result<std::size_t> refresh_step_import_source(const StepImportSource& expected,
+                                                               std::string digest) {
+    return step_import_sources_.refresh(expected, std::move(digest));
+  }
+
   [[nodiscard]] const DocumentId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
   [[nodiscard]] const AssemblyDocument& assembly() const noexcept;
@@ -112,6 +137,7 @@ private:
   [[nodiscard]] bool has_assembly_document_id(const DocumentId& id) const noexcept;
   [[nodiscard]] bool has_part_document_id(const DocumentId& id) const noexcept;
 
+  StepImportSourceRegistry step_import_sources_;
   DocumentId id_;
   std::string name_;
   AssemblyDocument assembly_;

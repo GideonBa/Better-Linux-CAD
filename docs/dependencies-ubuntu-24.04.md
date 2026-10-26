@@ -31,6 +31,7 @@ These packages prepare the development environment without already adding CAD co
 - `libfmt-dev`
 - `libspdlog-dev`
 - `catch2`
+- `libssl-dev` (Core STEP source SHA-256 fingerprints)
 
 ## Documentation
 
@@ -44,7 +45,7 @@ sudo apt-get update
 sudo apt-get install -y build-essential cmake ninja-build pkg-config git clang-format clang-tidy \
   libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev \
   libocct-data-exchange-dev libocct-visualization-dev libocct-ocaf-dev libocct-draw-dev \
-  qt6-base-dev libeigen3-dev libtbb-dev nlohmann-json3-dev libfmt-dev libspdlog-dev catch2 \
+  qt6-base-dev libeigen3-dev libtbb-dev nlohmann-json3-dev libfmt-dev libspdlog-dev catch2 libssl-dev \
   doxygen graphviz
 ```
 

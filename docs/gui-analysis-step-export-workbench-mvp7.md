@@ -13,6 +13,11 @@ structured Assembly product-graph STEP. Preflight requires a non-empty output, t
 document kind, valid Assembly structure where applicable, and fresh recompute results. Existing
 BodyId/product naming contracts are reused unchanged.
 
+Block 137 also protects registered STEP source paths from export, including sources of embedded
+Parts. Preflight and shell publication reject lexical/canonical aliases and existing hardlinks.
+The saved document supplies the asset root. Source registration does not change export inclusion
+or geometry semantics; details live in `docs/step-import-sequence-mvp10.md`.
+
 Progress reports bounded writer stages. Cancellation is accepted before the writer commit and
 therefore leaves no partial target file. Completion returns mode, exported item count, byte count,
 and a deterministic diagnostic. Writer or preflight failures remain normal GUI diagnostics and do

@@ -8,6 +8,7 @@
 #include "blcad/core/sketch_dimension_authoring_json.hpp"
 #include "blcad/core/sketch_dimension_catalog_system.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/gui/gui_step_import_workbench.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -405,6 +406,7 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
   if (json.has_error()) return Result<std::size_t>::failure(json.error());
   initialize_history(json.value(), "Open", true);
   record_information(path.string(), "document opened");
+  diagnose_step_import_sources();
   if (repair_failure)
     record_error(*repair_failure);
   return Result<std::size_t>::success(1U);
@@ -429,6 +431,12 @@ Result<std::uintmax_t> GuiDocumentSession::save_as(const std::filesystem::path& 
     const auto error = session_error("document path must not be empty");
     record_error(error);
     return Result<std::uintmax_t>::failure(error);
+  }
+
+  const auto protected_sources = validate_step_import_save_as(*this, path);
+  if (!protected_sources) {
+    record_error(protected_sources.error());
+    return Result<std::uintmax_t>::failure(protected_sources.error());
   }
 
   std::optional<std::string> constraint_json;
@@ -486,6 +494,7 @@ Result<std::uintmax_t> GuiDocumentSession::save_as(const std::filesystem::path& 
   saved_sketch_constraint_catalogs_ = sketch_constraint_catalogs_;
   saved_sketch_dimension_catalogs_ = sketch_dimension_catalogs_;
   record_information(path.string(), "document saved");
+  diagnose_step_import_sources();
   return written;
 }
 
@@ -932,7 +941,25 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
     record_error(*repair_failure);
   history_index_ = index;
   selection_.clear();
+  diagnose_step_import_sources();
   return Result<std::size_t>::success(1U);
+}
+
+void GuiDocumentSession::diagnose_step_import_sources() {
+  auto inspected = GuiStepImportWorkbench{}.inspect_sources(*this);
+  if (!inspected) {
+    record_error(inspected.error());
+    return;
+  }
+  for (const auto& item : inspected.value())
+    if (item.report.state() != StepImportFreshness::Available) {
+      diagnostics_.push_back({GuiDiagnosticSeverity::Warning, ErrorCategory::Validation,
+                              item.owner_document.value() + "/" + item.report.source().id().value(),
+                              "STEP source " + std::string(to_string(item.report.state())) + ": " +
+                                  item.report.diagnostic() +
+                                  "; inspect or refresh the source explicitly"});
+      ++presentation_revision_;
+    }
 }
 
 Result<std::size_t>

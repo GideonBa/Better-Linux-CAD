@@ -26,6 +26,7 @@ enum class GuiBrowserNodeKind {
   Constraint,
   Joint,
   Analysis,
+  ExternalSource,
 };
 
 enum class GuiPropertyKind { Identifier, Text, Quantity, Expression, Enumeration, Boolean, Reference, OrderedInputs, Status };

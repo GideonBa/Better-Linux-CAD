@@ -21,6 +21,7 @@
 #include "blcad/gui/shell/shell_sketch_3d_tools.hpp"
 #include "blcad/gui/shell/shell_sketch_diagnostics_tools.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
+#include "blcad/gui/shell/shell_step_import_tools.hpp"
 
 #include <QAbstractItemView>
 #include <QAction>
@@ -290,6 +291,8 @@ ShellWindow::ShellWindow() {
   sketch_3d_tools_ = std::make_unique<ShellSketch3DTools>(*this, *ribbon_, tab_model_);
   parameter_tools_ = std::make_unique<ShellParameterTools>(*this, *ribbon_, tab_model_);
   hole_tools_ = std::make_unique<ShellHoleTools>(*this, *ribbon_, tab_model_);
+  step_import_tools_ =
+      std::make_unique<ShellStepImportTools>(*this, *ribbon_, tab_model_, tab_assembly_);
   context_tools_ = std::make_unique<ShellContextTools>(*this);
   statusBar()->showMessage(QStringLiteral("Bereit"));
   refresh();
@@ -303,6 +306,7 @@ ShellWindow::~ShellWindow() {
   navigation_tools_.reset();
   repeat_tools_.reset();
   context_tools_.reset();
+  step_import_tools_.reset();
   sketch_3d_tools_.reset();
   parameter_tools_.reset();
   hole_tools_.reset();
@@ -707,6 +711,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (step_import_tools_)
+    step_import_tools_->cancel();
   if (hole_tools_)
     hole_tools_->cancel();
   if (parameter_tools_)
@@ -997,6 +1003,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (step_import_tools_)
+    step_import_tools_->cancel();
   if (hole_tools_)
     hole_tools_->cancel();
   if (parameter_tools_)
@@ -1037,6 +1045,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (step_import_tools_)
+    step_import_tools_->cancel();
   if (hole_tools_)
     hole_tools_->cancel();
   if (parameter_tools_)
@@ -1282,8 +1292,10 @@ void ShellWindow::refresh() {
   const bool sketch_active = active_sketch_.has_value();
   action_save_->setEnabled(has_document);
   action_save_as_->setEnabled(has_document);
-  action_undo_->setEnabled(session_.can_undo());
-  action_redo_->setEnabled(session_.can_redo());
+  action_undo_->setEnabled(session_.can_undo() ||
+                           (step_import_tools_ && step_import_tools_->can_undo_after_cancel()));
+  action_redo_->setEnabled(session_.can_redo() ||
+                           (step_import_tools_ && step_import_tools_->can_redo_after_cancel()));
   action_create_sketch_->setEnabled(has_document && !session_.reference_repair_mode() &&
                                     !sketch_active && !session_.task().active() &&
                                     selected_datum_plane().has_value());
@@ -1312,6 +1324,8 @@ void ShellWindow::refresh() {
   refresh_browser();
   refresh_properties();
   synchronize_navigation();
+  if (step_import_tools_)
+    step_import_tools_->refresh();
   if (hole_tools_)
     hole_tools_->refresh();
   if (parameter_tools_)

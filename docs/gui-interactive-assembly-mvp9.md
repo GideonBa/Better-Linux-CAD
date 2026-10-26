@@ -129,6 +129,12 @@ An identical already-owned Part can be reused; conflicting Part identities and d
 identities reject the whole import. Projects with cross-hierarchy intent are rejected before import
 because that intent cannot currently be transferred to a child definition without remapping.
 
+Block 137 additionally preserves each imported Part's STEP source registry and requires its relative
+assets to exist with matching digests in the saved target Project directory before definition import.
+A Project-owned registry prevents loading that Project as a child definition because its owner would
+otherwise be lost. The import neither copies assets nor silently retargets source paths; validation
+failure leaves the entire target unchanged. See `docs/step-import-sequence-mvp10.md`.
+
 Placement uses XYZ translation arrows or one selected X/Y/Z rotation ring, together with six numeric
 fields. A root component can be picked in the model; a root subassembly is selected by name in the
 panel. A preview Project supplies actual posed leaf shapes for the changed occurrence/subtree.

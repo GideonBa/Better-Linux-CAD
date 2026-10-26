@@ -919,18 +919,41 @@ Surface shell reference and the Solid result Body id. The produced solid, its sh
 state remain transient cache products. Canonical Geometry details are in
 `docs/part-closed-shell-to-solid-geometry-mvp6.md`.
 
-## Planned STEP import persistence from STEP Import Block 137
+## STEP source persistence — Block 137
 
-This section is planned architecture, not part of the current schema. Blocks 137–143 in
-`docs/step-import-sequence-mvp10.md` will freeze the exact additive JSON shape.
+Part and Project JSON gain an optional ordered `step_import_sources` array. Embedded Parts retain
+their independent source arrays. An absent array means no sources; serializers omit empty arrays,
+so canonical legacy documents retain their bytes. Existing envelope schema/version identifiers stay
+unchanged. A source record has exactly these five string fields:
+
+```json
+{
+  "id": "source.supplier",
+  "name": "Supplier bracket",
+  "project_relative_asset_path": "assets/bracket.step",
+  "sha256_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "mode": "reference"
+}
+```
+
+The digest above illustrates the spelling using the SHA-256 of an empty file; it does not imply a
+valid STEP document. The other mode is `editable_body`; unknown or implicit modes fail. JSON paths
+must be canonical relative `/` paths without parent traversal or absolute/drive prefixes. Digests
+must have exactly 64 lowercase hexadecimal characters. Unknown source fields, wrong JSON types,
+noncanonical spellings, duplicate ids and duplicate canonical paths within one registry are rejected.
+Array order is authored order. Source id/name are nonempty text without control characters.
+
+Filesystem availability, actual observed hashes and absolute roots are derived. Deserialization
+does not access files or silently accept changed bytes. All paths, including embedded Part paths,
+resolve relative to the saved containing document. Explicit refresh checks the original source and
+reinspects the asset before replacing only its digest. Exact path, freshness, save relocation and GUI
+contracts are in `docs/step-import-sequence-mvp10.md`.
+
+## Remaining STEP import persistence — Blocks 138–143
 
 Planned persistent import intent includes:
 
 ```text
-StepImportSourceId
-canonical project-relative asset path
-SHA-256 source-content digest
-mode = reference | editable_body
 selected imported product/body definitions
 persistent BLCAD BodyId outputs for EditableBody
 semantic imported-topology catalog and recovery descriptors

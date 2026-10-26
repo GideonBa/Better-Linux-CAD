@@ -19,7 +19,7 @@ phase_status:
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 implemented; MVP complete"
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
-  mvp_10: "STEP Import — Blocks 137–143 planned"
+  mvp_10: "STEP Import — Block 137 in progress; Blocks 138–143 planned"
 ---
 
 # MVP Plan
@@ -32,7 +32,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 136
-current block        Block 137 (planned)
+current block        Block 137 (in progress)
 current phase        STEP Import MVP-10
 current boundary     STEP source identity, import modes, JSON, and freshness
 ```
@@ -64,7 +64,7 @@ MVP-7   GUI Feature Validation                        Blocks 95–105 implemente
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
 MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 implemented
 MVP-9R  GUI Shell Reset                                 Blocks 132–136 implemented
-MVP-10  STEP Import                                            Blocks 137–143 planned
+MVP-10  STEP Import                         Block 137 in progress; Blocks 138–143 planned
 ```
 
 Canonical phase sequences:
@@ -1197,13 +1197,16 @@ GUI Shell Reset MVP-9R is complete through Block 136. Existing feature-specific 
 remain explicit, including discrete Revolute sampling and shared child-definition pose authority.
 Historical Block-131 controller acceptance remains separate from the completed shell evidence.
 
-## Current next technical step — Block 137 (planned)
+## Current next technical step — Block 137 (in progress)
 
 Start STEP source identity, explicit Reference/EditableBody modes, canonical JSON and freshness
 contracts according to `docs/step-import-sequence-mvp10.md`. Define portable project-relative source
 paths, SHA-256 digests and explicit missing/changed/unreadable-source diagnostics, with transactional
 refresh intent and focused Core tests. The matching source/mode task must consume that authority.
-The OCCT STEP/XDE reader follows in Block 138; Blocks 137–143 remain planned.
+Implementation started on 2026-10-26. Core source registries, immutable preview/refresh evidence,
+saved-document-relative asset checks and shell workflows are under implementation. Add realistic
+GUI history/relocation/recovery tests and native dialog/layout checks before advancing the block.
+The OCCT STEP/XDE reader follows in Block 138; Blocks 138–143 remain planned.
 
 ## Later phases
 
