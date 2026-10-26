@@ -304,6 +304,7 @@ struct ShellFeatureEditTools::Impl {
     auto* footer = new QHBoxLayout;
     apply = new QPushButton("Apply", content);
     apply->setObjectName("blcad.feature_edit.apply");
+    apply->setProperty("guiRole", "primary");
     auto* cancel = new QPushButton("Cancel", content);
     cancel->setObjectName("blcad.feature_edit.cancel");
     footer->addWidget(apply);

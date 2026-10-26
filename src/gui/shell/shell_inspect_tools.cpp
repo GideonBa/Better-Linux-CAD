@@ -206,6 +206,7 @@ ShellInspectTools::ShellInspectTools(ShellWindow& window, ShellRibbon& ribbon, i
   auto* buttons = new QHBoxLayout;
   auto* run = new QPushButton(QStringLiteral("Analyze"), panel);
   run->setObjectName("blcad.inspect.run");
+  run->setProperty("guiRole", "primary");
   auto* close = new QPushButton(QStringLiteral("Close"), panel);
   close->setObjectName("blcad.inspect.close");
   buttons->addWidget(run);

@@ -183,6 +183,7 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   auto* buttons = new QHBoxLayout;
   apply_ = new QPushButton(QStringLiteral("Apply"), panel);
   apply_->setObjectName("blcad.construction.apply");
+  apply_->setProperty("guiRole", "primary");
   auto* cancel = new QPushButton(QStringLiteral("Cancel"), panel);
   cancel->setObjectName("blcad.construction.cancel");
   buttons->addWidget(apply_);

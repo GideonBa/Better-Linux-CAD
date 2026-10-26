@@ -358,6 +358,13 @@ if(BLCAD_BUILD_GUI)
       assets/gui/arrow-up.xpm
       assets/gui/arrow-left.xpm
       assets/gui/arrow-right.xpm
+      assets/gui/fonts/Barlow-Regular.ttf
+      assets/gui/fonts/Barlow-Medium.ttf
+      assets/gui/fonts/BarlowCondensed-Medium.ttf
+      assets/gui/fonts/IBMPlexMono-Regular.ttf
+      assets/gui/fonts/Barlow-OFL.txt
+      assets/gui/fonts/BarlowCondensed-OFL.txt
+      assets/gui/fonts/IBMPlexMono-OFL.txt
   )
   target_link_libraries(
     blcad_gui

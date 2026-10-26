@@ -730,6 +730,12 @@ TEST_CASE("Native STEP source dialog and explicit mode controls remain reachable
     CHECK(ui.field<QTableWidget>("catalog").horizontalScrollBar()->maximum() == 0);
     for (const auto* name : {"expected_digest", "observed_digest"}) {
       auto& fingerprint = ui.field<QPlainTextEdit>(name);
+      const auto margins = fingerprint.contentsMargins();
+      INFO("Fingerprint " << name << ": widget height " << fingerprint.height()
+                          << ", viewport height " << fingerprint.viewport()->height()
+                          << ", contents margins " << margins.left() << ',' << margins.top() << ','
+                          << margins.right() << ',' << margins.bottom() << ", line spacing "
+                          << fingerprint.fontMetrics().lineSpacing());
       CHECK(fingerprint.isReadOnly());
       CHECK(fingerprint.horizontalScrollBar()->maximum() == 0);
       CHECK(fingerprint.verticalScrollBar()->maximum() == 0);

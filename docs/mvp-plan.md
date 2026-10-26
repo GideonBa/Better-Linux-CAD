@@ -1285,6 +1285,26 @@ white placeholders, Rapid Dimension labels, connected spline seams, nested mater
 the curved-body Union preview. The available X11 visual emits OCCT's known Medium depth/stencil
 warning; no High-severity, BadDrawable or BadWindow errors occurred. No required check is unavailable.
 
+## Hermes-inspired desktop design follow-up — 2026-10-26
+
+The user requested a documented plan followed by implementation of the Hermes website's aesthetic,
+explicitly releasing the previous monochrome/white-frame requirement. The implementation sequence,
+visual roles, acceptance criteria and evidence live in `docs/gui-hermes-design.md`.
+
+Implemented the shared electric-blue/paper palette, offline licensed Barlow/Plex typography,
+navigation/ribbon hierarchy, task action roles, coordinated canvas readouts and startup screen.
+Compact workspace arrows remain visible and clickable at 1024×640. STEP checksum readouts include
+styled padding in their height, and native focus/popup checks retain exact input assertions after
+bounded event-loop readiness.
+
+Final validation: Core **545 / 17,037**, Geometry **452 / 31,557**, offscreen GUI **566 cases,
+546 passed / 20 native-only skips / 73,433 assertions**, canonical native GUI **378 / 70,304**
+(no skips), 150% native design/workflow **5 / 771**, and required shell closure **3 / 299**.
+Separate native startup stayed running until the intentional timeout (124). The source freeze
+remained unchanged across final GUI/native checks. Native images and full evidence live in the
+design document. Delivery follows the normal protected-branch PR merge workflow; this follow-up
+does not advance numbered STEP import progress.
+
 ## Current next technical step — Block 138 (planned)
 
 Implement the OCCT STEP/XDE reader and deterministic product/body definitions over the verified

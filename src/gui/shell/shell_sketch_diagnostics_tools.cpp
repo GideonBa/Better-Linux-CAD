@@ -219,6 +219,8 @@ ShellSketchDiagnosticsTools::ShellSketchDiagnosticsTools(ShellWindow& window, Sh
   const auto button = [&](const char* name, const QString& label) {
     auto* result = new QPushButton(label, panel);
     result->setObjectName(QStringLiteral("blcad.sketch_diagnostics.") + name);
+    if (QString::fromLatin1(name) == QStringLiteral("apply"))
+      result->setProperty("guiRole", "primary");
     buttons->addWidget(result);
     return result;
   };

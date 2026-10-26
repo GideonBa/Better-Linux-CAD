@@ -1,9 +1,8 @@
 #include "blcad/gui/startup_splash.hpp"
+#include "blcad/gui/gui_appearance.hpp"
 
-#include <QFontDatabase>
 #include <QPaintEvent>
 #include <QPainter>
-#include <QPainterPath>
 #include <QVariantAnimation>
 
 #include <algorithm>
@@ -15,25 +14,6 @@ namespace {
 constexpr int kSplashWidth = 780;
 constexpr int kArtworkHeight = 400;
 constexpr int kSplashHeight = 560;
-
-QFont title_font() {
-  QFont font;
-  font.setFamilies({QStringLiteral("Times New Roman"), QStringLiteral("Tinos"),
-                    QStringLiteral("Liberation Serif"), QStringLiteral("serif")});
-  font.setPointSizeF(48.0);
-  font.setWeight(QFont::Normal);
-  font.setItalic(true);
-  font.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
-  return font;
-}
-
-QFont loading_font() {
-  QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-  font.setPointSize(12);
-  font.setBold(false);
-  font.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
-  return font;
-}
 
 } // namespace
 
@@ -92,49 +72,43 @@ void StartupSplash::paintEvent(QPaintEvent* event) {
   painter.setRenderHint(QPainter::Antialiasing);
   painter.setRenderHint(QPainter::TextAntialiasing);
 
-  painter.fillRect(rect(), Qt::black);
+  const QColor blue = QColor::fromRgb(appearance::blue);
+  const QColor paper = QColor::fromRgb(appearance::paper);
+  painter.fillRect(rect(), paper);
   if (!artwork_.isNull()) {
     const QRect cropped_source = artwork_.rect().adjusted(12, 0, -12, 0);
     painter.drawImage(QRect(0, 0, width(), kArtworkHeight), artwork_, cropped_source);
-  } else {
-    painter.fillRect(QRect(0, 0, width(), kArtworkHeight), Qt::white);
   }
 
-  QPainterPath title;
-  title.addText(0.0, 0.0, title_font(), QStringLiteral("BETTER LINUX CAD"));
-  QRectF title_bounds = title.boundingRect();
-  if (title_bounds.width() > width() - 24) {
-    const qreal scale = static_cast<qreal>(width() - 24) / title_bounds.width();
-    QTransform transform;
-    transform.scale(scale, scale);
-    title = transform.map(title);
-    title_bounds = title.boundingRect();
-  }
-  const qreal title_x = (width() - title_bounds.width()) / 2.0 - title_bounds.left();
-  const qreal title_y = kArtworkHeight - title_bounds.top() - 1.0;
-  painter.save();
-  painter.translate(title_x, title_y);
-  painter.setBrush(Qt::white);
-  painter.setPen(Qt::NoPen);
-  painter.drawPath(title);
-  painter.restore();
+  painter.fillRect(QRect(0, kArtworkHeight, width(), height() - kArtworkHeight), blue);
+  painter.setPen(paper);
+  painter.setFont(appearance::heading_font(64));
+  painter.drawText(QRect(30, 405, width() - 60, 74), Qt::AlignLeft | Qt::AlignVCenter,
+                   QStringLiteral("BETTER LINUX CAD"));
 
-  constexpr int track_left = 155;
-  constexpr int track_right = 625;
-  constexpr int track_y = 497;
+  painter.setFont(appearance::numeric_font(11));
+  painter.drawText(QRect(32, 479, width() - 64, 20), Qt::AlignLeft | Qt::AlignVCenter,
+                   QStringLiteral("PARAMETRIC DESIGN / ENGINEERING WORKSPACE"));
+
+  constexpr int track_left = 32;
+  constexpr int track_right = kSplashWidth - 32;
+  constexpr int track_y = 518;
   const int marker = track_left + (track_right - track_left) * progress_ / 100;
 
   painter.setRenderHint(QPainter::Antialiasing, false);
-  painter.setPen(QPen(Qt::white, 2.0, Qt::SolidLine, Qt::SquareCap));
+  painter.setPen(QPen(paper, 1.0, Qt::SolidLine, Qt::SquareCap));
   painter.drawLine(track_left, track_y, track_right, track_y);
-  painter.setPen(QPen(Qt::white, 1.0));
-  painter.drawLine(marker, track_y - 7, marker, track_y + 7);
+  painter.fillRect(QRect(track_left, track_y - 2, marker - track_left, 5), paper);
+  painter.setPen(QPen(blue, 1.0));
+  painter.drawRect(rect().adjusted(0, 0, -1, -1));
 
   painter.setRenderHint(QPainter::Antialiasing, true);
-  painter.setFont(loading_font());
-  painter.setPen(Qt::white);
-  painter.drawText(QRect(0, 510, width(), 32), Qt::AlignHCenter | Qt::AlignTop,
-                   QStringLiteral("LOADING"));
+  painter.setFont(appearance::numeric_font(12));
+  painter.setPen(paper);
+  painter.drawText(QRect(32, 531, width() - 64, 22), Qt::AlignLeft | Qt::AlignVCenter,
+                   QStringLiteral("INITIALIZING WORKSPACE"));
+  painter.drawText(QRect(32, 531, width() - 64, 22), Qt::AlignRight | Qt::AlignVCenter,
+                   QStringLiteral("%1%").arg(progress_));
 }
 
 } // namespace blcad::gui

@@ -486,6 +486,8 @@ void ShellWindow::build_docks() {
   browser_tree_ = new QTreeWidget(browser_dock);
   browser_tree_->setObjectName("blcad.shell.browser");
   browser_tree_->setHeaderLabel(QStringLiteral("No Document"));
+  browser_tree_->setUniformRowHeights(true);
+  browser_tree_->setIndentation(16);
   browser_tree_->setMinimumWidth(220);
   browser_tree_->header()->setStretchLastSection(true);
   browser_dock->setWidget(browser_tree_);
@@ -569,6 +571,8 @@ void ShellWindow::build_docks() {
   properties_->setColumnCount(2);
   properties_->setHorizontalHeaderLabels({QStringLiteral("Property"), QStringLiteral("Value")});
   properties_->verticalHeader()->setVisible(false);
+  properties_->setShowGrid(false);
+  properties_->setAlternatingRowColors(true);
   properties_->horizontalHeader()->setStretchLastSection(true);
   properties_->setSelectionMode(QAbstractItemView::SingleSelection);
   properties_->setSelectionBehavior(QAbstractItemView::SelectItems);
@@ -585,10 +589,13 @@ void ShellWindow::build_docks() {
   diagnostics_dock->setFeatures(QDockWidget::DockWidgetMovable |
                                 QDockWidget::DockWidgetClosable);
   diagnostics_ = new QPlainTextEdit(diagnostics_dock);
+  diagnostics_->setObjectName(QStringLiteral("blcad.shell.diagnostics"));
   diagnostics_->setReadOnly(true);
   diagnostics_->setPlaceholderText(QStringLiteral("Diagnostics appear here"));
   diagnostics_dock->setWidget(diagnostics_);
   addDockWidget(Qt::BottomDockWidgetArea, diagnostics_dock);
+  // Keep diagnostics present without competing with the model on first show.
+  resizeDocks({diagnostics_dock}, {112}, Qt::Vertical);
 }
 
 void ShellWindow::wire_viewport() {

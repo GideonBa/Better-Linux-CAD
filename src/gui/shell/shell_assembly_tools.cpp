@@ -291,6 +291,7 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   auto* footer = new QHBoxLayout;
   apply_ = new QPushButton(QStringLiteral("Apply"), contents);
   apply_->setObjectName("blcad.assembly.apply");
+  apply_->setProperty("guiRole", "primary");
   auto* cancel = new QPushButton(QStringLiteral("Cancel"), contents);
   cancel->setObjectName("blcad.assembly.cancel");
   footer->addWidget(apply_);

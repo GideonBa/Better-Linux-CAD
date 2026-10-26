@@ -1,0 +1,2 @@
+# Keep pinned upstream license bytes, including their original line endings.
+assets/gui/fonts/*-OFL.txt -text -whitespace

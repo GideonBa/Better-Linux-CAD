@@ -252,60 +252,99 @@ public:
     flush();
     const auto rectangle = view->visualRect(index);
     REQUIRE(view->viewport()->rect().contains(rectangle.center()));
+    const auto global = view->viewport()->mapToGlobal(rectangle.center());
+    bool pointer_ready = !native;
+    int pointer_warps = 0;
+    int stable_ticks = 0;
     if (native) {
       // Native popup tracking also consults the desktop pointer. Keep it at
-      // the same row as the synthetic events, including after earlier tests.
-      const auto global = view->viewport()->mapToGlobal(rectangle.center());
-      QCursor::setPos(global);
-      QGuiApplication::sync();
-      flush();
-      // Popup activation can enqueue a desktop pointer restore after the first
-      // successful warp. Reassert the intended row after those events settle,
-      // while retaining the exact cursor, row-index and click checks below.
-      int pointer_retries = 0;
-      const bool pointer_ready = wait_for_ui([&] {
-        if (QCursor::pos() != global && pointer_retries < 3) {
-          ++pointer_retries;
-          QCursor::setPos(global);
-          QGuiApplication::sync();
-          flush();
-        }
-        return QCursor::pos() == global;
+      // the same row as the synthetic events. Popup activation can restore an
+      // earlier pointer position, and its queued MotionNotify can replace a
+      // synthetic hover. Require both to agree across separate event-loop ticks.
+      QEventLoop transition;
+      QTimer tick;
+      QTimer deadline;
+      tick.setSingleShot(true); // Event draining below must not reenter this tick.
+      deadline.setSingleShot(true);
+      bool timed_out = false;
+      QObject::connect(&deadline, &QTimer::timeout, &transition, [&] {
+        timed_out = true;
+        transition.quit();
       });
-      const auto actual = QCursor::pos();
-      const auto popup_geometry = view->window()->geometry();
-      const auto screen_geometry = view->screen()->geometry();
-      const auto available_geometry = view->screen()->availableGeometry();
-      INFO("Requested cursor: " << global.x() << ',' << global.y());
-      INFO("Actual cursor: " << actual.x() << ',' << actual.y());
-      INFO("Pointer warp retries: " << pointer_retries);
-      const auto current_global = view->viewport()->mapToGlobal(rectangle.center());
-      INFO("Current row global position: " << current_global.x() << ',' << current_global.y());
-      INFO("Screen DPR: " << view->screen()->devicePixelRatio());
-      INFO("Popup geometry: " << popup_geometry.x() << ',' << popup_geometry.y() << ' '
-                              << popup_geometry.width() << 'x' << popup_geometry.height());
-      INFO("Screen geometry: " << screen_geometry.x() << ',' << screen_geometry.y() << ' '
-                               << screen_geometry.width() << 'x' << screen_geometry.height());
-      INFO("Available geometry: " << available_geometry.x() << ',' << available_geometry.y() << ' '
-                                  << available_geometry.width() << 'x'
-                                  << available_geometry.height());
-      if (!pointer_ready && qEnvironmentVariableIsSet("BLCAD_UI_CAPTURE_DIR")) {
-        capture("assembly-popup-pointer-mismatch");
-        const auto path = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR") +
-                          QStringLiteral("/assembly-popup-pointer-mismatch-popup.png");
-        REQUIRE(view->window()->grab().save(path));
-      }
+      QObject::connect(&tick, &QTimer::timeout, &transition, [&] {
+        const auto before = QCursor::pos();
+        if (before != global && pointer_warps < 4) {
+          ++pointer_warps;
+          QCursor::setPos(global);
+        }
+        QGuiApplication::sync();
+        flush();
+        if (timed_out)
+          return;
+        QMouseEvent move(QEvent::MouseMove, rectangle.center(), global, Qt::NoButton, Qt::NoButton,
+                         Qt::NoModifier);
+        QApplication::sendEvent(view->viewport(), &move);
+        QGuiApplication::sync();
+        flush();
+        if (timed_out)
+          return;
+        const auto actual = QCursor::pos();
+        const bool settled = actual == global && view->isVisible() &&
+                             view->viewport()->rect().contains(rectangle.center()) &&
+                             view->indexAt(rectangle.center()) == index &&
+                             view->currentIndex() == index;
+        stable_ticks = settled ? stable_ticks + 1 : 0;
+        if (stable_ticks >= 2) {
+          pointer_ready = true;
+          transition.quit();
+        } else {
+          tick.start(5);
+        }
+      });
+      deadline.start(2000);
+      tick.start(0);
+      transition.exec();
+    }
+    const auto actual = QCursor::pos();
+    const auto popup_geometry = view->window()->geometry();
+    const auto screen_geometry = view->screen()->geometry();
+    const auto available_geometry = view->screen()->availableGeometry();
+    INFO("Requested cursor: " << global.x() << ',' << global.y());
+    INFO("Actual cursor: " << actual.x() << ',' << actual.y());
+    INFO("Pointer warp requests: " << pointer_warps);
+    INFO("Stable cursor/hover ticks: " << stable_ticks);
+    const auto current_global = view->viewport()->mapToGlobal(rectangle.center());
+    INFO("Current row global position: " << current_global.x() << ',' << current_global.y());
+    INFO("Current hover row: " << view->currentIndex().row());
+    INFO("Screen DPR: " << view->screen()->devicePixelRatio());
+    INFO("Popup geometry: " << popup_geometry.x() << ',' << popup_geometry.y() << ' '
+                            << popup_geometry.width() << 'x' << popup_geometry.height());
+    INFO("Screen geometry: " << screen_geometry.x() << ',' << screen_geometry.y() << ' '
+                             << screen_geometry.width() << 'x' << screen_geometry.height());
+    INFO("Available geometry: " << available_geometry.x() << ',' << available_geometry.y() << ' '
+                                << available_geometry.width() << 'x'
+                                << available_geometry.height());
+    if (!pointer_ready && qEnvironmentVariableIsSet("BLCAD_UI_CAPTURE_DIR")) {
+      capture("assembly-popup-pointer-mismatch");
+      const auto path = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR") +
+                        QStringLiteral("/assembly-popup-pointer-mismatch-popup.png");
+      REQUIRE(view->window()->grab().save(path));
+    }
+    if (native) {
       REQUIRE(pointer_ready);
+      REQUIRE(actual == global);
     }
     REQUIRE(view->isVisible());
     REQUIRE(view->indexAt(rectangle.center()) == index);
     // A real popup selection first moves over the scrolled row. Publish the
     // hover before clicking so native menu selection follows the visible item.
-    QMouseEvent move(QEvent::MouseMove, rectangle.center(),
-                     view->viewport()->mapToGlobal(rectangle.center()), Qt::NoButton, Qt::NoButton,
-                     Qt::NoModifier);
-    QApplication::sendEvent(view->viewport(), &move);
-    flush();
+    if (!native) {
+      QMouseEvent move(QEvent::MouseMove, rectangle.center(),
+                       view->viewport()->mapToGlobal(rectangle.center()), Qt::NoButton,
+                       Qt::NoButton, Qt::NoModifier);
+      QApplication::sendEvent(view->viewport(), &move);
+      flush();
+    }
     REQUIRE(view->currentIndex() == index);
     click_at(*view->viewport(), rectangle.center());
     REQUIRE(control.currentIndex() == row);
@@ -648,6 +687,136 @@ private:
   bool native_dialogs_disabled_;
 };
 } // namespace
+
+TEST_CASE("Hermes desktop authors dimensions previews and edits a solid through history and reopen",
+          "[gui][integration][shell-combined-workflow][hermes-design-workflow]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Instrument bracket");
+  // Use available desktop space when proving the same workflow at higher DPI.
+  const QSize available = QApplication::platformName() == QStringLiteral("xcb")
+                              ? ui.window.screen()->availableGeometry().size() - QSize(32, 48)
+                              : QSize(1920, 1080);
+  const QSize ordinary = QSize(1280, 800).boundedTo(available);
+  ui.window.resize(ordinary);
+  ui.flush();
+  const auto sketch = ui.rectangle("datum.xy", {20, 20}, {50, 40});
+  ui.tree(sketch.value(), true);
+  REQUIRE(ui.window.active_sketch() == sketch);
+
+  // Reach the dimension group through the actual horizontally scrolling ribbon.
+  ui.command("sketch.dimension.rapid");
+  REQUIRE(ui.window.sketch_tools().rapid_dimension_active());
+  const auto hover = [&](Point2 point) {
+    const auto screen = checked(ui.window.viewport().sketch_plane_to_screen(point));
+    const QPointF local(screen.x, screen.y);
+    REQUIRE(ui.window.viewport().rect().contains(local.toPoint()));
+    QMouseEvent move(QEvent::MouseMove, local, ui.window.viewport().mapToGlobal(local.toPoint()),
+                     Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(&ui.window.viewport(), &move);
+    ui.flush();
+  };
+  hover({35, 20});
+  REQUIRE(ui.window.sketch_tools().rapid_dimension_candidate());
+  ui.plane_pick({35, 20});
+  hover({35, 8});
+  REQUIRE(ui.window.sketch_tools().rapid_dimension_candidate());
+  ui.plane_pick({35, 8});
+  const auto dimensions = checked(ui.window.session().sketch_dimension_catalog(sketch));
+  REQUIRE(dimensions.dimensions().size() == 1U);
+  CHECK(dimensions.dimensions().front().kind() == SketchDimensionKind::Length);
+  REQUIRE(dimensions.dimensions().front().parameter());
+  const auto* width = ui.window.session().part_document()->find_parameter(
+      *dimensions.dimensions().front().parameter());
+  REQUIRE(width);
+  CHECK(width->value().millimeters() == Approx(30));
+  ui.key(ui.window, Qt::Key_Escape);
+  CHECK_FALSE(ui.window.sketch_tools().rapid_dimension_active());
+  ui.capture("hermes-sketch");
+  ui.command("finish_sketch");
+  REQUIRE_FALSE(ui.window.active_sketch());
+  std::vector<std::string> states{ui.snapshot()};
+  const auto undo_before_preview = std::string(ui.window.session().undo_label());
+
+  ui.command("extrude");
+  ui.scalar("8 mm");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  auto& apply = ui.widget<QPushButton>("blcad.feature.apply");
+  auto& cancel = ui.widget<QPushButton>("blcad.feature.cancel");
+  REQUIRE(apply.isEnabled());
+  REQUIRE(cancel.isEnabled());
+  ui.reveal(apply);
+  ui.reveal(cancel);
+  CHECK(ui.snapshot() == states.back());
+  ui.capture("hermes-feature-preview");
+  const QSize compact = QSize(1024, 640).boundedTo(available);
+  ui.window.resize(compact);
+  ui.flush();
+  CHECK(ui.window.width() <= compact.width());
+  CHECK(ui.window.height() <= compact.height());
+  ui.reveal(apply);
+  ui.reveal(cancel);
+  ui.capture("hermes-feature-compact");
+  ui.window.resize(ordinary);
+  ui.flush();
+  ui.button("blcad.feature.cancel");
+  ui.idle();
+  CHECK(ui.snapshot() == states.back());
+  CHECK(ui.window.session().undo_label() == undo_before_preview);
+
+  const auto body = ui.extrude(8);
+  REQUIRE(ui.window.session().part_document()->features().size() == 1U);
+  const auto feature = ui.window.session().part_document()->features().front().id();
+  CHECK(ui.summary(body).solid_count == 1U);
+  CHECK(ui.summary(body).volume_mm3 == Approx(4800).margin(1e-5));
+  states.push_back(ui.snapshot());
+  const auto select_body = [&] {
+    ui.tree(body.value());
+    auto& browser = ui.window.model_browser();
+    const auto* selected = browser.currentItem();
+    REQUIRE(selected);
+    CHECK(selected->data(0, Qt::UserRole).toString() == QString::fromStdString(body.value()));
+    CHECK(selected->isSelected());
+    CHECK(browser.viewport()->rect().contains(browser.visualItemRect(selected).center()));
+    REQUIRE(ui.window.viewport().selected_semantic());
+    CHECK(ui.window.viewport().selected_semantic()->semantic_id == "body/" + body.value());
+  };
+  select_body();
+
+  ui.tree(feature.value(), true);
+  REQUIRE(ui.window.feature_edit_tools().active());
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.feature_edit.field/length_parameter"), "12");
+  ui.text(ui.widget<QLineEdit>("blcad.feature_edit.field/name"), "Bracket blank");
+  REQUIRE(ui.widget<QPushButton>("blcad.feature_edit.apply").isEnabled());
+  ui.reveal(ui.widget<QPushButton>("blcad.feature_edit.cancel"));
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.feature_edit.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(7200).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  CHECK(ui.summary(body).volume_mm3 == Approx(7200).margin(1e-5));
+  CHECK(checked(ui.window.session().sketch_dimension_catalog(sketch)).dimensions().size() == 1U);
+  ui.roundtrip(directory.filePath("instrument-bracket.blcad"));
+  CHECK(ui.summary(body).volume_mm3 == Approx(7200).margin(1e-5));
+  CHECK(checked(ui.window.session().sketch_dimension_catalog(sketch)).dimensions().size() == 1U);
+  ui.command("fit", 2);
+  select_body();
+  ui.capture("hermes-model");
+  ui.window.resize(QSize(1600, 1000).boundedTo(available));
+  ui.flush();
+  select_body();
+  ui.capture("hermes-model-large");
+  ui.window.resize(ordinary);
+  ui.flush();
+  // STEP export is in the far-end inspection group. command() scrolls the
+  // ribbon and verifies the actual button center before opening the dialog.
+  const auto step = directory.filePath("instrument-bracket.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).startsWith("ISO-10303-21;"));
+  CHECK(ui.snapshot() == states.back());
+  ui.idle();
+}
 
 TEST_CASE("Combined UI machining workflow edits upstream geometry then patterns transforms "
           "measures and exports",

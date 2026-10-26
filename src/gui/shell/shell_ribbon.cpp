@@ -1,12 +1,16 @@
 #include "blcad/gui/shell/shell_ribbon.hpp"
+#include "blcad/gui/gui_appearance.hpp"
 
 #include <QAction>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QLabel>
 #include <QMenu>
+#include <QResizeEvent>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QStackedWidget>
 #include <QTabBar>
 #include <QToolButton>
@@ -26,20 +30,106 @@ QHBoxLayout* button_row(QWidget* group) {
 } // namespace
 
 ShellRibbon::ShellRibbon(QWidget* parent) : QWidget(parent) {
+  setObjectName(QStringLiteral("blcad.shell.ribbon"));
   auto* column = new QVBoxLayout(this);
   column->setContentsMargins(0, 0, 0, 0);
   column->setSpacing(0);
-  tabs_ = new QTabBar(this);
+  auto* header = new QWidget(this);
+  header->setObjectName(QStringLiteral("blcad_ribbon_header"));
+  auto* navigation = new QHBoxLayout(header);
+  navigation->setContentsMargins(16, 0, 16, 0);
+  navigation->setSpacing(16);
+  auto* wordmark = new QLabel(QStringLiteral("BLCAD"), header);
+  wordmark->setProperty("guiRole", "wordmark");
+  wordmark->setAccessibleName(QStringLiteral("BLCAD parametric design"));
+  navigation->addWidget(wordmark);
+  tabs_ = new QTabBar(header);
+  tabs_->setObjectName(QStringLiteral("blcad_ribbon_tabs"));
   tabs_->setDocumentMode(true);
   tabs_->setExpanding(false);
+  tabs_->setUsesScrollButtons(false);
+  tabs_->setDrawBase(false);
+  tabs_->setFont(appearance::heading_font(17));
+  tab_navigation_ = new QScrollArea(header);
+  tab_navigation_->setObjectName(QStringLiteral("blcad_ribbon_navigation"));
+  tab_navigation_->setFrameShape(QFrame::NoFrame);
+  tab_navigation_->setWidgetResizable(false);
+  tab_navigation_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  tab_navigation_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  // Only the visible slice of the tab strip participates in header sizing.
+  // Its full content width must not push the navigation buttons offscreen.
+  tab_navigation_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+  tab_navigation_->setMinimumWidth(80);
+  tab_navigation_->setWidget(tabs_);
+  navigation->addWidget(tab_navigation_, 1);
+  tab_navigation_buttons_ = new QWidget(header);
+  tab_navigation_buttons_->setProperty("guiRole", "tabNavigation");
+  tab_navigation_buttons_->setFixedSize(48, 32);
+  // Overflow is reported while the header layout is being resized. Reserve
+  // this small control slot even when hidden so showing it cannot invalidate
+  // that same layout pass and leave the buttons outside the header.
+  auto navigation_policy = tab_navigation_buttons_->sizePolicy();
+  navigation_policy.setRetainSizeWhenHidden(true);
+  tab_navigation_buttons_->setSizePolicy(navigation_policy);
+  auto* arrows = new QHBoxLayout(tab_navigation_buttons_);
+  arrows->setContentsMargins(0, 0, 0, 0);
+  arrows->setSpacing(0);
+  const auto arrow = [&](const char* id, const QString& text, const char* asset) {
+    auto* button = new QToolButton(tab_navigation_buttons_);
+    button->setObjectName(QString::fromLatin1(id));
+    button->setProperty("guiRole", "tabNavigation");
+    button->setIcon(QIcon(QStringLiteral(":/blcad/gui/") + QString::fromLatin1(asset)));
+    button->setIconSize(QSize(5, 9));
+    button->setFixedSize(24, 32);
+    button->setAccessibleName(text);
+    button->setToolTip(text);
+    arrows->addWidget(button);
+    return button;
+  };
+  previous_tab_ = arrow("blcad.ribbon.tab_previous", QStringLiteral("Scroll workspace tabs left"),
+                        "arrow-left.xpm");
+  next_tab_ = arrow("blcad.ribbon.tab_next", QStringLiteral("Scroll workspace tabs right"),
+                    "arrow-right.xpm");
+  navigation->addWidget(tab_navigation_buttons_);
+  const auto scroll_tabs = [this](int direction) {
+    auto* bar = tab_navigation_->horizontalScrollBar();
+    bar->setValue(bar->value() +
+                  direction * std::max(64, tab_navigation_->viewport()->width() / 2));
+  };
+  connect(previous_tab_, &QToolButton::clicked, this, [scroll_tabs] { scroll_tabs(-1); });
+  connect(next_tab_, &QToolButton::clicked, this, [scroll_tabs] { scroll_tabs(1); });
+  connect(tab_navigation_->horizontalScrollBar(), &QScrollBar::rangeChanged, this,
+          [this] { update_tab_navigation(); });
+  connect(tab_navigation_->horizontalScrollBar(), &QScrollBar::valueChanged, this,
+          [this] { update_tab_navigation(); });
   pages_ = new QStackedWidget(this);
   // Keep the command surface reachable when a tab contains more groups than
   // fit beside the browser. Reserve room for the horizontal scrollbar as well
   // as the full button/caption height; group widths must not size the window.
   pages_->setFixedHeight(116);
-  column->addWidget(tabs_);
+  column->addWidget(header);
   column->addWidget(pages_);
   connect(tabs_, &QTabBar::currentChanged, pages_, &QStackedWidget::setCurrentIndex);
+  connect(tabs_, &QTabBar::currentChanged, this, [this](int index) {
+    const QRect tab = tabs_->tabRect(index);
+    tab_navigation_->ensureVisible(tab.center().x(), tab.center().y(), tab.width() / 2 + 4, 0);
+  });
+}
+
+void ShellRibbon::resizeEvent(QResizeEvent* event) {
+  QWidget::resizeEvent(event);
+  update_tab_navigation();
+}
+
+void ShellRibbon::update_tab_navigation() {
+  if (tabs_->count() == 0)
+    return;
+  tabs_->setFixedSize(tabs_->sizeHint());
+  tab_navigation_->setFixedHeight(tabs_->sizeHint().height());
+  auto* bar = tab_navigation_->horizontalScrollBar();
+  previous_tab_->setEnabled(bar->value() > bar->minimum());
+  next_tab_->setEnabled(bar->value() < bar->maximum());
+  tab_navigation_buttons_->setVisible(bar->maximum() > bar->minimum());
 }
 
 int ShellRibbon::add_tab(const QString& title) {
@@ -51,12 +141,14 @@ int ShellRibbon::add_tab(const QString& title) {
   scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   auto* page = new QWidget(scroll);
   auto* row = new QHBoxLayout(page);
-  row->setContentsMargins(8, 4, 8, 4);
-  row->setSpacing(10);
+  row->setContentsMargins(12, 8, 12, 6);
+  row->setSpacing(12);
   row->addStretch(1);
   scroll->setWidget(page);
   pages_->addWidget(scroll);
-  return tabs_->addTab(title);
+  const int index = tabs_->addTab(title);
+  update_tab_navigation();
+  return index;
 }
 
 QWidget* ShellRibbon::add_group(int tab_index, const QString& title) {
@@ -65,17 +157,19 @@ QWidget* ShellRibbon::add_group(int tab_index, const QString& title) {
     return nullptr;
   auto* page = scroll->widget();
   auto* group = new QFrame(page);
-  static_cast<QFrame*>(group)->setFrameShape(QFrame::StyledPanel);
+  group->setProperty("guiRole", "ribbonGroup");
+  group->setFrameShape(QFrame::NoFrame);
   auto* column = new QVBoxLayout(group);
-  column->setContentsMargins(6, 4, 6, 2);
-  column->setSpacing(2);
+  column->setContentsMargins(0, 0, 12, 0);
+  column->setSpacing(4);
   auto* buttons = new QHBoxLayout();
   buttons->setSpacing(4);
   column->addLayout(buttons, 1);
   auto* caption = new QLabel(title, group);
-  caption->setAlignment(Qt::AlignHCenter);
-  QFont caption_font = caption->font();
-  caption_font.setPointSizeF(caption_font.pointSizeF() * 0.85);
+  caption->setProperty("guiRole", "ribbonCaption");
+  caption->setAlignment(Qt::AlignLeft);
+  QFont caption_font = appearance::heading_font(13);
+  caption_font.setCapitalization(QFont::AllUppercase);
   caption->setFont(caption_font);
   column->addWidget(caption);
   auto* row = static_cast<QHBoxLayout*>(page->layout());
@@ -85,6 +179,7 @@ QWidget* ShellRibbon::add_group(int tab_index, const QString& title) {
 
 QToolButton* ShellRibbon::add_button(QWidget* group, QAction* action) {
   auto* button = new QToolButton(group);
+  button->setProperty("guiRole", "ribbonCommand");
   button->setDefaultAction(action);
   button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
   button->setAutoRaise(true);
@@ -97,6 +192,7 @@ QToolButton* ShellRibbon::add_button(QWidget* group, QAction* action) {
 QToolButton* ShellRibbon::add_menu_button(QWidget* group, const QString& title,
                                           const QList<QAction*>& actions) {
   auto* button = new QToolButton(group);
+  button->setProperty("guiRole", "ribbonCommand");
   button->setText(title);
   button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
   button->setAutoRaise(true);

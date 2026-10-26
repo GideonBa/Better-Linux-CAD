@@ -22,8 +22,12 @@
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QStandardItemModel>
+#include <QStyle>
+#include <QStyleOption>
 #include <QTableWidget>
+#include <QTextDocument>
 #include <QVBoxLayout>
+#include <cmath>
 #include <tuple>
 
 namespace blcad::gui {
@@ -308,7 +312,19 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
     value->setReadOnly(true);
     value->setWordWrapMode(QTextOption::WrapAnywhere);
     value->setFrameShape(QFrame::NoFrame);
-    value->setFixedHeight(3 * value->fontMetrics().lineSpacing() + 8);
+    value->ensurePolished();
+    // Reserve three wrapped lines inside the styled frame and padding, using
+    // the final font and document margins rather than assuming native chrome.
+    QStyleOptionFrame frame;
+    frame.initFrom(value);
+    frame.frameShape = value->frameShape();
+    const QRect styled_contents =
+        value->style()->subElementRect(QStyle::SE_ShapedFrameContents, &frame, value);
+    const int chrome_height = frame.rect.height() - styled_contents.height();
+    const int document_margins =
+        static_cast<int>(std::ceil(2.0 * value->document()->documentMargin()));
+    value->setFixedHeight(3 * value->fontMetrics().lineSpacing() + document_margins +
+                          chrome_height);
     value->setMinimumWidth(0);
     value->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     content_layout->addWidget(value);
@@ -322,6 +338,8 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   const auto button = [panel, buttons](const char* id, const QString& label) {
     auto* value = new QPushButton(label, panel);
     value->setObjectName(QStringLiteral("blcad.step_import.") + id);
+    if (QString::fromLatin1(id) == QStringLiteral("apply"))
+      value->setProperty("guiRole", "primary");
     buttons->addWidget(value);
     return value;
   };

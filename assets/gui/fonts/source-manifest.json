@@ -1,0 +1,41 @@
+{
+  "repository": "https://github.com/google/fonts",
+  "commit": "e7db6ca603fd4862010383ff17ffd6cc4ffac1c0",
+  "files": [
+    {
+      "file": "Barlow-Regular.ttf",
+      "source": "https://github.com/google/fonts/blob/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/barlow/Barlow-Regular.ttf",
+      "sha256": "95aa02c7c43096e0dd44d787ba6216864a67157e402adab59b35572e0c1577ea"
+    },
+    {
+      "file": "Barlow-Medium.ttf",
+      "source": "https://github.com/google/fonts/blob/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/barlow/Barlow-Medium.ttf",
+      "sha256": "f8906f762cb73dca441da034bc363b2d8e2e68bc10d5c05e58717646c20cc4b4"
+    },
+    {
+      "file": "Barlow-OFL.txt",
+      "source": "https://github.com/google/fonts/blob/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/barlow/OFL.txt",
+      "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f"
+    },
+    {
+      "file": "BarlowCondensed-Medium.ttf",
+      "source": "https://github.com/google/fonts/blob/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/barlowcondensed/BarlowCondensed-Medium.ttf",
+      "sha256": "262bd143292ce479ee0cd09a42b47ab173fca8e9c6eb5ed0b5c8a845bc371d17"
+    },
+    {
+      "file": "BarlowCondensed-OFL.txt",
+      "source": "https://github.com/google/fonts/blob/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/barlowcondensed/OFL.txt",
+      "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f"
+    },
+    {
+      "file": "IBMPlexMono-Regular.ttf",
+      "source": "https://github.com/google/fonts/blob/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/ibmplexmono/IBMPlexMono-Regular.ttf",
+      "sha256": "6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46"
+    },
+    {
+      "file": "IBMPlexMono-OFL.txt",
+      "source": "https://github.com/google/fonts/blob/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/ibmplexmono/OFL.txt",
+      "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
+    }
+  ]
+}

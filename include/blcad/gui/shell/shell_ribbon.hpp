@@ -4,6 +4,8 @@
 
 class QAction;
 class QStackedWidget;
+class QScrollArea;
+class QResizeEvent;
 class QTabBar;
 class QToolButton;
 
@@ -38,8 +40,16 @@ public:
   void set_tab_enabled(int index, bool enabled);
   [[nodiscard]] bool tab_enabled(int index) const;
 
+protected:
+  void resizeEvent(QResizeEvent* event) override;
+
 private:
+  void update_tab_navigation();
   QTabBar* tabs_{nullptr};
+  QScrollArea* tab_navigation_{nullptr};
+  QWidget* tab_navigation_buttons_{nullptr};
+  QToolButton* previous_tab_{nullptr};
+  QToolButton* next_tab_{nullptr};
   QStackedWidget* pages_{nullptr};
 };
 

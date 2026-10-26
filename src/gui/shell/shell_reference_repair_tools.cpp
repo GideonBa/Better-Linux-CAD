@@ -371,6 +371,8 @@ ShellReferenceRepairTools::ShellReferenceRepairTools(ShellWindow& window, ShellR
   const auto button = [&](const char* id, const QString& label) {
     auto* result = new QPushButton(label, panel);
     result->setObjectName(QStringLiteral("blcad.reference_repair.") + id);
+    if (QString::fromLatin1(id) == QStringLiteral("apply"))
+      result->setProperty("guiRole", "primary");
     buttons->addWidget(result);
     return result;
   };
