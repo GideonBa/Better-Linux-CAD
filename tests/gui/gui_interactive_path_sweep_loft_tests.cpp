@@ -1,3 +1,4 @@
+#include "../support/loft_alignment_fixture.hpp"
 #include "blcad/gui/gui_interactive_feature_coordinator.hpp"
 #include "blcad/gui/gui_interactive_path_sweep_loft.hpp"
 
@@ -7,7 +8,9 @@
 #include "blcad/core/feature.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/sketch.hpp"
+#include "blcad/geometry/closed_profile_adapter.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
@@ -237,4 +240,174 @@ TEST_CASE("Block 127 ordered loft-section reorder matches a directly ordered lof
 
   CHECK(serialize_part_document_to_json(*reordered.part_document()).value() ==
         serialize_part_document_to_json(*typed.part_document()).value());
+}
+
+TEST_CASE("New interactive Loft aligns independently drawn matching profile contours",
+          "[gui][interactive-loft][loft-section-alignment]") {
+  namespace fixture = blcad::test::loft_alignment;
+  auto middle = fixture::MiddleAuthoring::Reversed;
+  SECTION("the middle profile was drawn in the opposite direction") {
+    middle = fixture::MiddleAuthoring::Reversed;
+  }
+  SECTION("the middle profile was started at a different corner") {
+    middle = fixture::MiddleAuthoring::ShiftedStart;
+  }
+  CAPTURE(middle);
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(DocumentId("part.loft.alignment"), "Independent profile authoring"));
+  REQUIRE(session.commit_part_transaction("Create independently drawn profiles",
+                                          [&](PartDocument& part) {
+                                            part = fixture::inputs(middle);
+                                            return Result<std::size_t>::success(1);
+                                          }));
+  const auto original = serialize_part_document_to_json(*session.part_document()).value();
+
+  GuiInteractiveLoftController loft;
+  REQUIRE(loft.begin_loft(session, FeatureId("loft.aligned"), "Aligned Loft", LoftFeatureKind::Loft,
+                          BodyId("body.aligned")));
+  for (std::size_t station = 0; station < 3; ++station) {
+    const auto sketch = "section." + std::to_string(station);
+    REQUIRE(
+        loft.add_closed_section(SketchId(sketch), ProfileId("generated.region." + sketch + ".0")));
+  }
+
+  auto preview = loft.preview_shape(session);
+  INFO((preview ? "Loft preview built" : preview.error().message()));
+  REQUIRE(preview);
+  CHECK(loft.auto_alignment());
+  fixture::verify_prism(preview.value());
+  // Disposable candidate alignment must not accumulate across previews.
+  for (int repeat = 0; repeat < 2; ++repeat) {
+    auto repeated = loft.preview_shape(session);
+    REQUIRE(repeated);
+    fixture::verify_prism(repeated.value());
+  }
+  loft.set_auto_alignment(false);
+  CHECK_FALSE(loft.auto_alignment());
+  auto manual = loft.preview_shape(session);
+  REQUIRE(manual);
+  CHECK(geometry::RectangleExtrusionAdapter{}.summarize(manual.value()).volume_mm3 < 2200.0);
+  loft.set_auto_alignment(true);
+  auto restored = loft.preview_shape(session);
+  REQUIRE(restored);
+  fixture::verify_prism(restored.value());
+  CHECK(serialize_part_document_to_json(*session.part_document()).value() == original);
+  REQUIRE(loft.apply(session));
+  REQUIRE(session.recompute());
+  const auto* shape = session.part_shape_cache()->find_body_shape(BodyId("body.aligned"));
+  REQUIRE(shape);
+  fixture::verify_prism(*shape);
+  REQUIRE(session.undo());
+  CHECK(serialize_part_document_to_json(*session.part_document()).value() == original);
+}
+
+TEST_CASE("Interactive Loft keeps a manual normal flip local to its own section",
+          "[gui][interactive-loft][loft-section-alignment]") {
+  namespace fixture = blcad::test::loft_alignment;
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(DocumentId("part.loft.alignment"), "Local normal reversal"));
+  REQUIRE(session.commit_part_transaction("Load matching contours", [](PartDocument& part) {
+    part = fixture::inputs(fixture::MiddleAuthoring::Matching);
+    return Result<std::size_t>::success(1);
+  }));
+  GuiInteractiveLoftController loft;
+  REQUIRE(loft.begin_loft(session, FeatureId("loft.local.flip"), "Local reversal",
+                          LoftFeatureKind::Loft, BodyId("body.aligned")));
+  for (std::size_t station = 0; station < 3; ++station)
+    REQUIRE(loft.add_closed_section(SketchId("section." + std::to_string(station)),
+                                    fixture::profile(station), station == 1));
+  const auto preview = loft.preview_shape(session);
+  REQUIRE(preview);
+  // A deliberate reversal must remain visible rather than being silently
+  // undone, and it must not become the reference direction for the third row.
+  CHECK(geometry::RectangleExtrusionAdapter{}.summarize(preview.value()).volume_mm3 < 2200.0);
+  REQUIRE(loft.apply(session));
+  const auto& sections = session.part_document()->loft_features().back().sections();
+  REQUIRE(sections.size() == 3);
+  CHECK_FALSE(sections[0].flip_normal());
+  CHECK(sections[1].flip_normal());
+  CHECK_FALSE(sections[2].flip_normal());
+}
+
+TEST_CASE(
+    "Interactive Loft keeps explicitly bound guides and historical section intent authoritative",
+    "[gui][interactive-loft][loft-section-alignment]") {
+  namespace fixture = blcad::test::loft_alignment;
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(DocumentId("part.loft.alignment"), "Explicit seam authority"));
+  REQUIRE(session.commit_part_transaction("Load shifted contours and a seam guide", [](PartDocument&
+                                                                                           part) {
+    part = fixture::inputs(fixture::MiddleAuthoring::ShiftedStart);
+    REQUIRE(part.add_datum_plane(DatumPlane::xz().value()));
+    auto guide =
+        Sketch::create(SketchId("guide"), "Explicit seam guide", DatumPlaneId("datum.xz")).value();
+    REQUIRE(
+        guide.add_entity(LineSegment::create(SketchEntityId("first"), {0, 0}, {12, 20}).value()));
+    REQUIRE(
+        guide.add_entity(LineSegment::create(SketchEntityId("second"), {12, 20}, {0, 40}).value()));
+    REQUIRE(part.add_sketch(std::move(guide)));
+    std::vector<PathSegmentReference> segments;
+    for (const char* edge : {"first", "second"})
+      segments.push_back(PathSegmentReference::create_planar(
+                             SketchId("guide"), SketchEntityId(edge), PlanarPathCurveKind::Line)
+                             .value());
+    REQUIRE(part.add_path_curve(PathCurve::create(PathCurveId("guide.seam"), "Authored seam guide",
+                                                  segments, PathClosure::Open,
+                                                  PathOrientationRule::MinimumTwist)
+                                    .value()));
+    return Result<std::size_t>::success(1);
+  }));
+  bool guided = false;
+  SECTION("an explicit guide keeps its different middle seam binding") {
+    guided = true;
+    GuiInteractiveLoftController loft;
+    REQUIRE(loft.begin_loft(session, FeatureId("loft.explicit"), "Guided seam",
+                            LoftFeatureKind::Loft, BodyId("body.aligned")));
+    REQUIRE(loft.auto_alignment());
+    for (std::size_t station = 0; station < 3; ++station)
+      REQUIRE(loft.add_closed_section(SketchId("section." + std::to_string(station)),
+                                      fixture::profile(station)));
+    REQUIRE(loft.add_guide_curve(PathCurveId("guide.seam")));
+    // The guide passes (0,0,0), (12,0,20), (0,0,40), explicitly selecting
+    // different physical corners; automatic seam selection would break it.
+    REQUIRE(loft.preview_shape(session));
+    REQUIRE(loft.apply(session));
+  }
+  SECTION("a historical Core Loft retains its saved section references") {
+    REQUIRE(session.commit_part_transaction("Load historical Loft", [](PartDocument& part) {
+      auto context = FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody,
+                                                      std::nullopt, BodyId("body.aligned"));
+      REQUIRE(context);
+      return part.add_loft_feature(LoftFeature::create_loft(FeatureId("loft.explicit"),
+                                                            "Historical seam",
+                                                            fixture::references(), context.value())
+                                       .value());
+    }));
+  }
+  const auto& saved_feature = session.part_document()->loft_features().back();
+  REQUIRE(saved_feature.sections().size() == 3);
+  for (const auto& section : saved_feature.sections()) {
+    CHECK_FALSE(section.alignment_reference());
+    CHECK_FALSE(section.flip_normal());
+  }
+  CHECK(saved_feature.guide_curves().size() == (guided ? 1U : 0U));
+  const auto* saved_shape = session.part_shape_cache()->find_body_shape(BodyId("body.aligned"));
+  REQUIRE(saved_shape);
+  const auto saved_volume =
+      geometry::RectangleExtrusionAdapter{}.summarize(*saved_shape).volume_mm3;
+  CHECK(saved_volume > 0);
+  CHECK(saved_volume < 2200.0); // Deliberately authored seam twist remains present.
+  const auto saved = serialize_part_document_to_json(*session.part_document()).value();
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.create_part(DocumentId("part.loft.alignment"), "Restored historical intent"));
+  REQUIRE(reopened.commit_part_transaction("Restore saved intent", [&](PartDocument& part) {
+    part = fixture::checked(deserialize_part_document_from_json(saved));
+    return Result<std::size_t>::success(1);
+  }));
+  REQUIRE(reopened.recompute());
+  CHECK(serialize_part_document_to_json(*reopened.part_document()).value() == saved);
+  const auto* restored = reopened.part_shape_cache()->find_body_shape(BodyId("body.aligned"));
+  REQUIRE(restored);
+  CHECK(geometry::RectangleExtrusionAdapter{}.summarize(*restored).volume_mm3 ==
+        Catch::Approx(saved_volume).margin(1e-6));
 }

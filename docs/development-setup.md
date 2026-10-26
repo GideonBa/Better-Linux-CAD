@@ -1482,3 +1482,22 @@ Combined native workflows also await exact cursor/hover agreement across two sep
 before pressing a popup row. This settling is bounded to two seconds and four pointer requests;
 the final index and real click assertions remain strict. STEP source checks retain their complete
 checksum/no-internal-scroll assertions with the new styled field height.
+
+## Loft profile correspondence follow-up
+
+Build all five targets, then keep source edits, builds, GUI runs and separate startup serial.
+The Core/Geometry binaries may run alongside one GUI suite.
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests blcad_export_step -j6
+./build/dev-gui/blcad_geometry_tests "[loft-section-alignment],[loft-section-compatibility],[multi-section-loft],[guided-loft],[mixed-path-loft]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[loft-section-alignment],[shell-loft-section-alignment],[shell-loft-auto-segments],[shell-combined-loft],[shell-mixed-path-loft],[block136-spatial],[shell-combined-spatial-context]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-loft-alignment-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[loft-section-alignment],[shell-loft-section-alignment],[shell-loft-auto-segments],[shell-combined-loft],[shell-mixed-path-loft],[block136-spatial],[shell-combined-spatial-context]"
+```
+
+The analytic prism and circular/rational ellipse oracles check the shape between sections, not only
+validity or interpolation at authored planes. Inspect native `loft-section-alignment-*` captures for
+the matching option, task action reachability and the corrected three-section solid. After focused
+proof, run full Core, Geometry and offscreen GUI regression, required shell closure and separate
+native startup. Record actual counts, native-only omissions and source-freeze evidence in
+`docs/gui-interactive-path-sweep-loft-mvp9.md`.

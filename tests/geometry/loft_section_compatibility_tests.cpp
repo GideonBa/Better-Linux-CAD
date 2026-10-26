@@ -1,14 +1,17 @@
 #include "../support/loft_section_refinement_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/loft_adapter.hpp"
+#include "blcad/geometry/loft_section_alignment.hpp"
 #include "blcad/geometry/loft_section_compatibility.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 
+#include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <BRep_Builder.hxx>
+#include <Bnd_Box.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Compound.hxx>
 #include <catch2/catch_approx.hpp>
@@ -140,6 +143,129 @@ TEST_CASE("Automatic Loft preserves exact circular and rational section boundari
       const double a = 2 * std::numbers::pi * j / 24;
       on_shape(shape, {5 * std::cos(a), 5 * std::sin(a), 10 * double(i)});
     }
+}
+
+TEST_CASE("Loft authoring aligns opposite shifted exact curved profiles without refitting",
+          "[geometry][loft-section-alignment][loft-section-compatibility]") {
+  const bool rational = GENERATE(false, true);
+  CAPTURE(rational);
+  constexpr double major = 5;
+  const double minor = rational ? 3 : major;
+  constexpr double span = 40;
+  const double quarter = std::numbers::pi / 2;
+  auto part =
+      checked(PartDocument::create(DocumentId("part.curved.alignment"), "Curved alignment"));
+  REQUIRE(part.add_datum_plane(checked(DatumPlane::xy())));
+  REQUIRE(part.add_parameter(checked(Parameter::create_angle(
+      ParameterId("rotation"), "Explicit rotation", checked(Quantity::angle_deg(11))))));
+  std::vector<ProfileSectionReference> references;
+  for (std::size_t station = 0; station < 3; ++station) {
+    const auto suffix = std::to_string(station);
+    const auto plane = station == 0 ? std::string("datum.xy") : "plane." + suffix;
+    if (station != 0)
+      REQUIRE(part.add_construction_plane(checked(ConstructionPlane::create_explicit(
+          ConstructionPlaneId(plane), plane, {0, 0, station * span / 2}, {1, 0, 0}, {0, 1, 0},
+          {0, 0, 1}))));
+    auto sketch = checked(
+        Sketch::create(SketchId("curved." + suffix), "Curved " + suffix, DatumPlaneId(plane)));
+    std::vector<SketchEntityId> ids;
+    // Independently drawn middle contour: another starting quadrant and the
+    // opposite direction. Every physical profile is still the same circle/ellipse.
+    const double first = station == 1 ? quarter : 0;
+    const double step = station == 1 ? -quarter : quarter;
+    for (std::size_t curve = 0; curve < 4; ++curve) {
+      ids.emplace_back("curve." + std::to_string(curve));
+      const double angle = first + curve * step;
+      if (rational) {
+        REQUIRE(sketch.add_entity(checked(SplineSegment::create_elliptical_arc(
+            ids.back(), {0, 0}, {major, 0}, minor, angle, step))));
+      } else {
+        const auto at = [&](double a) { return Point2{major * std::cos(a), minor * std::sin(a)}; };
+        REQUIRE(sketch.add_entity(checked(ArcSegment::create_three_point(
+            ids.back(), at(angle), at(angle + step / 2), at(angle + step)))));
+      }
+    }
+    REQUIRE(sketch.add_profile(checked(ArcClosedProfile::create(ProfileId("outline"), ids))));
+    REQUIRE(part.add_sketch(std::move(sketch)));
+    references.push_back(checked(ProfileSectionReference::create_closed_region(
+        checked(ProfileRegionReference::create(SketchId("curved." + suffix), ProfileId("outline"),
+                                               PartFeatureInputRole::LoftSection)))));
+  }
+  REQUIRE(
+      part.add_body(checked(Body::create(BodyId("body.curved"), "Curved Loft", BodyKind::Solid))));
+  const auto context = checked(FeatureBodyResultContext::create(
+      FeatureBodyOperationMode::NewBody, std::nullopt, BodyId("body.curved")));
+  const auto append_loft = [&](PartDocument& target,
+                               const std::vector<ProfileSectionReference>& sections) {
+    REQUIRE(target.add_loft_feature(checked(LoftFeature::create_loft(
+        FeatureId("loft.curved"), "Aligned curved Loft", sections, context))));
+  };
+  const auto intent_with = [&](const std::vector<ProfileSectionReference>& sections) {
+    auto candidate = part;
+    append_loft(candidate, sections);
+    return checked(serialize_part_document_to_json(candidate));
+  };
+  auto shapes = checked(ShapeCache::create(ShapeCacheId("curved.alignment")));
+  const auto original = checked(serialize_part_document_to_json(part));
+  const auto aligned = checked(suggest_loft_section_alignment(part, references, shapes));
+  CHECK(checked(serialize_part_document_to_json(part)) == original);
+  CHECK(intent_with(checked(suggest_loft_section_alignment(part, references, shapes))) ==
+        intent_with(aligned));
+
+  // An explicit seam or rotation makes the entire original list authoritative,
+  // including the independently drawn profiles that would otherwise be aligned.
+  for (const bool rotation : {false, true}) {
+    auto explicit_sections = references;
+    explicit_sections[1] = checked(ProfileSectionReference::create_closed_region(
+        std::get<ProfileRegionReference>(references[1].source()),
+        rotation ? std::optional<SketchEntityId>{} : SketchEntityId("curve.2"), true,
+        rotation ? std::optional<ParameterId>{ParameterId("rotation")} : std::nullopt));
+    CHECK(intent_with(checked(suggest_loft_section_alignment(part, explicit_sections, shapes))) ==
+          intent_with(explicit_sections));
+  }
+  CHECK(checked(serialize_part_document_to_json(part)) == original);
+
+  append_loft(part, aligned);
+  const auto saved = checked(serialize_part_document_to_json(part));
+  const GeometryRecomputeExecutor executor;
+  REQUIRE(executor.execute_document(part, shapes));
+  const auto verify_prism = [&](const GeometryShape& shape) {
+    const auto* native = OcctShapeView::get(shape);
+    REQUIRE(native);
+    CHECK(BRepCheck_Analyzer(*native).IsValid());
+    const auto summary = RectangleExtrusionAdapter{}.summarize(shape);
+    CHECK(summary.solid_count == 1);
+    CHECK(summary.volume_mm3 ==
+          Catch::Approx(std::numbers::pi * major * minor * span).epsilon(1e-7));
+    Bnd_Box bounds;
+    BRepBndLib::AddOptimal(*native, bounds, false, false);
+    double xmin, ymin, zmin, xmax, ymax, zmax;
+    bounds.Get(xmin, ymin, zmin, xmax, ymax, zmax);
+    CHECK(xmin == Catch::Approx(-major).margin(2e-6));
+    CHECK(xmax == Catch::Approx(major).margin(2e-6));
+    CHECK(ymin == Catch::Approx(-minor).margin(2e-6));
+    CHECK(ymax == Catch::Approx(minor).margin(2e-6));
+    CHECK(zmin == Catch::Approx(0).margin(2e-6));
+    CHECK(zmax == Catch::Approx(span).margin(2e-6));
+    // Analytic trigonometric boundary points are independent of the heuristic's
+    // polyline and cover both authored and intermediate Loft stations.
+    for (const double z : {0., 10., 20., 30., 40.})
+      for (std::size_t sample = 0; sample < 24; ++sample) {
+        const double angle = 2 * std::numbers::pi * sample / 24;
+        on_shape(shape, {major * std::cos(angle), minor * std::sin(angle), z});
+      }
+  };
+  const auto* shape = shapes.find_body_shape(BodyId("body.curved"));
+  REQUIRE(shape);
+  verify_prism(*shape);
+  CHECK(checked(serialize_part_document_to_json(part)) == saved);
+  const auto reopened = checked(deserialize_part_document_from_json(saved));
+  auto reopened_shapes = checked(ShapeCache::create(ShapeCacheId("curved.reopened")));
+  REQUIRE(executor.execute_document(reopened, reopened_shapes));
+  const auto* reopened_shape = reopened_shapes.find_body_shape(BodyId("body.curved"));
+  REQUIRE(reopened_shape);
+  verify_prism(*reopened_shape);
+  CHECK(checked(serialize_part_document_to_json(reopened)) == saved);
 }
 
 TEST_CASE("Unequal open Loft sections retain center and endpoint guide bindings",

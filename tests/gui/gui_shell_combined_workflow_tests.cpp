@@ -1,3 +1,4 @@
+#include "../support/loft_alignment_fixture.hpp"
 #include "../support/loft_section_refinement_fixture.hpp"
 #include "../support/mixed_path_loft_fixture.hpp"
 #include "blcad/core/assembly_leaf_occurrence.hpp"
@@ -1933,6 +1934,120 @@ TEST_CASE(
   CHECK_FALSE(ui.window.session().dirty());
   ui.command("fit", 2);
   ui.capture("loft-automatic-unequal-spline-result");
+  ui.idle();
+}
+
+TEST_CASE("UI Loft aligns independently drawn sections through opt-out recovery history and export",
+          "[gui][integration][shell-combined-workflow][shell-loft-section-alignment]") {
+  namespace fixture = blcad::test::loft_alignment;
+  auto middle = fixture::MiddleAuthoring::Reversed;
+  SECTION("the middle contour was drawn backwards") {
+    middle = fixture::MiddleAuthoring::Reversed;
+  }
+  SECTION("the middle contour starts at another corner") {
+    middle = fixture::MiddleAuthoring::ShiftedStart;
+  }
+  CAPTURE(middle);
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto input = directory.filePath("independent-loft-sections.blcad.json");
+  REQUIRE(write_part_document_json_file(fixture::inputs(middle, false), input.toStdString()));
+  ui.file("open", input);
+  const auto original = ui.snapshot();
+  const auto sketches =
+      QJsonDocument::fromJson(QByteArray::fromStdString(original)).object().value("sketches");
+  const auto unchanged = [&] {
+    CHECK(QJsonDocument::fromJson(QByteArray::fromStdString(ui.snapshot()))
+              .object()
+              .value("sketches") == sketches);
+  };
+  const auto prepare = [&] {
+    ui.command("loft");
+    auto& automatic = ui.widget<QCheckBox>("blcad.spatial.auto_align");
+    REQUIRE(automatic.isChecked());
+    REQUIRE(automatic.isEnabled());
+    auto& source = ui.widget<QComboBox>("blcad.spatial.source");
+    // Select the tip before the middle, then correct the list with its real
+    // ordering control, as when assembling a Loft from a crowded browser.
+    for (const auto* prefix : {"Section 0 /", "Section 2 /", "Section 1 /"}) {
+      ui.choose(source, source.findText(prefix, Qt::MatchStartsWith));
+      ui.button("blcad.spatial.add");
+    }
+    auto& order = ui.widget<QListWidget>("blcad.spatial.order");
+    REQUIRE(order.count() == 3);
+    ui.list(order, 2);
+    ui.button("blcad.spatial.order.up");
+    CHECK(order.item(1)->text().startsWith("Section 1 /"));
+    ui.button("blcad.spatial.add"); // Duplicate current source is rejected.
+    CHECK(order.count() == 3);
+    REQUIRE(ui.window.viewport().feature_preview_active());
+    REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+    CHECK(ui.snapshot() == original);
+    unchanged();
+  };
+  prepare();
+  auto& automatic = ui.widget<QCheckBox>("blcad.spatial.auto_align");
+  ui.click(automatic);
+  CHECK_FALSE(automatic.isChecked());
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.click(automatic);
+  REQUIRE(automatic.isChecked());
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.capture("loft-section-alignment-preview");
+  ui.button("blcad.feature.cancel");
+  CHECK(ui.snapshot() == original);
+  CHECK_FALSE(ui.window.session().can_undo());
+  ui.idle();
+
+  // Opting out preserves the manually authored correspondence, including an
+  // intentional twist. Undo/Redo must reproduce that choice exactly.
+  prepare();
+  ui.click(ui.widget<QCheckBox>("blcad.spatial.auto_align"));
+  ui.button("blcad.feature.apply");
+  const auto manual_body = ui.window.session().part_document()->bodies().back().id();
+  const auto manual = ui.snapshot();
+  CHECK(ui.summary(manual_body).solid_count == 1);
+  CHECK(ui.summary(manual_body).volume_mm3 < 2200.0);
+  unchanged();
+  ui.command("undo");
+  CHECK(ui.snapshot() == original);
+  ui.command("redo");
+  CHECK(ui.snapshot() == manual);
+  ui.command("undo");
+  CHECK(ui.snapshot() == original);
+  ui.idle();
+
+  prepare(); // A fresh task starts with automatic correspondence enabled.
+  ui.button("blcad.feature.apply");
+  const auto body = ui.window.session().part_document()->bodies().back().id();
+  REQUIRE(ui.window.session().part_document()->loft_features().size() == 1);
+  REQUIRE(ui.window.session().part_document()->bodies().size() == 1);
+  const auto verify_body = [&] {
+    const auto* aligned = ui.window.session().part_shape_cache()->find_body_shape(body);
+    REQUIRE(aligned);
+    fixture::verify_prism(*aligned);
+  };
+  verify_body();
+  unchanged();
+  const auto corrected = ui.snapshot();
+  CHECK_FALSE(ui.window.session().can_redo());
+  ui.history({original, corrected});
+  verify_body();
+  unchanged();
+  ui.roundtrip(directory.filePath("aligned-loft.blcad.json"));
+  CHECK(ui.snapshot() == corrected);
+  verify_body();
+  unchanged();
+  const auto saved = ui.bytes(directory.filePath("aligned-loft.blcad.json"));
+  const auto step = directory.filePath("aligned-loft.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).startsWith("ISO-10303-21;"));
+  CHECK(ui.bytes(directory.filePath("aligned-loft.blcad.json")) == saved);
+  CHECK(ui.snapshot() == corrected);
+  CHECK_FALSE(ui.window.session().dirty());
+  ui.command("fit", 2);
+  ui.capture("loft-section-alignment-result");
   ui.idle();
 }
 

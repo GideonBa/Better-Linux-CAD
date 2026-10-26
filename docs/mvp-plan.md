@@ -1305,6 +1305,27 @@ remained unchanged across final GUI/native checks. Native images and full eviden
 design document. Delivery follows the normal protected-branch PR merge workflow; this follow-up
 does not advance numbered STEP import progress.
 
+## Loft profile correspondence follow-up — 2026-10-26
+
+The screenshot's new unsaved document is unavailable, so its exact settings cannot be reproduced.
+A deterministic regression nevertheless proves valid but distorted solids from independently drawn
+identical profiles: a 2,240 mm³ prism became 746.6667 or 1,642.6667 mm³ after reversing the middle
+contour or changing its starting corner.
+
+Implemented default, optional alignment for new closed-section GUI Lofts. Geometry suggests existing
+seam/flip references from a bounded, normalized contour comparison; manual reversals stay local and
+guide-bound or explicitly aligned intent remains authoritative. Existing saved features and source
+Sketches are preserved. Analytic prism/circle/ellipse tests and a complex actual-input GUI workflow
+cover intermediate geometry, cancellation, opt-out/recovery, history, Save/Open and STEP.
+
+Final validation: Core **545 / 17,037**, Geometry **453 / 33,119**, full offscreen GUI **570 cases,
+550 passed / 20 native-only skips / 74,758 assertions**, focused native Loft/path UI **17 / 4,830**
+(no skips), and required shell closure **3 / 299**. All five targets build; separate native startup
+stayed running until the intentional timeout (124), and the 737-file source freeze remained
+unchanged. Native captures, focused results, heuristic limits and unrelated native-only omissions
+are recorded in `docs/gui-interactive-path-sweep-loft-mvp9.md`. Numbered status remains through
+Block 137, with Block 138 planned.
+
 ## Current next technical step — Block 138 (planned)
 
 Implement the OCCT STEP/XDE reader and deterministic product/body definitions over the verified

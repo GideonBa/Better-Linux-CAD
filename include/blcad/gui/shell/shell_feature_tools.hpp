@@ -548,6 +548,7 @@ private:
   QComboBox* spatial_orientation_{nullptr};
   QComboBox* spatial_continuity_{nullptr};
   QCheckBox* spatial_closed_{nullptr};
+  QCheckBox* spatial_auto_align_{nullptr};
   QCheckBox* sweep_twist_{nullptr};
   std::array<QDoubleSpinBox*, 3> spatial_up_{};
   QPushButton* spatial_add_{nullptr};
