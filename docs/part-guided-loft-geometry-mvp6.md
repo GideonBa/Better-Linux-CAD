@@ -17,8 +17,11 @@ Section `i` of `n` binds to normalized path-length station `i / (n - 1)` (three 
 0, 0.5, 1; five sections: 0, 0.25, 0.5, 0.75, 1). Placement is not inferred by intersecting
 arbitrary section planes with the trajectory. Planes may have distinct normals and in-plane roll,
 but their profile centers must meet these stations within the binding tolerance (1e-5 mm).
-Corresponding sections require equal edge counts; controlled interpolation also requires matching
-edge kinds. Different sizes and polygon outlines are supported within that correspondence.
+Unequal edge counts are first refined by BLCAD's exact compatibility layer; controlled interpolation
+still requires matching edge kinds at corresponding refined positions. Different sizes and polygon
+outlines are supported within that correspondence. Authored section centers remain the original
+vertex averages; added subdivision vertices do not redefine them. Intermediate center translation
+uses interpolation of those original centers, preventing refinement density from moving a section.
 
 The control sampler retains resolved lines and circular arcs. Arc lengths and sampled positions
 use the actual circle, including reversed arcs; replacing an arc with two chords changes the section
@@ -38,9 +41,14 @@ bind the seam point and the opposite point, suitable for leading/trailing-edge c
 must pass through its bound point on every authored section at the corresponding normalized section
 station.
 
-Intermediate control sections interpolate matching authored edge kinds, then bind their selected
-boundary points to sampled guide positions. Mismatched edge kinds/counts, excessive guides, or a
-guide that misses an authored station fail closed. OCCT compatibility rewriting remains disabled.
+Intermediate control sections interpolate matching refined edge kinds, then bind their selected
+boundary points to sampled guide positions. Mismatched edge kinds, incompatible anchors, excessive
+guides, or a guide that misses an authored station fail closed. OCCT compatibility rewriting remains
+disabled. For automatically refined sections, each sampled guide station must identify one
+unambiguous original boundary vertex. The original-to-refined mapping must give the same anchor on
+every section, and different guides must bind distinct anchors. This preserves leading/trailing
+anchors even when their authored indices differ. Equal-count sections retain the historical ordinal
+rule. Automatic refinement does not guess a guide binding inside an authored edge.
 
 ## Continuity contract
 

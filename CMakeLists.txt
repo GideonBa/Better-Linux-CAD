@@ -197,6 +197,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/circular_pattern_adapter.cpp
     src/geometry/linear_pattern_adapter.cpp
     src/geometry/loft_adapter.cpp
+    src/geometry/loft_section_compatibility.cpp
     src/geometry/mirror_adapter.cpp
     src/geometry/rectangle_extrusion_adapter.cpp
     src/geometry/occt_shape_view.cpp
@@ -551,6 +552,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/linear_pattern_pipeline_tests.cpp
       tests/geometry/loft_feature_pipeline_tests.cpp
       tests/geometry/multi_section_loft_pipeline_tests.cpp
+      tests/geometry/loft_section_compatibility_tests.cpp
       tests/geometry/mixed_path_loft_tests.cpp
       tests/geometry/mirror_feature_pipeline_tests.cpp
       tests/geometry/parameter_expression_pipeline_tests.cpp

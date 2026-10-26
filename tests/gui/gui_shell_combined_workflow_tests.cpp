@@ -1,3 +1,4 @@
+#include "../support/loft_section_refinement_fixture.hpp"
 #include "../support/mixed_path_loft_fixture.hpp"
 #include "blcad/core/assembly_leaf_occurrence.hpp"
 #include "blcad/core/part_document_json.hpp"
@@ -31,6 +32,8 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QInputDialog>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -1631,6 +1634,99 @@ TEST_CASE(
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
   CHECK(ui.bytes(saved) == source_bytes);
   CHECK(ui.snapshot() == edited);
+  ui.idle();
+}
+
+TEST_CASE(
+    "UI Loft automatically reconciles unequal spline profiles through preview history and export",
+    "[gui][integration][shell-combined-workflow][shell-loft-auto-segments]") {
+  namespace fixture = blcad::test::loft_refinement;
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto input = directory.filePath("unequal-sections.blcad.json");
+  REQUIRE(write_part_document_json_file(fixture::inputs(), input.toStdString()));
+  ui.file("open", input);
+  const auto original = ui.snapshot();
+  const auto source_sketches =
+      QJsonDocument::fromJson(QByteArray::fromStdString(original)).object().value("sketches");
+  const auto unchanged = [&] {
+    CHECK(QJsonDocument::fromJson(QByteArray::fromStdString(ui.snapshot()))
+              .object()
+              .value("sketches") == source_sketches);
+    const auto& sketches = ui.window.session().part_document()->sketches();
+    REQUIRE(sketches.size() == 3);
+    CHECK(sketches[0].spline_segments().size() == 8);
+    CHECK(sketches[1].spline_segments().size() == 9);
+    CHECK(sketches[2].spline_segments().size() == 6);
+  };
+  const auto prepare = [&] {
+    ui.command("loft");
+    CHECK(ui.widget<QLabel>("blcad.spatial.order_hint").text().contains("automatisch"));
+    auto& source = ui.widget<QComboBox>("blcad.spatial.source");
+    for (const auto prefix : {"Root profile /", "Tip profile /", "Mid profile /"}) {
+      ui.choose(source, source.findText(prefix, Qt::MatchStartsWith));
+      ui.button("blcad.spatial.add");
+    }
+    auto& order = ui.widget<QListWidget>("blcad.spatial.order");
+    REQUIRE(order.count() == 3);
+    ui.list(order, 2);
+    ui.button("blcad.spatial.order.up");
+    CHECK(order.item(1)->text().startsWith("Mid profile /"));
+    REQUIRE(ui.window.viewport().feature_preview_active());
+    REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+    CHECK(ui.snapshot() == original);
+    unchanged();
+  };
+  prepare();
+  ui.key(ui.window.viewport(), Qt::Key_Escape);
+  ui.idle();
+  CHECK(ui.snapshot() == original);
+  CHECK_FALSE(ui.window.session().can_undo());
+  prepare();
+  auto& continuity = ui.widget<QComboBox>("blcad.spatial.continuity");
+  ui.choose(continuity, 2);
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  unchanged();
+  ui.choose(continuity, 0);
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.capture("loft-automatic-unequal-spline-preview");
+  ui.button("blcad.feature.apply");
+  const auto body = ui.window.session().part_document()->bodies().back().id();
+  const auto loft = ui.window.session().part_document()->loft_features().back().id();
+  const auto summary = ui.summary(body);
+  CHECK(summary.solid_count == 1);
+  CHECK(summary.volume_mm3 > 0);
+  unchanged();
+  std::vector<std::string> states{original, ui.snapshot()};
+  ui.tree(loft.value(), true);
+  ui.text(ui.widget<QLineEdit>("blcad.feature_edit.field/name"), "Automatically matched blade");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.feature_edit.apply");
+  CHECK(ui.window.session().part_document()->loft_features().back().id() == loft);
+  unchanged();
+  states.push_back(ui.snapshot());
+  ui.command("body_translate");
+  ui.list_data(ui.widget<QListWidget>("blcad.body.sources"), QString::fromStdString(body.value()));
+  ui.scalar("8 mm");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(body).solid_count == 1);
+  CHECK(ui.summary(body).volume_mm3 == Approx(summary.volume_mm3).epsilon(1e-8));
+  unchanged();
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  unchanged();
+  ui.roundtrip(directory.filePath("automatic-loft.blcad.json"));
+  unchanged();
+  const auto saved = ui.snapshot();
+  ui.file("export_part_step", directory.filePath("automatic-loft.step"));
+  CHECK(ui.bytes(directory.filePath("automatic-loft.step")).startsWith("ISO-10303-21;"));
+  CHECK(ui.snapshot() == saved);
+  CHECK_FALSE(ui.window.session().dirty());
+  ui.command("fit", 2);
+  ui.capture("loft-automatic-unequal-spline-result");
   ui.idle();
 }
 

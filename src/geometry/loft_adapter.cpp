@@ -1,4 +1,5 @@
 #include "blcad/geometry/loft_adapter.hpp"
+#include "blcad/geometry/loft_section_compatibility.hpp"
 
 #include "geometry_shape_internal.hpp"
 
@@ -173,7 +174,7 @@ interpolate_closed_section(const FeatureId& id, const std::vector<ClosedProfileC
                            const std::vector<ClosedProfileCurveSegment>& second, double ratio) {
   if (first.size() != second.size())
     return Result<std::vector<ClosedProfileCurveSegment>>::failure(
-        loft_error(id, "guided loft sections require matching authored edge counts"));
+        loft_error(id, "guided loft sections require matching refined edge counts"));
   std::vector<ClosedProfileCurveSegment> result;
   result.reserve(first.size());
   for (std::size_t index = 0U; index < first.size(); ++index) {
@@ -198,7 +199,7 @@ interpolate_open_section(const FeatureId& id, const std::vector<SweepPathSegment
                          const std::vector<SweepPathSegment>& second, double ratio) {
   if (first.size() != second.size())
     return Result<std::vector<SweepPathSegment>>::failure(
-        loft_error(id, "guided open loft sections require matching authored edge counts"));
+        loft_error(id, "guided open loft sections require matching refined edge counts"));
   std::vector<SweepPathSegment> result;
   result.reserve(first.size());
   for (std::size_t index = 0U; index < first.size(); ++index) {
@@ -217,18 +218,22 @@ interpolate_open_section(const FeatureId& id, const std::vector<SweepPathSegment
 controlled_closed_sections(
     const FeatureId& id,
     const std::vector<std::vector<ClosedProfileCurveSegment>>& authored_sections,
+    const LoftCompatibleSections<ClosedProfileCurveSegment>& compatible,
     const std::vector<SweepPathSegment>* center_path,
     const std::vector<std::vector<SweepPathSegment>>& guides) {
   if (center_path == nullptr && guides.empty())
-    return Result<std::vector<std::vector<ClosedProfileCurveSegment>>>::success(authored_sections);
+    return Result<std::vector<std::vector<ClosedProfileCurveSegment>>>::success(
+        compatible.sections);
   if (authored_sections.size() < 2U || authored_sections.front().empty())
     return Result<std::vector<std::vector<ClosedProfileCurveSegment>>>::failure(
         loft_error(id, "guided loft requires at least two non-empty sections"));
-  if (guides.size() > authored_sections.front().size())
+  if (std::any_of(authored_sections.begin(), authored_sections.end(),
+                  [&](const auto& section) { return guides.size() > section.size(); }))
     return Result<std::vector<std::vector<ClosedProfileCurveSegment>>>::failure(
         loft_error(id, "ordered loft guides exceed available seam-relative boundary points"));
-  const auto guide_point_index = [&guides, &authored_sections](std::size_t guide_index) {
-    return guide_index * authored_sections.front().size() / guides.size();
+  std::vector<std::size_t> guide_points(guides.size());
+  const auto guide_point_index = [&guide_points](std::size_t guide_index) {
+    return guide_points[guide_index];
   };
 
   const double span_count = static_cast<double>(authored_sections.size() - 1U);
@@ -247,23 +252,45 @@ controlled_closed_sections(
       auto point = sample_control_curve(id, guides[guide_index], ratio, "loft guide curve");
       if (point.has_error())
         return Result<std::vector<std::vector<ClosedProfileCurveSegment>>>::failure(point.error());
-      const std::size_t point_index = guide_point_index(guide_index);
+      std::size_t point_index = guide_index * authored_sections[index].size() / guides.size();
+      if (compatible.adjusted) {
+        std::size_t matches = 0;
+        for (std::size_t p = 0; p < authored_sections[index].size(); ++p)
+          if (distance(point.value(), authored_sections[index][p].start) <=
+              kControlBindingTolerance) {
+            point_index = p;
+            ++matches;
+          }
+        if (matches != 1)
+          return Result<std::vector<std::vector<ClosedProfileCurveSegment>>>::failure(
+              loft_error(id, "loft guide must bind one unambiguous authored boundary vertex"));
+      }
       if (distance(point.value(), authored_sections[index][point_index].start) >
           kControlBindingTolerance)
         return Result<std::vector<std::vector<ClosedProfileCurveSegment>>>::failure(
             loft_error(id, "ordered loft guide must pass through its seam-relative section point"));
+      const auto derived_index = compatible.source_vertices[index][point_index];
+      if (index && guide_points[guide_index] != derived_index)
+        return Result<std::vector<std::vector<ClosedProfileCurveSegment>>>::failure(
+            loft_error(id, "loft guides require corresponding refined boundary anchors"));
+      guide_points[guide_index] = derived_index;
     }
   }
+  auto unique_points = guide_points;
+  std::sort(unique_points.begin(), unique_points.end());
+  if (std::adjacent_find(unique_points.begin(), unique_points.end()) != unique_points.end())
+    return Result<std::vector<std::vector<ClosedProfileCurveSegment>>>::failure(
+        loft_error(id, "loft guides must bind distinct boundary anchors"));
 
   std::vector<std::vector<ClosedProfileCurveSegment>> result;
   result.reserve((authored_sections.size() - 1U) * kControlSamplesPerSpan + 1U);
   for (std::size_t span = 0U; span + 1U < authored_sections.size(); ++span) {
-    result.push_back(authored_sections[span]);
+    result.push_back(compatible.sections[span]);
     for (std::size_t sample = 1U; sample < kControlSamplesPerSpan; ++sample) {
       const double local_ratio = static_cast<double>(sample) / kControlSamplesPerSpan;
       const double global_ratio = (static_cast<double>(span) + local_ratio) / span_count;
-      auto section = interpolate_closed_section(id, authored_sections[span],
-                                                authored_sections[span + 1U], local_ratio);
+      auto section = interpolate_closed_section(id, compatible.sections[span],
+                                                compatible.sections[span + 1U], local_ratio);
       if (section.has_error())
         return Result<std::vector<std::vector<ClosedProfileCurveSegment>>>::failure(
             section.error());
@@ -272,7 +299,9 @@ controlled_closed_sections(
         if (point.has_error())
           return Result<std::vector<std::vector<ClosedProfileCurveSegment>>>::failure(
               point.error());
-        const Point3 center = closed_section_center(section.value());
+        const Point3 center =
+            interpolate(closed_section_center(authored_sections[span]),
+                        closed_section_center(authored_sections[span + 1U]), local_ratio);
         translate_closed_section(
             section.value(),
             {point.value().x - center.x, point.value().y - center.y, point.value().z - center.z});
@@ -292,26 +321,28 @@ controlled_closed_sections(
       result.push_back(std::move(section.value()));
     }
   }
-  result.push_back(authored_sections.back());
+  result.push_back(compatible.sections.back());
   return Result<std::vector<std::vector<ClosedProfileCurveSegment>>>::success(std::move(result));
 }
 
 [[nodiscard]] Result<std::vector<std::vector<SweepPathSegment>>>
 controlled_open_sections(const FeatureId& id,
                          const std::vector<std::vector<SweepPathSegment>>& authored_sections,
+                         const LoftCompatibleSections<SweepPathSegment>& compatible,
                          const std::vector<SweepPathSegment>* center_path,
                          const std::vector<std::vector<SweepPathSegment>>& guides) {
   if (center_path == nullptr && guides.empty())
-    return Result<std::vector<std::vector<SweepPathSegment>>>::success(authored_sections);
+    return Result<std::vector<std::vector<SweepPathSegment>>>::success(compatible.sections);
   if (authored_sections.size() < 2U || authored_sections.front().empty())
     return Result<std::vector<std::vector<SweepPathSegment>>>::failure(
         loft_error(id, "guided open loft requires at least two non-empty sections"));
-  if (guides.size() > authored_sections.front().size() + 1U)
+  if (std::any_of(authored_sections.begin(), authored_sections.end(),
+                  [&](const auto& section) { return guides.size() > section.size() + 1U; }))
     return Result<std::vector<std::vector<SweepPathSegment>>>::failure(
         loft_error(id, "ordered open loft guides exceed available section points"));
-  const std::size_t open_point_count = authored_sections.front().size() + 1U;
-  const auto guide_point_index = [&guides, open_point_count](std::size_t guide_index) {
-    return guide_index * open_point_count / guides.size();
+  std::vector<std::size_t> guide_points(guides.size());
+  const auto guide_point_index = [&guide_points](std::size_t guide_index) {
+    return guide_points[guide_index];
   };
 
   const auto section_point = [](const std::vector<SweepPathSegment>& section, std::size_t index) {
@@ -333,30 +364,55 @@ controlled_open_sections(const FeatureId& id,
       auto point = sample_control_curve(id, guides[guide_index], ratio, "open loft guide curve");
       if (point.has_error())
         return Result<std::vector<std::vector<SweepPathSegment>>>::failure(point.error());
-      if (distance(point.value(),
-                   section_point(authored_sections[index], guide_point_index(guide_index))) >
+      std::size_t point_index =
+          guide_index * (authored_sections[index].size() + 1U) / guides.size();
+      if (compatible.adjusted) {
+        std::size_t matches = 0;
+        for (std::size_t p = 0; p <= authored_sections[index].size(); ++p)
+          if (distance(point.value(), section_point(authored_sections[index], p)) <=
+              kControlBindingTolerance) {
+            point_index = p;
+            ++matches;
+          }
+        if (matches != 1)
+          return Result<std::vector<std::vector<SweepPathSegment>>>::failure(
+              loft_error(id, "open loft guide must bind one unambiguous authored boundary vertex"));
+      }
+      if (distance(point.value(), section_point(authored_sections[index], point_index)) >
           kControlBindingTolerance)
         return Result<std::vector<std::vector<SweepPathSegment>>>::failure(
             loft_error(id, "ordered open loft guide must pass through its section point"));
+      const auto derived_index = compatible.source_vertices[index][point_index];
+      if (index && guide_points[guide_index] != derived_index)
+        return Result<std::vector<std::vector<SweepPathSegment>>>::failure(
+            loft_error(id, "open loft guides require corresponding refined boundary anchors"));
+      guide_points[guide_index] = derived_index;
     }
   }
+  auto unique_points = guide_points;
+  std::sort(unique_points.begin(), unique_points.end());
+  if (std::adjacent_find(unique_points.begin(), unique_points.end()) != unique_points.end())
+    return Result<std::vector<std::vector<SweepPathSegment>>>::failure(
+        loft_error(id, "open loft guides must bind distinct boundary anchors"));
 
   std::vector<std::vector<SweepPathSegment>> result;
   result.reserve((authored_sections.size() - 1U) * kControlSamplesPerSpan + 1U);
   for (std::size_t span = 0U; span + 1U < authored_sections.size(); ++span) {
-    result.push_back(authored_sections[span]);
+    result.push_back(compatible.sections[span]);
     for (std::size_t sample = 1U; sample < kControlSamplesPerSpan; ++sample) {
       const double local_ratio = static_cast<double>(sample) / kControlSamplesPerSpan;
       const double global_ratio = (static_cast<double>(span) + local_ratio) / span_count;
-      auto section = interpolate_open_section(id, authored_sections[span],
-                                              authored_sections[span + 1U], local_ratio);
+      auto section = interpolate_open_section(id, compatible.sections[span],
+                                              compatible.sections[span + 1U], local_ratio);
       if (section.has_error())
         return Result<std::vector<std::vector<SweepPathSegment>>>::failure(section.error());
       if (center_path != nullptr) {
         auto point = sample_control_curve(id, *center_path, global_ratio, "open loft center path");
         if (point.has_error())
           return Result<std::vector<std::vector<SweepPathSegment>>>::failure(point.error());
-        const Point3 center = open_section_center(section.value());
+        const Point3 center =
+            interpolate(open_section_center(authored_sections[span]),
+                        open_section_center(authored_sections[span + 1U]), local_ratio);
         translate_open_section(
             section.value(),
             {point.value().x - center.x, point.value().y - center.y, point.value().z - center.z});
@@ -375,7 +431,7 @@ controlled_open_sections(const FeatureId& id,
       result.push_back(std::move(section.value()));
     }
   }
-  result.push_back(authored_sections.back());
+  result.push_back(compatible.sections.back());
   return Result<std::vector<std::vector<SweepPathSegment>>>::success(std::move(result));
 }
 
@@ -473,7 +529,7 @@ execute_loft(const FeatureId& id, const std::vector<std::vector<Segment>>& secti
   for (const auto& section : sections)
     if (section.size() != authored_edge_count)
       return Result<TopoDS_Shape>::failure(
-          loft_error(id, "all loft sections require matching authored edge counts"));
+          loft_error(id, "Loft compatibility did not produce matching derived edge counts"));
   try {
     BRepOffsetAPI_ThruSections builder(solid, Standard_False, kTolerance);
     builder.CheckCompatibility(Standard_False);
@@ -535,8 +591,11 @@ Result<GeometryShape> LoftAdapter::loft_closed_sections(
   if (continuity == LoftContinuity::G2)
     return Result<GeometryShape>::failure(loft_error(
         feature_id, "G2 loft continuity is unsupported without a verified curvature guarantee"));
-  auto sections =
-      controlled_closed_sections(feature_id, ordered_sections, center_path, guide_curves);
+  auto compatible = make_loft_sections_compatible(feature_id, ordered_sections);
+  if (!compatible)
+    return Result<GeometryShape>::failure(compatible.error());
+  auto sections = controlled_closed_sections(feature_id, ordered_sections, compatible.value(),
+                                             center_path, guide_curves);
   if (sections.has_error())
     return Result<GeometryShape>::failure(sections.error());
   auto shape =
@@ -560,7 +619,11 @@ LoftAdapter::loft_open_sections(FeatureId feature_id,
   if (continuity == LoftContinuity::G2)
     return Result<GeometryShape>::failure(loft_error(
         feature_id, "G2 loft continuity is unsupported without a verified curvature guarantee"));
-  auto sections = controlled_open_sections(feature_id, ordered_sections, center_path, guide_curves);
+  auto compatible = make_loft_sections_compatible(feature_id, ordered_sections);
+  if (!compatible)
+    return Result<GeometryShape>::failure(compatible.error());
+  auto sections = controlled_open_sections(feature_id, ordered_sections, compatible.value(),
+                                           center_path, guide_curves);
   if (sections.has_error())
     return Result<GeometryShape>::failure(sections.error());
   auto shape =

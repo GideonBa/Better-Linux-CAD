@@ -109,10 +109,21 @@ list and C0/G1/G2 continuity are explicit. Fewer than two sections, mixed incomp
 misbound paths/guides and unsupported G2 clear the preview and prevent Apply.
 For a center path, section `i` of `n` must have its center at normalized path-length station
 `i / (n - 1)`. Differently oriented/rolled planes and distinct compatible outlines are supported;
-arbitrary plane intersections or differing edge counts are not automatically reconciled.
+arbitrary plane intersections are not automatically inferred. Differing edge counts are automatically
+reconciled on derived Geometry copies during preview and Apply; original Sketch entities and control
+points remain unchanged. Exact line/arc/rational-Bézier subdivision preserves the section contours.
+The seam, normal flips and explicit order remain authoritative. Invalid/self-intersecting results,
+unsupported continuity and incompatible guide anchors still clear the preview and prevent Apply.
 Circular path/guide arcs retain their true length and sampled circle positions in Loft control;
 splines remain 32-span approximations. See `docs/part-guided-loft-geometry-mvp6.md`.
 G1 remains verified by Geometry; it is not silently substituted for G2.
+
+The Loft task states that profiles are reconciled automatically. The complex
+`[shell-loft-auto-segments]` workflow opens three synthetic fitted outlines with 8/9/6 edges on
+different planes, reorders sections, cancels/restarts, rejects G2 and recovers C0, commits the Loft,
+edits it, translates the resulting Body, checks exact history, canonically reopens and exports STEP.
+Original Sketch JSON is checked throughout. The shared synthetic fixture models the reported
+segmentation pattern without embedding a user's document in the repository.
 Solid, cut and surface results use the matching Body
 contract. Cut mode uses the selected existing target instead of incorrectly creating NewBody intent.
 
@@ -233,3 +244,40 @@ input `[shell-combined-projected-sweep]` workflow authors an XZ source and XY pr
 endpoints, adds a direction point and drives PathCurve/Sweep through rejected/corrected edits,
 history, canonical reopening and STEP. Exact target and copy semantics remain owned by
 `docs/gui-sketch3d-interaction-mvp8.md`.
+
+
+## Automatic section-refinement verification — 2026-10-26
+
+The refinement follow-up adds seven Geometry cases and one complex UI case. A local reproduction of
+the supplied 8/9/6-edge document, with its Sketch records intact and only Loft intent added,
+recomputes a valid solid and exports STEP successfully. Public regression fixtures use synthetic
+outlines with the same segmentation pattern.
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Focused Geometry | 23 | 3,054 | All passed |
+| Focused offscreen Loft/path UI | 12 | 2,582 | 11 passed; one native-only skip |
+| Focused native Loft/path UI | 12 | 2,844 | All passed; no skips |
+| Full Core | 539 | 16,579 | All passed |
+| Full Geometry | 448 | 31,285 | All passed |
+| Full offscreen GUI | 548 | 71,569 | 528 passed; 20 native-only skips |
+
+The native run covers `[shell-loft-auto-segments]`, `[shell-combined-loft]`,
+`[shell-mixed-path-loft]` and `[block136-spatial]`. It covers the focused offscreen exclusion;
+other native-only cases outside the changed Loft/path scope were not rerun in this follow-up.
+Builds, source edits, GUI runs and separate startup stayed serial. All five targets (application,
+GUI/Core/Geometry tests and STEP exporter) build. Native startup remained running until the planned
+six-second timeout (124). The known medium OCCT incomplete-visual depth/stencil warning remains;
+no high-severity graphics, BadDrawable or fatal lifecycle errors occurred.
+
+Native preview/result captures at 1280×800 in `/tmp/blcad-loft-auto-native` were inspected, including
+`loft-automatic-unequal-spline-preview` and `loft-automatic-unequal-spline-result`. The task explains
+automatic reconciliation, its full hint is readable, Apply/Cancel remain reachable and the resulting
+blade-like solid is visible. Exact source Sketch JSON and original 8/9/6 counts survive the entire
+GUI workflow. Changed C++ formatting and working/staged whitespace checks pass.
+
+Focused commands live in `docs/development-setup.md`. Local evidence logs use
+`/tmp/blcad-loft-auto-` with suffixes `geometry-focused.log`, `gui-focused.log`, `native.log`,
+`core-full.log`, `geometry-full.log`, `gui-full.log`, `startup.log`, `user-file.log` and
+`build-final.log`. Earlier development build failures are superseded by completed successful runs.
+No persistence version changes or numbered STEP import progress are implied.

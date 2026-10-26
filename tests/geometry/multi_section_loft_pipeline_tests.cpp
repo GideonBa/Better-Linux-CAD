@@ -193,7 +193,8 @@ TEST_CASE("Block 86 creates a four-section open LoftSurface", "[geometry][multi-
   CHECK(RectangleExtrusionAdapter{}.summarize(*shape).solid_count == 0U);
 }
 
-TEST_CASE("Block 86 rejects incidental section correspondence", "[geometry][multi-section-loft]") {
+TEST_CASE("Loft refines different polygon edge counts without kernel correspondence rewriting",
+          "[geometry][multi-section-loft][loft-section-compatibility]") {
   const auto square =
       polygon({{-5.0, -5.0, 0.0}, {5.0, -5.0, 0.0}, {5.0, 5.0, 0.0}, {-5.0, 5.0, 0.0}});
   const auto triangle = polygon({{-4.0, -4.0, 10.0}, {4.0, -4.0, 10.0}, {0.0, 4.0, 10.0}});
@@ -201,6 +202,6 @@ TEST_CASE("Block 86 rejects incidental section correspondence", "[geometry][mult
       polygon({{-3.0, -3.0, 20.0}, {3.0, -3.0, 20.0}, {3.0, 3.0, 20.0}, {-3.0, 3.0, 20.0}});
   auto result =
       LoftAdapter{}.loft_closed_sections(FeatureId("loft.mismatch"), {square, triangle, top}, true);
-  REQUIRE(result.has_error());
-  CHECK(result.error().message().find("matching authored edge counts") != std::string::npos);
+  REQUIRE(result);
+  CHECK(RectangleExtrusionAdapter{}.summarize(result.value()).solid_count == 1);
 }
