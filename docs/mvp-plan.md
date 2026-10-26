@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 136
-current_block: 137
-current_boundary: STEP source identity, import modes, JSON, and freshness
-current_tag: "[core][step-import-source]"
+implemented_through: Block 137
+current_block: 138
+current_boundary: OCCT STEP/XDE reader and deterministic imported body definitions
+current_tag: "[geometry][step-import-reader]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -19,7 +19,7 @@ phase_status:
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 implemented; MVP complete"
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
-  mvp_10: "STEP Import — Blocks 137–143 planned"
+  mvp_10: "STEP Import — Block 137 implemented; Blocks 138–143 planned"
 ---
 
 # MVP Plan
@@ -31,10 +31,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 136
-current block        Block 137 (planned)
+implemented through  Block 137
+current block        Block 138 (planned)
 current phase        STEP Import MVP-10
-current boundary     STEP source identity, import modes, JSON, and freshness
+current boundary     OCCT STEP/XDE reader and deterministic imported body definitions
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
@@ -51,6 +51,11 @@ ShellWindow proofs. Block 136 is accepted on 2026-10-25; its full regression, na
 visual and closure evidence is recorded in `docs/gui-shell-acceptance-mvp9r.md`. Dated implementation
 entries below retain the acceptance state at the time of each slice.
 
+Block 137 is complete on 2026-10-26: persistent STEP source identity, explicit modes, canonical JSON,
+freshness and transactional source management are implemented and verified. Its Core/GUI contracts,
+complex workflows, full regression and native evidence live in `docs/step-import-sequence-mvp10.md`.
+The actual STEP/XDE geometry reader remains the next planned boundary, Block 138.
+
 ## Phase map
 
 ```text
@@ -64,7 +69,7 @@ MVP-7   GUI Feature Validation                        Blocks 95–105 implemente
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
 MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 implemented
 MVP-9R  GUI Shell Reset                                 Blocks 132–136 implemented
-MVP-10  STEP Import                                            Blocks 137–143 planned
+MVP-10  STEP Import                         Block 137 implemented; Blocks 138–143 planned
 ```
 
 Canonical phase sequences:
@@ -1197,16 +1202,34 @@ GUI Shell Reset MVP-9R is complete through Block 136. Existing feature-specific 
 remain explicit, including discrete Revolute sampling and shared child-definition pose authority.
 Historical Block-131 controller acceptance remains separate from the completed shell evidence.
 
-## Current next technical step — Block 137 (planned)
+## Block 137 — STEP source identity and GUI management — Complete (2026-10-26)
 
-Start STEP source identity, explicit Reference/EditableBody modes, canonical JSON and freshness
-contracts according to `docs/step-import-sequence-mvp10.md`. Define portable project-relative source
-paths, SHA-256 digests and explicit missing/changed/unreadable-source diagnostics, with transactional
-refresh intent and focused Core tests. The matching source/mode task must consume that authority.
-The OCCT STEP/XDE reader follows in Block 138; Blocks 137–143 remain planned.
+Part and Project source registries persist explicit Reference/EditableBody intent, canonical relative
+paths and SHA-256 fingerprints with strict, legacy-compatible JSON. Read-only inspection distinguishes
+available, missing, changed and unreadable files. Explicit refresh rechecks source intent, document
+location and current bytes before an atomic digest update. Save As, definition loading and export
+protect source ownership and files.
+
+The shell source task and browser expose that authority. Twenty-one new cases comprise nine Core,
+seven headless GUI and five complex shell cases. They combine existing modeling, nested Projects,
+exact history, stale-preview recovery, Save/Open, relocation, owner-ID collisions, lifecycle controls
+and native dialogs/layout. Full Core (539), Geometry (441), offscreen GUI (527 passed, 20 native-only
+skips) and native shell (356 passed, no skips) pass; all four targets, native captures and separate
+application startup are verified. The historical Block-136 shell manifest remains unchanged; its
+completion gate accepts later numbered progress. Exact evidence is in
+`docs/step-import-sequence-mvp10.md`.
+
+## Current next technical step — Block 138 (planned)
+
+Implement the OCCT STEP/XDE reader and deterministic product/body definitions over the verified
+external-source contract. Normalize declared units to millimeters, preserve supported names and
+hierarchy diagnostics, and reject empty/invalid transfer or ambiguous units before mutation. Add real
+STEP fixtures and GUI inspection previews with product/body/unit diagnostics. Measure inspection cost
+on realistic assets while keeping explicit source revalidation. Imported topology, Reference Parts,
+EditableBody features and structured Assembly import remain Blocks 139–143.
 
 ## Later phases
 
 Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R
-is complete through Block 136. STEP Import MVP-10 follows in Blocks 137–143 (contract unchanged in
-`docs/step-import-sequence-mvp10.md`; only the numbering moves).
+is complete through Block 136. STEP Import MVP-10 has completed source management in Block 137;
+Blocks 138–143 remain planned in `docs/step-import-sequence-mvp10.md`.

@@ -34,7 +34,9 @@ remain useful independent authority checks.
   The ViewCube workflow exercises actual menu input. This is a reachability inventory, not a
   substitute for executing the interaction regressions.
 - Gap/status consistency, exact blocked-family accounting and completion derived from remaining
-  family gaps plus pending integrated workflows. Manifest completion must agree with the plan.
+  family gaps plus pending integrated workflows. Accepted shell completion must be covered by the
+  plan's numbered boundary. Later phases may advance the plan without rewriting this completed
+  Block-136 milestone; an unfinished shell record still requires its exact current boundary.
 
 Negative controls deliberately remove/duplicate families, use a deleted tag, substitute a headless
 source, hide a missing tag behind OR and claim completion with gaps. They must all be rejected.

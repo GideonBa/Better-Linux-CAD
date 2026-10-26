@@ -14,6 +14,7 @@ feature-specific documents under `docs/`.
 - Qt 6 for the optional desktop, Interactive Sketcher, and Interactive Modeling
 - nlohmann-json
 - Catch2 3
+- OpenSSL Crypto (SHA-256 for external STEP source freshness)
 
 The Assembly numeric engine and Block-109 planar Sketch solver use project-owned deterministic dense
 elimination routines. Eigen is installed by the reference dependency set but is not currently a BLCAD
@@ -28,7 +29,7 @@ sudo apt-get update
 sudo apt-get install -y build-essential cmake ninja-build pkg-config git clang-format clang-tidy \
   libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev \
   libocct-data-exchange-dev libocct-visualization-dev libocct-ocaf-dev libocct-draw-dev \
-  qt6-base-dev libeigen3-dev libtbb-dev nlohmann-json3-dev libfmt-dev libspdlog-dev catch2 \
+  qt6-base-dev libeigen3-dev libtbb-dev nlohmann-json3-dev libfmt-dev libspdlog-dev catch2 libssl-dev \
   doxygen graphviz
 ```
 
@@ -496,9 +497,11 @@ Interactive Sketcher MVP-8 (Blocks 106–121) and Interactive Part & Assembly Mo
 Blocks 132 (QOpenGLWidget viewport), 133 (`ShellWindow` + `ShellRibbon`, origin seeding), 134
 (`ShellSketchTools`), and 135 (`ShellFeatureTools`, Extrude/Revolve, manipulator overlay) are
 implemented; Block 136 restores full bounded feature coverage and is accepted with full offscreen,
-native Qt/OCCT and closure checks. All Blocks through 136 are complete. STEP Import starts at planned
-Block 137; the latest evidence lives in `docs/gui-shell-acceptance-mvp9r.md`. Dated proof sections
-below retain their original incremental status.
+native Qt/OCCT and closure checks. Block 137 adds verified STEP source intent, freshness and shell
+management. All Blocks through 137 are complete; Block 138 (STEP/XDE reader) is next. Source contracts
+and acceptance evidence live in `docs/step-import-sequence-mvp10.md`; the completed shell milestone
+lives in `docs/gui-shell-acceptance-mvp9r.md`. Dated proof sections below retain their original
+incremental status.
 
 ## GUI Shell Reset focused proof
 
@@ -1380,3 +1383,28 @@ import, invalid candidates, branching history, canonical reopening and flat/stru
 
 The canonical full/native command and final closure gate live in
 `docs/gui-shell-acceptance-mvp9r.md`. Use its latest evidence section for actual results and omissions.
+
+## STEP source identity and GUI proof — Block 137
+
+Configure again after adding OpenSSL Crypto, then build the four targets serially before tests:
+
+```bash
+cmake --preset dev-gui
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests -j6
+./build/dev-gui/blcad_core_tests "[step-import-source],[step-import-json],[step-import-freshness]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[step-import-workbench],[block137-step-import],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad137-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block137-step-import]"
+```
+
+The complex shell cases combine existing Sketch/Extrude modeling, explicit modes, preview invalidation,
+external file changes, refresh, exact history, Save/Open and complete-folder relocation. They also
+exercise missing/unreadable recovery, nested Project intent, source-owner isolation, native file
+chooser acceptance/cancellation and 1280×800 task layout. Headless GUI checks cover stale/forged
+evidence, no-op refresh, definition loading, Save As and document/sidecar/STEP overwrite protection.
+Core checks cover canonical identity/JSON, SHA-256 known vectors, filesystem boundaries and stale
+refresh evidence. These source-management fixtures do not claim STEP geometry reader coverage.
+
+Run the full Core, Geometry and offscreen GUI suites and append `[block137-step-import]` to the
+canonical native shell filter from `docs/gui-shell-acceptance-mvp9r.md`. Keep GUI runs and separate
+native application startup serial; keep production/test sources frozen throughout completed runs.
+Actual acceptance results are recorded in `docs/step-import-sequence-mvp10.md`.

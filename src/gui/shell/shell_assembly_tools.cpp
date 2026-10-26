@@ -3,6 +3,7 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/gui/gui_assembly_workbench.hpp"
+#include "blcad/gui/gui_step_import_workbench.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -438,6 +439,14 @@ Result<std::size_t> ShellAssemblyTools::import_definition(const QString& path) {
     result = GuiAssemblyWorkbench{}.add_part(session_, *source.part_document());
   else if (source.project()) {
     const Project imported = *source.project();
+    if (!imported.step_import_sources().empty())
+      return fail(
+          "Projekt mit eigenen STEP-Quellen kann noch nicht als Unterbaugruppe geladen werden");
+    for (const auto& part : imported.part_documents()) {
+      auto valid = validate_step_import_definition_sources(session_, part);
+      if (!valid)
+        return valid;
+    }
     if (imported.cross_hierarchy_constraint_count() || imported.cross_hierarchy_joint_count())
       return fail("Projekt mit hierarchieübergreifenden Beziehungen kann noch nicht als "
                   "Unterbaugruppe geladen werden");

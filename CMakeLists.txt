@@ -16,6 +16,7 @@ option(BLCAD_BUILD_GUI "Build optional Qt GUI targets" OFF)
 option(BLCAD_BUILD_TESTS "Build unit tests" ON)
 
 include(CTest)
+find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 
 if(BLCAD_BUILD_GUI AND NOT BLCAD_BUILD_GEOMETRY)
   message(FATAL_ERROR "BLCAD_BUILD_GUI requires BLCAD_BUILD_GEOMETRY=ON")
@@ -98,6 +99,8 @@ add_library(
   src/core/sketch_repair_undo_stack_summary.cpp
   src/core/shell_feature.cpp
   src/core/sweep_feature.cpp
+  src/core/step_import_source.cpp
+  src/core/step_import_freshness.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
 
@@ -109,6 +112,7 @@ target_include_directories(
 )
 
 target_compile_features(blcad_core PUBLIC cxx_std_20)
+target_link_libraries(blcad_core PRIVATE OpenSSL::Crypto)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options(blcad_core PRIVATE -Wall -Wextra -Wpedantic)
@@ -287,6 +291,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_command_registry.cpp
     src/gui/gui_assembly_workbench.cpp
     src/gui/gui_analysis_export_workbench.cpp
+    src/gui/gui_step_import_workbench.cpp
     src/gui/gui_document_browser.cpp
     src/gui/gui_document_session.cpp
     src/gui/gui_part_foundation_workbench.cpp
@@ -313,6 +318,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_sketch_diagnostics_tools.cpp
     src/gui/shell/shell_parameter_tools.cpp
     src/gui/shell/shell_hole_tools.cpp
+    src/gui/shell/shell_step_import_tools.cpp
     src/gui/shell/shell_sketch_3d_tools.cpp
     src/gui/shell/shell_construction_tools.cpp
     src/gui/shell/shell_construction_manipulators.cpp
@@ -380,6 +386,7 @@ if(BLCAD_BUILD_TESTS)
   add_executable(
     blcad_core_tests
     tests/core/feature_update_command_tests.cpp
+    tests/core/step_import_source_tests.cpp
     tests/core/assembly_angle_constraint_tests.cpp
     tests/core/assembly_constraint_graph_tests.cpp
     tests/core/assembly_constraint_tests.cpp
@@ -597,6 +604,8 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_analysis_export_workbench_tests.cpp
       tests/gui/gui_command_state_tests.cpp
       tests/gui/gui_document_session_tests.cpp
+      tests/gui/gui_step_import_workbench_tests.cpp
+      tests/gui/gui_shell_step_import_tests.cpp
       tests/gui/gui_document_browser_tests.cpp
       tests/gui/gui_occt_viewport_tests.cpp
       tests/gui/gui_part_foundation_workbench_tests.cpp

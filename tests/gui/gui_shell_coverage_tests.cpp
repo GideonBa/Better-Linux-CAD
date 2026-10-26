@@ -144,6 +144,22 @@ QJsonObject manifest() {
 QJsonObject baseline() {
   return read_json("docs/gui-feature-coverage-manifest-mvp7.json");
 }
+bool plan_covers_shell_acceptance(const QString& text, const QJsonObject& progress) {
+  const auto completed = QRegularExpression("^implemented_through: Block ([0-9]+)$",
+                                            QRegularExpression::MultilineOption)
+                             .match(text);
+  const auto current =
+      QRegularExpression("^current_block: ([0-9]+)$", QRegularExpression::MultilineOption)
+          .match(text);
+  if (!completed.hasMatch() || !current.hasMatch())
+    return false;
+  const int boundary = completed.captured(1).toInt();
+  const bool accepted = progress["acceptance"].toObject()["complete"].toBool();
+  // A completed phase remains a historical milestone when later phases advance.
+  return current.captured(1).toInt() == boundary + 1 &&
+         (accepted ? boundary >= progress["completed_through"].toInt()
+                   : boundary == progress["completed_through"].toInt());
+}
 } // namespace
 
 TEST_CASE("Replacement shell coverage resolves every current proof and records all acceptance gaps",
@@ -157,10 +173,7 @@ TEST_CASE("Replacement shell coverage resolves every current proof and records a
   REQUIRE(plan.open(QIODevice::ReadOnly));
   const auto text = QString::fromUtf8(plan.readAll());
   const auto progress = current["shell_reset_progress"].toObject();
-  CHECK(text.contains(QStringLiteral("implemented_through: Block %1\n")
-                          .arg(progress["completed_through"].toInt())));
-  CHECK(
-      text.contains(QStringLiteral("current_block: %1\n").arg(progress["current_block"].toInt())));
+  CHECK(plan_covers_shell_acceptance(text, progress));
   if (qEnvironmentVariableIntValue("BLCAD_REQUIRE_SHELL_ACCEPTANCE") == 1)
     CHECK(progress["acceptance"].toObject()["complete"].toBool());
 }
@@ -169,6 +182,17 @@ TEST_CASE(
     "[gui][shell-coverage][integration][gui-feature-coverage]") {
   const auto accepted = baseline();
   const auto original = manifest();
+  auto completed = original["shell_reset_progress"].toObject();
+  completed["completed_through"] = 136;
+  completed["acceptance"] = QJsonObject{{"complete", true}};
+  CHECK(plan_covers_shell_acceptance("implemented_through: Block 137\ncurrent_block: 138\n",
+                                     completed));
+  CHECK_FALSE(plan_covers_shell_acceptance("implemented_through: Block 135\ncurrent_block: 136\n",
+                                           completed));
+  CHECK_FALSE(plan_covers_shell_acceptance("implemented_through: Block 137\ncurrent_block: 137\n",
+                                           completed));
+  CHECK_FALSE(plan_covers_shell_acceptance(
+      "historical implemented_through: Block 137\ncurrent_block: 138\n", completed));
   auto reject = [&](auto mutate) {
     auto candidate = original;
     mutate(candidate);

@@ -393,10 +393,26 @@ circle, and cylinder descriptors. `GuiMeasureController` owns only transient pic
 and status values; Body volume/solid counts reuse `BodyResultInspector`. Freshness and typed-target
 validation fail closed, and no Measure state enters Core or JSON. Coverage manifest v2 and the
 integrated Part/Assembly acceptance close MVP-9. GUI Shell Reset MVP-9R (Blocks 132–136) replaces
-the Qt shell without moving any authority; STEP Import MVP-10 (Blocks 137–143) is the next
-architecture boundary.
+the Qt shell without moving any authority; STEP Import MVP-10 (Blocks 137–143) begins with the
+implemented Block-137 source layer described below.
 
 Canonical contract: `docs/gui-interactive-assembly-mvp9.md`.
+
+## External STEP source intent
+
+Block 137 adds independent ordered source registries to Part and Project intent. A source owns a typed
+id, name, portable relative asset path, accepted SHA-256 digest and explicit Reference/EditableBody
+mode. Canonical JSON stores those five fields; STEP bytes, absolute roots and inspected availability
+remain external or derived. Core filesystem inspection distinguishes matching, missing, changed and
+unreadable assets and revalidates immutable evidence before an explicit digest refresh.
+
+`GuiStepImportWorkbench` binds a prepared registration/refresh/removal to canonical document intent
+and its saved location, then applies one session transaction. `ShellStepImportTools` provides the
+source/mode task; browser projection and diagnostics expose both root and embedded-Part registries.
+Save As, definition loading and export validate source ownership and protect source files. Existing
+authored geometry remains independent; the OCCT STEP/XDE reader follows in Block 138.
+
+Canonical contracts: `docs/step-import-sequence-mvp10.md` and `docs/file-format.md`.
 
 ## Semantic Part-feature input and generated topology identity
 
@@ -480,5 +496,6 @@ surface-to-solid conversion with geometry diagnostics surfaced before commit, Bl
 feature edit lifecycle and Core feature-update commands, Block 130 adds interactive Assembly
 placement, compatibility-filtered relationships, oriented joint-frame previews, and coordinate
 motion, and Block 131 closes the phase with transient Measure, coverage manifest v2, and integrated
-acceptance. Blocks 132–136 rehost that surface on the MVP-9R shell; Block 137 (STEP source identity,
-modes, JSON, and freshness) is the next new architecture.
+acceptance. Blocks 132–136 rehost that surface on the MVP-9R shell. Block 137 implements STEP source
+identity, modes, JSON, freshness and transactional GUI management. The next planned architecture
+boundary is Block 138: the OCCT STEP/XDE reader and deterministic imported body definitions.

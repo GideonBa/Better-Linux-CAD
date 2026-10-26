@@ -1,6 +1,7 @@
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
 #include "blcad/core/assembly_leaf_occurrence.hpp"
 #include "blcad/core/project_json.hpp"
+#include "blcad/gui/gui_step_import_workbench.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -541,6 +542,9 @@ Result<GuiStepExportResult> ShellInspectTools::export_step(const GuiStepExportRe
   auto preflight = workbench_.preflight_step_export(window_.session(), request);
   if (!preflight)
     return Result<GuiStepExportResult>::failure(preflight.error());
+  auto protected_source = validate_step_import_output_path(window_.session(), request.output);
+  if (!protected_source)
+    return Result<GuiStepExportResult>::failure(protected_source.error());
   const auto target = QString::fromStdString(request.output.string());
   const auto document_path = QString::fromStdString(window_.session().file_path().string());
   const QFileInfo target_info(target), document_info(document_path);

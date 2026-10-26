@@ -29,6 +29,7 @@ private:
 };
 
 struct DocumentIdTag;
+struct StepImportSourceIdTag;
 struct ParameterIdTag;
 struct DatumPlaneIdTag;
 struct DatumAxisIdTag;
@@ -58,6 +59,7 @@ struct BodyIdTag;
 struct BodyTransformIdTag;
 
 using DocumentId = TypedId<DocumentIdTag>;
+using StepImportSourceId = TypedId<StepImportSourceIdTag>;
 using ParameterId = TypedId<ParameterIdTag>;
 using DatumPlaneId = TypedId<DatumPlaneIdTag>;
 using DatumAxisId = TypedId<DatumAxisIdTag>;

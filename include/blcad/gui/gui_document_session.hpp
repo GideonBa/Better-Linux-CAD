@@ -152,6 +152,7 @@ private:
   void append_history(std::string json, std::string label);
   void record_error(const Error& error);
   void record_information(std::string object_id, std::string message);
+  void diagnose_step_import_sources();
   void reset_document() noexcept;
 
   Document document_;

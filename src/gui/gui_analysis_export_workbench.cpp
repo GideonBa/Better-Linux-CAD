@@ -1,4 +1,5 @@
 #include "blcad/gui/gui_analysis_export_workbench.hpp"
+#include "blcad/gui/gui_step_import_workbench.hpp"
 
 #include "blcad/core/assembly_constraint_graph.hpp"
 #include "blcad/geometry/assembly_step_exporter.hpp"
@@ -50,6 +51,9 @@ Result<std::size_t> GuiAnalysisExportWorkbench::preflight_step_export(
     const GuiDocumentSession& session, const GuiStepExportRequest& request) const {
   if (request.output.empty())
     return Result<std::size_t>::failure(Error::export_error("gui.step_export", "output path must not be empty"));
+  const auto protected_source = validate_step_import_output_path(session, request.output);
+  if (!protected_source)
+    return protected_source;
   if (!session.derived_results_fresh())
     return Result<std::size_t>::failure(Error::export_error("gui.step_export", "recompute must be fresh before export"));
   switch (request.mode) {

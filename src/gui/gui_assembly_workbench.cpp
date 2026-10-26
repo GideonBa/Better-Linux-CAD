@@ -1,4 +1,5 @@
 #include "blcad/gui/gui_assembly_workbench.hpp"
+#include "blcad/gui/gui_step_import_workbench.hpp"
 
 #include "blcad/geometry/assembly_rigid_body_solver.hpp"
 
@@ -37,7 +38,14 @@ GuiAssemblySelectionPrompt GuiAssemblyWorkbench::prompt_for(GuiAssemblyCommand c
   return {"Select compatible Assembly input", std::nullopt, "assembly_input"};
 }
 
-Result<std::size_t> GuiAssemblyWorkbench::add_part(GuiDocumentSession& s, PartDocument v) const { return commit(s, "Insert Part definition", [v=std::move(v)](Project& p) mutable { return p.add_part_document(std::move(v)); }); }
+Result<std::size_t> GuiAssemblyWorkbench::add_part(GuiDocumentSession& s, PartDocument v) const {
+  auto valid = validate_step_import_definition_sources(s, v);
+  if (!valid)
+    return valid;
+  return commit(s, "Insert Part definition", [v = std::move(v)](Project& p) mutable {
+    return p.add_part_document(std::move(v));
+  });
+}
 Result<std::size_t> GuiAssemblyWorkbench::add_child_assembly(GuiDocumentSession& s, AssemblyDocument v) const { return commit(s, "Insert child Assembly", [v=std::move(v)](Project& p) mutable { return p.add_child_assembly_document(std::move(v)); }); }
 Result<std::size_t> GuiAssemblyWorkbench::add_root_member_part(GuiDocumentSession& s, DocumentId id) const { return commit(s, "Register Assembly Part", [id](Project& p) { return p.assembly().add_member_part(id); }); }
 Result<std::size_t> GuiAssemblyWorkbench::add_root_component(GuiDocumentSession& s, ComponentInstance v) const { return commit(s, "Insert component", [v=std::move(v)](Project& p) mutable { return p.assembly().add_component_instance(std::move(v)); }); }
