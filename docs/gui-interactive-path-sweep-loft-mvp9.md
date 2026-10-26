@@ -112,7 +112,13 @@ For a center path, section `i` of `n` must have its center at normalized path-le
 arbitrary plane intersections are not automatically inferred. Differing edge counts are automatically
 reconciled on derived Geometry copies during preview and Apply; original Sketch entities and control
 points remain unchanged. Exact line/arc/rational-Bézier subdivision preserves the section contours.
-The seam, normal flips and explicit order remain authoritative. Invalid/self-intersecting results,
+New closed-section candidates enable **Align Profile Starts and Directions** by default. This
+matches each later section to the preceding baseline using existing boundary starts and both
+directions. Checkmarks apply an additional local reversal after that automatic baseline. Disable
+the option to preserve the drawn correspondence. Open sections and guide-bound candidates use
+their authored correspondence; the checkbox is disabled for those task configurations.
+The effective seam/flip references are stored in the existing Loft intent. Existing saved Loft
+features retain their references during recompute and reopening. Invalid/self-intersecting results,
 unsupported continuity and incompatible guide anchors still clear the preview and prevent Apply.
 Circular path/guide arcs retain their true length and sampled circle positions in Loft control;
 splines remain 32-span approximations. See `docs/part-guided-loft-geometry-mvp6.md`.
@@ -132,7 +138,7 @@ use 32 deterministic line spans as existing spatial splines do; line and circula
 exact. This extends execution of existing spline intent without changing persistence. Raw profile
 recovery remains with Finish Sketch: the chooser offers materialized profiles, including closed fitted
 splines, and existing open paths. Semantic-edge path authoring, projected infinite paths and richer
-section alignment remain headless/deferred capabilities.
+interactive point-by-point section alignment remain headless/deferred capabilities.
 
 Focused shell and Geometry proof:
 
@@ -281,3 +287,64 @@ Focused commands live in `docs/development-setup.md`. Local evidence logs use
 `core-full.log`, `geometry-full.log`, `gui-full.log`, `startup.log`, `user-file.log` and
 `build-final.log`. Earlier development build failures are superseded by completed successful runs.
 No persistence version changes or numbered STEP import progress are implied.
+
+## Profile correspondence follow-up — 2026-10-26
+
+The reported screenshot's new document was closed without saving, so its exact feature settings
+cannot be recovered or claimed as reproduced. A separate deterministic regression establishes a
+matching failure: three identical asymmetrical profiles on z=0/20/40 have area 56 mm² and should
+enclose 2,240 mm³. Reversing the middle profile's drawing direction produced 746.6667 mm³; starting
+it at another corner produced 1,642.6667 mm³. Both products were accepted as valid solids. Eight
+independent side intersections at intermediate z=10/30 also proved the distortion, beyond merely
+checking that the Loft passes through its authored sketches.
+
+The new authoring-only alignment derives effective references for each disposable preview and
+again for Apply. It never writes them back into the raw task list, so repeated preview, reordering,
+option changes and cancellation do not accumulate rotations or reversals. Local row flips are
+applied after computing the automatic baseline for the whole chain. Guides opt out because they
+bind seam-relative boundary points. Explicit alignment/rotation references also opt out of automatic
+suggestion. The source Sketch records and existing document JSON schema are unchanged.
+
+`[loft-section-alignment]` exercises both drawing variants, analytic volume and intermediate side
+measurements, repeated previews, opt-out/recovery, local manual flips, explicit guides and historical
+saved references. Geometry variants additionally use true circles and rational ellipses with a
+simultaneously shifted seam and reversed direction, checking independent analytic volume, bounds
+and trigonometric surface samples, including intermediate stations and Save/Open.
+`[shell-loft-section-alignment]` opens prepared independently drawn inputs, selects/reorders/rejects
+duplicates through the real Loft widgets, toggles automatic correspondence, cancels and restarts,
+commits manual and automatic versions, branches history, canonically reopens and exports STEP.
+
+Final acceptance:
+
+| Suite | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Focused Geometry | 19 | 4,215 | All passed |
+| Focused offscreen Loft/path UI | 17 | 4,476 | 16 passed; one native-only skip |
+| Focused native Loft/path UI | 17 | 4,830 | All passed; no skips |
+| Full Core | 545 | 17,037 | All passed |
+| Full Geometry | 453 | 33,119 | All passed |
+| Full offscreen GUI | 570 | 74,758 | 550 passed; 20 native-only skips |
+| Required shell coverage closure | 3 | 299 | All passed |
+
+All five targets build. Source edits, builds, GUI runs and separate native startup stayed serial;
+Core/Geometry ran alongside one GUI suite. A SHA-256 manifest of 737 CMake, source, test and asset
+files stayed unchanged through final focused/full GUI checks and startup. Changed C++ formatting,
+including all new files, and whitespace checks pass. Independent Geometry and GUI code reviews
+found no blocking issues.
+
+The native scope includes the new correspondence workflow, automatic unequal-section refinement,
+mixed-path and combined Loft, Block-136 spatial tasks and spatial context workflows. It covers the
+focused offscreen exclusion; the unrelated native-only cases and full canonical native suite were
+not rerun for this bounded follow-up. Native preview/result captures at 1280×800 in
+`/tmp/blcad-loft-alignment-native` were inspected: the matching checkbox and complete hint are
+readable, Apply/Cancel remain reachable and the corrected three-section prism has no visible twist.
+Separate native startup remained running until the planned six-second timeout (124). The known
+medium OCCT incomplete-visual depth/stencil warning remains; no high-severity graphics, BadDrawable,
+BadWindow or fatal lifecycle errors occurred.
+
+Commands live in `docs/development-setup.md`. Local evidence logs use
+`/tmp/blcad-loft-alignment-` with suffixes `build.log`, `geometry-focused.log`, `gui-focused.log`,
+`native.log`, `core-full.log`, `geometry-full.log`, `gui-full.log`, `closure.log` and `startup.log`.
+The source manifest is `source-freeze.json`. The intentionally failing `baseline-test.log` records
+the old distortion before the fix; completed final runs supersede development attempts. This
+follow-up does not change persistence versions or advance the numbered STEP import plan.

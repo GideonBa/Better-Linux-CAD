@@ -197,6 +197,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/circular_pattern_adapter.cpp
     src/geometry/linear_pattern_adapter.cpp
     src/geometry/loft_adapter.cpp
+    src/geometry/loft_section_alignment.cpp
     src/geometry/loft_section_compatibility.cpp
     src/geometry/mirror_adapter.cpp
     src/geometry/rectangle_extrusion_adapter.cpp

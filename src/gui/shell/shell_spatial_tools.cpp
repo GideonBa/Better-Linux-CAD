@@ -191,6 +191,13 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   spatial_order_hint_->setAlignment(Qt::AlignLeft | Qt::AlignTop);
   spatial_order_hint_->setObjectName("blcad.spatial.order_hint");
   ordering->addWidget(spatial_order_hint_);
+  spatial_auto_align_ =
+      new QCheckBox(QStringLiteral("Align Profile Starts and Directions"), spatial_controls_);
+  spatial_auto_align_->setObjectName("blcad.spatial.auto_align");
+  spatial_auto_align_->setToolTip(QStringLiteral(
+      "Match profile start points and directions before building the loft. "
+      "Turn off to keep the drawn correspondence. Guides define their own correspondence."));
+  form->addRow(spatial_auto_align_);
   spatial_path_ = new QComboBox(spatial_controls_);
   spatial_path_->setObjectName("blcad.spatial.path");
   form->addRow(QStringLiteral("Path / Spine"), spatial_path_);
@@ -289,6 +296,10 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
     if (spatial())
       refresh_spatial_preview();
   });
+  connect(spatial_auto_align_, &QCheckBox::toggled, this, [this] {
+    if (command_ == Command::Loft)
+      refresh_spatial_preview();
+  });
   connect(sweep_twist_, &QCheckBox::toggled, this, [this] {
     if (command_ == Command::Sweep) {
       update_spatial_controls();
@@ -320,7 +331,7 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
   const QSignalBlocker source(spatial_source_), mode(spatial_mode_), target(spatial_target_),
       path(spatial_path_), guide(spatial_guide_), order(spatial_order_), guides(spatial_guides_),
       closed(spatial_closed_), orientation(spatial_orientation_), continuity(spatial_continuity_),
-      twist(sweep_twist_);
+      twist(sweep_twist_), alignment(spatial_auto_align_);
   spatial_source_->clear();
   spatial_path_->clear();
   spatial_guide_->clear();
@@ -373,6 +384,7 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
   spatial_closed_->setChecked(false);
   spatial_orientation_->setCurrentIndex(1);
   spatial_continuity_->setCurrentIndex(0);
+  spatial_auto_align_->setChecked(true);
   for (std::size_t i = 0; i < 3; ++i) {
     const QSignalBlocker block(spatial_up_[i]);
     spatial_up_[i]->setValue(i == 1 ? 1 : 0);
@@ -388,7 +400,7 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
   spatial_order_hint_->setText(
       command == Command::Loft
           ? QStringLiteral(
-                "Order sections with Up/Down. Checkmarks reverse normals. "
+                "Order with Up/Down. Checkmarks reverse each section. "
                 "Profile segments are adjusted automatically; sketches remain unchanged.")
           : QStringLiteral("Drag the list or use Up/Down. Checkmarks reverse "
                            "segment direction or section normals."));
@@ -429,6 +441,13 @@ void ShellFeatureTools::update_spatial_controls() {
   for (auto* input : spatial_up_)
     form->setRowVisible(input, path && spatial_orientation_->currentIndex() == 2);
   form->setRowVisible(spatial_continuity_, loft);
+  form->setRowVisible(spatial_auto_align_, loft);
+  bool closed_sections = true;
+  for (int i = 0; i < spatial_order_->count(); ++i)
+    closed_sections =
+        closed_sections &&
+        spatial_inputs_.at(spatial_order_->item(i)->data(Qt::UserRole).toInt()).profile.has_value();
+  spatial_auto_align_->setEnabled(loft && closed_sections && spatial_guides_->count() == 0);
   form->setRowVisible(sweep_twist_, sweep);
   numeric_editor_->setVisible(spatial_scalar());
   value_label_->setVisible(spatial_scalar());
@@ -584,6 +603,7 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
                                    static_cast<LoftFeatureKind>(mode), result, pending);
       if (!begun)
         return begun;
+      loft.set_auto_alignment(spatial_auto_align_->isChecked() && spatial_auto_align_->isEnabled());
       for (int i = 0; i < spatial_order_->count(); ++i) {
         const auto* item = spatial_order_->item(i);
         const auto& source = spatial_inputs_.at(item->data(Qt::UserRole).toInt());
@@ -611,6 +631,7 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
 }
 
 void ShellFeatureTools::refresh_spatial_preview() {
+  update_spatial_controls();
   if (command_ == Command::Sweep && coordinator_.path_sweep().active())
     spatial_twist_ = coordinator_.path_sweep().twist();
   auto begun = rebuild_spatial_controller();

@@ -49,6 +49,32 @@ fails before publishing a shape. These are refinement limits; equal-count legacy
 existing validation path. Arbitrary shape intersections, unsupported continuity and invalid OCCT
 products still fail transactionally.
 
+## New-candidate correspondence suggestions — 2026-10-26
+
+`suggest_loft_section_alignment` is an authoring helper for new GUI Loft candidates. It uses the same
+closed-section resolver as execution and returns existing `alignment_reference`/`flip_normal` values.
+The first profile keeps its canonical start; later original boundary starts and both traversal
+directions are scored against the preceding automatic baseline. A length-weighted center and
+perimeter normalization reduce sensitivity to translations, scale and the number of authored edges.
+Ties prefer the drawn seam/direction, with fixed candidate ordering and an improvement tolerance.
+
+The ranking uses 64 uniformly spaced perimeter samples from a bounded table of 32 parameter spans
+per curved edge. Circular/rational Bézier evaluators supply those sample positions. This approximation
+only ranks original seam/direction choices: exact curves, original Sketch entities and the subsequent
+exact subdivision remain unchanged. `RectangleProfile` and `CircleProfile` have no entity seam
+identifiers, so only their existing seam and traversal direction are eligible. Limits are 4,096 edges
+per section and 65,536 total. Invalid or excessive candidate geometry fails before publication.
+
+The automatic baseline ignores manual row flips; the chosen direction is then XORed with each row's
+own reversal. Explicit alignment/rotation or open-section lists pass through unchanged. The GUI also
+opts guide-bound candidates out. Strongly bent or rolled workplanes can require manual intent;
+minimum sampled world-space distance is a starting suggestion, not a proof of twist-free arbitrary
+geometry. Users can disable automatic matching.
+
+Execution never calls this helper. Previously saved Loft references, explicit guide bindings and
+`CheckCompatibility(false)` remain authoritative. Newly committed effective references use the
+existing Core/JSON contract and reproduce identically after Save/Open.
+
 ## Recompute and products
 
 Parameter edits on any intermediate section invalidate the Loft dependency and rebuild the whole

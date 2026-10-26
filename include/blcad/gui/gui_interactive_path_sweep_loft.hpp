@@ -12,6 +12,7 @@
 #include "blcad/core/path_curve.hpp"
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/sweep_feature.hpp"
+#include "blcad/geometry/loft_section_alignment.hpp"
 
 #include <optional>
 #include <string>
@@ -344,6 +345,7 @@ public:
     path_curve_.reset();
     guide_curves_.clear();
     continuity_ = LoftContinuity::C0;
+    auto_alignment_ = true;
     active_ = true;
     return Result<std::size_t>::success(1);
   }
@@ -352,6 +354,12 @@ public:
   [[nodiscard]] LoftFeatureKind kind() const noexcept { return kind_; }
   [[nodiscard]] LoftContinuity continuity() const noexcept { return continuity_; }
   [[nodiscard]] std::size_t section_count() const noexcept { return sections_.size(); }
+  [[nodiscard]] bool auto_alignment() const noexcept {
+    return auto_alignment_;
+  }
+  void set_auto_alignment(bool enabled) noexcept {
+    auto_alignment_ = enabled;
+  }
 
   [[nodiscard]] Result<std::size_t>
   add_closed_section(SketchId sketch, ProfileId profile, bool flip_normal = false) {
@@ -398,10 +406,11 @@ public:
   [[nodiscard]] Result<GuiPartFeaturePreview> preview(const GuiDocumentSession& session) const {
     if (!active_) return preview_fail("no loft command is active");
     const auto* part = session.part_document();
-    if (part == nullptr) return preview_fail("preview requires an active Part document");
+    if (part == nullptr || session.part_shape_cache() == nullptr)
+      return preview_fail("preview requires an active Part document and shape cache");
     if (sections_.size() < 2U) return preview_fail("loft requires at least two ordered sections");
     PartDocument candidate = *part;
-    if (auto added = add_feature(candidate); added.has_error())
+    if (auto added = add_feature(candidate, *session.part_shape_cache()); added.has_error())
       return Result<GuiPartFeaturePreview>::failure(added.error());
     auto plan = candidate.create_recompute_plan();
     if (plan.has_error()) return Result<GuiPartFeaturePreview>::failure(plan.error());
@@ -414,7 +423,7 @@ public:
     if (!checked)
       return Result<geometry::GeometryShape>::failure(checked.error());
     PartDocument candidate = *session.part_document();
-    auto added = add_feature(candidate);
+    auto added = add_feature(candidate, *session.part_shape_cache());
     if (!added)
       return Result<geometry::GeometryShape>::failure(added.error());
     return detail::preview_feature_body(candidate, feature_, result_body_);
@@ -423,8 +432,10 @@ public:
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
     auto checked = preview(session);
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
-    auto committed = session.commit_part_transaction(
-        "Apply Loft", [this](PartDocument& part) { return add_feature(part); });
+    auto committed =
+        session.commit_part_transaction("Apply Loft", [this, &session](PartDocument& part) {
+          return add_feature(part, *session.part_shape_cache());
+        });
     if (committed.has_error()) return committed;
     active_ = false;
     return committed;
@@ -450,7 +461,8 @@ private:
     return Result<std::size_t>::success(sections_.size());
   }
 
-  [[nodiscard]] Result<std::size_t> add_feature(PartDocument& part) const {
+  [[nodiscard]] Result<std::size_t> add_feature(PartDocument& part,
+                                                const geometry::ShapeCache& cache) const {
     if (pending_body_) {
       auto added = part.add_body(*pending_body_);
       if (!added)
@@ -462,22 +474,31 @@ private:
                        : FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody,
                                                           std::nullopt, result_body_);
     if (context.has_error()) return Result<std::size_t>::failure(context.error());
-    Result<LoftFeature> feature = build_loft(context.value());
+    auto effective_sections = sections_;
+    if (auto_alignment_ && guide_curves_.empty()) {
+      auto aligned = geometry::suggest_loft_section_alignment(part, sections_, cache);
+      if (!aligned)
+        return Result<std::size_t>::failure(aligned.error());
+      effective_sections = std::move(aligned.value());
+    }
+    Result<LoftFeature> feature = build_loft(context.value(), std::move(effective_sections));
     if (feature.has_error()) return Result<std::size_t>::failure(feature.error());
     return part.add_loft_feature(std::move(feature.value()));
   }
 
-  [[nodiscard]] Result<LoftFeature> build_loft(const FeatureBodyResultContext& context) const {
+  [[nodiscard]] Result<LoftFeature>
+  build_loft(const FeatureBodyResultContext& context,
+             std::vector<ProfileSectionReference> sections) const {
     switch (kind_) {
     case LoftFeatureKind::Loft:
-      return LoftFeature::create_loft(feature_, name_, sections_, context, path_curve_,
+      return LoftFeature::create_loft(feature_, name_, std::move(sections), context, path_curve_,
                                       guide_curves_, continuity_);
     case LoftFeatureKind::LoftCut:
-      return LoftFeature::create_loft_cut(feature_, name_, sections_, context, path_curve_,
-                                          guide_curves_, continuity_);
+      return LoftFeature::create_loft_cut(feature_, name_, std::move(sections), context,
+                                          path_curve_, guide_curves_, continuity_);
     case LoftFeatureKind::LoftSurface:
-      return LoftFeature::create_loft_surface(feature_, name_, sections_, context, path_curve_,
-                                              guide_curves_, continuity_);
+      return LoftFeature::create_loft_surface(feature_, name_, std::move(sections), context,
+                                              path_curve_, guide_curves_, continuity_);
     }
     return Result<LoftFeature>::failure(
         Error::validation(feature_.value(), "unsupported loft kind"));
@@ -501,6 +522,7 @@ private:
   FeatureId feature_{""};
   std::string name_;
   LoftFeatureKind kind_{LoftFeatureKind::Loft};
+  bool auto_alignment_{true};
   BodyId result_body_{""};
   std::vector<ProfileSectionReference> sections_;
   std::optional<PathCurveId> path_curve_;

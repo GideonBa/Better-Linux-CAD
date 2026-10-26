@@ -9,6 +9,7 @@
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
 #include "blcad/geometry/sketch_region_finder.hpp"
+#include "loft_section_alignment_internal.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -2071,6 +2072,14 @@ extrude_composite_profile(const Sketch& sketch, const Feature& feature) noexcept
 }
 
 } // namespace
+
+Result<std::vector<ClosedProfileCurveSegment>> detail::resolve_loft_alignment_section(
+    const PartDocument& document, const ProfileSectionReference& section, const ShapeCache& cache) {
+  if (section.kind() != LoftSectionKind::ClosedRegion)
+    return Result<std::vector<ClosedProfileCurveSegment>>::failure(
+        geometry_error("loft.section_alignment", "Loft alignment requires a closed section"));
+  return resolve_loft_closed_section(document, section, cache, WorkplaneResolver{});
+}
 
 Result<std::pair<Point3, Vector3>> GeometryRecomputeExecutor::resolve_feature_axis(
     const PartDocument& document, const AxisReference& reference, const ShapeCache& cache) const {
