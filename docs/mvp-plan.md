@@ -1326,6 +1326,57 @@ unchanged. Native captures, focused results, heuristic limits and unrelated nati
 are recorded in `docs/gui-interactive-path-sweep-loft-mvp9.md`. Numbered status remains through
 Block 137, with Block 138 planned.
 
+## Modeling usability issue triage — 2026-10-26
+
+The user requested investigation and GitHub issues for later implementation. Review at main
+`5e37af328d47ab7f2b5254114dc381fd98b70e35` produced the following independent backlog items.
+Each issue includes pinned source evidence, reproduction or explicit evidence limits, proposed
+acceptance criteria and realistic native GUI workflows. Existing features are distinguished from
+missing shell/persistence integration; these tickets do not claim that every reported path is absent.
+
+| Area | Issue | Evidence / current status | Suggested priority |
+| --- | --- | --- | --- |
+| Sketch endpoint snaps | [#104](https://github.com/GideonBa/Better-Linux-CAD/issues/104) | Confirmed persistence gap for loop closure / restarted Line | P2 |
+| Coincident → closed region | [#105](https://github.com/GideonBa/Better-Linux-CAD/issues/105) | Runtime reproduction; solver/region tolerance mismatch | P1 |
+| Dimension line layout | [#106](https://github.com/GideonBa/Better-Linux-CAD/issues/106) | Confirmed family-specific rendering gaps; DIN/ISO target recorded | P2 |
+| Dimension double-click editing | [#107](https://github.com/GideonBa/Better-Linux-CAD/issues/107) | Confirmed paint/pick mismatch; exact reported gesture pending | P1 |
+| Dimension deletion | [#108](https://github.com/GideonBa/Better-Linux-CAD/issues/108) | Existing backend; visible-selection/keyboard route needs reproduction | P1 |
+| Construction conversion | [#109](https://github.com/GideonBa/Better-Linux-CAD/issues/109) | Missing shell toggle and curved-flag compatibility persistence | P2 |
+| Sketch-line rotation axes | [#110](https://github.com/GideonBa/Better-Linux-CAD/issues/110) | Missing persistent sketch/entity axis source | P2 |
+| Body Rotate axis parity | [#111](https://github.com/GideonBa/Better-Linux-CAD/issues/111) | Shell omits existing derived-datum/semantic-edge support | P2 |
+| Sketch on planar result face | [#112](https://github.com/GideonBa/Better-Linux-CAD/issues/112) | Direct workflow and general associative support identity missing | P2 |
+| Cut feedback and workflow | [#113](https://github.com/GideonBa/Better-Linux-CAD/issues/113) | Disjoint-tool no-op confirmed; exact reported failure pending | P1 |
+| Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | Synchronous full-model work confirmed and measured; UI profiling pending | P1 |
+
+The independent Coincident probe commits the real GUI constraint intent, then checks Geometry:
+a 100×50 mm outline with a 0.001 mm initial gap retains a 3.85787585e-8 mm gap after an accepted
+solve and has no closed region. The strict Geometry Finish API rejects it; the shell may leave the
+editor without creating a usable profile. The zero-gap control yields one region. A separate Cut
+probe accepts a disjoint tool with unchanged 1,000 mm³ target volume; the overlapping control
+correctly removes 40 mm³.
+
+The isolated Debug backend preview probe uses 1/25/100/500 existing rectangular extrusion features
+and three samples per size. Median new-Extrude preview costs are 0.475/5.606/30.984/408.725 ms.
+Each candidate starts with an empty ShapeCache and recomputes the complete document; committed edits
+also perform whole-document JSON/history work, while changed scene publication recreates AIS
+presentations. These are measured execution costs and investigation leads, not a profile of the
+user's exact model or an end-to-end native event latency guarantee.
+
+Existing focused checks passed: Sketch Core **17 / 392**, region Geometry **4 / 101**,
+axis/workplane Core **20 / 931**, axis/workplane Geometry **35 / 1,450**, Cut/recompute Geometry
+**32 / 2,144**, and targeted native Sketch/dimension/Revolve/Body/Cut/performance GUI
+**38 / 5,213** (no skips). These passing tests cover the supported paths and expose the need for the
+new end-to-end regressions specified in the issues. No implementation source changed, so full
+regression suites were not repeated for this documentation-only delivery.
+
+Local evidence: `/tmp/blcad-issue-triage-probes.cpp`, `/tmp/blcad-issue-triage-probes.log`,
+`/tmp/blcad-issue-triage-probes-large.log`, `/tmp/blcad-issue-triage-cut-geometry.log` and
+`/tmp/blcad-issue-triage-native.log`; supporting scope logs use
+`/tmp/blcad-issue-triage-sketch-` and `/tmp/blcad-triage-axes-planes-`.
+The suggested P1 queue first restores profile closure and dimension edit/delete usability, then
+clarifies ineffective Cuts and profiles complex-Part interaction. Numbered status remains through
+Block 137; Block 138 and subsequent STEP topology/import work remain planned.
+
 ## Current next technical step — Block 138 (planned)
 
 Implement the OCCT STEP/XDE reader and deterministic product/body definitions over the verified
