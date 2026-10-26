@@ -143,7 +143,7 @@ void clean(ShellWindow& window) {
 } // namespace
 
 TEST_CASE("Hole authoring publishes complete single and circular cuts as one history entry",
-          "[gui][block136-holes]") {
+          "[gui][block136-holes][presentation-visibility]") {
   for (const bool circular : {false, true}) {
     INFO(circular);
     ShellWindow window;
@@ -155,7 +155,7 @@ TEST_CASE("Hole authoring publishes complete single and circular cuts as one his
     const auto revision = window.session().presentation_revision();
     REQUIRE(window.hole_tools().begin());
     CHECK_FALSE(window.hole_tools().apply());
-    CHECK(field<QLineEdit>(window, "name").text() == "Bohrungen 3");
+    CHECK(field<QLineEdit>(window, "name").text() == "Holes 3");
     field<QComboBox>(window, "placement").setCurrentIndex(circular ? 1 : 0);
     preview(window);
     CHECK(snapshot(window) == before);
@@ -163,6 +163,20 @@ TEST_CASE("Hole authoring publishes complete single and circular cuts as one his
     CHECK(window.session().presentation_revision() == revision);
     CHECK_FALSE(window.session().dirty());
     CHECK_FALSE(window.session().can_undo());
+    const auto model_revision = window.session().model_revision();
+    const auto diameter = field<QLineEdit>(window, "diameter").text();
+    REQUIRE(window.session().set_presentation_visible("datum-plane/datum.xy", false));
+    window.refresh_feature_selection_scene();
+    CHECK(window.hole_tools().active());
+    CHECK(window.session().task().active());
+    CHECK(field<QLineEdit>(window, "diameter").text() == diameter);
+    preview(window);
+    REQUIRE(window.session().set_presentation_visible("datum-plane/datum.xy", true));
+    window.refresh_feature_selection_scene();
+    CHECK(window.hole_tools().active());
+    CHECK(window.session().model_revision() == model_revision);
+    CHECK(window.session().presentation_revision() == revision + 2U);
+    CHECK(snapshot(window) == before);
     REQUIRE(window.hole_tools().apply());
     clean(window);
     const auto& part = *window.session().part_document();

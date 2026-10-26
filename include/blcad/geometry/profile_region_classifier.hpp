@@ -1,8 +1,11 @@
 #pragma once
 
 #include "blcad/core/part_document.hpp"
+#include "blcad/core/sketch_contour.hpp"
+#include "blcad/geometry/closed_profile_adapter.hpp"
 #include "blcad/geometry/dimension_driven_profile_resolver.hpp"
 #include "blcad/geometry/reference_generated_profile_resolver.hpp"
+#include "blcad/geometry/sketch_finish.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,7 +15,7 @@
 
 namespace blcad::geometry {
 
-enum class ContainedProfileHoleKind { Polygon, Circle };
+enum class ContainedProfileHoleKind { Polygon, Circle, Curves };
 
 // A directly nested profile that bounds a hole in the material region of a
 // selected outer profile. Polygon vertices stay in sketch-local coordinates;
@@ -24,6 +27,8 @@ struct ContainedProfileHole {
   std::vector<Point2> vertices;
   Point2 center;
   double radius_mm = 0.0;
+  // Exact sketch-local curves; vertices are used only for containment/picking.
+  std::vector<ClosedProfileCurveSegment> curves{};
 };
 
 // Compatibility view used by callers that only support analytic circles.
@@ -240,13 +245,13 @@ resolve_closed_profile_vertices(const PartDocument& document, const Sketch& sket
 [[nodiscard]] inline bool
 boundaries_intersect_or_touch(const ContainedProfileHole& left,
                               const ContainedProfileHole& right) noexcept {
-  if (left.kind == ContainedProfileHoleKind::Polygon &&
-      right.kind == ContainedProfileHoleKind::Polygon)
+  if (left.kind != ContainedProfileHoleKind::Circle &&
+      right.kind != ContainedProfileHoleKind::Circle)
     return polygon_boundaries_intersect_or_touch(left.vertices, right.vertices);
-  if (left.kind == ContainedProfileHoleKind::Polygon)
+  if (left.kind != ContainedProfileHoleKind::Circle)
     return polygon_circle_boundaries_intersect_or_touch(left.vertices, right.center,
                                                         right.radius_mm);
-  if (right.kind == ContainedProfileHoleKind::Polygon)
+  if (right.kind != ContainedProfileHoleKind::Circle)
     return polygon_circle_boundaries_intersect_or_touch(right.vertices, left.center,
                                                         left.radius_mm);
   return circle_boundaries_intersect_or_touch(left.center, left.radius_mm, right.center,
@@ -255,18 +260,77 @@ boundaries_intersect_or_touch(const ContainedProfileHole& left,
 
 [[nodiscard]] inline bool strictly_contains(const ContainedProfileHole& outer,
                                             const ContainedProfileHole& inner) noexcept {
-  if (outer.kind == ContainedProfileHoleKind::Polygon &&
-      inner.kind == ContainedProfileHoleKind::Polygon)
+  if (outer.kind != ContainedProfileHoleKind::Circle &&
+      inner.kind != ContainedProfileHoleKind::Circle)
     return polygon_strictly_inside_polygon(inner.vertices, outer.vertices);
-  if (outer.kind == ContainedProfileHoleKind::Polygon)
+  if (outer.kind != ContainedProfileHoleKind::Circle)
     return circle_strictly_inside_polygon(inner.center, inner.radius_mm, outer.vertices);
-  if (inner.kind == ContainedProfileHoleKind::Polygon)
+  if (inner.kind != ContainedProfileHoleKind::Circle)
     return polygon_strictly_inside_circle(inner.vertices, outer.center, outer.radius_mm);
   return circle_strictly_inside_circle(inner.center, inner.radius_mm, outer.center,
                                        outer.radius_mm);
 }
 
 } // namespace profile_region_classifier_detail
+
+// Resolve one exact curved contour without converting its persistent curves to
+// line segments. Sampling remains a conservative containment/picking product.
+[[nodiscard]] inline Result<ContainedProfileHole>
+resolve_curved_profile_hole(const PartDocument& document, const Sketch& sketch, const ProfileId& id,
+                            const std::vector<SketchEntityId>& ids) {
+  auto subset = Sketch::create(sketch.id(), sketch.name(), sketch.workplane());
+  if (!subset)
+    return Result<ContainedProfileHole>::failure(subset.error());
+  for (const auto& entity : ids) {
+    auto added = [&] {
+      if (const auto* line = sketch.find_line_segment(entity))
+        return subset.value().add_entity(*line);
+      if (const auto* arc = sketch.find_arc_segment(entity))
+        return subset.value().add_entity(*arc);
+      if (const auto* spline = sketch.find_spline_segment(entity))
+        return subset.value().add_entity(*spline);
+      return Result<std::size_t>::failure(
+          Error::validation(id.value(), "profile curve must exist"));
+    }();
+    if (!added)
+      return Result<ContainedProfileHole>::failure(added.error());
+  }
+  auto region = SketchRegionFinder{}.find_single_curve_region(document, subset.value());
+  if (!region)
+    return Result<ContainedProfileHole>::failure(region.error());
+  auto traversal = resolve_sketch_contour(sketch, region.value().source_entities());
+  if (!traversal)
+    return Result<ContainedProfileHole>::failure(traversal.error());
+  ContainedProfileHole result{
+      id, ContainedProfileHoleKind::Curves, region.value().vertices, {}, 0.0, {}};
+  const auto point = [](Point2 p) { return Point3{p.x, p.y, 0}; };
+  for (const auto& entry : traversal.value()) {
+    ClosedProfileCurveSegment curve;
+    if (const auto* line = sketch.find_line_segment(entry.id))
+      curve = {ClosedProfileCurveKind::Line, point(line->start()), {}, point(line->end())};
+    else if (const auto* arc = sketch.find_arc_segment(entry.id))
+      curve = {ClosedProfileCurveKind::CircularArc, point(arc->start()), point(arc->mid()),
+               point(arc->end())};
+    else {
+      const auto& spline = *sketch.find_spline_segment(entry.id);
+      curve = {ClosedProfileCurveKind::CubicBezierSpline,
+               point(spline.start()),
+               point(spline.control1()),
+               point(spline.end()),
+               point(spline.control2()),
+               spline.weights()};
+    }
+    if (entry.reversed) {
+      std::swap(curve.start, curve.end);
+      if (curve.kind == ClosedProfileCurveKind::CubicBezierSpline) {
+        std::swap(curve.mid, curve.control2);
+        std::reverse(curve.weights.begin(), curve.weights.end());
+      }
+    }
+    result.curves.push_back(curve);
+  }
+  return Result<ContainedProfileHole>::success(std::move(result));
+}
 
 // Classifies material-region holes formed by all supported simple closed
 // profiles. Only immediate children of `outer_profile` are returned: a loop
@@ -335,6 +399,29 @@ classify_contained_profile_holes(const PartDocument& document, const Sketch& ske
     candidates.push_back(
         {circle.id(), ContainedProfileHoleKind::Circle, {}, circle.center(), radius});
   }
+
+  const auto append_curved = [&](const ProfileId& id, const std::vector<SketchEntityId>& ids) {
+    if (id == outer_profile)
+      return;
+    auto hole = resolve_curved_profile_hole(document, sketch, id, ids);
+    if (hole && polygon_strictly_inside_polygon(hole.value().vertices, outer_vertices))
+      candidates.push_back(std::move(hole.value()));
+  };
+  for (const auto& profile : sketch.arc_closed_profiles())
+    append_curved(profile.id(), profile.curve_segments());
+  // A selection-first feature can materialize only its outer region; enclosed
+  // raw spline/arc loops still bound holes and must agree with the viewport.
+  auto raw = SketchFinishService::analyze_unmaterialized(document, sketch);
+  if (raw)
+    for (const auto& region : raw.value().regions) {
+      if (region.id == outer_profile)
+        continue;
+      if (!region.curve_segments.empty())
+        append_curved(region.id, region.curve_segments);
+      else if (polygon_strictly_inside_polygon(region.vertices, outer_vertices))
+        candidates.push_back(
+            {region.id, ContainedProfileHoleKind::Polygon, region.vertices, {}, 0.0, {}});
+    }
 
   std::vector<bool> valid(candidates.size(), true);
   for (std::size_t left = 0U; left < candidates.size(); ++left) {

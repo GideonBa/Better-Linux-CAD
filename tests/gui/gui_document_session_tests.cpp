@@ -4,6 +4,8 @@
 #include "../support/repair_open_fixture.hpp"
 #include "blcad/core/datum_plane.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/sketch_constraint_authoring_json.hpp"
+#include "blcad/core/sketch_dimension_authoring_json.hpp"
 #include <QTemporaryDir>
 
 #include <catch2/catch_test_macros.hpp>
@@ -96,6 +98,215 @@ TEST_CASE("GUI session opens Part and Project files through existing persistence
   std::error_code ignored;
   std::filesystem::remove(part_path, ignored);
   std::filesystem::remove(project_path, ignored);
+}
+
+namespace {
+
+template <typename T> T migration_checked(Result<T> result) {
+  REQUIRE(result);
+  return std::move(result.value());
+}
+
+struct LegacySplineSidecars {
+  PartDocument part;
+  SketchConstraintCatalog constraints;
+  SketchDimensionCatalog dimensions;
+};
+
+LegacySplineSidecars legacy_spline_sidecars() {
+  const DocumentId document("part.legacy.spline");
+  const SketchId sketch_id("sketch.legacy.spline");
+  auto part = migration_checked(PartDocument::create(document, "Legacy spline intent"));
+  REQUIRE(part.add_datum_plane(migration_checked(DatumPlane::xy())));
+  REQUIRE(part.add_parameter(migration_checked(Parameter::create_length(
+      ParameterId("height"), "Height", migration_checked(Quantity::length_mm(10.0, "height"))))));
+  auto sketch =
+      migration_checked(Sketch::create(sketch_id, "Closed fit", DatumPlaneId("datum.xy")));
+  REQUIRE(sketch.add_entity(migration_checked(SplineSegment::create_cubic_bezier(
+      SketchEntityId("curve"), {-10, 0}, {-10, 5}, {-5, 10}, {0, 10}))));
+  REQUIRE(sketch.add_entity(migration_checked(SplineSegment::create_cubic_bezier(
+      SketchEntityId("curve.fit.2"), {0, 10}, {5, 10}, {10, 5}, {10, 0}))));
+  REQUIRE(sketch.add_entity(migration_checked(SplineSegment::create_cubic_bezier(
+      SketchEntityId("curve.fit.3"), {10, 0}, {5, -10}, {-5, -10}, {-10, 0}))));
+  REQUIRE(part.add_sketch(std::move(sketch)));
+  const auto point = [](std::string id) {
+    return migration_checked(SketchConstraintIntentTarget::point(SketchPointId(std::move(id))));
+  };
+  auto constraints = migration_checked(SketchConstraintCatalog::create(
+      document, sketch_id,
+      {migration_checked(SketchConstraintIntent::create(
+           SketchConstraintId("fixed.interior"), SketchSolverConstraintKind::Fixed,
+           {point("entity/curve/end")}, SketchConstraintIntentSource::Manual)),
+       migration_checked(SketchConstraintIntent::create(
+           SketchConstraintId("fixed.seam"), SketchSolverConstraintKind::Fixed,
+           {point("entity/curve/start")}, SketchConstraintIntentSource::Automatic)),
+       migration_checked(SketchConstraintIntent::create(
+           SketchConstraintId("join.interior"), SketchSolverConstraintKind::Coincident,
+           {point("entity/curve/end"), point("entity/curve.fit.2/start")},
+           SketchConstraintIntentSource::Automatic)),
+       migration_checked(SketchConstraintIntent::create(
+           SketchConstraintId("join.seam"), SketchSolverConstraintKind::Coincident,
+           {point("entity/curve/start"), point("entity/curve.fit.3/end")}))}));
+  auto dimensions = migration_checked(SketchDimensionCatalog::create(
+      document, sketch_id,
+      {migration_checked(SketchDimensionIntent::create(
+           SketchDimensionId("height.driving"), SketchDimensionKind::VerticalDistance,
+           SketchDimensionMode::Driving, {point("entity/curve/start"), point("entity/curve/end")},
+           ParameterId("height"), {2, 7})),
+       migration_checked(SketchDimensionIntent::create(
+           SketchDimensionId("width.reference"), SketchDimensionKind::PointToPointDistance,
+           SketchDimensionMode::Reference,
+           {point("entity/curve/start"), point("entity/curve.fit.2/end")}, std::nullopt,
+           {-3, 4}))}));
+  return {std::move(part), std::move(constraints), std::move(dimensions)};
+}
+
+void write_legacy_spline_sidecars(const std::filesystem::path& path,
+                                  const LegacySplineSidecars& fixture) {
+  REQUIRE(write_part_document_json_file(fixture.part, path));
+  const auto write = [](const std::filesystem::path& target, const std::string& content) {
+    std::ofstream stream(target, std::ios::binary);
+    REQUIRE(stream);
+    stream << content;
+    REQUIRE(stream);
+  };
+  write(path.string() + ".sketch-constraints.json",
+        migration_checked(serialize_sketch_constraint_catalogs_to_json(fixture.part.id(),
+                                                                       {fixture.constraints})));
+  write(path.string() + ".sketch-dimensions.json",
+        migration_checked(
+            serialize_sketch_dimension_catalogs_to_json(fixture.part.id(), {fixture.dimensions})));
+}
+
+} // namespace
+
+TEST_CASE("GUI open migrates legacy fitted spline sidecar points and saves canonical intent",
+          "[gui][document-session][spline-sidecar-migration][persistence]") {
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto path = std::filesystem::path(directory.filePath("legacy.blcad.json").toStdString());
+  const auto saved =
+      std::filesystem::path(directory.filePath("canonical.blcad.json").toStdString());
+  const auto fixture = legacy_spline_sidecars();
+  write_legacy_spline_sidecars(path, fixture);
+
+  GuiDocumentSession session;
+  REQUIRE(session.open_file(path));
+  CHECK_FALSE(session.dirty());
+  const auto constraints =
+      migration_checked(session.sketch_constraint_catalog(fixture.constraints.sketch()));
+  REQUIRE(constraints.constraints().size() == 2U);
+  CHECK(constraints.document() == fixture.part.id());
+  for (const auto& intent : constraints.constraints()) {
+    const auto* previous = fixture.constraints.find(intent.id());
+    REQUIRE(previous != nullptr);
+    CHECK(intent.kind() == previous->kind());
+    CHECK(intent.source() == previous->source());
+    CHECK(intent.targets()[0].kind() == SketchConstraintIntentTargetKind::Point);
+    CHECK(intent.targets()[0].id() == (intent.id() == SketchConstraintId("fixed.interior")
+                                           ? "entity/curve.fit.2/start"
+                                           : "entity/curve.fit.3/end"));
+  }
+  const auto dimensions =
+      migration_checked(session.sketch_dimension_catalog(fixture.dimensions.sketch()));
+  REQUIRE(dimensions.dimensions().size() == 2U);
+  for (const auto& intent : dimensions.dimensions()) {
+    const auto* previous = fixture.dimensions.find(intent.id());
+    REQUIRE(previous != nullptr);
+    CHECK(intent.kind() == previous->kind());
+    CHECK(intent.mode() == previous->mode());
+    CHECK(intent.parameter() == previous->parameter());
+    CHECK(intent.label_offset() == previous->label_offset());
+    CHECK(intent.targets()[0].id() == "entity/curve.fit.3/end");
+    CHECK(intent.targets()[1].id() ==
+          (intent.driving() ? "entity/curve.fit.2/start" : "entity/curve.fit.2/end"));
+  }
+  CHECK(migration_checked(serialize_part_document_to_json(*session.part_document())) ==
+        migration_checked(serialize_part_document_to_json(fixture.part)));
+  REQUIRE(session.save_as(saved));
+  CHECK(read_file(saved.string() + ".sketch-constraints.json") ==
+        migration_checked(
+            serialize_sketch_constraint_catalogs_to_json(fixture.part.id(), {constraints})));
+  CHECK(read_file(saved.string() + ".sketch-dimensions.json") ==
+        migration_checked(
+            serialize_sketch_dimension_catalogs_to_json(fixture.part.id(), {dimensions})));
+
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(saved));
+  CHECK(migration_checked(reopened.sketch_constraint_catalog(fixture.constraints.sketch())) ==
+        constraints);
+  CHECK(migration_checked(reopened.sketch_dimension_catalog(fixture.dimensions.sketch())) ==
+        dimensions);
+}
+
+TEST_CASE("GUI sidecar topology migration rejects unrelated or collapsed intent atomically",
+          "[gui][document-session][spline-sidecar-migration][persistence][atomic]") {
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto path = std::filesystem::path(directory.filePath("invalid.blcad.json").toStdString());
+  auto fixture = legacy_spline_sidecars();
+  bool malformed_target = false;
+  const auto point = [](std::string id) {
+    return migration_checked(SketchConstraintIntentTarget::point(SketchPointId(std::move(id))));
+  };
+  SECTION("unknown point cannot be inferred from an endpoint-like spelling") {
+    REQUIRE(fixture.constraints.add(migration_checked(SketchConstraintIntent::create(
+        SketchConstraintId("unknown"), SketchSolverConstraintKind::Fixed,
+        {point("entity/curve.fit.99/end")}))));
+  }
+  SECTION("unknown entities remain invalid") {
+    REQUIRE(fixture.constraints.add(migration_checked(SketchConstraintIntent::create(
+        SketchConstraintId("unknown"), SketchSolverConstraintKind::Fixed,
+        {migration_checked(SketchConstraintIntentTarget::entity("entity/curve.fit.99"))}))));
+  }
+  SECTION("unknown dimension point cannot be silently discarded") {
+    REQUIRE(fixture.dimensions.add(migration_checked(SketchDimensionIntent::create(
+        SketchDimensionId("unknown"), SketchDimensionKind::AlignedDistance,
+        SketchDimensionMode::Reference,
+        {point("entity/curve/start"), point("entity/curve.fit.99/end")}))));
+  }
+  SECTION("a dimension collapsed onto a shared junction is rejected") {
+    REQUIRE(fixture.dimensions.add(migration_checked(SketchDimensionIntent::create(
+        SketchDimensionId("collapsed"), SketchDimensionKind::AlignedDistance,
+        SketchDimensionMode::Reference,
+        {point("entity/curve/end"), point("entity/curve.fit.2/start")}))));
+  }
+  SECTION("a collapsed noncoincident constraint is rejected") {
+    REQUIRE(fixture.constraints.add(migration_checked(SketchConstraintIntent::create(
+        SketchConstraintId("collapsed"), SketchSolverConstraintKind::Collinear,
+        {point("entity/curve/end"), point("entity/curve.fit.2/start"),
+         point("entity/curve.fit.2/end")}))));
+  }
+  SECTION("malformed target kinds are rejected before migration") {
+    malformed_target = true;
+  }
+  write_legacy_spline_sidecars(path, fixture);
+  if (malformed_target) {
+    const auto sidecar = path.string() + ".sketch-constraints.json";
+    auto json = nlohmann::json::parse(read_file(sidecar));
+    json["catalogs"][0]["constraints"][0]["targets"][0]["kind"] = "spline_endpoint";
+    std::ofstream stream(sidecar, std::ios::binary);
+    REQUIRE(stream);
+    stream << json.dump(2);
+    REQUIRE(stream);
+  }
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(DocumentId("active.part"), "Keep active Part"));
+  REQUIRE(session.commit_part_transaction("Keep existing history", [](PartDocument& part) {
+    return part.add_datum_plane(DatumPlane::xy().value());
+  }));
+  const auto before = migration_checked(serialize_part_document_to_json(*session.part_document()));
+  const auto* cache = session.part_shape_cache();
+  const auto history_label = session.undo_label();
+  REQUIRE_FALSE(session.open_file(path, true));
+  CHECK(migration_checked(serialize_part_document_to_json(*session.part_document())) == before);
+  CHECK(session.part_shape_cache() == cache);
+  CHECK(session.undo_label() == history_label);
+  CHECK(session.file_path().empty());
+  CHECK(session.dirty());
+  CHECK(session.can_undo());
+  CHECK(session.sketch_constraint_catalogs().empty());
+  CHECK(session.sketch_dimension_catalogs().empty());
 }
 
 TEST_CASE("GUI transaction failure retains the last valid document and records diagnostics",

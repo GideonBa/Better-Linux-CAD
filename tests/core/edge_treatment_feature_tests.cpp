@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <optional>
 
 using namespace blcad;
@@ -302,4 +303,81 @@ TEST_CASE("Block 68 JSON is strict and backward compatible", "[core][edge-treatm
   malformed = nlohmann::json::parse(serialized.value());
   malformed["edge_treatments"] = nlohmann::json::object();
   CHECK(deserialize_part_document_from_json(malformed.dump()).has_error());
+}
+
+TEST_CASE("Result edge witnesses persist canonical producer identity and reject malformed intent",
+          "[core][edge-treatment][result-edge]") {
+  auto document = base_document();
+  std::array<Point3, ResultEdgeReference::sample_count> samples;
+  for (std::size_t i = 0; i < samples.size(); ++i)
+    samples[i] = {double(i), double(i * i), 8};
+  auto witness = ResultEdgeReference::create(FeatureId("feature.base"), 6, 22, samples);
+  REQUIRE(witness);
+  auto reversed = samples;
+  std::reverse(reversed.begin(), reversed.end());
+  REQUIRE(ResultEdgeReference::create(FeatureId("feature.base"), 6, 22, reversed));
+  CHECK(
+      ResultEdgeReference::create(FeatureId("feature.base"), 6, 22, reversed).value().identity() ==
+      witness.value().identity());
+  auto reference = EdgeReference::create_result(PartFeatureInputRole::FilletEdge, witness.value());
+  REQUIRE(reference);
+  REQUIRE(validate_part_feature_input_reference(document, reference.value()));
+  REQUIRE(document.add_fillet_feature(
+      FilletFeature::create(FeatureId("fillet.witness"), "Curved round", BodyId("body.base"),
+                            {reference.value()}, ParameterId("fillet.radius"))
+          .value()));
+  const auto json = serialize_part_document_to_json(document).value();
+  auto restored = deserialize_part_document_from_json(json);
+  REQUIRE(restored);
+  CHECK(serialize_part_document_to_json(restored.value()).value() == json);
+  auto malformed = nlohmann::json::parse(json);
+  auto& edge = malformed["edge_treatments"][0]["edges"][0];
+  SECTION("missing witness point") {
+    edge["samples"].erase(edge["samples"].begin());
+  }
+  SECTION("unknown witness field") {
+    edge["traversal_index"] = 2;
+  }
+  SECTION("invalid curve type") {
+    edge["curve_type"] = 9;
+  }
+  SECTION("unsigned curve type cannot wrap to a supported value") {
+    edge["curve_type"] = std::uint64_t{4294967297ULL};
+  }
+  SECTION("negative curve type cannot wrap to a supported value") {
+    edge["curve_type"] = std::int64_t{-4294967295LL};
+  }
+  SECTION("missing producer") {
+    edge["source_feature"] = "missing";
+  }
+  SECTION("negative curve length") {
+    edge["length_mm"] = -1;
+  }
+  CHECK_FALSE(deserialize_part_document_from_json(malformed.dump()));
+  CHECK_FALSE(ResultEdgeReference::create(FeatureId(""), 1, 1, samples));
+  CHECK_FALSE(EdgeReference::create_result(PartFeatureInputRole::RevolveAxis, witness.value()));
+}
+
+TEST_CASE("Finishing before Union persists cross-family execution order without a transform",
+          "[core][edge-treatment][body-boolean][feature-order]") {
+  auto document = base_document();
+  const auto edge = linear_edge(PartFeatureInputRole::FilletEdge, SemanticEdge::TopFront);
+  REQUIRE(document.add_fillet_feature(FilletFeature::create(FeatureId("fillet.before_union"),
+                                                            "Round", BodyId("body.base"), {edge},
+                                                            ParameterId("fillet.radius"))
+                                          .value()));
+  REQUIRE(document.add_body(body("tool")));
+  REQUIRE(document.add_body_boolean_feature(
+      BodyBooleanFeature::create(FeatureId("union"), BodyBooleanOperation::Add, BodyId("body.base"),
+                                 {BodyId("tool")}, BodyBooleanResultMode::ModifyTarget,
+                                 std::nullopt, false)
+          .value()));
+  const auto serialized = serialize_part_document_to_json(document).value();
+  const auto root = nlohmann::json::parse(serialized);
+  REQUIRE(root.contains("feature_order"));
+  auto restored = deserialize_part_document_from_json(serialized);
+  REQUIRE(restored);
+  CHECK(restored.value().dependency_graph().has_dependency("fillet.before_union", "union"));
+  CHECK_FALSE(restored.value().dependency_graph().has_dependency("union", "fillet.before_union"));
+  CHECK(serialize_part_document_to_json(restored.value()).value() == serialized);
 }

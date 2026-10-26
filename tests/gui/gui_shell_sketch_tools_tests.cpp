@@ -61,7 +61,16 @@ void reenter_sketch(ShellWindow& window, const SketchId& sketch) {
   REQUIRE(sketch != nullptr);
   auto topology = SketchTopology::migrate_legacy(*sketch);
   REQUIRE(topology);
-  return std::move(topology.value());
+  // These legacy tool tests inspect authored entities; selectable immutable
+  // origin references are verified by the dedicated reference workflow tests.
+  auto points = topology.value().points();
+  auto entities = topology.value().entities();
+  std::erase_if(points,
+                [](const auto& point) { return point.id().value().starts_with("reference/"); });
+  std::erase_if(entities, [](const auto& entity) { return entity.id().starts_with("reference/"); });
+  return SketchTopology::create(sketch->id(), std::move(points), std::move(entities),
+                                topology.value().dependencies())
+      .value();
 }
 
 void select_first_entity(ShellWindow& window) {
@@ -366,7 +375,7 @@ TEST_CASE("Finish Sketch leaves an open contour intact for later editing",
   const auto* sketch = window.session().part_document()->find_sketch(sketch_id);
   REQUIRE(sketch != nullptr);
   CHECK(sketch->profile_count() == 0U);
-  CHECK(window.statusBar()->currentMessage().contains(QStringLiteral("offene Konturen")));
+  CHECK(window.statusBar()->currentMessage().contains(QStringLiteral("open contours")));
   CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before.value());
   CHECK(window.session().undo_label() == history);
   CHECK_FALSE(window.feature_tools().begin_extrude());

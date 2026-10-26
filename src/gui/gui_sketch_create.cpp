@@ -472,8 +472,7 @@ Result<std::size_t> GuiSketchCreateController::add_pick(GuiSketchCreatePick pick
         create_error("the active Sketch creation tool already has all required picks"));
   if (tool_ == GuiSketchCreateTool::Spline && !picks_.empty() &&
       distance(picks_.back().point, pick.point) <= kEpsilon)
-    return Result<std::size_t>::failure(
-        create_error("Aufeinanderfolgende Spline-Punkte müssen verschieden sein"));
+    return Result<std::size_t>::failure(create_error("Consecutive spline points must be distinct"));
   picks_.push_back(pick);
   return Result<std::size_t>::success(picks_.size());
 }

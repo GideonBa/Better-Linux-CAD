@@ -529,7 +529,7 @@ TEST_CASE("Sketch ribbon remains usable in a normal desktop window",
   qApp->processEvents();
   capture_ui(window, "sketch-ribbon-right");
   for (auto* button : page->findChildren<QToolButton*>()) {
-    if (button->text() != QStringLiteral("Fang"))
+    if (button->text() != QStringLiteral("Snap"))
       continue;
     CHECK(page->viewport()->rect().contains(
         QRect(button->mapTo(page->viewport(), QPoint{}), button->size())));
@@ -833,7 +833,7 @@ TEST_CASE("Mirror and symmetry editors pick a centerline then multiple elements"
   }
   QAction* action = nullptr;
   for (auto* candidate : window.sketch_tools().findChildren<QAction*>())
-    if (symmetric ? candidate->text() == QStringLiteral("Symmetrisch")
+    if (symmetric ? candidate->text() == QStringLiteral("Symmetric")
                   : candidate->objectName() == QStringLiteral("sketch.operation.mirror"))
       action = candidate;
   REQUIRE(action);

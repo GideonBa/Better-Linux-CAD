@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_rapid_dimension.hpp"
 #include "blcad/gui/gui_sketch_create.hpp"
 #include "blcad/gui/gui_sketch_drag.hpp"
 #include "blcad/gui/gui_sketch_operations.hpp"
@@ -62,6 +63,14 @@ public:
   apply_dimension(SketchDimensionKind kind, bool reference,
                   std::optional<ParameterId> parameter = std::nullopt);
   [[nodiscard]] Result<std::size_t> edit_selected_dimension(const std::string& text);
+  [[nodiscard]] bool begin_rapid_dimension();
+  [[nodiscard]] bool rapid_dimension_active() const noexcept {
+    return rapid_dimension_active_;
+  }
+  [[nodiscard]] const std::optional<GuiRapidDimensionCandidate>&
+  rapid_dimension_candidate() const noexcept {
+    return rapid_candidate_;
+  }
   // Ändern-Gruppe (Block 116). Trim/Extend/Split operate on a clicked curve at
   // the pick point; Fillet/Chamfer operate on exactly two selected curves with
   // a radius/distance. Each previews once and commits one atomic transaction.
@@ -133,10 +142,20 @@ private:
   void cancel_drag(bool cancel_workspace, const std::string& message);
   void publish_drag_preview(const GuiSketchDragPreview& preview);
   void publish_handles(const std::vector<GuiSketchDragHandle>& handles);
+  [[nodiscard]] bool drag_handle_visible(const GuiSketchDragHandle& handle) const;
   void publish_scene_for(const Sketch& sketch, bool include_annotations = true);
   void report(const Error& error) const;
   void report_message(const std::string& message) const;
   void show_workspace_status() const;
+  [[nodiscard]] std::optional<SketchConstraintIntentTarget>
+  rapid_target(const SketchTopology& topology, const std::optional<GuiSketchHit>& hit,
+               Point2 pointer) const;
+  void update_rapid_dimension(Point2 pointer, const std::optional<GuiSketchHit>& hit);
+  void rapid_dimension_press(Point2 pointer, const std::optional<GuiSketchHit>& hit);
+  [[nodiscard]] Result<std::size_t>
+  commit_dimension(SketchDimensionKind kind, bool reference, std::optional<ParameterId> parameter,
+                   std::vector<SketchConstraintIntentTarget> targets,
+                   std::optional<Point2> label_position = std::nullopt);
 
   ShellWindow& window_;
   GuiDocumentSession& session_;
@@ -151,6 +170,11 @@ private:
   QAction* reference_dimension_action_{nullptr};
   QAction* delete_constraint_action_{nullptr};
   QAction* edit_dimension_action_{nullptr};
+  QAction* rapid_dimension_action_{nullptr};
+  bool rapid_dimension_active_{false};
+  bool rapid_alternate_radial_{false};
+  std::vector<SketchConstraintIntentTarget> rapid_targets_;
+  std::optional<GuiRapidDimensionCandidate> rapid_candidate_;
   QAction* fillet_action_{nullptr};
   QAction* chamfer_action_{nullptr};
   std::vector<QAction*> constraint_actions_;

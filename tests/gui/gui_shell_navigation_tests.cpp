@@ -179,7 +179,7 @@ TEST_CASE("Shell Home and named views preserve complete cameras and replace trim
   invoke(window, "view_front");
   invoke(window, "bookmark_restore");
   same_camera(window.viewport().camera_bookmark(), replacement);
-  save_mark(window, "Vorne");
+  save_mark(window, "Front");
   CHECK(marks(window).count() == 2);
   marks(window).setEditText("unknown");
   CHECK_FALSE(action(window, "bookmark_restore").isEnabled());
@@ -189,7 +189,7 @@ TEST_CASE("Shell Home and named views preserve complete cameras and replace trim
   marks(window).setEditText("Schnitt Ä");
   invoke(window, "bookmark_remove");
   CHECK(marks(window).count() == 1);
-  CHECK(marks(window).itemText(0) == "Vorne");
+  CHECK(marks(window).itemText(0) == "Front");
   CHECK_FALSE(action(window, "bookmark_restore").isEnabled());
   invoke(window, "view_home");
   same_camera(window.viewport().camera_bookmark(), saved);

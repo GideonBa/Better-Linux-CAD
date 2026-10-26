@@ -126,7 +126,7 @@ TEST_CASE("Repeat records only accepted modeling commands and keeps the record a
   CHECK_FALSE(repeat(window).isEnabled());
   CHECK(snapshot(window) == before);
   fillet(window);
-  CHECK(repeat(window).text() == "Erneut: Verrunden");
+  CHECK(repeat(window).text() == "Repeat: Fillet");
   qApp->processEvents();
   auto& button = control<QToolButton>(window, "blcad.repeat.button");
   CHECK(button.width() >= button.sizeHint().width());
@@ -138,12 +138,12 @@ TEST_CASE("Repeat records only accepted modeling commands and keeps the record a
   CHECK(snapshot(window) == applied);
   window.feature_tools().cancel();
   CHECK(repeat(window).isEnabled());
-  CHECK(repeat(window).text() == "Erneut: Verrunden");
+  CHECK(repeat(window).text() == "Repeat: Fillet");
   invoke(window, "hole");
   control<QLineEdit>(window, "blcad.hole.diameter").setText("invalid");
   CHECK_FALSE(window.hole_tools().preview());
   CHECK_FALSE(window.hole_tools().apply());
-  CHECK(repeat(window).text() == "Erneut: Verrunden");
+  CHECK(repeat(window).text() == "Repeat: Fillet");
   window.hole_tools().cancel();
   CHECK(snapshot(window) == applied);
   REQUIRE(window.undo());
@@ -166,7 +166,7 @@ TEST_CASE("Repeat uses the current profile and ordinary defaults instead of repl
   invoke(window, "extrude");
   REQUIRE(window.feature_tools().set_numeric_text("23 mm"));
   REQUIRE(window.feature_tools().apply());
-  CHECK(repeat(window).text() == "Erneut: Extrusion");
+  CHECK(repeat(window).text() == "Repeat: Extrude");
   tree(window, "body.base");
   CHECK_FALSE(repeat(window).isEnabled());
   // This explicit handoff occurs after normal refresh, as Finish Sketch does.
@@ -282,7 +282,7 @@ TEST_CASE("Repeat is transient across Save history and document replacement boun
     REQUIRE(answered);
     replaced = false;
   }
-  CHECK(repeat(window).text() == (replaced ? "Befehl wiederholen" : label));
+  CHECK(repeat(window).text() == (replaced ? "Repeat Command" : label));
   CHECK(repeat(window).isEnabled() == !replaced);
 }
 

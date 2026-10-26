@@ -3,6 +3,12 @@
 #include "blcad/core/error.hpp"
 #include "blcad/core/part_document.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
+#include <limits>
+#include <locale>
+#include <sstream>
 #include <type_traits>
 #include <utility>
 
@@ -116,6 +122,8 @@ std::string_view to_string(PartFeatureInputSourceKind source_kind) noexcept {
     return "semantic_cylindrical_face";
   case PartFeatureInputSourceKind::SemanticCircularEdge:
     return "semantic_circular_edge";
+  case PartFeatureInputSourceKind::ResultEdge:
+    return "result_edge";
   case PartFeatureInputSourceKind::Body:
     return "body";
   }
@@ -367,6 +375,50 @@ std::string FaceReference::source_node_id() const {
   return std::visit([](const auto& source) { return source.source_feature().value(); }, source_);
 }
 
+ResultEdgeReference::ResultEdgeReference(FeatureId feature, int type, double length,
+                                         std::array<Point3, sample_count> samples)
+    : source_feature_(std::move(feature)), curve_type_(type), length_mm_(length),
+      samples_(samples) {}
+Result<ResultEdgeReference> ResultEdgeReference::create(FeatureId feature, int type, double length,
+                                                        std::array<Point3, sample_count> samples) {
+  if (feature.empty() || type < 0 || type > 8 || !std::isfinite(length) || length <= 0 ||
+      std::any_of(samples.begin(), samples.end(), [](Point3 p) {
+        return !std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z);
+      }))
+    return Result<ResultEdgeReference>::failure(validation_error(
+        feature.value(), "result edge requires a producer and finite curve witness"));
+  const auto less = [](Point3 a, Point3 b) {
+    if (a.x != b.x)
+      return a.x < b.x;
+    if (a.y != b.y)
+      return a.y < b.y;
+    return a.z < b.z;
+  };
+  if (std::lexicographical_compare(samples.rbegin(), samples.rend(), samples.begin(), samples.end(),
+                                   less))
+    std::reverse(samples.begin(), samples.end());
+  for (auto& p : samples) {
+    if (p.x == 0)
+      p.x = 0;
+    if (p.y == 0)
+      p.y = 0;
+    if (p.z == 0)
+      p.z = 0;
+  }
+  return Result<ResultEdgeReference>::success(
+      ResultEdgeReference(std::move(feature), type, length, samples));
+}
+std::string ResultEdgeReference::identity() const {
+  std::ostringstream out;
+  out.imbue(std::locale::classic());
+  out << "result/" << source_feature_.value().size() << ':' << source_feature_.value() << '/'
+      << curve_type_ << '/' << std::setprecision(std::numeric_limits<double>::max_digits10)
+      << length_mm_;
+  for (auto p : samples_)
+    out << '/' << p.x << ',' << p.y << ',' << p.z;
+  return out.str();
+}
+
 EdgeReference::EdgeReference(PartFeatureInputRole role, EdgeReferenceSource source)
     : role_(role), source_(std::move(source)) {}
 Result<EdgeReference> EdgeReference::create_linear(PartFeatureInputRole role,
@@ -383,6 +435,13 @@ Result<EdgeReference> EdgeReference::create_circular(PartFeatureInputRole role,
     return Result<EdgeReference>::failure(valid.error());
   return Result<EdgeReference>::success(EdgeReference(role, std::move(edge)));
 }
+Result<EdgeReference> EdgeReference::create_result(PartFeatureInputRole role,
+                                                   ResultEdgeReference edge) {
+  auto valid = validate_role(role, PartFeatureInputCapability::Edge, edge.source_feature().value());
+  if (!valid)
+    return Result<EdgeReference>::failure(valid.error());
+  return Result<EdgeReference>::success(EdgeReference(role, std::move(edge)));
+}
 PartFeatureInputRole EdgeReference::role() const noexcept {
   return role_;
 }
@@ -393,9 +452,11 @@ const EdgeReferenceSource& EdgeReference::source() const noexcept {
   return source_;
 }
 PartFeatureInputSourceKind EdgeReference::source_kind() const noexcept {
-  return std::holds_alternative<SemanticEdgeReference>(source_)
-             ? PartFeatureInputSourceKind::SemanticLinearEdge
-             : PartFeatureInputSourceKind::SemanticCircularEdge;
+  if (std::holds_alternative<SemanticEdgeReference>(source_))
+    return PartFeatureInputSourceKind::SemanticLinearEdge;
+  return std::holds_alternative<SemanticCircularEdgeReference>(source_)
+             ? PartFeatureInputSourceKind::SemanticCircularEdge
+             : PartFeatureInputSourceKind::ResultEdge;
 }
 std::string EdgeReference::source_node_id() const {
   return std::visit([](const auto& source) { return source.source_feature().value(); }, source_);
@@ -509,9 +570,24 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
 Result<std::size_t> validate_part_feature_input_reference(const PartDocument& document,
                                                           const EdgeReference& reference) {
   return std::visit(
-      [&](const auto& source) {
-        return validate_generated_topology_reference(document,
-                                                     GeneratedTopologyReferenceIdentity(source));
+      [&](const auto& source) -> Result<std::size_t> {
+        using T = std::decay_t<decltype(source)>;
+        if constexpr (std::is_same_v<T, ResultEdgeReference>) {
+          const auto& id = source.source_feature();
+          if (document.find_feature(id) || document.find_revolve_feature(id) ||
+              document.find_sweep_feature(id) || document.find_loft_feature(id) ||
+              document.find_surface_feature(id) || document.find_linear_pattern_feature(id) ||
+              document.find_circular_pattern_feature(id) || document.find_mirror_feature(id) ||
+              document.find_fillet_feature(id) || document.find_chamfer_feature(id) ||
+              document.find_shell_feature(id) || document.find_draft_feature(id) ||
+              document.find_body_boolean_feature(id) ||
+              document.find_body_transform(BodyTransformId(id.value())))
+            return Result<std::size_t>::success(1U);
+          return Result<std::size_t>::failure(
+              validation_error(id.value(), "result edge producer must exist"));
+        } else
+          return validate_generated_topology_reference(document,
+                                                       GeneratedTopologyReferenceIdentity(source));
       },
       reference.source());
 }

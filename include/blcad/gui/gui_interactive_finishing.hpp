@@ -31,7 +31,9 @@ namespace blcad::gui {
   return std::visit(
       [](const auto& source) -> std::string {
         using T = std::decay_t<decltype(source)>;
-        if constexpr (std::is_same_v<T, SemanticEdgeReference>)
+        if constexpr (std::is_same_v<T, ResultEdgeReference>)
+          return source.identity();
+        else if constexpr (std::is_same_v<T, SemanticEdgeReference>)
           return source.node_id();
         else
           return source.source_feature().value() + ":" + source.source_profile().value() + ":" +

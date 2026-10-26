@@ -1,3 +1,4 @@
+#include "blcad/gui/gui_appearance.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 #include "blcad/gui/startup_splash.hpp"
 
@@ -11,6 +12,7 @@ int main(int argc, char* argv[]) {
     qputenv("QT_QPA_PLATFORM", "xcb");
 #endif
   QApplication application(argc, argv);
+  blcad::gui::configure_gui_appearance(application);
   QApplication::setApplicationName(QStringLiteral("BLCAD"));
   QApplication::setOrganizationName(QStringLiteral("BLCAD"));
 

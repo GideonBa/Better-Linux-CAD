@@ -8,6 +8,7 @@
 #include <charconv>
 #include <concepts>
 #include <sstream>
+#include <type_traits>
 
 namespace blcad::gui {
 namespace {
@@ -94,6 +95,26 @@ GuiBrowserNode part_node(const PartDocument& part, const T& object, GuiBrowserNo
                          std::optional<GuiSelectionKind> selection = std::nullopt) {
   const std::string id = object.id().value();
   GuiBrowserNode node{kind, id, part.id().value(), object_label(object), selection};
+  if (kind == GuiBrowserNodeKind::Feature) {
+    node.visibility_semantic_id = "feature/" + id;
+    if constexpr (requires { object.body_result_context(); }) {
+      const auto& context = object.body_result_context();
+      if constexpr (requires { context.has_value(); }) {
+        if (context)
+          node.visibility_semantic_id = "body/" + context->effective_produced_body().value();
+      } else {
+        node.visibility_semantic_id = "body/" + context.effective_produced_body().value();
+      }
+    } else if constexpr (requires { object.effective_result_body(); }) {
+      node.visibility_semantic_id = "body/" + object.effective_result_body().value();
+    } else if constexpr (requires { object.result_body(); }) {
+      node.visibility_semantic_id = "body/" + object.result_body().value();
+    } else if constexpr (requires { object.target_body(); }) {
+      node.visibility_semantic_id = "body/" + object.target_body().value();
+    } else if constexpr (requires { object.body(); }) {
+      node.visibility_semantic_id = "body/" + object.body().value();
+    }
+  }
   node.properties.push_back(property("id", "Identifier", id, GuiPropertyKind::Identifier, false,
                                     {}, "Persistent identifiers are generated/read-only"));
   node.properties.push_back(property("name", "Name", object_label(object)));
@@ -177,6 +198,8 @@ void append_part_nodes(GuiBrowserNode& parent, const PartDocument& part, const R
     auto node = part_node(part, object, kind, selection);
     if (!viewport_prefix.empty())
       node.viewport_semantic_id = std::string(viewport_prefix) + object.id().value();
+    if constexpr (std::is_same_v<typename Range::value_type, Sketch3D>)
+      node.visibility_semantic_id = "sketch3d/" + object.id().value();
     parent.children.push_back(std::move(node));
   }
 }
@@ -199,6 +222,15 @@ void append_sketch_records(GuiBrowserNode& parent, const PartDocument& part, con
                         viewport_entity ? std::optional(GuiSelectionKind::SketchEntity) : std::nullopt};
     if (viewport_entity)
       node.viewport_semantic_id = "sketch/" + sketch.id().value() + "/entity/" + record.id().value();
+    if (viewport_entity)
+      node.visibility_semantic_id = node.viewport_semantic_id;
+    else if (family.ends_with("profile") || family == "circular-hole-pattern")
+      node.visibility_semantic_id =
+          "sketch/" + sketch.id().value() + "/profile/" + record.id().value();
+    else if (family == "dimension" || family.ends_with("constraint") || family == "tangent")
+      node.visibility_semantic_id = "sketch/" + sketch.id().value() +
+                                    (family == "dimension" ? "/dimension/" : "/constraint/") +
+                                    record.id().value();
     node.properties = {
         property("id", "Identifier", record.id().value(), GuiPropertyKind::Identifier, false, {},
                  "Persistent identifiers are read-only"),
@@ -212,16 +244,28 @@ void append_sketch_records(GuiBrowserNode& parent, const PartDocument& part, con
 void append_planar_sketches(GuiBrowserNode& parent, const PartDocument& part) {
   for (const auto& sketch : part.sketches()) {
     auto node = part_node(part, sketch, GuiBrowserNodeKind::Sketch);
+    node.visibility_semantic_id = "sketch/" + sketch.id().value();
     node.properties.push_back(property("workplane", "Workplane", sketch.workplane().value(),
                                        GuiPropertyKind::Reference));
     node.properties.push_back(property("profiles", "Profile count",
                                        std::to_string(sketch.profile_count()), GuiPropertyKind::Status));
+    for (const auto& reference : std::vector<std::pair<std::string, std::string>>{
+             {"origin", "Origin"}, {"axis/x", "X axis"}, {"axis/y", "Y axis"}}) {
+      const std::string id = "sketch/" + sketch.id().value() + "/reference/" + reference.first;
+      GuiBrowserNode child{GuiBrowserNodeKind::Datum, id, part.id().value(), reference.second,
+                           GuiSelectionKind::SketchEntity};
+      child.viewport_semantic_id = id;
+      child.visibility_semantic_id = id;
+      node.children.push_back(std::move(child));
+    }
     append_sketch_records(node, part, sketch, sketch.line_segments(), "line", true);
     append_sketch_records(node, part, sketch, sketch.arc_segments(), "arc", true);
     append_sketch_records(node, part, sketch, sketch.spline_segments(), "spline", true);
-    append_sketch_records(node, part, sketch, sketch.projected_points(), "projected-point");
-    append_sketch_records(node, part, sketch, sketch.projected_lines(), "projected-line");
-    append_sketch_records(node, part, sketch, sketch.reference_generated_lines(), "reference-line");
+    append_sketch_records(node, part, sketch, sketch.points(), "point", true);
+    append_sketch_records(node, part, sketch, sketch.projected_points(), "projected-point", true);
+    append_sketch_records(node, part, sketch, sketch.projected_lines(), "projected-line", true);
+    append_sketch_records(node, part, sketch, sketch.reference_generated_lines(), "reference-line",
+                          true);
     append_sketch_records(node, part, sketch, sketch.constraints(), "reference-constraint");
     append_sketch_records(node, part, sketch, sketch.geometric_constraints(), "geometric-constraint");
     append_sketch_records(node, part, sketch, sketch.driving_dimensions(), "dimension");
@@ -301,7 +345,7 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
     (is_origin_axis(axis) ? origin_axes : other_axes).push_back(axis);
 
   if (!origin_planes.empty() || !origin_axes.empty()) {
-    auto origin = group("Ursprung");
+    auto origin = group("Origin");
     append_part_nodes(origin, part, origin_planes, GuiBrowserNodeKind::Datum,
                       GuiSelectionKind::Datum, "datum-plane/");
     append_part_nodes(origin, part, origin_axes, GuiBrowserNodeKind::Datum, GuiSelectionKind::Datum,
@@ -417,6 +461,8 @@ GuiBrowserNode build_assembly(const AssemblyDocument& assembly, std::string labe
   for (const auto& occurrence : assembly.subassembly_instances()) {
     GuiBrowserNode node{GuiBrowserNodeKind::Subassembly, occurrence.id().value(), assembly.id().value(),
                         occurrence.name(), GuiSelectionKind::Component};
+    node.visibility_semantic_id =
+        "subassembly/" + assembly.id().value() + "/" + occurrence.id().value();
     node.properties = {
         property("id", "Identifier", occurrence.id().value(), GuiPropertyKind::Identifier, false, {}, "Persistent identifiers are read-only"),
         property("name", "Name", occurrence.name()),
@@ -517,6 +563,30 @@ GuiDocumentBrowser GuiDocumentBrowser::build(const GuiDocumentSession& session) 
     append_session_diagnostics(project_root, session);
     browser.roots_.push_back(std::move(project_root));
   }
+  const auto annotate_visibility = [&](auto&& self, GuiBrowserNode& node) -> void {
+    if (node.visibility_semantic_id.empty())
+      node.visibility_semantic_id = node.viewport_semantic_id;
+    if (!node.visibility_semantic_id.empty())
+      node.presentation_visible = session.presentation_visible(node.visibility_semantic_id);
+    const auto visibility =
+        std::find_if(node.properties.begin(), node.properties.end(),
+                     [](const auto& field) { return field.key == "visibility"; });
+    if (visibility != node.properties.end() && visibility->value == "false")
+      node.presentation_visible = false;
+    if (node.visibility_semantic_id.starts_with("body/")) {
+      const auto* part = session.part_document();
+      if (session.project())
+        part = session.project()->find_part_document(DocumentId(node.owner_document_id));
+      const auto* body =
+          part ? part->find_body(BodyId(node.visibility_semantic_id.substr(5U))) : nullptr;
+      if (body && body->visibility() == BodyVisibility::Hidden)
+        node.presentation_visible = false;
+    }
+    for (auto& child : node.children)
+      self(self, child);
+  };
+  for (auto& root : browser.roots_)
+    annotate_visibility(annotate_visibility, root);
   return browser;
 }
 
@@ -529,10 +599,55 @@ const GuiBrowserNode* GuiDocumentBrowser::find(std::string_view semantic_id) con
   return nullptr;
 }
 
+Result<std::size_t> set_browser_presentation_visible(GuiDocumentSession& session,
+                                                     const GuiBrowserNode& node, bool visible) {
+  if (node.visibility_semantic_id.empty())
+    return unsupported(node.semantic_id, "presentation_visibility");
+  std::size_t changed_count = 0U;
+  if (node.kind == GuiBrowserNodeKind::Component || node.kind == GuiBrowserNodeKind::Subassembly) {
+    auto changed =
+        edit_browser_property(session, node, "visibility", visible ? "true" : "false", true);
+    if (!changed)
+      return changed;
+    changed_count += changed.value();
+    // Clear any older transient occurrence mask as the authoritative Core flag
+    // now controls every nested occurrence of the definition.
+    auto cleared = session.set_presentation_visible(node.visibility_semantic_id, true);
+    if (!cleared)
+      return cleared;
+    return Result<std::size_t>::success(changed_count + cleared.value());
+  }
+  if (visible && node.visibility_semantic_id.starts_with("body/")) {
+    const auto* part = session.part_document();
+    if (session.project())
+      part = session.project()->find_part_document(DocumentId(node.owner_document_id));
+    const BodyId body_id(node.visibility_semantic_id.substr(5U));
+    const auto* body = part ? part->find_body(body_id) : nullptr;
+    if (body && body->visibility() == BodyVisibility::Hidden) {
+      GuiBrowserNode owner{GuiBrowserNodeKind::Body, body_id.value(), node.owner_document_id,
+                           body->name()};
+      auto changed = edit_browser_property(session, owner, "visibility", "true", true);
+      if (!changed)
+        return changed;
+      changed_count += changed.value();
+    }
+  }
+  auto changed = session.set_presentation_visible(node.visibility_semantic_id, visible);
+  if (!changed)
+    return changed;
+  return Result<std::size_t>::success(changed_count + changed.value());
+}
+
 Result<std::size_t> edit_browser_property(GuiDocumentSession& session,
                                           const GuiBrowserNode& node, std::string_view key,
                                           std::string_view value, bool commit) {
   const bool bool_value = value == "true";
+  if (key == "presentation_visibility") {
+    if (node.visibility_semantic_id.empty() || (value != "true" && value != "false"))
+      return unsupported(node.semantic_id, key);
+    return commit ? session.set_presentation_visible(node.visibility_semantic_id, bool_value)
+                  : Result<std::size_t>::success(1U);
+  }
   if ((key == "visibility") && value != "true" && value != "false")
     return Result<std::size_t>::failure(Error::validation(node.semantic_id, "visibility must be true or false"));
 

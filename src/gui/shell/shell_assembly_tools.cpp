@@ -43,29 +43,29 @@ QString title(ShellAssemblyTools::Command c) {
   using C = ShellAssemblyTools::Command;
   switch (c) {
   case C::InsertComponent:
-    return QStringLiteral("Bauteil einsetzen");
+    return QStringLiteral("Insert Part");
   case C::InsertSubassembly:
-    return QStringLiteral("Unterbaugruppe einsetzen");
+    return QStringLiteral("Insert Subassembly");
   case C::Placement:
-    return QStringLiteral("Platzieren");
+    return QStringLiteral("Place");
   case C::Relationship:
-    return QStringLiteral("Beziehung");
+    return QStringLiteral("Relationship");
   case C::Joint:
-    return QStringLiteral("Gelenk");
+    return QStringLiteral("Joint");
   case C::Motion:
-    return QStringLiteral("Gelenk bewegen");
+    return QStringLiteral("Drive Joint");
   case C::Solve:
-    return QStringLiteral("Baugruppe lösen");
+    return QStringLiteral("Solve Assembly");
   case C::ValidateHierarchy:
-    return QStringLiteral("Hierarchie prüfen");
+    return QStringLiteral("Inspect Hierarchy");
   case C::CrossRelationship:
-    return QStringLiteral("Hierarchie-Beziehung");
+    return QStringLiteral("Hierarchy Relationship");
   case C::CrossJoint:
-    return QStringLiteral("Hierarchie-Gelenk");
+    return QStringLiteral("Hierarchy Joint");
   case C::CrossSolve:
-    return QStringLiteral("Hierarchie lösen");
+    return QStringLiteral("Solve Hierarchy");
   case C::CrossMotion:
-    return QStringLiteral("Hierarchie bewegen");
+    return QStringLiteral("Move Hierarchy");
   default:
     return {};
   }
@@ -91,24 +91,24 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
                                        OcctViewport& viewport, ShellRibbon& ribbon, int tab)
     : QObject(&window), window_(window), session_(session), viewport_(viewport),
       coordinator_(&session, &layer_) {
-  auto* document = ribbon.add_group(tab, QStringLiteral("Baugruppe"));
-  auto* create = new QAction(QStringLiteral("Neue Baugruppe"), this);
+  auto* document = ribbon.add_group(tab, QStringLiteral("Assembly"));
+  auto* create = new QAction(QStringLiteral("New Assembly"), this);
   create->setObjectName("blcad.action.new_project");
   connect(create, &QAction::triggered, this, [this] {
     bool ok = false;
     auto name =
-        QInputDialog::getText(&window_, QStringLiteral("Neue Baugruppe"), QStringLiteral("Name"),
-                              QLineEdit::Normal, QStringLiteral("Baugruppe"), &ok)
+        QInputDialog::getText(&window_, QStringLiteral("New Assembly"), QStringLiteral("Name"),
+                              QLineEdit::Normal, QStringLiteral("Assembly"), &ok)
             .trimmed();
     if (ok && !name.isEmpty())
       (void)window_.new_project(name);
   });
   ribbon.add_button(document, create);
-  import_action_ = new QAction(QStringLiteral("Definition laden"), this);
+  import_action_ = new QAction(QStringLiteral("Load Definition"), this);
   import_action_->setObjectName("blcad.action.assembly_import");
   connect(import_action_, &QAction::triggered, this, [this] {
     auto path =
-        QFileDialog::getOpenFileName(&window_, QStringLiteral("Bauteil oder Baugruppe laden"), {},
+        QFileDialog::getOpenFileName(&window_, QStringLiteral("Load Part or Assembly"), {},
                                      QStringLiteral("BLCAD (*.blcad.json *.blcad.project.json)"));
     if (!path.isEmpty()) {
       auto result = import_definition(path);
@@ -117,7 +117,7 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
     }
   });
   ribbon.add_small_button(document, import_action_);
-  auto* tools = ribbon.add_group(tab, QStringLiteral("Anordnen und verbinden"));
+  auto* tools = ribbon.add_group(tab, QStringLiteral("Arrange and Connect"));
   for (const auto& [command, id] : std::vector<std::pair<Command, const char*>>{
            {Command::InsertComponent, "assembly_insert_component"},
            {Command::InsertSubassembly, "assembly_insert_subassembly"},
@@ -145,7 +145,7 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   overlay_->setObjectName("blcad.assembly.overlay");
   viewport.installEventFilter(this);
   window.installEventFilter(this);
-  dock_ = new QDockWidget(QStringLiteral("Baugruppe"), &window);
+  dock_ = new QDockWidget(QStringLiteral("Assembly"), &window);
   dock_->setObjectName("blcad.shell.assembly_task");
   dock_->setFeatures(QDockWidget::DockWidgetMovable);
   auto* contents = new QWidget(dock_);
@@ -170,11 +170,11 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   placement_form->addRow(QStringLiteral("Definition"), definition_);
   occurrence_ = new QComboBox(panel);
   occurrence_->setObjectName("blcad.assembly.occurrence");
-  placement_form->addRow(QStringLiteral("Vorkommen"), occurrence_);
+  placement_form->addRow(QStringLiteral("Occurrence"), occurrence_);
   placement_drag_ = new QComboBox(panel);
-  placement_drag_->addItems({QStringLiteral("Verschieben XYZ"), QStringLiteral("Drehen X"),
-                             QStringLiteral("Drehen Y"), QStringLiteral("Drehen Z")});
-  placement_form->addRow(QStringLiteral("Dynamischer Griff"), placement_drag_);
+  placement_drag_->addItems({QStringLiteral("Translate XYZ"), QStringLiteral("Rotate X"),
+                             QStringLiteral("Rotate Y"), QStringLiteral("Rotate Z")});
+  placement_form->addRow(QStringLiteral("Dynamic Handle"), placement_drag_);
   connect(placement_drag_, &QComboBox::currentIndexChanged, this, [this] {
     if (!sync_ && placement()) {
       publish_handles();
@@ -200,9 +200,9 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
         changed();
     });
   }
-  grounding_ = new QCheckBox(QStringLiteral("Fixiert"), panel);
-  visibility_ = new QCheckBox(QStringLiteral("Sichtbar"), panel);
-  suppression_ = new QCheckBox(QStringLiteral("Unterdrückt"), panel);
+  grounding_ = new QCheckBox(QStringLiteral("Grounded"), panel);
+  visibility_ = new QCheckBox(QStringLiteral("Visible"), panel);
+  suppression_ = new QCheckBox(QStringLiteral("Suppressed"), panel);
   placement_form->addRow(grounding_);
   placement_form->addRow(visibility_);
   placement_form->addRow(suppression_);
@@ -213,23 +213,23 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   relationship_type_->setObjectName("blcad.assembly.relationship_type");
   relationship_type_->addItems({"Mate", "Concentric", "Distance", "Insert", "Angle", "Coincident",
                                 "Parallel", "Perpendicular"});
-  target_form->addRow(QStringLiteral("Beziehung"), relationship_type_);
+  target_form->addRow(QStringLiteral("Relationship"), relationship_type_);
   joint_type_ = new QComboBox(panel);
   joint_type_->setObjectName("blcad.assembly.joint_type");
   joint_type_->addItems({"Revolute", "Prismatic", "Cylindrical", "Planar", "Spherical"});
-  target_form->addRow(QStringLiteral("Gelenkart"), joint_type_);
+  target_form->addRow(QStringLiteral("Joint Type"), joint_type_);
   pick_ = new QComboBox(panel);
-  pick_->addItems({QStringLiteral("Referenz A"), QStringLiteral("Referenz B")});
-  target_form->addRow(QStringLiteral("Modellklick wählt"), pick_);
+  pick_->addItems({QStringLiteral("Reference A"), QStringLiteral("Reference B")});
+  target_form->addRow(QStringLiteral("Viewport Click Selects"), pick_);
   first_ = new QComboBox(panel);
   second_ = new QComboBox(panel);
   first_->setObjectName("blcad.assembly.first");
   second_->setObjectName("blcad.assembly.second");
-  target_form->addRow(QStringLiteral("Referenz A"), first_);
-  target_form->addRow(QStringLiteral("Referenz B"), second_);
+  target_form->addRow(QStringLiteral("Reference A"), first_);
+  target_form->addRow(QStringLiteral("Reference B"), second_);
   slots_ = new QTableWidget(0, 4, panel);
   slots_->setObjectName("blcad.assembly.slots");
-  slots_->setHorizontalHeaderLabels({QStringLiteral("Koordinate"), QStringLiteral("Wert"),
+  slots_->setHorizontalHeaderLabels({QStringLiteral("Coordinate"), QStringLiteral("Value"),
                                      QStringLiteral("Minimum"), QStringLiteral("Maximum")});
   slots_->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
   slots_->setMinimumHeight(135);
@@ -242,8 +242,8 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   joint_->setObjectName("blcad.assembly.joint");
   coordinate_ = new QComboBox(panel);
   coordinate_->setObjectName("blcad.assembly.coordinate");
-  motion_form->addRow(QStringLiteral("Gelenk"), joint_);
-  motion_form->addRow(QStringLiteral("Koordinate"), coordinate_);
+  motion_form->addRow(QStringLiteral("Joint"), joint_);
+  motion_form->addRow(QStringLiteral("Coordinate"), coordinate_);
   slider_ = new QSlider(Qt::Horizontal, panel);
   slider_->setRange(0, 1000);
   motion_form->addRow(slider_);
@@ -267,7 +267,7 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   drag_editor_ = new QLineEdit(panel);
   drag_editor_->setObjectName("blcad.assembly.drag_value");
   drag_editor_->setPlaceholderText(
-      QStringLiteral("Während des Ziehens Maß tippen, Enter beendet den Zug"));
+      QStringLiteral("Type a value while dragging; Enter finishes the drag"));
   inputs->addWidget(drag_editor_);
   for (auto* combo : {definition_, occurrence_, placement_drag_, relationship_type_, joint_type_,
                       first_, second_, pick_, joint_, coordinate_}) {
@@ -278,10 +278,10 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   }
   auto* hint = new QLabel(
       QStringLiteral(
-          "Anwenden übernimmt eine gültige Vorschau als einen rückgängig machbaren "
-          "Schritt. Escape setzt einen Zug zurück; erneut Escape bricht den Befehl ab. "
-          "Bewegliche Gelenkkoordinaten benötigen Unter- und Obergrenzen. Freies Platzieren löst "
-          "bestehende Beziehungen nicht automatisch."),
+          "Apply commits a valid preview as one undoable "
+          "step. Escape resets a drag; press Escape again to cancel the command. "
+          "Movable joint coordinates require lower and upper limits. Free placement does "
+          "not automatically solve existing relationships."),
       panel);
   hint->setWordWrap(true);
   inputs->addWidget(hint);
@@ -289,9 +289,9 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   scroll->setWidget(panel);
   column->addWidget(scroll, 1);
   auto* footer = new QHBoxLayout;
-  apply_ = new QPushButton(QStringLiteral("Anwenden"), contents);
+  apply_ = new QPushButton(QStringLiteral("Apply"), contents);
   apply_->setObjectName("blcad.assembly.apply");
-  auto* cancel = new QPushButton(QStringLiteral("Abbrechen"), contents);
+  auto* cancel = new QPushButton(QStringLiteral("Cancel"), contents);
   cancel->setObjectName("blcad.assembly.cancel");
   footer->addWidget(apply_);
   footer->addWidget(cancel);
@@ -429,27 +429,26 @@ RigidTransform ShellAssemblyTools::transform() const {
 }
 Result<std::size_t> ShellAssemblyTools::import_definition(const QString& path) {
   if (active() || session_.task().active() || !session_.project())
-    return fail("Definition laden benötigt eine Baugruppe ohne aktiven Befehl");
+    return fail("Loading a definition requires an assembly without an active command");
   GuiDocumentSession source;
   auto opened = source.open_file(path.toStdString());
   if (!opened)
     return opened;
-  Result<std::size_t> result = fail("Unbekannter Definitionstyp");
+  Result<std::size_t> result = fail("Unknown definition type");
   if (source.part_document())
     result = GuiAssemblyWorkbench{}.add_part(session_, *source.part_document());
   else if (source.project()) {
     const Project imported = *source.project();
     if (!imported.step_import_sources().empty())
-      return fail(
-          "Projekt mit eigenen STEP-Quellen kann noch nicht als Unterbaugruppe geladen werden");
+      return fail("A project with its own STEP sources cannot yet be loaded as a subassembly");
     for (const auto& part : imported.part_documents()) {
       auto valid = validate_step_import_definition_sources(session_, part);
       if (!valid)
         return valid;
     }
     if (imported.cross_hierarchy_constraint_count() || imported.cross_hierarchy_joint_count())
-      return fail("Projekt mit hierarchieübergreifenden Beziehungen kann noch nicht als "
-                  "Unterbaugruppe geladen werden");
+      return fail("A project with cross-hierarchy relationships cannot yet be loaded as a "
+                  "subassembly");
     result = session_.commit_project_transaction(
         "Load Assembly definition", [imported](Project& project) -> Result<std::size_t> {
           std::size_t count = 0;
@@ -458,7 +457,8 @@ Result<std::size_t> ShellAssemblyTools::import_definition(const QString& path) {
               auto a = serialize_part_document_to_json(*existing),
                    b = serialize_part_document_to_json(part);
               if (!a || !b || a.value() != b.value())
-                return fail("Bauteildefinition mit gleicher ID und anderem Inhalt vorhanden");
+                return fail(
+                    "A part definition with the same ID and different content already exists");
             } else {
               auto added = project.add_part_document(part);
               if (!added)
@@ -485,7 +485,7 @@ Result<std::size_t> ShellAssemblyTools::begin(Command command) {
   const auto* project = session_.project();
   if (active() || session_.task().active() || !project || !session_.derived_results_fresh() ||
       command == Command::None)
-    return fail("Baugruppenbefehl benötigt ein aktuelles Projekt ohne aktiven Befehl");
+    return fail("Assembly command requires a current project without an active command");
   sync_ = true;
   definition_->clear();
   occurrence_->clear();
@@ -494,11 +494,11 @@ Result<std::size_t> ShellAssemblyTools::begin(Command command) {
   joint_->clear();
   coordinate_->clear();
   solve_group_->clear();
-  definition_->addItem(QStringLiteral("Bitte wählen"), QString());
-  occurrence_->addItem(QStringLiteral("Bitte wählen"), QString());
-  first_->addItem(QStringLiteral("Bitte wählen"), -1);
-  second_->addItem(QStringLiteral("Zuerst Referenz A wählen"), -1);
-  joint_->addItem(QStringLiteral("Bitte wählen"), QString());
+  definition_->addItem(QStringLiteral("Select"), QString());
+  occurrence_->addItem(QStringLiteral("Select"), QString());
+  first_->addItem(QStringLiteral("Select"), -1);
+  second_->addItem(QStringLiteral("Select reference A first"), -1);
+  joint_->addItem(QStringLiteral("Select"), QString());
   if (command == Command::InsertComponent)
     for (const auto& part : project->part_documents())
       definition_->addItem(QString::fromStdString(part.name()),
@@ -595,7 +595,7 @@ Result<std::size_t> ShellAssemblyTools::begin(Command command) {
   if (!session_.task().begin("assembly.interactive") ||
       !session_.task().begin_parameter_editing() || !session_.task().show_preview()) {
     command_ = Command::None;
-    return fail("Baugruppenaufgabe konnte nicht gestartet werden");
+    return fail("Could not start assembly task");
   }
   previous_mask_ = viewport_.selection_filter_mask();
   previous_scope_ = viewport_.selection_semantic_scope();
@@ -685,7 +685,7 @@ ShellAssemblyTools::coordinate_slots(Result<std::size_t>& status) const {
       bool ok = false;
       double scalar = text.toDouble(&ok);
       if (!ok || !std::isfinite(scalar)) {
-        status = fail("Gelenkkoordinaten benötigen gültige Zahlen");
+        status = fail("Joint coordinates require valid numbers");
         return {};
       }
       auto q = angular ? Quantity::angle_deg(scalar) : Quantity::linear_displacement_mm(scalar);
@@ -751,12 +751,12 @@ void ShellAssemblyTools::synchronize_values() {
                                  0.0, 1000.0))
                 : 0);
         slider_label_->setText(
-            QStringLiteral("Regler: %1 bis %2%3. Grenzen: %4 / %5")
+            QStringLiteral("Slider: %1 to %2%3. Limits: %4 / %5")
                 .arg(slider_lower_)
                 .arg(slider_upper_)
                 .arg(c.kind == AssemblyJointCoordinateKind::Angular ? " deg" : " mm",
-                     c.lower_limit ? QString::number(*c.lower_limit) : QStringLiteral("offen"),
-                     c.upper_limit ? QString::number(*c.upper_limit) : QStringLiteral("offen")));
+                     c.lower_limit ? QString::number(*c.lower_limit) : QStringLiteral("open"),
+                     c.upper_limit ? QString::number(*c.upper_limit) : QStringLiteral("open")));
       }
   sync_ = false;
 }
@@ -794,8 +794,8 @@ void ShellAssemblyTools::update_second_choices() {
   }
   const QSignalBlocker block(second_);
   second_->clear();
-  second_->addItem(a ? QStringLiteral("Passende Referenz B wählen")
-                     : QStringLiteral("Zuerst Referenz A wählen"),
+  second_->addItem(a ? QStringLiteral("Select a compatible reference B")
+                     : QStringLiteral("Select reference A first"),
                    -1);
   for (std::size_t i = 0; i < targets_.size(); ++i)
     if (std::any_of(compatible.begin(), compatible.end(),
@@ -811,7 +811,7 @@ Result<std::size_t> ShellAssemblyTools::rebuild_controller() {
   if (advanced())
     return Result<std::size_t>::success(1);
   if (placement()) {
-    Result<std::size_t> begun = fail("Zuerst eine Definition oder ein Vorkommen wählen");
+    Result<std::size_t> begun = fail("Select a definition or occurrence first");
     const auto definition = definition_->currentData().toString().toStdString();
     const auto key = occurrence_->currentData().toString();
     if (command_ == Command::InsertComponent && !definition.empty())
@@ -837,7 +837,7 @@ Result<std::size_t> ShellAssemblyTools::rebuild_controller() {
     p.set_suppression(suppression_->isChecked() ? ComponentSuppressionState::Suppressed
                                                 : ComponentSuppressionState::Active);
   } else if (command_ == Command::Relationship || command_ == Command::Joint) {
-    Result<std::size_t> begun = fail("Referenzen A und B wählen");
+    Result<std::size_t> begun = fail("Select references A and B");
     const auto* a = selected(first_);
     const auto* b = selected(second_);
     if (command_ == Command::Relationship) {
@@ -860,7 +860,7 @@ Result<std::size_t> ShellAssemblyTools::rebuild_controller() {
       if (!begun)
         return begun;
       if (!a || !b)
-        return fail("Kompatible Referenzen A und B aus unterschiedlichen Komponenten wählen");
+        return fail("Select compatible references A and B from different components");
       begun = coordinator_.relationship().select_first(session_, a->reference);
       if (begun)
         begun = coordinator_.relationship().select_second(session_, b->reference);
@@ -875,7 +875,7 @@ Result<std::size_t> ShellAssemblyTools::rebuild_controller() {
       if (!begun)
         return begun;
       if (!a || !b)
-        return fail("Kompatible Gelenkreferenzen A und B wählen");
+        return fail("Select compatible joint references A and B");
       begun = coordinator_.joint().select_first(session_, a->reference);
       if (begun)
         begun = coordinator_.joint().select_second(session_, b->reference);
@@ -902,7 +902,7 @@ Result<std::size_t> ShellAssemblyTools::rebuild_controller() {
       return Result<std::size_t>::failure(resolved.error());
     auto frame = world_frame(resolved.value());
     if (!frame)
-      return fail("Gelenk benötigt einen aufgelösten orientierten Rahmen");
+      return fail("Joint requires a resolved oriented frame");
     coordinator_.set_motion_frame(*frame);
   }
   publish_handles();
@@ -928,7 +928,7 @@ Result<std::size_t> ShellAssemblyTools::preview() {
     if (!checked)
       return Result<std::size_t>::failure(checked.error());
     candidate = std::move(checked.value());
-    status = QStringLiteral("Platzierung gültig. Neue Position bleibt bis Anwenden eine Vorschau.");
+    status = QStringLiteral("Placement valid. New position remains a preview until Apply.");
   } else if (command_ == Command::Relationship) {
     auto checked = coordinator_.relationship().preview(session_);
     if (!checked)
@@ -940,7 +940,7 @@ Result<std::size_t> ShellAssemblyTools::preview() {
         geometry::AssemblySolveResultApplier{}.apply(candidate, checked.value().solved_pose);
     if (!posed)
       return posed;
-    status = QStringLiteral("Beziehung gelöst. Rest-Freiheitsgrade: %1; RMS: %2")
+    status = QStringLiteral("Relationship solved. Remaining degrees of freedom: %1; RMS: %2")
                  .arg(checked.value().diagnostics.rank_summary.remaining_dof)
                  .arg(checked.value().solved_pose.residual_summary.final_rms, 0, 'g', 4);
   } else if (command_ == Command::Joint) {
@@ -951,7 +951,7 @@ Result<std::size_t> ShellAssemblyTools::preview() {
     if (!added)
       return added;
     status =
-        QStringLiteral("Gelenkrahmen kompatibel. Die Referenzrahmen bleiben im Modell sichtbar.");
+        QStringLiteral("Joint frames compatible. Reference frames remain visible in the model.");
   } else if (command_ == Command::Motion) {
     auto checked = coordinator_.motion().preview(session_);
     if (!checked)
@@ -960,11 +960,10 @@ Result<std::size_t> ShellAssemblyTools::preview() {
         geometry::AssemblyJointMotionResultApplier{}.apply(candidate, checked.value().motion);
     if (!moved)
       return moved;
-    status =
-        QStringLiteral("Bewegung konvergiert. Gelenk-Freiheitsgrade: %1; ungetrieben: %2; RMS: %3")
-            .arg(checked.value().hud.joint_dof)
-            .arg(checked.value().hud.undriven_dof)
-            .arg(checked.value().hud.final_rms, 0, 'g', 4);
+    status = QStringLiteral("Motion converged. Joint degrees of freedom: %1; passive: %2; RMS: %3")
+                 .arg(checked.value().hud.joint_dof)
+                 .arg(checked.value().hud.undriven_dof)
+                 .arg(checked.value().hud.final_rms, 0, 'g', 4);
   } else if (command_ == Command::Solve) {
     std::vector<ComponentInstanceId> group;
     for (auto* item : solve_group_->selectedItems())
@@ -976,12 +975,12 @@ Result<std::size_t> ShellAssemblyTools::preview() {
     if (!solved)
       return Result<std::size_t>::failure(solved.error());
     if (!solved.value().converged())
-      return fail("Ausgewählte Gruppe konnte nicht konvergent gelöst werden");
+      return fail("Selected group could not be solved to convergence");
     auto posed = geometry::AssemblySolveResultApplier{}.apply(candidate, solved.value());
     if (!posed)
       return posed;
     solved_ = std::move(solved.value());
-    status = QStringLiteral("Gruppe gelöst. Rest-Freiheitsgrade: %1; RMS: %2")
+    status = QStringLiteral("Group solved. Remaining degrees of freedom: %1; RMS: %2")
                  .arg(inspected.value().rank_summary.remaining_dof)
                  .arg(solved_->residual_summary.final_rms, 0, 'g', 4);
   }
@@ -1065,11 +1064,11 @@ void ShellAssemblyTools::changed() {
         relationship_type_->currentIndex() == static_cast<int>(AssemblyConstraintType::Angle))));
   value_label_->setVisible(value_->isVisible());
   value_label_->setText((command_ == Command::Motion || command_ == Command::CrossMotion)
-                            ? QStringLiteral("Koordinatenwert")
+                            ? QStringLiteral("Coordinate Value")
                         : relationship_type_->currentIndex() ==
                                 static_cast<int>(AssemblyConstraintType::Angle)
-                            ? QStringLiteral("Winkel (deg)")
-                            : QStringLiteral("Abstand (mm)"));
+                            ? QStringLiteral("Angle (deg)")
+                            : QStringLiteral("Distance (mm)"));
   if (command_ == Command::Relationship || command_ == Command::CrossRelationship) {
     const QSignalBlocker block(value_);
     value_->setSuffix(relationship_type_->currentIndex() ==
@@ -1182,7 +1181,7 @@ std::vector<geometry::ViewportSceneItem> ShellAssemblyTools::selection_items() c
 }
 Result<std::size_t> ShellAssemblyTools::candidate(const GuiViewportManipulatorCandidate& input) {
   if (!std::isfinite(input.scalar_value))
-    return fail("Ungültiger Manipulatorwert");
+    return fail("Invalid manipulator value");
   const auto previous = placement()
                             ? std::optional<RigidTransform>(coordinator_.placement().transform())
                             : std::nullopt;
@@ -1190,7 +1189,7 @@ Result<std::size_t> ShellAssemblyTools::candidate(const GuiViewportManipulatorCa
   const bool accepted = placement() ? coordinator_.placement().apply_manipulator(input)
                                     : coordinator_.motion().apply_manipulator(session_, input);
   if (!accepted)
-    return fail("Manipulator passt nicht zum aktiven Baugruppenbefehl");
+    return fail("Manipulator does not match the active assembly command");
   auto checked = preview();
   if (!checked) {
     if (previous)
@@ -1207,7 +1206,7 @@ Result<std::size_t> ShellAssemblyTools::candidate(const GuiViewportManipulatorCa
 }
 Result<std::size_t> ShellAssemblyTools::set_drag_text(const QString& text) {
   if (layer_.active_handle_id().empty())
-    return fail("Zuerst einen Manipulator ziehen");
+    return fail("Drag a manipulator first");
   std::string value = text.trimmed().toStdString();
   if (std::none_of(value.begin(), value.end(), [](unsigned char c) { return std::isalpha(c); }))
     value += layer_.active_handle_id().starts_with(kAssemblyPlacementRotatePrefix) ||
@@ -1215,7 +1214,7 @@ Result<std::size_t> ShellAssemblyTools::set_drag_text(const QString& text) {
                  ? " deg"
                  : " mm";
   if (!layer_.set_numeric_input(value) || !layer_.candidate())
-    return fail("Ungültige Maßeingabe");
+    return fail("Invalid dimension input");
   return candidate(*layer_.candidate());
 }
 void ShellAssemblyTools::restore_drag() {
@@ -1287,8 +1286,7 @@ void ShellAssemblyTools::refresh() {
     auto json = serialize_project_to_json(*project);
     if (!json || json.value() != source_json_) {
       cancel();
-      window_.statusBar()->showMessage(
-          QStringLiteral("Baugruppe geändert. Befehl erneut starten."));
+      window_.statusBar()->showMessage(QStringLiteral("Assembly changed. Restart the command."));
       return;
     }
     revision_ = session_.presentation_revision();
@@ -1324,8 +1322,8 @@ void ShellAssemblyTools::end(bool applied) {
   window_.refresh_feature_selection_scene();
   window_.finish_context_task(applied);
   window_.refresh();
-  window_.statusBar()->showMessage(applied ? QStringLiteral("Baugruppenbefehl angewendet")
-                                           : QStringLiteral("Baugruppenbefehl abgebrochen"));
+  window_.statusBar()->showMessage(applied ? QStringLiteral("Assembly command applied")
+                                           : QStringLiteral("Assembly command cancelled"));
 }
 void ShellAssemblyTools::cancel() {
   if (active())
@@ -1334,10 +1332,10 @@ void ShellAssemblyTools::cancel() {
 Result<std::size_t> ShellAssemblyTools::apply() {
   if (!active() || !session_.project() || session_.task().command_id() != "assembly.interactive" ||
       !layer_.active_handle_id().empty())
-    return fail("Kein anwendbarer Baugruppenbefehl");
+    return fail("No applicable assembly command");
   auto source = serialize_project_to_json(*session_.project());
   if (!session_.derived_results_fresh() || !source || source.value() != source_json_)
-    return fail("Baugruppe geändert. Befehl erneut starten.");
+    return fail("Assembly changed. Restart the command.");
   auto checked = rebuild_controller();
   if (!checked)
     return checked;

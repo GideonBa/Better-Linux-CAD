@@ -31,26 +31,26 @@ Error error(std::string message) {
 QString action_label(SketchRepairSuggestionAction action) {
   switch (action) {
   case SketchRepairSuggestionAction::AddFixedEndpointConstraint:
-    return QStringLiteral("Endpunkt fixieren");
+    return QStringLiteral("Fix Endpoint");
   case SketchRepairSuggestionAction::RemoveDuplicateFixedEndpointConstraint:
-    return QStringLiteral("Doppelte Fixierungen entfernen");
+    return QStringLiteral("Remove Duplicate Fixes");
   case SketchRepairSuggestionAction::RemoveDuplicateDrivingDimension:
-    return QStringLiteral("Doppelte treibende Maße entfernen");
+    return QStringLiteral("Remove Duplicate Driving Dimensions");
   case SketchRepairSuggestionAction::RemoveConflictingOrientationConstraint:
-    return QStringLiteral("Widersprüchliche Ausrichtung manuell bearbeiten");
+    return QStringLiteral("Edit Conflicting Alignment Manually");
   case SketchRepairSuggestionAction::AddDrivingDimension:
-    return QStringLiteral("Treibendes Maß manuell ergänzen");
+    return QStringLiteral("Add Driving Dimension Manually");
   }
-  return QStringLiteral("Manuell bearbeiten");
+  return QStringLiteral("Edit Manually");
 }
 QString severity_label(SketchDiagnosticSeverity severity) {
   switch (severity) {
   case SketchDiagnosticSeverity::Info:
-    return QStringLiteral("Hinweis");
+    return QStringLiteral("Information");
   case SketchDiagnosticSeverity::Warning:
-    return QStringLiteral("Warnung");
+    return QStringLiteral("Warning");
   case SketchDiagnosticSeverity::Error:
-    return QStringLiteral("Fehler");
+    return QStringLiteral("Error");
   }
   return {};
 }
@@ -83,7 +83,7 @@ struct ShellSketchDiagnosticsTools::Impl {
   bool current() const {
     const auto& session = window.session();
     return active && session.part_document() && session.derived_results_fresh() &&
-           session.task().command_id() == task_id && session.presentation_revision() == revision &&
+           session.task().command_id() == task_id && session.model_revision() == revision &&
            editing_sketch == window.active_sketch() &&
            (!editing_sketch || sketch_id() == *editing_sketch);
   }
@@ -104,8 +104,7 @@ struct ShellSketchDiagnosticsTools::Impl {
   void select_suggestion() {
     invalidate();
     preview_button->setEnabled(false);
-    summary->setText(
-        QStringLiteral("Für diese Meldung ist keine automatische Reparatur verfügbar."));
+    summary->setText(QStringLiteral("No automatic repair is available for this diagnostic."));
     const auto* selected = choice();
     if (!current() || !selected)
       return;
@@ -117,12 +116,12 @@ struct ShellSketchDiagnosticsTools::Impl {
       return;
     }
     if (!checked.value().applied()) {
-      summary->setText(QStringLiteral("Manuelle Bearbeitung erforderlich: ") +
+      summary->setText(QStringLiteral("Manual editing required: ") +
                        text(checked.value().message()));
       return;
     }
     summary->setText(
-        QStringLiteral("Vorschlag ausgewählt. Vorschau prüfen, dann ausdrücklich anwenden."));
+        QStringLiteral("Suggestion selected. Check the preview, then apply explicitly."));
     preview_button->setEnabled(true);
   }
   void select_diagnostic() {
@@ -165,7 +164,7 @@ struct ShellSketchDiagnosticsTools::Impl {
     diagnostics->setCurrentRow(report.empty() ? -1 : 0);
     select_diagnostic();
     if (report.empty())
-      summary->setText(QStringLiteral("Keine Meldungen für diese Skizze."));
+      summary->setText(QStringLiteral("No diagnostics for this sketch."));
   }
 };
 
@@ -173,31 +172,31 @@ ShellSketchDiagnosticsTools::ShellSketchDiagnosticsTools(ShellWindow& window, Sh
                                                          int model_tab, int sketch_tab)
     : QObject(&window), impl_(std::make_unique<Impl>(window)) {
   auto& ui = *impl_;
-  ui.action = new QAction(QStringLiteral("Skizze prüfen"), this);
+  ui.action = new QAction(QStringLiteral("Inspect Sketch"), this);
   ui.action->setObjectName("blcad.action.sketch_diagnostics");
   for (const int tab : {model_tab, sketch_tab})
-    ribbon.add_button(ribbon.add_group(tab, QStringLiteral("Skizzendiagnose")), ui.action);
+    ribbon.add_button(ribbon.add_group(tab, QStringLiteral("Sketch Diagnostics")), ui.action);
   connect(ui.action, &QAction::triggered, this, [this] {
     auto result = begin();
     if (!result)
       impl_->window.report_error(result.error());
   });
-  ui.dock = new QDockWidget(QStringLiteral("Skizze prüfen und reparieren"), &window);
+  ui.dock = new QDockWidget(QStringLiteral("Inspect and Repair Sketch"), &window);
   ui.dock->setObjectName("blcad.shell.sketch_diagnostics_task");
   auto* panel = new QWidget(ui.dock);
   auto* layout = new QVBoxLayout(panel);
   auto* hint = new QLabel(
       QStringLiteral(
-          "Fixierungen, Ausrichtungen und treibende Maße prüfen. Die Freiheitsgrade des "
-          "Skizzeneditors werden separat angezeigt. Eine Meldung und einen Vorschlag auswählen, "
-          "Vorschau prüfen und anschließend anwenden. Andere Meldungen können bestehen bleiben."),
+          "Check fixes, alignments, and driving dimensions. Sketch editor degrees of freedom "
+          "are displayed separately. Select a diagnostic and suggestion, "
+          "check the preview, then apply. Other diagnostics may remain."),
       panel);
   hint->setWordWrap(true);
   layout->addWidget(hint);
   auto* form = new QFormLayout;
   ui.sketches = new QComboBox(panel);
   ui.sketches->setObjectName("blcad.sketch_diagnostics.sketch");
-  form->addRow(QStringLiteral("Skizze"), ui.sketches);
+  form->addRow(QStringLiteral("Sketch"), ui.sketches);
   layout->addLayout(form);
   ui.diagnostics = new QListWidget(panel);
   ui.diagnostics->setObjectName("blcad.sketch_diagnostics.diagnostics");
@@ -223,9 +222,9 @@ ShellSketchDiagnosticsTools::ShellSketchDiagnosticsTools(ShellWindow& window, Sh
     buttons->addWidget(result);
     return result;
   };
-  ui.preview_button = button("preview", QStringLiteral("Vorschau"));
-  ui.apply_button = button("apply", QStringLiteral("Anwenden"));
-  auto* cancel_button = button("cancel", QStringLiteral("Abbrechen"));
+  ui.preview_button = button("preview", QStringLiteral("Preview"));
+  ui.apply_button = button("apply", QStringLiteral("Apply"));
+  auto* cancel_button = button("cancel", QStringLiteral("Cancel"));
   layout->addLayout(buttons);
   ui.dock->setWidget(panel);
   window.addDockWidget(Qt::RightDockWidgetArea, ui.dock);
@@ -261,7 +260,7 @@ Result<std::size_t> ShellSketchDiagnosticsTools::begin() {
   auto& ui = *impl_;
   if (!ui.available())
     return Result<std::size_t>::failure(
-        error("Skizzendiagnose benötigt ein aktuelles Bauteil ohne aktiven Befehl"));
+        error("Sketch diagnostics require a current part without an active command"));
   ui.editing_sketch = ui.window.active_sketch();
   if (ui.editing_sketch) {
     ui.window.sketch_tools().deactivate();
@@ -271,7 +270,7 @@ Result<std::size_t> ShellSketchDiagnosticsTools::begin() {
   (void)session.task().begin(std::string(task_id));
   (void)session.task().begin_parameter_editing();
   ui.active = true;
-  ui.revision = session.presentation_revision();
+  ui.revision = session.model_revision();
   {
     QSignalBlocker blocker(ui.sketches);
     ui.sketches->clear();
@@ -293,12 +292,12 @@ Result<std::size_t> ShellSketchDiagnosticsTools::preview() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
-    return Result<std::size_t>::failure(error("Modell oder Befehl geändert. Diagnose neu öffnen."));
+    return Result<std::size_t>::failure(error("Model or command changed. Reopen diagnostics."));
   }
   ui.invalidate();
   const auto* suggestion = ui.choice();
   if (!suggestion)
-    return Result<std::size_t>::failure(error("Einen Reparaturvorschlag auswählen"));
+    return Result<std::size_t>::failure(error("Select a repair suggestion"));
   auto sketch = *ui.window.session().part_document()->find_sketch(ui.sketch_id());
   auto changed = SketchRepairCommandExecutor{}.apply(sketch, SketchRepairCommand(*suggestion));
   if (!changed)
@@ -326,7 +325,7 @@ Result<std::size_t> ShellSketchDiagnosticsTools::preview() {
       shapes.push_back(std::move(item.shape));
     }
   if (shapes.empty())
-    return Result<std::size_t>::failure(error("Vorschlag hat keine darstellbare Geometrie"));
+    return Result<std::size_t>::failure(error("Suggestion has no displayable geometry"));
   auto shown = ui.window.viewport().set_feature_previews(std::move(shapes), std::move(replaced));
   if (!shown)
     return shown;
@@ -338,8 +337,8 @@ Result<std::size_t> ShellSketchDiagnosticsTools::preview() {
   const auto remaining = SketchConstraintDiagnostics{}.analyze(
       *candidate.part_document()->find_sketch(ui.sketch_id()));
   ui.summary->setText(
-      QStringLiteral("Vorschau gültig. Geänderte Bedingungen/Maße: %1\nVerbleibende Meldungen: %2 "
-                     "Fehler, %3 Warnungen. Anwenden übernimmt eine Reparatur.")
+      QStringLiteral("Preview valid. Changed constraints/dimensions: %1\nRemaining diagnostics: %2 "
+                     "errors, %3 warnings. Apply commits one repair.")
           .arg(ids.join(", "))
           .arg(remaining.error_count())
           .arg(remaining.warning_count()));
@@ -354,7 +353,7 @@ Result<std::size_t> ShellSketchDiagnosticsTools::apply() {
   if (!ui.current() || !ui.previewed) {
     if (!ui.current())
       cancel();
-    return Result<std::size_t>::failure(error("Zuerst eine aktuelle Reparaturvorschau prüfen"));
+    return Result<std::size_t>::failure(error("Check a current repair preview first"));
   }
   auto checked = preview();
   if (!checked)

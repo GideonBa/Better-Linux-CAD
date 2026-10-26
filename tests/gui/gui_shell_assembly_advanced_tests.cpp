@@ -134,8 +134,8 @@ TEST_CASE("Hierarchy validation reports repeated paths without authoring history
   const auto scope = window.viewport().selection_semantic_scope();
   REQUIRE(window.assembly_tools().begin(C::ValidateHierarchy));
   const auto text = widget<QLabel>(window, "summary").text();
-  CHECK(text.contains("3 Baugruppenvorkommen"));
-  CHECK(text.contains("3 sichtbare aktive"));
+  CHECK(text.contains("3 assembly occurrences"));
+  CHECK(text.contains("3 visible active"));
   CHECK(text.contains("Root / left"));
   CHECK(text.contains("Root / right"));
   CHECK_FALSE(widget<QPushButton>(window, "apply").isEnabled());

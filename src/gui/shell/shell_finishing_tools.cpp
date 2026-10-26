@@ -34,24 +34,24 @@ QString target_label(const std::string& label) {
   if (marker == std::string::npos)
     return QString::fromStdString(label);
   const auto role = label.substr(marker + 3);
-  for (const auto& [key, text] : {std::pair{"top_front", "Oben vorne"},
-                                  {"top_back", "Oben hinten"},
-                                  {"top_right", "Oben rechts"},
-                                  {"top_left", "Oben links"},
-                                  {"bottom_front", "Unten vorne"},
-                                  {"bottom_back", "Unten hinten"},
-                                  {"bottom_right", "Unten rechts"},
-                                  {"bottom_left", "Unten links"},
-                                  {"front_right", "Vorne rechts"},
-                                  {"front_left", "Vorne links"},
-                                  {"back_right", "Hinten rechts"},
-                                  {"back_left", "Hinten links"},
-                                  {"top", "Oben"},
-                                  {"bottom", "Unten"},
-                                  {"right", "Rechts"},
-                                  {"left", "Links"},
-                                  {"front", "Vorne"},
-                                  {"back", "Hinten"}})
+  for (const auto& [key, text] : {std::pair{"top_front", "Top Front"},
+                                  {"top_back", "Top Back"},
+                                  {"top_right", "Top Right"},
+                                  {"top_left", "Top Left"},
+                                  {"bottom_front", "Bottom Front"},
+                                  {"bottom_back", "Bottom Back"},
+                                  {"bottom_right", "Bottom Right"},
+                                  {"bottom_left", "Bottom Left"},
+                                  {"front_right", "Front Right"},
+                                  {"front_left", "Front Left"},
+                                  {"back_right", "Back Right"},
+                                  {"back_left", "Back Left"},
+                                  {"top", "Top"},
+                                  {"bottom", "Bottom"},
+                                  {"right", "Right"},
+                                  {"left", "Left"},
+                                  {"front", "Front"},
+                                  {"back", "Back"}})
     if (role == key)
       return QString::fromStdString(label.substr(0, marker)) + QStringLiteral(" / ") +
              QString::fromUtf8(text);
@@ -70,12 +70,12 @@ void preserve_finishing_row_heights(QWidget& controls, QLayout& form) {
 QString command_title(ShellFeatureTools::Command command) {
   using C = ShellFeatureTools::Command;
   if (command == C::Fillet)
-    return QStringLiteral("Verrunden");
+    return QStringLiteral("Fillet");
   if (command == C::Chamfer)
-    return QStringLiteral("Fase");
+    return QStringLiteral("Chamfer");
   if (command == C::Shell)
-    return QStringLiteral("Aushöhlen");
-  return QStringLiteral("Formschräge");
+    return QStringLiteral("Shell");
+  return QStringLiteral("Draft");
 }
 } // namespace
 
@@ -232,31 +232,30 @@ void ShellFeatureTools::build_finishing_controls(QWidget* panel, QFormLayout&) {
   finishing_controls_->setMinimumWidth(280);
   finishing_body_ = new QComboBox(finishing_controls_);
   finishing_body_->setObjectName(QStringLiteral("blcad.finishing.body"));
-  add_row(QStringLiteral("Körper"), finishing_body_);
+  add_row(QStringLiteral("Body"), finishing_body_);
   finishing_targets_list_ = new QListWidget(finishing_controls_);
   finishing_targets_list_->setObjectName(QStringLiteral("blcad.finishing.targets"));
   finishing_targets_list_->setSelectionMode(QAbstractItemView::MultiSelection);
   finishing_targets_list_->setMinimumHeight(170);
-  column->addWidget(new QLabel(QStringLiteral("Elemente auswählen"), finishing_controls_));
+  column->addWidget(new QLabel(QStringLiteral("Select Elements"), finishing_controls_));
   column->addWidget(finishing_targets_list_);
-  auto* hint =
-      new QLabel(QStringLiteral("Kanten oder Flächen im Modell oder in der Liste anklicken. "
-                                "Ein weiterer Klick entfernt sie aus der Auswahl."),
-                 finishing_controls_);
+  auto* hint = new QLabel(QStringLiteral("Click edges or faces in the model or list. "
+                                         "Click again to remove them from the selection."),
+                          finishing_controls_);
   hint->setWordWrap(true);
   column->addWidget(hint);
   finishing_mode_ = new QComboBox(finishing_controls_);
   finishing_mode_->setObjectName(QStringLiteral("blcad.finishing.mode"));
-  add_row(QStringLiteral("Modus"), finishing_mode_);
+  add_row(QStringLiteral("Mode"), finishing_mode_);
   secondary_numeric_editor_ = new QLineEdit(finishing_controls_);
   secondary_numeric_editor_->setObjectName(QStringLiteral("blcad.finishing.secondary"));
-  add_row(QStringLiteral("Zweites Maß"), secondary_numeric_editor_);
+  add_row(QStringLiteral("Second Size"), secondary_numeric_editor_);
   draft_axis_ = new QComboBox(finishing_controls_);
   draft_axis_->setObjectName(QStringLiteral("blcad.finishing.pull_axis"));
-  add_row(QStringLiteral("Zugrichtung"), draft_axis_);
+  add_row(QStringLiteral("Pull Direction"), draft_axis_);
   draft_plane_ = new QComboBox(finishing_controls_);
   draft_plane_->setObjectName(QStringLiteral("blcad.finishing.neutral_plane"));
-  add_row(QStringLiteral("Neutrale Ebene"), draft_plane_);
+  add_row(QStringLiteral("Neutral Plane"), draft_plane_);
   // Give each input its style-derived lower bound before computing scroll bounds.
   for (QWidget* input : std::array<QWidget*, 5>{
            finishing_body_, finishing_mode_, secondary_numeric_editor_, draft_axis_, draft_plane_})
@@ -308,10 +307,10 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
   if (active() || session_.task().active() || window_.active_sketch() ||
       session_.document_kind() != GuiDocumentKind::Part ||
       session_.workspace() != GuiWorkspace::Part || !session_.part_shape_cache())
-    return fail("Bearbeitung benötigt ein Bauteil ohne aktiven Befehl");
+    return fail("Finishing requires a part without an active command");
   if (command != Command::Fillet && command != Command::Chamfer && command != Command::Shell &&
       command != Command::Draft)
-    return fail("Unbekannte Bearbeitungsfunktion");
+    return fail("Unknown finishing function");
   const auto& part = *session_.part_document();
   {
     const QSignalBlocker body_block(finishing_body_), mode_block(finishing_mode_),
@@ -325,7 +324,7 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
                                  QString::fromStdString(body.id().value()));
     }
     if (finishing_body_->count() == 0)
-      return fail("Keine eindeutig referenzierbaren Kanten oder Flächen vorhanden");
+      return fail("No unambiguously referenceable edges or faces available");
     for (const auto& selection : session_.selection().entries()) {
       if (selection.kind != GuiSelectionKind::Body || !selection.semantic_id.starts_with("body/"))
         continue;
@@ -336,11 +335,10 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
     }
     finishing_mode_->clear();
     if (command == Command::Chamfer)
-      finishing_mode_->addItems({QStringLiteral("Gleiche Abstände"),
-                                 QStringLiteral("Zwei Abstände"),
-                                 QStringLiteral("Abstand und Winkel")});
+      finishing_mode_->addItems({QStringLiteral("Equal Distances"), QStringLiteral("Two Distances"),
+                                 QStringLiteral("Distance and Angle")});
     if (command == Command::Shell)
-      finishing_mode_->addItems({QStringLiteral("Nach innen"), QStringLiteral("Nach außen")});
+      finishing_mode_->addItems({QStringLiteral("Inward"), QStringLiteral("Outward")});
     draft_axis_->clear();
     draft_plane_->clear();
     for (const auto& axis : part.datum_axes())
@@ -369,7 +367,7 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
     if (feature_taken || part.find_parameter(ParameterId("parameter." + base + ".first")) ||
         part.find_parameter(ParameterId("parameter." + base + ".second")) ||
         std::any_of(part.parameters().begin(), part.parameters().end(), [&](const auto& p) {
-          return p.name() == name + " Maß" || p.name() == name + " Zweites Maß";
+          return p.name() == name + " Size" || p.name() == name + " Second Size";
         }))
       continue;
     finishing_feature_ = id;
@@ -386,7 +384,7 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
     command_ = Command::None;
     if (session_.task().active())
       (void)session_.task().cancel();
-    return fail("Bearbeitungsaufgabe konnte nicht gestartet werden");
+    return fail("Could not start editing task");
   }
   finishing_first_value_ = command == Command::Draft ? 5 : 1;
   finishing_second_value_ = 1;
@@ -444,10 +442,10 @@ Result<std::size_t> ShellFeatureTools::rebuild_finishing_controller() {
                           : Quantity::length_mm(finishing_first_value_);
   if (!quantity)
     return Result<std::size_t>::failure(quantity.error());
-  auto parameter = angular ? Parameter::create_angle(finishing_parameter_, finishing_name_ + " Maß",
-                                                     quantity.value())
+  auto parameter = angular ? Parameter::create_angle(finishing_parameter_,
+                                                     finishing_name_ + " Size", quantity.value())
                            : Parameter::create_length(finishing_parameter_,
-                                                      finishing_name_ + " Maß", quantity.value());
+                                                      finishing_name_ + " Size", quantity.value());
   if (!parameter)
     return Result<std::size_t>::failure(parameter.error());
   std::vector<Parameter> pending{parameter.value()};
@@ -463,9 +461,9 @@ Result<std::size_t> ShellFeatureTools::rebuild_finishing_controller() {
       if (!q)
         return Result<std::size_t>::failure(q.error());
       auto p = mode == 2 ? Parameter::create_angle(finishing_second_parameter_,
-                                                   finishing_name_ + " Zweites Maß", q.value())
+                                                   finishing_name_ + " Second Size", q.value())
                          : Parameter::create_length(finishing_second_parameter_,
-                                                    finishing_name_ + " Zweites Maß", q.value());
+                                                    finishing_name_ + " Second Size", q.value());
       if (!p)
         return Result<std::size_t>::failure(p.error());
       pending.push_back(p.value());
@@ -537,10 +535,10 @@ Result<std::size_t> ShellFeatureTools::rebuild_finishing_controller() {
 QString ShellFeatureTools::finishing_summary() const {
   const auto count = finishing_targets_list_->selectedItems().size();
   const bool edges = command_ == Command::Fillet || command_ == Command::Chamfer;
-  return QStringLiteral("%1 %2 ausgewählt. Vorschau gültig.")
+  return QStringLiteral("%1 %2 selected. Preview valid.")
       .arg(count)
-      .arg(edges ? (count == 1 ? QStringLiteral("Kante") : QStringLiteral("Kanten"))
-                 : (count == 1 ? QStringLiteral("Fläche") : QStringLiteral("Flächen")));
+      .arg(edges ? (count == 1 ? QStringLiteral("Edge") : QStringLiteral("Edges"))
+                 : (count == 1 ? QStringLiteral("Face") : QStringLiteral("Faces")));
 }
 
 void ShellFeatureTools::refresh_finishing_preview() {
@@ -583,7 +581,7 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::finishing_selection_
         for (const auto& target : targets.value())
           items.push_back(
               {edges ? geometry::ViewportSceneKind::Edge : geometry::ViewportSceneKind::Face,
-               target.semantic_id, target.shape});
+               target.semantic_id, target.shape, SketchLineRole::Geometry, body.id().value()});
     }
   }
   if (finishing())
@@ -591,13 +589,28 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::finishing_selection_
       items.push_back({std::holds_alternative<EdgeReference>(target.reference)
                            ? geometry::ViewportSceneKind::Edge
                            : geometry::ViewportSceneKind::Face,
-                       target.semantic_id, target.shape});
+                       target.semantic_id, target.shape, SketchLineRole::Geometry,
+                       finishing_body_->currentData().toString().toStdString()});
   if (surface())
-    for (const auto& target : surface_targets_)
+    for (const auto& target : surface_targets_) {
+      // Surface inputs retain their typed producer reference; resolve its
+      // Body without interpreting the serialized transient selection identity.
+      const auto source = std::visit(
+          [](const auto& reference) {
+            return std::visit([](const auto& producer) { return producer.source_feature(); },
+                              reference.source());
+          },
+          target.reference);
+      const auto* feature = session_.part_document()->find_feature(source);
+      const std::string owner_body_id =
+          feature && feature->body_result_context()
+              ? feature->body_result_context()->effective_produced_body().value()
+              : std::string{};
       items.push_back({std::holds_alternative<EdgeReference>(target.reference)
                            ? geometry::ViewportSceneKind::Edge
                            : geometry::ViewportSceneKind::Face,
-                       target.semantic_id, target.shape});
+                       target.semantic_id, target.shape, SketchLineRole::Geometry, owner_body_id});
+    }
   return items;
 }
 } // namespace blcad::gui

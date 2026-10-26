@@ -12,6 +12,27 @@ Assembly modeling workspaces. It upgrades the existing MVP-7 form-driven workben
 capability-driven preselection, contextual command recommendations, visible transient navigation
 controls, and a single command-start lifecycle without adding persistent Part or Assembly intent.
 
+## Desktop appearance and language
+
+The current desktop uses English command labels, task instructions, diagnostics, browser headings,
+file dialogs, and newly generated default names. Existing authored names and persistent identifiers
+remain unchanged when a document is opened. The application sets an English locale with decimal-point
+numeric input, independently of the system display language.
+
+`configure_gui_appearance` installs the same appearance in the application and GUI acceptance runner:
+black widget backgrounds, white text and control borders, square corners, and solid fills. Native
+file dialogs are disabled so document dialogs follow that contract. Focused, checked, hovered, and
+selected controls use white border changes; disabled controls keep white text and use dotted borders
+or italic labels. These states do not rely on colored or gradient backgrounds. CAD geometry retains
+its semantic selection and reference markings against the black viewport background.
+
+The `[gui][appearance]` regressions render buttons, inputs, combo boxes and the ribbon, exercise
+pressed/checked buttons and tab navigation, and check the disabled palette and English menu labels.
+They verify square white frame corners, uniform black interiors, visible enabled/disabled control
+arrows and white placeholder text; the same cases run on offscreen Qt and native xcb. Embedded arrow
+assets keep these controls independent of platform style defaults. Native workflow captures
+additionally show the full desktop and model annotations.
+
 ## Authority boundary
 
 ```text

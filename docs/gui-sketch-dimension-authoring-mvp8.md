@@ -72,8 +72,8 @@ bindings and derive their displayed value from the current topology.
 | Aligned distance | point, point | Length |
 | Point-to-point distance | point, point | Length |
 | Length | line entity | Length |
-| Radius | arc entity | Length |
-| Diameter | arc entity | Length |
+| Radius | arc entity or full `CircleProfile` | Length |
+| Diameter | arc entity or full `CircleProfile` | Length |
 | Angle | line entity, line entity | Angle |
 | Arc length | arc entity | Length |
 
@@ -81,10 +81,15 @@ Horizontal/vertical and angular target order is canonicalized by the GUI authori
 creation. Headless callers retain explicit ordered-target semantics and must provide the intended positive
 orientation.
 
-Block 115 dimensions over full `CircleProfile` records remain outside the shared historical topology
-bridge. Radius, diameter, and arc-length authoring therefore target persistent three-point arc entities in
-this block. Extending shared topology to full-circle profile entities is a later compatibility extension,
-not an implicit screen-space special case.
+Radius and diameter also accept a persistent full `CircleProfile`. A full circle already owns a
+Length diameter parameter: a driving diameter annotation binds that parameter directly, and a radius
+annotation exposes half its value. Radius literal edits write twice the entered radius to the same
+parameter. Reference annotations only measure it. No sampled circumference points, extra size parameter,
+or duplicate solver equation are introduced. Both annotations follow subsequent parameter edits.
+A circle dimension rejects rebinding to an unrelated parameter. A direct circle size accepts literal
+edits; direct-to-expression conversion through this dimension editor is rejected atomically. Existing expression-backed
+circle parameters accept dimension formula edits with the radius/diameter conversion applied in Core.
+Arc length still requires a persistent three-point arc.
 
 ## Driving and reference behavior
 
@@ -218,6 +223,33 @@ Dragging a dimension badge previews a plane-space delta without mutating the doc
 includes the final pointer sample and commits exactly one `Move sketch dimension label` transaction.
 An unchanged placement creates no history entry. Escape, loss of mouse capture, switching tools or
 leaving the Sketch discards the preview. Annotation rendering and hit testing share the same anchor.
+
+## Rapid Dimension
+
+The Sketch ribbon exposes **Rapid Dimension** (shortcut **D**). Hover shows a disposable measured
+preview. Pick a curve, or two endpoints/points (including the fixed Sketch origin), move to the desired
+label position, and click empty space to publish one dimension. The tool remains active for the next
+measurement. Escape clears the current picks; Escape again exits. Switching tools or leaving the Sketch
+also discards the draft. Preview and label placement do not write history.
+
+Inference uses persistent topology roles:
+
+- line: length, with horizontal/vertical projections when placing above/beside a diagonal line;
+- point pair: horizontal, vertical or aligned distance according to label position;
+- two nonparallel lines: angle; two horizontal/vertical parallel lines: perpendicular axis distance;
+- arc: radius; full circle: diameter;
+- pressing D again (or the Rapid Dimension button) switches radius and diameter.
+
+The existing Reference toggle chooses reference creation. The placed label location belongs to the
+same atomic transaction as the dimension and its parameter. Hover does not run a second solver or
+invent persistent geometry. Unsupported targets produce no candidate. Invalid or conflicting creation
+keeps the draft and leaves the document unchanged. Double-click a placed driving annotation to edit
+its value; Enter accepts valid values and Escape cancels. Radius and diameter badges retain their
+R/Ø prefix in both hover previews and accepted annotations. Existing explicit family commands remain
+available for deterministic selection-first authoring.
+
+The preview is a rendering-only overlay: it does not take part in hit testing and cannot block the
+underlying curve/point selection. Family, measurement and units come from the shared Core authority.
 
 ## Atomic commit, freshness, undo, and redo
 

@@ -255,11 +255,10 @@ protected:
       const QRectF badge(annotation.point.x - text_rect.width() * 0.5 - 4.0,
                          annotation.point.y - text_rect.height() * 0.5 - 2.0,
                          text_rect.width() + 8.0, text_rect.height() + 4.0);
-      painter.setPen(Qt::NoPen);
-      painter.setBrush(annotation.dimension ? QColor(30, 34, 40, 215)
-                                            : QColor(30, 34, 40, 170));
-      painter.drawRoundedRect(badge, 3.0, 3.0);
-      painter.setPen(annotation.dimension ? QColor(235, 240, 245) : QColor(255, 196, 61));
+      painter.setPen(QPen(Qt::white, 1.0));
+      painter.setBrush(Qt::black);
+      painter.drawRect(badge);
+      painter.setPen(Qt::white);
       painter.setBrush(Qt::NoBrush);
       painter.drawText(badge, Qt::AlignCenter, annotation.label);
     }
@@ -968,6 +967,7 @@ void OcctViewport::clear_sketch_interaction() {
   sketch_box_active_ = false;
   sketch_drag_handles_.clear();
   sketch_preview_polyline_.clear();
+  dimension_preview_.reset();
   sketch_operation_preview_.clear();
   sketch_preview_closed_ = false;
   if (auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_)) {
@@ -1239,8 +1239,8 @@ void OcctViewport::paintEvent(QPaintEvent* event) {
   if (!impl_->view.IsNull())
     return; // The render surface child paints the 3D view.
   QPainter painter(this);
-  painter.fillRect(rect(), QColor(48, 52, 59));
-  painter.setPen(QColor(215, 220, 226));
+  painter.fillRect(rect(), Qt::black);
+  painter.setPen(Qt::white);
   const QString message = impl_->initialization_error.empty()
                               ? QStringLiteral("OCCT 3D Viewport")
                               : QString::fromStdString(impl_->initialization_error);
@@ -1463,7 +1463,7 @@ void OcctViewport::initialize_native_viewer() {
     impl_->context = new AIS_InteractiveContext(impl_->viewer);
     impl_->view = impl_->viewer->CreateView();
     impl_->view->SetImmediateUpdate(false);
-    impl_->view->SetBackgroundColor(Quantity_Color(0.08, 0.10, 0.13, Quantity_TOC_RGB));
+    impl_->view->SetBackgroundColor(Quantity_Color(0.0, 0.0, 0.0, Quantity_TOC_RGB));
     impl_->owner_to_index.clear();
     for (std::size_t index = 0; index < impl_->presentations.size(); ++index) {
       auto& presentation = impl_->presentations[index];
@@ -1736,13 +1736,22 @@ void OcctViewport::rebuild_sketch_scene_points() {
   overlay->set_scene_points(std::move(points));
 }
 
+void OcctViewport::set_sketch_dimension_preview(
+    std::optional<GuiSketchAnnotationPrimitive> annotation) {
+  dimension_preview_ = std::move(annotation);
+  rebuild_sketch_annotations();
+}
+
 void OcctViewport::rebuild_sketch_annotations() {
   auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_);
   if (overlay == nullptr)
     return;
   std::vector<SketchInteractionOverlay::AnnotationBadge> badges;
   if (sketch_interaction_) {
-    for (const auto& annotation : sketch_interaction_->scene().annotations) {
+    auto annotations = sketch_interaction_->scene().annotations;
+    if (dimension_preview_)
+      annotations.push_back(*dimension_preview_);
+    for (const auto& annotation : annotations) {
       if (annotation.label.empty())
         continue;
       auto screen = sketch_interaction_->mapping().plane_to_screen(annotation.point);

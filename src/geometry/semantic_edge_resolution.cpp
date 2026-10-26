@@ -5,7 +5,9 @@
 #include "blcad/geometry/workplane_resolver.hpp"
 
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepGProp.hxx>
 #include <BRep_Tool.hxx>
+#include <GProp_GProps.hxx>
 #include <GeomAbs_CurveType.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp.hxx>
@@ -166,10 +168,61 @@ struct ExpectedCircle {
 }
 } // namespace
 
+Result<ResultEdgeReference> make_result_edge_reference(const FeatureId& producer,
+                                                       const TopoDS_Edge& edge) {
+  if (BRep_Tool::Degenerated(edge))
+    return Result<ResultEdgeReference>::failure(
+        edge_error(producer, "degenerate edge has no curve witness"));
+  BRepAdaptor_Curve curve(edge);
+  const double first = curve.FirstParameter(), last = curve.LastParameter();
+  if (!std::isfinite(first) || !std::isfinite(last) || last <= first)
+    return Result<ResultEdgeReference>::failure(
+        edge_error(producer, "edge has no finite curve witness"));
+  std::array<Point3, ResultEdgeReference::sample_count> samples;
+  for (std::size_t i = 0; i < samples.size(); ++i) {
+    const auto p = curve.Value(first + (last - first) * double(i) / double(samples.size() - 1));
+    samples[i] = {p.X(), p.Y(), p.Z()};
+  }
+  GProp_GProps properties;
+  BRepGProp::LinearProperties(edge, properties);
+  return ResultEdgeReference::create(producer, static_cast<int>(curve.GetType()), properties.Mass(),
+                                     samples);
+}
+
 Result<TopoDS_Edge> resolve_semantic_edge(const PartDocument& document, const ShapeCache& cache,
                                           const TopoDS_Shape& target,
                                           const EdgeReference& reference, const FeatureId& id,
                                           std::string_view feature_label) {
+  if (const auto* expected = std::get_if<ResultEdgeReference>(&reference.source())) {
+    auto valid = validate_part_feature_input_reference(document, reference);
+    if (!valid)
+      return Result<TopoDS_Edge>::failure(valid.error());
+    TopTools_IndexedMapOfShape edges;
+    TopExp::MapShapes(target, TopAbs_EDGE, edges);
+    std::vector<TopoDS_Edge> matches;
+    for (int i = 1; i <= edges.Extent(); ++i) {
+      const auto edge = TopoDS::Edge(edges(i));
+      auto witness = make_result_edge_reference(expected->source_feature(), edge);
+      if (!witness || witness.value().curve_type() != expected->curve_type() ||
+          std::abs(witness.value().length_mm() - expected->length_mm()) > kTolerance)
+        continue;
+      const auto& actual = witness.value().samples();
+      const auto& wanted = expected->samples();
+      bool forward = true, reverse = true;
+      for (std::size_t n = 0; n < actual.size(); ++n) {
+        forward = forward && distance(actual[n], wanted[n]) <= kTolerance;
+        reverse = reverse && distance(actual[n], wanted[actual.size() - 1 - n]) <= kTolerance;
+      }
+      if (forward || reverse)
+        matches.push_back(edge);
+    }
+    if (matches.size() != 1U)
+      return Result<TopoDS_Edge>::failure(edge_error(
+          id, matches.empty()
+                  ? "selected result edge changed or no longer exists; select the edge again"
+                  : "selected result edge is ambiguous; select an unambiguous edge"));
+    return Result<TopoDS_Edge>::success(matches.front());
+  }
   if (std::holds_alternative<SemanticEdgeReference>(reference.source()))
     return resolve_linear(document, cache, target,
                           std::get<SemanticEdgeReference>(reference.source()), id, feature_label);

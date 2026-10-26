@@ -5,6 +5,7 @@
 #include "blcad/core/id.hpp"
 #include "blcad/core/result.hpp"
 
+#include <array>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -47,6 +48,7 @@ enum class PartFeatureInputSourceKind {
   SemanticPlanarFace,
   SemanticCylindricalFace,
   SemanticCircularEdge,
+  ResultEdge,
   Body,
 };
 
@@ -150,7 +152,40 @@ private:
   FaceReferenceSource source_;
 };
 
-using EdgeReferenceSource = std::variant<SemanticEdgeReference, SemanticCircularEdgeReference>;
+// A geometric selection witness anchored to the producing feature, never a
+// kernel traversal index. Recovery requires a unique complete matching witness
+// on the current Body and fails closed after incompatible upstream edits.
+class ResultEdgeReference {
+public:
+  static constexpr std::size_t sample_count = 17U;
+  [[nodiscard]] static Result<ResultEdgeReference> create(FeatureId source_feature, int curve_type,
+                                                          double length_mm,
+                                                          std::array<Point3, sample_count> samples);
+  [[nodiscard]] const FeatureId& source_feature() const noexcept {
+    return source_feature_;
+  }
+  [[nodiscard]] int curve_type() const noexcept {
+    return curve_type_;
+  }
+  [[nodiscard]] double length_mm() const noexcept {
+    return length_mm_;
+  }
+  [[nodiscard]] const std::array<Point3, sample_count>& samples() const noexcept {
+    return samples_;
+  }
+  [[nodiscard]] std::string identity() const;
+
+private:
+  ResultEdgeReference(FeatureId source_feature, int curve_type, double length_mm,
+                      std::array<Point3, sample_count> samples);
+  FeatureId source_feature_;
+  int curve_type_;
+  double length_mm_;
+  std::array<Point3, sample_count> samples_;
+};
+
+using EdgeReferenceSource =
+    std::variant<SemanticEdgeReference, SemanticCircularEdgeReference, ResultEdgeReference>;
 
 class EdgeReference {
 public:
@@ -158,6 +193,9 @@ public:
                                                            SemanticEdgeReference edge);
   [[nodiscard]] static Result<EdgeReference> create_circular(PartFeatureInputRole role,
                                                              SemanticCircularEdgeReference edge);
+
+  [[nodiscard]] static Result<EdgeReference> create_result(PartFeatureInputRole role,
+                                                           ResultEdgeReference edge);
 
   [[nodiscard]] PartFeatureInputRole role() const noexcept;
   [[nodiscard]] PartFeatureInputCapability expected_capability() const noexcept;

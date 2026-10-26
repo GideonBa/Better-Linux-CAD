@@ -92,7 +92,8 @@ public:
     std::vector<SketchDimensionGlyph> glyphs;
     glyphs.reserve(catalog.dimensions().size());
     for (const auto& dimension : catalog.dimensions()) {
-      auto measurement = SketchDimensionMeasurementEvaluator::measure(topology, dimension);
+      auto measurement =
+          SketchDimensionMeasurementEvaluator::measure(topology, dimension, &document);
       if (measurement.has_error())
         return Result<std::vector<SketchDimensionGlyph>>::failure(measurement.error());
       auto glyph = resolve(topology, dimension, measurement.value());
@@ -105,18 +106,22 @@ public:
 
 private:
   [[nodiscard]] static double characteristic_length(const SketchTopology& topology) noexcept {
-    if (topology.points().empty()) return 1.0;
-    double min_x = topology.points().front().position().x;
-    double max_x = min_x;
-    double min_y = topology.points().front().position().y;
-    double max_y = min_y;
+    bool initialized = false;
+    double min_x{}, max_x{}, min_y{}, max_y{};
     for (const auto& point : topology.points()) {
+      if (point.id().value().starts_with("reference/"))
+        continue;
+      if (!initialized) {
+        min_x = max_x = point.position().x;
+        min_y = max_y = point.position().y;
+        initialized = true;
+      }
       min_x = std::min(min_x, point.position().x);
       max_x = std::max(max_x, point.position().x);
       min_y = std::min(min_y, point.position().y);
       max_y = std::max(max_y, point.position().y);
     }
-    return std::hypot(max_x - min_x, max_y - min_y);
+    return initialized ? std::hypot(max_x - min_x, max_y - min_y) : 1.0;
   }
 
   // Extremities the dimension line spans, in plane space. Distance/length
@@ -150,6 +155,13 @@ private:
         return {};
       center.x /= static_cast<double>(count);
       center.y /= static_cast<double>(count);
+      if (entity->kind() == SketchTopologyEntityKind::Arc) {
+        auto arc = SketchDimensionMeasurementEvaluator::arc_geometry(topology, *entity,
+                                                                     dimension.id().value());
+        if (!arc)
+          return {};
+        center = arc.value().center;
+      }
       const double radius = dimension.kind() == SketchDimensionKind::Radius ? value : value * 0.5;
       if (dimension.kind() == SketchDimensionKind::Radius)
         return {center, {center.x + radius, center.y}};

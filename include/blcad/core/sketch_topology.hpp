@@ -4,8 +4,10 @@
 #include "blcad/core/sketch_contour.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstddef>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -428,6 +430,66 @@ public:
       for (const auto& contour : profile.inner_contours()) connect_contour(contour);
     }
 
+    // A fitted spline is persisted as a numbered family of cubic segments.
+    // Its open-chain junctions carry the same connectivity intent as the
+    // junctions in an explicit closed contour. Do not weld unrelated curves
+    // merely because two independently authored endpoints happen to coincide.
+    std::map<std::string, std::map<std::size_t, const SplineSegment*>> fitted_families;
+    for (const auto& spline : sketch.spline_segments()) {
+      const auto& id = spline.id().value();
+      const auto marker = id.rfind(".fit.");
+      if (marker == std::string::npos)
+        continue;
+      std::size_t index{};
+      const auto suffix = std::string_view(id).substr(marker + 5U);
+      const auto parsed = std::from_chars(suffix.data(), suffix.data() + suffix.size(), index);
+      if (parsed.ec != std::errc{} || parsed.ptr != suffix.data() + suffix.size() || index < 1U ||
+          suffix != std::to_string(index))
+        continue;
+      const std::string base = id.substr(0U, marker);
+      fitted_families[base].emplace(index, &spline);
+      if (index == 1U)
+        continue;
+      const auto* previous =
+          sketch.find_spline_segment(SketchEntityId(base + ".fit." + std::to_string(index - 1U)));
+      if (previous == nullptr && index == 2U)
+        previous = sketch.find_spline_segment(SketchEntityId(base));
+      if (previous != nullptr && std::hypot(previous->end().x - spline.start().x,
+                                            previous->end().y - spline.start().y) <= 1.0e-9)
+        shared_usage_pairs.emplace_back(usage_id(entity_id(previous->id()), "end"),
+                                        usage_id(entity_id(spline.id()), "start"));
+    }
+    for (auto& [base, members] : fitted_families) {
+      if (!members.contains(1U)) {
+        const auto* first = sketch.find_spline_segment(SketchEntityId(base));
+        if (first != nullptr)
+          members.emplace(1U, first);
+      }
+      // A closed raw fitted curve need not have a materialized profile yet.
+      // Recover its seam from the complete numbered family, never from global
+      // coordinate proximity or from a family containing an index/junction gap.
+      if (members.size() < 2U || members.begin()->first != 1U ||
+          members.rbegin()->first != members.size())
+        continue;
+      const SplineSegment* previous = nullptr;
+      bool connected = true;
+      for (const auto& [index, segment] : members) {
+        (void)index;
+        if (previous != nullptr && std::hypot(previous->end().x - segment->start().x,
+                                              previous->end().y - segment->start().y) > 1.0e-9) {
+          connected = false;
+          break;
+        }
+        previous = segment;
+      }
+      const auto* first = members.begin()->second;
+      const auto* last = members.rbegin()->second;
+      if (connected &&
+          std::hypot(last->end().x - first->start().x, last->end().y - first->start().y) <= 1.0e-9)
+        shared_usage_pairs.emplace_back(usage_id(entity_id(last->id()), "end"),
+                                        usage_id(entity_id(first->id()), "start"));
+    }
+
     std::sort(candidates.begin(), candidates.end(), [](const auto& left, const auto& right) {
       return left.id < right.id;
     });
@@ -523,6 +585,32 @@ public:
       auto entity = SketchTopologyEntity::create(candidate.id, candidate.kind, std::move(point_ids),
                                                  candidate.dependencies, candidate.flags, candidate.weights);
       if (entity.has_error()) return Result<SketchTopology>::failure(entity.error());
+      entities.push_back(std::move(entity.value()));
+    }
+
+    // Sketch references use stable topology ids and reference flags, so the
+    // solver can constrain authored geometry against them without moving the
+    // origin or introducing hidden, authored construction geometry.
+    const SketchTopologyFlags reference_flags{.construction = false, .reference = true};
+    for (const auto& definition :
+         std::vector<std::pair<std::string, Point2>>{{"reference/origin", {0.0, 0.0}},
+                                                     {"reference/axis/x/start", {-1.0, 0.0}},
+                                                     {"reference/axis/x/end", {1.0, 0.0}},
+                                                     {"reference/axis/y/start", {0.0, -1.0}},
+                                                     {"reference/axis/y/end", {0.0, 1.0}}}) {
+      auto point = SketchTopologyPoint::create(SketchPointId(definition.first), definition.second,
+                                               reference_flags);
+      if (point.has_error())
+        return Result<SketchTopology>::failure(point.error());
+      points.push_back(std::move(point.value()));
+    }
+    for (const std::string axis : {"x", "y"}) {
+      const std::string id = "reference/axis/" + axis;
+      auto entity = SketchTopologyEntity::create(
+          id, SketchTopologyEntityKind::Line,
+          {SketchPointId(id + "/start"), SketchPointId(id + "/end")}, {}, reference_flags);
+      if (entity.has_error())
+        return Result<SketchTopology>::failure(entity.error());
       entities.push_back(std::move(entity.value()));
     }
 

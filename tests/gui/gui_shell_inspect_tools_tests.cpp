@@ -162,7 +162,7 @@ TEST_CASE("Assembly analysis distinguishes collisions clearance and contact with
     control<QComboBox>(window, "kind").setCurrentIndex(kind);
     control<QPushButton>(window, "run").click();
     REQUIRE(rows.rowCount() == 1);
-    CHECK(rows.item(0, 2)->text().startsWith("Kollision:"));
+    CHECK(rows.item(0, 2)->text().startsWith("Interference:"));
     CHECK(rows.item(0, 0)->toolTip().contains("component.plate."));
     CHECK(rows.item(0, 0)->text().contains("Plate"));
   }
@@ -176,7 +176,7 @@ TEST_CASE("Assembly analysis distinguishes collisions clearance and contact with
     if (group.item(i)->data(Qt::UserRole).toString() == "component.plate.free")
       group.item(i)->setSelected(true);
   REQUIRE(window.inspect_tools().run_analysis());
-  CHECK(control<QLabel>(window, "summary").text().contains("Verbleibende Freiheitsgrade: 6"));
+  CHECK(control<QLabel>(window, "summary").text().contains("Remaining degrees of freedom: 6"));
   window.inspect_tools().cancel();
   CHECK_FALSE(window.session().task().active());
   CHECK(snapshot(window) == before);
@@ -212,7 +212,7 @@ TEST_CASE("Analysis input changes and model freshness invalidate previous result
   control<QComboBox>(window, "kind").setCurrentIndex(2);
   REQUIRE(window.inspect_tools().run_analysis());
   REQUIRE(rows.rowCount() == 1);
-  CHECK(rows.item(0, 2)->text().startsWith("Getrennt:"));
+  CHECK(rows.item(0, 2)->text().startsWith("Separated:"));
   REQUIRE(window.undo());
   CHECK_FALSE(window.inspect_tools().active());
   CHECK(rows.rowCount() == 0);
@@ -237,7 +237,7 @@ TEST_CASE("Assembly clearance threshold and touching classification use current 
   threshold.setValue(1);
   REQUIRE(window.inspect_tools().run_analysis());
   REQUIRE(rows.rowCount() == 1);
-  CHECK(rows.item(0, 2)->text() == "Abstand: 0.5 mm");
+  CHECK(rows.item(0, 2)->text() == "Distance: 0.5 mm");
   threshold.setValue(0.25);
   CHECK(rows.rowCount() == 0);
   REQUIRE(window.inspect_tools().run_analysis());
@@ -248,7 +248,7 @@ TEST_CASE("Assembly clearance threshold and touching classification use current 
   control<QComboBox>(window, "kind").setCurrentIndex(2);
   REQUIRE(window.inspect_tools().run_analysis());
   REQUIRE(rows.rowCount() == 1);
-  CHECK(rows.item(0, 2)->text() == "Berührung: 0 mm");
+  CHECK(rows.item(0, 2)->text() == "Contact: 0 mm");
   auto* dock = window.findChild<QDockWidget*>("blcad.shell.inspect_task");
   REQUIRE(dock);
   dock->close();

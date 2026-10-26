@@ -122,7 +122,7 @@ TEST_CASE("Construction editor previews explicit geometry and commits one revers
     CAPTURE(static_cast<int>(kind));
     ShellWindow window;
     REQUIRE_FALSE(action(window, "create_construction").isEnabled());
-    REQUIRE(window.new_part("Konstruktion"));
+    REQUIRE(window.new_part("Construction"));
     QTemporaryDir directory;
     REQUIRE(window.save_to(directory.filePath("before.blcad.json")));
     const auto before = snapshot(window);
@@ -239,7 +239,7 @@ TEST_CASE("Construction relationships resolve picked points lines and three-poin
 TEST_CASE("Offset workplane provisions its parameter atomically and reuses existing bindings",
           "[gui][block136-construction][shell-construction-offset]") {
   ShellWindow window;
-  REQUIRE(window.new_part("Versatz"));
+  REQUIRE(window.new_part("Offset"));
   const auto before = snapshot(window);
   action(window, "create_workplane").trigger();
   REQUIRE(window.construction_tools().active());
@@ -362,7 +362,7 @@ TEST_CASE("Invalid construction candidates remove previews and leave history unc
 TEST_CASE("Construction cancel Escape close and stale revision discard only transient intent",
           "[gui][block136-construction][shell-construction-lifecycle]") {
   ShellWindow window;
-  REQUIRE(window.new_part("Abbrechen"));
+  REQUIRE(window.new_part("Cancel"));
   const auto before = snapshot(window);
   for (int mode = 0; mode < 3; ++mode) {
     begin(window, Kind::OffsetPlane);
@@ -386,10 +386,12 @@ TEST_CASE("Construction cancel Escape close and stale revision discard only tran
     CHECK(snapshot(window) == before);
   }
   begin(window, Kind::OffsetPlane);
+  const auto model_revision = window.session().model_revision();
   REQUIRE(window.session().commit_part_transaction("External change", [](PartDocument& part) {
     return part.add_construction_point(checked(ConstructionPoint::create_explicit(
         ConstructionPointId("external.point"), "External", {0, 0, 8})));
   }));
+  CHECK(window.session().model_revision() > model_revision);
   CHECK(window.construction_tools().apply().has_error());
   window.refresh();
   CHECK_FALSE(window.construction_tools().active());
@@ -432,7 +434,7 @@ TEST_CASE("Construction identifiers avoid existing objects and generated paramet
   control<QLineEdit>(window, "name").setText("   ");
   CHECK(window.construction_tools().apply().has_error());
   CHECK_FALSE(window.viewport().feature_preview_active());
-  control<QLineEdit>(window, "name").setText("Versatz");
+  control<QLineEdit>(window, "name").setText("Offset");
   apply(window);
   CHECK(window.session().part_document()->construction_planes().back().id().value() ==
         "construction.shell.2");
@@ -550,7 +552,7 @@ TEST_CASE("Browser construction edits retain identity and exact reversible persi
   for (auto kind : {Kind::Point, Kind::Line, Kind::Axis, Kind::Plane}) {
     CAPTURE(static_cast<int>(kind));
     ShellWindow window;
-    REQUIRE(window.new_part("Bearbeiten"));
+    REQUIRE(window.new_part("Modify"));
     begin(window, kind);
     origin(window, {12, -8, 5});
     apply(window);
@@ -560,7 +562,7 @@ TEST_CASE("Browser construction edits retain identity and exact reversible persi
     const auto before = snapshot(window);
     const auto revision = window.session().presentation_revision();
     edit_tree(window, id);
-    CHECK(control<QLineEdit>(window, "name").text() == "Konstruktion 1");
+    CHECK(control<QLineEdit>(window, "name").text() == "Construction 1");
     CHECK(control<QDoubleSpinBox>(window, "origin.z").value() == 5);
     origin(window, {20, 3, 9});
     control<QLineEdit>(window, "name").setText("Geändert");

@@ -42,6 +42,7 @@
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QScreen>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSlider>
@@ -258,7 +259,43 @@ public:
       QCursor::setPos(global);
       QGuiApplication::sync();
       flush();
-      REQUIRE(wait_for_ui([&] { return QCursor::pos() == global; }));
+      // Popup activation can enqueue a desktop pointer restore after the first
+      // successful warp. Reassert the intended row after those events settle,
+      // while retaining the exact cursor, row-index and click checks below.
+      int pointer_retries = 0;
+      const bool pointer_ready = wait_for_ui([&] {
+        if (QCursor::pos() != global && pointer_retries < 3) {
+          ++pointer_retries;
+          QCursor::setPos(global);
+          QGuiApplication::sync();
+          flush();
+        }
+        return QCursor::pos() == global;
+      });
+      const auto actual = QCursor::pos();
+      const auto popup_geometry = view->window()->geometry();
+      const auto screen_geometry = view->screen()->geometry();
+      const auto available_geometry = view->screen()->availableGeometry();
+      INFO("Requested cursor: " << global.x() << ',' << global.y());
+      INFO("Actual cursor: " << actual.x() << ',' << actual.y());
+      INFO("Pointer warp retries: " << pointer_retries);
+      const auto current_global = view->viewport()->mapToGlobal(rectangle.center());
+      INFO("Current row global position: " << current_global.x() << ',' << current_global.y());
+      INFO("Screen DPR: " << view->screen()->devicePixelRatio());
+      INFO("Popup geometry: " << popup_geometry.x() << ',' << popup_geometry.y() << ' '
+                              << popup_geometry.width() << 'x' << popup_geometry.height());
+      INFO("Screen geometry: " << screen_geometry.x() << ',' << screen_geometry.y() << ' '
+                               << screen_geometry.width() << 'x' << screen_geometry.height());
+      INFO("Available geometry: " << available_geometry.x() << ',' << available_geometry.y() << ' '
+                                  << available_geometry.width() << 'x'
+                                  << available_geometry.height());
+      if (!pointer_ready && qEnvironmentVariableIsSet("BLCAD_UI_CAPTURE_DIR")) {
+        capture("assembly-popup-pointer-mismatch");
+        const auto path = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR") +
+                          QStringLiteral("/assembly-popup-pointer-mismatch-popup.png");
+        REQUIRE(view->window()->grab().save(path));
+      }
+      REQUIRE(pointer_ready);
     }
     REQUIRE(view->isVisible());
     REQUIRE(view->indexAt(rectangle.center()) == index);
@@ -431,7 +468,7 @@ public:
     // grid-snap command instead of changing viewport/controller configuration.
     for (auto* button : window.ribbon().findChildren<QToolButton*>())
       if (auto* selected = button->defaultAction();
-          selected && selected->text() == "Fang" && selected->isChecked())
+          selected && selected->text() == "Snap" && selected->isChecked())
         click(*button);
     command("sketch.create.corner_rectangle");
     REQUIRE(window.sketch_tools().tool_active());
@@ -910,7 +947,7 @@ TEST_CASE("Combined UI path extrusion machines a prior cut and follows corrected
   for (int index = 1; index <= 3; ++index) {
     auto& source = ui.widget<QComboBox>("blcad.spatial.source");
     ui.choose(source,
-              source.findText("3D-Skizze 1 / line." + QString::number(index), Qt::MatchStartsWith));
+              source.findText("3D Sketch 1 / line." + QString::number(index), Qt::MatchStartsWith));
     ui.button("blcad.spatial.add");
   }
   ui.button("blcad.feature.apply");
@@ -1133,10 +1170,10 @@ TEST_CASE("Combined UI view navigation preserves Sketch and machining state thro
   ui.command("capture_home", 2);
   auto& marks = ui.widget<QComboBox>("blcad.navigation.bookmarks");
   REQUIRE(marks.lineEdit());
-  ui.text(*marks.lineEdit(), "Oben");
+  ui.text(*marks.lineEdit(), "Top");
   ui.command("bookmark_save", 2);
   ui.command("view_front", 2);
-  ui.text(*marks.lineEdit(), "Vorne");
+  ui.text(*marks.lineEdit(), "Front");
   ui.command("bookmark_save", 2);
   CHECK(marks.count() == 2);
   ui.command("view_back", 2); // Actual ViewCube popup input.
@@ -1166,7 +1203,7 @@ TEST_CASE("Combined UI view navigation preserves Sketch and machining state thro
   ui.text(ui.widget<QLineEdit>("blcad.extrude.taper"), "invalid");
   ui.window.ribbon().set_current_tab(2);
   ui.flush();
-  ui.choose(marks, marks.findText("Vorne"));
+  ui.choose(marks, marks.findText("Front"));
   ui.command("bookmark_restore", 2);
   CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
   CHECK_FALSE(ui.window.viewport().feature_preview_active());
@@ -1218,7 +1255,7 @@ TEST_CASE("Combined UI view navigation preserves Sketch and machining state thro
   CHECK(marks.count() == 2);
   ui.window.ribbon().set_current_tab(2);
   ui.flush();
-  ui.choose(marks, marks.findText("Oben"));
+  ui.choose(marks, marks.findText("Top"));
   ui.command("bookmark_restore", 2);
   ui.command("bookmark_remove", 2);
   CHECK(marks.count() == 1);
@@ -1269,13 +1306,13 @@ TEST_CASE(
   ui.data(ui.widget<QComboBox>("blcad.extrude.target"), QString::fromStdString(base.value()));
   ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 5);
   ui.choose(ui.widget<QComboBox>("blcad.extrude.pick_role"), 1);
-  ui.standard_view("Rechts");
+  ui.standard_view("Right");
   ui.command("fit", 2);
   ui.limit_face(source, "right", {30, -10, 10});
   CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
   CHECK_FALSE(ui.window.viewport().feature_preview_active());
   CHECK(ui.snapshot() == states.back());
-  ui.standard_view("Oben");
+  ui.standard_view("Top");
   ui.limit_face(source, "top", {-20, -10, 20});
   REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
   CHECK(ui.window.viewport().feature_preview_replaces("body/" + base.value()));
@@ -1464,7 +1501,7 @@ TEST_CASE(
   REQUIRE(order.count() == 3);
   ui.list(order, 2);
   for (auto* button : ui.window.findChildren<QPushButton*>())
-    if (button->isVisible() && button->text() == "Hoch") {
+    if (button->isVisible() && button->text() == "Up") {
       ui.click(*button);
       break;
     }
@@ -1552,7 +1589,7 @@ TEST_CASE(
   ui.list(sections, 2);
   bool moved = false;
   for (auto* button : ui.window.findChildren<QPushButton*>())
-    if (button->isVisible() && button->text() == "Hoch") {
+    if (button->isVisible() && button->text() == "Up") {
       ui.click(*button);
       moved = true;
       break;
@@ -1662,7 +1699,7 @@ TEST_CASE(
   };
   const auto prepare = [&] {
     ui.command("loft");
-    CHECK(ui.widget<QLabel>("blcad.spatial.order_hint").text().contains("automatisch"));
+    CHECK(ui.widget<QLabel>("blcad.spatial.order_hint").text().contains("automatically"));
     auto& source = ui.widget<QComboBox>("blcad.spatial.source");
     for (const auto prefix : {"Root profile /", "Tip profile /", "Mid profile /"}) {
       ui.choose(source, source.findText(prefix, Qt::MatchStartsWith));
@@ -2082,7 +2119,7 @@ TEST_CASE("Combined UI authors a bounded Planar joint drives all coordinates and
   ui.button("blcad.inspect.run");
   auto& rows = ui.widget<QTableWidget>("blcad.inspect.results");
   REQUIRE(rows.rowCount() == 1);
-  CHECK(rows.item(0, 2)->text().startsWith("Abstand:"));
+  CHECK(rows.item(0, 2)->text().startsWith("Distance:"));
   bool parsed = false;
   const double clearance = rows.item(0, 2)->text().section(' ', 1, 1).toDouble(&parsed);
   REQUIRE(parsed);
@@ -2170,12 +2207,12 @@ TEST_CASE("Combined UI Assembly workflow imports an authored Part places relates
   ui.button("blcad.inspect.run");
   auto& rows = ui.widget<QTableWidget>("blcad.inspect.results");
   REQUIRE(rows.rowCount() == 1);
-  CHECK(rows.item(0, 2)->text().startsWith("Abstand: 10"));
+  CHECK(rows.item(0, 2)->text().startsWith("Distance: 10"));
   ui.choose(ui.widget<QComboBox>("blcad.inspect.kind"), 2);
   CHECK(rows.rowCount() == 0);
   ui.button("blcad.inspect.run");
   REQUIRE(rows.rowCount() == 1);
-  CHECK(rows.item(0, 2)->text().startsWith("Getrennt:"));
+  CHECK(rows.item(0, 2)->text().startsWith("Separated:"));
   ui.button("blcad.inspect.close");
   CHECK(ui.snapshot() == solved);
   ui.command("undo");
@@ -2623,7 +2660,7 @@ TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects
   for (int index = 1; index <= 3; ++index) {
     auto& source = ui.widget<QComboBox>("blcad.spatial.source");
     ui.choose(source,
-              source.findText("3D-Skizze 1 / line." + QString::number(index), Qt::MatchStartsWith));
+              source.findText("3D Sketch 1 / line." + QString::number(index), Qt::MatchStartsWith));
     ui.button("blcad.spatial.add");
   }
   ui.button("blcad.feature.apply");
@@ -2785,7 +2822,7 @@ TEST_CASE(
   for (int index = 1; index <= 2; ++index) {
     auto& input = ui.widget<QComboBox>("blcad.spatial.source");
     ui.choose(input,
-              input.findText("3D-Skizze 1 / line." + QString::number(index), Qt::MatchStartsWith));
+              input.findText("3D Sketch 1 / line." + QString::number(index), Qt::MatchStartsWith));
     ui.button("blcad.spatial.add");
   }
   ui.button("blcad.feature.apply");
@@ -3156,7 +3193,7 @@ TEST_CASE("Combined UI repeats fresh hole tasks then updates finishing and sourc
   ui.button("blcad.hole.preview");
   ui.button("blcad.hole.apply");
   states.push_back(ui.snapshot());
-  CHECK(ui.action("repeat_last_command").text() == "Erneut: Bohrungen");
+  CHECK(ui.action("repeat_last_command").text() == "Repeat: Holes");
   ui.command("repeat_last_command");
   REQUIRE(ui.window.hole_tools().active());
   CHECK(ui.widget<QLineEdit>("blcad.hole.center_x").text() == "0");
@@ -3180,7 +3217,7 @@ TEST_CASE("Combined UI repeats fresh hole tasks then updates finishing and sourc
   ui.scalar("1 mm");
   ui.button("blcad.feature.apply");
   states.push_back(ui.snapshot());
-  CHECK(ui.action("repeat_last_command").text() == "Erneut: Verrunden");
+  CHECK(ui.action("repeat_last_command").text() == "Repeat: Fillet");
   // Exercise the actual window shortcut, including focus outside the ribbon.
   ui.window.activateWindow();
   ui.window.setFocus();
@@ -3199,7 +3236,7 @@ TEST_CASE("Combined UI repeats fresh hole tasks then updates finishing and sourc
   ui.button("blcad.parameters.preview");
   ui.button("blcad.parameters.apply");
   states.push_back(ui.snapshot());
-  CHECK(ui.action("repeat_last_command").text() == "Erneut: Verrunden");
+  CHECK(ui.action("repeat_last_command").text() == "Repeat: Fillet");
   ui.history(states);
   REQUIRE(ui.action("repeat_last_command").isEnabled());
   auto& repeat_button = ui.widget<QToolButton>("blcad.repeat.button");
@@ -3208,7 +3245,7 @@ TEST_CASE("Combined UI repeats fresh hole tasks then updates finishing and sourc
   ui.capture("repeat-after-history");
   ui.roundtrip(directory.filePath("repeated-machining.blcad"));
   CHECK_FALSE(ui.action("repeat_last_command").isEnabled());
-  CHECK(ui.action("repeat_last_command").text() == "Befehl wiederholen");
+  CHECK(ui.action("repeat_last_command").text() == "Repeat Command");
   const auto step = directory.filePath("repeated-machining.step");
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).contains("ISO-10303-21"));
@@ -4101,7 +4138,7 @@ TEST_CASE(
   ui.button("blcad.inspect.run");
   auto& results = ui.widget<QTableWidget>("blcad.inspect.results");
   REQUIRE(results.rowCount() == 1);
-  CHECK(results.item(0, 2)->text().startsWith("Kollision:"));
+  CHECK(results.item(0, 2)->text().startsWith("Interference:"));
   const auto highlight = [&](int row, int column) {
     auto* item = results.item(row, column);
     REQUIRE(item);
@@ -4210,7 +4247,7 @@ TEST_CASE("Combined UI repeated subassemblies share solved motion through qualif
   }
   std::vector<std::string> states{ui.snapshot()};
   ui.command("assembly_validate_hierarchy");
-  CHECK(ui.widget<QLabel>("blcad.assembly.summary").text().contains("3 sichtbare aktive"));
+  CHECK(ui.widget<QLabel>("blcad.assembly.summary").text().contains("3 visible active"));
   CHECK_FALSE(ui.widget<QPushButton>("blcad.assembly.apply").isEnabled());
   ui.capture("combined-assembly-hierarchy-validation");
   ui.button("blcad.assembly.cancel");
@@ -4358,7 +4395,7 @@ TEST_CASE("Combined UI repeated subassemblies share solved motion through qualif
       repeated_pair = row;
   }
   REQUIRE(repeated_pair >= 0);
-  CHECK(results.item(repeated_pair, 2)->text().startsWith("Getrennt:"));
+  CHECK(results.item(repeated_pair, 2)->text().startsWith("Separated:"));
   std::vector<std::string> highlighted;
   for (int column = 0; column < 2; ++column) {
     auto* item = results.item(repeated_pair, column);

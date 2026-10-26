@@ -214,7 +214,7 @@ TEST_CASE(
   CHECK(control<QComboBox>(window, "suggestion").currentData() ==
         "remove_conflicting_orientation_constraint");
   CHECK_FALSE(control<QPushButton>(window, "preview").isEnabled());
-  CHECK(control<QLabel>(window, "summary").text().contains("Manuelle"));
+  CHECK(control<QLabel>(window, "summary").text().contains("Manual"));
   CHECK_FALSE(window.sketch_diagnostics_tools().preview());
   CHECK_FALSE(window.sketch_diagnostics_tools().apply());
   select(window, "free_spline_control_point/spline:control1");
@@ -228,7 +228,7 @@ TEST_CASE(
   CHECK_FALSE(control<QPushButton>(window, "preview").isEnabled());
   choose_sketch(window, "empty");
   CHECK(control<QListWidget>(window, "diagnostics").count() == 0);
-  CHECK(control<QLabel>(window, "summary").text().contains("Keine Meldungen"));
+  CHECK(control<QLabel>(window, "summary").text().contains("No diagnostics"));
   CHECK(snapshot(window) == before);
   CHECK_FALSE(window.session().dirty());
 }

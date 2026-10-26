@@ -254,12 +254,11 @@ TEST_CASE("Additive feature actions reject a CircularHolePattern-only Sketch",
         auto radius = Parameter::create_length(
             ParameterId("pattern.radius"), "Radius",
             Quantity::length_mm(20.0, "pattern.radius").value());
-        auto count = Parameter::create_count(
-            ParameterId("pattern.count"), "Anzahl",
-            Quantity::count(6.0, "pattern.count").value());
-        auto diameter = Parameter::create_length(
-            ParameterId("pattern.diameter"), "Durchmesser",
-            Quantity::length_mm(5.0, "pattern.diameter").value());
+        auto count = Parameter::create_count(ParameterId("pattern.count"), "Count",
+                                             Quantity::count(6.0, "pattern.count").value());
+        auto diameter =
+            Parameter::create_length(ParameterId("pattern.diameter"), "Diameter",
+                                     Quantity::length_mm(5.0, "pattern.diameter").value());
         if (radius.has_error()) return Result<std::size_t>::failure(radius.error());
         if (count.has_error()) return Result<std::size_t>::failure(count.error());
         if (diameter.has_error()) return Result<std::size_t>::failure(diameter.error());
@@ -703,7 +702,7 @@ TEST_CASE("Block 135 failed geometry preview keeps Apply disabled across shell r
   create_finished_rectangle(window);
   auto& tools = window.feature_tools();
   REQUIRE(tools.begin_extrude());
-  auto* apply_button = find_push_button(window, QStringLiteral("Anwenden"));
+  auto* apply_button = find_push_button(window, QStringLiteral("Apply"));
   REQUIRE(apply_button != nullptr);
   REQUIRE(apply_button->isEnabled());
 
@@ -739,7 +738,7 @@ TEST_CASE("Block 135 Apply rejects a mismatched task before committing the docum
   const FeatureId feature = tools.coordinator().extrude().feature_id();
   const std::size_t body_count = window.session().part_document()->body_count();
   const std::size_t parameter_count = window.session().part_document()->parameter_count();
-  auto* apply_button = find_push_button(window, QStringLiteral("Anwenden"));
+  auto* apply_button = find_push_button(window, QStringLiteral("Apply"));
   REQUIRE(apply_button != nullptr);
 
   SECTION("task is no longer in Preview") {
@@ -846,7 +845,7 @@ TEST_CASE("Block 135 auto-provisioning skips conflicting generated parameter nam
         auto quantity = Quantity::length_mm(4.0, "user.depth");
         if (quantity.has_error())
           return Result<std::size_t>::failure(quantity.error());
-        auto parameter = Parameter::create_length(ParameterId("user.depth"), "Extrusion 1 Tiefe",
+        auto parameter = Parameter::create_length(ParameterId("user.depth"), "Extrude 1 Depth",
                                                   quantity.value());
         if (parameter.has_error())
           return Result<std::size_t>::failure(parameter.error());
@@ -1040,7 +1039,7 @@ TEST_CASE("Extrusion starts through real tree and ribbon mouse clicks",
   REQUIRE(window.feature_tools().active());
 
   const BodyId body = window.feature_tools().coordinator().extrude().result_body_id();
-  auto* apply_button = find_push_button(window, QStringLiteral("Anwenden"));
+  auto* apply_button = find_push_button(window, QStringLiteral("Apply"));
   REQUIRE(apply_button != nullptr);
   REQUIRE(apply_button->isVisible());
   REQUIRE(apply_button->isEnabled());
@@ -1059,7 +1058,7 @@ TEST_CASE("A line-drawn face extrudes through the complete native mouse workflow
 
   // Create the document through the same ribbon button and modal confirmation
   // a user operates. No test-side Sketch or line entity is constructed.
-  auto* new_button = find_tool_button(window, QStringLiteral("Neu"));
+  auto* new_button = find_tool_button(window, QStringLiteral("New"));
   REQUIRE(new_button != nullptr);
   REQUIRE(new_button->isVisible());
   REQUIRE(click_modal_ok_while_clicking(*new_button, new_button->rect().center()));
@@ -1076,7 +1075,7 @@ TEST_CASE("A line-drawn face extrudes through the complete native mouse workflow
   REQUIRE_FALSE(xy_rect.isEmpty());
   click_widget(*tree.viewport(), xy_rect.center());
 
-  auto* create_sketch = find_tool_button(window, QStringLiteral("2D-Skizze erstellen"));
+  auto* create_sketch = find_tool_button(window, QStringLiteral("Create 2D Sketch"));
   REQUIRE(create_sketch != nullptr);
   REQUIRE(create_sketch->isVisible());
   REQUIRE(create_sketch->isEnabled());
@@ -1084,10 +1083,10 @@ TEST_CASE("A line-drawn face extrudes through the complete native mouse workflow
   REQUIRE(window.active_sketch().has_value());
   const SketchId sketch_id = *window.active_sketch();
 
-  auto* line_button = find_tool_button(window, QStringLiteral("Linie"));
+  auto* line_button = find_tool_button(window, QStringLiteral("Line"));
   REQUIRE(line_button != nullptr);
   REQUIRE(line_button->isVisible());
-  REQUIRE(click_popup_action(*line_button, QStringLiteral("Linie")));
+  REQUIRE(click_popup_action(*line_button, QStringLiteral("Line")));
   REQUIRE(window.sketch_tools().tool_active());
 
   auto& viewport = window.viewport();
@@ -1122,7 +1121,7 @@ TEST_CASE("A line-drawn face extrudes through the complete native mouse workflow
   profile_center.x /= static_cast<double>(drawn->line_segments().size());
   profile_center.y /= static_cast<double>(drawn->line_segments().size());
 
-  auto* finish = find_tool_button(window, QStringLiteral("Skizze fertig stellen"));
+  auto* finish = find_tool_button(window, QStringLiteral("Finish Sketch"));
   REQUIRE(finish != nullptr);
   REQUIRE(finish->isVisible());
   REQUIRE(finish->isEnabled());
@@ -1173,7 +1172,7 @@ TEST_CASE("A line-drawn face extrudes through the complete native mouse workflow
   REQUIRE(viewport.feature_preview_active());
   const BodyId body = window.feature_tools().coordinator().extrude().result_body_id();
 
-  auto* apply_button = find_push_button(window, QStringLiteral("Anwenden"));
+  auto* apply_button = find_push_button(window, QStringLiteral("Apply"));
   REQUIRE(apply_button != nullptr);
   REQUIRE(apply_button->isVisible());
   REQUIRE(apply_button->isEnabled());
@@ -1462,7 +1461,7 @@ TEST_CASE("A rectangle containing a circle exposes and extrudes the face with a 
 
   // Author the complete example through the same visible controls a user
   // operates. No profile or entity is inserted directly into the document.
-  auto* new_button = find_tool_button(window, QStringLiteral("Neu"));
+  auto* new_button = find_tool_button(window, QStringLiteral("New"));
   REQUIRE(new_button != nullptr);
   REQUIRE(new_button->isVisible());
   REQUIRE(click_modal_ok_while_clicking(*new_button, new_button->rect().center()));
@@ -1477,7 +1476,7 @@ TEST_CASE("A rectangle containing a circle exposes and extrudes the face with a 
   REQUIRE_FALSE(xy_rect.isEmpty());
   click_widget(*tree.viewport(), xy_rect.center());
 
-  auto* create_sketch = find_tool_button(window, QStringLiteral("2D-Skizze erstellen"));
+  auto* create_sketch = find_tool_button(window, QStringLiteral("Create 2D Sketch"));
   REQUIRE(create_sketch != nullptr);
   REQUIRE(create_sketch->isVisible());
   REQUIRE(create_sketch->isEnabled());
@@ -1493,19 +1492,19 @@ TEST_CASE("A rectangle containing a circle exposes and extrudes the face with a 
   for (const QPoint point : {outer_first, outer_second, screen_center, circle_edge})
     REQUIRE(viewport.rect().contains(point));
 
-  auto* rectangle_button = find_tool_button(window, QStringLiteral("Rechteck"));
+  auto* rectangle_button = find_tool_button(window, QStringLiteral("Rectangle"));
   REQUIRE(rectangle_button != nullptr);
   REQUIRE(rectangle_button->isVisible());
-  REQUIRE(click_popup_action(*rectangle_button, QStringLiteral("Rechteck (2 Punkte)")));
+  REQUIRE(click_popup_action(*rectangle_button, QStringLiteral("Rectangle (2 Points)")));
   REQUIRE(window.sketch_tools().tool_active());
   click_widget(viewport, outer_first);
   click_widget(viewport, outer_second);
   CHECK_FALSE(window.sketch_tools().tool_active());
 
-  auto* circle_button = find_tool_button(window, QStringLiteral("Kreis"));
+  auto* circle_button = find_tool_button(window, QStringLiteral("Circle"));
   REQUIRE(circle_button != nullptr);
   REQUIRE(circle_button->isVisible());
-  REQUIRE(click_popup_action(*circle_button, QStringLiteral("Kreis (Mitte/Radius)")));
+  REQUIRE(click_popup_action(*circle_button, QStringLiteral("Circle (Center/Radius)")));
   REQUIRE(window.sketch_tools().tool_active());
   click_widget(viewport, screen_center);
   click_widget(viewport, circle_edge);
@@ -1542,7 +1541,7 @@ TEST_CASE("A rectangle containing a circle exposes and extrudes the face with a 
   REQUIRE(circle_center.y - circle_radius > y_min);
   REQUIRE(circle_center.y + circle_radius < y_max);
 
-  auto* finish = find_tool_button(window, QStringLiteral("Skizze fertig stellen"));
+  auto* finish = find_tool_button(window, QStringLiteral("Finish Sketch"));
   REQUIRE(finish != nullptr);
   REQUIRE(finish->isVisible());
   REQUIRE(finish->isEnabled());
@@ -1617,7 +1616,7 @@ TEST_CASE("A rectangle containing a circle exposes and extrudes the face with a 
   const double depth = window.feature_tools().coordinator().extrude().distance();
   const BodyId body = window.feature_tools().coordinator().extrude().result_body_id();
 
-  auto* apply_button = find_push_button(window, QStringLiteral("Anwenden"));
+  auto* apply_button = find_push_button(window, QStringLiteral("Apply"));
   REQUIRE(apply_button != nullptr);
   REQUIRE(apply_button->isVisible());
   REQUIRE(apply_button->isEnabled());
@@ -1648,7 +1647,7 @@ TEST_CASE("Nested line polygons expose and extrude the outer face with a polygon
 
   // Create the part, enter an XY sketch, and draw both contours exclusively
   // through the same visible controls and native viewport clicks as a user.
-  auto* new_button = find_tool_button(window, QStringLiteral("Neu"));
+  auto* new_button = find_tool_button(window, QStringLiteral("New"));
   REQUIRE(new_button != nullptr);
   REQUIRE(new_button->isVisible());
   REQUIRE(click_modal_ok_while_clicking(*new_button, new_button->rect().center()));
@@ -1663,7 +1662,7 @@ TEST_CASE("Nested line polygons expose and extrude the outer face with a polygon
   REQUIRE_FALSE(xy_rect.isEmpty());
   click_widget(*tree.viewport(), xy_rect.center());
 
-  auto* create_sketch = find_tool_button(window, QStringLiteral("2D-Skizze erstellen"));
+  auto* create_sketch = find_tool_button(window, QStringLiteral("Create 2D Sketch"));
   REQUIRE(create_sketch != nullptr);
   REQUIRE(create_sketch->isVisible());
   REQUIRE(create_sketch->isEnabled());
@@ -1685,10 +1684,10 @@ TEST_CASE("Nested line polygons expose and extrude the outer face with a polygon
   for (const QPoint& click : inner_clicks)
     REQUIRE(viewport.rect().contains(click));
 
-  auto* line_button = find_tool_button(window, QStringLiteral("Linie"));
+  auto* line_button = find_tool_button(window, QStringLiteral("Line"));
   REQUIRE(line_button != nullptr);
   REQUIRE(line_button->isVisible());
-  REQUIRE(click_popup_action(*line_button, QStringLiteral("Linie")));
+  REQUIRE(click_popup_action(*line_button, QStringLiteral("Line")));
   REQUIRE(window.sketch_tools().tool_active());
   for (const QPoint& click : outer_clicks)
     click_widget(viewport, click);
@@ -1698,7 +1697,7 @@ TEST_CASE("Nested line polygons expose and extrude the outer face with a polygon
   // does in the interactive application. Start a fresh disconnected chain.
   right_click_widget(viewport, outer_clicks.front());
   REQUIRE_FALSE(window.sketch_tools().tool_active());
-  REQUIRE(click_popup_action(*line_button, QStringLiteral("Linie")));
+  REQUIRE(click_popup_action(*line_button, QStringLiteral("Line")));
   REQUIRE(window.sketch_tools().tool_active());
   for (const QPoint& click : inner_clicks)
     click_widget(viewport, click);
@@ -1712,7 +1711,7 @@ TEST_CASE("Nested line polygons expose and extrude the outer face with a polygon
   REQUIRE(authored->line_segments().size() == 8U);
   CHECK(authored->profile_count() == 0U);
 
-  auto* finish = find_tool_button(window, QStringLiteral("Skizze fertig stellen"));
+  auto* finish = find_tool_button(window, QStringLiteral("Finish Sketch"));
   REQUIRE(finish != nullptr);
   REQUIRE(finish->isVisible());
   REQUIRE(finish->isEnabled());
@@ -1831,7 +1830,7 @@ TEST_CASE("Nested line polygons expose and extrude the outer face with a polygon
   const double depth = window.feature_tools().coordinator().extrude().distance();
   const BodyId body = window.feature_tools().coordinator().extrude().result_body_id();
 
-  auto* apply_button = find_push_button(window, QStringLiteral("Anwenden"));
+  auto* apply_button = find_push_button(window, QStringLiteral("Apply"));
   REQUIRE(apply_button != nullptr);
   REQUIRE(apply_button->isVisible());
   REQUIRE(apply_button->isEnabled());

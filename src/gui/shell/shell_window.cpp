@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_window.hpp"
+#include "blcad/gui/gui_presentation_visibility.hpp"
 
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
@@ -33,6 +34,7 @@
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QLabel>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QSignalBlocker>
@@ -52,6 +54,7 @@ namespace {
 
 constexpr int kSemanticIdRole = Qt::UserRole;
 constexpr int kViewportIdRole = Qt::UserRole + 1;
+constexpr int kVisibilityIdRole = Qt::UserRole + 2;
 
 QString sanitized_document_id(const QString& name, QStringView prefix) {
   QString id;
@@ -81,6 +84,12 @@ QTreeWidgetItem* append_browser_item(QTreeWidgetItem* parent, QTreeWidget* tree,
   item->setText(0, QString::fromStdString(node.label));
   item->setData(0, kSemanticIdRole, QString::fromStdString(node.semantic_id));
   item->setData(0, kViewportIdRole, QString::fromStdString(node.viewport_semantic_id));
+  if (!node.visibility_semantic_id.empty()) {
+    item->setData(0, kVisibilityIdRole, QString::fromStdString(node.visibility_semantic_id));
+    item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+    item->setCheckState(0, node.presentation_visible ? Qt::Checked : Qt::Unchecked);
+    item->setToolTip(0, QStringLiteral("Toggle visibility"));
+  }
   for (const auto& child : node.children)
     append_browser_item(item, tree, child);
   return item;
@@ -251,20 +260,20 @@ ShellWindow::ShellWindow() {
 
   build_ribbon();
   build_docks();
-  statusBar()->addPermanentWidget(new QLabel(QStringLiteral("Auswahl:"), this));
+  statusBar()->addPermanentWidget(new QLabel(QStringLiteral("Selection:"), this));
   selection_filter_ = new QComboBox(this);
   selection_filter_->setObjectName(QStringLiteral("blcad.selection.filter"));
-  selection_filter_->setAccessibleName(QStringLiteral("Auswahlfilter"));
-  selection_filter_->setToolTip(QStringLiteral("Auswahl im Modell und Browser begrenzen"));
+  selection_filter_->setAccessibleName(QStringLiteral("Selection Filter"));
+  selection_filter_->setToolTip(QStringLiteral("Limit selection in the model and browser"));
   const std::pair<const char*, GuiModelingSelectionFilter> filters[] = {
-      {"Alles", GuiModelingSelectionFilter::All},
+      {"All", GuiModelingSelectionFilter::All},
       {"Profile", GuiModelingSelectionFilter::Profiles},
-      {"Bezugselemente", GuiModelingSelectionFilter::Datums},
-      {"Flächen", GuiModelingSelectionFilter::Faces},
-      {"Kanten", GuiModelingSelectionFilter::Edges},
-      {"Körper", GuiModelingSelectionFilter::Bodies},
-      {"Komponenten", GuiModelingSelectionFilter::Components},
-      {"Baugruppen-Ziele", GuiModelingSelectionFilter::AssemblyTargets}};
+      {"Datums", GuiModelingSelectionFilter::Datums},
+      {"Faces", GuiModelingSelectionFilter::Faces},
+      {"Edges", GuiModelingSelectionFilter::Edges},
+      {"Body", GuiModelingSelectionFilter::Bodies},
+      {"Components", GuiModelingSelectionFilter::Components},
+      {"Assembly Targets", GuiModelingSelectionFilter::AssemblyTargets}};
   for (const auto& [label, filter] : filters)
     selection_filter_->addItem(QString::fromUtf8(label),
                                GuiModelingWorkspace::selection_filter_mask(filter));
@@ -294,7 +303,7 @@ ShellWindow::ShellWindow() {
   step_import_tools_ =
       std::make_unique<ShellStepImportTools>(*this, *ribbon_, tab_model_, tab_assembly_);
   context_tools_ = std::make_unique<ShellContextTools>(*this);
-  statusBar()->showMessage(QStringLiteral("Bereit"));
+  statusBar()->showMessage(QStringLiteral("Ready"));
   refresh();
 }
 
@@ -325,61 +334,61 @@ ShellWindow::~ShellWindow() {
 }
 
 void ShellWindow::build_ribbon() {
-  tab_model_ = ribbon_->add_tab(QStringLiteral("3D-Modell"));
-  tab_sketch_ = ribbon_->add_tab(QStringLiteral("Skizze"));
-  tab_view_ = ribbon_->add_tab(QStringLiteral("Ansicht"));
-  tab_assembly_ = ribbon_->add_tab(QStringLiteral("Baugruppe"));
+  tab_model_ = ribbon_->add_tab(QStringLiteral("3D Model"));
+  tab_sketch_ = ribbon_->add_tab(QStringLiteral("Sketch"));
+  tab_view_ = ribbon_->add_tab(QStringLiteral("View"));
+  tab_assembly_ = ribbon_->add_tab(QStringLiteral("Assembly"));
 
   // 3D-Modell → Dokument
-  auto* document_group = ribbon_->add_group(tab_model_, QStringLiteral("Dokument"));
-  action_new_part_ = new QAction(QStringLiteral("Neu"), this);
+  auto* document_group = ribbon_->add_group(tab_model_, QStringLiteral("Document"));
+  action_new_part_ = new QAction(QStringLiteral("New"), this);
   action_new_part_->setObjectName("blcad.action.new_part");
   action_new_part_->setShortcut(QKeySequence::New);
   action_new_part_->setShortcutContext(Qt::WindowShortcut);
   connect(action_new_part_, &QAction::triggered, this, [this] {
     bool accepted = false;
-    const QString name = QInputDialog::getText(this, QStringLiteral("Neues Bauteil"),
-                                               QStringLiteral("Name:"), QLineEdit::Normal,
-                                               QStringLiteral("Bauteil"), &accepted)
-                             .trimmed();
+    const QString name =
+        QInputDialog::getText(this, QStringLiteral("New Part"), QStringLiteral("Name:"),
+                              QLineEdit::Normal, QStringLiteral("Part"), &accepted)
+            .trimmed();
     if (accepted && !name.isEmpty())
       (void)new_part(name);
   });
-  action_open_ = new QAction(QStringLiteral("Öffnen"), this);
+  action_open_ = new QAction(QStringLiteral("Open"), this);
   action_open_->setObjectName("blcad.action.open");
   action_open_->setShortcut(QKeySequence::Open);
   action_open_->setShortcutContext(Qt::WindowShortcut);
   connect(action_open_, &QAction::triggered, this, [this] {
     const QString path = QFileDialog::getOpenFileName(
-        this, QStringLiteral("BLCAD-Dokument öffnen"), {},
-        QStringLiteral("BLCAD-Dokumente (*.blcad.json *.blcad.project.json);;JSON (*.json)"));
+        this, QStringLiteral("Open BLCAD Document"), {},
+        QStringLiteral("BLCAD Documents (*.blcad.json *.blcad.project.json);;JSON (*.json)"));
     if (!path.isEmpty())
       (void)open_path(path);
   });
-  action_open_repair_ = new QAction(QStringLiteral("Zur Reparatur öffnen"), this);
+  action_open_repair_ = new QAction(QStringLiteral("Open for Repair"), this);
   action_open_repair_->setObjectName("blcad.action.open_repair");
   connect(action_open_repair_, &QAction::triggered, this, [this] {
-    const QString path = QFileDialog::getOpenFileName(
-        this, QStringLiteral("Bauteil zur Referenzreparatur öffnen"), {},
-        QStringLiteral("BLCAD-Bauteile (*.blcad.json);;JSON (*.json)"));
+    const QString path =
+        QFileDialog::getOpenFileName(this, QStringLiteral("Open Part for Reference Repair"), {},
+                                     QStringLiteral("BLCAD Parts (*.blcad.json);;JSON (*.json)"));
     if (!path.isEmpty())
       (void)open_path(path, GuiDocumentOpenMode::ReferenceRepair);
   });
-  action_save_ = new QAction(QStringLiteral("Speichern"), this);
+  action_save_ = new QAction(QStringLiteral("Save"), this);
   action_save_->setObjectName("blcad.action.save");
   action_save_->setShortcut(QKeySequence::Save);
   action_save_->setShortcutContext(Qt::WindowShortcut);
   connect(action_save_, &QAction::triggered, this, [this] { (void)save_to({}); });
-  action_save_as_ = new QAction(QStringLiteral("Speichern unter"), this);
+  action_save_as_ = new QAction(QStringLiteral("Save As"), this);
   action_save_as_->setObjectName("blcad.action.save_as");
   action_save_as_->setShortcut(QKeySequence::SaveAs);
   action_save_as_->setShortcutContext(Qt::WindowShortcut);
   connect(action_save_as_, &QAction::triggered, this, [this] {
-    const QString path = QFileDialog::getSaveFileName(
-        this, QStringLiteral("BLCAD-Dokument speichern"), {},
-        session_.document_kind() == GuiDocumentKind::Project
-            ? QStringLiteral("BLCAD-Projekt (*.blcad.project.json)")
-            : QStringLiteral("BLCAD-Bauteil (*.blcad.json)"));
+    const QString path =
+        QFileDialog::getSaveFileName(this, QStringLiteral("Save BLCAD Document"), {},
+                                     session_.document_kind() == GuiDocumentKind::Project
+                                         ? QStringLiteral("BLCAD Project (*.blcad.project.json)")
+                                         : QStringLiteral("BLCAD Part (*.blcad.json)"));
     if (!path.isEmpty())
       (void)save_to(path);
   });
@@ -396,13 +405,13 @@ void ShellWindow::build_ribbon() {
   addAction(action_save_as_);
 
   // 3D-Modell → Bearbeiten (undo/redo, always available via shortcut)
-  auto* edit_group = ribbon_->add_group(tab_model_, QStringLiteral("Bearbeiten"));
-  action_undo_ = new QAction(QStringLiteral("Rückgängig"), this);
+  auto* edit_group = ribbon_->add_group(tab_model_, QStringLiteral("Modify"));
+  action_undo_ = new QAction(QStringLiteral("Undo"), this);
   action_undo_->setObjectName("blcad.action.undo");
   action_undo_->setShortcut(QKeySequence::Undo);
   action_undo_->setShortcutContext(Qt::WindowShortcut);
   connect(action_undo_, &QAction::triggered, this, [this] { (void)undo(); });
-  action_redo_ = new QAction(QStringLiteral("Wiederherstellen"), this);
+  action_redo_ = new QAction(QStringLiteral("Redo"), this);
   action_redo_->setObjectName("blcad.action.redo");
   action_redo_->setShortcut(QKeySequence::Redo);
   action_redo_->setShortcutContext(Qt::WindowShortcut);
@@ -415,18 +424,18 @@ void ShellWindow::build_ribbon() {
   repeat_tools_ = std::make_unique<ShellRepeatTools>(*this, *ribbon_, edit_group);
 
   // 3D-Modell → Skizze
-  auto* sketch_group = ribbon_->add_group(tab_model_, QStringLiteral("Skizze"));
-  action_create_sketch_ = new QAction(QStringLiteral("2D-Skizze erstellen"), this);
+  auto* sketch_group = ribbon_->add_group(tab_model_, QStringLiteral("Sketch"));
+  action_create_sketch_ = new QAction(QStringLiteral("Create 2D Sketch"), this);
   action_create_sketch_->setObjectName("blcad.action.create_sketch");
   action_create_sketch_->setToolTip(
-      QStringLiteral("Ursprungsebene wählen, dann Skizze auf dieser Ebene beginnen"));
+      QStringLiteral("Select an origin plane, then start a sketch on that plane"));
   connect(action_create_sketch_, &QAction::triggered, this,
           [this] { (void)create_sketch_on_selection(); });
   ribbon_->add_button(sketch_group, action_create_sketch_);
 
   // Skizze → Beenden (draw/constrain/dimension groups arrive with Block 134)
-  auto* finish_group = ribbon_->add_group(tab_sketch_, QStringLiteral("Beenden"));
-  action_finish_sketch_ = new QAction(QStringLiteral("Skizze fertig stellen"), this);
+  auto* finish_group = ribbon_->add_group(tab_sketch_, QStringLiteral("Finish"));
+  action_finish_sketch_ = new QAction(QStringLiteral("Finish Sketch"), this);
   action_finish_sketch_->setObjectName("blcad.action.finish_sketch");
   connect(action_finish_sketch_, &QAction::triggered, this,
           [this] { (void)finish_active_sketch(); });
@@ -436,8 +445,8 @@ void ShellWindow::build_ribbon() {
   navigation_tools_ = std::make_unique<ShellNavigationTools>(*this, *ribbon_, tab_view_);
 
   // Ansicht → Darstellung
-  auto* display_group = ribbon_->add_group(tab_view_, QStringLiteral("Darstellung"));
-  action_perspective_ = new QAction(QStringLiteral("Perspektive"), this);
+  auto* display_group = ribbon_->add_group(tab_view_, QStringLiteral("Display"));
+  action_perspective_ = new QAction(QStringLiteral("Perspective"), this);
   action_perspective_->setObjectName("blcad.action.perspective");
   action_perspective_->setCheckable(true);
   action_perspective_->setChecked(true);
@@ -454,9 +463,9 @@ void ShellWindow::build_ribbon() {
     const char* label;
     GuiViewportDisplayMode mode;
     QAction** slot;
-  } modes[] = {{"Schattiert", GuiViewportDisplayMode::Shaded, &action_shaded_},
-               {"Kanten", GuiViewportDisplayMode::ShadedWithEdges, &action_shaded_edges_},
-               {"Drahtgitter", GuiViewportDisplayMode::Wireframe, &action_wireframe_}};
+  } modes[] = {{"Shaded", GuiViewportDisplayMode::Shaded, &action_shaded_},
+               {"Edges", GuiViewportDisplayMode::ShadedWithEdges, &action_shaded_edges_},
+               {"Wireframe", GuiViewportDisplayMode::Wireframe, &action_wireframe_}};
   for (const auto& definition : modes) {
     auto* action = new QAction(QString::fromUtf8(definition.label), this);
     action->setCheckable(true);
@@ -472,11 +481,11 @@ void ShellWindow::build_ribbon() {
 }
 
 void ShellWindow::build_docks() {
-  auto* browser_dock = new QDockWidget(QStringLiteral("Modell"), this);
+  auto* browser_dock = new QDockWidget(QStringLiteral("Model"), this);
   browser_dock->setFeatures(QDockWidget::DockWidgetMovable);
   browser_tree_ = new QTreeWidget(browser_dock);
   browser_tree_->setObjectName("blcad.shell.browser");
-  browser_tree_->setHeaderLabel(QStringLiteral("Kein Dokument"));
+  browser_tree_->setHeaderLabel(QStringLiteral("No Document"));
   browser_tree_->setMinimumWidth(220);
   browser_tree_->header()->setStretchLastSection(true);
   browser_dock->setWidget(browser_tree_);
@@ -486,16 +495,79 @@ void ShellWindow::build_docks() {
           [this](QTreeWidgetItem* current, QTreeWidgetItem*) { handle_tree_selection(current); });
   connect(browser_tree_, &QTreeWidget::itemDoubleClicked, this,
           [this](QTreeWidgetItem* item, int) { handle_tree_activation(item); });
+  connect(browser_tree_, &QTreeWidget::itemChanged, this,
+          [this](QTreeWidgetItem* item, int column) {
+            if (column != 0 || item == nullptr)
+              return;
+            const std::string id = item->data(0, kVisibilityIdRole).toString().toStdString();
+            if (id.empty())
+              return;
+            const bool visible = item->checkState(0) == Qt::Checked;
+            const auto* source =
+                browser_model_.find(item->data(0, kSemanticIdRole).toString().toStdString());
+            if (!source)
+              return;
+            const GuiBrowserNode node = *source;
+            // Rebuilding the browser must happen after the originating itemChanged
+            // emission has returned; otherwise Qt may keep a dangling tree item.
+            QMetaObject::invokeMethod(
+                this,
+                [this, node, visible] {
+                  const auto changed = set_browser_presentation_visible(session_, node, visible);
+                  if (!changed) {
+                    show_error(changed.error());
+                    return;
+                  }
+                  viewport_->clear_selection();
+                  refresh();
+                  if (active_sketch_)
+                    sketch_tools_->publish_scene();
+                },
+                Qt::QueuedConnection);
+          });
+  browser_tree_->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(browser_tree_, &QTreeWidget::customContextMenuRequested, this,
+          [this](const QPoint& point) {
+            auto* item = browser_tree_->itemAt(point);
+            const std::string id =
+                item ? item->data(0, kVisibilityIdRole).toString().toStdString() : std::string{};
+            const auto* source =
+                item ? browser_model_.find(item->data(0, kSemanticIdRole).toString().toStdString())
+                     : nullptr;
+            const GuiBrowserNode node = source ? *source : GuiBrowserNode{};
+            QMenu menu(browser_tree_);
+            QAction* toggle = nullptr;
+            const bool visible = source && source->presentation_visible;
+            if (!id.empty())
+              toggle = menu.addAction(visible ? QStringLiteral("Hide") : QStringLiteral("Show"));
+            auto* show_all = menu.addAction(QStringLiteral("Show all hidden presentations"));
+            show_all->setEnabled(!session_.hidden_presentations().empty());
+            const auto* chosen = menu.exec(browser_tree_->viewport()->mapToGlobal(point));
+            if (chosen == nullptr)
+              return;
+            if (chosen == show_all)
+              (void)session_.show_all_presentations();
+            else if (chosen == toggle) {
+              const auto changed = set_browser_presentation_visible(session_, node, !visible);
+              if (!changed) {
+                show_error(changed.error());
+                return;
+              }
+            }
+            viewport_->clear_selection();
+            refresh();
+            if (active_sketch_)
+              sketch_tools_->publish_scene();
+          });
 
   // Property inspector below the model tree: read-only for most properties,
   // editable for the ones Core contracts support (parameter value/expression).
-  auto* property_dock = new QDockWidget(QStringLiteral("Eigenschaften"), this);
+  auto* property_dock = new QDockWidget(QStringLiteral("Properties"), this);
   property_dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
   properties_ = new QTableWidget(property_dock);
   properties_->setObjectName("blcad.shell.properties");
   properties_->setColumnCount(2);
-  properties_->setHorizontalHeaderLabels(
-      {QStringLiteral("Eigenschaft"), QStringLiteral("Wert")});
+  properties_->setHorizontalHeaderLabels({QStringLiteral("Property"), QStringLiteral("Value")});
   properties_->verticalHeader()->setVisible(false);
   properties_->horizontalHeader()->setStretchLastSection(true);
   properties_->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -509,12 +581,12 @@ void ShellWindow::build_docks() {
   connect(properties_, &QTableWidget::itemChanged, this,
           [this](QTableWidgetItem* item) { handle_property_changed(item); });
 
-  auto* diagnostics_dock = new QDockWidget(QStringLiteral("Diagnose"), this);
+  auto* diagnostics_dock = new QDockWidget(QStringLiteral("Diagnostics"), this);
   diagnostics_dock->setFeatures(QDockWidget::DockWidgetMovable |
                                 QDockWidget::DockWidgetClosable);
   diagnostics_ = new QPlainTextEdit(diagnostics_dock);
   diagnostics_->setReadOnly(true);
-  diagnostics_->setPlaceholderText(QStringLiteral("Diagnosen erscheinen hier"));
+  diagnostics_->setPlaceholderText(QStringLiteral("Diagnostics appear here"));
   diagnostics_dock->setWidget(diagnostics_);
   addDockWidget(Qt::BottomDockWidgetArea, diagnostics_dock);
 }
@@ -668,8 +740,7 @@ bool ShellWindow::open_path(const QString& path, GuiDocumentOpenMode mode) {
       show_error(begun.error());
       return false;
     }
-    statusBar()->showMessage(
-        QStringLiteral("Referenzen prüfen und Reparatur vollständig anwenden."));
+    statusBar()->showMessage(QStringLiteral("Check references and apply the entire repair."));
   }
   return true;
 }
@@ -677,11 +748,11 @@ bool ShellWindow::open_path(const QString& path, GuiDocumentOpenMode mode) {
 bool ShellWindow::save_to(const QString& path) {
   QString target = path;
   if (target.isEmpty() && session_.file_path().empty()) {
-    target = QFileDialog::getSaveFileName(
-        this, QStringLiteral("BLCAD-Dokument speichern"), {},
-        session_.document_kind() == GuiDocumentKind::Project
-            ? QStringLiteral("BLCAD-Projekt (*.blcad.project.json)")
-            : QStringLiteral("BLCAD-Bauteil (*.blcad.json)"));
+    target =
+        QFileDialog::getSaveFileName(this, QStringLiteral("Save BLCAD Document"), {},
+                                     session_.document_kind() == GuiDocumentKind::Project
+                                         ? QStringLiteral("BLCAD Project (*.blcad.project.json)")
+                                         : QStringLiteral("BLCAD Part (*.blcad.json)"));
     if (target.isEmpty())
       return false;
   }
@@ -700,11 +771,10 @@ bool ShellWindow::confirm_document_replacement() {
   if (!session_.dirty())
     return true;
   const auto answer = QMessageBox::warning(
-      this, QStringLiteral("Ungespeicherte Änderungen"),
-      QStringLiteral("Änderungen in %1 vor dem Fortfahren speichern?")
+      this, QStringLiteral("Unsaved Changes"),
+      QStringLiteral("Save changes to %1 before continuing?")
           .arg(QString::fromStdString(std::string(session_.display_name()))),
-      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
-      QMessageBox::Save);
+      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save);
   if (answer == QMessageBox::Save)
     return save_to({});
   return answer == QMessageBox::Discard;
@@ -809,15 +879,14 @@ bool ShellWindow::create_sketch_on_selection() {
   const auto plane = selected_datum_plane();
   if (session_.reference_repair_mode() || active_sketch_ || session_.task().active() ||
       part == nullptr || !plane) {
-    statusBar()->showMessage(
-        QStringLiteral("Zuerst eine Arbeitsebene wählen, dann 2D-Skizze erstellen"));
+    statusBar()->showMessage(QStringLiteral("Select a workplane first, then create a 2D sketch"));
     return false;
   }
   std::size_t number = 1;
   while (part->find_sketch(SketchId("sketch.skizze" + std::to_string(number))) != nullptr)
     ++number;
   auto sketch = Sketch::create(SketchId("sketch.skizze" + std::to_string(number)),
-                               "Skizze" + std::to_string(number), *plane);
+                               "Sketch" + std::to_string(number), *plane);
   if (sketch.has_error()) {
     show_error(sketch.error());
     return false;
@@ -922,10 +991,10 @@ bool ShellWindow::finish_active_sketch() {
         case geometry::SketchRegionDiagnosticKind::OpenContour:
           break;
         case geometry::SketchRegionDiagnosticKind::SelfIntersection:
-          message = "Keine geschlossene Fläche: Die Kontur überschneidet sich selbst.";
+          message = "No closed region: the contour intersects itself.";
           break;
         case geometry::SketchRegionDiagnosticKind::AmbiguousTopology:
-          message = "Keine geschlossene Fläche: Die Kontur ist verzweigt oder mehrdeutig.";
+          message = "No closed region: the contour is branched or ambiguous.";
           break;
         }
         return reject_finish(Error::validation(finished_sketch.value(), std::move(message)));
@@ -943,11 +1012,9 @@ bool ShellWindow::finish_active_sketch() {
         if (topology.has_error())
           return reject_finish(topology.error());
         auto committed = session_.commit_part_sketch_intent_transaction(
-            "Skizzenprofil materialisieren",
-            [completed = std::move(completed), finished_sketch,
-             migration = std::move(migration)](
-                PartDocument& document,
-                std::vector<SketchConstraintCatalog>& constraint_catalogs,
+            "Materialize sketch profile",
+            [completed = std::move(completed), finished_sketch, migration = std::move(migration)](
+                PartDocument& document, std::vector<SketchConstraintCatalog>& constraint_catalogs,
                 std::vector<SketchDimensionCatalog>& dimension_catalogs) mutable {
               auto updated = document.update_sketch(std::move(completed));
               if (updated.has_error())
@@ -992,13 +1059,13 @@ bool ShellWindow::finish_active_sketch() {
   // handoff only after that synchronization has completed.
   if (feature_tools_ && finished_profile.has_value() &&
       feature_tools_->select_profile(finished_sketch, *finished_profile))
-    statusBar()->showMessage(QStringLiteral("Profil bereit — Extrusion oder Drehung wählen"));
+    statusBar()->showMessage(QStringLiteral("Profile ready — choose Extrude or Revolve"));
   else if (feature_tools_ && feature_tools_->select_open_line(finished_sketch))
     statusBar()->showMessage(
-        QStringLiteral("Offene Linie bereit — Extrusion mit Wandstärke wählen"));
+        QStringLiteral("Open line ready — choose Extrude with wall thickness"));
   else if (has_open_contours)
-    statusBar()->showMessage(QStringLiteral(
-        "Skizze beendet — offene Konturen bleiben zum Weiterbearbeiten erhalten"));
+    statusBar()->showMessage(
+        QStringLiteral("Sketch finished — open contours remain available for editing"));
   return true;
 }
 
@@ -1311,7 +1378,7 @@ void ShellWindow::refresh() {
                      : QStringLiteral("BLCAD"));
 
   if (session_.reference_repair_mode())
-    setWindowTitle(windowTitle() + QStringLiteral(" [Reparatur]"));
+    setWindowTitle(windowTitle() + QStringLiteral(" [Repair]"));
 
   QStringList lines;
   for (const auto& diagnostic : session_.diagnostics())
@@ -1385,10 +1452,9 @@ void ShellWindow::refresh_browser() {
   {
     const QSignalBlocker blocker(browser_tree_);
     browser_tree_->clear();
-    browser_tree_->setHeaderLabel(
-        session_.has_document()
-            ? QString::fromStdString(std::string(session_.display_name()))
-            : QStringLiteral("Kein Dokument"));
+    browser_tree_->setHeaderLabel(session_.has_document()
+                                      ? QString::fromStdString(std::string(session_.display_name()))
+                                      : QStringLiteral("No Document"));
     for (const auto& root : browser_model_.roots()) {
       auto* item = append_browser_item(nullptr, browser_tree_, root);
       item->setExpanded(true);
@@ -1465,6 +1531,7 @@ void ShellWindow::refresh_viewport_scene() {
     auto targets = construction_tools_->selection_items();
     scene.value().insert(scene.value().end(), targets.begin(), targets.end());
   }
+  filter_presentation_visibility(session_, scene.value());
   const auto published = viewport_->set_scene(std::move(scene.value()));
   if (published.has_error())
     append_diagnostic(published.error());

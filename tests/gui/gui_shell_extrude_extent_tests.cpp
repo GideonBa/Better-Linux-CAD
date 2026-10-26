@@ -2,6 +2,8 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
+#include "blcad/gui/gui_presentation_visibility.hpp"
+#include "blcad/gui/shell/shell_construction_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -384,6 +386,82 @@ TEST_CASE("Extrude viewport roles retain typed source planes on every origin pla
       REQUIRE(window.redo());
       CHECK(snapshot(window) == after);
     }
+}
+
+TEST_CASE(
+    "Hidden bodies and current producers stay unavailable to limit surface and construction picks",
+    "[gui][presentation-visibility][hidden-body-picking][block136-extrude-limit-picking]") {
+  ShellWindow window;
+  seed(window, true);
+  auto& tools = window.feature_tools();
+  const auto before = snapshot(window);
+  const auto sources = geometry::ViewportSceneBuilder{}.build_construction_sources(
+      *window.session().part_document(), *window.session().part_shape_cache());
+  REQUIRE(sources);
+  REQUIRE(sources.value().size() == 26U);
+  std::vector<geometry::ViewportSceneItem> construction_items;
+  for (const auto& source : sources.value())
+    construction_items.push_back(source.item);
+
+  const auto verify_hidden = [&](std::string_view stage,
+                                 const std::vector<geometry::ViewportSceneItem>& originals,
+                                 std::string_view pick) {
+    INFO("picker stage=" << stage << " pick=" << pick);
+    REQUIRE_FALSE(originals.empty());
+    const auto scope = window.viewport().selection_semantic_scope();
+    REQUIRE(scope);
+    REQUIRE(std::find(scope->begin(), scope->end(), pick) != scope->end());
+    for (const auto& item : originals)
+      REQUIRE(item.owner_body_id == "body.base");
+    for (const std::string mask : {"body/body.base", "feature/feature.base"}) {
+      INFO("hidden mask=" << mask << " pick=" << pick);
+      REQUIRE(window.session().set_presentation_visible(mask, false));
+      window.refresh_feature_selection_scene();
+      auto filtered = originals;
+      filter_presentation_visibility(window.session(), filtered);
+      CHECK(filtered.empty());
+      CHECK_FALSE(window.viewport().select_semantic(pick));
+      CHECK(snapshot(window) == before);
+      REQUIRE(window.session().set_presentation_visible(mask, true));
+      window.refresh_feature_selection_scene();
+      filtered = originals;
+      filter_presentation_visibility(window.session(), filtered);
+      CHECK(filtered.size() == originals.size());
+      CHECK(window.session().task().active());
+    }
+    CHECK(window.viewport().selection_semantic_scope() == scope);
+    REQUIRE(window.viewport().select_semantic(pick));
+    CHECK(snapshot(window) == before);
+  };
+
+  choose(window, "blcad.extrude.extent", static_cast<int>(ExtrudeExtentMode::ToFace));
+  choose(window, "blcad.extrude.pick_role", 1);
+  const auto limits = tools.extrude_selection_items();
+  REQUIRE(limits.size() == 6U);
+  // The complete catalogue includes all six faces, twelve edges and eight
+  // vertices. ToFace consumes those exact source items without losing owners.
+  verify_hidden("construction source catalogue / ToFace", construction_items, limit_source("top"));
+  choose(window, "blcad.extrude.pick_role", 1);
+  verify_hidden("ToFace", limits, limit_source("top"));
+  tools.cancel();
+
+  REQUIRE(tools.begin_surface(ShellFeatureTools::Command::FillSurface));
+  const auto surface_items = tools.finishing_selection_items();
+  REQUIRE_FALSE(surface_items.empty());
+  const auto edge = std::find_if(surface_items.begin(), surface_items.end(), [](const auto& item) {
+    return item.kind == geometry::ViewportSceneKind::Edge;
+  });
+  REQUIRE(edge != surface_items.end());
+  verify_hidden("Fill Surface", surface_items, edge->semantic_id);
+  tools.cancel();
+
+  auto& construction = window.construction_tools();
+  REQUIRE(construction.begin(ShellConstructionTools::Kind::PointOnVertex));
+  const auto vertices = construction.selection_items();
+  REQUIRE(vertices.size() == 8U);
+  verify_hidden("Point On Vertex", vertices, vertices.front().semantic_id);
+  construction.cancel();
+  CHECK(snapshot(window) == before);
 }
 
 TEST_CASE("Extrude picker mode transitions restore scope and retain correctable local inputs",

@@ -200,7 +200,7 @@ TEST_CASE("Sketch3D explicitly confirms parameter detachment and rejects unaccep
   const auto before = snapshot(window);
   edit(window);
   move(window, "driven", 6, 4, 2);
-  CHECK(control<QLabel>(window, "summary").text().contains("Zustimmung"));
+  CHECK(control<QLabel>(window, "summary").text().contains("confirmation"));
   CHECK_FALSE(window.sketch_3d_tools().preview());
   CHECK(snapshot(window) == before);
   control<QCheckBox>(window, "detach").setChecked(true);
@@ -502,7 +502,7 @@ TEST_CASE("Sketch3D viewport collection uses candidate point and line identities
   CHECK(control<QComboBox>(window, "start").currentData().toString() == "point.1");
   pointer(window, QEvent::MouseButtonPress, {2, 2});
   pointer(window, QEvent::MouseButtonRelease, {2, 2});
-  CHECK(control<QLabel>(window, "summary").text().contains("Kein passender"));
+  CHECK(control<QLabel>(window, "summary").text().contains("No matching"));
   CHECK(snapshot(window) == before);
   window.sketch_3d_tools().cancel();
   CHECK(window.viewport().selection_filter_mask() == 17);
@@ -944,7 +944,7 @@ TEST_CASE("Sketch3D placement rejects unobservable axes and planes and recovers 
     pointer(window, QEvent::MouseButtonPress, p);
     pointer(window, QEvent::MouseButtonRelease, p);
     CHECK(control<QComboBox>(window, "point").count() == 1);
-    CHECK(control<QLabel>(window, "summary").text().contains("Ansicht ändern"));
+    CHECK(control<QLabel>(window, "summary").text().contains("Change the view"));
     CHECK(snapshot(window) == before);
   }
   placement_mode(window, "", 6);
@@ -1222,7 +1222,7 @@ TEST_CASE("Sketch3D direction guards pending XYZ overflow and session boundaries
     direction_tuple(window, "1", "0", "0");
     button(window, "stage_direction");
     CHECK(control<QComboBox>(window, "point").count() == 7);
-    CHECK(control<QLabel>(window, "summary").text().contains("XYZ-Bereich"));
+    CHECK(control<QLabel>(window, "summary").text().contains("XYZ range"));
     CHECK(snapshot(window) == before);
     button(window, "clear_direction");
     REQUIRE(window.sketch_3d_tools().preview());
@@ -1343,7 +1343,7 @@ TEST_CASE(
   copy_projection(window);
   CHECK(control<QLabel>(window, "projection_receipts")
             .text()
-            .contains("point.9 ← planar.xy / projected / Projizierter Punkt"));
+            .contains("point.9 ← planar.xy / projected / Projected Point"));
   REQUIRE(window.sketch_3d_tools().preview());
   REQUIRE(window.sketch_3d_tools().apply());
   const auto& sketch = *window.session().part_document()->find_sketch_3d(Sketch3DId("spatial"));
@@ -1531,7 +1531,7 @@ TEST_CASE("Sketch3D planar copying rejects coordinate overflow and expires unfin
     projection_source(window, "far.sketch", SketchReferenceTargetKind::LineSegmentStart);
     copy_projection(window);
     CHECK(control<QComboBox>(window, "point").count() == 6);
-    CHECK(control<QLabel>(window, "summary").text().contains("XYZ-Bereich"));
+    CHECK(control<QLabel>(window, "summary").text().contains("XYZ range"));
     return;
   }
   projection_source(window, "planar.xy", SketchReferenceTargetKind::LineSegmentStart);

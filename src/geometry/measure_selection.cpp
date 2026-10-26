@@ -52,12 +52,9 @@ MeasureSelectionBuilder::build(const std::vector<MeasureSelectionOwner>& owners,
                               const char* family, const char* label, Point3 anchor,
                               GeometryMeasureTarget descriptor) {
         result.push_back({prefix + family + "/" + std::to_string(index),
-                          owner.label + " / " + label + " " + std::to_string(index),
-                          kind,
-                          GeometryShape(std::make_shared<GeometryShape::Impl>(native)),
-                          anchor,
-                          descriptor,
-                          {}});
+                          owner.label + " / " + label + " " + std::to_string(index), kind,
+                          GeometryShape(std::make_shared<GeometryShape::Impl>(native)), anchor,
+                          descriptor, owner.body});
       };
       TopTools_IndexedMapOfShape vertices, edges, faces;
       TopExp::MapShapes(shape, TopAbs_VERTEX, vertices);
@@ -65,7 +62,7 @@ MeasureSelectionBuilder::build(const std::vector<MeasureSelectionOwner>& owners,
       TopExp::MapShapes(shape, TopAbs_FACE, faces);
       for (int i = 1; i <= vertices.Extent(); ++i) {
         const Point3 p = point(BRep_Tool::Pnt(TopoDS::Vertex(vertices(i))));
-        append(vertices(i), MeasureSelectionKind::Point, i, "vertex", "Punkt", p, p);
+        append(vertices(i), MeasureSelectionKind::Point, i, "vertex", "Point", p, p);
       }
       for (int i = 1; i <= edges.Extent(); ++i) {
         const auto edge = TopoDS::Edge(edges(i));
@@ -77,11 +74,11 @@ MeasureSelectionBuilder::build(const std::vector<MeasureSelectionOwner>& owners,
           continue;
         const Point3 anchor = point(curve.Value(first + (last - first) / 2));
         if (curve.GetType() == GeomAbs_Line)
-          append(edge, MeasureSelectionKind::Line, i, "edge", "Gerade Kante", anchor,
+          append(edge, MeasureSelectionKind::Line, i, "edge", "Straight Edge", anchor,
                  AssemblyLineTargetDescriptor{anchor, direction(curve.Line().Direction())});
         else if (curve.GetType() == GeomAbs_Circle) {
           const auto circle = curve.Circle();
-          append(edge, MeasureSelectionKind::Circle, i, "edge", "Kreiskante", anchor,
+          append(edge, MeasureSelectionKind::Circle, i, "edge", "Circular Edge", anchor,
                  AssemblyCircularEdgeTargetDescriptor{
                      point(circle.Location()), direction(circle.XAxis().Direction()),
                      direction(circle.YAxis().Direction()), direction(circle.Axis().Direction()),
@@ -96,13 +93,13 @@ MeasureSelectionBuilder::build(const std::vector<MeasureSelectionOwner>& owners,
         const Point3 anchor = point(properties.CentreOfMass());
         if (surface.GetType() == GeomAbs_Plane) {
           const auto plane = surface.Plane();
-          append(face, MeasureSelectionKind::Plane, i, "face", "Ebene Fläche", anchor,
+          append(face, MeasureSelectionKind::Plane, i, "face", "Planar Face", anchor,
                  AssemblyPlanarTargetDescriptor{anchor, direction(plane.XAxis().Direction()),
                                                 direction(plane.YAxis().Direction()),
                                                 direction(plane.Axis().Direction())});
         } else if (surface.GetType() == GeomAbs_Cylinder) {
           const auto cylinder = surface.Cylinder();
-          append(face, MeasureSelectionKind::Cylinder, i, "face", "Zylinderfläche", anchor,
+          append(face, MeasureSelectionKind::Cylinder, i, "face", "Cylindrical Face", anchor,
                  AssemblyCylindricalSurfaceTargetDescriptor{point(cylinder.Location()),
                                                             direction(cylinder.Axis().Direction()),
                                                             cylinder.Radius()});

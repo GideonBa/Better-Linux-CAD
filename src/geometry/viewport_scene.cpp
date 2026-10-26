@@ -142,6 +142,39 @@ Result<TopoDS_Wire> make_polygon_wire(const PointRange& points, PointMapper map_
   return Result<TopoDS_Wire>::success(polygon.Wire());
 }
 
+template <typename PointMapper>
+Result<TopoDS_Wire> make_exact_curve_wire(const std::vector<ClosedProfileCurveSegment>& curves,
+                                          PointMapper map_point) {
+  BRepBuilderAPI_MakeWire wire;
+  const auto map = [&](Point3 p) { return map_point(Point2{p.x, p.y}); };
+  for (const auto& segment : curves) {
+    TopoDS_Edge edge;
+    if (segment.kind == ClosedProfileCurveKind::Line)
+      edge = BRepBuilderAPI_MakeEdge(map(segment.start), map(segment.end)).Edge();
+    else if (segment.kind == ClosedProfileCurveKind::CircularArc) {
+      GC_MakeArcOfCircle arc(map(segment.start), map(segment.mid), map(segment.end));
+      if (!arc.IsDone())
+        return Result<TopoDS_Wire>::failure(scene_error("could not build curved region arc"));
+      edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge();
+    } else {
+      TColgp_Array1OfPnt poles(1, 4);
+      poles.SetValue(1, map(segment.start));
+      poles.SetValue(2, map(segment.mid));
+      poles.SetValue(3, map(segment.control2));
+      poles.SetValue(4, map(segment.end));
+      TColStd_Array1OfReal weights(1, 4);
+      for (int i = 1; i <= 4; ++i)
+        weights.SetValue(i, segment.weights[i - 1]);
+      Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles, weights);
+      edge = BRepBuilderAPI_MakeEdge(curve).Edge();
+    }
+    wire.Add(edge);
+  }
+  if (!wire.IsDone())
+    return Result<TopoDS_Wire>::failure(scene_error("could not build exact region wire"));
+  return Result<TopoDS_Wire>::success(wire.Wire());
+}
+
 template <typename PointRange, typename PointMapper>
 Result<TopoDS_Shape> make_profile_face(const PointRange& points, PointMapper map_point,
                                        const std::vector<ContainedProfileHole>& holes = {}) {
@@ -153,6 +186,8 @@ Result<TopoDS_Shape> make_profile_face(const PointRange& points, PointMapper map
   for (const ContainedProfileHole& hole : holes) {
     Result<TopoDS_Wire> wire = hole.kind == ContainedProfileHoleKind::Circle
                                    ? make_circle_wire(hole.center, hole.radius_mm, map_point)
+                               : hole.kind == ContainedProfileHoleKind::Curves
+                                   ? make_exact_curve_wire(hole.curves, map_point)
                                    : make_polygon_wire(hole.vertices, map_point);
     if (wire.has_error())
       return Result<TopoDS_Shape>::failure(wire.error());
@@ -190,6 +225,10 @@ ViewportSceneBuilder::build_construction_sources(const PartDocument& document,
       }
       const auto identity = "construction-source/" + std::to_string(feature.id().value().size()) +
                             ":" + feature.id().value() + "/";
+      const std::string owner_body_id =
+          feature.body_result_context()
+              ? feature.body_result_context()->effective_produced_body().value()
+              : std::string{};
       for (int i = 0; i < 6; ++i) {
         auto reference = SemanticFaceReference::create(feature.id(), static_cast<SemanticFace>(i));
         if (!reference)
@@ -208,7 +247,8 @@ ViewportSceneBuilder::build_construction_sources(const PartDocument& document,
           targets.push_back({{ViewportSceneKind::Face,
                               identity + "face/" + std::string(to_string(reference.value().face())),
                               GeometryShape(std::make_shared<GeometryShape::Impl>(
-                                  BRepBuilderAPI_MakeFace(polygon.Wire()).Shape()))},
+                                  BRepBuilderAPI_MakeFace(polygon.Wire()).Shape())),
+                              SketchLineRole::Geometry, owner_body_id},
                              reference.value()});
         }
       }
@@ -225,7 +265,8 @@ ViewportSceneBuilder::build_construction_sources(const PartDocument& document,
                               GeometryShape(std::make_shared<GeometryShape::Impl>(
                                   BRepBuilderAPI_MakeEdge(to_point(edge.value().start),
                                                           to_point(edge.value().end))
-                                      .Shape()))},
+                                      .Shape())),
+                              SketchLineRole::Geometry, owner_body_id},
                              reference.value()});
       }
       for (int i = 0; i < 8; ++i) {
@@ -239,7 +280,8 @@ ViewportSceneBuilder::build_construction_sources(const PartDocument& document,
               {{ViewportSceneKind::Vertex,
                 identity + "vertex/" + std::string(to_string(reference.value().vertex())),
                 GeometryShape(std::make_shared<GeometryShape::Impl>(
-                    BRepBuilderAPI_MakeVertex(to_point(vertex.value().position)).Shape()))},
+                    BRepBuilderAPI_MakeVertex(to_point(vertex.value().position)).Shape())),
+                SketchLineRole::Geometry, owner_body_id},
                reference.value()});
       }
     }
@@ -263,7 +305,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
         continue;
       const auto kind = body->kind() == BodyKind::Surface ? ViewportSceneKind::SurfaceBody
                                                           : ViewportSceneKind::SolidBody;
-      items.push_back({kind, "body/" + cached.body_id.value(), cached.shape});
+      items.push_back({kind, "body/" + cached.body_id.value(), cached.shape,
+                       SketchLineRole::Geometry, cached.body_id.value()});
     }
 
     if (items.empty() && shape_cache.has_final_shape() && shape_cache.final_shape() != nullptr &&
@@ -459,19 +502,15 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
             scene_error("closed profile references an unavailable sketch curve"));
       };
       const auto contour_is_counter_clockwise =
-          [&sketch](const std::vector<SketchEntityId>& contour) -> std::optional<bool> {
-        std::vector<Point2> vertices;
-        vertices.reserve(contour.size());
-        for (const SketchEntityId& entity : contour) {
-          const LineSegment* line = sketch.find_line_segment(entity);
-          if (line == nullptr)
-            return std::nullopt;
-          vertices.push_back(line->start());
-        }
-        const double area_twice = signed_polygon_area_twice(vertices);
+          [&sketch, &document](const std::vector<SketchEntityId>& contour) -> std::optional<bool> {
+        auto sampled = resolve_curved_profile_hole(document, sketch,
+                                                   ProfileId("transient.orientation"), contour);
+        if (!sampled)
+          return std::nullopt;
+        const double area_twice = signed_polygon_area_twice(sampled.value().vertices);
         if (std::abs(area_twice) <= 1.0e-12)
           return std::nullopt;
-        return area_twice > 0.0;
+        return area_twice > 0;
       };
       const std::vector<std::vector<SketchEntityId>> no_inner_contours;
       const std::vector<ContainedProfileHole> no_profile_holes;
@@ -520,6 +559,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
           Result<TopoDS_Wire> inner_wire =
               hole.kind == ContainedProfileHoleKind::Circle
                   ? make_circle_wire(hole.center, hole.radius_mm, point)
+              : hole.kind == ContainedProfileHoleKind::Curves
+                  ? make_exact_curve_wire(hole.curves, point)
                   : make_polygon_wire(hole.vertices, point);
           if (inner_wire.has_error())
             return Result<std::size_t>::failure(inner_wire.error());
@@ -558,8 +599,16 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
           return Result<std::vector<ViewportSceneItem>>::failure(appended.error());
       }
       for (const ArcClosedProfile& profile : sketch.arc_closed_profiles()) {
+        auto contour =
+            resolve_curved_profile_hole(document, sketch, profile.id(), profile.curve_segments());
+        if (!contour)
+          return Result<std::vector<ViewportSceneItem>>::failure(contour.error());
+        auto holes = classify_contained_profile_holes(document, sketch, profile.id(),
+                                                      contour.value().vertices);
+        if (!holes)
+          return Result<std::vector<ViewportSceneItem>>::failure(holes.error());
         auto appended = append_curve_profile(profile.id(), profile.curve_segments(),
-                                             no_inner_contours, no_profile_holes);
+                                             no_inner_contours, holes.value());
         if (appended.has_error())
           return Result<std::vector<ViewportSceneItem>>::failure(appended.error());
       }
@@ -580,8 +629,12 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
       if (detected_regions) {
         for (const auto& region : detected_regions.value().regions) {
           if (!region.curve_segments.empty()) {
+            auto holes =
+                classify_contained_profile_holes(document, sketch, region.id, region.vertices);
+            if (!holes)
+              continue;
             auto appended = append_curve_profile(region.id, region.curve_segments,
-                                                no_inner_contours, no_profile_holes);
+                                                 no_inner_contours, holes.value());
             if (appended.has_error())
               continue;
             continue;

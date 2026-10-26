@@ -104,10 +104,10 @@ std::size_t next_extrude_index(const PartDocument& part) {
         !part.dependency_graph().has_node("parameter.extrusion." + suffix + ".depth.second") &&
         !part.dependency_graph().has_node("parameter.extrusion." + suffix + ".depth.wall") &&
         !part.dependency_graph().has_node("parameter.extrusion." + suffix + ".depth.wall.second") &&
-        !parameter_name_exists(part, "Extrusion " + suffix + " Tiefe") &&
-        !parameter_name_exists(part, "feature.extrusion." + suffix + " zweite Tiefe") &&
-        !parameter_name_exists(part, "feature.extrusion." + suffix + " Wandstärke") &&
-        !parameter_name_exists(part, "feature.extrusion." + suffix + " zweite Wandstärke"))
+        !parameter_name_exists(part, "Extrude " + suffix + " Depth") &&
+        !parameter_name_exists(part, "feature.extrusion." + suffix + " Second Depth") &&
+        !parameter_name_exists(part, "feature.extrusion." + suffix + " Wall Thickness") &&
+        !parameter_name_exists(part, "feature.extrusion." + suffix + " Second Wall Thickness"))
       return index;
   }
 }
@@ -154,20 +154,20 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
                                      OcctViewport& viewport, ShellRibbon& ribbon, int model_tab)
     : QObject(&window), window_(window), session_(session), sketch_workbench_(sketch_workbench),
       viewport_(viewport), coordinator_(&session_, &layer_) {
-  auto* feature_group = ribbon.add_group(model_tab, QStringLiteral("Erstellen"));
-  action_extrude_ = new QAction(QStringLiteral("Extrusion"), this);
+  auto* feature_group = ribbon.add_group(model_tab, QStringLiteral("Create"));
+  action_extrude_ = new QAction(QStringLiteral("Extrude"), this);
   action_extrude_->setObjectName(QStringLiteral("blcad.action.extrude"));
   action_extrude_->setToolTip(
-      QStringLiteral("Profil wählen und eine Extrusion mit Vorschau starten"));
+      QStringLiteral("Select a profile and start an extrusion with preview"));
   connect(action_extrude_, &QAction::triggered, this, [this] {
     const auto begun = begin_extrude();
     if (begun.has_error())
       report(begun.error());
   });
-  action_revolve_ = new QAction(QStringLiteral("Drehung"), this);
+  action_revolve_ = new QAction(QStringLiteral("Revolve"), this);
   action_revolve_->setObjectName(QStringLiteral("blcad.action.revolve"));
   action_revolve_->setToolTip(
-      QStringLiteral("Profil wählen und eine Drehung um eine passende Ursprungsachse starten"));
+      QStringLiteral("Select a profile and start a revolution around a suitable origin axis"));
   connect(action_revolve_, &QAction::triggered, this, [this] {
     const auto begun = begin_revolve();
     if (begun.has_error())
@@ -176,11 +176,11 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   ribbon.add_button(feature_group, action_extrude_);
   ribbon.add_button(feature_group, action_revolve_);
 
-  auto* finishing_group = ribbon.add_group(model_tab, QStringLiteral("Bearbeiten"));
-  for (const auto& [command, label, id] : {std::tuple{Command::Fillet, "Verrunden", "fillet"},
-                                           std::tuple{Command::Chamfer, "Fase", "chamfer"},
-                                           std::tuple{Command::Shell, "Aushöhlen", "shell"},
-                                           std::tuple{Command::Draft, "Formschräge", "draft"}}) {
+  auto* finishing_group = ribbon.add_group(model_tab, QStringLiteral("Modify"));
+  for (const auto& [command, label, id] : {std::tuple{Command::Fillet, "Fillet", "fillet"},
+                                           std::tuple{Command::Chamfer, "Chamfer", "chamfer"},
+                                           std::tuple{Command::Shell, "Shell", "shell"},
+                                           std::tuple{Command::Draft, "Draft", "draft"}}) {
     auto* action = new QAction(QString::fromUtf8(label), this);
     action->setObjectName(QStringLiteral("blcad.action.") + QString::fromUtf8(id));
     connect(action, &QAction::triggered, this, [this, command] {
@@ -192,11 +192,11 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
     finishing_actions_.emplace_back(command, action);
   }
 
-  auto* pattern_group = ribbon.add_group(model_tab, QStringLiteral("Muster"));
+  auto* pattern_group = ribbon.add_group(model_tab, QStringLiteral("Pattern"));
   for (const auto& [command, label, id] :
-       {std::tuple{Command::LinearPattern, "Lineares Muster", "linear_pattern"},
-        std::tuple{Command::CircularPattern, "Kreismuster", "circular_pattern"},
-        std::tuple{Command::BodyMirror, "Körper spiegeln", "body_mirror"}}) {
+       {std::tuple{Command::LinearPattern, "Linear Pattern", "linear_pattern"},
+        std::tuple{Command::CircularPattern, "Circular Pattern", "circular_pattern"},
+        std::tuple{Command::BodyMirror, "Mirror Bodies", "body_mirror"}}) {
     auto* action = new QAction(QString::fromUtf8(label), this);
     action->setObjectName(QStringLiteral("blcad.action.") + QString::fromUtf8(id));
     connect(action, &QAction::triggered, this, [this, command] {
@@ -208,12 +208,12 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
     pattern_actions_.emplace_back(command, action);
   }
 
-  auto* body_group = ribbon.add_group(model_tab, QStringLiteral("Körper"));
+  auto* body_group = ribbon.add_group(model_tab, QStringLiteral("Body"));
   for (const auto& [command, label, id] :
-       {std::tuple{Command::BodyBoolean, "Kombinieren", "body_boolean"},
-        std::tuple{Command::BodyTranslate, "Verschieben", "body_translate"},
-        std::tuple{Command::BodyRotate, "Drehen", "body_rotate"},
-        std::tuple{Command::BodyScale, "Skalieren", "body_scale"}}) {
+       {std::tuple{Command::BodyBoolean, "Combine", "body_boolean"},
+        std::tuple{Command::BodyTranslate, "Move", "body_translate"},
+        std::tuple{Command::BodyRotate, "Rotate", "body_rotate"},
+        std::tuple{Command::BodyScale, "Scale", "body_scale"}}) {
     auto* action = new QAction(QString::fromUtf8(label), this);
     action->setObjectName(QStringLiteral("blcad.action.") + QString::fromUtf8(id));
     connect(action, &QAction::triggered, this, [this, command] {
@@ -227,7 +227,7 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
 
   auto* spatial_group = ribbon.add_group(model_tab, QStringLiteral("Sweep / Loft"));
   for (const auto& [command, label, id] :
-       {std::tuple{Command::PathCurve, "Pfad erstellen", "path_curve"},
+       {std::tuple{Command::PathCurve, "Create Path", "path_curve"},
         std::tuple{Command::Sweep, "Sweep", "sweep"}, std::tuple{Command::Loft, "Loft", "loft"}}) {
     auto* action = new QAction(QString::fromUtf8(label), this);
     action->setObjectName(QStringLiteral("blcad.action.") + QString::fromUtf8(id));
@@ -244,14 +244,14 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
       action_loft_ = action;
   }
 
-  auto* surface_group = ribbon.add_group(model_tab, QStringLiteral("Flächen"));
+  auto* surface_group = ribbon.add_group(model_tab, QStringLiteral("Faces"));
   for (const auto& [command, label, id] :
-       {std::tuple{Command::BoundarySurface, "Begrenzungsfläche", "surface_boundary"},
-        std::tuple{Command::FillSurface, "Füllfläche", "surface_fill"},
-        std::tuple{Command::TrimSurface, "Fläche trimmen", "surface_trim"},
-        std::tuple{Command::ExtendSurface, "Fläche erweitern", "surface_extend"},
-        std::tuple{Command::SurfaceStitch, "Flächen vernähen", "surface_stitch"},
-        std::tuple{Command::ClosedShellToSolid, "Hülle zu Volumen", "surface_to_solid"}}) {
+       {std::tuple{Command::BoundarySurface, "Boundary Surface", "surface_boundary"},
+        std::tuple{Command::FillSurface, "Fill Surface", "surface_fill"},
+        std::tuple{Command::TrimSurface, "Trim Surface", "surface_trim"},
+        std::tuple{Command::ExtendSurface, "Extend Surface", "surface_extend"},
+        std::tuple{Command::SurfaceStitch, "Stitch Surfaces", "surface_stitch"},
+        std::tuple{Command::ClosedShellToSolid, "Shell to Solid", "surface_to_solid"}}) {
     auto* action = new QAction(QString::fromUtf8(label), this);
     action->setObjectName(QStringLiteral("blcad.action.") + QString::fromUtf8(id));
     connect(action, &QAction::triggered, this, [this, command] {
@@ -283,7 +283,7 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   auto* form = new QFormLayout();
   numeric_editor_ = new QLineEdit(panel);
   numeric_editor_->setObjectName(QStringLiteral("blcad.manipulator_numeric_hud"));
-  value_label_ = new QLabel(QStringLiteral("Wert"), panel);
+  value_label_ = new QLabel(QStringLiteral("Value"), panel);
   form->addRow(value_label_, numeric_editor_);
   column->addLayout(form);
   build_extrude_controls(panel);
@@ -294,9 +294,9 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   build_spatial_controls(panel);
   build_surface_controls(panel);
   auto* buttons = new QHBoxLayout();
-  apply_button_ = new QPushButton(QStringLiteral("Anwenden"), dock_contents);
+  apply_button_ = new QPushButton(QStringLiteral("Apply"), dock_contents);
   apply_button_->setObjectName(QStringLiteral("blcad.feature.apply"));
-  cancel_button_ = new QPushButton(QStringLiteral("Abbrechen"), dock_contents);
+  cancel_button_ = new QPushButton(QStringLiteral("Cancel"), dock_contents);
   cancel_button_->setObjectName(QStringLiteral("blcad.feature.cancel"));
   buttons->addWidget(apply_button_);
   buttons->addWidget(cancel_button_);
@@ -435,7 +435,7 @@ Result<std::pair<SketchId, ProfileId>> ShellFeatureTools::profile_from_selection
     if (const auto valid = validate(*selected_profile_))
       return Result<std::pair<SketchId, ProfileId>>::success(*valid);
   return Result<std::pair<SketchId, ProfileId>>::failure(
-      Error::validation("gui.shell.feature", "zuerst ein materialisiertes Skizzenprofil wählen"));
+      Error::validation("gui.shell.feature", "select a materialized sketch profile first"));
 }
 
 Result<GuiSketchPlaneView> ShellFeatureTools::selected_profile_plane() const {
@@ -449,7 +449,7 @@ Result<DatumAxisId> ShellFeatureTools::default_revolve_axis(const GuiSketchPlane
   const auto* part = session_.part_document();
   if (part == nullptr)
     return Result<DatumAxisId>::failure(
-        Error::validation("gui.shell.feature", "Drehung benötigt ein aktives Bauteil"));
+        Error::validation("gui.shell.feature", "Revolve requires an active part"));
   for (const auto& axis : part->datum_axes()) {
     if (axis.kind() != DatumAxisKind::Explicit)
       continue;
@@ -460,13 +460,13 @@ Result<DatumAxisId> ShellFeatureTools::default_revolve_axis(const GuiSketchPlane
       return Result<DatumAxisId>::success(axis.id());
   }
   return Result<DatumAxisId>::failure(Error::validation(
-      "gui.shell.feature", "keine zur Profilebene passende Bezugsachse gefunden"));
+      "gui.shell.feature", "no reference axis compatible with the profile plane found"));
 }
 
 Result<std::size_t> ShellFeatureTools::begin_extrude() {
   if (active() || session_.task().active())
     return Result<std::size_t>::failure(
-        Error::validation("gui.shell.feature", "zuerst den aktiven Befehl beenden"));
+        Error::validation("gui.shell.feature", "finish the active command first"));
   auto selected = profile_from_selection();
   const auto open_line = open_line_from_selection();
   if (selected.has_error() && !open_line)
@@ -478,7 +478,7 @@ Result<std::size_t> ShellFeatureTools::begin_extrude() {
   const auto* part = session_.part_document();
   if (part == nullptr)
     return Result<std::size_t>::failure(
-        Error::validation("gui.shell.feature", "Extrusion benötigt ein aktives Bauteil"));
+        Error::validation("gui.shell.feature", "Extrude requires an active part"));
 
   const std::size_t index = next_extrude_index(*part);
   const std::string suffix = std::to_string(index);
@@ -489,22 +489,22 @@ Result<std::size_t> ShellFeatureTools::begin_extrude() {
   if (quantity.has_error())
     return Result<std::size_t>::failure(quantity.error());
   auto parameter =
-      Parameter::create_length(parameter_id, "Extrusion " + suffix + " Tiefe", quantity.value());
+      Parameter::create_length(parameter_id, "Extrude " + suffix + " Depth", quantity.value());
   if (parameter.has_error())
     return Result<std::size_t>::failure(parameter.error());
-  auto body = Body::create(body_id, "Körper " + suffix, BodyKind::Solid);
+  auto body = Body::create(body_id, "Body " + suffix, BodyKind::Solid);
   if (body.has_error())
     return Result<std::size_t>::failure(body.error());
 
   preview_valid_ = false;
   if (!session_.task().begin("part.extrude") || !session_.task().begin_parameter_editing())
     return Result<std::size_t>::failure(
-        Error::validation("gui.shell.feature", "Extrusionsaufgabe konnte nicht gestartet werden"));
+        Error::validation("gui.shell.feature", "Could not start extrude task"));
   GuiFeatureManipulatorFrame frame{plane.value().origin, plane.value().normal, plane.value().normal,
                                    plane.value().x_axis};
   auto begun = coordinator_.begin_extrude_with_new_inputs(
       sketch, open_line ? std::nullopt : std::optional(selected.value().second), feature,
-      "Extrusion " + suffix, std::move(parameter.value()), std::move(body.value()), frame);
+      "Extrude " + suffix, std::move(parameter.value()), std::move(body.value()), frame);
   if (begun.has_error()) {
     (void)session_.task().cancel();
     return begun;
@@ -533,9 +533,9 @@ Result<std::size_t> ShellFeatureTools::begin_extrude() {
   if (!session_.task().show_preview()) {
     cancel();
     return Result<std::size_t>::failure(
-        Error::internal("gui.shell.feature", "Extrusionsvorschau konnte nicht aktiviert werden"));
+        Error::internal("gui.shell.feature", "Could not activate extrude preview"));
   }
-  show_task_panel(QStringLiteral("Extrusion"), QStringLiteral("mm"), 10.0);
+  show_task_panel(QStringLiteral("Extrude"), QStringLiteral("mm"), 10.0);
   auto preview = preview_and_publish();
   if (preview.has_error()) {
     const Error error = preview.error();
@@ -549,7 +549,7 @@ Result<std::size_t> ShellFeatureTools::begin_extrude() {
 Result<std::size_t> ShellFeatureTools::begin_revolve(std::optional<DatumAxisId> requested_axis) {
   if (active() || session_.task().active())
     return Result<std::size_t>::failure(
-        Error::validation("gui.shell.feature", "zuerst den aktiven Befehl beenden"));
+        Error::validation("gui.shell.feature", "finish the active command first"));
   auto selected = profile_from_selection();
   if (selected.has_error())
     return Result<std::size_t>::failure(selected.error());
@@ -566,16 +566,16 @@ Result<std::size_t> ShellFeatureTools::begin_revolve(std::optional<DatumAxisId> 
   const std::string suffix = std::to_string(index);
   const FeatureId feature("feature.drehung." + suffix);
   const BodyId body_id("body." + suffix);
-  auto body = Body::create(body_id, "Körper " + suffix, BodyKind::Solid);
+  auto body = Body::create(body_id, "Body " + suffix, BodyKind::Solid);
   if (body.has_error())
     return Result<std::size_t>::failure(body.error());
 
   preview_valid_ = false;
   if (!session_.task().begin("part.revolve") || !session_.task().begin_parameter_editing())
     return Result<std::size_t>::failure(
-        Error::validation("gui.shell.feature", "Drehungsaufgabe konnte nicht gestartet werden"));
+        Error::validation("gui.shell.feature", "Could not start revolve task"));
   auto begun = coordinator_.begin_revolve_with_new_body(
-      selected.value().first, selected.value().second, feature, "Drehung " + suffix, axis.reference,
+      selected.value().first, selected.value().second, feature, "Revolve " + suffix, axis.reference,
       std::move(body.value()), axis.frame);
   if (begun.has_error()) {
     (void)session_.task().cancel();
@@ -590,9 +590,9 @@ Result<std::size_t> ShellFeatureTools::begin_revolve(std::optional<DatumAxisId> 
   if (!session_.task().show_preview()) {
     cancel();
     return Result<std::size_t>::failure(
-        Error::internal("gui.shell.feature", "Drehungsvorschau konnte nicht aktiviert werden"));
+        Error::internal("gui.shell.feature", "Could not activate revolve preview"));
   }
-  show_task_panel(QStringLiteral("Drehung"), QStringLiteral("deg"), 180.0);
+  show_task_panel(QStringLiteral("Revolve"), QStringLiteral("deg"), 180.0);
   auto preview = preview_and_publish();
   // Keep an invalid initial profile/axis combination correctable in the task.
   if (!preview)
@@ -604,7 +604,7 @@ Result<std::size_t> ShellFeatureTools::begin_revolve(std::optional<DatumAxisId> 
 Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_text(const QString& text) {
   if (!active())
     return Result<GuiPartFeaturePreview>::failure(
-        Error::validation("gui.shell.feature", "kein aktiver Feature-Wert"));
+        Error::validation("gui.shell.feature", "no active feature value"));
   const std::string_view unit = command_ == Command::BodyScale ? ""
                                 : angular_value()              ? "deg"
                                                                : "mm";
@@ -612,7 +612,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_text(const QString&
   if (!value.has_value()) {
     synchronize_numeric_editor(current_value());
     return Result<GuiPartFeaturePreview>::failure(
-        Error::validation("gui.shell.feature", "numerischer Wert oder Einheit ist ungültig"));
+        Error::validation("gui.shell.feature", "numeric value or unit is invalid"));
   }
   auto preview = set_numeric_value(*value);
   if (preview.has_error())
@@ -626,7 +626,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_translation_text(std::size_
   if (command_ != Command::BodyTranslate || component > 2 || !value) {
     synchronize_numeric_editor(current_value());
     return Result<GuiPartFeaturePreview>::failure(
-        Error::validation("body", "Verschiebung oder Einheit ist ungültig"));
+        Error::validation("body", "translation or unit is invalid"));
   }
   GuiViewportManipulatorCandidate candidate;
   candidate.handle_id = std::string(kTransformTranslatePrefix) + "." + "xyz"[component];
@@ -639,7 +639,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_translation_text(std::size_
         !layer_.candidate()) {
       synchronize_numeric_editor(current_value());
       return Result<GuiPartFeaturePreview>::failure(
-          Error::validation("body", "zuerst den aktiven Manipulatorzug abschließen"));
+          Error::validation("body", "finish the active manipulator drag first"));
     }
     candidate = *layer_.candidate();
   }
@@ -653,7 +653,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_scale_center_text(std::size
       !layer_.active_handle_id().empty()) {
     synchronize_body_editors();
     return Result<GuiPartFeaturePreview>::failure(
-        Error::validation("body", "Skalierungszentrum oder Einheit ist ungültig"));
+        Error::validation("body", "scale center or unit is invalid"));
   }
   const auto previous = body_scale_center_;
   if (component == 0)
@@ -676,13 +676,13 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_scale_center_text(std::size
 Result<GuiPartFeaturePreview> ShellFeatureTools::set_secondary_numeric_text(const QString& text) {
   if (command_ != Command::Chamfer || finishing_mode_->currentIndex() <= 0)
     return Result<GuiPartFeaturePreview>::failure(
-        Error::validation("finishing", "kein zweites Fasenmaß aktiv"));
+        Error::validation("finishing", "no second chamfer size active"));
   const bool angular = finishing_mode_->currentIndex() == 2;
   auto value = parse_numeric(text, angular ? "deg" : "mm");
   if (!value) {
     secondary_numeric_editor_->setText(number_text(finishing_second_value_));
     return Result<GuiPartFeaturePreview>::failure(
-        Error::validation("finishing", "zweites Maß oder Einheit ist ungültig"));
+        Error::validation("finishing", "second size or unit is invalid"));
   }
   GuiViewportManipulatorCandidate candidate;
   candidate.handle_id = std::string(angular ? kChamferAngleHandleId : kChamferDistance2HandleId);
@@ -695,7 +695,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_secondary_numeric_text(cons
         !layer_.set_numeric_input(number_text(*value).toStdString() + (angular ? " deg" : " mm")) ||
         !layer_.candidate())
       return Result<GuiPartFeaturePreview>::failure(
-          Error::validation("finishing", "aktiver Manipulatorzug passt nicht zum zweiten Maß"));
+          Error::validation("finishing", "active manipulator drag does not match the second size"));
     candidate = *layer_.candidate();
   }
   auto preview = accept_manipulator_candidate(candidate);
@@ -707,39 +707,39 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_secondary_numeric_text(cons
 Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_value(double value) {
   if (!active() || !std::isfinite(value))
     return Result<GuiPartFeaturePreview>::failure(
-        Error::validation("gui.shell.feature", "kein aktiver Feature-Wert"));
+        Error::validation("gui.shell.feature", "no active feature value"));
   GuiViewportManipulatorCandidate candidate;
   candidate.source = GuiViewportManipulatorInputSource::Numeric;
   candidate.scalar_value = value;
   if (command_ == Command::Extrude) {
     if (value <= 0.0)
       return Result<GuiPartFeaturePreview>::failure(
-          Error::validation("gui.shell.feature", "Extrusionstiefe muss positiv sein"));
+          Error::validation("gui.shell.feature", "Extrude depth must be positive"));
     candidate.handle_id = std::string(kExtrudeExtentHandleId);
     candidate.value_kind = GuiViewportManipulatorValueKind::Distance;
   } else if (command_ == Command::Revolve) {
     if (value <= 0.0 || value >= 360.0)
-      return Result<GuiPartFeaturePreview>::failure(
-          Error::validation("gui.shell.feature", "Drehwinkel muss zwischen 0 und 360 Grad liegen"));
+      return Result<GuiPartFeaturePreview>::failure(Error::validation(
+          "gui.shell.feature", "Revolve angle must be between 0 and 360 degrees"));
     candidate.handle_id = std::string(kRevolveAngleHandleId);
     candidate.value_kind = GuiViewportManipulatorValueKind::Angle;
   } else if (surface()) {
     if (!surface_scalar() || !coordinator_.surface().active())
       return Result<GuiPartFeaturePreview>::failure(
-          Error::validation("surface", "Zuerst gültige Flächeneingaben auswählen"));
+          Error::validation("surface", "Select valid surface inputs first"));
     candidate.handle_id = std::string(
         command_ == Command::ExtendSurface ? kSurfaceExtendHandleId : kSurfaceToleranceValueId);
     candidate.value_kind = GuiViewportManipulatorValueKind::Distance;
   } else if (spatial()) {
     if (!spatial_scalar())
-      return Result<GuiPartFeaturePreview>::failure(Error::validation(
-          "spatial", "nur die aktive Sweep-Verdrehung besitzt einen numerischen Winkel"));
+      return Result<GuiPartFeaturePreview>::failure(
+          Error::validation("spatial", "only the active sweep twist has a numeric angle"));
     candidate.handle_id = std::string(kSweepTwistHandleId);
     candidate.value_kind = GuiViewportManipulatorValueKind::Angle;
   } else if (body_operation()) {
     if (command_ == Command::BodyBoolean)
       return Result<GuiPartFeaturePreview>::failure(
-          Error::validation("body", "Boolean hat kein numerisches Maß"));
+          Error::validation("body", "Boolean has no numeric size"));
     candidate.handle_id = command_ == Command::BodyTranslate
                               ? std::string(kTransformTranslatePrefix) + ".x"
                           : command_ == Command::BodyRotate ? std::string(kTransformAngleHandleId)
@@ -751,7 +751,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_value(double value)
   } else if (pattern()) {
     if (command_ == Command::BodyMirror)
       return Result<GuiPartFeaturePreview>::failure(
-          Error::validation("pattern", "Spiegeln hat keinen numerischen Abstand"));
+          Error::validation("pattern", "Mirror has no numeric distance"));
     candidate.handle_id = std::string(command_ == Command::LinearPattern ? kPatternSpacingHandleId
                                                                          : kPatternAngleHandleId);
     candidate.value_kind = angular_value() ? GuiViewportManipulatorValueKind::Angle
@@ -762,7 +762,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_value(double value)
                              : coordinator_.shell_draft().handles();
     if (handles.empty())
       return Result<GuiPartFeaturePreview>::failure(
-          Error::validation("finishing", "zuerst gültige Eingaben und Elemente auswählen"));
+          Error::validation("finishing", "select valid inputs and elements first"));
     candidate.handle_id = handles.front().id;
     candidate.value_kind = angular_value() ? GuiViewportManipulatorValueKind::Angle
                                            : GuiViewportManipulatorValueKind::Distance;
@@ -770,12 +770,12 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_value(double value)
   if (!layer_.active_handle_id().empty()) {
     if (layer_.active_handle_id() != candidate.handle_id)
       return Result<GuiPartFeaturePreview>::failure(
-          Error::validation(candidate.handle_id, "zuerst den aktiven Manipulatorzug abschließen"));
+          Error::validation(candidate.handle_id, "finish the active manipulator drag first"));
     const std::string unit = command_ == Command::BodyScale ? "" : angular_value() ? " deg" : " mm";
     if (!layer_.set_numeric_input(number_text(value).toStdString() + unit) ||
         !layer_.candidate().has_value())
       return Result<GuiPartFeaturePreview>::failure(
-          Error::validation(candidate.handle_id, "numerische Manipulatoreingabe ist ungültig"));
+          Error::validation(candidate.handle_id, "numeric manipulator input is invalid"));
     candidate = *layer_.candidate();
   }
   return accept_manipulator_candidate(candidate);
@@ -785,7 +785,7 @@ Result<GuiPartFeaturePreview>
 ShellFeatureTools::accept_manipulator_candidate(const GuiViewportManipulatorCandidate& candidate) {
   if (!active())
     return Result<GuiPartFeaturePreview>::failure(
-        Error::validation("gui.shell.feature", "kein aktives interaktives Feature"));
+        Error::validation("gui.shell.feature", "no active interactive feature"));
   const bool secondary =
       command_ == Command::Chamfer && (candidate.handle_id == kChamferDistance2HandleId ||
                                        candidate.handle_id == kChamferAngleHandleId);
@@ -793,7 +793,7 @@ ShellFeatureTools::accept_manipulator_candidate(const GuiViewportManipulatorCand
   if (!std::isfinite(candidate.scalar_value) || !coordinator_.on_candidate(candidate))
     return Result<GuiPartFeaturePreview>::failure(
         Error::validation(candidate.handle_id.empty() ? "gui.shell.feature" : candidate.handle_id,
-                          "Manipulator-Kandidat passt nicht zum aktiven Feature"));
+                          "manipulator candidate does not match the active feature"));
   synchronize_manipulator_editor(candidate.handle_id);
   if (secondary) {
     finishing_second_value_ = coordinator_.finishing().second_value();
@@ -814,9 +814,9 @@ ShellFeatureTools::accept_manipulator_candidate(const GuiViewportManipulatorCand
   if (candidate.handle_id == kPatternCountHandleId)
     rollback.count_value = static_cast<int>(previous_value);
   if (!coordinator_.on_candidate(rollback)) {
-    return Result<GuiPartFeaturePreview>::failure(Error::internal(
-        candidate.handle_id.empty() ? "gui.shell.feature" : candidate.handle_id,
-        "gültiger Manipulatorwert konnte nach Vorschaufehler nicht wiederhergestellt werden"));
+    return Result<GuiPartFeaturePreview>::failure(
+        Error::internal(candidate.handle_id.empty() ? "gui.shell.feature" : candidate.handle_id,
+                        "could not restore valid manipulator value after preview error"));
   }
   synchronize_manipulator_editor(candidate.handle_id);
   if (secondary) {
@@ -845,12 +845,12 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   auto preview =
       pattern() && pattern_sources_->selectedItems().empty()
           ? Result<GuiPartFeaturePreview>::failure(
-                Error::validation("pattern", "Mindestens einen Körper auswählen."))
+                Error::validation("pattern", "Select at least one body."))
       : finishing() && finishing_targets_list_->selectedItems().empty()
           ? Result<GuiPartFeaturePreview>::failure(Error::validation(
                 "gui.shell.finishing", command_ == Command::Fillet || command_ == Command::Chamfer
-                                           ? "Mindestens eine Kante auswählen."
-                                           : "Mindestens eine Fläche auswählen."))
+                                           ? "Select at least one edge."
+                                           : "Select at least one face."))
           : coordinator_.preview();
   if (preview.has_error()) {
     viewport_.clear_feature_preview();
@@ -906,14 +906,14 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     return Result<GuiPartFeaturePreview>::failure(published.error());
   }
   const auto summary =
-      surface() ? task_dock_->windowTitle() + QStringLiteral(": Vorschau gültig.")
+      surface() ? task_dock_->windowTitle() + QStringLiteral(": Preview valid.")
       : command_ == Command::Extrude
-          ? QStringLiteral("%1 · %2: Vorschau gültig.")
+          ? QStringLiteral("%1 · %2: Preview valid.")
                 .arg(extrude_operation_->currentText(), extrude_direction_->currentIndex() == 2
                                                             ? extrude_path_->currentText()
                                                             : extrude_extent_->currentText())
       : command_ == Command::Revolve
-          ? QStringLiteral("%1 · %2: Vorschau gültig.")
+          ? QStringLiteral("%1 · %2: Preview valid.")
                 .arg(revolve_operation_->currentText(), revolve_extent_->currentText())
       : spatial()        ? spatial_summary()
       : body_operation() ? body_summary()
@@ -923,7 +923,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   task_summary_->setText(summary);
   preview_valid_ = true;
   refresh_enablement();
-  window_.statusBar()->showMessage(QStringLiteral("Vorschau: %1").arg(summary));
+  window_.statusBar()->showMessage(QStringLiteral("Preview: %1").arg(summary));
   synchronize_overlay();
   return preview;
 }
@@ -931,15 +931,15 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
 Result<std::size_t> ShellFeatureTools::apply() {
   if (!active())
     return Result<std::size_t>::failure(
-        Error::validation("gui.shell.feature", "kein aktives Feature zum Anwenden"));
+        Error::validation("gui.shell.feature", "no active feature to apply"));
   if (!layer_.active_handle_id().empty())
-    return Result<std::size_t>::failure(Error::validation(
-        "gui.shell.feature", "aktiven Manipulatorzug vor dem Anwenden abschließen"));
+    return Result<std::size_t>::failure(
+        Error::validation("gui.shell.feature", "finish the active manipulator drag before Apply"));
   const std::string_view expected_command = command_id();
   if (session_.task().stage() != GuiTaskStage::Preview ||
       session_.task().command_id() != expected_command) {
-    return Result<std::size_t>::failure(Error::validation(
-        "gui.shell.feature", "Feature-Aufgabe ist nicht in einem anwendbaren Vorschauzustand"));
+    return Result<std::size_t>::failure(
+        Error::validation("gui.shell.feature", "feature task has no applicable preview"));
   }
   auto preview = preview_and_publish();
   if (preview.has_error())
@@ -991,7 +991,7 @@ Result<std::size_t> ShellFeatureTools::apply() {
   hide_task_panel();
   synchronize_overlay();
   window_.refresh();
-  window_.statusBar()->showMessage(QStringLiteral("Feature angewendet"));
+  window_.statusBar()->showMessage(QStringLiteral("Feature applied"));
   if (accepted_action)
     window_.remember_repeatable_command(*accepted_action);
   return applied;
@@ -1037,7 +1037,7 @@ void ShellFeatureTools::cancel() noexcept {
   window_.finish_context_task(false);
   window_.refresh();
   if (was_active)
-    window_.statusBar()->showMessage(QStringLiteral("Feature-Befehl abgebrochen"));
+    window_.statusBar()->showMessage(QStringLiteral("Feature command cancelled"));
 }
 
 void ShellFeatureTools::reset() noexcept {
@@ -1278,17 +1278,17 @@ void ShellFeatureTools::show_task_panel(QString title, QString unit, double valu
   numeric_editor_->setVisible(command_ != Command::BodyMirror && command_ != Command::BodyBoolean &&
                               (!spatial() || spatial_scalar()) && (!surface() || surface_scalar()));
   task_dock_->setWindowTitle(std::move(title));
-  const QString label = command_ == Command::SurfaceStitch   ? QStringLiteral("Toleranz")
-                        : command_ == Command::ExtendSurface ? QStringLiteral("Abstand")
-                        : command_ == Command::Sweep         ? QStringLiteral("Verdrehung")
+  const QString label = command_ == Command::SurfaceStitch   ? QStringLiteral("Tolerance")
+                        : command_ == Command::ExtendSurface ? QStringLiteral("Distance")
+                        : command_ == Command::Sweep         ? QStringLiteral("Twist")
                         : command_ == Command::BodyTranslate ? QStringLiteral("X")
-                        : command_ == Command::BodyScale     ? QStringLiteral("Faktor")
+                        : command_ == Command::BodyScale     ? QStringLiteral("Factor")
                         : command_ == Command::Fillet        ? QStringLiteral("Radius")
-                        : command_ == Command::Chamfer       ? QStringLiteral("Abstand")
-                        : command_ == Command::Shell         ? QStringLiteral("Wandstärke")
-                        : command_ == Command::LinearPattern ? QStringLiteral("Abstand / Länge")
-                        : angular_value()                    ? QStringLiteral("Winkel")
-                                                             : QStringLiteral("Tiefe");
+                        : command_ == Command::Chamfer       ? QStringLiteral("Distance")
+                        : command_ == Command::Shell         ? QStringLiteral("Wall Thickness")
+                        : command_ == Command::LinearPattern ? QStringLiteral("Distance / Length")
+                        : angular_value()                    ? QStringLiteral("Angle")
+                                                             : QStringLiteral("Depth");
   value_label_->setText(unit.isEmpty() ? label
                                        : label + QStringLiteral(" (") + unit + QStringLiteral(")"));
   numeric_editor_->setPlaceholderText(std::move(unit));

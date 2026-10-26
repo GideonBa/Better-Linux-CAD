@@ -149,6 +149,7 @@ public:
   [[nodiscard]] const std::vector<GuiSelection>& sketch_selections() const noexcept;
   [[nodiscard]] const std::optional<GuiSketchSnapResult>& sketch_snap_result() const noexcept;
   [[nodiscard]] const std::optional<GuiSketchHit>& hovered_sketch_hit() const noexcept;
+  void set_sketch_dimension_preview(std::optional<GuiSketchAnnotationPrimitive> annotation);
   [[nodiscard]] const std::optional<GuiSketchScreenRect>& sketch_box_selection() const noexcept;
   [[nodiscard]] std::size_t sketch_grid_line_count() const noexcept;
   [[nodiscard]] std::size_t sketch_drag_handle_count() const noexcept;
@@ -222,6 +223,7 @@ private:
   std::optional<Point2> sketch_inference_anchor_;
   std::optional<GuiSketchSnapResult> sketch_snap_result_;
   std::optional<GuiSketchHit> hovered_sketch_hit_;
+  std::optional<GuiSketchAnnotationPrimitive> dimension_preview_;
   std::optional<GuiSketchScreenRect> sketch_box_selection_;
   std::vector<Point2> sketch_drag_handles_;
   std::vector<Point2> sketch_preview_polyline_;

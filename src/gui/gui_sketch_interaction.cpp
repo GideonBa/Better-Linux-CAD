@@ -990,6 +990,15 @@ GuiSketchInteractionSceneBuilder::build_impl(const PartDocument& document, const
   }
 
   build_intersections(scene);
+  const std::string reference_prefix = "sketch/" + sketch.id().value() + "/reference/";
+  add_point(scene, reference_prefix + "origin", "reference/origin", {0.0, 0.0},
+            GuiSketchSnapKind::Origin);
+  add_curve(scene, reference_prefix + "axis/x", "reference/axis/x",
+            GuiSketchCurveKind::ReferenceLine,
+            {{-kReferenceLineExtent, 0.0}, {kReferenceLineExtent, 0.0}});
+  add_curve(scene, reference_prefix + "axis/y", "reference/axis/y",
+            GuiSketchCurveKind::ReferenceLine,
+            {{0.0, -kReferenceLineExtent}, {0.0, kReferenceLineExtent}});
   return Result<GuiSketchInteractionScene>::success(std::move(scene));
 }
 

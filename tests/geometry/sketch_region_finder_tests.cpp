@@ -419,3 +419,64 @@ TEST_CASE("A valid spline region is not rejected by intersections of its endpoin
   REQUIRE(finished);
   CHECK(finished.value().document.find_sketch(sketch.id())->arc_closed_profiles().size() == 1);
 }
+
+TEST_CASE("Nested rational spline regions expose the outer material face with an exact hole",
+          "[geometry][sketch-regions][sketch-curved-regions][nested-spline-region]") {
+  auto part = PartDocument::create(DocumentId("nested.spline"), "Nested spline").value();
+  REQUIRE(part.add_datum_plane(DatumPlane::xy().value()));
+  REQUIRE(part.add_parameter(make_length_parameter("depth", "Depth", 6)));
+  auto sketch = Sketch::create(SketchId("nested"), "Nested", DatumPlaneId("datum.xy")).value();
+  add_line(sketch, "a.bottom", {-20, -15}, {20, -15});
+  add_line(sketch, "a.right", {20, -15}, {20, 15});
+  add_line(sketch, "a.top", {20, 15}, {-20, 15});
+  add_line(sketch, "a.left", {-20, 15}, {-20, -15});
+  for (int i = 0; i < 4; ++i)
+    REQUIRE(sketch.add_entity(SplineSegment::create_elliptical_arc(
+                                  SketchEntityId("b.spline." + std::to_string(i)), {}, {8, 0}, 4,
+                                  i * std::acos(-1.0) / 2, std::acos(-1.0) / 2)
+                                  .value()));
+  REQUIRE(part.add_sketch(sketch));
+  auto analysis = SketchFinishService::analyze(part, sketch).value();
+  REQUIRE(analysis.regions.size() == 2);
+  const auto outer = SketchFinishService::select_region_at(analysis, {15, 0});
+  const auto inner = SketchFinishService::select_region_at(analysis, {0, 0});
+  REQUIRE(outer);
+  REQUIRE(inner);
+  CHECK(outer != inner);
+  const auto material_area = 40 * 30 - std::acos(-1.0) * 8 * 4;
+  const auto check_face = [&](const PartDocument& state) {
+    auto cache = ShapeCache::create(ShapeCacheId("scene")).value();
+    auto scene = ViewportSceneBuilder{}.build_part(state, cache);
+    REQUIRE(scene);
+    auto face = std::find_if(scene.value().begin(), scene.value().end(), [&](const auto& item) {
+      return item.semantic_id == "sketch/nested/profile/" + outer->value();
+    });
+    REQUIRE(face != scene.value().end());
+    GProp_GProps properties;
+    BRepGProp::SurfaceProperties(*OcctShapeView::get(face->shape), properties);
+    CHECK(properties.Mass() == Catch::Approx(material_area).epsilon(1e-8));
+  };
+  check_face(part);
+  auto finished = SketchFinishService::finish(part, sketch.id(), outer);
+  REQUIRE(finished);
+  part = finished.value().document;
+  // The inner spline remains unmaterialized and still participates in the
+  // selected outer region; source curves/weights never become a polygon.
+  REQUIRE(part.find_sketch(sketch.id())->arc_closed_profiles().empty());
+  check_face(part);
+  REQUIRE(part.add_feature(Feature::create_additive_extrude(FeatureId("extrude"), "Material",
+                                                            sketch.id(), ParameterId("depth"))
+                               .value()
+                               .with_profile(*outer)
+                               .value()));
+  auto cache = ShapeCache::create(ShapeCacheId("solid")).value();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  CHECK(RectangleExtrusionAdapter{}.summarize(*cache.final_shape()).volume_mm3 ==
+        Catch::Approx(material_area * 6).epsilon(1e-8));
+  auto restored =
+      deserialize_part_document_from_json(serialize_part_document_to_json(part).value());
+  REQUIRE(restored);
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(restored.value(), cache));
+  CHECK(RectangleExtrusionAdapter{}.summarize(*cache.final_shape()).volume_mm3 ==
+        Catch::Approx(material_area * 6).epsilon(1e-8));
+}

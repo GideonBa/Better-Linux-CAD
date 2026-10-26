@@ -8,7 +8,7 @@
 namespace blcad::gui {
 
 Result<std::size_t> seed_origin_geometry(GuiDocumentSession& session) {
-  return session.commit_part_transaction("Ursprung anlegen", [](PartDocument& document) {
+  return session.commit_part_transaction("Create Origin", [](PartDocument& document) {
     auto xy = DatumPlane::xy();
     auto xz = DatumPlane::xz();
     auto yz = DatumPlane::yz();
@@ -28,9 +28,9 @@ Result<std::size_t> seed_origin_geometry(GuiDocumentSession& session) {
       const char* id;
       const char* name;
       Vector3 direction;
-    } axes[] = {{"datum.axis.x", "X-Achse", {1.0, 0.0, 0.0}},
-                {"datum.axis.y", "Y-Achse", {0.0, 1.0, 0.0}},
-                {"datum.axis.z", "Z-Achse", {0.0, 0.0, 1.0}}};
+    } axes[] = {{"datum.axis.x", "X Axis", {1.0, 0.0, 0.0}},
+                {"datum.axis.y", "Y Axis", {0.0, 1.0, 0.0}},
+                {"datum.axis.z", "Z Axis", {0.0, 0.0, 1.0}}};
     for (const auto& definition : axes) {
       auto axis = DatumAxis::create_explicit(DatumAxisId(definition.id), definition.name,
                                              Point3{0.0, 0.0, 0.0}, definition.direction);

@@ -14,11 +14,14 @@ class ShapeCache;
 
 // Shared semantic edge resolution for the edge-driven Part features (Fillet,
 // Chamfer). Both resolve a persisted `EdgeReference` — semantic linear or
-// semantic circular — against a freshly computed target shape, and both fail
-// closed when the reference no longer matches exactly one edge.
+// semantic circular, or a producer-anchored result witness — against a freshly computed target
+// shape, and both fail closed when the reference no longer matches exactly one edge.
 //
 // `feature_label` only selects the feature wording inside the returned
 // diagnostics ("fillet", "chamfer"); it carries no resolution policy.
+[[nodiscard]] Result<ResultEdgeReference> make_result_edge_reference(const FeatureId& producer,
+                                                                     const TopoDS_Edge& edge);
+
 [[nodiscard]] Result<TopoDS_Edge>
 resolve_semantic_edge(const PartDocument& document, const ShapeCache& cache,
                       const TopoDS_Shape& target, const EdgeReference& reference,

@@ -59,50 +59,50 @@ void ShellFeatureTools::build_extrude_controls(QWidget* panel) {
     row(label, field);
     return field;
   };
-  extrude_extent_ = combo("blcad.extrude.extent", QStringLiteral("Begrenzung"));
-  for (const auto& [label, mode] : {std::pair{"Abstand", ExtrudeExtentMode::Distance},
-                                    {"Symmetrisch", ExtrudeExtentMode::Symmetric},
-                                    {"Zwei Seiten", ExtrudeExtentMode::TwoSided},
-                                    {"Durch alles", ExtrudeExtentMode::ThroughAll},
-                                    {"Bis zum nächsten", ExtrudeExtentMode::ToNext},
-                                    {"Bis Fläche", ExtrudeExtentMode::ToFace},
-                                    {"Zwischen Flächen", ExtrudeExtentMode::Between}})
+  extrude_extent_ = combo("blcad.extrude.extent", QStringLiteral("Boundary"));
+  for (const auto& [label, mode] : {std::pair{"Distance", ExtrudeExtentMode::Distance},
+                                    {"Symmetric", ExtrudeExtentMode::Symmetric},
+                                    {"Two Sides", ExtrudeExtentMode::TwoSided},
+                                    {"Through All", ExtrudeExtentMode::ThroughAll},
+                                    {"To Next", ExtrudeExtentMode::ToNext},
+                                    {"To Face", ExtrudeExtentMode::ToFace},
+                                    {"Between Faces", ExtrudeExtentMode::Between}})
     extrude_extent_->addItem(QString::fromUtf8(label), static_cast<int>(mode));
   extrude_operation_ = combo("blcad.extrude.operation", QStringLiteral("Operation"));
-  for (const auto& [label, mode] : {std::pair{"Neuer Körper", FeatureBodyOperationMode::NewBody},
-                                    {"Vereinigen", FeatureBodyOperationMode::Join},
-                                    {"Ausschneiden", FeatureBodyOperationMode::Cut},
-                                    {"Schnittmenge", FeatureBodyOperationMode::Intersect}})
+  for (const auto& [label, mode] : {std::pair{"New Body", FeatureBodyOperationMode::NewBody},
+                                    {"Union", FeatureBodyOperationMode::Join},
+                                    {"Cut", FeatureBodyOperationMode::Cut},
+                                    {"Intersect", FeatureBodyOperationMode::Intersect}})
     extrude_operation_->addItem(QString::fromUtf8(label), static_cast<int>(mode));
-  extrude_target_ = combo("blcad.extrude.target", QStringLiteral("Zielkörper"));
-  extrude_direction_ = combo("blcad.extrude.direction", QStringLiteral("Richtung"));
-  extrude_direction_->addItem(QStringLiteral("Skizzennormale"));
-  extrude_direction_->addItem(QStringLiteral("Entgegengesetzt"));
-  extrude_direction_->addItem(QStringLiteral("Entlang Pfad"));
-  extrude_path_ = combo("blcad.extrude.path", QStringLiteral("Offener Pfad"));
+  extrude_target_ = combo("blcad.extrude.target", QStringLiteral("Target Body"));
+  extrude_direction_ = combo("blcad.extrude.direction", QStringLiteral("Direction"));
+  extrude_direction_->addItem(QStringLiteral("Sketch Normal"));
+  extrude_direction_->addItem(QStringLiteral("Opposite"));
+  extrude_direction_->addItem(QStringLiteral("Along Path"));
+  extrude_path_ = combo("blcad.extrude.path", QStringLiteral("Open Path"));
   extrude_second_distance_ = new QLineEdit(QStringLiteral("5"), extrude_controls_);
   extrude_second_distance_->setObjectName(QStringLiteral("blcad.extrude.second_distance"));
-  row(QStringLiteral("Zweite Tiefe (mm)"), extrude_second_distance_);
-  extrude_first_face_ = combo("blcad.extrude.first_face", QStringLiteral("Erste Fläche"));
-  extrude_second_face_ = combo("blcad.extrude.second_face", QStringLiteral("Zweite Fläche"));
-  extrude_pick_role_ = combo("blcad.extrude.pick_role", QStringLiteral("Viewport-Auswahl"));
-  extrude_pick_role_->addItem(QStringLiteral("Auswahl beenden"));
-  extrude_pick_role_->addItem(QStringLiteral("Erste Fläche"));
+  row(QStringLiteral("Second Depth (mm)"), extrude_second_distance_);
+  extrude_first_face_ = combo("blcad.extrude.first_face", QStringLiteral("First Face"));
+  extrude_second_face_ = combo("blcad.extrude.second_face", QStringLiteral("Second Face"));
+  extrude_pick_role_ = combo("blcad.extrude.pick_role", QStringLiteral("Viewport Selection"));
+  extrude_pick_role_->addItem(QStringLiteral("Finish Selection"));
+  extrude_pick_role_->addItem(QStringLiteral("First Face"));
   extrude_taper_ = new QLineEdit(extrude_controls_);
   extrude_taper_->setObjectName(QStringLiteral("blcad.extrude.taper"));
-  extrude_taper_->setPlaceholderText(QStringLiteral("Optional, -90 < Winkel < 90"));
-  row(QStringLiteral("Formschräge (deg)"), extrude_taper_);
-  extrude_thin_mode_ = combo("blcad.extrude.thin_mode", QStringLiteral("Wandaufbau"));
-  for (const auto& [label, mode] : {std::pair{"Einseitig links", ExtrudeThinMode::OneSided},
-                                    {"Mittig", ExtrudeThinMode::MidPlane},
-                                    {"Zwei Seiten", ExtrudeThinMode::TwoSided}})
+  extrude_taper_->setPlaceholderText(QStringLiteral("Optional, -90 < Angle < 90"));
+  row(QStringLiteral("Draft (deg)"), extrude_taper_);
+  extrude_thin_mode_ = combo("blcad.extrude.thin_mode", QStringLiteral("Wall Layout"));
+  for (const auto& [label, mode] : {std::pair{"One Side Left", ExtrudeThinMode::OneSided},
+                                    {"Centered", ExtrudeThinMode::MidPlane},
+                                    {"Two Sides", ExtrudeThinMode::TwoSided}})
     extrude_thin_mode_->addItem(QString::fromUtf8(label), static_cast<int>(mode));
   extrude_thickness_ = new QLineEdit(QStringLiteral("1"), extrude_controls_);
   extrude_thickness_->setObjectName(QStringLiteral("blcad.extrude.thickness"));
-  row(QStringLiteral("Wandstärke (mm)"), extrude_thickness_);
+  row(QStringLiteral("Wall Thickness (mm)"), extrude_thickness_);
   extrude_second_thickness_ = new QLineEdit(QStringLiteral("1"), extrude_controls_);
   extrude_second_thickness_->setObjectName(QStringLiteral("blcad.extrude.second_thickness"));
-  row(QStringLiteral("Wand rechts (mm)"), extrude_second_thickness_);
+  row(QStringLiteral("Right Wall (mm)"), extrude_second_thickness_);
   extrude_hint_ = new QLabel(extrude_controls_);
   extrude_hint_->setWordWrap(true);
   column->addWidget(extrude_hint_);
@@ -133,7 +133,7 @@ void ShellFeatureTools::reset_extrude_controls(GuiFeatureManipulatorFrame frame)
   if (coordinator_.extrude().uses_open_line())
     extrude_direction_->removeItem(2);
   else if (extrude_direction_->count() < 3)
-    extrude_direction_->addItem(QStringLiteral("Entlang Pfad"));
+    extrude_direction_->addItem(QStringLiteral("Along Path"));
   extrude_thin_mode_->setCurrentIndex(0);
   extrude_thickness_->setText(QStringLiteral("1"));
   extrude_second_thickness_->setText(QStringLiteral("1"));
@@ -173,17 +173,17 @@ void ShellFeatureTools::reset_extrude_controls(GuiFeatureManipulatorFrame frame)
           const auto face_label = [&] {
             switch (face->face()) {
             case SemanticFace::Top:
-              return QStringLiteral("Oben");
+              return QStringLiteral("Top");
             case SemanticFace::Bottom:
-              return QStringLiteral("Unten");
+              return QStringLiteral("Bottom");
             case SemanticFace::Left:
-              return QStringLiteral("Links");
+              return QStringLiteral("Left");
             case SemanticFace::Right:
-              return QStringLiteral("Rechts");
+              return QStringLiteral("Right");
             case SemanticFace::Front:
-              return QStringLiteral("Vorne");
+              return QStringLiteral("Front");
             case SemanticFace::Back:
-              return QStringLiteral("Hinten");
+              return QStringLiteral("Back");
             }
             return QString::fromUtf8(to_string(face->face()).data());
           }();
@@ -208,15 +208,14 @@ void ShellFeatureTools::update_extrude_controls() {
   const bool thin = coordinator_.extrude().uses_open_line();
   extrude_hint_->setText(
       thin ? QStringLiteral(
-                 "Links und rechts folgen der Linienrichtung in der Skizze. Bei Zwei Seiten "
-                 "wirkt die erste Stärke links, die zweite rechts. Mittig verwendet die gesamte "
-                 "Wandstärke. Durch alles und Bis zum nächsten benötigen einen Zielkörper. "
-                 "Alle Eingaben bleiben bis Anwenden lokal.")
-           : QStringLiteral(
-                 "Durch alles und Bis zum nächsten benötigen einen Zielkörper. "
-                 "Begrenzungsflächen müssen senkrecht zur Extrusionsrichtung liegen. "
-                 "Entlang Pfad verwendet die Orientierung eines vorhandenen offenen Pfads. "
-                 "Alle Eingaben bleiben bis Anwenden lokal."));
+                 "Left and right follow the line direction in the sketch. With Two Sides, "
+                 "the first thickness acts left, the second right. Centered uses the total "
+                 "wall thickness. Through All and To Next require a target body. "
+                 "All input remains local until Apply.")
+           : QStringLiteral("Through All and To Next require a target body. "
+                            "Limit faces must be perpendicular to the extrusion direction. "
+                            "Along Path uses the orientation of an existing open path. "
+                            "All input remains local until Apply."));
   const bool distance = !path && distance_extent(mode);
   numeric_editor_->setVisible(distance);
   value_label_->setVisible(distance);
@@ -237,7 +236,7 @@ void ShellFeatureTools::update_extrude_controls() {
   {
     const QSignalBlocker blocker(extrude_pick_role_);
     if (mode == ExtrudeExtentMode::Between && extrude_pick_role_->count() < 3)
-      extrude_pick_role_->addItem(QStringLiteral("Zweite Fläche"));
+      extrude_pick_role_->addItem(QStringLiteral("Second Face"));
     if (mode != ExtrudeExtentMode::Between)
       extrude_pick_role_->removeItem(2);
     if (!faces)
@@ -365,13 +364,13 @@ Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {
   if (!path && distance_extent(mode)) {
     const auto depth = scalar(numeric_editor_->text(), "mm");
     if (!depth || *depth <= 0)
-      return fail("Extrusionstiefe muss eine positive Länge sein.");
+      return fail("Extrude depth must be a positive length.");
   }
   if (!path && operation == FeatureBodyOperationMode::NewBody &&
       (mode == ExtrudeExtentMode::ThroughAll || mode == ExtrudeExtentMode::ToNext))
-    return fail("Diese Begrenzung benötigt eine Operation mit Zielkörper.");
+    return fail("This extent requires an operation with a target body.");
   if (operation != FeatureBodyOperationMode::NewBody && extrude_target_->currentIndex() < 0)
-    return fail("Einen sichtbaren Volumenkörper als Ziel auswählen.");
+    return fail("Select a visible solid body as the target.");
   controller.set_operation(
       operation,
       operation == FeatureBodyOperationMode::NewBody
@@ -379,7 +378,7 @@ Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {
           : std::optional<BodyId>{BodyId(extrude_target_->currentData().toString().toStdString())});
   if (path) {
     if (extrude_path_->currentIndex() < 0)
-      return fail("Einen offenen Pfad auswählen; neue Pfade über den Befehl Pfad anlegen.");
+      return fail("Select an open path; create new paths with Create Path.");
     controller.set_path_curve(PathCurveId(extrude_path_->currentData().toString().toStdString()));
     controller.set_taper(std::nullopt);
     controller.clear_thin();
@@ -391,10 +390,10 @@ Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {
   if (mode == ExtrudeExtentMode::TwoSided) {
     const auto depth = scalar(extrude_second_distance_->text(), "mm");
     if (!depth || *depth <= 0)
-      return fail("Zweite Tiefe muss eine positive Länge sein.");
+      return fail("Second depth must be a positive length.");
     const auto id = controller.distance_parameter_id().value() + ".second";
     auto parameter =
-        Parameter::create_length(ParameterId(id), controller.feature_id().value() + " zweite Tiefe",
+        Parameter::create_length(ParameterId(id), controller.feature_id().value() + " Second Depth",
                                  Quantity::length_mm(*depth, id).value());
     if (!parameter)
       return Result<std::size_t>::failure(parameter.error());
@@ -404,7 +403,7 @@ Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {
   if (!extrude_taper_->text().trimmed().isEmpty()) {
     taper = scalar(extrude_taper_->text(), "deg");
     if (!taper || *taper <= -90 || *taper >= 90)
-      return fail("Formschräge muss zwischen -90 und 90 Grad liegen.");
+      return fail("Draft must be between -90 and 90 degrees.");
   }
   controller.set_taper(taper);
   if (controller.uses_open_line()) {
@@ -414,17 +413,17 @@ Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {
       const auto value = scalar(field->text(), "mm");
       if (!value || *value <= 0)
         return Result<Parameter>::failure(
-            Error::validation("extrude", "Wandstärke muss eine positive Länge sein."));
+            Error::validation("extrude", "Wall thickness must be a positive length."));
       return Parameter::create_length(
           ParameterId(controller.distance_parameter_id().value() + suffix),
           controller.feature_id().value() + label, Quantity::length_mm(*value).value());
     };
-    auto first = thickness(extrude_thickness_, ".wall", " Wandstärke");
+    auto first = thickness(extrude_thickness_, ".wall", " Wall Thickness");
     if (!first)
       return Result<std::size_t>::failure(first.error());
     std::optional<Parameter> second;
     if (thin_mode == ExtrudeThinMode::TwoSided) {
-      auto value = thickness(extrude_second_thickness_, ".wall.second", " zweite Wandstärke");
+      auto value = thickness(extrude_second_thickness_, ".wall.second", " Second Wall Thickness");
       if (!value)
         return Result<std::size_t>::failure(value.error());
       second = std::move(value.value());
@@ -436,12 +435,12 @@ Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {
   std::optional<FaceReference> first, second;
   if (mode == ExtrudeExtentMode::ToFace || mode == ExtrudeExtentMode::Between) {
     if (extrude_first_face_->currentIndex() < 0)
-      return fail("Eine erste ebene Begrenzungsfläche auswählen.");
+      return fail("Select the first planar limit face.");
     first = extrude_faces_.at(static_cast<std::size_t>(extrude_first_face_->currentIndex()));
   }
   if (mode == ExtrudeExtentMode::Between) {
     if (extrude_second_face_->currentIndex() < 0)
-      return fail("Eine zweite ebene Begrenzungsfläche auswählen.");
+      return fail("Select the second planar limit face.");
     second = extrude_faces_.at(static_cast<std::size_t>(extrude_second_face_->currentIndex()));
   }
   controller.set_limit_faces(std::move(first), std::move(second));

@@ -42,11 +42,11 @@ TEST_CASE("Block 98 Part browser exposes deterministic groups and typed editable
   const auto browser = GuiDocumentBrowser::build(session);
   REQUIRE(browser.roots().size() == 1);
   const auto& root = browser.roots().front();
-  // datum.xy is an origin id and lands in the MVP-9R "Ursprung" folder that
+  // datum.xy is an origin id and lands in the MVP-9R "Origin" folder that
   // precedes "Datums / Workplanes".
   REQUIRE(root.children.size() == 10);
   CHECK(root.children[0].label == "Parameters");
-  CHECK(root.children[1].label == "Ursprung");
+  CHECK(root.children[1].label == "Origin");
   CHECK(root.children[2].label == "Datums / Workplanes");
   CHECK(root.children[7].label == "Bodies");
   CHECK(root.children[9].label == "Session diagnostics");

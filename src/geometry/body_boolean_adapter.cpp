@@ -6,9 +6,11 @@
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
+#include <BRepCheck_Analyzer.hxx>
 #include <Standard_Failure.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopTools_ListOfShape.hxx>
 #include <TopoDS_Shape.hxx>
 
 #include <exception>
@@ -28,12 +30,24 @@ template <typename Algorithm>
                                                      const TopoDS_Shape& left,
                                                      const TopoDS_Shape& right,
                                                      std::string_view operation) {
-  Algorithm algorithm(left, right);
+  // GeometryShape copies share OCCT topology with earlier cached results.
+  // Set safe-input mode before the first build: the two-shape constructors
+  // execute eagerly, and simplification would otherwise mutate shared faces.
+  Algorithm algorithm;
+  TopTools_ListOfShape arguments, tools;
+  arguments.Append(left);
+  tools.Append(right);
+  algorithm.SetArguments(arguments);
+  algorithm.SetTools(tools);
+  algorithm.SetNonDestructive(true);
   algorithm.Build();
-  if (!algorithm.IsDone()) {
+  if (!algorithm.IsDone() || algorithm.HasErrors()) {
     return Result<TopoDS_Shape>::failure(
         boolean_error(feature_id, std::string(operation) + " operation did not complete"));
   }
+  // Collapse shared coplanar faces and tangent edges so downstream selection
+  // and finishing operate on the actual united boundary.
+  algorithm.SimplifyResult(true, true);
   TopoDS_Shape result = algorithm.Shape();
   if (result.IsNull()) {
     return Result<TopoDS_Shape>::failure(
@@ -43,6 +57,9 @@ template <typename Algorithm>
     return Result<TopoDS_Shape>::failure(boolean_error(
         feature_id, std::string(operation) + " operation produced no solid result"));
   }
+  if (!BRepCheck_Analyzer(result, true).IsValid())
+    return Result<TopoDS_Shape>::failure(
+        boolean_error(feature_id, std::string(operation) + " operation produced an invalid solid"));
   return Result<TopoDS_Shape>::success(std::move(result));
 }
 

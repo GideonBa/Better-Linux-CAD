@@ -37,84 +37,84 @@ constexpr const char* collections[] = {"features",        "revolve_features", "s
                                        "draft_features",  "body_booleans"};
 QString label(const std::string& key) {
   static const std::map<std::string, QString> labels = {
-      {"id", "Kennung"},
+      {"id", "Identifier"},
       {"name", "Name"},
-      {"type", "Feature-Art"},
-      {"kind", "Bezugsart"},
-      {"source_kind", "Bezugsart"},
-      {"operation_mode", "Ergebnisart"},
-      {"produced_body", "Ergebniskörper"},
-      {"result_body", "Ergebniskörper"},
-      {"target_body", "Zielkörper"},
-      {"target_feature", "Zielfeature"},
-      {"input_sketch", "Skizze"},
-      {"sketch", "Skizze"},
-      {"profile", "Profil"},
-      {"path", "Pfad"},
-      {"path_curve", "Pfad"},
-      {"axis", "Achse"},
-      {"datum_axis", "Bezugsachse"},
-      {"datum_plane", "Bezugsebene"},
-      {"construction_line", "Konstruktionslinie"},
-      {"construction_plane", "Konstruktionsebene"},
-      {"source_feature", "Quellfeature"},
+      {"type", "Feature Type"},
+      {"kind", "Reference Type"},
+      {"source_kind", "Reference Type"},
+      {"operation_mode", "Result Type"},
+      {"produced_body", "Result Body"},
+      {"result_body", "Result Body"},
+      {"target_body", "Target Body"},
+      {"target_feature", "Target Feature"},
+      {"input_sketch", "Sketch"},
+      {"sketch", "Sketch"},
+      {"profile", "Profile"},
+      {"path", "Path"},
+      {"path_curve", "Path"},
+      {"axis", "Axis"},
+      {"datum_axis", "Reference Axis"},
+      {"datum_plane", "Reference Plane"},
+      {"construction_line", "Construction Line"},
+      {"construction_plane", "Construction Plane"},
+      {"source_feature", "Source Feature"},
       {"feature", "Feature"},
-      {"body", "Körper"},
-      {"face", "Fläche"},
-      {"edge", "Kante"},
-      {"semantic_edge", "Modellkante"},
-      {"semantic_face", "Modellfläche"},
-      {"edges", "Kanten"},
-      {"faces", "Flächen"},
-      {"removed_faces", "Entfernte Flächen"},
-      {"sources", "Quellen"},
-      {"length_parameter", "Länge"},
+      {"body", "Body"},
+      {"face", "Face"},
+      {"edge", "Edge"},
+      {"semantic_edge", "Model Edge"},
+      {"semantic_face", "Model Face"},
+      {"edges", "Edges"},
+      {"faces", "Faces"},
+      {"removed_faces", "Removed Faces"},
+      {"sources", "Sources"},
+      {"length_parameter", "Length"},
       {"radius_parameter", "Radius"},
-      {"thickness_parameter", "Wandstärke"},
-      {"angle_parameter", "Winkel"},
-      {"count_parameter", "Anzahl"},
-      {"first_parameter", "Erstes Maß"},
-      {"second_parameter", "Zweites Maß"},
-      {"parameter", "Maß"},
-      {"first_distance_parameter", "Erste Länge"},
-      {"second_distance_parameter", "Zweite Länge"},
-      {"direction", "Richtung"},
-      {"extent", "Ausdehnung"},
-      {"extrude", "Extrusion"},
-      {"mode", "Modus"},
-      {"side", "Seite"},
-      {"depth", "Tiefe"},
-      {"angle_deg", "Winkel"},
-      {"total_angle_deg", "Gesamtwinkel"},
-      {"taper_angle_deg", "Entformungswinkel"},
-      {"equal_spacing", "Gleichmäßige Verteilung"},
-      {"mirror_plane", "Spiegelebene"},
-      {"neutral_plane", "Neutrale Ebene"},
-      {"pull_direction", "Entformungsrichtung"},
-      {"boundaries", "Begrenzungen"},
-      {"boundary", "Begrenzung"},
-      {"target", "Zielfläche"},
-      {"trimming", "Schnittkontur"},
-      {"distance_parameter", "Abstand"},
-      {"tolerance_parameter", "Toleranz"},
-      {"surfaces", "Flächen"},
-      {"shell", "Hülle"},
-      {"sections", "Querschnitte"},
-      {"guide_curves", "Führungskurven"},
-      {"guide_path", "Führungspfad"},
-      {"continuity", "Stetigkeit"},
-      {"flip_normal", "Normale umkehren"},
-      {"reverse", "Umkehren"},
-      {"rotation_offset", "Winkelversatz"},
-      {"alignment_reference", "Ausrichtungspunkt"},
-      {"twist_parameter", "Verdrillung"},
-      {"orientation_override", "Orientierung"},
-      {"fixed_up_vector_override", "Aufwärtsvektor"},
+      {"thickness_parameter", "Wall Thickness"},
+      {"angle_parameter", "Angle"},
+      {"count_parameter", "Count"},
+      {"first_parameter", "First Size"},
+      {"second_parameter", "Second Size"},
+      {"parameter", "Size"},
+      {"first_distance_parameter", "First Length"},
+      {"second_distance_parameter", "Second Length"},
+      {"direction", "Direction"},
+      {"extent", "Extent"},
+      {"extrude", "Extrude"},
+      {"mode", "Mode"},
+      {"side", "Side"},
+      {"depth", "Depth"},
+      {"angle_deg", "Angle"},
+      {"total_angle_deg", "Total Angle"},
+      {"taper_angle_deg", "Draft Angle"},
+      {"equal_spacing", "Uniform Distribution"},
+      {"mirror_plane", "Mirror Plane"},
+      {"neutral_plane", "Neutral Plane"},
+      {"pull_direction", "Pull Direction"},
+      {"boundaries", "Boundaries"},
+      {"boundary", "Boundary"},
+      {"target", "Target Face"},
+      {"trimming", "Cut Contour"},
+      {"distance_parameter", "Distance"},
+      {"tolerance_parameter", "Tolerance"},
+      {"surfaces", "Faces"},
+      {"shell", "Shell"},
+      {"sections", "Sections"},
+      {"guide_curves", "Guide Curves"},
+      {"guide_path", "Guide Path"},
+      {"continuity", "Continuity"},
+      {"flip_normal", "Reverse Normal"},
+      {"reverse", "Reverse"},
+      {"rotation_offset", "Angle Offset"},
+      {"alignment_reference", "Alignment Point"},
+      {"twist_parameter", "Twist"},
+      {"orientation_override", "Orientation"},
+      {"fixed_up_vector_override", "Up Vector"},
       {"x", "X"},
       {"y", "Y"},
       {"z", "Z"},
-      {"tools", "Werkzeugkörper"},
-      {"keep_tools", "Werkzeuge behalten"},
+      {"tools", "Tool Bodies"},
+      {"keep_tools", "Keep Tools"},
       {"operation", "Operation"}};
   if (auto found = labels.find(key); found != labels.end())
     return found->second;
@@ -124,69 +124,69 @@ QString label(const std::string& key) {
 }
 QString enum_label(const std::string& value) {
   static const std::map<std::string, QString> names = {
-      {"new_body", "Neuer Körper"},
-      {"modify_target", "Zielkörper ändern"},
-      {"add_to_target", "Zum Zielkörper hinzufügen"},
-      {"cut_from_target", "Vom Zielkörper abziehen"},
-      {"closed_region", "Geschlossenes Profil"},
-      {"open_path", "Offener Pfad"},
-      {"datum_axis", "Bezugsachse"},
-      {"datum_plane", "Bezugsebene"},
-      {"construction_line", "Konstruktionslinie"},
-      {"construction_plane", "Konstruktionsebene"},
-      {"semantic_linear_edge", "Gerade Modellkante"},
-      {"semantic_planar_face", "Ebene Modellfläche"},
-      {"equal_distance", "Gleiche Abstände"},
-      {"two_distance", "Zwei Abstände"},
-      {"distance_angle", "Abstand und Winkel"},
-      {"spacing", "Abstand"},
-      {"total_extent", "Gesamtausdehnung"},
-      {"through_all", "Durch alles"},
-      {"full", "Vollständig"},
-      {"angle", "Winkel"},
-      {"symmetric", "Symmetrisch"},
-      {"distance", "Abstand"},
+      {"new_body", "New Body"},
+      {"modify_target", "Modify Target Body"},
+      {"add_to_target", "Add to Target Body"},
+      {"cut_from_target", "Remove from Target Body"},
+      {"closed_region", "Closed Profile"},
+      {"open_path", "Open Path"},
+      {"datum_axis", "Reference Axis"},
+      {"datum_plane", "Reference Plane"},
+      {"construction_line", "Construction Line"},
+      {"construction_plane", "Construction Plane"},
+      {"semantic_linear_edge", "Straight Model Edge"},
+      {"semantic_planar_face", "Planar Model Face"},
+      {"equal_distance", "Equal Distances"},
+      {"two_distance", "Two Distances"},
+      {"distance_angle", "Distance and Angle"},
+      {"spacing", "Distance"},
+      {"total_extent", "Overall Extent"},
+      {"through_all", "Through All"},
+      {"full", "Full"},
+      {"angle", "Angle"},
+      {"symmetric", "Symmetric"},
+      {"distance", "Distance"},
       {"c0", "C0"},
       {"g1", "G1"},
       {"g2", "G2"},
-      {"positive", "Positiv"},
-      {"negative", "Negativ"},
-      {"inward", "Nach innen"},
-      {"outward", "Nach außen"},
-      {"add", "Vereinigen"},
-      {"subtract", "Abziehen"},
-      {"intersect", "Schnittmenge"}};
+      {"positive", "Positive"},
+      {"negative", "Negative"},
+      {"inward", "Inward"},
+      {"outward", "Outward"},
+      {"add", "Union"},
+      {"subtract", "Subtract"},
+      {"intersect", "Intersect"}};
   auto found = names.find(value);
   return found == names.end() ? label(value) : found->second;
 }
 QString family(Kind kind) {
   switch (kind) {
   case Kind::Extrude:
-    return "Extrusion";
+    return "Extrude";
   case Kind::Revolve:
-    return "Drehung";
+    return "Revolve";
   case Kind::Sweep:
     return "Sweep";
   case Kind::Loft:
     return "Loft";
   case Kind::Surface:
-    return "Fläche";
+    return "Face";
   case Kind::LinearPattern:
-    return "Lineare Anordnung";
+    return "Linear Pattern";
   case Kind::CircularPattern:
-    return "Kreisanordnung";
+    return "Circular Pattern";
   case Kind::Mirror:
-    return "Spiegelung";
+    return "Mirror";
   case Kind::Fillet:
-    return "Abrundung";
+    return "Fillet";
   case Kind::Chamfer:
-    return "Fase";
+    return "Chamfer";
   case Kind::Shell:
-    return "Wandung";
+    return "Shell";
   case Kind::Draft:
-    return "Entformung";
+    return "Draft";
   case Kind::BodyBoolean:
-    return "Boolesche Operation";
+    return "Boolean Operation";
   }
   return {};
 }
@@ -275,7 +275,7 @@ struct ShellFeatureEditTools::Impl {
 
   Impl(ShellFeatureEditTools& owner_, ShellWindow& window_)
       : owner(owner_), window(window_), session(window.session()), viewport(window.viewport()) {
-    dock = new QDockWidget("Feature bearbeiten", &window);
+    dock = new QDockWidget("Edit Feature", &window);
     dock->setObjectName("blcad.shell.feature_edit_task");
     dock->setFeatures(QDockWidget::DockWidgetMovable);
     auto* content = new QWidget(dock);
@@ -287,7 +287,7 @@ struct ShellFeatureEditTools::Impl {
     dynamic = new QComboBox(content);
     dynamic->setObjectName("blcad.feature_edit.dynamic");
     dynamic->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
-    column->addWidget(new QLabel("Dynamischer Wert", content));
+    column->addWidget(new QLabel("Dynamic Value", content));
     column->addWidget(dynamic);
     scroll = new QScrollArea(content);
     scroll->setObjectName("blcad.feature_edit.inputs_scroll");
@@ -295,16 +295,16 @@ struct ShellFeatureEditTools::Impl {
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
     column->addWidget(scroll, 1);
-    auto* hint = new QLabel("Die Vorschau prüft auch nachgelagerte Features. Geteilte Parameter "
-                            "wirken auf alle Verwendungen; Formelwerte werden über ihre Formel "
-                            "bestimmt. Escape setzt einen Zug zurück, erneut Escape bricht ab.",
+    auto* hint = new QLabel("The preview also checks downstream features. Shared parameters "
+                            "affect every use; formula values are determined by their formulas. "
+                            "Escape resets a drag; press Escape again to cancel.",
                             content);
     hint->setWordWrap(true);
     column->addWidget(hint);
     auto* footer = new QHBoxLayout;
-    apply = new QPushButton("Anwenden", content);
+    apply = new QPushButton("Apply", content);
     apply->setObjectName("blcad.feature_edit.apply");
-    auto* cancel = new QPushButton("Abbrechen", content);
+    auto* cancel = new QPushButton("Cancel", content);
     cancel->setObjectName("blcad.feature_edit.cancel");
     footer->addWidget(apply);
     footer->addWidget(cancel);
@@ -461,7 +461,7 @@ struct ShellFeatureEditTools::Impl {
     auto* scalar = number(row, path, parameter_value(selected), selected.value().kind());
     scalar->setEnabled(!selected.is_expression());
     if (selected.formula())
-      scalar->setToolTip("Formel: " + QString::fromStdString(*selected.formula()));
+      scalar->setToolTip("Formula: " + QString::fromStdString(*selected.formula()));
     layout->addWidget(scalar);
     form->addRow(label(key), row);
     QObject::connect(
@@ -471,7 +471,7 @@ struct ShellFeatureEditTools::Impl {
           const QSignalBlocker block(scalar);
           scalar->setValue(parameter_value(*p));
           scalar->setEnabled(!p->is_expression());
-          scalar->setToolTip(p->formula() ? "Formel: " + QString::fromStdString(*p->formula())
+          scalar->setToolTip(p->formula() ? "Formula: " + QString::fromStdString(*p->formula())
                                           : QString());
           (void)preview();
         });
@@ -528,7 +528,7 @@ struct ShellFeatureEditTools::Impl {
         optional_default = Json{{"x", 0.0}, {"y", 0.0}, {"z", 1.0}};
       }
       if (optional) {
-        auto* enabled = new QCheckBox(label(key) + " verwenden", form->parentWidget());
+        auto* enabled = new QCheckBox(label(key) + " Use", form->parentWidget());
         enabled->setObjectName("blcad.feature_edit.enable" + path);
         enabled->setChecked(!item.is_null());
         enabled->setEnabled(!item.is_null() || optional_default.has_value());
@@ -562,16 +562,19 @@ struct ShellFeatureEditTools::Impl {
           else
             build_leaf(inputs, key, entry, item[index]);
           auto* buttons = new QHBoxLayout;
-          for (auto operation : {QString("↑"), QString("↓"), QString("Entfernen")}) {
+          for (auto operation : {QString("↑"), QString("↓"), QString("Remove")}) {
             auto* button = new QPushButton(operation, box);
-            button->setObjectName("blcad.feature_edit." + operation + entry);
+            // Keep the established automation identity independent of the display language.
+            const QString identity =
+                operation == "Remove" ? QStringLiteral("Entfernen") : operation;
+            button->setObjectName("blcad.feature_edit." + identity + entry);
             button->setEnabled(operation == "↑"   ? index > 0
                                : operation == "↓" ? index + 1 < item.size()
                                                   : true);
             buttons->addWidget(button);
             QObject::connect(button, &QPushButton::clicked, &owner, [this, path, index, operation] {
               auto& array = value(path);
-              if (operation == "Entfernen")
+              if (operation == "Remove")
                 array.erase(array.begin() + static_cast<Json::difference_type>(index));
               else
                 std::swap(array[index], array[operation == "↑" ? index - 1 : index + 1]);
@@ -581,7 +584,7 @@ struct ShellFeatureEditTools::Impl {
           inputs->addRow(buttons);
           nested->addRow(box);
         }
-        auto* add = new QPushButton("Eintrag hinzufügen", group);
+        auto* add = new QPushButton("Add Entry", group);
         add->setObjectName("blcad.feature_edit.add" + path);
         const auto choices = references(key, path);
         add->setEnabled(!item.empty() || array_templates.contains(path) || !choices.empty());
@@ -617,16 +620,16 @@ struct ShellFeatureEditTools::Impl {
           fixed ? std::vector<std::pair<std::string, std::string>>{} : references(key, path);
       if (!fixed && (key == "side" || key == "direction")) {
         if (text == "positive" || text == "negative")
-          choices = {{"positive", "Positiv"}, {"negative", "Negativ"}};
+          choices = {{"positive", "Positive"}, {"negative", "Negative"}};
         else if (text == "+Z" || text == "opposite_sketch_normal")
-          choices = {{"+Z", "Skizzennormale"}, {"opposite_sketch_normal", "Normale umkehren"}};
+          choices = {{"+Z", "Sketch Normal"}, {"opposite_sketch_normal", "Reverse Normal"}};
         else if (text == "inward" || text == "outward")
-          choices = {{"inward", "Nach innen"}, {"outward", "Nach außen"}};
+          choices = {{"inward", "Inward"}, {"outward", "Outward"}};
       }
       if (key == "continuity")
         choices = {{"c0", "C0"}, {"g1", "G1"}, {"g2", "G2"}};
       if (key == "operation")
-        choices = {{"add", "Vereinigen"}, {"subtract", "Abziehen"}, {"intersect", "Schnittmenge"}};
+        choices = {{"add", "Union"}, {"subtract", "Subtract"}, {"intersect", "Intersect"}};
       if (!choices.empty()) {
         auto* input = combo(parent);
         for (const auto& [id, name] : choices)
@@ -692,7 +695,7 @@ struct ShellFeatureEditTools::Impl {
     numbers.clear();
     units.clear();
     dynamic->clear();
-    dynamic->addItem("Kein Griff", QString());
+    dynamic->addItem("No Handle", QString());
     auto* panel = new QWidget;
     auto* column = new QVBoxLayout(panel);
     auto* form = new QFormLayout;
@@ -758,7 +761,7 @@ struct ShellFeatureEditTools::Impl {
     if (building)
       return Result<std::size_t>::success(0);
     if (!fresh())
-      return reject(error("Feature oder Dokument geändert. Bearbeitung erneut starten."));
+      return reject(error("Feature or document changed. Restart editing."));
     auto decoded = decode();
     if (!decoded)
       return reject(decoded.error());
@@ -799,8 +802,8 @@ struct ShellFeatureEditTools::Impl {
       viewport.clear_feature_preview();
     valid = true;
     apply->setEnabled(layer.active_handle_id().empty());
-    status->setText("Vorschau gültig, einschließlich nachgelagerter Features. Änderungen erst mit "
-                    "Anwenden übernehmen.");
+    status->setText("Preview valid, including downstream features. Commit changes with "
+                    "Apply.");
     if (layer.active_handle_id().empty())
       publish_handle();
     owner.refresh_presentation();
@@ -842,10 +845,10 @@ struct ShellFeatureEditTools::Impl {
   Result<std::size_t> accept_candidate(const GuiViewportManipulatorCandidate& candidate) {
     const auto selected = numbers.find(dynamic->currentData().toString());
     if (selected == numbers.end())
-      return Result<std::size_t>::failure(error("Kein dynamischer Wert ausgewählt"));
+      return Result<std::size_t>::failure(error("No dynamic value selected"));
     selected->second->setValue(candidate.scalar_value);
     return valid ? Result<std::size_t>::success(1)
-                 : Result<std::size_t>::failure(error("Ungültige Vorschau"));
+                 : Result<std::size_t>::failure(error("Invalid Preview"));
   }
   void finish(bool applied) {
     edit.cancel();
@@ -902,7 +905,7 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   if (active() || p.window.active_sketch() || p.session.task().active() ||
       !p.session.derived_results_fresh())
     return Result<std::size_t>::failure(
-        error("Feature-Bearbeitung benötigt ein aktuelles Bauteil ohne aktiven Befehl"));
+        error("Feature editing requires a current part without an active command"));
   auto begun = p.edit.begin(p.session, id);
   if (!begun)
     return begun;
@@ -929,19 +932,19 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   }
   if (p.collection.empty()) {
     p.edit.cancel();
-    return Result<std::size_t>::failure(error("Feature-Art kann nicht bearbeitet werden"));
+    return Result<std::size_t>::failure(error("Feature type cannot be edited"));
   }
   if (!p.session.task().begin(task_id) || !p.session.task().begin_parameter_editing() ||
       !p.session.task().show_preview()) {
     p.edit.cancel();
-    return Result<std::size_t>::failure(error("Bearbeitungsaufgabe konnte nicht gestartet werden"));
+    return Result<std::size_t>::failure(error("Could not start editing task"));
   }
   p.previous_mask = p.viewport.selection_filter_mask();
   p.previous_scope = p.viewport.selection_semantic_scope();
   p.viewport.set_selection_filter_mask(0);
   p.parameter_values.clear();
   p.array_templates.clear();
-  p.dock->setWindowTitle(family(p.edit.kind()) + " bearbeiten");
+  p.dock->setWindowTitle(family(p.edit.kind()) + " Edit");
   p.build_form();
   p.dock->show();
   p.dock->raise();
@@ -957,7 +960,7 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
 Result<std::size_t> ShellFeatureEditTools::apply() {
   auto& p = *impl_;
   if (!p.fresh() || !p.layer.active_handle_id().empty())
-    return Result<std::size_t>::failure(error("Keine frische anwendbare Feature-Bearbeitung"));
+    return Result<std::size_t>::failure(error("No current applicable feature edit"));
   auto preview = p.preview();
   if (!preview)
     return preview;
@@ -983,7 +986,7 @@ void ShellFeatureEditTools::refresh() {
     return;
   if (!p.fresh()) {
     cancel();
-    p.window.statusBar()->showMessage("Feature geändert. Bearbeitung erneut starten.");
+    p.window.statusBar()->showMessage("Feature changed. Restart editing.");
     return;
   }
   refresh_presentation();
@@ -1005,13 +1008,13 @@ void ShellFeatureEditTools::refresh_presentation() {
 Result<std::size_t> ShellFeatureEditTools::set_drag_text(const QString& text) {
   auto& p = *impl_;
   if (p.layer.active_handle_id().empty())
-    return Result<std::size_t>::failure(error("Zuerst einen Griff ziehen"));
+    return Result<std::size_t>::failure(error("Drag a handle first"));
   auto input = text.trimmed();
   const auto kind = p.units.at(p.dynamic->currentData().toString());
   if (std::none_of(input.begin(), input.end(), [](QChar c) { return c.isLetter(); }))
     input += kind == QuantityKind::AngleDeg ? " deg" : kind == QuantityKind::Count ? "" : " mm";
   if (!p.layer.set_numeric_input(input.toStdString()) || !p.layer.candidate())
-    return Result<std::size_t>::failure(error("Ungültige Maßeingabe"));
+    return Result<std::size_t>::failure(error("Invalid dimension input"));
   return p.accept_candidate(*p.layer.candidate());
 }
 bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {

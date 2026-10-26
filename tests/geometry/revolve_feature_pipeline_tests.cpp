@@ -3,6 +3,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <optional>
 
 using namespace blcad;
@@ -348,4 +349,78 @@ TEST_CASE("Block 62 rejects a self-intersecting axis-crossing profile transactio
   CHECK(failed.error().object_id() == "revolve.main");
   CHECK(failed.error().message() == "revolve profile crosses its axis and would self-intersect");
   CHECK(body_volume(cache, "body.revolve") == Catch::Approx(before));
+}
+
+TEST_CASE("Downstream Boolean simplification preserves earlier cached rotational cuts",
+          "[geometry][revolve-feature][body-boolean][boolean-cache-isolation]") {
+  auto part = PartDocument::create(DocumentId("rotational.cache"), "Rotational cache").value();
+  REQUIRE(part.add_datum_plane(DatumPlane::xy().value()));
+  REQUIRE(part.add_construction_plane(
+      ConstructionPlane::create_explicit(ConstructionPlaneId("base.plane"), "Base bottom",
+                                         {0, 0, -12}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1})
+          .value()));
+  for (const auto& [id, value] : {std::pair{"base.width", 60.0},
+                                  {"base.height", 60.0},
+                                  {"depth", 24.0},
+                                  {"groove.width", 24.0},
+                                  {"groove.height", 4.0}})
+    REQUIRE(part.add_parameter(length_parameter(id, value)));
+  auto base = Sketch::create(SketchId("base"), "Base", DatumPlaneId("base.plane")).value();
+  REQUIRE(base.add_profile(RectangleProfile::create(ProfileId("base.profile"),
+                                                    ParameterId("base.width"),
+                                                    ParameterId("base.height"))
+                               .value()));
+  REQUIRE(part.add_sketch(base));
+  auto groove = Sketch::create(SketchId("groove"), "Groove", DatumPlaneId("datum.xy")).value();
+  REQUIRE(groove.add_profile(RectangleProfile::create(ProfileId("groove.profile"),
+                                                      ParameterId("groove.width"),
+                                                      ParameterId("groove.height"), {0, 8})
+                                 .value()));
+  REQUIRE(part.add_sketch(groove));
+  REQUIRE(part.add_construction_line(
+      ConstructionLine::create_explicit(ConstructionLineId("axis.x"), "X", {}, {1, 0, 0}).value()));
+  REQUIRE(part.add_body(solid_body("body")));
+  REQUIRE(part.add_feature(
+      Feature::create_additive_extrude(FeatureId("base.extrude"), "Base", base.id(),
+                                       ParameterId("depth"))
+          .value()
+          .with_body_result_context(context(FeatureBodyOperationMode::NewBody, "body"))
+          .value()));
+  const auto cut = [&](const char* id, RevolveAngleExtent extent) {
+    return RevolveFeature::create_revolve_cut(
+               FeatureId(id), id, revolve_profile("groove", "groove.profile"),
+               construction_axis("axis.x"), extent, context(FeatureBodyOperationMode::Cut, "body"))
+        .value();
+  };
+  auto cache = shape_cache();
+  const GeometryRecomputeExecutor executor;
+  REQUIRE(executor.execute_document(part, cache));
+  const GeometryShape base_copy = *cache.find_feature_shape(FeatureId("base.extrude"));
+  const auto volume = [](const GeometryShape& shape) {
+    return RectangleExtrusionAdapter{}.summarize(shape).volume_mm3;
+  };
+  REQUIRE(part.add_revolve_feature(
+      cut("cut.first", RevolveAngleExtent::angle(90, RevolveSide::Negative).value())));
+  REQUIRE(executor.execute_revolve(part, FeatureId("cut.first"), cache));
+  const GeometryShape first_copy = *cache.find_feature_shape(FeatureId("cut.first"));
+  CHECK(volume(first_copy) == Catch::Approx(86400 - 384 * std::acos(-1.0)).margin(1e-5));
+  REQUIRE(part.add_revolve_feature(cut("cut.second", RevolveAngleExtent::symmetric(90).value())));
+  REQUIRE(executor.execute_revolve(part, FeatureId("cut.second"), cache));
+  REQUIRE(part.add_revolve_feature(cut("cut.full", RevolveAngleExtent::full())));
+  REQUIRE(executor.execute_revolve(part, FeatureId("cut.full"), cache));
+  CHECK(volume(base_copy) == Catch::Approx(86400).margin(1e-5));
+  CHECK(volume(first_copy) == Catch::Approx(86400 - 384 * std::acos(-1.0)).margin(1e-5));
+  CHECK(body_volume(cache, "body") == Catch::Approx(86400 - 1536 * std::acos(-1.0)).margin(1e-5));
+  part.mark_all_clean();
+  REQUIRE(part.update_revolve_feature(
+      cut("cut.first", RevolveAngleExtent::angle(60, RevolveSide::Negative).value())));
+  // Feature editing in the GUI replays the document. A dependency-only plan
+  // schedules dirty consumers, not the explicitly changed feature itself.
+  REQUIRE(executor.execute_document(part, cache));
+  REQUIRE(cache.find_feature_shape(FeatureId("cut.first")));
+  CHECK(volume(*cache.find_feature_shape(FeatureId("cut.first"))) ==
+        Catch::Approx(86400 - 256 * std::acos(-1.0)).margin(1e-5));
+  CHECK(volume(base_copy) == Catch::Approx(86400).margin(1e-5));
+  CHECK(volume(first_copy) == Catch::Approx(86400 - 384 * std::acos(-1.0)).margin(1e-5));
+  CHECK(body_volume(cache, "body") == Catch::Approx(86400 - 1536 * std::acos(-1.0)).margin(1e-5));
 }

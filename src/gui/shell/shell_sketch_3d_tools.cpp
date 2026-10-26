@@ -158,7 +158,7 @@ struct ShellSketch3DTools::Impl {
     const auto& session = window.session();
     return draft && session.part_document() && session.derived_results_fresh() &&
            !session.reference_repair_mode() && !window.active_sketch() &&
-           session.task().command_id() == task_id && session.presentation_revision() == revision;
+           session.task().command_id() == task_id && session.model_revision() == revision;
   }
   bool has_direction_input() const {
     return std::any_of(direction.begin(), direction.end(),
@@ -177,8 +177,8 @@ struct ShellSketch3DTools::Impl {
     cancel_placement();
     invalidate();
     refresh_handles();
-    summary->setText(QStringLiteral(
-        "Distanz, Azimut und Elevation vollständig ergänzen oder Richtungseingabe leeren."));
+    summary->setText(
+        QStringLiteral("Complete distance, azimuth, and elevation or clear direction input."));
   }
   void invalidate() {
     previewed = false;
@@ -215,8 +215,7 @@ struct ShellSketch3DTools::Impl {
     detach->setChecked(false);
     detach->setVisible(selected && !selected->parameter_dependencies().empty());
     pending_point = false;
-    summary->setText(
-        QStringLiteral("Punkte/Linien lokal übernehmen, dann die gesamte Vorschau prüfen."));
+    summary->setText(QStringLiteral("Accept points/lines locally, then check the full preview."));
     refresh_handles();
   }
   void fill_points(const SketchEntityId& selected) {
@@ -229,8 +228,8 @@ struct ShellSketch3DTools::Impl {
     start->clear();
     end->clear();
     placement_anchor->clear();
-    placement_anchor->addItem(QStringLiteral("Ursprung (0, 0, 0)"), QString());
-    point->addItem(QStringLiteral("Neuer Punkt"), QString());
+    placement_anchor->addItem(QStringLiteral("Origin (0, 0, 0)"), QString());
+    point->addItem(QStringLiteral("New Point"), QString());
     for (const auto& item : draft->points()) {
       const auto id = text(item.id().value());
       point->addItem(id, id);
@@ -250,11 +249,10 @@ struct ShellSketch3DTools::Impl {
   }
   Result<std::size_t> stage_point() {
     if (!current())
-      return Result<std::size_t>::failure(
-          error("3D-Skizze neu öffnen: Modell oder Befehl geändert."));
+      return Result<std::size_t>::failure(error("Reopen 3D sketch: model or command changed."));
     if (drag || placement_pressed || has_direction_input())
       return Result<std::size_t>::failure(
-          error("Zeigergeste beenden und Richtungseingabe ergänzen oder leeren."));
+          error("Finish pointer gesture and complete or clear direction input."));
     for (auto* spin : coordinates)
       spin->interpretText();
     const SketchPoint3DValue value{coordinates[0]->value(), coordinates[1]->value(),
@@ -263,7 +261,7 @@ struct ShellSketch3DTools::Impl {
     const auto* selected = draft->find_point(id);
     if (selected && !selected->parameter_dependencies().empty() && !detach->isChecked())
       return Result<std::size_t>::failure(
-          error("Parameterbindung nur mit ausdrücklicher Zustimmung durch XYZ-Werte ersetzen."));
+          error("Replace parameter bindings with XYZ values only with explicit confirmation."));
     if (!selected)
       id = next_entity(*draft, "point");
     auto candidate = selected ? Sketch3DInteractionService::move_point(*draft, id, value)
@@ -273,16 +271,15 @@ struct ShellSketch3DTools::Impl {
     draft = std::move(candidate.value().sketch);
     changed = true;
     fill_points(id);
-    summary->setText(
-        QStringLiteral("Punkt lokal übernommen. %1 Punkte, %2 Linien. Noch nicht gespeichert.")
-            .arg(draft->points().size())
-            .arg(draft->lines().size()));
+    summary->setText(QStringLiteral("Point accepted locally. %1 points, %2 lines. Not saved yet.")
+                         .arg(draft->points().size())
+                         .arg(draft->lines().size()));
     return Result<std::size_t>::success(draft->entity_count());
   }
   Result<std::size_t> stage_line() {
     if (!current() || pending_point || drag || placement_pressed || has_direction_input())
       return Result<std::size_t>::failure(
-          error("Punktänderung zuerst lokal übernehmen oder neu auswählen."));
+          error("Accept the point change locally first or select again."));
     invalidate();
     auto line = SketchLine3D::create(next_entity(*draft, "line"),
                                      SketchEntityId(start->currentData().toString().toStdString()),
@@ -297,7 +294,7 @@ struct ShellSketch3DTools::Impl {
     changed = true;
     invalidate();
     summary->setText(
-        QStringLiteral("Linie lokal übernommen. %1 Punkte, %2 Linien. Vorschau prüfen.")
+        QStringLiteral("Line accepted locally. %1 points, %2 lines. Check the preview.")
             .arg(draft->points().size())
             .arg(draft->lines().size()));
     return added;
@@ -453,8 +450,8 @@ struct ShellSketch3DTools::Impl {
     numeric_invalid = !layer.set_numeric_input(numeric->text().toStdString());
     if (numeric_invalid) {
       invalidate();
-      summary->setText(QStringLiteral(
-          "Ungültiger Griffwert. XYZ-Koordinate in mm eingeben oder Escape drücken."));
+      summary->setText(
+          QStringLiteral("Invalid handle value. Enter an XYZ coordinate in mm or press Escape."));
     } else
       accept_drag(*layer.candidate());
   }
@@ -470,8 +467,8 @@ struct ShellSketch3DTools::Impl {
     if (placement_overlay)
       placement_overlay->present({}, std::nullopt);
     if (had_candidate && current())
-      summary->setText(QStringLiteral(
-          "Punktplatzierung verworfen. Frühere lokale Änderungen bleiben erhalten."));
+      summary->setText(
+          QStringLiteral("Point placement discarded. Earlier local changes are preserved."));
   }
   Result<Point3> anchor_point() const {
     const auto id = placement_anchor->currentData().toString();
@@ -479,7 +476,7 @@ struct ShellSketch3DTools::Impl {
       return Result<Point3>::success({});
     const auto* anchor = draft->find_point(SketchEntityId(id.toStdString()));
     if (!anchor)
-      return Result<Point3>::failure(error("Platzierungsanker neu auswählen."));
+      return Result<Point3>::failure(error("Select the placement anchor again."));
     return Result<Point3>::success(resolved_point(*anchor));
   }
   const PlanarSource* selected_projection() const {
@@ -491,8 +488,8 @@ struct ShellSketch3DTools::Impl {
     const auto role = source.target.kind() == SketchReferenceTargetKind::LineSegmentStart
                           ? QStringLiteral("Start")
                       : source.target.kind() == SketchReferenceTargetKind::LineSegmentEnd
-                          ? QStringLiteral("Ende")
-                          : QStringLiteral("Projizierter Punkt");
+                          ? QStringLiteral("End")
+                          : QStringLiteral("Projected Point");
     return text(source.sketch.value()) + " / " + text(source.target.entity().value()) + " / " +
            role;
   }
@@ -500,7 +497,7 @@ struct ShellSketch3DTools::Impl {
     const auto& part = *window.session().part_document();
     const auto* sketch = part.find_sketch(source.sketch);
     if (!sketch)
-      return Result<Point3>::failure(error("Quellskizze nicht mehr vorhanden. Befehl neu öffnen."));
+      return Result<Point3>::failure(error("Source sketch no longer exists. Reopen the command."));
     const auto* cache = window.session().part_shape_cache();
     const auto plane = cache
                            ? geometry::WorkplaneResolver{}.resolve_for_sketch(part, *sketch, *cache)
@@ -511,7 +508,7 @@ struct ShellSketch3DTools::Impl {
     if (source.target.kind() == SketchReferenceTargetKind::ProjectedPoint) {
       const auto* point = sketch->find_projected_point(source.target.entity());
       if (!point)
-        return Result<Point3>::failure(error("Projizierter Quellpunkt nicht mehr vorhanden."));
+        return Result<Point3>::failure(error("Projected source point no longer exists."));
       const auto resolved =
           cache ? geometry::SketchReferenceProjector{}.resolve_point(part, *sketch, *point, *cache)
                 : geometry::SketchReferenceProjector{}.resolve_point(part, *sketch, *point);
@@ -522,28 +519,28 @@ struct ShellSketch3DTools::Impl {
                source.target.kind() == SketchReferenceTargetKind::LineSegmentEnd) {
       const auto* line = sketch->find_line_segment(source.target.entity());
       if (!line)
-        return Result<Point3>::failure(error("Quelllinie nicht mehr vorhanden."));
+        return Result<Point3>::failure(error("Source line no longer exists."));
       local = source.target.kind() == SketchReferenceTargetKind::LineSegmentStart ? line->start()
                                                                                   : line->end();
     } else
-      return Result<Point3>::failure(error("Quelle muss ein unterstützter Skizzenpunkt sein."));
+      return Result<Point3>::failure(error("Source must be a supported sketch point."));
     const auto value = geometry::WorkplaneResolver{}.evaluate_point(plane.value(), local);
     if (!manipulator_detail::finite(value) || std::abs(value.x) > 1e9 || std::abs(value.y) > 1e9 ||
         std::abs(value.z) > 1e9)
-      return Result<Point3>::failure(error("Quellpunkt liegt außerhalb des XYZ-Bereichs ±1e9 mm."));
+      return Result<Point3>::failure(error("Source point lies outside the XYZ range ±1e9 mm."));
     return Result<Point3>::success(value);
   }
   void update_projection_info() {
     const auto* source = selected_projection();
     if (!current() || !source) {
       projection_info->setText(QStringLiteral(
-          "Quellpunkt wählen. Übernahme erzeugt eine unabhängige XYZ-Kopie ohne Verknüpfung."));
+          "Select a source point. Accept creates an independent XYZ copy without a reference."));
       return;
     }
     const auto value = resolve_projection(*source);
     projection_info->setText(
         source_description(*source) + "\n" +
-        (value ? QStringLiteral("XYZ: %1, %2, %3 mm. Übernahme als unabhängige Kopie bestätigen.")
+        (value ? QStringLiteral("XYZ: %1, %2, %3 mm. Confirm accepting an independent copy.")
                      .arg(value.value().x, 0, 'g', 15)
                      .arg(value.value().y, 0, 'g', 15)
                      .arg(value.value().z, 0, 'g', 15)
@@ -552,7 +549,7 @@ struct ShellSketch3DTools::Impl {
   void fill_projection_sources() {
     QSignalBlocker source_blocker(projection_source), copy_blocker(projection_copy);
     projection_source->clear();
-    projection_source->addItem(QStringLiteral("Quellpunkt wählen"));
+    projection_source->addItem(QStringLiteral("Select Source Point"));
     projection_copy->setChecked(false);
     planar_sources.clear();
     copied_sources.clear();
@@ -572,11 +569,11 @@ struct ShellSketch3DTools::Impl {
         add(SketchReferenceTarget(SketchReferenceTargetKind::LineSegmentStart, line.id()),
             QStringLiteral("Start"));
         add(SketchReferenceTarget(SketchReferenceTargetKind::LineSegmentEnd, line.id()),
-            QStringLiteral("Ende"));
+            QStringLiteral("End"));
       }
       for (const auto& point : sketch.projected_points())
         add(SketchReferenceTarget(SketchReferenceTargetKind::ProjectedPoint, point.id()),
-            QStringLiteral("Projizierter Punkt"));
+            QStringLiteral("Projected Point"));
     }
     projection_source->setCurrentIndex(0);
     update_projection_info();
@@ -584,16 +581,15 @@ struct ShellSketch3DTools::Impl {
   Result<std::size_t> stage_projection() {
     if (!current() || drag || placement_pressed)
       return Result<std::size_t>::failure(
-          error("Aktuelle 3D-Skizze öffnen und Zeigergeste beenden."));
+          error("Open the current 3D sketch and finish the pointer gesture."));
     for (auto* spin : coordinates)
       spin->interpretText();
     if (pending_point || has_direction_input())
-      return Result<std::size_t>::failure(
-          error("XYZ-/Richtungseingabe zuerst übernehmen oder verwerfen."));
+      return Result<std::size_t>::failure(error("Accept or discard XYZ/direction input first."));
     const auto* source = selected_projection();
     if (!source || !projection_copy->isChecked())
       return Result<std::size_t>::failure(
-          error("Quellpunkt wählen und unabhängige XYZ-Kopie ausdrücklich bestätigen."));
+          error("Select a source point and explicitly confirm an independent XYZ copy."));
     const auto value = resolve_projection(*source);
     if (!value)
       return Result<std::size_t>::failure(value.error());
@@ -615,33 +611,33 @@ struct ShellSketch3DTools::Impl {
     for (const auto& copied : copied_sources)
       receipts.push_back(text(copied.local_point.value()) + " ← " +
                          source_description({copied.source_sketch, copied.source_target}));
-    projection_receipts->setText(QStringLiteral("Kopierherkunft (unabhängige XYZ-Werte):\n") +
+    projection_receipts->setText(QStringLiteral("Copy source (independent XYZ values):\n") +
                                  receipts.join('\n'));
     projection_receipts->show();
-    summary->setText(QStringLiteral("Punkt %1 aus %2 lokal kopiert. Gesamte Vorschau prüfen.")
+    summary->setText(QStringLiteral("Point %1 from %2 copied locally. Check the full preview.")
                          .arg(text(id.value()), source_description(*source)));
     return Result<std::size_t>::success(draft->entity_count());
   }
   Result<std::size_t> stage_direction() {
     if (!current() || drag || placement_pressed)
       return Result<std::size_t>::failure(
-          error("Aktuelle 3D-Skizze öffnen und Zeigergeste beenden."));
+          error("Open the current 3D sketch and finish the pointer gesture."));
     for (auto* spin : coordinates)
       spin->interpretText();
     if (pending_point)
       return Result<std::size_t>::failure(
-          error("XYZ-Punktänderung zuerst lokal übernehmen oder neu auswählen."));
+          error("Accept the XYZ point change locally first or select again."));
     std::array<double, 3> values{};
     for (std::size_t i = 0; i < direction.size(); ++i) {
       bool valid = false;
       values[i] = direction[i]->text().trimmed().toDouble(&valid);
       if (!valid || !std::isfinite(values[i]))
         return Result<std::size_t>::failure(
-            error("Distanz, Azimut und Elevation als endliche Zahlen vollständig eingeben."));
+            error("Enter finite values for distance, azimuth, and elevation."));
     }
     if (values[0] < 0 || values[0] > 1e9 || std::abs(values[1]) > 360 || std::abs(values[2]) > 90)
       return Result<std::size_t>::failure(
-          error("Distanz: 0 bis 1e9 mm; Azimut: -360 bis 360°, Elevation: -90 bis 90°."));
+          error("Distance: 0 to 1e9 mm; azimuth: -360 to 360°, elevation: -90 to 90°."));
     const auto anchor = anchor_point();
     if (!anchor)
       return Result<std::size_t>::failure(anchor.error());
@@ -656,7 +652,7 @@ struct ShellSketch3DTools::Impl {
       return Result<std::size_t>::failure(value.error());
     const auto p = value.value();
     if (std::abs(p.x) > 1e9 || std::abs(p.y) > 1e9 || std::abs(p.z) > 1e9)
-      return Result<std::size_t>::failure(error("Punkt liegt außerhalb des XYZ-Bereichs ±1e9 mm."));
+      return Result<std::size_t>::failure(error("Point lies outside the XYZ range ±1e9 mm."));
     auto result = stage_placement({p.x, p.y, p.z});
     if (result) {
       reset_direction();
@@ -669,7 +665,7 @@ struct ShellSketch3DTools::Impl {
     auto& viewport = window.viewport();
     if (!finite(pointer) || pointer.x < 0 || pointer.y < 0 || pointer.x >= viewport.width() ||
         pointer.y >= viewport.height())
-      return Result<Point3>::failure(error("Punkt innerhalb des Modellfensters platzieren."));
+      return Result<Point3>::failure(error("Place the point inside the viewport."));
     if (!placement_pressed) {
       const auto anchor = anchor_point();
       if (!anchor)
@@ -679,7 +675,7 @@ struct ShellSketch3DTools::Impl {
     auto ray = viewport.screen_to_view_ray(pointer);
     if (!ray || !finite(ray.value().origin) || !finite(ray.value().direction) ||
         length(ray.value().direction) <= epsilon)
-      return Result<Point3>::failure(error("Kein gültiger Sehstrahl für die Punktplatzierung."));
+      return Result<Point3>::failure(error("No valid view ray for point placement."));
     const auto direction = normalized_or_zero(ray.value().direction);
     const auto delta = subtract(placement_origin, ray.value().origin);
     const auto view = normalized_or_zero(subtract(camera->target, camera->eye));
@@ -691,7 +687,8 @@ struct ShellSketch3DTools::Impl {
                                               : Vector3{0, 0, 1};
       const double b = dot(axis, direction), denominator = 1 - b * b;
       if (denominator < 1e-8)
-        return Result<Point3>::failure(error("Achse liegt in Blickrichtung. Ansicht ändern."));
+        return Result<Point3>::failure(
+            error("Axis is parallel to the view direction. Change the view."));
       const double distance = (b * dot(direction, delta) - dot(axis, delta)) / denominator;
       value = add(placement_origin, scale(axis, distance));
     } else {
@@ -701,8 +698,7 @@ struct ShellSketch3DTools::Impl {
                                                 : view;
       const double denominator = dot(direction, normal);
       if (length(normal) <= epsilon || std::abs(denominator) < 1e-8)
-        return Result<Point3>::failure(
-            error("Ebene liegt kantenparallel zur Ansicht. Ansicht ändern."));
+        return Result<Point3>::failure(error("Plane is edge-on to the view. Change the view."));
       value = add(ray.value().origin, scale(direction, dot(delta, normal) / denominator));
     }
     auto resolved = Sketch3DInteractionService::resolve_point(
@@ -715,20 +711,19 @@ struct ShellSketch3DTools::Impl {
         std::abs(value.z) > 1e9 ||
         (camera->projection == GuiViewportProjection::Perspective &&
          dot(subtract(value, camera->eye), view) <= epsilon))
-      return Result<Point3>::failure(
-          error("Platzierung liegt außerhalb des sichtbaren XYZ-Bereichs."));
+      return Result<Point3>::failure(error("Placement lies outside the visible XYZ range."));
     return Result<Point3>::success(value);
   }
   void update_placement(GuiSketchScreenPoint pointer) {
     if (pending_point || has_direction_input()) {
       placement_hover.reset();
-      summary->setText(QStringLiteral("Punkt-/Richtungseingabe zuerst übernehmen oder verwerfen."));
+      summary->setText(QStringLiteral("Accept or discard point/direction input first."));
     } else {
       const auto value = resolve_placement(pointer);
       placement_hover = value ? std::optional(value.value()) : std::nullopt;
       summary->setText(
           value ? QStringLiteral(
-                      "Neuer Punkt: X %1, Y %2, Z %3 mm. Linke Maustaste loslassen zum Übernehmen.")
+                      "New point: X %1, Y %2, Z %3 mm. Release the left mouse button to accept.")
                       .arg(value.value().x, 0, 'g', 12)
                       .arg(value.value().y, 0, 'g', 12)
                       .arg(value.value().z, 0, 'g', 12)
@@ -744,9 +739,8 @@ struct ShellSketch3DTools::Impl {
     draft = std::move(candidate.value().sketch);
     changed = true;
     fill_points(id);
-    summary->setText(
-        QStringLiteral("Punkt %1 lokal platziert. Linien ergänzen und Vorschau prüfen.")
-            .arg(text(id.value())));
+    summary->setText(QStringLiteral("Point %1 placed locally. Add lines and check the preview.")
+                         .arg(text(id.value())));
     return Result<std::size_t>::success(draft->entity_count());
   }
   bool pick_at(GuiSketchScreenPoint pointer) {
@@ -774,7 +768,7 @@ struct ShellSketch3DTools::Impl {
       if (selected_line) {
         start->setCurrentIndex(start->findData(text(selected_line->start_point().value())));
         end->setCurrentIndex(end->findData(text(selected_line->end_point().value())));
-        summary->setText(QStringLiteral("Linie gewählt: ") + text(selected_line->id().value()));
+        summary->setText(QStringLiteral("Line selected: ") + text(selected_line->id().value()));
       }
     } else {
       for (const auto& item : draft->points()) {
@@ -790,12 +784,12 @@ struct ShellSketch3DTools::Impl {
       if (!selected.empty()) {
         auto* input = role == 1 ? point : role == 2 ? start : end;
         input->setCurrentIndex(input->findData(text(selected.value())));
-        summary->setText(QStringLiteral("Punkt gewählt: ") + text(selected.value()));
+        summary->setText(QStringLiteral("Point selected: ") + text(selected.value()));
       }
     }
     if (selected.empty() && !selected_line)
-      summary->setText(QStringLiteral(
-          "Kein passender Punkt bzw. keine Linie der aktiven 3D-Skizze an dieser Stelle."));
+      summary->setText(
+          QStringLiteral("No matching point or line of the active 3D sketch at this location."));
     return true;
   }
   bool pointer_event(QObject* watched, QEvent* event) {
@@ -936,10 +930,10 @@ struct ShellSketch3DTools::Impl {
 ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon, int model_tab)
     : QObject(&window), impl_(std::make_unique<Impl>(window, *this)) {
   auto& ui = *impl_;
-  ui.action = new QAction(QStringLiteral("3D-Skizze"), this);
+  ui.action = new QAction(QStringLiteral("3D Sketch"), this);
   ui.action->setObjectName("blcad.action.sketch_3d");
-  ribbon.add_button(ribbon.add_group(model_tab, QStringLiteral("Räumliche Skizze")), ui.action);
-  ui.dock = new QDockWidget(QStringLiteral("3D-Skizze: Punkte und Linien"), &window);
+  ribbon.add_button(ribbon.add_group(model_tab, QStringLiteral("Spatial Sketch")), ui.action);
+  ui.dock = new QDockWidget(QStringLiteral("3D Sketch: Points and Lines"), &window);
   ui.dock->setObjectName("blcad.shell.sketch3d_task");
   auto* panel = new QWidget(ui.dock);
   auto* layout = new QVBoxLayout(panel);
@@ -952,8 +946,8 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   ui.title->setWordWrap(true);
   column->addWidget(ui.title);
   auto* hint = new QLabel(
-      QStringLiteral("XYZ in Modellkoordinaten (mm). Punkte und Linien werden zunächst nur lokal "
-                     "übernommen. Anwenden speichert die geprüfte 3D-Skizze in einem Schritt."),
+      QStringLiteral("XYZ in model coordinates (mm). Points and lines are initially accepted "
+                     "locally. Apply saves the checked 3D sketch in one step."),
       inputs);
   hint->setWordWrap(true);
   column->addWidget(hint);
@@ -966,7 +960,7 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
     form->addRow(label, result);
     return result;
   };
-  ui.point = combo("point", QStringLiteral("Punkt bearbeiten"));
+  ui.point = combo("point", QStringLiteral("Edit Point"));
   for (int axis = 0; axis < 3; ++axis) {
     auto* spin = new QDoubleSpinBox(inputs);
     spin->setObjectName(QStringLiteral("blcad.sketch3d.") + "xyz"[axis]);
@@ -990,11 +984,10 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
       impl_->pending_point = true;
       impl_->invalidate();
       impl_->refresh_handles();
-      impl_->summary->setText(
-          QStringLiteral("Punktänderung zuerst mit „Punkt übernehmen“ bestätigen."));
+      impl_->summary->setText(QStringLiteral("Confirm the point change with Accept Point first."));
     });
   }
-  ui.detach = new QCheckBox(QStringLiteral("Parameterbindungen durch XYZ-Werte ersetzen"), inputs);
+  ui.detach = new QCheckBox(QStringLiteral("Replace Parameter Bindings with XYZ Values"), inputs);
   ui.detach->setObjectName("blcad.sketch3d.detach");
   form->addRow(ui.detach);
   const auto stage_button = [&](const char* id, const QString& label) {
@@ -1003,30 +996,30 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
     form->addRow(result);
     return result;
   };
-  auto* stage_point = stage_button("stage_point", QStringLiteral("Punkt übernehmen"));
-  ui.pick = combo("pick", QStringLiteral("Modellklick wählt"));
-  ui.pick->addItems({QStringLiteral("Aus"), QStringLiteral("Punkt bearbeiten"),
-                     QStringLiteral("Linienstart"), QStringLiteral("Linienende"),
-                     QStringLiteral("Linie (beide Enden)"),
-                     QStringLiteral("Neuen Punkt platzieren")});
-  ui.placement_anchor = combo("placement_anchor", QStringLiteral("Platzierungsanker"));
-  ui.grips = new QCheckBox(QStringLiteral("Punktgriffe anzeigen"), inputs);
+  auto* stage_point = stage_button("stage_point", QStringLiteral("Accept Point"));
+  ui.pick = combo("pick", QStringLiteral("Viewport Click Selects"));
+  ui.pick->addItems({QStringLiteral("Off"), QStringLiteral("Edit Point"),
+                     QStringLiteral("Line Start"), QStringLiteral("Line End"),
+                     QStringLiteral("Line (Both Ends)"), QStringLiteral("Place New Point")});
+  ui.placement_anchor = combo("placement_anchor", QStringLiteral("Placement Anchor"));
+  ui.grips = new QCheckBox(QStringLiteral("Show Point Handles"), inputs);
   ui.grips->setObjectName("blcad.sketch3d.grips");
   form->addRow(ui.grips);
-  ui.lock = combo("lock", QStringLiteral("Zeiger-/Griffsperre"));
-  ui.lock->addItems({QStringLiteral("XYZ"), QStringLiteral("X-Achse"), QStringLiteral("Y-Achse"),
-                     QStringLiteral("Z-Achse"), QStringLiteral("XY-Ebene"),
-                     QStringLiteral("YZ-Ebene"), QStringLiteral("ZX-Ebene")});
+  ui.lock = combo("lock", QStringLiteral("Pointer / Handle Restriction"));
+  ui.lock->addItems({QStringLiteral("XYZ"), QStringLiteral("X Axis"), QStringLiteral("Y Axis"),
+                     QStringLiteral("Z Axis"), QStringLiteral("XY Plane"),
+                     QStringLiteral("YZ Plane"), QStringLiteral("ZX Plane")});
   ui.numeric = new QLineEdit(inputs);
   ui.numeric->setObjectName("blcad.sketch3d.grip_numeric");
   ui.numeric->setReadOnly(true);
-  ui.numeric->setPlaceholderText(QStringLiteral("Griff ziehen, dann XYZ-Koordinate in mm"));
-  form->addRow(QStringLiteral("Griffwert (XYZ)"), ui.numeric);
+  ui.numeric->setPlaceholderText(
+      QStringLiteral("Drag a handle, then enter an XYZ coordinate in mm"));
+  form->addRow(QStringLiteral("Handle Value (XYZ)"), ui.numeric);
   const std::array direction_ids{"distance", "azimuth", "elevation"};
-  const std::array direction_labels{QStringLiteral("Distanz (mm)"), QStringLiteral("Azimut (°)"),
+  const std::array direction_labels{QStringLiteral("Distance (mm)"), QStringLiteral("Azimuth (°)"),
                                     QStringLiteral("Elevation (°)")};
-  const std::array direction_hints{QStringLiteral("0 bis 1e9"), QStringLiteral("-360 bis 360"),
-                                   QStringLiteral("-90 bis 90")};
+  const std::array direction_hints{QStringLiteral("0 to 1e9"), QStringLiteral("-360 to 360"),
+                                   QStringLiteral("-90 to 90")};
   for (std::size_t i = 0; i < ui.direction.size(); ++i) {
     auto* field = new QLineEdit(inputs);
     field->setObjectName(QStringLiteral("blcad.sketch3d.") + direction_ids[i]);
@@ -1036,18 +1029,17 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
     connect(field, &QLineEdit::textChanged, this, [this] { impl_->edit_direction(); });
   }
   auto* stage_direction =
-      stage_button("stage_direction", QStringLiteral("Punkt aus Richtung ergänzen"));
-  auto* clear_direction =
-      stage_button("clear_direction", QStringLiteral("Richtungseingabe leeren"));
-  ui.projection_source = combo("projection_source", QStringLiteral("Planarer Quellpunkt"));
-  ui.projection_copy = new QCheckBox(QStringLiteral("Unabhängige XYZ-Kopie bestätigen"), inputs);
+      stage_button("stage_direction", QStringLiteral("Add Point from Direction"));
+  auto* clear_direction = stage_button("clear_direction", QStringLiteral("Clear Direction Input"));
+  ui.projection_source = combo("projection_source", QStringLiteral("Planar Source Point"));
+  ui.projection_copy = new QCheckBox(QStringLiteral("Confirm Independent XYZ Copy"), inputs);
   ui.projection_copy->setObjectName("blcad.sketch3d.projection_copy");
   form->addRow(ui.projection_copy);
   auto* stage_projection =
-      stage_button("stage_projection", QStringLiteral("Quellpunkt nach 3D kopieren"));
-  ui.start = combo("start", QStringLiteral("Linienstart"));
-  ui.end = combo("end", QStringLiteral("Linienende"));
-  auto* stage_line = stage_button("stage_line", QStringLiteral("Linie ergänzen"));
+      stage_button("stage_projection", QStringLiteral("Copy Source Point to 3D"));
+  ui.start = combo("start", QStringLiteral("Line Start"));
+  ui.end = combo("end", QStringLiteral("Line End"));
+  auto* stage_line = stage_button("stage_line", QStringLiteral("Add Line"));
   column->addLayout(form);
   ui.projection_info = new QLabel(inputs);
   ui.projection_info->setObjectName("blcad.sketch3d.projection_info");
@@ -1059,11 +1051,12 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   column->addWidget(ui.projection_receipts);
   auto* placement_hint = new QLabel(
       QStringLiteral(
-          "Punkte platzieren: XYZ nutzt die Bildebene durch den Anker; Achsen/Ebenen nutzen "
-          "Modellrichtungen durch denselben Anker. Ankerkoordinaten werden kopiert. Escape beendet "
-          "die Platzierung und erhält bereits lokal übernommene Punkte. Richtungseingabe ergänzt "
-          "einen neuen Punkt relativ zum Anker: Azimut ab +X in Richtung +Y, Elevation ab XY nach "
-          "+Z. Zahlen mit Dezimalpunkt eingeben. Diese Winkel ersetzen die Zeiger-/Griffsperre."),
+          "Point placement: XYZ uses the view plane through the anchor; axes/planes use "
+          "model directions through the same anchor. Anchor coordinates are copied. Escape ends "
+          "placement and preserves locally accepted points. Direction input adds "
+          "a new point relative to the anchor: azimuth from +X towards +Y, elevation from XY "
+          "towards "
+          "+Z. Enter decimal-point numbers. These angles replace the pointer/handle restriction."),
       inputs);
   placement_hint->setWordWrap(true);
   column->addWidget(placement_hint);
@@ -1081,9 +1074,9 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
     buttons->addWidget(result);
     return result;
   };
-  auto* preview_button = button("preview", QStringLiteral("Vorschau"));
-  ui.apply = button("apply", QStringLiteral("Anwenden"));
-  auto* cancel_button = button("cancel", QStringLiteral("Abbrechen"));
+  auto* preview_button = button("preview", QStringLiteral("Preview"));
+  ui.apply = button("apply", QStringLiteral("Apply"));
+  auto* cancel_button = button("cancel", QStringLiteral("Cancel"));
   layout->addLayout(buttons);
   ui.dock->setWidget(panel);
   window.addDockWidget(Qt::RightDockWidgetArea, ui.dock);
@@ -1156,13 +1149,13 @@ Result<std::size_t> ShellSketch3DTools::begin() {
   auto& ui = *impl_;
   if (!ui.available())
     return Result<std::size_t>::failure(
-        error("3D-Skizze benötigt ein aktuelles Bauteil ohne aktiven Befehl."));
+        error("3D sketch requires a current part without an active command."));
   const auto& part = *ui.window.session().part_document();
   for (std::size_t index = 1;; ++index) {
     const std::string id = "sketch3d." + std::to_string(index);
     if (part.dependency_graph().has_node(id))
       continue;
-    auto created = Sketch3D::create(Sketch3DId(id), "3D-Skizze " + std::to_string(index));
+    auto created = Sketch3D::create(Sketch3DId(id), "3D Sketch " + std::to_string(index));
     if (!created)
       return Result<std::size_t>::failure(created.error());
     return open(std::move(created.value()), false);
@@ -1172,10 +1165,10 @@ Result<std::size_t> ShellSketch3DTools::begin_edit(Sketch3DId id) {
   auto& ui = *impl_;
   if (!ui.available())
     return Result<std::size_t>::failure(
-        error("3D-Skizze benötigt ein aktuelles Bauteil ohne aktiven Befehl."));
+        error("3D sketch requires a current part without an active command."));
   const auto* source = ui.window.session().part_document()->find_sketch_3d(id);
   if (!source)
-    return Result<std::size_t>::failure(error("3D-Skizze nicht gefunden."));
+    return Result<std::size_t>::failure(error("3D sketch not found."));
   return open(*source, true);
 }
 Result<std::size_t> ShellSketch3DTools::open(Sketch3D sketch, bool editing) {
@@ -1183,7 +1176,7 @@ Result<std::size_t> ShellSketch3DTools::open(Sketch3D sketch, bool editing) {
   auto& session = ui.window.session();
   (void)session.task().begin(std::string(task_id));
   (void)session.task().begin_parameter_editing();
-  ui.revision = session.presentation_revision();
+  ui.revision = session.model_revision();
   ui.draft = std::move(sketch);
   ui.editing = editing;
   ui.changed = false;
@@ -1212,21 +1205,19 @@ Result<std::size_t> ShellSketch3DTools::preview() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
-    return Result<std::size_t>::failure(
-        error("3D-Skizze neu öffnen: Modell oder Befehl geändert."));
+    return Result<std::size_t>::failure(error("Reopen 3D sketch: model or command changed."));
   }
   for (auto* spin : ui.coordinates)
     spin->interpretText();
   if (ui.placement_pressed)
-    return Result<std::size_t>::failure(error("Punktplatzierung zuerst beenden."));
+    return Result<std::size_t>::failure(error("Finish point placement first."));
   ui.invalidate();
   if (ui.has_direction_input())
-    return Result<std::size_t>::failure(error("Richtungseingabe zuerst ergänzen oder leeren."));
+    return Result<std::size_t>::failure(error("Complete or clear direction input first."));
   if (ui.numeric_invalid)
-    return Result<std::size_t>::failure(
-        error("Ungültigen Griffwert korrigieren oder Escape drücken."));
+    return Result<std::size_t>::failure(error("Correct the invalid handle value or press Escape."));
   if (!ui.changed || ui.pending_point || ui.draft->points().empty())
-    return Result<std::size_t>::failure(error("Punkte/Linien zuerst lokal übernehmen."));
+    return Result<std::size_t>::failure(error("Accept points/lines locally first."));
   // The complete session copy validates catalogs, reference connectivity and
   // downstream Geometry without publishing history, dirty state or file I/O.
   auto candidate = ui.window.session();
@@ -1253,8 +1244,8 @@ Result<std::size_t> ShellSketch3DTools::preview() {
   ui.previewed = true;
   ui.apply->setEnabled(!ui.drag);
   (void)ui.window.session().task().show_preview();
-  ui.summary->setText(QStringLiteral("Vorschau gültig: %1 Punkte, %2 Linien. Abhängige Pfade und "
-                                     "Körper neu berechnet. Anwenden übernimmt einen Schritt.")
+  ui.summary->setText(QStringLiteral("Preview valid: %1 points, %2 lines. Dependent paths and "
+                                     "bodies recomputed. Apply commits one step.")
                           .arg(ui.draft->points().size())
                           .arg(ui.draft->lines().size()));
   return Result<std::size_t>::success(ui.draft->entity_count());
@@ -1264,10 +1255,10 @@ Result<std::size_t> ShellSketch3DTools::apply() {
   if (!ui.current() || !ui.previewed) {
     if (!ui.current())
       cancel();
-    return Result<std::size_t>::failure(error("Zuerst eine aktuelle Vorschau prüfen."));
+    return Result<std::size_t>::failure(error("Check a current preview first."));
   }
   if (ui.drag || ui.placement_pressed)
-    return Result<std::size_t>::failure(error("Griffbewegung zuerst beenden."));
+    return Result<std::size_t>::failure(error("Finish handle movement first."));
   auto checked = preview();
   if (!checked)
     return checked;
@@ -1330,7 +1321,7 @@ bool ShellSketch3DTools::eventFilter(QObject* watched, QEvent* event) {
       impl_->cancel_placement();
       impl_->pick->setCurrentIndex(0);
       impl_->summary->setText(
-          QStringLiteral("Punktplatzierung beendet. Lokale Änderungen bleiben erhalten."));
+          QStringLiteral("Point placement finished. Local changes are preserved."));
     } else
       cancel();
     return true;

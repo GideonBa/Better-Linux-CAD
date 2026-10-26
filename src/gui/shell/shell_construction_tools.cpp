@@ -53,7 +53,7 @@ void select_generated(QComboBox* combo, const FeatureId& feature, int element) {
 ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon& ribbon,
                                                int model_tab)
     : QObject(&window), window_(window) {
-  auto* group = ribbon.add_group(model_tab, QStringLiteral("Konstruktion"));
+  auto* group = ribbon.add_group(model_tab, QStringLiteral("Construction"));
   const auto action = [&](const char* id, const char* label, Kind kind) {
     auto* result = new QAction(QString::fromUtf8(label), this);
     result->setObjectName(QStringLiteral("blcad.action.") + id);
@@ -65,10 +65,10 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
     ribbon.add_small_button(group, result);
     return result;
   };
-  construction_action_ = action("create_construction", "Konstruktionsgeometrie", Kind::Point);
-  workplane_action_ = action("create_workplane", "Arbeitsebene", Kind::OffsetPlane);
+  construction_action_ = action("create_construction", "Construction Geometry", Kind::Point);
+  workplane_action_ = action("create_workplane", "Workplane", Kind::OffsetPlane);
 
-  dock_ = new QDockWidget(QStringLiteral("Konstruktionsgeometrie"), &window);
+  dock_ = new QDockWidget(QStringLiteral("Construction Geometry"), &window);
   dock_->setObjectName("blcad.shell.construction_task");
   dock_->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
   auto* panel = new QWidget(dock_);
@@ -86,16 +86,16 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   kind_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
   kind_->setMinimumContentsLength(12);
   kind_->addItems(
-      {QStringLiteral("Punkt (XYZ)"), QStringLiteral("Linie (Punkt und Richtung)"),
-       QStringLiteral("Linie durch zwei Punkte"), QStringLiteral("Achse (Punkt und Richtung)"),
-       QStringLiteral("Achse aus Konstruktionslinie"),
-       QStringLiteral("Ebene (Ursprung und Richtungen)"), QStringLiteral("Versatzebene"),
-       QStringLiteral("Ebene durch drei Punkte"), QStringLiteral("Ebene auf Modellfläche"),
-       QStringLiteral("Punkt auf Modellkante (Mitte)"), QStringLiteral("Punkt auf Modellecke"),
-       QStringLiteral("Linie parallel zu Linie durch Punkt"),
-       QStringLiteral("Linie parallel zu Modellkante durch Punkt"),
-       QStringLiteral("Ebene parallel zu Ebene durch Punkt")});
-  form_->addRow(QStringLiteral("Typ"), kind_);
+      {QStringLiteral("Point (XYZ)"), QStringLiteral("Line (Point and Direction)"),
+       QStringLiteral("Line Through Two Points"), QStringLiteral("Axis (Point and Direction)"),
+       QStringLiteral("Axis from Construction Line"),
+       QStringLiteral("Plane (Origin and Directions)"), QStringLiteral("Offset Plane"),
+       QStringLiteral("Plane Through Three Points"), QStringLiteral("Plane on Model Face"),
+       QStringLiteral("Point at Model Edge Midpoint"), QStringLiteral("Point on Model Vertex"),
+       QStringLiteral("Line Parallel to Line Through Point"),
+       QStringLiteral("Line Parallel to Model Edge Through Point"),
+       QStringLiteral("Plane Parallel to Plane Through Point")});
+  form_->addRow(QStringLiteral("Type"), kind_);
   name_ = new QLineEdit(inputs);
   name_->setObjectName("blcad.construction.name");
   form_->addRow(QStringLiteral("Name"), name_);
@@ -123,9 +123,9 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   y_direction_row_ = triple("y_direction", y_direction_, false);
   direction_[0]->setValue(1);
   y_direction_[1]->setValue(1);
-  form_->addRow(QStringLiteral("Ursprung"), origin_row_);
-  form_->addRow(QStringLiteral("X-Richtung"), direction_row_);
-  form_->addRow(QStringLiteral("Y-Richtung (senkrecht)"), y_direction_row_);
+  form_->addRow(QStringLiteral("Origin"), origin_row_);
+  form_->addRow(QStringLiteral("X Direction"), direction_row_);
+  form_->addRow(QStringLiteral("Y Direction (Perpendicular)"), y_direction_row_);
   const auto combo = [&](const char* id, const QString& label) {
     auto* result = new QComboBox(inputs);
     result->setObjectName(QStringLiteral("blcad.construction.") + id);
@@ -138,12 +138,12 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
     });
     return result;
   };
-  plane_ = combo("plane", QStringLiteral("Bezugsebene"));
-  line_ = combo("line", QStringLiteral("Konstruktionslinie"));
+  plane_ = combo("plane", QStringLiteral("Reference Plane"));
+  line_ = combo("line", QStringLiteral("Construction Line"));
   for (int i = 0; i < 3; ++i)
     points_[i] =
-        combo(("point" + std::to_string(i + 1)).c_str(), QStringLiteral("Punkt %1").arg(i + 1));
-  parameter_ = combo("parameter", QStringLiteral("Versatzparameter"));
+        combo(("point" + std::to_string(i + 1)).c_str(), QStringLiteral("Point %1").arg(i + 1));
+  parameter_ = combo("parameter", QStringLiteral("Offset Parameter"));
   offset_ = new QDoubleSpinBox(inputs);
   offset_->setObjectName("blcad.construction.offset");
   offset_->setDecimals(6);
@@ -151,22 +151,22 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   offset_->setValue(10);
   offset_->setSuffix(QStringLiteral(" mm"));
   offset_->setKeyboardTracking(false);
-  form_->addRow(QStringLiteral("Versatz (+Normalrichtung)"), offset_);
-  face_ = combo("face", QStringLiteral("Modellfläche"));
-  edge_ = combo("edge", QStringLiteral("Modellkante"));
-  vertex_ = combo("vertex", QStringLiteral("Modellecke"));
+  form_->addRow(QStringLiteral("Offset (+Normal Direction)"), offset_);
+  face_ = combo("face", QStringLiteral("Model Face"));
+  edge_ = combo("edge", QStringLiteral("Model Edge"));
+  vertex_ = combo("vertex", QStringLiteral("Model Vertex"));
   pick_role_ = new QComboBox(inputs);
   pick_role_->setObjectName("blcad.construction.pick_role");
-  form_->addRow(QStringLiteral("Modellklick wählt"), pick_role_);
+  form_->addRow(QStringLiteral("Viewport Click Selects"), pick_role_);
   connect(pick_role_, &QComboBox::currentIndexChanged, this, [this] { update_pick_scope(); });
   manipulation_ = new QComboBox(inputs);
   manipulation_->setObjectName("blcad.construction.manipulation");
-  form_->addRow(QStringLiteral("Griffe"), manipulation_);
+  form_->addRow(QStringLiteral("Handles"), manipulation_);
   grip_numeric_ = new QLineEdit(inputs);
   grip_numeric_->setObjectName("blcad.construction.grip_numeric");
-  grip_numeric_->setPlaceholderText(QStringLiteral("Griff ziehen, dann mm oder deg eingeben"));
+  grip_numeric_->setPlaceholderText(QStringLiteral("Drag a handle, then enter mm or deg"));
   grip_numeric_->setReadOnly(true);
-  form_->addRow(QStringLiteral("Griffwert"), grip_numeric_);
+  form_->addRow(QStringLiteral("Handle Value"), grip_numeric_);
   connect(manipulation_, &QComboBox::currentIndexChanged, this, [this] {
     cancel_drag();
     refresh_handles();
@@ -181,9 +181,9 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   scroll->setWidget(inputs);
   column->addWidget(scroll);
   auto* buttons = new QHBoxLayout;
-  apply_ = new QPushButton(QStringLiteral("Anwenden"), panel);
+  apply_ = new QPushButton(QStringLiteral("Apply"), panel);
   apply_->setObjectName("blcad.construction.apply");
-  auto* cancel = new QPushButton(QStringLiteral("Abbrechen"), panel);
+  auto* cancel = new QPushButton(QStringLiteral("Cancel"), panel);
   cancel->setObjectName("blcad.construction.cancel");
   buttons->addWidget(apply_);
   buttons->addWidget(cancel);
@@ -255,7 +255,7 @@ void ShellConstructionTools::fill_references() {
       add(control, point, "construction-point/");
   for (int i = 0; i < 3; ++i)
     points_[i]->setCurrentIndex(std::min(i, points_[i]->count() - 1));
-  parameter_->addItem(QStringLiteral("Neuer Parameter"), QString{});
+  parameter_->addItem(QStringLiteral("New Parameter"), QString{});
   for (const auto& parameter : part.parameters())
     if (parameter.type() == ParameterType::Length)
       add(parameter_, parameter);
@@ -305,12 +305,12 @@ Result<std::size_t> ShellConstructionTools::begin(Kind kind) {
   if (!session.part_document() || !session.derived_results_fresh() || window_.active_sketch() ||
       session.task().active())
     return Result<std::size_t>::failure(
-        error("Konstruktion benötigt ein aktuelles Bauteil ohne aktiven Befehl"));
+        error("Construction requires a current part without an active command"));
   updating_ = true;
   editing_ = false;
   dependencies_.clear();
   kind_->setEnabled(true);
-  dock_->setWindowTitle(QStringLiteral("Konstruktion erstellen"));
+  dock_->setWindowTitle(QStringLiteral("Create Construction"));
   fill_references();
   std::size_t number = 1;
   const auto& graph = session.part_document()->dependency_graph();
@@ -319,7 +319,7 @@ Result<std::size_t> ShellConstructionTools::begin(Kind kind) {
   } while (graph.has_node(id_) || graph.has_node(id_ + ".offset") ||
            graph.has_node(id_ + ".relation"));
   relation_id_ = id_ + ".relation";
-  name_->setText(QStringLiteral("Konstruktion %1").arg(number - 1));
+  name_->setText(QStringLiteral("Construction %1").arg(number - 1));
   kind_->setCurrentIndex(static_cast<int>(kind));
   for (auto* coordinate : origin_)
     coordinate->setValue(0);
@@ -338,10 +338,10 @@ Result<std::size_t> ShellConstructionTools::begin_edit(std::string_view object_i
   if (!part || !session.derived_results_fresh() || window_.active_sketch() ||
       session.task().active())
     return Result<std::size_t>::failure(
-        error("Bearbeiten benötigt ein aktuelles Bauteil ohne aktiven Befehl"));
+        error("Editing requires a current part without an active command"));
   // Principal origin geometry stays fixed in the shell.
   if (object_id == "datum.axis.x" || object_id == "datum.axis.y" || object_id == "datum.axis.z")
-    return Result<std::size_t>::failure(error("Ursprungsgeometrie ist fest definiert"));
+    return Result<std::size_t>::failure(error("Origin geometry is fixed"));
   Kind kind;
   std::string name;
   std::optional<ConstructionRelation> relation;
@@ -420,7 +420,7 @@ Result<std::size_t> ShellConstructionTools::begin_edit(std::string_view object_i
     kind = Kind::FacePlane;
     name = plane->name();
   } else {
-    return Result<std::size_t>::failure(error("Kein bearbeitbares Konstruktionselement gewählt"));
+    return Result<std::size_t>::failure(error("No editable construction element selected"));
   }
   updating_ = true;
   editing_ = true;
@@ -465,7 +465,7 @@ Result<std::size_t> ShellConstructionTools::begin_edit(std::string_view object_i
     const auto& reference = part->find_derived_workplane(DatumPlaneId(id))->face_reference();
     select_generated(face_, reference.source_feature(), static_cast<int>(reference.face()));
   }
-  dock_->setWindowTitle(QStringLiteral("Konstruktion bearbeiten"));
+  dock_->setWindowTitle(QStringLiteral("Edit Construction"));
   updating_ = false;
   return open_task();
 }
@@ -474,8 +474,8 @@ Result<std::size_t> ShellConstructionTools::open_task() {
   auto& session = window_.session();
   if (!session.task().begin(std::string(editing_ ? edit_task_id : task_id)) ||
       !session.task().begin_parameter_editing())
-    return Result<std::size_t>::failure(error("Konstruktion konnte nicht gestartet werden"));
-  revision_ = session.presentation_revision();
+    return Result<std::size_t>::failure(error("Could not start construction"));
+  revision_ = session.model_revision();
   previous_filter_ = window_.viewport().selection_filter_mask();
   previous_scope_ = window_.viewport().selection_semantic_scope();
   precise_values_.reset();
@@ -611,13 +611,12 @@ std::vector<geometry::ViewportSceneItem> ShellConstructionTools::selection_items
 Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
   const auto kind = static_cast<Kind>(kind_->currentIndex());
   if (editing_ && kind != edit_kind_)
-    return Result<std::size_t>::failure(
-        error("Der Konstruktionstyp bleibt beim Bearbeiten erhalten"));
+    return Result<std::size_t>::failure(error("The construction type is preserved when editing"));
   const auto name = editing_ && name_->text().toStdString() == original_name_
                         ? original_name_
                         : name_->text().trimmed().toStdString();
   if (name.empty())
-    return Result<std::size_t>::failure(error("Name darf nicht leer sein"));
+    return Result<std::size_t>::failure(error("Name must not be empty"));
   const auto values = definition_values();
   const auto coordinates = values[0];
   const Point3 origin{coordinates.x, coordinates.y, coordinates.z};
@@ -761,12 +760,12 @@ Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
       auto quantity = Quantity::length_mm(offset_value(), parameter.value());
       if (!quantity)
         return Result<std::size_t>::failure(quantity.error());
-      auto parameter_name = "Versatz " + name;
+      auto parameter_name = "Offset " + name;
       for (std::size_t suffix = 2;
            std::any_of(part.parameters().begin(), part.parameters().end(),
                        [&](const Parameter& item) { return item.name() == parameter_name; });
            ++suffix)
-        parameter_name = "Versatz " + name + " " + std::to_string(suffix);
+        parameter_name = "Offset " + name + " " + std::to_string(suffix);
       auto added =
           insert(part, Parameter::create_length(parameter, parameter_name, quantity.value()),
                  &PartDocument::add_parameter);
@@ -794,19 +793,18 @@ Result<std::size_t> ShellConstructionTools::populate(PartDocument& part) const {
         editing_ ? &PartDocument::update_derived_workplane : &PartDocument::add_derived_workplane);
   }
   }
-  return Result<std::size_t>::failure(error("Unbekannter Konstruktionstyp"));
+  return Result<std::size_t>::failure(error("Unknown construction type"));
 }
 
 bool ShellConstructionTools::current() const {
   const auto& session = window_.session();
   return active_ && session.part_document() && session.part_shape_cache() &&
          session.task().command_id() == (editing_ ? edit_task_id : task_id) &&
-         session.derived_results_fresh() && session.presentation_revision() == revision_;
+         session.derived_results_fresh() && session.model_revision() == revision_;
 }
 Result<std::size_t> ShellConstructionTools::preview() {
   if (!current())
-    return Result<std::size_t>::failure(
-        error("Modell oder Befehl geändert. Konstruktion neu öffnen."));
+    return Result<std::size_t>::failure(error("Model or command changed. Reopen construction."));
   apply_->setEnabled(false);
   window_.viewport().clear_feature_preview();
   (void)window_.session().task().return_to_editing();
@@ -859,8 +857,7 @@ Result<std::size_t> ShellConstructionTools::preview() {
     if (included(item))
       shapes.push_back(std::move(item.shape));
   if (shapes.empty() || (!editing_ && shapes.size() != 1))
-    return Result<std::size_t>::failure(
-        error("Konstruktionsgeometrie konnte nicht dargestellt werden"));
+    return Result<std::size_t>::failure(error("Could not display construction geometry"));
   if (editing_) {
     auto original = geometry::ViewportSceneBuilder{}.build_part(
         *window_.session().part_document(), *window_.session().part_shape_cache());
@@ -874,10 +871,10 @@ Result<std::size_t> ShellConstructionTools::preview() {
   if (!shown)
     return shown;
   (void)window_.session().task().show_preview();
-  summary_->setText(
-      editing_ ? QStringLiteral("Vorschau einschließlich nachgelagerter Geometrie gültig. Anwenden "
-                                "übernimmt die Änderung.")
-               : QStringLiteral("Vorschau gültig. Anwenden erstellt ein Konstruktionselement."));
+  summary_->setText(editing_
+                        ? QStringLiteral("Preview including downstream geometry valid. Apply "
+                                         "commits the change.")
+                        : QStringLiteral("Preview valid. Apply creates a construction element."));
   apply_->setEnabled(true);
   return Result<std::size_t>::success(1);
 }
@@ -890,17 +887,16 @@ void ShellConstructionTools::update_preview() {
   if (numeric_invalid_) {
     apply_->setEnabled(false);
     summary_->setText(
-        QStringLiteral("Ungültiger Griffwert. Zahl in mm bzw. deg eingeben oder Escape drücken."));
+        QStringLiteral("Invalid handle value. Enter a number in mm or deg, or press Escape."));
   }
   refresh_handles();
 }
 Result<std::size_t> ShellConstructionTools::apply() {
   if (!current())
-    return Result<std::size_t>::failure(
-        error("Modell oder Befehl geändert. Konstruktion neu öffnen."));
+    return Result<std::size_t>::failure(error("Model or command changed. Reopen construction."));
   if (numeric_invalid_)
     return Result<std::size_t>::failure(
-        error("Ungültiger Griffwert. Wert korrigieren oder Escape drücken."));
+        error("Invalid handle value. Correct the value or press Escape."));
   drag_.reset();
   layer_.cancel();
   if (window_.viewport().mouseGrabber() == &window_.viewport())

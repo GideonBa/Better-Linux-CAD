@@ -125,7 +125,7 @@ void StartupSplash::paintEvent(QPaintEvent* event) {
   const int marker = track_left + (track_right - track_left) * progress_ / 100;
 
   painter.setRenderHint(QPainter::Antialiasing, false);
-  painter.setPen(QPen(Qt::white, 2.0, Qt::SolidLine, Qt::RoundCap));
+  painter.setPen(QPen(Qt::white, 2.0, Qt::SolidLine, Qt::SquareCap));
   painter.drawLine(track_left, track_y, track_right, track_y);
   painter.setPen(QPen(Qt::white, 1.0));
   painter.drawLine(marker, track_y - 7, marker, track_y + 7);

@@ -33,43 +33,43 @@ ShellContextTools::ShellContextTools(ShellWindow& window) : QObject(&window), wi
   };
   std::size_t index = 0;
   for (const auto& [kind, id, label] :
-       {std::tuple{FeatureCommand::Extrude, "extrude", "Extrusion"},
-        std::tuple{FeatureCommand::Revolve, "revolve", "Drehung"},
+       {std::tuple{FeatureCommand::Extrude, "extrude", "Extrude"},
+        std::tuple{FeatureCommand::Revolve, "revolve", "Revolve"},
         std::tuple{FeatureCommand::Sweep, "sweep", "Sweep"},
         std::tuple{FeatureCommand::Loft, "loft", "Loft"},
-        std::tuple{FeatureCommand::Fillet, "fillet", "Verrunden"},
-        std::tuple{FeatureCommand::Chamfer, "chamfer", "Fase"},
-        std::tuple{FeatureCommand::Shell, "shell", "Aushöhlen"},
-        std::tuple{FeatureCommand::Draft, "draft", "Formschräge"},
-        std::tuple{FeatureCommand::LinearPattern, "linear_pattern", "Lineares Muster"},
-        std::tuple{FeatureCommand::CircularPattern, "circular_pattern", "Kreismuster"},
-        std::tuple{FeatureCommand::BodyMirror, "body_mirror", "Spiegeln"},
-        std::tuple{FeatureCommand::BodyBoolean, "body_boolean", "Kombinieren"},
-        std::tuple{FeatureCommand::BodyTranslate, "body_translate", "Verschieben"},
-        std::tuple{FeatureCommand::BodyRotate, "body_rotate", "Drehen"},
-        std::tuple{FeatureCommand::BodyScale, "body_scale", "Skalieren"},
-        std::tuple{FeatureCommand::BoundarySurface, "surface_boundary", "Begrenzungsfläche"},
-        std::tuple{FeatureCommand::FillSurface, "surface_fill", "Füllfläche"},
-        std::tuple{FeatureCommand::TrimSurface, "surface_trim", "Trimmen"},
-        std::tuple{FeatureCommand::ExtendSurface, "surface_extend", "Erweitern"},
-        std::tuple{FeatureCommand::SurfaceStitch, "surface_stitch", "Vernähen"},
-        std::tuple{FeatureCommand::ClosedShellToSolid, "surface_to_solid", "Volumen"}}) {
+        std::tuple{FeatureCommand::Fillet, "fillet", "Fillet"},
+        std::tuple{FeatureCommand::Chamfer, "chamfer", "Chamfer"},
+        std::tuple{FeatureCommand::Shell, "shell", "Shell"},
+        std::tuple{FeatureCommand::Draft, "draft", "Draft"},
+        std::tuple{FeatureCommand::LinearPattern, "linear_pattern", "Linear Pattern"},
+        std::tuple{FeatureCommand::CircularPattern, "circular_pattern", "Circular Pattern"},
+        std::tuple{FeatureCommand::BodyMirror, "body_mirror", "Mirror"},
+        std::tuple{FeatureCommand::BodyBoolean, "body_boolean", "Combine"},
+        std::tuple{FeatureCommand::BodyTranslate, "body_translate", "Move"},
+        std::tuple{FeatureCommand::BodyRotate, "body_rotate", "Rotate"},
+        std::tuple{FeatureCommand::BodyScale, "body_scale", "Scale"},
+        std::tuple{FeatureCommand::BoundarySurface, "surface_boundary", "Boundary Surface"},
+        std::tuple{FeatureCommand::FillSurface, "surface_fill", "Fill Surface"},
+        std::tuple{FeatureCommand::TrimSurface, "surface_trim", "Trim"},
+        std::tuple{FeatureCommand::ExtendSurface, "surface_extend", "Extend"},
+        std::tuple{FeatureCommand::SurfaceStitch, "surface_stitch", "Stitch"},
+        std::tuple{FeatureCommand::ClosedShellToSolid, "surface_to_solid", "Solid"}}) {
     const auto [wrapper, button] = action(id, label);
     commands_.at(index++) = {kind, wrapper, button};
     connect(wrapper, &QAction::triggered, this, [this, kind] { begin(kind); });
   }
   using AssemblyCommand = ShellAssemblyTools::Command;
   for (const auto& [kind, id, label] :
-       {std::tuple{AssemblyCommand::Placement, "assembly_placement", "Platzierung"},
-        std::tuple{AssemblyCommand::Relationship, "assembly_relationship", "Beziehung"},
-        std::tuple{AssemblyCommand::Joint, "assembly_joint", "Gelenk"},
-        std::tuple{AssemblyCommand::Motion, "assembly_motion", "Bewegen"},
-        std::tuple{AssemblyCommand::Solve, "assembly_solve", "Gruppe lösen"}}) {
+       {std::tuple{AssemblyCommand::Placement, "assembly_placement", "Placement"},
+        std::tuple{AssemblyCommand::Relationship, "assembly_relationship", "Relationship"},
+        std::tuple{AssemblyCommand::Joint, "assembly_joint", "Joint"},
+        std::tuple{AssemblyCommand::Motion, "assembly_motion", "Move"},
+        std::tuple{AssemblyCommand::Solve, "assembly_solve", "Solve Group"}}) {
     const auto [wrapper, button] = action(id, label);
     commands_.at(index++) = {kind, wrapper, button};
     connect(wrapper, &QAction::triggered, this, [this, kind] { begin(kind); });
   }
-  std::tie(cancel_, cancel_button_) = action("cancel", "Abbrechen");
+  std::tie(cancel_, cancel_button_) = action("cancel", "Cancel");
   connect(cancel_, &QAction::triggered, this, [this] {
     if (cancel_->isEnabled() && panel_->isVisible() && consumed_ &&
         window_.session().task().active() &&

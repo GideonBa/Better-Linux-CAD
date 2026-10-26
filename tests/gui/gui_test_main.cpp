@@ -1,3 +1,4 @@
+#include "blcad/gui/gui_appearance.hpp"
 #include <QApplication>
 #include <QByteArray>
 
@@ -15,6 +16,7 @@ int main(int argc, char* argv[]) {
   }
 
   QApplication application(argc, argv);
+  blcad::gui::configure_gui_appearance(application);
   QApplication::setApplicationName(QStringLiteral("BLCAD GUI Tests"));
   return Catch::Session().run(argc, argv);
 }

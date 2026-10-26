@@ -23,6 +23,12 @@ struct GuiSketchDimensionPreview {
 
 class GuiSketchDimensionController {
 public:
+  [[nodiscard]] static std::string annotation_label(const geometry::SketchDimensionGlyph& glyph) {
+    if (glyph.token == "R" || glyph.token == "Ø")
+      return glyph.token + " " + glyph.value_text;
+    return glyph.value_text;
+  }
+
   // Provision an optional driving parameter only inside the accepted operation.
   [[nodiscard]] static Result<std::size_t>
   add(GuiDocumentSession& session, SketchId sketch, SketchDimensionIntent intent,
@@ -105,7 +111,7 @@ public:
     SketchDimensionMeasurement measurement = [&]() {
       if (preview.value().measurement) return *preview.value().measurement;
       auto source_measurement = SketchDimensionMeasurementEvaluator::measure(
-          topology.value(), candidate);
+          topology.value(), candidate, session.part_document());
       return source_measurement.has_error()
                  ? fallback_measurement(candidate)
                  : source_measurement.value();
@@ -118,9 +124,12 @@ public:
         candidate, measurement, state);
     if (glyph.has_error())
       return Result<GuiSketchDimensionController>::failure(glyph.error());
-    GuiSketchAnnotationPrimitive annotation{
-        glyph.value().semantic_id, glyph.value().candidate_id, glyph.value().anchor,
-        GuiSketchHitKind::Dimension};
+    GuiSketchAnnotationPrimitive annotation{glyph.value().semantic_id,
+                                            glyph.value().candidate_id,
+                                            glyph.value().anchor,
+                                            GuiSketchHitKind::Dimension,
+                                            {},
+                                            {}};
     return Result<GuiSketchDimensionController>::success(GuiSketchDimensionController(
         session.part_document()->id(), std::move(topology.value()),
         std::move(constraints.value()), std::move(dimensions.value()),
@@ -229,6 +238,10 @@ public:
       const auto kind = entity_kind(targets.front());
       if (kind == SketchTopologyEntityKind::Line)
         result.push_back(SketchDimensionKind::Length);
+      if (kind == SketchTopologyEntityKind::CircleProfile) {
+        result.push_back(SketchDimensionKind::Radius);
+        result.push_back(SketchDimensionKind::Diameter);
+      }
       if (kind == SketchTopologyEntityKind::Arc) {
         result.push_back(SketchDimensionKind::Radius);
         result.push_back(SketchDimensionKind::Diameter);
@@ -288,7 +301,7 @@ public:
     annotations.reserve(glyphs.value().size());
     for (const auto& glyph : glyphs.value())
       annotations.push_back({glyph.semantic_id, glyph.candidate_id, glyph.anchor,
-                             GuiSketchHitKind::Dimension, glyph.value_text, glyph.leader});
+                             GuiSketchHitKind::Dimension, annotation_label(glyph), glyph.leader});
     return Result<std::vector<GuiSketchAnnotationPrimitive>>::success(
         std::move(annotations));
   }

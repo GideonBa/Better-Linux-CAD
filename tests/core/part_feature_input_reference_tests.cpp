@@ -91,6 +91,7 @@ TEST_CASE("Part feature input roles capabilities and source kinds have stable sp
   CHECK(to_string(PartFeatureInputRole::ShellRemovalFace) == "shell_removal_face");
   CHECK(to_string(PartFeatureInputRole::DraftPullDirection) == "draft_pull_direction");
   CHECK(to_string(PartFeatureInputSourceKind::SemanticCircularEdge) == "semantic_circular_edge");
+  CHECK(to_string(PartFeatureInputSourceKind::ResultEdge) == "result_edge");
 
   CHECK(part_feature_input_role_accepts(PartFeatureInputRole::RevolveAxis,
                                         PartFeatureInputCapability::Axis));

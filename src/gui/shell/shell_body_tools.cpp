@@ -22,12 +22,12 @@ namespace {
 QString title(ShellFeatureTools::Command command) {
   using C = ShellFeatureTools::Command;
   if (command == C::BodyBoolean)
-    return QStringLiteral("Körper kombinieren");
+    return QStringLiteral("Combine Bodies");
   if (command == C::BodyTranslate)
-    return QStringLiteral("Körper verschieben");
+    return QStringLiteral("Move Bodies");
   if (command == C::BodyRotate)
-    return QStringLiteral("Körper drehen");
-  return QStringLiteral("Körper skalieren");
+    return QStringLiteral("Rotate Bodies");
+  return QStringLiteral("Scale Bodies");
 }
 } // namespace
 
@@ -41,10 +41,10 @@ bool ShellFeatureTools::body_transform() const noexcept {
 
 QString ShellFeatureTools::body_summary() const {
   return command_ == Command::BodyBoolean
-             ? QStringLiteral("%1: %2 Werkzeugkörper. Vorschau gültig.")
+             ? QStringLiteral("%1: %2 tool bodies. Preview valid.")
                    .arg(boolean_operation_->currentText())
                    .arg(body_sources_->selectedItems().size())
-             : QStringLiteral("%1 Körper. Vorschau gültig; gemeinsam als einen Schritt anwenden.")
+             : QStringLiteral("%1 bodies. Preview valid; apply together as one step.")
                    .arg(body_sources_->selectedItems().size());
 }
 
@@ -59,14 +59,14 @@ void ShellFeatureTools::build_body_controls(QWidget* panel) {
   boolean_operation_ = new QComboBox(body_controls_);
   boolean_operation_->setObjectName("blcad.boolean.operation");
   boolean_operation_->addItems(
-      {QStringLiteral("Vereinen"), QStringLiteral("Abziehen"), QStringLiteral("Schnittmenge")});
+      {QStringLiteral("Union"), QStringLiteral("Subtract"), QStringLiteral("Intersect")});
   form->addRow(QStringLiteral("Operation"), boolean_operation_);
   boolean_target_ = new QComboBox(body_controls_);
   boolean_target_->setObjectName("blcad.boolean.target");
-  form->addRow(QStringLiteral("Zielkörper"), boolean_target_);
+  form->addRow(QStringLiteral("Target Body"), boolean_target_);
   body_axis_ = new QComboBox(body_controls_);
   body_axis_->setObjectName("blcad.body.axis");
-  form->addRow(QStringLiteral("Drehachse"), body_axis_);
+  form->addRow(QStringLiteral("Rotation Axis"), body_axis_);
   body_reference_button_ = new QPushButton(body_controls_);
   body_reference_button_->setObjectName("blcad.body.pick_reference");
   body_reference_button_->setCheckable(true);
@@ -75,13 +75,13 @@ void ShellFeatureTools::build_body_controls(QWidget* panel) {
   body_sources_->setObjectName("blcad.body.sources");
   body_sources_->setSelectionMode(QAbstractItemView::MultiSelection);
   body_sources_->setMinimumHeight(95);
-  form->addRow(new QLabel(QStringLiteral("Körperauswahl"), body_controls_));
+  form->addRow(new QLabel(QStringLiteral("Body Selection"), body_controls_));
   form->addRow(body_sources_);
   boolean_result_ = new QComboBox(body_controls_);
   boolean_result_->setObjectName("blcad.boolean.result");
-  boolean_result_->addItems({QStringLiteral("Zielkörper ändern"), QStringLiteral("Neuer Körper")});
-  form->addRow(QStringLiteral("Ergebnis"), boolean_result_);
-  boolean_keep_tools_ = new QCheckBox(QStringLiteral("Werkzeugkörper behalten"), body_controls_);
+  boolean_result_->addItems({QStringLiteral("Modify Target Body"), QStringLiteral("New Body")});
+  form->addRow(QStringLiteral("Result"), boolean_result_);
+  boolean_keep_tools_ = new QCheckBox(QStringLiteral("Keep Tool Bodies"), body_controls_);
   boolean_keep_tools_->setObjectName("blcad.boolean.keep_tools");
   form->addRow(boolean_keep_tools_);
   for (std::size_t i = 0; i < body_translation_editors_.size(); ++i) {
@@ -102,7 +102,7 @@ void ShellFeatureTools::build_body_controls(QWidget* panel) {
     auto* editor = new QLineEdit(body_controls_);
     body_center_editors_[i] = editor;
     editor->setObjectName(QStringLiteral("blcad.body.center.%1").arg(i));
-    form->addRow(QStringLiteral("Zentrum %1 (mm)").arg(QStringLiteral("XYZ").at(i)), editor);
+    form->addRow(QStringLiteral("Center %1 (mm)").arg(QStringLiteral("XYZ").at(i)), editor);
     editor->installEventFilter(this);
     connect(editor, &QLineEdit::editingFinished, this, [this, editor, i] {
       if (command_ != Command::BodyScale || synchronizing_numeric_)
@@ -112,19 +112,19 @@ void ShellFeatureTools::build_body_controls(QWidget* panel) {
         report(edited.error());
     });
   }
-  body_owned_sketches_ = new QCheckBox(QStringLiteral("Skizzen mitbewegen"), body_controls_);
+  body_owned_sketches_ = new QCheckBox(QStringLiteral("Move Owned Sketches"), body_controls_);
   body_owned_construction_ =
-      new QCheckBox(QStringLiteral("Hilfsgeometrie mitbewegen"), body_controls_);
+      new QCheckBox(QStringLiteral("Move Owned Construction Geometry"), body_controls_);
   body_owned_sketches_->setToolTip(
-      QStringLiteral("Bereits zugeordnete Skizzen mit den Körpern transformieren."));
+      QStringLiteral("Transform already owned sketches with the bodies."));
   body_owned_construction_->setToolTip(
-      QStringLiteral("Bereits zugeordnete Hilfsgeometrie mit den Körpern transformieren."));
+      QStringLiteral("Transform already owned construction geometry with the bodies."));
   form->addRow(body_owned_sketches_);
   form->addRow(body_owned_construction_);
-  auto* hint = new QLabel(
-      QStringLiteral("Weitere Klicks ergänzen oder entfernen Körper. "
-                     "Die Liste bleibt auch bei ausgeblendeten Ausgangskörpern verfügbar."),
-      body_controls_);
+  auto* hint =
+      new QLabel(QStringLiteral("Click again to add or remove bodies. "
+                                "The list remains available when source bodies are hidden."),
+                 body_controls_);
   hint->setWordWrap(true);
   // Keep wrapping guidance out of the dynamic form: Qt 6.4's height-for-width
   // pass can reuse hidden rows' indices and collapse unrelated visible fields.
@@ -231,10 +231,10 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
   const auto* part = session_.part_document();
   if (active() || session_.task().active() || window_.active_sketch() || !part ||
       session_.workspace() != GuiWorkspace::Part || !session_.part_shape_cache())
-    return fail("Körperoperation benötigt ein Bauteil ohne aktiven Befehl");
+    return fail("Body operation requires a part without an active command");
   if (command != Command::BodyBoolean && command != Command::BodyTranslate &&
       command != Command::BodyRotate && command != Command::BodyScale)
-    return fail("Unbekannte Körperoperation");
+    return fail("Unknown body operation");
   const QSignalBlocker sources(body_sources_), target(boolean_target_),
       operation(boolean_operation_), result(boolean_result_), axis(body_axis_),
       keep(boolean_keep_tools_), sketches(body_owned_sketches_),
@@ -256,7 +256,7 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
         item->setSelected(true);
   }
   if (body_sources_->count() < (command == Command::BodyBoolean ? 2 : 1))
-    return fail("Nicht genügend sichtbare, berechnete Körper vorhanden");
+    return fail("Not enough visible recomputed bodies available");
   if (command == Command::BodyBoolean && !body_sources_->selectedItems().empty())
     boolean_target_->setCurrentIndex(body_sources_->row(body_sources_->selectedItems().front()));
   for (const auto& datum : part->datum_axes()) {
@@ -280,7 +280,7 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
                           "construction-line/" + line.id().value()});
   }
   if (command == Command::BodyRotate && body_axes_.empty())
-    return fail("Zuerst eine Drehachse erstellen");
+    return fail("Create a rotation axis first");
   for (std::size_t i = 0; i < body_axes_.size(); ++i)
     if (body_axes_[i].semantic_id == "datum-axis/datum.axis.z")
       body_axis_->setCurrentIndex(i);
@@ -288,7 +288,7 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
     const auto suffix = std::to_string(n);
     body_feature_ = FeatureId("feature.bodyop." + suffix);
     body_result_ = BodyId("body.boolean." + suffix);
-    body_result_name_ = "Boolesches Ergebnis " + suffix;
+    body_result_name_ = "Boolean Result " + suffix;
     if (part->dependency_graph().has_node(body_feature_.value()) || part->find_body(body_result_) ||
         std::any_of(part->bodies().begin(), part->bodies().end(),
                     [&](const auto& b) { return b.name() == body_result_name_; }))
@@ -309,7 +309,7 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
     command_ = Command::None;
     if (session_.task().active())
       (void)session_.task().cancel();
-    return fail("Körperaufgabe konnte nicht gestartet werden");
+    return fail("Could not start body task");
   }
   previous_selection_mask_ = viewport_.selection_filter_mask();
   previous_semantic_scope_ = viewport_.selection_semantic_scope();
@@ -330,8 +330,8 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
   form->setRowVisible(body_reference_button_,
                       command == Command::BodyBoolean || command == Command::BodyRotate);
   body_reference_button_->setText(command == Command::BodyBoolean
-                                      ? QStringLiteral("Zielkörper im Modell wählen")
-                                      : QStringLiteral("Drehachse im Modell wählen"));
+                                      ? QStringLiteral("Pick Target Body in Model")
+                                      : QStringLiteral("Pick Rotation Axis in Model"));
   for (auto* editor : body_translation_editors_)
     form->setRowVisible(editor, command == Command::BodyTranslate);
   for (auto* editor : body_center_editors_)
@@ -421,8 +421,7 @@ Result<std::size_t> ShellFeatureTools::rebuild_body_controller() {
       first = false;
     }
     if (first)
-      return Result<std::size_t>::failure(
-          Error::validation("body", "Mindestens einen Körper auswählen."));
+      return Result<std::size_t>::failure(Error::validation("body", "Select at least one body."));
     if (command_ == Command::BodyTranslate)
       controller.set_translation(body_translation_);
     else if (command_ == Command::BodyRotate)
