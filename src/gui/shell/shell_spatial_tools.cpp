@@ -388,6 +388,13 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
         spatial_source_->setCurrentIndex(i);
   }
   command_ = command;
+  spatial_order_hint_->setText(
+      command == Command::Loft
+          ? QStringLiteral(
+                "Schnitte mit Hoch/Runter ordnen. Häkchen kehren Normalen um. "
+                "Profilsegmente werden automatisch angepasst; Skizzen bleiben unverändert.")
+          : QStringLiteral("Liste ziehen oder Hoch/Runter verwenden. Häkchen kehren "
+                           "Segmentrichtung bzw. Schnittnormalen um."));
   if (!session_.task().begin(std::string(command_id())) ||
       !session_.task().begin_parameter_editing() || !session_.task().show_preview()) {
     command_ = Command::None;

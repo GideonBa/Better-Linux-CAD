@@ -1219,6 +1219,22 @@ application startup are verified. The historical Block-136 shell manifest remain
 completion gate accepts later numbered progress. Exact evidence is in
 `docs/step-import-sequence-mvp10.md`.
 
+## Loft automatic segment compatibility follow-up — 2026-10-26
+
+Completed automatic derived subdivision for unequal Loft edge counts while retaining original
+Sketch intent and explicit order/seam/normal authority. Seven new Geometry cases and one complex GUI
+case cover the 8/9/6 spline pattern, exact rational/circular contours, original boundary points,
+center/guide binding, bounded failure, preview/cancellation, downstream modeling, history and
+Save/Open/STEP. A local reproduction of the supplied document also recomputes and exports without
+manually subdividing its Sketches.
+
+All five build targets pass. Full Core (539 cases), Geometry (448) and offscreen GUI (528 passed,
+20 native-only skips) pass. The affected native Loft/path suite passes 12 cases with no skips;
+its focused offscreen counterpart passes 11 cases with one native-only skip. Native captures and
+separate application startup are verified. Exact evidence and remaining geometric bounds live in
+`docs/gui-interactive-path-sweep-loft-mvp9.md` and the Part Loft Geometry documents. This improves
+the existing Loft boundary; Block 138 and later STEP import work remain planned.
+
 ## Current next technical step — Block 138 (planned)
 
 Implement the OCCT STEP/XDE reader and deterministic product/body definitions over the verified

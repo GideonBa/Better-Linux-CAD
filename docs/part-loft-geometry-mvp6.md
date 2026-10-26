@@ -16,8 +16,10 @@ Composite regions with holes remain outside this execution boundary.
 Section order comes exclusively from `LoftFeature::sections()`. Closed explicit alignment entities
 rotate the authored profile boundary to the selected seam; otherwise the profile resolver's
 canonical seam applies. `flip_normal` reverses section orientation, and `rotation_offset` rotates a
-closed section about its own workplane normal. Matching authored edge counts are required so OCCT
-wire traversal cannot silently decide correspondence.
+closed section about its own workplane normal. Equal authored edge counts retain the existing
+correspondence. Since the 2026-10-26 follow-up, unequal counts are reconciled through exact derived
+subdivision before wire creation; see `docs/part-multi-section-loft-geometry-mvp6.md`. OCCT wire
+traversal never decides correspondence and kernel compatibility rewriting remains disabled.
 
 ## Products and Body operations
 

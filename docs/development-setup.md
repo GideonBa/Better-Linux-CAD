@@ -1408,3 +1408,25 @@ Run the full Core, Geometry and offscreen GUI suites and append `[block137-step-
 canonical native shell filter from `docs/gui-shell-acceptance-mvp9r.md`. Keep GUI runs and separate
 native application startup serial; keep production/test sources frozen throughout completed runs.
 Actual acceptance results are recorded in `docs/step-import-sequence-mvp10.md`.
+
+## Automatic Loft section refinement follow-up
+
+The 2026-10-26 Loft follow-up accepts unequal section edge counts through exact derived Geometry
+subdivision. It does not rewrite Sketch entities or add JSON fields. Numbered STEP import progress
+remains through Block 137; Block 138 is still planned.
+
+```bash
+cmake --preset dev-gui
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests blcad_export_step -j6
+./build/dev-gui/blcad_geometry_tests "[loft-section-compatibility],[loft-feature],[multi-section-loft],[guided-loft],[mixed-path-loft]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[shell-loft-auto-segments],[shell-combined-loft],[shell-mixed-path-loft],[block136-spatial]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-loft-auto-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-loft-auto-segments],[shell-combined-loft],[shell-mixed-path-loft],[block136-spatial]"
+```
+
+The focused Geometry oracle checks the original spline boundaries independently of the refinement
+algorithm, rational and circular curves, center/guide anchors and bounded failure. The combined UI
+workflow checks preview/cancellation, G2 rejection/recovery, exact Sketch persistence, downstream
+Body translation, history, canonical Save/Open and STEP export. Run the full Core/Geometry and
+offscreen GUI binaries after the focused proof, plus separate native startup. Keep source edits,
+builds and GUI runs serial. Actual follow-up results live in
+`docs/gui-interactive-path-sweep-loft-mvp9.md`.
