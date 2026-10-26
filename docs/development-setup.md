@@ -1453,3 +1453,32 @@ Visibility checks also keep active Hole/construction tasks and their pick scopes
 and restoring source geometry; real model edits still invalidate stale tasks. Inspect monochrome controls and the model/annotation state in native captures. Run full
 Core, Geometry and offscreen GUI regression plus the shell coverage closure gate after focused proof.
 Actual results belong to the dated follow-up entry in `docs/mvp-plan.md`.
+
+## Hermes-inspired desktop redesign
+
+The implementation plan and current design contract live in `docs/gui-hermes-design.md`. Build all
+five targets using the command above before testing. Keep source edits, builds, GUI runs and the
+separate native startup serial. Fonts are bundled Qt resources; no desktop font installation or
+runtime network access is required.
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[appearance],[startup-splash],[hermes-design-workflow],[rapid-dimension],[ribbon]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-hermes-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[appearance],[startup-splash],[hermes-design-workflow],[rapid-dimension],[ribbon],[shell-combined-part],[shell-combined-spatial-context],[shell-combined-finishing-context],[shell-combined-parameters],[shell-combined-assembly-context],[block137-step-import],[native-viewer-lifecycle]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-hermes-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[appearance],[startup-splash],[hermes-design-workflow]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][gui-feature-coverage]"
+```
+
+Inspect the `hermes-*` captures for the navigation, typography, inputs, disabled states, dimension
+badges, task action reachability and model visibility at both window sizes. Also run a focused
+1.5× scale proof, the full offscreen GUI suite, the shell coverage closure gate and separate native
+application startup; record actual results and any environment constraints in the design document.
+For final native acceptance, extend the canonical shell filter from
+`docs/gui-shell-acceptance-mvp9r.md` with the subsequent Block-137, Loft and modeling-usability tags
+above, plus `[appearance],[startup-splash],[hermes-design-workflow],[rapid-dimension],[ribbon]`.
+Native widget exposure, focus and compact navigation checks await bounded Qt event-loop readiness
+and then require real focus, complete button bounds and actual mouse hits.
+Combined native workflows also await exact cursor/hover agreement across two separate event turns
+before pressing a popup row. This settling is bounded to two seconds and four pointer requests;
+the final index and real click assertions remain strict. STEP source checks retain their complete
+checksum/no-internal-scroll assertions with the new styled field height.

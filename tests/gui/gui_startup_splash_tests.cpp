@@ -1,3 +1,4 @@
+#include "blcad/gui/gui_appearance.hpp"
 #include "blcad/gui/startup_splash.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -25,7 +26,14 @@ TEST_CASE("GUI startup splash embeds artwork and bounds progress", "[gui][startu
   rendered.fill(Qt::transparent);
   QPainter painter(&rendered);
   splash.render(&painter);
-  CHECK(rendered.pixelColor(10, 410) == QColor(Qt::black));
+  const QColor blue = QColor::fromRgb(appearance::blue);
+  const QColor paper = QColor::fromRgb(appearance::paper);
+  CHECK(rendered.pixelColor(10, 410) == blue);
+  CHECK(rendered.pixelColor(0, 0) == blue);
+  CHECK(rendered.pixelColor(rendered.width() - 1, rendered.height() - 1) == blue);
+  CHECK(rendered.pixelColor(100, 516) == paper);
+  CHECK(rendered.pixelColor(700, 516) == blue);
+  CHECK(rendered.pixelColor(700, 518) == paper);
 
   const QString screenshot_path = qEnvironmentVariable("BLCAD_SPLASH_SCREENSHOT");
   if (!screenshot_path.isEmpty())

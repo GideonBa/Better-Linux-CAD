@@ -296,6 +296,7 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   auto* buttons = new QHBoxLayout();
   apply_button_ = new QPushButton(QStringLiteral("Apply"), dock_contents);
   apply_button_->setObjectName(QStringLiteral("blcad.feature.apply"));
+  apply_button_->setProperty("guiRole", "primary");
   cancel_button_ = new QPushButton(QStringLiteral("Cancel"), dock_contents);
   cancel_button_->setObjectName(QStringLiteral("blcad.feature.cancel"));
   buttons->addWidget(apply_button_);

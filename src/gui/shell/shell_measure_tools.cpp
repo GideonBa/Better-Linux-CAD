@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_measure_tools.hpp"
+#include "blcad/gui/gui_appearance.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -61,6 +62,7 @@ protected:
   void paintEvent(QPaintEvent*) override {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
+    painter.setFont(appearance::numeric_font());
     painter.setPen(QPen(QColor(255, 195, 55), 2));
     std::vector<QPointF> projected;
     for (const auto& point : witnesses) {
@@ -75,9 +77,10 @@ protected:
         painter.drawEllipse(point, 4, 4);
       const auto middle = (projected[0] + projected[1]) / 2;
       const QRectF label(middle + QPointF(8, -26), QSizeF(210, 24));
-      painter.fillRect(label, Qt::black);
-      painter.setPen(Qt::white);
+      painter.fillRect(label, QColor::fromRgb(appearance::paper));
+      painter.setPen(QColor::fromRgb(appearance::blue));
       painter.drawRect(label);
+      painter.setPen(QColor::fromRgb(appearance::ink));
       painter.drawText(label, Qt::AlignLeft | Qt::AlignVCenter, value);
     }
     for (const auto& [label, point] : markers) {
@@ -85,6 +88,7 @@ protected:
       if (!screen)
         continue;
       const QPointF p(screen.value().x, screen.value().y);
+      painter.setPen(QColor::fromRgb(appearance::paper));
       painter.drawEllipse(p, 6, 6);
       painter.setPen(Qt::white);
       painter.drawText(p + QPointF(8, 16), label);

@@ -288,6 +288,8 @@ ShellParameterTools::ShellParameterTools(ShellWindow& window, ShellRibbon& ribbo
                          const QString& label) {
     auto* result = new QPushButton(label, parent);
     result->setObjectName(QStringLiteral("blcad.parameters.") + name);
+    if (QString::fromLatin1(name) == QStringLiteral("apply"))
+      result->setProperty("guiRole", "primary");
     row->addWidget(result);
     return result;
   };

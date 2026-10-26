@@ -1,4 +1,5 @@
 #include "blcad/gui/occt_viewport.hpp"
+#include "blcad/gui/gui_appearance.hpp"
 
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/gui/gui_viewport_manipulator.hpp"
@@ -247,18 +248,17 @@ protected:
     for (const auto& annotation : annotations_) {
       if (annotation.label.isEmpty())
         continue;
-      QFont font = painter.font();
-      font.setPointSizeF(annotation.dimension ? 9.5 : 10.0);
-      painter.setFont(font);
+      painter.setFont(appearance::numeric_font(annotation.dimension ? 13 : 14));
+      const QFont font = painter.font();
       const QFontMetricsF metrics(font);
       const QRectF text_rect = metrics.boundingRect(annotation.label);
       const QRectF badge(annotation.point.x - text_rect.width() * 0.5 - 4.0,
                          annotation.point.y - text_rect.height() * 0.5 - 2.0,
                          text_rect.width() + 8.0, text_rect.height() + 4.0);
-      painter.setPen(QPen(Qt::white, 1.0));
-      painter.setBrush(Qt::black);
+      painter.setPen(QPen(QColor::fromRgb(appearance::blue), 1.0));
+      painter.setBrush(QColor::fromRgb(appearance::paper));
       painter.drawRect(badge);
-      painter.setPen(Qt::white);
+      painter.setPen(QColor::fromRgb(appearance::ink));
       painter.setBrush(Qt::NoBrush);
       painter.drawText(badge, Qt::AlignCenter, annotation.label);
     }
@@ -498,7 +498,7 @@ OcctViewport::OcctViewport(QWidget* parent) : QWidget(parent), impl_(std::make_u
   setAccessibleName(QStringLiteral("BLCAD 3D viewport"));
   setFocusPolicy(Qt::StrongFocus);
   setMouseTracking(true);
-  setMinimumSize(480, 320);
+  setMinimumSize(360, 260);
   setAutoFillBackground(false);
   sketch_overlay_ = new SketchInteractionOverlay(this);
   sketch_overlay_->setGeometry(rect());
@@ -1239,7 +1239,7 @@ void OcctViewport::paintEvent(QPaintEvent* event) {
   if (!impl_->view.IsNull())
     return; // The render surface child paints the 3D view.
   QPainter painter(this);
-  painter.fillRect(rect(), Qt::black);
+  painter.fillRect(rect(), QColor::fromRgb(appearance::canvas));
   painter.setPen(Qt::white);
   const QString message = impl_->initialization_error.empty()
                               ? QStringLiteral("OCCT 3D Viewport")
@@ -1463,7 +1463,9 @@ void OcctViewport::initialize_native_viewer() {
     impl_->context = new AIS_InteractiveContext(impl_->viewer);
     impl_->view = impl_->viewer->CreateView();
     impl_->view->SetImmediateUpdate(false);
-    impl_->view->SetBackgroundColor(Quantity_Color(0.0, 0.0, 0.0, Quantity_TOC_RGB));
+    const QColor background = QColor::fromRgb(appearance::canvas);
+    impl_->view->SetBackgroundColor(Quantity_Color(background.redF(), background.greenF(),
+                                                   background.blueF(), Quantity_TOC_RGB));
     impl_->owner_to_index.clear();
     for (std::size_t index = 0; index < impl_->presentations.size(); ++index) {
       auto& presentation = impl_->presentations[index];

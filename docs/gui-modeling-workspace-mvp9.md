@@ -19,19 +19,27 @@ file dialogs, and newly generated default names. Existing authored names and per
 remain unchanged when a document is opened. The application sets an English locale with decimal-point
 numeric input, independently of the system display language.
 
-`configure_gui_appearance` installs the same appearance in the application and GUI acceptance runner:
-black widget backgrounds, white text and control borders, square corners, and solid fills. Native
-file dialogs are disabled so document dialogs follow that contract. Focused, checked, hovered, and
-selected controls use white border changes; disabled controls keep white text and use dotted borders
-or italic labels. These states do not rely on colored or gradient backgrounds. CAD geometry retains
-its semantic selection and reference markings against the black viewport background.
+The Hermes-inspired redesign supersedes the initial monochrome theme. `configure_gui_appearance`
+installs the same electric-blue/paper design system in the application and GUI acceptance runner.
+The navigation and primary actions use blue; readable indigo text, white inputs and fine separators
+organize paper panels. The modeling canvas uses solid dark navy and retains semantic geometry,
+selection and reference markings. Controls remain square and use solid fills. Native file dialogs
+are disabled so document dialogs follow the same contract.
 
-The `[gui][appearance]` regressions render buttons, inputs, combo boxes and the ribbon, exercise
-pressed/checked buttons and tab navigation, and check the disabled palette and English menu labels.
-They verify square white frame corners, uniform black interiors, visible enabled/disabled control
-arrows and white placeholder text; the same cases run on offscreen Qt and native xcb. Embedded arrow
-assets keep these controls independent of platform style defaults. Native workflow captures
-additionally show the full desktop and model annotations.
+Bundled Barlow supplies readable body text, Barlow Condensed supplies navigation/section headings,
+and IBM Plex Mono supplies scalar inputs and model readouts. These fonts are registered offline from
+Qt resources; their original SIL OFL notices and exact upstream checksums accompany the assets.
+The ribbon retains horizontal scrolling, stable action labels and shortcuts. Primary task acceptance
+buttons explicitly declare a presentation role; secondary actions remain quiet. Browser/property
+rows, focused inputs and checked commands have distinct selection/focus states, including disabled
+controls. Diagnostics remain visible with a compact initial height.
+
+The `[gui][appearance]` regressions inspect rendered pixels, readable contrast, registered fonts,
+enabled/disabled arrow affordances, focus and button states. `[hermes-design-workflow]` combines
+Sketch dimensions, preview/cancel/apply, feature editing, history, Save/Open and STEP export at
+1024×640, 1280×800 and 1600×1000, bounded to the available native desktop at higher DPI. Compact
+workspace navigation is checked through visible arrows and actual mouse hits. The implementation
+plan, exact visual roles and final native evidence live in `docs/gui-hermes-design.md`.
 
 ## Authority boundary
 

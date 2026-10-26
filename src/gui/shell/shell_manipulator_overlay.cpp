@@ -1,5 +1,7 @@
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
+#include "blcad/gui/gui_appearance.hpp"
 #include "blcad/gui/gui_viewport_manipulator.hpp"
+#include <QFontMetrics>
 #include <QPainter>
 #include <QWidget>
 #include <cmath>
@@ -39,10 +41,22 @@ protected:
         draw_arrow_head(painter, anchor, endpoint);
         painter.drawEllipse(endpoint, 4.5, 4.5);
       }
-      painter.setPen(Qt::white);
-      if (!presentation.value_text.empty())
-        painter.drawText(endpoint + QPointF(9.0, 16.0),
-                         QString::fromStdString(presentation.value_text));
+      painter.setFont(appearance::numeric_font());
+      painter.setPen(QColor::fromRgb(appearance::paper));
+      if (!presentation.value_text.empty()) {
+        const QString text = QString::fromStdString(presentation.value_text);
+        const QPointF origin = endpoint + QPointF(9.0, 16.0);
+        const QRectF badge = QFontMetricsF(painter.font())
+                                 .boundingRect(text)
+                                 .translated(origin)
+                                 .adjusted(-4.0, -2.0, 4.0, 2.0);
+        painter.fillRect(badge, QColor::fromRgb(appearance::paper));
+        painter.setPen(QColor::fromRgb(appearance::blue));
+        painter.drawRect(badge);
+        painter.setPen(QColor::fromRgb(appearance::ink));
+        painter.drawText(origin, text);
+      }
+      painter.setPen(QColor::fromRgb(appearance::paper));
       if (presentation.handle_id.ends_with(".x") || presentation.handle_id.ends_with(".y") ||
           presentation.handle_id.ends_with(".z"))
         painter.drawText(endpoint + QPointF(8, -8),

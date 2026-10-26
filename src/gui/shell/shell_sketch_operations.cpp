@@ -537,6 +537,7 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
   layout->addWidget(status);
   auto* controls = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
   controls->button(QDialogButtonBox::Ok)->setText(QStringLiteral("Apply"));
+  controls->button(QDialogButtonBox::Ok)->setProperty("guiRole", "primary");
   controls->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("Cancel"));
   layout->addWidget(controls);
   const auto request = [&] {
