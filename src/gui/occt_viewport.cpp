@@ -255,10 +255,10 @@ protected:
       const QRectF badge(annotation.point.x - text_rect.width() * 0.5 - 4.0,
                          annotation.point.y - text_rect.height() * 0.5 - 2.0,
                          text_rect.width() + 8.0, text_rect.height() + 4.0);
-      painter.setPen(QPen(QColor::fromRgb(appearance::blue), 1.0));
-      painter.setBrush(QColor::fromRgb(appearance::paper));
+      painter.setPen(QPen(QColor::fromRgb(appearance::accent), 1.0));
+      painter.setBrush(QColor::fromRgb(appearance::panel));
       painter.drawRect(badge);
-      painter.setPen(QColor::fromRgb(appearance::ink));
+      painter.setPen(QColor::fromRgb(appearance::text));
       painter.setBrush(Qt::NoBrush);
       painter.drawText(badge, Qt::AlignCenter, annotation.label);
     }

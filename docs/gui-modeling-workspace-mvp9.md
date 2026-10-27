@@ -19,12 +19,14 @@ file dialogs, and newly generated default names. Existing authored names and per
 remain unchanged when a document is opened. The application sets an English locale with decimal-point
 numeric input, independently of the system display language.
 
-The Hermes-inspired redesign supersedes the initial monochrome theme. `configure_gui_appearance`
-installs the same electric-blue/paper design system in the application and GUI acceptance runner.
-The navigation and primary actions use blue; readable indigo text, white inputs and fine separators
-organize paper panels. The modeling canvas uses solid dark navy and retains semantic geometry,
-selection and reference markings. Controls remain square and use solid fills. Native file dialogs
-are disabled so document dialogs follow the same contract.
+The Hermes-inspired redesign supplies the existing layout and typography. The 2026-10-27 color-only
+follow-up makes `configure_gui_appearance` use the same dark-violet/black palette in the application
+and GUI acceptance runner. Navigation, panels and inputs use the reference's dark violet tones;
+off-white text and light lavender accents keep controls, selection and focus readable. The near-black
+modeling canvas retains semantic geometry, selection and reference markings. Controls remain square
+with solid fills; widget sizes, spacing and interactions remain unchanged. Native file dialogs are
+disabled so document dialogs follow the same contract. The startup splash is restored to its
+pre-redesign Archimedes artwork, italic white title and centered `LOADING` on black.
 
 Bundled Barlow supplies readable body text, Barlow Condensed supplies navigation/section headings,
 and IBM Plex Mono supplies scalar inputs and model readouts. These fonts are registered offline from

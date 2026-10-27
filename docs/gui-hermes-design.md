@@ -1,10 +1,10 @@
-# Hermes-inspired desktop redesign
+# Desktop design and dark-violet palette
 
 Reference: [Hermes Agent](https://hermes-agent.nousresearch.com/), inspected 2026-10-26.
-The reference contributes electric blue, paper-colored typography, condensed display lettering,
-technical metadata and carefully spaced, lightly divided sections. BLCAD adapts these principles to
-a dense desktop CAD workspace. The user's latest instruction explicitly releases the previous
-black/white and white-frame requirement. English labels, square geometry and solid fills remain.
+The reference contributed the desktop's typography, spacing and lightly divided sections. The
+2026-10-27 color-only follow-up replaces electric blue and paper panels with the user's dark-violet
+to black reference palette. Layout, widget geometry, typography, labels and interactions remain
+unchanged. The startup splash is restored verbatim from the parent of redesign commit `b6e4f68`.
 
 ## Implementation plan and acceptance
 
@@ -25,16 +25,19 @@ Block-138 STEP reader remains planned.
 
 | Role | Value / rule |
 | --- | --- |
-| Identity and primary actions | Electric blue `#0000f2`, paper/white foreground |
-| Desktop/panel paper | `#f5f4ef`, input surface `#ffffff` |
-| Main text | Deep indigo `#191638` |
-| Secondary text | Muted indigo with a minimum readable text contrast |
-| Quiet separators | Pale indigo; one-pixel rules only at meaningful group boundaries |
-| Interactive field edges and scroll thumbs | Indigo `#8b85a3`, at least 3:1 contrast against paper |
-| Hover / selection | Pale blue hover; blue selected rows with white text |
+| Identity/navigation, menus and headers | Dark violet `#1d0124`, light foreground |
+| Desktop/panels | `#15011a`, input/list surface `#0d0010` |
+| Main text | Off-white `#f5f1f7` |
+| Secondary text | Muted lavender `#b9a9c2`, at least 4.5:1 on the dark surfaces |
+| Quiet separators | `#3f2948`; existing one-pixel rules at group boundaries |
+| Interactive field edges and scroll thumbs | `#887292`, at least 3:1 against panels |
+| Hover / selection / primary actions | `#22012a` hover; `#26012f` selection/primary fill with light text and lavender edges |
+| Selected text in editors | Light lavender `#d7a8ed` background with dark `#0d0010` text |
+| Accent / checked indicators | Light lavender `#d7a8ed` for readable titles, focus, control edges and checked indicators |
 | Focus | Explicit contrasting outline, independent of hover and selection |
-| Disabled | Muted readable text and subdued flat surface; no italic command labels |
-| Modeling canvas | Solid dark navy `#101426`, retaining distinct CAD geometry/selection colors |
+| Disabled | Muted readable text; arrow cells `#19011f`; existing disabled-state rules |
+| Modeling canvas / tooltips | Solid near-black `#08000a` / `#040005`, retaining distinct CAD geometry/selection colors |
+| Startup splash | Original Archimedes artwork, italic white serif title, white progress line/marker and centered `LOADING` on black |
 | Display typography | Bundled Barlow Condensed Medium for identity, navigation and section headings |
 | UI typography | Bundled Barlow Regular/Medium, readable at ordinary CAD control sizes |
 | Numeric typography | Bundled IBM Plex Mono for editable scalar values and technical readouts |
@@ -51,7 +54,7 @@ Authored sources and documentation retain the repository's normal formatting che
 ## Interaction and verification boundaries
 
 - Selection, hover, keyboard focus, checked and disabled states remain distinguishable.
-- Inputs, combo/spin arrows, checkboxes, menu branches and scrollbars remain visible on paper and blue.
+- Inputs, combo/spin arrows, checkboxes, menu branches and scrollbars remain visible on dark surfaces.
 - STEP source checksum readouts must show the complete wrapped SHA-256 text without their own
   horizontal or vertical scrolling at 1280×800. Their height must include the polished font,
   document margins and the actual styled frame/padding.
@@ -59,7 +62,7 @@ Authored sources and documentation retain the repository's normal formatting che
   Workspace tabs have explicit previous/next buttons when space is limited. Their reserved control
   slot keeps both arrows inside the header during native resize; pixel, containment and actual
   mouse-hit tests verify that the last workspace remains reachable.
-- Dark-canvas dimensions and manipulators use coordinated readable overlays, independent of paper panels.
+- Dark-canvas dimensions and manipulators use coordinated readable dark badges and light text.
 - Diagnostics remain available without taking most of the initial modeling canvas.
 - The canvas permits a 360×260 logical-pixel minimum; the combined task workflow checks a compact
   1024×640 window as well as the ordinary and larger layout, bounded to the native available desktop.
@@ -68,7 +71,47 @@ Authored sources and documentation retain the repository's normal formatting che
   visibility, Undo/Redo, Save/Open and existing Part/Surface/Assembly commands at native sizes.
 - Source edits, builds, GUI runs and separate startup remain serial per `development-setup.md`.
 
-## Verification evidence
+## Color-only follow-up verification (2026-10-27)
+
+All five GUI-preset targets were built. Final verification:
+
+| Check | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full offscreen GUI | 570 | 74,778 | 550 passed; 20 native-only skips |
+| Focused native Qt/OCCT appearance, splash, ribbon, dimensions, Measure and combined modeling/file workflows | 36 | 5,970 | Passed; no skips |
+| Native appearance/splash/combined workflow at 150% | 5 | 791 | Passed on unchanged repeat |
+| Separate native application startup | — | — | Ran until intentional six-second timeout, exit 124 |
+
+The stylesheet comparison confirms identical non-color declarations, including fonts, padding,
+spacing, sizes and border widths/styles. `startup_splash.cpp` matches `b6e4f68^` byte for byte.
+The appearance proof inspects actual rendered text-selection pixels and their contrast, as well as
+field edges, pressed/checked/disabled states, placeholders, arrows and compact tab navigation.
+
+The first sandboxed focused offscreen run passed the appearance/splash checks but could not read the
+published STEP output at the end of the combined workflow; the final full offscreen and native runs
+passed with normal filesystem access. The first 150% run missed a Rapid Dimension hover candidate
+before authoring; all appearance/splash cases passed, and an unchanged repeat passed all five cases. No
+interaction code or test input was modified to address either environment-sensitive result.
+
+Native captures for controls, Sketch, feature tasks, Measure, Assembly and the restored splash were
+inspected at ordinary and compact sizes, including 150% scaling. The available X11 visual emits the
+known OCCT Medium depth/stencil warning; final native/scaled/startup logs contain no High-severity,
+BadDrawable or BadWindow errors. Reproduction commands are in `development-setup.md`.
+
+All 737 source/test/asset/build-definition files in `/tmp/blcad-violet-source-freeze-final.json`
+remained unchanged through the final native, scaled, startup and full offscreen runs. Logs are
+`/tmp/blcad-violet-{build-final,gui-full,native,native-150-retry,startup}.log`; the initial sandboxed
+focused log and first scaled attempt are retained separately. Numbered feature status is unchanged.
+
+Current native feature preview at 1280×800:
+
+![Dark-violet task panels and near-black modeling canvas](images/dark-violet-feature-preview.png)
+
+The same unchanged layout at 1024×640:
+
+![Compact dark-violet desktop with reachable task actions](images/dark-violet-feature-compact.png)
+
+## Historical redesign verification evidence
 
 Final acceptance passed on 2026-10-26:
 
@@ -114,7 +157,7 @@ protected-branch PR merge into `main`. The delivery gate requires comparing the 
 with `origin/main` after integration and a clean working tree. Numbered feature sequencing remains
 Block 137 complete / Block 138 planned.
 
-The versioned captures below show the implemented design.
+The versioned captures below show the original 2026-10-26 design, before the color-only follow-up.
 
 Native Qt/OCCT feature preview at 1280×800:
 

@@ -77,10 +77,10 @@ protected:
         painter.drawEllipse(point, 4, 4);
       const auto middle = (projected[0] + projected[1]) / 2;
       const QRectF label(middle + QPointF(8, -26), QSizeF(210, 24));
-      painter.fillRect(label, QColor::fromRgb(appearance::paper));
-      painter.setPen(QColor::fromRgb(appearance::blue));
+      painter.fillRect(label, QColor::fromRgb(appearance::panel));
+      painter.setPen(QColor::fromRgb(appearance::accent));
       painter.drawRect(label);
-      painter.setPen(QColor::fromRgb(appearance::ink));
+      painter.setPen(QColor::fromRgb(appearance::text));
       painter.drawText(label, Qt::AlignLeft | Qt::AlignVCenter, value);
     }
     for (const auto& [label, point] : markers) {
@@ -88,7 +88,7 @@ protected:
       if (!screen)
         continue;
       const QPointF p(screen.value().x, screen.value().y);
-      painter.setPen(QColor::fromRgb(appearance::paper));
+      painter.setPen(QColor::fromRgb(appearance::text));
       painter.drawEllipse(p, 6, 6);
       painter.setPen(Qt::white);
       painter.drawText(p + QPointF(8, 16), label);

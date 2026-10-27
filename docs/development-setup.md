@@ -1501,3 +1501,23 @@ the matching option, task action reachability and the corrected three-section so
 proof, run full Core, Geometry and offscreen GUI regression, required shell closure and separate
 native startup. Record actual counts, native-only omissions and source-freeze evidence in
 `docs/gui-interactive-path-sweep-loft-mvp9.md`.
+
+## Dark-violet color-only follow-up
+
+The current palette and restored pre-redesign splash contract live in `docs/gui-hermes-design.md`.
+Build the five GUI-preset targets above. Keep source changes, builds, GUI runs and separate startup
+serial; retain the existing fonts, spacing, widget sizes and interactions.
+
+```bash
+mkdir -p /tmp/blcad-violet-native /tmp/blcad-violet-native-150
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-violet-native BLCAD_SPLASH_SCREENSHOT=/tmp/blcad-violet-native/splash.png QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[appearance],[startup-splash],[hermes-design-workflow],[rapid-dimension],[ribbon],[shell-combined-part],[shell-combined-spatial-context],[shell-combined-finishing-context],[shell-combined-parameters],[shell-combined-assembly-context],[block137-step-import],[block136-measure],[gui][viewport],[native-viewer-lifecycle]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-violet-native-150 BLCAD_SPLASH_SCREENSHOT=/tmp/blcad-violet-native-150/splash.png QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[appearance],[startup-splash],[hermes-design-workflow]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+The standalone startup intentionally stops with timeout exit 124. Inspect captures for panel/input
+contrast, checked/disabled/focus states, dark dimension/Measure/manipulator badges, and the original
+black-and-white splash. The existing combined workflow proves compact and ordinary window sizes,
+model edits, history, Save/Open and STEP export. Record actual skips and native results in the design
+document; offscreen tests cannot prove OCCT rendering.

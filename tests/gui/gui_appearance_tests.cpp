@@ -91,15 +91,16 @@ std::size_t matching_pixels(const QImage& image, QRect area, QColor color) {
 
 } // namespace
 
-TEST_CASE("Hermes-inspired GUI uses readable offline fonts and square blue-paper controls",
+TEST_CASE("Dark-violet GUI retains readable offline fonts and square controls",
           "[gui][appearance]") {
-  const QColor blue = QColor::fromRgb(appearance::blue);
-  const QColor paper = QColor::fromRgb(appearance::paper);
-  const QColor ink = QColor::fromRgb(appearance::ink);
+  const QColor accent = QColor::fromRgb(appearance::accent);
+  const QColor panel_color = QColor::fromRgb(appearance::panel);
+  const QColor text = QColor::fromRgb(appearance::text);
   const QColor muted = QColor::fromRgb(appearance::muted);
   const QColor line = QColor::fromRgb(appearance::line);
   const QColor edge = QColor::fromRgb(appearance::edge);
-  const QColor white = Qt::white;
+  const QColor base = QColor::fromRgb(appearance::base);
+  const QColor selection = QColor::fromRgb(appearance::selection);
 
   QWidget panel;
   auto* layout = new QVBoxLayout(&panel);
@@ -150,39 +151,43 @@ TEST_CASE("Hermes-inspired GUI uses readable offline fonts and square blue-paper
 
   const QPalette palette = QApplication::palette();
   for (const auto group : {QPalette::Active, QPalette::Inactive, QPalette::Disabled}) {
-    const QColor foreground = group == QPalette::Disabled ? muted : ink;
-    CHECK(palette.color(group, QPalette::Window) == paper);
-    CHECK(palette.color(group, QPalette::Button) == paper);
-    CHECK(palette.color(group, QPalette::Base) == white);
+    const QColor foreground = group == QPalette::Disabled ? muted : text;
+    CHECK(palette.color(group, QPalette::Window) == panel_color);
+    CHECK(palette.color(group, QPalette::Button) == panel_color);
+    CHECK(palette.color(group, QPalette::Base) == base);
     CHECK(palette.color(group, QPalette::WindowText) == foreground);
     CHECK(palette.color(group, QPalette::Text) == foreground);
     CHECK(palette.color(group, QPalette::ButtonText) == foreground);
-    CHECK(palette.color(group, QPalette::Highlight) == blue);
-    CHECK(palette.color(group, QPalette::HighlightedText) == white);
-    CHECK(contrast(foreground, paper) >= 4.5);
-    CHECK(contrast(foreground, white) >= 4.5);
+    CHECK(palette.color(group, QPalette::Highlight) == accent);
+    CHECK(palette.color(group, QPalette::HighlightedText) == base);
+    CHECK(contrast(foreground, panel_color) >= 4.5);
+    CHECK(contrast(foreground, base) >= 4.5);
   }
-  CHECK(contrast(paper, blue) >= 4.5);
-  CHECK(contrast(white, blue) >= 4.5);
-  CHECK(contrast(edge, paper) >= 3.0);
+  for (const auto surface : {appearance::panel, appearance::base, appearance::chrome,
+                             appearance::selection, appearance::hover, appearance::canvas}) {
+    CHECK(contrast(text, QColor::fromRgb(surface)) >= 4.5);
+    CHECK(contrast(muted, QColor::fromRgb(surface)) >= 4.5);
+    CHECK(contrast(accent, QColor::fromRgb(surface)) >= 3.0);
+  }
+  CHECK(contrast(edge, panel_color) >= 3.0);
 
   check_square_frame(*button, edge);
-  check_uniform_fill(*button, paper);
-  check_square_frame(*primary, blue);
-  check_uniform_fill(*primary, blue);
-  CHECK(primary->palette().color(QPalette::ButtonText) == paper);
+  check_uniform_fill(*button, panel_color);
+  check_square_frame(*primary, accent);
+  check_uniform_fill(*primary, selection);
+  CHECK(primary->palette().color(QPalette::ButtonText) == text);
   check_square_frame(*disabled, line);
-  check_uniform_fill(*disabled, paper);
+  check_uniform_fill(*disabled, panel_color);
   CHECK(disabled->palette().color(QPalette::Disabled, QPalette::ButtonText) == muted);
 
   button->setDown(true);
-  check_square_frame(*button, blue);
-  check_uniform_fill(*button, blue);
+  check_square_frame(*button, accent);
+  check_uniform_fill(*button, selection);
   button->setDown(false);
   button->setCheckable(true);
   button->setChecked(true);
-  check_square_frame(*button, blue);
-  check_uniform_fill(*button, blue);
+  check_square_frame(*button, accent);
+  check_uniform_fill(*button, selection);
   check->setChecked(true);
   check->setEnabled(false);
   QStyleOptionButton check_option;
@@ -206,7 +211,7 @@ TEST_CASE("Hermes-inspired GUI uses readable offline fonts and square blue-paper
   const QRect thumb = scroll->style()->subControlRect(QStyle::CC_ScrollBar, &scroll_option,
                                                       QStyle::SC_ScrollBarSlider, scroll);
   REQUIRE(thumb.width() > 8);
-  CHECK(contrast(rendered(*scroll).pixelColor(thumb.center()), paper) >= 3.0);
+  CHECK(contrast(rendered(*scroll).pixelColor(thumb.center()), panel_color) >= 3.0);
   choice->setCurrentIndex(1);
   CHECK(input->text() == QStringLiteral("12.5"));
   CHECK(choice->currentText() == QStringLiteral("Radius"));
@@ -242,20 +247,26 @@ TEST_CASE("Hermes-inspired GUI uses readable offline fonts and square blue-paper
   if (native)
     REQUIRE(panel.isActiveWindow());
   REQUIRE(input->hasFocus());
-  check_square_frame(*input, blue);
-  check_uniform_fill(*input, white);
+  check_square_frame(*input, accent);
+  check_uniform_fill(*input, base);
   // Focus changes color while retaining the same one-pixel field frame.
   const auto focused_input = rendered(*input);
-  CHECK(focused_input.pixelColor(0, focused_input.height() / 2) == blue);
-  CHECK(focused_input.pixelColor(1, focused_input.height() / 2) == white);
-  CHECK(rendered(panel).pixelColor(0, 0) == paper);
+  CHECK(focused_input.pixelColor(0, focused_input.height() / 2) == accent);
+  CHECK(focused_input.pixelColor(1, focused_input.height() / 2) == base);
+  CHECK(rendered(panel).pixelColor(0, 0) == panel_color);
+  input->selectAll();
+  const auto selected_input = rendered(*input);
+  CHECK(matching_pixels(selected_input, input->rect().adjusted(8, 4, -8, -4), accent) > 20U);
+  CHECK(contrast(input->palette().color(QPalette::HighlightedText),
+                 input->palette().color(QPalette::Highlight)) >= 4.5);
   capture(panel, QStringLiteral("hermes-controls-states.png"));
 }
 
-TEST_CASE("Hermes-inspired ribbon and menus retain English labels and distinct tool states",
+TEST_CASE("Dark-violet ribbon and menus retain English labels and distinct tool states",
           "[gui][appearance][ribbon]") {
-  const QColor blue = QColor::fromRgb(appearance::blue);
-  const QColor paper = QColor::fromRgb(appearance::paper);
+  const QColor accent = QColor::fromRgb(appearance::accent);
+  const QColor panel_color = QColor::fromRgb(appearance::panel);
+  const QColor selection = QColor::fromRgb(appearance::selection);
   ShellRibbon ribbon;
   const int model = ribbon.add_tab(QStringLiteral("3D Model"));
   const int sketch = ribbon.add_tab(QStringLiteral("Sketch"));
@@ -279,16 +290,16 @@ TEST_CASE("Hermes-inspired ribbon and menus retain English labels and distinct t
   CHECK(command->text() == QStringLiteral("Extrude"));
   CHECK(menu_button->menu()->actions().at(0)->text() == QStringLiteral("Fillet"));
   CHECK(menu_button->menu()->actions().at(1)->text() == QStringLiteral("Chamfer"));
-  check_uniform_fill(*command, paper);
+  check_uniform_fill(*command, panel_color);
   command->setCheckable(true);
   command->setChecked(true);
-  check_square_frame(*command, blue);
-  check_uniform_fill(*command, blue);
+  check_square_frame(*command, accent);
+  check_uniform_fill(*command, selection);
   ribbon.set_current_tab(sketch);
   CHECK(ribbon.current_tab() == sketch);
   ribbon.set_current_tab(model);
   CHECK(command->isVisible());
-  check_uniform_fill(*menu_button, paper);
+  check_uniform_fill(*menu_button, panel_color);
   capture(ribbon, QStringLiteral("hermes-english-ribbon.png"));
 
   ribbon.resize(360, 180);
@@ -358,9 +369,10 @@ TEST_CASE("Hermes-inspired ribbon and menus retain English labels and distinct t
   capture(ribbon, QStringLiteral("hermes-navigation-compact.png"));
 }
 
-TEST_CASE("Hermes-inspired numeric controls retain visible arrows and opaque readable placeholders",
+TEST_CASE("Dark-violet numeric controls retain visible arrows and opaque readable placeholders",
           "[gui][appearance]") {
-  const QColor blue = QColor::fromRgb(appearance::blue);
+  const QColor chrome = QColor::fromRgb(appearance::chrome);
+  const QColor disabled_surface = QColor::fromRgb(appearance::disabled_surface);
   const QColor muted = QColor::fromRgb(appearance::muted);
   QWidget panel;
   auto* layout = new QVBoxLayout(&panel);
@@ -381,13 +393,13 @@ TEST_CASE("Hermes-inspired numeric controls retain visible arrows and opaque rea
 
   const auto check_arrow = [&](QWidget& control, QRect arrow) {
     // Exclude the cell frame and require both glyph and background pixels:
-    // an empty white drop-down must not satisfy this rendering proof.
+    // an empty drop-down must not satisfy this rendering proof.
     const QRect interior = arrow.adjusted(2, 2, -2, -2);
     REQUIRE(interior.width() > 0);
     REQUIRE(interior.height() > 0);
     const auto image = rendered(control);
     CHECK(matching_pixels(image, interior, Qt::white) >= 5U);
-    CHECK(matching_pixels(image, interior, control.isEnabled() ? blue : muted) >= 10U);
+    CHECK(matching_pixels(image, interior, control.isEnabled() ? chrome : disabled_surface) >= 10U);
   };
 
   for (const bool enabled : {true, false}) {
@@ -410,15 +422,15 @@ TEST_CASE("Hermes-inspired numeric controls retain visible arrows and opaque rea
   for (const auto group : {QPalette::Active, QPalette::Inactive, QPalette::Disabled})
     CHECK(placeholder->palette().color(group, QPalette::PlaceholderText) == muted);
   const auto placeholder_image = rendered(*placeholder);
-  double minimum_luminance = 1.0;
+  double maximum_luminance = 0.0;
   for (int y = 8; y < placeholder_image.height() - 8; ++y)
     for (int x = 8; x < placeholder_image.width() - 8; ++x)
-      minimum_luminance =
-          std::min(minimum_luminance, luminance(placeholder_image.pixelColor(x, y)));
+      maximum_luminance =
+          std::max(maximum_luminance, luminance(placeholder_image.pixelColor(x, y)));
   INFO("Placeholder image " << placeholder_image.width() << 'x' << placeholder_image.height()
-                            << "; interior minimum luminance " << minimum_luminance);
-  // Half-opacity muted text against white is too pale; actual antialiased
-  // glyphs must retain dark pixels in addition to the opaque palette contract.
-  CHECK(minimum_luminance < 0.3);
+                            << "; interior maximum luminance " << maximum_luminance);
+  // Half-opacity muted text against a dark input is too dim; actual antialiased
+  // glyphs must retain light pixels in addition to the opaque palette contract.
+  CHECK(maximum_luminance > 0.3);
   capture(panel, QStringLiteral("hermes-input-affordances.png"));
 }
