@@ -22,11 +22,11 @@ numeric input, independently of the system display language.
 The Hermes-inspired redesign supplies the existing layout and typography. The 2026-10-27 color-only
 follow-up makes `configure_gui_appearance` use the same dark-violet/black palette in the application
 and GUI acceptance runner. Navigation, panels and inputs use the reference's dark violet tones;
-off-white text and light lavender accents keep controls, selection and focus readable. The near-black
-modeling canvas retains semantic geometry, selection and reference markings. Controls remain square
-with solid fills; widget sizes, spacing and interactions remain unchanged. Native file dialogs are
-disabled so document dialogs follow the same contract. The startup splash is restored to its
-pre-redesign Archimedes artwork, italic white title and centered `LOADING` on black.
+off-white text and light lavender accents keep controls, selection and focus readable. The modeling
+canvas uses charcoal gray (`#181a1b`) and retains semantic geometry, selection and reference markings.
+Controls remain square with solid fills; widget sizes, spacing and interactions remain unchanged.
+Native file dialogs are disabled so document dialogs follow the same contract. The startup splash is
+restored to its pre-redesign Archimedes artwork, italic white title and centered `LOADING` on black.
 
 Bundled Barlow supplies readable body text, Barlow Condensed supplies navigation/section headings,
 and IBM Plex Mono supplies scalar inputs and model readouts. These fonts are registered offline from

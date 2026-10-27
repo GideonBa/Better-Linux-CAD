@@ -36,7 +36,8 @@ Block-138 STEP reader remains planned.
 | Accent / checked indicators | Light lavender `#d7a8ed` for readable titles, focus, control edges and checked indicators |
 | Focus | Explicit contrasting outline, independent of hover and selection |
 | Disabled | Muted readable text; arrow cells `#19011f`; existing disabled-state rules |
-| Modeling canvas / tooltips | Solid near-black `#08000a` / `#040005`, retaining distinct CAD geometry/selection colors |
+| Modeling canvas | Solid charcoal gray `#181a1b`, retaining distinct CAD geometry/selection colors |
+| Tooltips | Near-black `#040005` with light text |
 | Startup splash | Original Archimedes artwork, italic white serif title, white progress line/marker and centered `LOADING` on black |
 | Display typography | Bundled Barlow Condensed Medium for identity, navigation and section headings |
 | UI typography | Bundled Barlow Regular/Medium, readable at ordinary CAD control sizes |
@@ -103,9 +104,24 @@ remained unchanged through the final native, scaled, startup and full offscreen 
 `/tmp/blcad-violet-{build-final,gui-full,native,native-150-retry,startup}.log`; the initial sandboxed
 focused log and first scaled attempt are retained separately. Numbered feature status is unchanged.
 
+### Charcoal canvas follow-up (2026-10-27)
+
+The subsequent user swatch changes only the modeling-canvas constant to `#181a1b`; both the native
+OCCT view and offscreen fallback use it. All five GUI-preset targets were rebuilt. The existing
+`[appearance],[gui][viewport],[hermes-design-workflow],[native-viewer-lifecycle]` selection passed
+offscreen (10 cases, 879 assertions; one expected native-only skip) and natively (11 cases,
+886 assertions; no skips). Both rendered previews have exactly RGB `(24, 26, 27)` at the clear canvas
+pixel `(400, 200)`. Updated native captures below were inspected. Separate native startup reached
+the intentional timeout (124), with no High-severity, BadDrawable or BadWindow errors.
+
+The full-suite and scaled evidence above belongs to the initial palette commit `4b9a0b1`; this
+single-color follow-up used focused rendering/viewport checks. Logs are
+`/tmp/blcad-charcoal-{build,offscreen,native,startup}.log`. The 737 files in
+`/tmp/blcad-charcoal-source-freeze.json` remained unchanged during native and startup verification.
+
 Current native feature preview at 1280×800:
 
-![Dark-violet task panels and near-black modeling canvas](images/dark-violet-feature-preview.png)
+![Dark-violet task panels and charcoal-gray modeling canvas](images/dark-violet-feature-preview.png)
 
 The same unchanged layout at 1024×640:
 
