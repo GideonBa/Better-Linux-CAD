@@ -146,6 +146,7 @@ QPushButton:disabled, QPushButton[guiRole="primary"]:disabled {
 QToolButton {
   border: 1px solid transparent; background: transparent; padding: 5px 8px;
 }
+QToolButton[guiRole="ribbonCompact"] { padding: 2px 8px; }
 QToolButton:hover { background: @hover@; border-color: @line@; }
 QToolButton:pressed, QToolButton:checked { background: @selection@; color: @text@; border-color: @accent@; }
 QToolButton:focus { border: 1px dashed @accent@; }

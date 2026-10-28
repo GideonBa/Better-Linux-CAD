@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_context_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -24,10 +25,15 @@ ShellContextTools::ShellContextTools(ShellWindow& window) : QObject(&window), wi
   const auto action = [&](const char* id, const char* label) {
     auto* result = new QAction(QString::fromUtf8(label), this);
     result->setObjectName(QStringLiteral("blcad.action.context_") + QString::fromLatin1(id));
+    apply_gui_action_icon(*result);
     auto* button = new QToolButton(panel_);
     button->setObjectName(QStringLiteral("blcad.context.") + QString::fromLatin1(id));
     button->setDefaultAction(result);
-    button->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    button->setToolButtonStyle(result->icon().isNull() ? Qt::ToolButtonTextOnly
+                                                       : Qt::ToolButtonIconOnly);
+    button->setIconSize(QSize(24, 24));
+    button->setToolTip(result->text());
+    button->setAccessibleName(result->text());
     row->addWidget(button);
     return std::pair{result, button};
   };

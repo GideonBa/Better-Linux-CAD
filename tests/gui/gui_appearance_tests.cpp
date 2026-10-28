@@ -347,7 +347,8 @@ TEST_CASE("Dark-violet ribbon and menus retain English labels and distinct tool 
   capture(ribbon, QStringLiteral("hermes-navigation-before-scroll.png"));
   CHECK(ribbon.rect().contains(QRect(next->mapTo(&ribbon, QPoint()), next->size())));
   CHECK(ribbon.childAt(next->mapTo(&ribbon, next->rect().center())) == next);
-  CHECK(matching_pixels(rendered(*next), next->rect().adjusted(2, 2, -2, -2), Qt::white) >= 3U);
+  CHECK(matching_pixels(rendered(*next), next->rect().adjusted(2, 2, -2, -2),
+                        QColor::fromRgb(appearance::text)) >= 3U);
   const auto click = [](QWidget& control, QPoint point) {
     const QPoint global = control.mapToGlobal(point);
     QMouseEvent press(QEvent::MouseButtonPress, point, global, Qt::LeftButton, Qt::LeftButton,

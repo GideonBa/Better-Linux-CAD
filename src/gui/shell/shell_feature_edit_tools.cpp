@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
@@ -302,10 +303,10 @@ struct ShellFeatureEditTools::Impl {
     hint->setWordWrap(true);
     column->addWidget(hint);
     auto* footer = new QHBoxLayout;
-    apply = new QPushButton("Apply", content);
+    apply = make_gui_button("Apply", content);
     apply->setObjectName("blcad.feature_edit.apply");
     apply->setProperty("guiRole", "primary");
-    auto* cancel = new QPushButton("Cancel", content);
+    auto* cancel = make_gui_button("Cancel", content);
     cancel->setObjectName("blcad.feature_edit.cancel");
     footer->addWidget(apply);
     footer->addWidget(cancel);
@@ -564,7 +565,7 @@ struct ShellFeatureEditTools::Impl {
             build_leaf(inputs, key, entry, item[index]);
           auto* buttons = new QHBoxLayout;
           for (auto operation : {QString("↑"), QString("↓"), QString("Remove")}) {
-            auto* button = new QPushButton(operation, box);
+            auto* button = make_gui_button(operation, box);
             // Keep the established automation identity independent of the display language.
             const QString identity =
                 operation == "Remove" ? QStringLiteral("Entfernen") : operation;
@@ -585,7 +586,7 @@ struct ShellFeatureEditTools::Impl {
           inputs->addRow(buttons);
           nested->addRow(box);
         }
-        auto* add = new QPushButton("Add Entry", group);
+        auto* add = make_gui_button("Add Entry", group);
         add->setObjectName("blcad.feature_edit.add" + path);
         const auto choices = references(key, path);
         add->setEnabled(!item.empty() || array_templates.contains(path) || !choices.empty());

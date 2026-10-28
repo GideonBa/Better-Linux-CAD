@@ -43,6 +43,13 @@ Sketch dimensions, preview/cancel/apply, feature editing, history, Save/Open and
 workspace navigation is checked through visible arrows and actual mouse hits. The implementation
 plan, exact visual roles and final native evidence live in `docs/gui-hermes-design.md`.
 
+The 2026-10-28 Pixelarticons follow-up supplies local, theme-colored icons through an explicit
+presentation catalog. Ribbon/menu actions and task buttons keep their existing labels and shortcuts;
+mapped context shortcuts keep those labels in tooltips and accessibility names. Browser icons derive
+from typed node/record metadata, independently of authored names. Functions without a representative
+pack symbol remain text-only. Compact ribbon commands retain the existing horizontal overflow and
+fixed page height. The icon renderer and provenance contract live in `assets/gui/pixelarticons/README.md`.
+
 ## Authority boundary
 
 ```text

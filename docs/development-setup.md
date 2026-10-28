@@ -1521,3 +1521,26 @@ contrast, checked/disabled/focus states, dark dimension/Measure/manipulator badg
 black-and-white splash. The existing combined workflow proves compact and ordinary window sizes,
 model edits, history, Save/Open and STEP export. Record actual skips and native results in the design
 document; offscreen tests cannot prove OCCT rendering.
+
+## Curated Pixelarticons integration
+
+The icon catalog, exact pinned upstream/license and optional mask-regeneration instructions live in
+`assets/gui/pixelarticons/README.md`. Builds use committed Qt resources; no SVG plugin, npm install,
+asset generation or network access is required. Build all five GUI-preset targets as above, then keep
+source edits, builds, GUI runs and separate startup serial.
+
+```bash
+mkdir -p /tmp/blcad-pixelart-offscreen /tmp/blcad-pixelart-native /tmp/blcad-pixelart-native-150
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-pixelart-offscreen QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[icons],[appearance],[startup-splash],[hermes-design-workflow],[ribbon],[model-browser]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-pixelart-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[icons],[appearance],[startup-splash],[hermes-design-workflow],[rapid-dimension],[ribbon],[shell-combined-part],[shell-combined-spatial-context],[shell-combined-finishing-context],[shell-combined-parameters],[shell-combined-assembly-context],[block137-step-import],[block136-measure],[gui][viewport],[native-viewer-lifecycle],[block136-profile-context],[block136-body-context],[block136-pattern-context],[block136-surface-context],[block136-feature-edit],[block136-assembly-context],[block136-construction]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-pixelart-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[icons],[appearance],[startup-splash],[hermes-design-workflow]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+The focused proof checks resource/license hashes, nonempty masks, exact normal/active/checked/disabled
+colors, binary alpha and physical pixel sizes at 100%, 150% and 200%. It verifies labeled commands,
+unchanged callbacks/shortcuts, typed browser metadata and text-only fallbacks for unsupported CAD
+functions. Native workflows exercise compact tab navigation, context buttons, task/dialog actions,
+history, Save/Open and STEP export. Inspect ordinary/compact captures and scaled icons, then record
+actual results and skips in `docs/gui-hermes-design.md`. Startup timeout 124 is intentional.

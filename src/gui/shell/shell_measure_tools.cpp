@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_measure_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_appearance.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -157,11 +158,11 @@ ShellMeasureTools::ShellMeasureTools(ShellWindow& window, GuiDocumentSession& se
   column->addWidget(readout_);
   column->addStretch();
   auto* buttons = new QHBoxLayout;
-  auto* clear = new QPushButton(QStringLiteral("Select Again"), panel);
+  auto* clear = make_gui_button(QStringLiteral("Select Again"), panel);
   clear->setObjectName("blcad.measure.clear");
-  copy_ = new QPushButton(QStringLiteral("Copy"), panel);
+  copy_ = make_gui_button(QStringLiteral("Copy"), panel);
   copy_->setObjectName("blcad.measure.copy");
-  auto* close = new QPushButton(QStringLiteral("Close"), panel);
+  auto* close = make_gui_button(QStringLiteral("Close"), panel);
   close->setObjectName("blcad.measure.close");
   for (auto* button : {clear, copy_, close})
     buttons->addWidget(button);

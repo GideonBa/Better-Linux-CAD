@@ -1,10 +1,12 @@
-# Desktop design and dark-violet palette
+# Desktop design, dark-violet palette and icons
 
 Reference: [Hermes Agent](https://hermes-agent.nousresearch.com/), inspected 2026-10-26.
 The reference contributed the desktop's typography, spacing and lightly divided sections. The
 2026-10-27 color-only follow-up replaces electric blue and paper panels with the user's dark-violet
 to black reference palette. Layout, widget geometry, typography, labels and interactions remain
 unchanged. The startup splash is restored verbatim from the parent of redesign commit `b6e4f68`.
+The 2026-10-28 follow-up adds a curated Pixelarticons subset to the existing shell, retaining labels
+and text-only fallbacks for CAD functions without a representative symbol.
 
 ## Implementation plan and acceptance
 
@@ -52,6 +54,28 @@ The upstream license bytes include original line endings and trailing spaces; `.
 preserves these three license files verbatim and scopes whitespace-check exemptions to them.
 Authored sources and documentation retain the repository's normal formatting checks.
 
+## Icon system
+
+[Pixelarticons](https://github.com/halfmage/pixelarticons) 2.4.2 is pinned to commit
+`c9ecc2da61afde85dbe539025e3d931c6152ad75`. The 65 selected public MIT-licensed SVGs, original license,
+lossless 24px XPM masks and checksums live in `assets/gui/pixelarticons/`. All resources are local;
+the QtGui-only renderer needs no SVG plugin or runtime download. Regeneration is documented there.
+
+The explicit catalog supplies representative symbols for file/history actions, common editing,
+selected Sketch shapes/constraints/dimensions, body transforms, parameters, references, exchange,
+navigation and typed model-tree entries. Generic symbols are shared where the meaning is the same.
+Specialized CAD operations such as Extrude, Revolve, Loft and fillets retain their text. Unknown
+actions, feature/joint types and Sketch record families receive no guessed substitute.
+
+Large ribbon commands retain icons above their labels. Mapped compact commands keep labels beside
+24px icons, with two-pixel vertical padding inside the existing ribbon height and horizontal scroll
+surface. Workspace tabs and their overflow arrows use the same icon family. Context shortcuts use
+icons with their original text as tooltip/accessibility label; unsupported shortcuts remain text.
+Task buttons, relevant choices, visibility menus and model-tree entries share the same catalog.
+Normal, active/checked and disabled states use the documented text/accent/muted colors. Pixel masks
+retain hard edges at native and fractional display scales. Action IDs, callbacks, labels, shortcuts,
+selection metadata, persistence and modeling authority remain with their existing owners.
+
 ## Interaction and verification boundaries
 
 - Selection, hover, keyboard focus, checked and disabled states remain distinguishable.
@@ -71,6 +95,45 @@ Authored sources and documentation retain the repository's normal formatting che
 - Combined workflows cover Rapid Dimension, sketch completion/re-entry, feature preview/cancel/apply,
   visibility, Undo/Redo, Save/Open and existing Part/Surface/Assembly commands at native sizes.
 - Source edits, builds, GUI runs and separate startup remain serial per `development-setup.md`.
+
+## Pixelarticons follow-up verification (2026-10-28)
+
+All five GUI-preset targets were built after the final catalog review. Final verification:
+
+| Check | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full offscreen GUI | 574 | 75,457 | 554 passed; 20 expected native-only skips |
+| Native Qt/OCCT icons, appearance, splash, ribbon, viewport, context/task tools and combined modeling/file workflows | 82 | 23,487 | Passed; no skips |
+| Native icons/appearance/splash/combined workflow at 150% | 9 | 1,469 | Passed; no skips |
+| Separate native application startup | — | — | Ran until intentional six-second timeout, exit 124 |
+
+The new four-case icon proof covers bundled masks/license hashes, exact state colors and display
+scaling, action labels/callbacks/shortcuts, a dynamically labeled Repeat command, typed browser
+metadata and deliberate text fallbacks, including axes and arc records.
+
+All 65 vendored SVGs and the MIT license match the pinned upstream archive byte for byte; all SVG
+and mask SHA-256 values match the manifest. No build or runtime dependency was added.
+`startup_splash.cpp` still matches `b6e4f68^` exactly. Numbered feature status is unchanged.
+
+Native captures were inspected at ordinary and compact sizes and at 150% scaling for command
+labels, tab navigation, task actions, browser entries and pixel edges. The clear native canvas
+pixel `(400, 200)` remains exactly RGB `(24, 26, 27)`. The available X11 visual emits the known OCCT
+Medium depth/stencil warning; final native/scaled/startup logs contain no High-severity,
+BadDrawable or BadWindow errors.
+
+All 877 source/test/asset/build-definition files in
+`/tmp/blcad-pixelart-source-freeze-delivery.json` remained unchanged through the final full GUI,
+native, scaled and startup runs. Logs are
+`/tmp/blcad-pixelart-{build-delivery,gui-delivery,native-delivery,native-150-delivery,startup-delivery}.log`.
+Reproduction commands are in `development-setup.md`.
+
+Native feature preview with the curated icons at 1280×800:
+
+![Pixelarticons on the dark-violet desktop and charcoal canvas](images/pixelart-feature-preview.png)
+
+The same task at 1024×640:
+
+![Compact desktop with Pixelarticons and reachable task actions](images/pixelart-feature-compact.png)
 
 ## Color-only follow-up verification (2026-10-27)
 
@@ -119,7 +182,7 @@ single-color follow-up used focused rendering/viewport checks. Logs are
 `/tmp/blcad-charcoal-{build,offscreen,native,startup}.log`. The 737 files in
 `/tmp/blcad-charcoal-source-freeze.json` remained unchanged during native and startup verification.
 
-Current native feature preview at 1280×800:
+Color-only native feature preview at 1280×800, before the icon follow-up:
 
 ![Dark-violet task panels and charcoal-gray modeling canvas](images/dark-violet-feature-preview.png)
 

@@ -29,7 +29,7 @@ public:
   // tool families, e.g. the rectangle variants).
   QToolButton* add_menu_button(QWidget* group, const QString& title,
                                const QList<QAction*>& actions);
-  // Compact text button; stacked two per column inside the group.
+  // Compact labeled button with an optional icon; two per column in the group.
   QToolButton* add_small_button(QWidget* group, QAction* action);
   void add_widget(QWidget* group, QWidget* widget);
 

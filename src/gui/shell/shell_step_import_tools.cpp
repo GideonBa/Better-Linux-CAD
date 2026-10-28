@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_step_import_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/gui/gui_step_import_workbench.hpp"
@@ -268,6 +269,7 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   ui.operation->setObjectName("blcad.step_import.operation");
   ui.operation->addItems({QStringLiteral("Register"), QStringLiteral("Update Checksum"),
                           QStringLiteral("Remove Source")});
+  apply_gui_choice_icons(*ui.operation);
   form->addRow(QStringLiteral("Change"), ui.operation);
   ui.name = new QLineEdit(content);
   ui.name->setObjectName("blcad.step_import.name");
@@ -279,7 +281,7 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   ui.path->setObjectName("blcad.step_import.path");
   ui.path->setPlaceholderText("assets/bauteil.step");
   path_layout->addWidget(ui.path);
-  ui.browse = new QPushButton(QStringLiteral("Choose File…"), path_row);
+  ui.browse = make_gui_button(QStringLiteral("Choose File…"), path_row);
   ui.browse->setObjectName("blcad.step_import.browse");
   path_layout->addWidget(ui.browse);
   form->addRow(QStringLiteral("Relative Path"), path_row);
@@ -336,7 +338,7 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   layout->addWidget(scroll);
   auto* buttons = new QHBoxLayout;
   const auto button = [panel, buttons](const char* id, const QString& label) {
-    auto* value = new QPushButton(label, panel);
+    auto* value = make_gui_button(label, panel);
     value->setObjectName(QStringLiteral("blcad.step_import.") + id);
     if (QString::fromLatin1(id) == QStringLiteral("apply"))
       value->setProperty("guiRole", "primary");
