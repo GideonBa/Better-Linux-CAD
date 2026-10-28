@@ -1542,6 +1542,9 @@ BLCAD_UI_CAPTURE_DIR=/tmp/blcad-rotor-native QT_QPA_PLATFORM=xcb ./build/dev-gui
 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-rotor-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[complex-part-workflow],[interactive-pattern-mirror],[interactive-body-operation],[interactive-path-sweep],[interactive-loft]"
 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-rotor-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[preview-cache],[complex-part-workflow],[cut-material-workflow],[shell-combined-part],[shell-combined-loft],[shell-combined-spatial-context],[shell-combined-finishing-context],[shell-combined-pattern-context],[shell-combined-body-context],[shell-combined-bodies],[shell-combined-surface-context],[shell-combined-extrude-extents],[shell-combined-revolve-controls],[shell-combined-path-extrude],[shell-combined-thin-extrude],[shell-combined-extrude-limit-picking],[curved-union-workflow],[interactive-finishing],[interactive-surface],[integration][gui-feature-coverage],[native-viewer-lifecycle]"
 BLCAD_PROFILE_SAMPLES=11 BLCAD_PROFILE_OUTPUT=/tmp/blcad-rotor-profile.json QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[complex-part-profile]"
+BLCAD_PROFILE_SEQUENCE=1 BLCAD_PROFILE_SAMPLES=5 BLCAD_PROFILE_OUTPUT=/tmp/blcad-rotor-sequence.json QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[complex-part-profile]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[preview-cache],[interactive-surface],[stitch-diagnostic-overlay]"
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-rotor-sequence-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[complex-part-workflow],[interactive-surface],[stitch-diagnostic-overlay],[shell-combined-surface-context],[native-viewer-lifecycle],[integration][gui-feature-coverage]"
 ```
 
 The profile is explicitly selected by tag and excluded from CTest/default GUI execution. It uses
@@ -1552,6 +1555,23 @@ redraw/readback measured for both full and cached Fillet results. These referenc
 replace the actual controller preview being profiled. JSON timing covers serialization plus parsing,
 not complete application history. The queued zero-timer measures event-loop blocking during that
 call, not physical mouse latency. No portable timing assertion is introduced.
+
+The sequence variant uses 4/12/24 serial Body translations after the 5/20/40-blade pattern
+(7/15/27 committed producers). It additionally measures the real curved-Sketch baseline solver,
+driving dimension authoring, a 32-pointer burst coalesced to one drag solve, native mouse selection,
+preview through publication/event processing/capture, and actual Fillet Apply/Undo/Redo including
+their history/recompute costs. Five samples give one first observation and four repeats; warm p95
+is consequently the maximum repeat, not a high-confidence population estimate. The original
+11-sample comparison remains a separate fixture and series. Run only one timing process at once.
+
+`[complex-part-sequence]` is an ordinary correctness gate for all three sizes. It checks upstream
+recompute through the full transform chain against an empty-cache oracle, retained independent
+sources, driving dimension edits, coalescing, drag commit, stale commit rejection, history and
+catalog persistence. The shell `[complex-part-workflow]` runs both 20- and 40-blade deep fixtures,
+including actual native edge picking, recovery, cancellation, parameter editing and STEP.
+Its source-volume and remote-Fillet oracles use adaptive integration in the test-only
+`blcad_geometry_test_support` library; OCCT headers stay private to that Geometry support target.
+The ordinary production `ShapeSummary` integration and all modeling tolerances are unchanged.
 
 Inspect `rotor-fillet-recovered-preview` and `rotor-edited-reopened` captures for the native workflow.
 Parameter Manager literal fields take values without units; the primary manipulator HUD accepts

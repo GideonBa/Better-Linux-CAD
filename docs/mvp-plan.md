@@ -1346,7 +1346,7 @@ missing shell/persistence integration; these tickets do not claim that every rep
 | Body Rotate axis parity | [#111](https://github.com/GideonBa/Better-Linux-CAD/issues/111) | Shell omits existing derived-datum/semantic-edge support | P2 |
 | Sketch on planar result face | [#112](https://github.com/GideonBa/Better-Linux-CAD/issues/112) | Direct workflow and general associative support identity missing | P2 |
 | Cut feedback and workflow | [#113](https://github.com/GideonBa/Better-Linux-CAD/issues/113) | Implemented: distinct Cut outcomes, correctable diagnostics and exact curved extents; native regression verified | P1 |
-| Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | In progress: native rotor profiling, cached previews and single-sampled edge witnesses implemented; broader latency work pending | P1 |
+| Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | Implemented for review: cached previews/Surface validation, single-sampled witnesses and deep-rotor native profiling; residual costs and local target misses documented | P1 |
 
 The independent Coincident probe commits the real GUI constraint intent, then checks Geometry:
 a 100×50 mm outline with a 0.001 mm initial gap retains a 3.85787585e-8 mm gap after an accepted
@@ -1415,6 +1415,30 @@ limits and exact contracts live in `docs/gui-modeling-workspace-mvp9.md` and `do
 Validation: Core **546 / 17,061**, Geometry **459 / 35,243**, offscreen GUI **554 passed /
 20 native-only skips / 76,545 assertions**, expanded native **25 / 9,772**, 150% rotor and
 supplementary controller checks **9 / 828**, final native profile **1 / 870**. All five targets build;
-separate startup reaches intentional timeout 124. Issue #114 remains in progress for full history/
-edit costs and broader input/solver/drag/picking profiling. No numbered implementation block is
-advanced by this bounded follow-up.
+separate startup reaches intentional timeout 124. At this initial stage, full history/edit costs and
+broader input/solver/drag/picking profiling remained outside the proof. No numbered implementation
+block was advanced by this bounded follow-up.
+
+
+Issue #114 interaction acceptance (2026-10-29) adds 5/20/40-blade connected rotors with 4/12/24
+serial transforms (7/15/27 producers), real driving-dimension edits and curved Sketch drag sequences.
+The isolated native profile now separates solver, dimension authoring, coalesced drag, actual mouse
+picking, complete preview publication/events/capture, and Apply/Undo/Redo including history costs.
+Surface metadata validation reuses the same affected-root cache path as shape preview.
+
+Deep 20/40-blade preview p95 is **66.1 / 131.7 ms**; publication/events/capture included is
+**119.2 / 199.3 ms**. Full Apply/Undo/Redo still costs about **5–6 s** at 40 blades. Local targets
+and two recorded misses (20-blade drag **17.8 ms** versus 16 ms; 40-blade JSON **24.0 ms** versus
+20 ms) are explicit review evidence, not user-approved release guarantees. Measurements prioritize
+commit/history next; renderer changes and workers are not introduced by this fix.
+
+Focused offscreen proof passes **3 cases / 620 assertions**, the isolated five-sample native profile
+**1 / 1,349**, and final native proof including both large rotor workflows, Surface/Stitch,
+viewport lifecycle and required shell coverage **8 / 1,858**, without skips. All five targets build;
+a separate startup exits at intentional timeout **124**. Source hub/blade volume checks and remote
+Fillet-removal invariance replace an unsupported exact aggregate-scaling oracle, with the final
+volume tolerance tightened and production tolerances unchanged. The final **741** source/test/
+asset/build-definition fingerprints remain unchanged after native verification. Scope, raw data,
+budget review and residual performance limits are documented in the existing workspace/development
+docs. The implementation is ready for PR review; the issue remains open until review/merge.
+No numbered implementation block is advanced.
