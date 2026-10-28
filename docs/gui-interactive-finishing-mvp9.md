@@ -190,3 +190,19 @@ the current result and strict saved-reference replay. `[curved-union-workflow]` 
 sequence with radius refinement, cancel/preview isolation, Undo/Redo, a second overlapping cylinder,
 Union, consumed-tool checks and Save/Open. Under native xcb it selects the first circular edge through
 real viewport mouse events. Kernel-invalid radii/distances still reject Apply without mutation.
+
+
+## Complex-result selection construction — issue #114 follow-up
+
+Result-edge catalog construction samples each unique current edge once per build, then checks the
+sampled witnesses for ambiguity. Previously every offered edge caused a fresh resampling of the
+entire Body. No catalog is retained across model changes. Selection and persistent recovery share
+the same curve-kind, length and complete 17-point forward/reverse comparison at the existing
+absolute tolerance; ambiguous, changed and non-finite witnesses remain unavailable. Producer IDs,
+reference spellings and native picking behavior remain unchanged. Fillet and Chamfer enablement
+also use this builder, so its cost can affect other actions while the shell refreshes.
+
+Finishing previews participate in the shared candidate-cache contract in
+`docs/gui-modeling-workspace-mvp9.md`. The representative rotor profile and actual shell workflow
+exercise curved current-result edges and radius recovery without weakening the existing reference
+or geometry validation rules.

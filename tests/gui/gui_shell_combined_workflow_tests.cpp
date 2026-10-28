@@ -1,6 +1,7 @@
 #include "../support/loft_alignment_fixture.hpp"
 #include "../support/loft_section_refinement_fixture.hpp"
 #include "../support/mixed_path_loft_fixture.hpp"
+#include "../support/rotor_performance_fixture.hpp"
 #include "blcad/core/assembly_leaf_occurrence.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
@@ -179,6 +180,7 @@ public:
     flush();
   }
   void click(QWidget& control) {
+    INFO(control.objectName().toStdString());
     REQUIRE(control.isEnabled());
     reveal(control);
     if (auto* checkbox = qobject_cast<QCheckBox*>(&control)) {
@@ -4746,6 +4748,94 @@ TEST_CASE("Combined UI repeated subassemblies share solved motion through qualif
   }
   CHECK(ui.bytes(child_file) == saved_child);
   ui.idle();
+}
+
+TEST_CASE("Combined UI complex rotor keeps preview recovery history and persistence consistent",
+          "[gui][integration][shell-combined-workflow][complex-part-workflow]") {
+  WorkflowUi ui;
+  ui.fit_first_screen();
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto fixture = test::rotor_performance_part(20);
+  const auto source = directory.filePath("rotor.blcad");
+  {
+    QFile file(source);
+    REQUIRE(file.open(QIODevice::WriteOnly));
+    REQUIRE(file.write(
+                QByteArray::fromStdString(checked(serialize_part_document_to_json(fixture)))) > 0);
+  }
+  ui.file("open", source);
+  const BodyId body("body.rotor");
+  const double original_volume = ui.summary(body).volume_mm3;
+  REQUIRE(ui.summary(body).solid_count == 1);
+  std::vector<std::string> states{ui.snapshot()};
+  const auto targets = checked(geometry::FinishingSelectionBuilder::build(
+      *ui.window.session().part_document(), *ui.window.session().part_shape_cache(), body,
+      PartFeatureInputRole::FilletEdge));
+  const auto tip = std::find_if(targets.begin(), targets.end(), [](const auto& target) {
+    return target.anchor.x > 85 && std::abs(target.anchor.y) < 20 && target.anchor.z > 9;
+  });
+  REQUIRE(tip != targets.end());
+  const int tip_row = static_cast<int>(std::distance(targets.begin(), tip));
+  const auto begin = [&] {
+    ui.command("view_top", 2);
+    ui.command("fillet");
+    if (QApplication::platformName() == "xcb") {
+      const auto point = checked(ui.window.viewport().model_to_screen(tip->anchor));
+      REQUIRE(ui.window.viewport().rect().contains(QPoint(qRound(point.x), qRound(point.y))));
+      ui.click_at(ui.window.viewport(), {point.x, point.y});
+    } else {
+      ui.list(ui.widget<QListWidget>("blcad.finishing.targets"), tip_row);
+    }
+    auto& edges = ui.widget<QListWidget>("blcad.finishing.targets");
+    REQUIRE(edges.selectedItems().size() == 1);
+    CHECK(edges.row(edges.selectedItems().front()) == tip_row);
+    ui.scalar("0.2 mm");
+    REQUIRE(ui.window.viewport().feature_preview_active());
+  };
+  begin();
+  const auto accepted = ui.widget<QLineEdit>("blcad.manipulator_numeric_hud").text();
+  ui.scalar("100 mm");
+  CHECK(ui.widget<QLineEdit>("blcad.manipulator_numeric_hud").text() == accepted);
+  CHECK(ui.snapshot() == states.back());
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.capture("rotor-fillet-recovered-preview");
+  ui.button("blcad.feature.cancel");
+  CHECK(ui.snapshot() == states.back());
+  begin();
+  ui.button("blcad.feature.apply");
+  const double rounded = ui.summary(body).volume_mm3;
+  REQUIRE(rounded < original_volume);
+  states.push_back(ui.snapshot());
+  ui.command("body_translate");
+  ui.list_data(ui.widget<QListWidget>("blcad.body.sources"), "body.rotor");
+  ui.scalar("2 mm");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(rounded).epsilon(1e-10));
+  states.push_back(ui.snapshot());
+  ui.command("parameters");
+  ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"), "hub.height");
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "5");
+  ui.button("blcad.parameters.stage");
+  ui.button("blcad.parameters.preview");
+  REQUIRE(ui.widget<QPushButton>("blcad.parameters.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.parameters.apply");
+  // Each spline blade has exact area 4*(90-40)=200 mm² and height 10.
+  // The hub/blade overlap is linear in hub height. The tip fillet lies
+  // entirely outside the hub, and Translate preserves volume.
+  const double expected = rounded - (original_volume - 20 * 200 * 10) / 6;
+  // ShapeSummary uses ordinary OCCT mass integration for the spline surfaces.
+  CHECK(ui.summary(body).volume_mm3 == Approx(expected).epsilon(1e-8).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.roundtrip(directory.filePath("edited-rotor.blcad"));
+  CHECK(ui.summary(body).volume_mm3 == Approx(expected).epsilon(1e-8).margin(1e-5));
+  ui.file("export_part_step", directory.filePath("rotor.step"));
+  CHECK(ui.bytes(directory.filePath("rotor.step")).contains("ISO-10303-21"));
+  ui.capture("rotor-edited-reopened");
 }
 
 TEST_CASE("Combined UI Subtract distinguishes wrong target full removal and an existing void",

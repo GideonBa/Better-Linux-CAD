@@ -1525,3 +1525,38 @@ the matching option, task action reachability and the corrected three-section so
 proof, run full Core, Geometry and offscreen GUI regression, required shell closure and separate
 native startup. Record actual counts, native-only omissions and source-freeze evidence in
 `docs/gui-interactive-path-sweep-loft-mvp9.md`.
+
+
+## Complex-Part cache and rotor profile — issue #114
+
+Build all five targets. Keep source edits, builds, GUI suites and startup serial. Core/Geometry
+regressions may run with one correctness GUI suite. Timing runs must be isolated from other builds
+and test processes; native X11/GLX is required for publication/redraw measurements.
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests blcad_export_step -j6
+./build/dev-gui/blcad_core_tests "[recompute_plan]"
+./build/dev-gui/blcad_geometry_tests "[finishing-selection],[result-edge],[curved-finishing],[body-boolean],[recompute]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[preview-cache],[complex-part-workflow],[shell-combined-bodies]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-rotor-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[preview-cache],[complex-part-workflow],[shell-combined-bodies]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-rotor-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[complex-part-workflow],[interactive-pattern-mirror],[interactive-body-operation],[interactive-path-sweep],[interactive-loft]"
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-rotor-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[preview-cache],[complex-part-workflow],[cut-material-workflow],[shell-combined-part],[shell-combined-loft],[shell-combined-spatial-context],[shell-combined-finishing-context],[shell-combined-pattern-context],[shell-combined-body-context],[shell-combined-bodies],[shell-combined-surface-context],[shell-combined-extrude-extents],[shell-combined-revolve-controls],[shell-combined-path-extrude],[shell-combined-thin-extrude],[shell-combined-extrude-limit-picking],[curved-union-workflow],[interactive-finishing],[interactive-surface],[integration][gui-feature-coverage],[native-viewer-lifecycle]"
+BLCAD_PROFILE_SAMPLES=11 BLCAD_PROFILE_OUTPUT=/tmp/blcad-rotor-profile.json QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[complex-part-profile]"
+```
+
+The profile is explicitly selected by tag and excluded from CTest/default GUI execution. It uses
+5/20/40 spline blades around one revolved hub; set `BLCAD_PROFILE_BLADES=20` to isolate a size.
+One first call and ten repeated samples yield separate first/p50/p95 values and raw measurements.
+An empty-cache full candidate is also computed as a volume oracle, with native publication and
+redraw/readback measured for both full and cached Fillet results. These reference operations do not
+replace the actual controller preview being profiled. JSON timing covers serialization plus parsing,
+not complete application history. The queued zero-timer measures event-loop blocking during that
+call, not physical mouse latency. No portable timing assertion is introduced.
+
+Inspect `rotor-fillet-recovered-preview` and `rotor-edited-reopened` captures for the native workflow.
+Parameter Manager literal fields take values without units; the primary manipulator HUD accepts
+units and restores the last accepted value on a failed preview. The exact candidate-cache contract
+and evidence boundaries live in `docs/gui-modeling-workspace-mvp9.md`; result-witness comparison
+remains owned by `docs/gui-interactive-finishing-mvp9.md`. Full Core/Geometry/offscreen GUI,
+affected native feature families, required shell coverage and separate startup still follow the
+focused proof. Numbered implementation sequencing remains in `docs/mvp-plan.md`.

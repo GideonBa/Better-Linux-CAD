@@ -22,6 +22,11 @@ class ShapeCache;
 [[nodiscard]] Result<ResultEdgeReference> make_result_edge_reference(const FeatureId& producer,
                                                                      const TopoDS_Edge& edge);
 
+// The same full, tolerance-aware witness comparison used for persistent recovery
+// and for detecting ambiguous choices in a freshly built selection catalog.
+[[nodiscard]] bool result_edge_witness_matches(const ResultEdgeReference& actual,
+                                               const ResultEdgeReference& wanted) noexcept;
+
 [[nodiscard]] Result<TopoDS_Edge>
 resolve_semantic_edge(const PartDocument& document, const ShapeCache& cache,
                       const TopoDS_Shape& target, const EdgeReference& reference,

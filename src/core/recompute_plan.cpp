@@ -1,6 +1,8 @@
 #include "blcad/core/recompute_plan.hpp"
 
 #include <utility>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace blcad {
 
@@ -21,6 +23,35 @@ RecomputePlan::from_graph_and_invalidation_state(const DependencyGraph& graph,
     }
   }
 
+  return Result<RecomputePlan>::success(RecomputePlan(std::move(steps)));
+}
+
+Result<RecomputePlan>
+RecomputePlan::from_graph_and_changed_nodes(const DependencyGraph& graph,
+                                            const std::vector<NodeId>& changed) {
+  auto ordered = graph.topological_order();
+  if (!ordered)
+    return Result<RecomputePlan>::failure(ordered.error());
+  std::unordered_map<NodeId, std::vector<NodeId>> dependents;
+  for (const auto& [source, dependent] : graph.dependencies())
+    dependents[source].push_back(dependent);
+  std::unordered_set<NodeId> affected;
+  std::vector<NodeId> pending;
+  for (const auto& node : changed) {
+    if (!graph.has_node(node))
+      return Result<RecomputePlan>::failure(
+          Error::dependency(node, "recompute root must exist in dependency graph"));
+    if (affected.insert(node).second)
+      pending.push_back(node);
+  }
+  for (std::size_t index = 0; index < pending.size(); ++index)
+    for (const auto& dependent : dependents[pending[index]])
+      if (affected.insert(dependent).second)
+        pending.push_back(dependent);
+  std::vector<RecomputeStep> steps;
+  for (const auto& node : ordered.value())
+    if (affected.contains(node))
+      steps.push_back({node});
   return Result<RecomputePlan>::success(RecomputePlan(std::move(steps)));
 }
 

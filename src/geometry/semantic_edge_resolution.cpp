@@ -189,6 +189,22 @@ Result<ResultEdgeReference> make_result_edge_reference(const FeatureId& producer
                                      samples);
 }
 
+bool result_edge_witness_matches(const ResultEdgeReference& actual,
+                                 const ResultEdgeReference& wanted) noexcept {
+  if (actual.curve_type() != wanted.curve_type() ||
+      std::abs(actual.length_mm() - wanted.length_mm()) > kTolerance)
+    return false;
+  bool forward = true, reverse = true;
+  for (std::size_t n = 0; n < actual.samples().size(); ++n) {
+    forward = forward && distance(actual.samples()[n], wanted.samples()[n]) <= kTolerance;
+    reverse = reverse && distance(actual.samples()[n],
+                                  wanted.samples()[actual.samples().size() - 1 - n]) <= kTolerance;
+    if (!forward && !reverse)
+      return false;
+  }
+  return forward || reverse;
+}
+
 Result<TopoDS_Edge> resolve_semantic_edge(const PartDocument& document, const ShapeCache& cache,
                                           const TopoDS_Shape& target,
                                           const EdgeReference& reference, const FeatureId& id,
@@ -203,17 +219,7 @@ Result<TopoDS_Edge> resolve_semantic_edge(const PartDocument& document, const Sh
     for (int i = 1; i <= edges.Extent(); ++i) {
       const auto edge = TopoDS::Edge(edges(i));
       auto witness = make_result_edge_reference(expected->source_feature(), edge);
-      if (!witness || witness.value().curve_type() != expected->curve_type() ||
-          std::abs(witness.value().length_mm() - expected->length_mm()) > kTolerance)
-        continue;
-      const auto& actual = witness.value().samples();
-      const auto& wanted = expected->samples();
-      bool forward = true, reverse = true;
-      for (std::size_t n = 0; n < actual.size(); ++n) {
-        forward = forward && distance(actual[n], wanted[n]) <= kTolerance;
-        reverse = reverse && distance(actual[n], wanted[actual.size() - 1 - n]) <= kTolerance;
-      }
-      if (forward || reverse)
+      if (witness && result_edge_witness_matches(witness.value(), *expected))
         matches.push_back(edge);
     }
     if (matches.size() != 1U)

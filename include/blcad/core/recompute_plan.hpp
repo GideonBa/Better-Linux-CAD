@@ -23,6 +23,11 @@ public:
   from_graph_and_invalidation_state(const DependencyGraph& graph,
                                     const InvalidationState& invalidation_state);
 
+  // Include each changed node itself and every dependent, once, in graph order.
+  // Unlike the invalidation-state plan, this also executes newly added features.
+  [[nodiscard]] static Result<RecomputePlan>
+  from_graph_and_changed_nodes(const DependencyGraph& graph, const std::vector<NodeId>& changed);
+
   [[nodiscard]] bool empty() const noexcept;
   [[nodiscard]] std::size_t step_count() const noexcept;
   [[nodiscard]] const std::vector<RecomputeStep>& steps() const noexcept;
