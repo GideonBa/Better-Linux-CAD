@@ -160,6 +160,26 @@ Degenerate line/arc calculations use deterministic numerical floors for evaluati
 kinds, missing targets, or structurally unsupported entities produce `invalid_reference` rather than
 inventing geometry.
 
+### Exact Coincident closure
+
+Explicit point-to-point Coincident constraints define equality groups by stable point identity.
+Each group receives exactly one coordinate pair before convergence is tested and throughout numeric
+iteration. Unanchored groups use the mean of their member positions; an immutable reference or Fixed
+target anchors the group to its source position. Distinct anchored positions are conflicting even
+when their normalized separation is small. Fixed entity targets anchor all their defining points.
+
+Central differences for the numeric step stay in this equality subspace, and every line-search
+candidate is projected back into it. All constraint residuals are then reevaluated normally. The
+unprojected final Jacobian still owns rank, redundancy and DOF accounting over the original canonical
+variable order. Conflict probes rebuild groups from the reduced constraint set.
+
+This preserves separate point identities and persistent relation provenance. Coordinate proximity
+alone creates no relation. Point-on-object, dimensions and other residuals retain their existing
+contracts; no region, profile or topology tolerance is enlarged. Consequently, an accepted explicit
+Coincident junction is exactly connected for the absolute `1e-9` closure checks consumed by Finish
+Sketch, including line, arc and spline endpoints. See `gui-sketch-regions-finish-mvp8.md` for the
+cross-layer regression and native workflow.
+
 ## Numeric solve
 
 The implementation uses deterministic damped Gauss-Newton iteration:

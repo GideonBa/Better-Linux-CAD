@@ -6,6 +6,8 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
+#include "blcad/geometry/sketch_finish.hpp"
+#include "blcad/gui/gui_sketch_dimensions.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_construction_tools.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
@@ -833,6 +835,133 @@ TEST_CASE("Hermes desktop authors dimensions previews and edits a solid through 
   CHECK(ui.bytes(step).startsWith("ISO-10303-21;"));
   CHECK(ui.snapshot() == states.back());
   ui.idle();
+}
+
+TEST_CASE(
+    "Coincident repair restores a dragged junction and supports dimensions history and extrusion",
+    "[gui][integration][coincident-closure][coincident-closure-native]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Repaired contour");
+  ui.tree("datum.xy");
+  ui.command("create_sketch");
+  REQUIRE(ui.window.active_sketch());
+  const auto sketch_id = *ui.window.active_sketch();
+  ui.command("sketch.create.line");
+  const auto coordinates = [&](Point2 point) {
+    const auto text = QString::number(point.x) + ";" + QString::number(point.y);
+    for (auto character : text)
+      ui.key(ui.window, character.unicode(), QString(character));
+    ui.key(ui.window, Qt::Key_Return);
+  };
+  // Exact numeric input deliberately leaves the closing junction independent:
+  // no endpoint snap was accepted there. Ordinary chain junctions are automatic.
+  coordinates({10, 10});
+  for (Point2 offset : {Point2{40, 0}, {0, 30}, {-40, 0}, {0, -30}})
+    coordinates(offset);
+  for (int backout = 0; backout < 3 && ui.window.sketch_tools().tool_active(); ++backout)
+    ui.key(ui.window, Qt::Key_Escape);
+  REQUIRE_FALSE(ui.window.sketch_tools().tool_active());
+  const auto sketch = [&]() -> const Sketch& {
+    return *ui.window.session().part_document()->find_sketch(sketch_id);
+  };
+  REQUIRE(sketch().line_segments().size() == 4U);
+  const auto mouse = [&](QEvent::Type type, Point2 point) {
+    const auto screen = checked(ui.window.viewport().sketch_plane_to_screen(point));
+    ui.mouse(ui.window.viewport(), {screen.x, screen.y}, type);
+    ui.flush();
+  };
+  const auto drag_start = checked(ui.window.viewport().sketch_plane_to_screen({10, 10}));
+  const auto drag_end = checked(ui.window.viewport().sketch_plane_to_screen({-5, -10}));
+  REQUIRE(std::hypot(drag_end.x - drag_start.x, drag_end.y - drag_start.y) >
+          QApplication::startDragDistance());
+  mouse(QEvent::MouseButtonPress, {10, 10});
+  mouse(QEvent::MouseMove, {-5, -10});
+  mouse(QEvent::MouseButtonRelease, {-5, -10});
+  const auto first = sketch().line_segments().front().start();
+  const auto last = sketch().line_segments().back().end();
+  REQUIRE(std::hypot(first.x - last.x, first.y - last.y) > 1.0);
+  CHECK_FALSE(
+      geometry::SketchFinishService::finish(*ui.window.session().part_document(), sketch_id));
+  std::vector<std::string> states{ui.snapshot()};
+  const auto constraints_before = checked(ui.window.session().sketch_constraint_catalog(sketch_id));
+  ui.plane_pick(first);
+  const auto last_screen = checked(ui.window.viewport().sketch_plane_to_screen(last));
+  ui.click_at(ui.window.viewport(), {last_screen.x, last_screen.y}, Qt::ControlModifier);
+  REQUIRE(ui.window.session().selection().entries().size() == 2U);
+  bool applied = false;
+  for (auto* button : ui.window.ribbon().findChildren<QToolButton*>())
+    if (button->defaultAction() && button->defaultAction()->text() == "Coincident") {
+      ui.click(*button);
+      applied = true;
+      break;
+    }
+  REQUIRE(applied);
+  CHECK(checked(ui.window.session().sketch_constraint_catalog(sketch_id)).constraints().size() ==
+        constraints_before.constraints().size() + 1U);
+  CHECK(sketch().line_segments().front().start() == sketch().line_segments().back().end());
+  REQUIRE(geometry::SketchFinishService::finish(*ui.window.session().part_document(), sketch_id));
+  states.push_back(ui.snapshot());
+  ui.capture("coincident-repaired-junction");
+
+  // Author two dimensions through the actual Rapid Dimension pointer workflow.
+  for (std::size_t line_index : {0U, 1U}) {
+    const auto line = sketch().line_segments()[line_index];
+    const Point2 center{(line.start().x + line.end().x) / 2, (line.start().y + line.end().y) / 2};
+    ui.command("sketch.dimension.rapid");
+    const auto hover = [&](Point2 point) {
+      const auto screen = checked(ui.window.viewport().sketch_plane_to_screen(point));
+      QMouseEvent move(QEvent::MouseMove, {screen.x, screen.y},
+                       ui.window.viewport().mapToGlobal(QPoint(qRound(screen.x), qRound(screen.y))),
+                       Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+      QApplication::sendEvent(&ui.window.viewport(), &move);
+      ui.flush();
+      REQUIRE(ui.window.sketch_tools().rapid_dimension_candidate());
+    };
+    hover(center);
+    ui.plane_pick(center);
+    const Point2 label =
+        line_index == 0 ? Point2{center.x, center.y - 15} : Point2{center.x + 15, center.y};
+    hover(label);
+    ui.plane_pick(label);
+    ui.key(ui.window, Qt::Key_Escape);
+    REQUIRE(checked(ui.window.session().sketch_dimension_catalog(sketch_id)).dimensions().size() ==
+            line_index + 1U);
+    states.push_back(ui.snapshot());
+  }
+  const auto area = [&] {
+    double twice_area = 0;
+    for (const auto& line : sketch().line_segments())
+      twice_area += line.start().x * line.end().y - line.start().y * line.end().x;
+    return std::abs(twice_area) / 2;
+  };
+  const double repaired_area = area();
+  REQUIRE(repaired_area > 100);
+  ui.command("finish_sketch");
+  states.push_back(ui.snapshot());
+  const auto body = ui.extrude(8);
+  CHECK(ui.summary(body).volume_mm3 == Approx(repaired_area * 8).margin(1e-5));
+  states.push_back(ui.snapshot());
+  const auto dimension =
+      checked(ui.window.session().sketch_dimension_catalog(sketch_id)).dimensions().front();
+  const auto current =
+      ui.window.session().part_document()->find_parameter(*dimension.parameter())->value();
+  checked(GuiSketchDimensionController::edit_literal(
+      ui.window.session(), sketch_id, dimension.id(),
+      checked(Quantity::length_mm(current.millimeters() * 1.1))));
+  ui.window.refresh();
+  CHECK(sketch().line_segments().front().start() == sketch().line_segments().back().end());
+  CHECK(ui.summary(body).volume_mm3 == Approx(area() * 8).margin(1e-5));
+  CHECK(ui.summary(body).volume_mm3 != Approx(repaired_area * 8).margin(1e-5));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.roundtrip(directory.filePath("repaired-contour.blcad.json"));
+  CHECK(ui.summary(body).volume_mm3 == Approx(area() * 8).margin(1e-5));
+  ui.capture("coincident-repaired-solid");
+  const auto exported = directory.filePath("repaired-contour.step");
+  ui.file("export_part_step", exported);
+  CHECK(ui.bytes(exported).startsWith("ISO-10303-21;"));
 }
 
 TEST_CASE("Combined UI machining workflow edits upstream geometry then patterns transforms "

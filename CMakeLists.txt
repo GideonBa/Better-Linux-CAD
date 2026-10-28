@@ -669,6 +669,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_sketch_tools_tests.cpp
       tests/gui/gui_shell_sketch_operations_tests.cpp
       tests/gui/gui_shell_sketch_interaction_tests.cpp
+      tests/gui/gui_coincident_closure_tests.cpp
       tests/gui/gui_sketch_interaction_tests.cpp
       tests/gui/gui_sketch_primitive_constraints_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp

@@ -107,6 +107,96 @@ TEST_CASE("Sketch solver converges a fully constrained line",
   CHECK(solved.value().residuals.final_rms <= 1.0e-9);
 }
 
+TEST_CASE("Explicit coincidence groups have exact coordinates at every model scale",
+          "[core][sketch-solver][coincident-closure]") {
+  for (double scale : {0.001, 1.0, 1000.0, 1000000.0}) {
+    for (double gap : {1.0, 0.001, 0.000001, 0.00000005, 0.0}) {
+      CAPTURE(scale, gap);
+      const auto topology =
+          SketchTopology::create(SketchId("exact"),
+                                 {make_point("a", {0.0, 0.0}), make_point("b", {0.0, gap * scale}),
+                                  make_point("c", {gap * scale, gap * scale}),
+                                  make_point("unrelated", {100.0 * scale, 50.0 * scale})},
+                                 {})
+              .value();
+      const auto system =
+          SketchConstraintSystem::create(
+              topology.sketch(), {make_constraint("a-b", SketchSolverConstraintKind::Coincident,
+                                                  {point_target("a"), point_target("b")}),
+                                  make_constraint("b-c", SketchSolverConstraintKind::Coincident,
+                                                  {point_target("b"), point_target("c")})})
+              .value();
+      const auto solved = SketchConstraintSolver{}.solve(topology, system);
+      REQUIRE(solved);
+      CHECK(solved.value().status == SketchSolveStatus::UnderConstrained);
+      const auto& result = solved.value().topology;
+      CHECK(result.find_point(SketchPointId("a"))->position() ==
+            result.find_point(SketchPointId("b"))->position());
+      CHECK(result.find_point(SketchPointId("b"))->position() ==
+            result.find_point(SketchPointId("c"))->position());
+      CHECK(*result.find_point(SketchPointId("unrelated")) ==
+            *topology.find_point(SketchPointId("unrelated")));
+      CHECK(solved.value().remaining_dof == 4U);
+      CHECK(solved.value().residuals.final_max_abs == 0.0);
+    }
+  }
+}
+
+TEST_CASE("Exact coincidence respects anchored points and simultaneous dimensions",
+          "[core][sketch-solver][coincident-closure]") {
+  for (bool reference : {false, true}) {
+    CAPTURE(reference);
+    const Point2 anchor{4.0, -2.0};
+    const auto topology =
+        SketchTopology::create(
+            SketchId("anchored"),
+            {SketchTopologyPoint::create(SketchPointId("anchor"), anchor, {.reference = reference})
+                 .value(),
+             make_point("linked", {4.0, -2.00000005}), make_point("end", {8.0, 3.0})},
+            {make_entity("line", SketchTopologyEntityKind::Line,
+                         {SketchPointId("linked"), SketchPointId("end")})})
+            .value();
+    std::vector<SketchSolverConstraint> constraints{
+        make_constraint("join", SketchSolverConstraintKind::Coincident,
+                        {point_target("anchor"), point_target("linked")}),
+        make_constraint("horizontal", SketchSolverConstraintKind::Horizontal,
+                        {entity_target("line")}),
+        make_constraint("length", SketchSolverConstraintKind::HorizontalDistance,
+                        {point_target("linked"), point_target("end")}, 12.0)};
+    if (!reference)
+      constraints.push_back(
+          make_constraint("fixed", SketchSolverConstraintKind::Fixed, {point_target("anchor")}));
+    const auto system = SketchConstraintSystem::create(topology.sketch(), constraints).value();
+    const auto solved = SketchConstraintSolver{}.solve(topology, system);
+    REQUIRE(solved);
+    CHECK(solved.value().status == SketchSolveStatus::FullyConstrained);
+    CHECK(solved.value().topology.find_point(SketchPointId("anchor"))->position() == anchor);
+    CHECK(solved.value().topology.find_point(SketchPointId("linked"))->position() == anchor);
+    const auto end = solved.value().topology.find_point(SketchPointId("end"))->position();
+    CHECK(end.x == Catch::Approx(16.0).margin(1.0e-7));
+    CHECK(end.y == Catch::Approx(-2.0).margin(1.0e-7));
+  }
+}
+
+TEST_CASE("Coincidence rejects distinct fixed anchors even below normalized convergence",
+          "[core][sketch-solver][coincident-closure][sketch-conflict-diagnostics]") {
+  const auto topology = make_line_topology({0.0, 0.0}, {0.0, 0.00000005});
+  const auto system =
+      SketchConstraintSystem::create(
+          topology.sketch(),
+          {make_constraint("a.fixed", SketchSolverConstraintKind::Fixed, {point_target("point.a")}),
+           make_constraint("b.fixed", SketchSolverConstraintKind::Fixed, {point_target("point.b")}),
+           make_constraint("join", SketchSolverConstraintKind::Coincident,
+                           {point_target("point.a"), point_target("point.b")})})
+          .value();
+  const auto solved = SketchConstraintSolver{}.solve(topology, system);
+  REQUIRE(solved);
+  CHECK(solved.value().status == SketchSolveStatus::Conflicting);
+  CHECK(solved.value().topology == topology);
+  CHECK(solved.value().conflicting_constraint_ids ==
+        std::vector<std::string>{"a.fixed", "b.fixed", "join"});
+}
+
 TEST_CASE("Sketch solver evaluates every Block 109 initial residual family",
           "[core][sketch-solver]") {
   std::vector<SketchTopologyPoint> points{

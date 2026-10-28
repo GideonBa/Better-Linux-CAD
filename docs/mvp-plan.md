@@ -1337,7 +1337,7 @@ missing shell/persistence integration; these tickets do not claim that every rep
 | Area | Issue | Evidence / current status | Suggested priority |
 | --- | --- | --- | --- |
 | Sketch endpoint snaps | [#104](https://github.com/GideonBa/Better-Linux-CAD/issues/104) | Confirmed persistence gap for loop closure / restarted Line | P2 |
-| Coincident → closed region | [#105](https://github.com/GideonBa/Better-Linux-CAD/issues/105) | Runtime reproduction; solver/region tolerance mismatch | P1 |
+| Coincident → closed region | [#105](https://github.com/GideonBa/Better-Linux-CAD/issues/105) | Exact Coincident equality groups implemented; cross-layer/native regression in `gui-sketch-regions-finish-mvp8.md` | P1 |
 | Dimension line layout | [#106](https://github.com/GideonBa/Better-Linux-CAD/issues/106) | Confirmed family-specific rendering gaps; DIN/ISO target recorded | P2 |
 | Dimension double-click editing | [#107](https://github.com/GideonBa/Better-Linux-CAD/issues/107) | Confirmed paint/pick mismatch; exact reported gesture pending | P1 |
 | Dimension deletion | [#108](https://github.com/GideonBa/Better-Linux-CAD/issues/108) | Existing backend; visible-selection/keyboard route needs reproduction | P1 |
@@ -1376,6 +1376,11 @@ Local evidence: `/tmp/blcad-issue-triage-probes.cpp`, `/tmp/blcad-issue-triage-p
 The suggested P1 queue first restores profile closure and dimension edit/delete usability, then
 clarifies ineffective Cuts and profiles complex-Part interaction. Numbered status remains through
 Block 137; Block 138 and subsequent STEP topology/import work remain planned.
+
+The 2026-10-28 issue follow-up implements exact Coincident equality groups for #105. Its cross-layer,
+mixed-curve, native dimension/drag/Extrude and history/persistence proofs are recorded in
+`gui-sketch-regions-finish-mvp8.md`; the numeric contract is in
+`sketch-planar-constraint-solver-mvp8.md`. This maintenance fix advances no numbered block.
 
 ## Current next technical step — Block 138 (planned)
 
