@@ -138,3 +138,21 @@ Next steps may use the plan but should stay small:
 - update deterministic Body entries in a generalized `ShapeCache`
 - continue to use OCCT only behind `blcad_geometry`
 - do not build a GUI yet
+
+
+## Explicit candidate roots — issue #114 follow-up
+
+`RecomputePlan::from_graph_and_changed_nodes(graph, roots)` builds a disposable plan containing
+both the supplied nodes themselves and every transitive dependent, once, in the existing graph's
+topological order. Unknown roots and cycles fail closed; an empty root list gives an empty plan.
+The original invalidation-state factory keeps its Dirty-only semantics. Neither factory mutates
+Core intent or invalidation state.
+
+Feature previews need the explicit factory because newly added features initially have Clean
+entries, and `mark_feature_changed` marks the feature itself Changed rather than Dirty. A candidate
+must execute those features as well as all affected consumers, including dependencies through Body
+alias nodes. A later tool transformation can therefore invalidate/recompute an earlier associative
+Boolean and its downstream modifiers while retaining unrelated cached producers. The focused
+`[core][recompute_plan][preview-cache]` regression checks this ordered closure, duplicate roots,
+unrelated branches and invalid graphs. GUI reuse and fallback rules are owned by
+`docs/gui-modeling-workspace-mvp9.md`.

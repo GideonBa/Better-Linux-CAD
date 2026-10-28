@@ -83,6 +83,58 @@ Apply publishes the feature and its used inputs in one transaction, preserving e
 sidecars and canonical reopening. Existing Feature Edit can edit retained parameter/reference
 fields; it does not change extent discriminators.
 
+### Cut outcome and curved-profile follow-up — 2026-10-28, issue #113
+
+The scalar/face extent executor now accepts selected circles and line/arc/spline closed profiles.
+It keeps exact circular arcs and rational cubic spans, translates the contour to the resolved start
+plane and extrudes through the resolved end distance. Offset and oblique workplane frames retain
+their authored coordinates. Circular outer boundaries retain analytic center/radius during hole
+classification; selected curved contours retain their immediate inner material-region boundaries.
+Nonzero Draft on a curved outer profile is explicitly unsupported and asks the user to clear the
+Draft angle.
+
+This repairs the runtime failure where a circle accepted for historical Through All was rejected
+by the richer Distance/Two Sides executor. The existing schema, selected profile identities and
+extent/limit resolvers remain authoritative. Selected curved Through-All features use the same
+exact span path; unselected historical hole-pattern features retain their aggregate executor.
+
+Cut also requires measurable material removal. Disjoint/tangent tools, full target removal and
+invalid geometry have distinct task diagnostics; the exact policy and numerical resolution are
+owned by `docs/part-body-boolean-geometry-mvp6.md`. The task hint names target, Normal/Opposite
+direction and depth/Through All as correction choices. An invalid preview clears the replacement
+presentation and disables Apply. The existing primary numeric HUD still rolls back rejected values
+visibly; a rejected Cut cannot commit through a forced Apply call. Correcting target/direction/
+extent and cancelling a recovered preview both retain the existing transaction contracts.
+
+`[cut-material-diagnostics]` checks disjoint/tangent tools at three scales, aggregate tools and hole
+patterns, tiny cuts, full removal, invalid solid inputs, source-cache immutability, pre-Cut replay,
+exact circular/arc spans with inner holes, independent material-point classification and persistence.
+`[cut-material-workflow]` uses real widgets, keyboard input and native model picks for multiple
+Bodies, wrong-target/full-removal/existing-void diagnostics, offset/oblique circle Cuts after Fillet,
+direction/Two Sides/Through All recovery, cancellation, failed-Apply atomicity, analytic volumes,
+upstream depth edits, exact history, canonical reopening and STEP export. Native hole probes align
+and magnify the view until the center is beyond the boundary's screen-space selection tolerance.
+
+Final issue #113 verification (2026-10-28): all five GUI-preset targets build. Full Core passes
+**545 cases / 17,037 assertions**, full Geometry **459 / 35,243**, and full offscreen GUI
+**552 passed / 20 expected native-only skips / 76,150 assertions** (572 cases). The expanded native
+Cut/extent/Revolve/Body/finishing/Union regression including required shell coverage passes
+**20 / 7,596**, and the new Cut plus associative-tool workflows at 150% pass **3 / 1,918**;
+neither native run skips cases. A separate native application startup reaches the intentional
+six-second timeout (124). Inspected ordinary-scale diagnostic/hole captures and verified all
+**737** frozen source/test/asset/build-definition hashes after testing. Builds, source edits, GUI
+suites and startup were serial; final native/scaled/startup logs contain no High-severity,
+BadDrawable or BadWindow errors. The available X11 visual retains its known OCCT Medium depth/stencil
+warning. Reproduction commands live in `docs/development-setup.md`; local evidence is
+`/tmp/blcad-issue113-{build,core-full,geometry-full,gui-full,native-regression,native-150,startup}.log`
+and `/tmp/blcad-issue113-native{,-150}/`.
+
+The initial simple-box regressions fail on the previous adapter, and the new native offset-circle
+workflow exposed the richer executor's unsupported-profile failure before its fix. The broader
+Body history case now checks rejected disjoint tool movement and a valid associative overlap,
+rather than accepting an upstream edit that turns its Cut into a no-op. These reproduce concrete
+failures; they do not claim every possible reported model failure has the same cause.
+
 Focused proof: `[block136-extrude-extents]` in `gui_shell_extrude_extent_tests.cpp`. The actual-input
 `[shell-combined-extrude-extents]` workflow creates a plate and offset sketch, cuts with two sides,
 corrects transverse/coincident face bounds, cuts to/between source planes, checks exact history,

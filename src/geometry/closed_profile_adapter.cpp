@@ -14,6 +14,7 @@
 #include <Standard_Failure.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Shape.hxx>
+#include <TopTools_ListOfShape.hxx>
 #include <TopoDS_Wire.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Lin.hxx>
@@ -565,7 +566,13 @@ ClosedProfileAdapter::cut_profile_through_all(const GeometryShape& target,
           make_geometry_error("could not build closed profile cut prism"));
     }
 
-    BRepAlgoAPI_Cut cut_builder(target_shape, prism_builder.Shape());
+    BRepAlgoAPI_Cut cut_builder;
+    TopTools_ListOfShape arguments, tools;
+    arguments.Append(target_shape);
+    tools.Append(prism_builder.Shape());
+    cut_builder.SetArguments(arguments);
+    cut_builder.SetTools(tools);
+    cut_builder.SetNonDestructive(true);
     cut_builder.Build();
     if (!cut_builder.IsDone() || cut_builder.HasErrors()) {
       return Result<GeometryShape>::failure(
@@ -628,7 +635,13 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_with_holes_through_all(
           make_geometry_error("could not build closed profile cut prism"));
     }
 
-    BRepAlgoAPI_Cut cut_builder(target_shape, prism_builder.Shape());
+    BRepAlgoAPI_Cut cut_builder;
+    TopTools_ListOfShape arguments, tools;
+    arguments.Append(target_shape);
+    tools.Append(prism_builder.Shape());
+    cut_builder.SetArguments(arguments);
+    cut_builder.SetTools(tools);
+    cut_builder.SetNonDestructive(true);
     cut_builder.Build();
     if (!cut_builder.IsDone() || cut_builder.HasErrors()) {
       return Result<GeometryShape>::failure(

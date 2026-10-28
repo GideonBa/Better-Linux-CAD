@@ -142,7 +142,7 @@ public:
     auto candidate = candidate_document(session);
     if (!candidate)
       return Result<geometry::GeometryShape>::failure(candidate.error());
-    return detail::preview_feature_body(candidate.value(), feature_, result_body_);
+    return detail::preview_feature_body(session, candidate.value(), feature_, result_body_);
   }
 
   [[nodiscard]] bool active() const noexcept { return active_; }

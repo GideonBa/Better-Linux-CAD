@@ -266,7 +266,7 @@ public:
     auto added = add_feature(candidate);
     if (!added)
       return Result<geometry::GeometryShape>::failure(added.error());
-    return detail::preview_feature_body(candidate, feature_, target_body_);
+    return detail::preview_feature_body(session, candidate, feature_, target_body_);
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
@@ -601,7 +601,7 @@ public:
     auto added = add_feature(candidate);
     if (!added)
       return Result<geometry::GeometryShape>::failure(added.error());
-    return detail::preview_feature_body(candidate, feature_, target_body_);
+    return detail::preview_feature_body(session, candidate, feature_, target_body_);
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
