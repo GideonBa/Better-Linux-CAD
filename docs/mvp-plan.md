@@ -1339,14 +1339,22 @@ missing shell/persistence integration; these tickets do not claim that every rep
 | Sketch endpoint snaps | [#104](https://github.com/GideonBa/Better-Linux-CAD/issues/104) | Confirmed persistence gap for loop closure / restarted Line | P2 |
 | Coincident → closed region | [#105](https://github.com/GideonBa/Better-Linux-CAD/issues/105) | Runtime reproduction; solver/region tolerance mismatch | P1 |
 | Dimension line layout | [#106](https://github.com/GideonBa/Better-Linux-CAD/issues/106) | Confirmed family-specific rendering gaps; DIN/ISO target recorded | P2 |
-| Dimension double-click editing | [#107](https://github.com/GideonBa/Better-Linux-CAD/issues/107) | Confirmed paint/pick mismatch; exact reported gesture pending | P1 |
-| Dimension deletion | [#108](https://github.com/GideonBa/Better-Linux-CAD/issues/108) | Existing backend; visible-selection/keyboard route needs reproduction | P1 |
+| Dimension double-click editing | [#107](https://github.com/GideonBa/Better-Linux-CAD/issues/107) | Implemented: shared badge rectangle and independent double-click resolution; native proof | P1 |
+| Dimension deletion | [#108](https://github.com/GideonBa/Better-Linux-CAD/issues/108) | Implemented: visible selection, multi-selection enablement and real Delete/Backspace proof | P1 |
 | Construction conversion | [#109](https://github.com/GideonBa/Better-Linux-CAD/issues/109) | Missing shell toggle and curved-flag compatibility persistence | P2 |
 | Sketch-line rotation axes | [#110](https://github.com/GideonBa/Better-Linux-CAD/issues/110) | Missing persistent sketch/entity axis source | P2 |
 | Body Rotate axis parity | [#111](https://github.com/GideonBa/Better-Linux-CAD/issues/111) | Shell omits existing derived-datum/semantic-edge support | P2 |
 | Sketch on planar result face | [#112](https://github.com/GideonBa/Better-Linux-CAD/issues/112) | Direct workflow and general associative support identity missing | P2 |
 | Cut feedback and workflow | [#113](https://github.com/GideonBa/Better-Linux-CAD/issues/113) | Disjoint-tool no-op confirmed; exact reported failure pending | P1 |
 | Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | Synchronous full-model work confirmed and measured; UI profiling pending | P1 |
+
+The 2026-10-28 dimension-input follow-up implements #107/#108 with shared painted/picked badge
+bounds, independent double-click resolution, visible selection and multi-dimension Delete/Backspace
+enablement. The unchanged editor/deletion transactions retain geometry, relations and backing
+parameters. Full GUI **557 passed / 20 native-only skips / 76,327 assertions**, native affected
+workflows **49 / 3,115**, and native 150% **7 / 1,606** passed. Exact contracts and evidence live in
+`docs/gui-sketch-dimension-authoring-mvp8.md`. This is an unnumbered usability fix; Block 138 remains
+planned and no entire implementation block is advanced.
 
 The independent Coincident probe commits the real GUI constraint intent, then checks Geometry:
 a 100×50 mm outline with a 0.001 mm initial gap retains a 3.85787585e-8 mm gap after an accepted

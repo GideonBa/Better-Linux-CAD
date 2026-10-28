@@ -1431,6 +1431,30 @@ offscreen GUI binaries after the focused proof, plus separate native startup. Ke
 builds and GUI runs serial. Actual follow-up results live in
 `docs/gui-interactive-path-sweep-loft-mvp9.md`.
 
+## Dimension label input follow-up — issues #107 and #108
+
+Build all five GUI-preset targets before testing. Keep source edits, builds, GUI suites and separate
+startup serial. Prepare the capture directories before invoking existing native capture helpers.
+
+```bash
+cmake --build --preset dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app blcad_export_step -j6
+mkdir -p /tmp/blcad-dimension-input-native /tmp/blcad-dimension-input-native-150
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-dimension-input-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[dimension-label-input],[sketch-hit-test],[sketch-dimension-workflow],[rapid-dimension],[sketch-constraints],[sketch-drag],[hermes-design-workflow],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-dimension-input-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[dimension-label-input]"
+```
+
+The new cases prepare geometry through authoring APIs, then select, double-click, type and delete
+through real Qt mouse/key events. Native fixtures require an OCCT viewer and bounded actual window/
+keyboard focus readiness. They cover length/radius/diameter/angle labels at both edges and center,
+geometry overlap, references, invalid-input correction, Escape, stacked and multiple selection,
+highlight pixels, retained formula parameters, a downstream circle extrusion, history and canonical
+document/catalog reopening with recomputed body volumes. The controller case varies zoom and uses
+an offset, rotated workplane. Inspect `dimension-selected-overlap.png`, then smoke-start `blcad`
+separately. The behavior contract and dated validation evidence live in
+`docs/gui-sketch-dimension-authoring-mvp8.md`; numbered implementation status remains in
+`docs/mvp-plan.md`.
+
 ## English desktop and modeling usability follow-up
 
 Build all five GUI-preset targets, then keep source changes, builds, GUI runs and separate native

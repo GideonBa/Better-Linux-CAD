@@ -222,7 +222,32 @@ capabilities and the current selection.
 Dragging a dimension badge previews a plane-space delta without mutating the document. Release
 includes the final pointer sample and commits exactly one `Move sketch dimension label` transaction.
 An unchanged placement creates no history entry. Escape, loss of mouse capture, switching tools or
-leaving the Sketch discards the preview. Annotation rendering and hit testing share the same anchor.
+leaving the Sketch discards the preview.
+
+The viewport shares the numeric font, measured text rectangle and padding between annotation
+painting and picking, in logical device-independent pixels. The complete visible badge (including
+its border) is selectable at every zoom and display scale. A visible dimension badge takes
+precedence over underlying points and curves. Overlapping badges prefer the nearest projected
+anchor, with deterministic distance/identity tie-breaking; repeated clicks cycle the complete hit
+stack. An unchanged badge click preserves that cycle and creates no document/history transaction.
+Selected badges use the application highlight/text colors and paint above overlapping labels;
+hovered badges receive an outline. Existing dimension lines and their midpoint-to-badge extensions
+are selectable within the curve pick tolerance, below real geometry in the hit order. The
+family-specific dimension line/arc presentation follow-up remains tracked by issue #106.
+
+A left double-click resolves the visible badge at the event position independently of prior
+selection and opens its driving editor. The matching release is consumed so it cannot cycle to a
+different overlapping object. Creation, Rapid Dimension and modal modification/operation tools
+retain their own gestures. Enter uses the existing atomic dimension transaction, invalid input
+leaves a correctable editor with feedback, and Escape changes neither the document nor history.
+Reference dimensions explain their read-only measurement semantics in the status bar.
+
+Clicking a badge and pressing Delete or Backspace removes that dimension. Ctrl-click adds/removes
+selection; the delete action is enabled for multiple selected dimensions/constraints as well as
+geometry. Annotation-only deletion preserves Sketch geometry, unrelated constraints/dimensions and
+all backing parameters, including externally referenced formula/feature inputs. Intentional
+geometry deletion retains the existing cascading removal policy. Deletion, editing and placement
+use the existing Undo/Redo and Save/Open contracts; no persistence fields were added for picking.
 
 ## Rapid Dimension
 
@@ -342,6 +367,43 @@ QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[integration][sketch-
 The proof covers all family signatures, deterministic sidecar ordering/roundtrip, driving/reference
 semantics, typed parameters, direct and expression edits, arc-length calibration, semantic glyphs,
 selection roles, atomic add/edit/undo/redo, Save/Open, Qt command registration, and later drag enforcement.
+
+## Dimension label input validation — 2026-10-28
+
+Issues #107 and #108 share the confirmed font-metrics rectangle versus 12-DIP anchor-disk mismatch.
+The original implementation fails the four new input regression cases, including text edges,
+geometry overlap and read-only feedback (28 failed assertions / 448 evaluated). Native integration
+also exposed a separate enablement bug: multiple selected dimensions disabled the existing Delete
+action even though its transaction already supported them. Both causes are fixed without replacing
+the dimension editor, solver, persistence or deletion transaction.
+
+Final validation, with production/test sources frozen throughout the completed runs:
+
+- All five GUI-preset targets built successfully.
+- Full offscreen GUI: **577 cases — 557 passed, 20 expected native-only skips; 76,327 assertions**.
+- Native Qt/OCCT affected Sketch, dimension, drag, constraint, Rapid Dimension, combined desktop
+  and required shell-coverage proof: **49 cases / 3,115 assertions**, no skips.
+- Native dimension-input proof at 150% scale: **7 cases / 1,606 assertions**, no skips.
+- Separate native application startup reached the intentional six-second timeout (124).
+- Inspected `dimension-selected-overlap.png` at both scales, checked the diff and verified all
+  **739 source/test/asset/build-definition hashes** remained unchanged during final validation.
+
+The native tests require actual window/keyboard focus before sending keys and flush complete
+stationary click sequences together, matching the existing combined shell fixtures. Initial fixture
+iterations exposed asynchronous focus/mouse-event interference; these checks keep selection and
+keyboard delivery strict. Existing capture helpers require the output directory to be created first.
+An initial sandboxed full run was stopped after STEP `QSaveFile` publication failures. The unchanged
+export control passed outside that sandbox (**6 cases / 188 assertions**, one native-only skip);
+the final full and native runs used those file permissions. Final native/scaled/startup logs contain
+no High-severity, BadDrawable or BadWindow errors; the available X11 visual retains the known OCCT
+Medium depth/stencil warning.
+
+Exact final logs: `/tmp/blcad-issue107-build-final.log`, `/tmp/blcad-issue107-gui-final.log`,
+`/tmp/blcad-issue107-native-final.log`, `/tmp/blcad-issue107-native-150.log` and
+`/tmp/blcad-issue107-startup.log`. Capture roots use `/tmp/blcad-issue107-native-final` and
+`/tmp/blcad-issue107-native-150`; frozen inputs are recorded in
+`/tmp/blcad-issue107-source-freeze.json`. Reproduction commands live in
+`docs/development-setup.md`. Numbered status remains through Block 137; Block 138 stays planned.
 
 ## Next boundary
 

@@ -1093,14 +1093,51 @@ GuiSketchInteractionController::hits_at(GuiSketchScreenPoint screen_point) const
     if (screen.has_error())
       return Result<std::vector<GuiSketchHit>>::failure(screen.error());
     const double screen_delta = screen_distance(screen_point, screen.value());
-    if (screen_delta <= config_.annotation_hit_tolerance_dip)
+    bool label_hit = false;
+    if (annotation.label_bounds_dip) {
+      const auto& bounds = *annotation.label_bounds_dip;
+      label_hit =
+          GuiSketchScreenRect{
+              {screen.value().x + bounds.left(), screen.value().y + bounds.top()},
+              {screen.value().x + bounds.right(), screen.value().y + bounds.bottom()}}
+              .contains(screen_point);
+    }
+    if (label_hit ||
+        (!annotation.label_bounds_dip && screen_delta <= config_.annotation_hit_tolerance_dip)) {
       hits.push_back({annotation.hit_kind, annotation.semantic_id, annotation.candidate_id,
-                      annotation.point, distance(raw.value(), annotation.point), screen_delta});
+                      annotation.point, distance(raw.value(), annotation.point), screen_delta,
+                      label_hit});
+      continue;
+    }
+    // Match the currently painted dimension line and midpoint-to-label extension.
+    // A leader does not outrank real geometry; the opaque value rectangle does.
+    if (annotation.hit_kind == GuiSketchHitKind::Dimension && annotation.leader.size() >= 2U) {
+      const Point2 a = annotation.leader.front();
+      const Point2 b = annotation.leader.back();
+      const Point2 midpoint{(a.x + b.x) * 0.5, (a.y + b.y) * 0.5};
+      const std::vector<Point2> plane_points{a, b, midpoint, annotation.point};
+      std::vector<GuiSketchScreenPoint> screen_points;
+      for (const auto point : plane_points) {
+        auto projected = mapping_.plane_to_screen(point);
+        if (!projected)
+          return Result<std::vector<GuiSketchHit>>::failure(projected.error());
+        screen_points.push_back(projected.value());
+      }
+      const auto nearest = nearest_on_screen_polyline(screen_point, screen_points, plane_points);
+      if (nearest.distance <= config_.curve_hit_tolerance_dip)
+        hits.push_back({annotation.hit_kind, annotation.semantic_id, annotation.candidate_id,
+                        nearest.plane_point, distance(raw.value(), nearest.plane_point),
+                        nearest.distance});
+    }
   }
 
   std::sort(hits.begin(), hits.end(), [](const GuiSketchHit& first, const GuiSketchHit& second) {
-    const int first_priority = hit_priority(first.kind);
-    const int second_priority = hit_priority(second.kind);
+    const int first_priority = first.label_hit && first.kind == GuiSketchHitKind::Dimension
+                                   ? -1
+                                   : hit_priority(first.kind);
+    const int second_priority = second.label_hit && second.kind == GuiSketchHitKind::Dimension
+                                    ? -1
+                                    : hit_priority(second.kind);
     if (first_priority != second_priority)
       return first_priority < second_priority;
     if (std::abs(first.screen_distance_dip - second.screen_distance_dip) > kEpsilon)
