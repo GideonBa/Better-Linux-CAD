@@ -96,3 +96,29 @@ TEST_CASE("RecomputePlan reports cycles from the dependency graph", "[core][reco
   CHECK(plan.error().object_id() == "dependency_graph");
   CHECK(plan.error().message() == "dependency graph contains a cycle");
 }
+
+TEST_CASE("Explicit recompute roots include new features and associative Body consumers",
+          "[core][recompute_plan][preview-cache]") {
+  DependencyGraph graph;
+  REQUIRE(graph.add_dependency("base", "move.tool"));
+  REQUIRE(graph.add_dependency("move.tool", "body:tool"));
+  REQUIRE(graph.add_dependency("body:tool", "cut"));
+  REQUIRE(graph.add_dependency("target.base", "cut"));
+  REQUIRE(graph.add_dependency("cut", "scale.target"));
+  REQUIRE(graph.add_dependency("unrelated.base", "unrelated.fillet"));
+  const auto plan =
+      RecomputePlan::from_graph_and_changed_nodes(graph, {"move.tool", "move.tool", "cut"});
+  REQUIRE(plan);
+  CHECK(plan.value().step_count() == 4);
+  CHECK_FALSE(plan.value().contains("base"));
+  CHECK_FALSE(plan.value().contains("target.base"));
+  CHECK_FALSE(plan.value().contains("unrelated.fillet"));
+  const auto nodes = plan.value().node_ids();
+  CHECK(index_of(nodes, "move.tool") < index_of(nodes, "body:tool"));
+  CHECK(index_of(nodes, "body:tool") < index_of(nodes, "cut"));
+  CHECK(index_of(nodes, "cut") < index_of(nodes, "scale.target"));
+  CHECK(RecomputePlan::from_graph_and_changed_nodes(graph, {}).value().empty());
+  CHECK_FALSE(RecomputePlan::from_graph_and_changed_nodes(graph, {"missing"}));
+  REQUIRE(graph.add_dependency("scale.target", "base"));
+  CHECK_FALSE(RecomputePlan::from_graph_and_changed_nodes(graph, {"move.tool"}));
+}

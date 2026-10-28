@@ -676,6 +676,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_spatial_surface_workbench_tests.cpp
       tests/gui/gui_interactive_modeling_mvp9_acceptance_tests.cpp
       tests/gui/gui_interactive_finishing_tests.cpp
+      tests/gui/gui_complex_part_performance_tests.cpp
       tests/gui/gui_interactive_pattern_body_tests.cpp
       tests/gui/gui_interactive_path_sweep_loft_tests.cpp
       tests/gui/gui_interactive_surface_tests.cpp
@@ -685,6 +686,8 @@ if(BLCAD_BUILD_TESTS)
     )
     target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2)
     target_compile_definitions(blcad_gui_tests PRIVATE BLCAD_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    set_source_files_properties(tests/gui/gui_complex_part_performance_tests.cpp PROPERTIES
+      COMPILE_DEFINITIONS "BLCAD_PROFILE_BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\"")
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
       target_compile_options(blcad_gui_tests PRIVATE -Wall -Wextra -Wpedantic)
@@ -693,6 +696,7 @@ if(BLCAD_BUILD_TESTS)
     catch_discover_tests(
       blcad_gui_tests
       TEST_PREFIX "gui."
+      TEST_SPEC "~[complex-part-profile]"
       PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" SKIP_RETURN_CODE 4
     )
   endif()
