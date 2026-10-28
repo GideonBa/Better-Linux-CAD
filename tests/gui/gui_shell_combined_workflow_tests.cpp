@@ -48,6 +48,7 @@
 #include <QScrollBar>
 #include <QSlider>
 #include <QSpinBox>
+#include <QStatusBar>
 #include <QTableWidget>
 #include <QTemporaryDir>
 #include <QTimer>
@@ -55,6 +56,7 @@
 #include <QTreeWidget>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -107,6 +109,18 @@ public:
     qApp->processEvents();
     QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
     qApp->processEvents();
+  }
+  void fit_first_screen() {
+    if (QApplication::platformName() != "xcb")
+      return;
+    auto* screen = QGuiApplication::screenAt(QPoint(0, 0));
+    REQUIRE(screen);
+    const auto available = screen->availableGeometry().adjusted(12, 12, -12, -12);
+    window.move(available.topLeft());
+    window.resize(std::min(1280, available.width()), std::min(800, available.height()));
+    window.raise();
+    window.activateWindow();
+    flush();
   }
   bool wait_for_ui(const std::function<bool()>& ready) {
     if (!ready()) {
@@ -1629,13 +1643,25 @@ TEST_CASE("Combined UI Boolean transform and Mirror workflow preserves branching
 
   ui.command("body_translate");
   ui.list_data(ui.widget<QListWidget>("blcad.body.sources"), QString::fromStdString(tool.value()));
+  const auto move_history = std::string(ui.window.session().undo_label());
+  const bool move_can_redo = ui.window.session().can_redo();
   ui.scalar("40 mm");
+  CHECK(ui.window.statusBar()->currentMessage().contains("no measurable material"));
+  CHECK(ui.snapshot() == scaled);
+  CHECK(ui.window.session().undo_label() == move_history);
+  CHECK(ui.window.session().can_redo() == move_can_redo);
+  CHECK(ui.bounds(tool).minimum.x == Approx(30).margin(1e-5));
+  // Retained Boolean tools are associative: moving the tool entirely out of
+  // the target invalidates the existing Cut. Recover with a valid overlap.
+  ui.scalar("5 mm");
   ui.button("blcad.feature.apply");
   CHECK_FALSE(ui.window.session().can_redo());
   CHECK(ui.window.session().part_document()->mirror_features().empty());
   CHECK(ui.summary(tool).volume_mm3 == Approx(4000));
-  CHECK(ui.bounds(tool).minimum.x == Approx(70).margin(1e-5));
+  CHECK(ui.bounds(tool).minimum.x == Approx(35).margin(1e-5));
+  CHECK(ui.summary(target).volume_mm3 == Approx(24000));
   ui.roundtrip(directory.filePath("branched.blcad.json"));
+  CHECK(ui.summary(target).volume_mm3 == Approx(24000));
   ui.idle();
 }
 
@@ -4719,5 +4745,237 @@ TEST_CASE("Combined UI repeated subassemblies share solved motion through qualif
     CHECK(ui.snapshot() == persisted);
   }
   CHECK(ui.bytes(child_file) == saved_child);
+  ui.idle();
+}
+
+TEST_CASE("Combined UI Subtract distinguishes wrong target full removal and an existing void",
+          "[gui][integration][shell-combined-workflow][cut-material-workflow]") {
+  WorkflowUi ui;
+  ui.fit_first_screen();
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Cut outcome recovery");
+  ui.rectangle("datum.xy", {0, 0}, {10, 10}, Point2{30, 30});
+  const auto target = ui.extrude(10);
+  ui.rectangle("datum.xy", {40, 0}, {50, 10}, Point2{70, 30});
+  const auto wrong_target = ui.extrude(10);
+  ui.rectangle("datum.xy", {4, 4}, {6, 6}, Point2{20, 20});
+  const auto tool = ui.extrude(20);
+  ui.rectangle("datum.xy", {-1, -1}, {11, 11}, Point2{30, 30});
+  const auto covering_tool = ui.extrude(20);
+  std::vector<std::string> states{ui.snapshot()};
+  const auto begin = [&](const BodyId& body, const BodyId& cutter) {
+    ui.command("body_boolean");
+    ui.choose(ui.widget<QComboBox>("blcad.boolean.operation"), 1);
+    ui.data(ui.widget<QComboBox>("blcad.boolean.target"), QString::fromStdString(body.value()));
+    auto& keep = ui.widget<QCheckBox>("blcad.boolean.keep_tools");
+    if (!keep.isChecked())
+      ui.click(keep);
+    ui.list_data(ui.widget<QListWidget>("blcad.body.sources"),
+                 QString::fromStdString(cutter.value()));
+  };
+  const auto invalid = [&](const QString& reason) {
+    CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+    CHECK_FALSE(ui.window.viewport().feature_preview_active());
+    CHECK(ui.widget<QLabel>("blcad.feature.summary").text().contains(reason));
+    const auto before = ui.snapshot();
+    const auto history = std::string(ui.window.session().undo_label());
+    // The button prevents a user Apply; also prove the command's transaction
+    // guard rejects a forced call without publishing a candidate or history.
+    REQUIRE_FALSE(ui.window.feature_tools().apply());
+    CHECK(ui.snapshot() == before);
+    CHECK(ui.window.session().undo_label() == history);
+    CHECK(ui.summary(target).volume_mm3 == Approx(1000));
+  };
+  begin(wrong_target, tool);
+  invalid("no measurable material");
+  ui.capture("cut-wrong-target-diagnostic");
+  ui.data(ui.widget<QComboBox>("blcad.boolean.target"), QString::fromStdString(target.value()));
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.feature.cancel");
+  CHECK(ui.snapshot() == states.back());
+
+  begin(target, covering_tool);
+  invalid("entire target");
+  ui.capture("cut-full-removal-diagnostic");
+  ui.button("blcad.feature.cancel");
+  CHECK(ui.snapshot() == states.back());
+  begin(target, tool);
+  ui.capture("cut-material-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(target).volume_mm3 == Approx(960));
+  CHECK(ui.summary(wrong_target).volume_mm3 == Approx(1000));
+  CHECK(ui.summary(tool).volume_mm3 == Approx(80));
+  states.push_back(ui.snapshot());
+  // The same tool now lies in an existing void, so a second Subtract must
+  // explain its lack of material rather than silently adding an unchanged feature.
+  begin(target, tool);
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.widget<QLabel>("blcad.feature.summary").text().contains("no measurable material"));
+  ui.button("blcad.feature.cancel");
+  CHECK(ui.snapshot() == states.back());
+  ui.history(states);
+  ui.roundtrip(directory.filePath("subtract-recovery.blcad.json"));
+  CHECK(ui.summary(target).volume_mm3 == Approx(960));
+  ui.file("export_part_step", directory.filePath("subtract-recovery.step"));
+  CHECK(ui.bytes(directory.filePath("subtract-recovery.step")).startsWith("ISO-10303-21;"));
+  ui.idle();
+}
+
+TEST_CASE("Combined UI curved Cut recovers direction and extent on offset and oblique supports",
+          "[gui][integration][shell-combined-workflow][cut-material-workflow]") {
+  const bool oblique = GENERATE(false, true);
+  CAPTURE(oblique);
+  WorkflowUi ui;
+  ui.fit_first_screen();
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Curved Cut diagnostics");
+  ui.rectangle("datum.xy", {0, 0}, {20, 20});
+  const auto target = ui.extrude(10);
+  const auto producer = ui.window.session().part_document()->features().front().id();
+  ui.command("fillet");
+  ui.list(ui.widget<QListWidget>("blcad.finishing.targets"), 0);
+  ui.scalar("0.5 mm");
+  ui.button("blcad.feature.apply");
+  const auto fillet = ui.window.session().part_document()->fillet_features().back().id();
+  const double original = ui.summary(target).volume_mm3;
+  CHECK(original < 4000);
+  ui.rectangle("datum.xy", {40, 0}, {50, 10}, Point2{70, 30});
+  const auto wrong_target = ui.extrude(10);
+
+  ui.command("create_construction");
+  ui.choose(ui.widget<QComboBox>("blcad.construction.kind"),
+            static_cast<int>(ShellConstructionTools::Kind::Plane));
+  for (const auto& [field, value] :
+       std::vector<std::pair<QString, QString>>{{"origin.x", oblique ? "20" : "10"},
+                                                {"origin.y", "10"},
+                                                {"origin.z", "15"},
+                                                {"direction.x", "1"},
+                                                {"direction.z", oblique ? "-1" : "0"}})
+    ui.number(ui.widget<QDoubleSpinBox>("blcad.construction." + field), value);
+  ui.button("blcad.construction.apply");
+  const auto support =
+      ui.window.session().part_document()->construction_planes().back().workplane_id();
+  ui.tree(support.value());
+  ui.command("create_sketch");
+  const auto sketch = *ui.window.active_sketch();
+  ui.command("sketch.create.center_radius_circle");
+  const auto coordinates = [&](const QString& text) {
+    for (const auto character : text)
+      ui.key(ui.window, character.unicode(), QString(character));
+    ui.key(ui.window, Qt::Key_Return);
+  };
+  coordinates("0;0");
+  coordinates("1;0");
+  REQUIRE(ui.window.session().part_document()->find_sketch(sketch)->circle_profiles().size() == 1);
+  ui.command("finish_sketch");
+  std::vector<std::string> states{ui.snapshot()};
+  const auto cut = [&] {
+    ui.tree(sketch.value());
+    ui.command("extrude");
+    ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+    ui.data(ui.widget<QComboBox>("blcad.extrude.target"), QString::fromStdString(target.value()));
+  };
+  cut();
+  ui.scalar("100 mm");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.widget<QLabel>("blcad.feature.summary").text().contains("no measurable material"));
+  CHECK(ui.widget<QLabel>("blcad.extrude.hint").text().contains("direction"));
+  const auto history = std::string(ui.window.session().undo_label());
+  REQUIRE_FALSE(ui.window.feature_tools().apply());
+  CHECK(ui.window.session().undo_label() == history);
+  CHECK(ui.snapshot() == states.back());
+  ui.capture(oblique ? "cut-oblique-outward-diagnostic" : "cut-offset-outward-diagnostic");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.direction"), 1);
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.data(ui.widget<QComboBox>("blcad.extrude.target"),
+          QString::fromStdString(wrong_target.value()));
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.widget<QLabel>("blcad.feature.summary").text().contains("no measurable material"));
+  ui.data(ui.widget<QComboBox>("blcad.extrude.target"), QString::fromStdString(target.value()));
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.direction"), 0);
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 2);
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.second_distance"), "100 mm");
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK(ui.snapshot() == states.back());
+  ui.button("blcad.feature.cancel");
+  CHECK(ui.snapshot() == states.back());
+  CHECK(ui.summary(target).volume_mm3 == Approx(original));
+
+  cut();
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 3);
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.capture(oblique ? "cut-oblique-through-all-preview" : "cut-offset-through-all-preview");
+  ui.button("blcad.feature.apply");
+  const double normal_z = oblique ? std::sqrt(0.5) : 1;
+  CHECK(ui.summary(target).volume_mm3 ==
+        Approx(original - std::numbers::pi * 10 / normal_z).margin(1e-5));
+  if (ui.window.viewport().native_viewer_available()) {
+    ui.data(ui.widget<QComboBox>("blcad.selection.filter"),
+            selection_kind_bit(GuiSelectionKind::Body));
+    REQUIRE(ui.window.viewport().set_plane_camera(
+        {10, 10, 5}, {oblique ? normal_z : 0, 0, normal_z}, {0, 1, 0}));
+    auto camera = ui.window.viewport().camera_bookmark();
+    camera.target = {10, 10, 5};
+    camera.eye = {10 + (oblique ? 100 * normal_z : 0), 10, 5 + 100 * normal_z};
+    camera.projection = GuiViewportProjection::Orthographic;
+    REQUIRE(ui.window.viewport().restore_camera_bookmark(camera));
+    ui.flush();
+    const auto initial_center = checked(ui.window.viewport().model_to_screen({10, 10, 5}));
+    const auto initial_rim = checked(ui.window.viewport().model_to_screen({10, 11, 5}));
+    const double radius_dip =
+        std::hypot(initial_rim.x - initial_center.x, initial_rim.y - initial_center.y);
+    REQUIRE(std::isfinite(radius_dip));
+    REQUIRE(radius_dip > 0);
+    // Native V3d bookmarks expose a zoom coefficient. Calibrate from the
+    // authoritative projection instead of treating it as a model-space span.
+    camera = ui.window.viewport().camera_bookmark();
+    camera.scale *= 20 / radius_dip;
+    REQUIRE(ui.window.viewport().restore_camera_bookmark(camera));
+    ui.flush();
+    const auto center_screen = checked(ui.window.viewport().model_to_screen({10, 10, 5}));
+    const auto rim_screen = checked(ui.window.viewport().model_to_screen({10, 11, 5}));
+    // Keep the hole larger than OCCT's screen-space selection tolerance.
+    REQUIRE(std::hypot(rim_screen.x - center_screen.x, rim_screen.y - center_screen.y) > 12);
+    const auto pick = [&](Point3 point) {
+      const auto screen = checked(ui.window.viewport().model_to_screen(point));
+      REQUIRE(ui.window.viewport().rect().contains(QPoint(qRound(screen.x), qRound(screen.y))));
+      ui.click_at(ui.window.viewport(), {screen.x, screen.y});
+    };
+    // Look along the actual cutting axis: the center ray passes through the
+    // hole while a neighbouring ray must still pick the retained target body.
+    pick({10, 10, 5});
+    INFO((ui.window.session().selection().empty()
+              ? std::string("clear hole ray")
+              : ui.window.session().selection().entries().front().semantic_id));
+    CHECK(ui.window.session().selection().empty());
+    pick({10, 14, 5});
+    REQUIRE(ui.window.session().selection().size() == 1);
+    CHECK(ui.window.session().selection().entries().front().semantic_id ==
+          "body/" + target.value());
+    ui.capture(oblique ? "cut-oblique-native-hole-proof" : "cut-offset-native-hole-proof");
+    ui.data(ui.widget<QComboBox>("blcad.selection.filter"), 0xFFFFFFFFU);
+  }
+  states.push_back(ui.snapshot());
+  ui.tree(producer.value(), true);
+  ui.widget<QDoubleSpinBox>("blcad.feature_edit.field/length_parameter").setValue(12);
+  ui.button("blcad.feature_edit.apply");
+  const auto* before_cut = ui.window.session().part_shape_cache()->find_feature_shape(fillet);
+  REQUIRE(before_cut);
+  const double updated = geometry::RectangleExtrusionAdapter{}.summarize(*before_cut).volume_mm3;
+  CHECK(ui.summary(target).volume_mm3 ==
+        Approx(updated - std::numbers::pi * 12 / normal_z).margin(1e-5));
+  CHECK(ui.summary(wrong_target).volume_mm3 == Approx(1000));
+  states.push_back(ui.snapshot());
+  ui.history(states);
+  ui.roundtrip(directory.filePath("curved-cut.blcad.json"));
+  CHECK(ui.summary(target).volume_mm3 ==
+        Approx(updated - std::numbers::pi * 12 / normal_z).margin(1e-5));
+  ui.file("export_part_step", directory.filePath("curved-cut.step"));
+  CHECK(ui.bytes(directory.filePath("curved-cut.step")).startsWith("ISO-10303-21;"));
   ui.idle();
 }

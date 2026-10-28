@@ -1431,6 +1431,30 @@ offscreen GUI binaries after the focused proof, plus separate native startup. Ke
 builds and GUI runs serial. Actual follow-up results live in
 `docs/gui-interactive-path-sweep-loft-mvp9.md`.
 
+## Cut outcome and curved-profile regression — issue #113
+
+Build all five targets, then keep source edits, builds, GUI suites and application startup serial.
+Core/Geometry tests may run alongside one GUI suite. The native commands require a working X11/GLX
+display; offscreen verifies the logical backend only.
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests blcad_export_step -j6
+./build/dev-gui/blcad_geometry_tests "[cut-material-diagnostics],[cut-material-removal],[body-boolean],[extrude-extent],[recompute],[revolve-feature]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[cut-material-workflow],[shell-combined-bodies]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-cut-native BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[cut-material-workflow],[block136-extrude-extents],[shell-combined-extrude-extents],[shell-combined-revolve-controls],[shell-combined-path-extrude],[shell-combined-thin-extrude],[shell-combined-extrude-limit-picking],[shell-combined-bodies],[shell-combined-body-context],[shell-combined-finishing-context],[curved-union-workflow],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-cut-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[cut-material-workflow],[shell-combined-bodies]"
+```
+
+The new native workflows fit their window on the first available screen before strict popup input.
+Inspect the `cut-*-diagnostic` captures and both `cut-*-native-hole-proof` views. The latter magnify
+and pick the empty hole center and retained material independently. Rejected numeric values restore
+the last valid preview and report in the status bar; invalid target/direction/extent controls instead
+clear preview and disable Apply. Existing summary and hint widgets have stable object names for
+regression assertions. Run full Core, Geometry and offscreen GUI regression, required shell coverage
+closure and separate native application startup after the focused checks. Exact behavior and dated
+verification are recorded in `docs/part-body-boolean-geometry-mvp6.md` and
+`docs/gui-interactive-extrude-revolve-mvp9.md`; numbered delivery remains in `docs/mvp-plan.md`.
+
 ## English desktop and modeling usability follow-up
 
 Build all five GUI-preset targets, then keep source changes, builds, GUI runs and separate native

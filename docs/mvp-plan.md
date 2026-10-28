@@ -1345,7 +1345,7 @@ missing shell/persistence integration; these tickets do not claim that every rep
 | Sketch-line rotation axes | [#110](https://github.com/GideonBa/Better-Linux-CAD/issues/110) | Missing persistent sketch/entity axis source | P2 |
 | Body Rotate axis parity | [#111](https://github.com/GideonBa/Better-Linux-CAD/issues/111) | Shell omits existing derived-datum/semantic-edge support | P2 |
 | Sketch on planar result face | [#112](https://github.com/GideonBa/Better-Linux-CAD/issues/112) | Direct workflow and general associative support identity missing | P2 |
-| Cut feedback and workflow | [#113](https://github.com/GideonBa/Better-Linux-CAD/issues/113) | Disjoint-tool no-op confirmed; exact reported failure pending | P1 |
+| Cut feedback and workflow | [#113](https://github.com/GideonBa/Better-Linux-CAD/issues/113) | Implemented: distinct Cut outcomes, correctable diagnostics and exact curved extents; native regression verified | P1 |
 | Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | Synchronous full-model work confirmed and measured; UI profiling pending | P1 |
 
 The independent Coincident probe commits the real GUI constraint intent, then checks Geometry:
@@ -1391,3 +1391,14 @@ EditableBody features and structured Assembly import remain Blocks 139–143.
 Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R
 is complete through Block 136. STEP Import MVP-10 has completed source management in Block 137;
 Blocks 138–143 remain planned in `docs/step-import-sequence-mvp10.md`.
+
+
+Issue #113 follow-up (2026-10-28) rejects ineffective/full-target Cuts with distinct correction
+messages, guards aggregate and legacy paths without mutating cached sources, and supports exact
+circle/arc/spline contours through resolved extrusion extents. Native workflows prove wrong-target
+and outward-direction recovery after Fillet, independent material/volume outcomes, transactional
+failure, associative tool edits, history, reopening and STEP. Full Core **545 / 17,037**, Geometry
+**459 / 35,243**, offscreen GUI **552 passed / 20 native-only skips / 76,150 assertions**; expanded
+native **20 / 7,596**, native 150% **3 / 1,918**, all five targets built and separate startup reached
+intentional timeout 124. Exact contracts/evidence live in `docs/part-body-boolean-geometry-mvp6.md`
+and `docs/gui-interactive-extrude-revolve-mvp9.md`. Numbered implementation status is unchanged.

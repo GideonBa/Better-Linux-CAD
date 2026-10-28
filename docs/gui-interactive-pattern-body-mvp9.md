@@ -210,6 +210,12 @@ Cancel or failure restores the original scene. Apply appends the per-Body transf
 selection-list order in a single transaction. One Undo reverses the entire batch; Undo/Redo and
 Save/Open preserve the ordered stack and existing schema.
 
+Combine/Subtract rejects ineffective and full-target-removing candidates with separate, correctable
+task diagnostics. Multi-tool removal is evaluated as one aggregate operation; retained/consumed tool
+and result-mode contracts apply only after a successful material-removing result. The shared Cut
+policy and regression evidence are owned by `docs/part-body-boolean-geometry-mvp6.md` and
+`docs/gui-interactive-extrude-revolve-mvp9.md` (issue #113 follow-up).
+
 Focused shell proof:
 
 ```bash
