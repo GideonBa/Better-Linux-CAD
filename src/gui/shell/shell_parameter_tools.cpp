@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_parameter_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -267,10 +268,12 @@ ShellParameterTools::ShellParameterTools(ShellWindow& window, ShellRibbon& ribbo
                                     {"Angle", ParameterType::Angle}})
     ui.type->addItem(QString::fromUtf8(label), static_cast<int>(type));
   form->addRow(QStringLiteral("Type"), ui.type);
+  apply_gui_choice_icons(*ui.type);
   ui.mode = new QComboBox(content);
   ui.mode->setObjectName("blcad.parameters.mode");
   ui.mode->addItem(QStringLiteral("Value"), false);
   ui.mode->addItem(QStringLiteral("Formula"), true);
+  apply_gui_choice_icons(*ui.mode);
   form->addRow(QStringLiteral("Input"), ui.mode);
   ui.input = new QLineEdit(content);
   ui.input->setObjectName("blcad.parameters.input");
@@ -286,7 +289,7 @@ ShellParameterTools::ShellParameterTools(ShellWindow& window, ShellRibbon& ribbo
   }
   const auto button = [](QWidget* parent, QHBoxLayout* row, const char* name,
                          const QString& label) {
-    auto* result = new QPushButton(label, parent);
+    auto* result = make_gui_button(label, parent);
     result->setObjectName(QStringLiteral("blcad.parameters.") + name);
     if (QString::fromLatin1(name) == QStringLiteral("apply"))
       result->setProperty("guiRole", "primary");

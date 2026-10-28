@@ -1455,6 +1455,30 @@ separately. The behavior contract and dated validation evidence live in
 `docs/gui-sketch-dimension-authoring-mvp8.md`; numbered implementation status remains in
 `docs/mvp-plan.md`.
 
+## Cut outcome and curved-profile regression — issue #113
+
+Build all five targets, then keep source edits, builds, GUI suites and application startup serial.
+Core/Geometry tests may run alongside one GUI suite. The native commands require a working X11/GLX
+display; offscreen verifies the logical backend only.
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests blcad_export_step -j6
+./build/dev-gui/blcad_geometry_tests "[cut-material-diagnostics],[cut-material-removal],[body-boolean],[extrude-extent],[recompute],[revolve-feature]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[cut-material-workflow],[shell-combined-bodies]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-cut-native BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[cut-material-workflow],[block136-extrude-extents],[shell-combined-extrude-extents],[shell-combined-revolve-controls],[shell-combined-path-extrude],[shell-combined-thin-extrude],[shell-combined-extrude-limit-picking],[shell-combined-bodies],[shell-combined-body-context],[shell-combined-finishing-context],[curved-union-workflow],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-cut-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[cut-material-workflow],[shell-combined-bodies]"
+```
+
+The new native workflows fit their window on the first available screen before strict popup input.
+Inspect the `cut-*-diagnostic` captures and both `cut-*-native-hole-proof` views. The latter magnify
+and pick the empty hole center and retained material independently. Rejected numeric values restore
+the last valid preview and report in the status bar; invalid target/direction/extent controls instead
+clear preview and disable Apply. Existing summary and hint widgets have stable object names for
+regression assertions. Run full Core, Geometry and offscreen GUI regression, required shell coverage
+closure and separate native application startup after the focused checks. Exact behavior and dated
+verification are recorded in `docs/part-body-boolean-geometry-mvp6.md` and
+`docs/gui-interactive-extrude-revolve-mvp9.md`; numbered delivery remains in `docs/mvp-plan.md`.
+
 ## English desktop and modeling usability follow-up
 
 Build all five GUI-preset targets, then keep source changes, builds, GUI runs and separate native
@@ -1525,3 +1549,101 @@ the matching option, task action reachability and the corrected three-section so
 proof, run full Core, Geometry and offscreen GUI regression, required shell closure and separate
 native startup. Record actual counts, native-only omissions and source-freeze evidence in
 `docs/gui-interactive-path-sweep-loft-mvp9.md`.
+
+## Dark-violet color-only follow-up
+
+The current palette and restored pre-redesign splash contract live in `docs/gui-hermes-design.md`.
+Build the five GUI-preset targets above. Keep source changes, builds, GUI runs and separate startup
+serial; retain the existing fonts, spacing, widget sizes and interactions.
+
+```bash
+mkdir -p /tmp/blcad-violet-native /tmp/blcad-violet-native-150
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-violet-native BLCAD_SPLASH_SCREENSHOT=/tmp/blcad-violet-native/splash.png QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[appearance],[startup-splash],[hermes-design-workflow],[rapid-dimension],[ribbon],[shell-combined-part],[shell-combined-spatial-context],[shell-combined-finishing-context],[shell-combined-parameters],[shell-combined-assembly-context],[block137-step-import],[block136-measure],[gui][viewport],[native-viewer-lifecycle]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-violet-native-150 BLCAD_SPLASH_SCREENSHOT=/tmp/blcad-violet-native-150/splash.png QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[appearance],[startup-splash],[hermes-design-workflow]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+The standalone startup intentionally stops with timeout exit 124. Inspect captures for panel/input
+contrast, checked/disabled/focus states, dark dimension/Measure/manipulator badges, and the original
+black-and-white splash. The existing combined workflow proves compact and ordinary window sizes,
+model edits, history, Save/Open and STEP export. Record actual skips and native results in the design
+document; offscreen tests cannot prove OCCT rendering.
+
+## Curated Pixelarticons integration
+
+The icon catalog, exact pinned upstream/license and optional mask-regeneration instructions live in
+`assets/gui/pixelarticons/README.md`. Builds use committed Qt resources; no SVG plugin, npm install,
+asset generation or network access is required. Build all five GUI-preset targets as above, then keep
+source edits, builds, GUI runs and separate startup serial.
+
+```bash
+mkdir -p /tmp/blcad-pixelart-offscreen /tmp/blcad-pixelart-native /tmp/blcad-pixelart-native-150
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-pixelart-offscreen QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[icons],[appearance],[startup-splash],[hermes-design-workflow],[ribbon],[model-browser]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-pixelart-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[icons],[appearance],[startup-splash],[hermes-design-workflow],[rapid-dimension],[ribbon],[shell-combined-part],[shell-combined-spatial-context],[shell-combined-finishing-context],[shell-combined-parameters],[shell-combined-assembly-context],[block137-step-import],[block136-measure],[gui][viewport],[native-viewer-lifecycle],[block136-profile-context],[block136-body-context],[block136-pattern-context],[block136-surface-context],[block136-feature-edit],[block136-assembly-context],[block136-construction]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-pixelart-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[icons],[appearance],[startup-splash],[hermes-design-workflow]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+The focused proof checks resource/license hashes, nonempty masks, exact normal/active/checked/disabled
+colors, binary alpha and physical pixel sizes at 100%, 150% and 200%. It verifies labeled commands,
+unchanged callbacks/shortcuts, typed browser metadata and text-only fallbacks for unsupported CAD
+functions. Native workflows exercise compact tab navigation, context buttons, task/dialog actions,
+history, Save/Open and STEP export. Inspect ordinary/compact captures and scaled icons, then record
+actual results and skips in `docs/gui-hermes-design.md`. Startup timeout 124 is intentional.
+
+
+## Complex-Part cache and rotor profile — issue #114
+
+Build all five targets. Keep source edits, builds, GUI suites and startup serial. Core/Geometry
+regressions may run with one correctness GUI suite. Timing runs must be isolated from other builds
+and test processes; native X11/GLX is required for publication/redraw measurements.
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests blcad_export_step -j6
+./build/dev-gui/blcad_core_tests "[recompute_plan]"
+./build/dev-gui/blcad_geometry_tests "[finishing-selection],[result-edge],[curved-finishing],[body-boolean],[recompute]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[preview-cache],[complex-part-workflow],[shell-combined-bodies]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-rotor-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[preview-cache],[complex-part-workflow],[shell-combined-bodies]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-rotor-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[complex-part-workflow],[interactive-pattern-mirror],[interactive-body-operation],[interactive-path-sweep],[interactive-loft]"
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-rotor-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[preview-cache],[complex-part-workflow],[cut-material-workflow],[shell-combined-part],[shell-combined-loft],[shell-combined-spatial-context],[shell-combined-finishing-context],[shell-combined-pattern-context],[shell-combined-body-context],[shell-combined-bodies],[shell-combined-surface-context],[shell-combined-extrude-extents],[shell-combined-revolve-controls],[shell-combined-path-extrude],[shell-combined-thin-extrude],[shell-combined-extrude-limit-picking],[curved-union-workflow],[interactive-finishing],[interactive-surface],[integration][gui-feature-coverage],[native-viewer-lifecycle]"
+BLCAD_PROFILE_SAMPLES=11 BLCAD_PROFILE_OUTPUT=/tmp/blcad-rotor-profile.json QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[complex-part-profile]"
+BLCAD_PROFILE_SEQUENCE=1 BLCAD_PROFILE_SAMPLES=5 BLCAD_PROFILE_OUTPUT=/tmp/blcad-rotor-sequence.json QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[complex-part-profile]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[preview-cache],[interactive-surface],[stitch-diagnostic-overlay]"
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-rotor-sequence-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[complex-part-workflow],[interactive-surface],[stitch-diagnostic-overlay],[shell-combined-surface-context],[native-viewer-lifecycle],[integration][gui-feature-coverage]"
+```
+
+The profile is explicitly selected by tag and excluded from CTest/default GUI execution. It uses
+5/20/40 spline blades around one revolved hub; set `BLCAD_PROFILE_BLADES=20` to isolate a size.
+One first call and ten repeated samples yield separate first/p50/p95 values and raw measurements.
+An empty-cache full candidate is also computed as a volume oracle, with native publication and
+redraw/readback measured for both full and cached Fillet results. These reference operations do not
+replace the actual controller preview being profiled. JSON timing covers serialization plus parsing,
+not complete application history. The queued zero-timer measures event-loop blocking during that
+call, not physical mouse latency. No portable timing assertion is introduced.
+
+The sequence variant uses 4/12/24 serial Body translations after the 5/20/40-blade pattern
+(7/15/27 committed producers). It additionally measures the real curved-Sketch baseline solver,
+driving dimension authoring, a 32-pointer burst coalesced to one drag solve, native mouse selection,
+preview through publication/event processing/capture, and actual Fillet Apply/Undo/Redo including
+their history/recompute costs. Five samples give one first observation and four repeats; warm p95
+is consequently the maximum repeat, not a high-confidence population estimate. The original
+11-sample comparison remains a separate fixture and series. Run only one timing process at once.
+
+`[complex-part-sequence]` is an ordinary correctness gate for all three sizes. It checks upstream
+recompute through the full transform chain against an empty-cache oracle, retained independent
+sources, driving dimension edits, coalescing, drag commit, stale commit rejection, history and
+catalog persistence. The shell `[complex-part-workflow]` runs both 20- and 40-blade deep fixtures,
+including actual native edge picking, recovery, cancellation, parameter editing and STEP.
+Its source-volume and remote-Fillet oracles use adaptive integration in the test-only
+`blcad_geometry_test_support` library; OCCT headers stay private to that Geometry support target.
+The ordinary production `ShapeSummary` integration and all modeling tolerances are unchanged.
+
+Inspect `rotor-fillet-recovered-preview` and `rotor-edited-reopened` captures for the native workflow.
+Parameter Manager literal fields take values without units; the primary manipulator HUD accepts
+units and restores the last accepted value on a failed preview. The exact candidate-cache contract
+and evidence boundaries live in `docs/gui-modeling-workspace-mvp9.md`; result-witness comparison
+remains owned by `docs/gui-interactive-finishing-mvp9.md`. Full Core/Geometry/offscreen GUI,
+affected native feature families, required shell coverage and separate startup still follow the
+focused proof. Numbered implementation sequencing remains in `docs/mvp-plan.md`.

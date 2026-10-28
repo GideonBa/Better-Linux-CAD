@@ -2,11 +2,15 @@
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include <TopExp_Explorer.hxx>
+#include <BRepClass3d_SolidClassifier.hxx>
+#include <gp_Pnt.hxx>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <optional>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -96,7 +100,243 @@ double body_volume(const ShapeCache& cache, const char* body_id) {
   return RectangleExtrusionAdapter{}.summarize(*shape).volume_mm3;
 }
 
+PartDocument cut_probe(double scale, Point2 tool_center, double tool_width = 2.0,
+                       double tool_height = 2.0) {
+  auto created = PartDocument::create(DocumentId("part.cut_probe"), "Cut diagnostics");
+  REQUIRE(created);
+  auto document = created.value();
+  REQUIRE(document.add_datum_plane(DatumPlane::xy().value()));
+  add_box(document, "a", 10 * scale, 10 * scale, 10 * scale);
+  add_box(document, "b", tool_width * scale, tool_height * scale, 20 * scale,
+          {tool_center.x * scale, tool_center.y * scale});
+  return document;
+}
+
 } // namespace
+
+TEST_CASE("Cut distinguishes real removal from disjoint and tangent tools at different scales",
+          "[geometry][body-boolean][cut-material-diagnostics]") {
+  const double scale = GENERATE(0.001, 1.0, 1000.0);
+  const double offset = GENERATE(0.0, 6.0, 100.0);
+  CAPTURE(scale, offset);
+  const auto document = cut_probe(scale, {offset, 0});
+  auto cache = make_cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, cache));
+  const auto target = *cache.find_body_shape(BodyId("body.a"));
+  const auto tool = *cache.find_body_shape(BodyId("body.b"));
+  const auto before = body_volume(cache, "body.a");
+  const auto cut = BodyBooleanAdapter{}.combine(FeatureId("cut.probe"),
+                                                BodyBooleanOperation::Subtract, target, {tool});
+  if (offset == 0) {
+    REQUIRE(cut);
+    CHECK(RectangleExtrusionAdapter{}.summarize(cut.value()).volume_mm3 ==
+          Catch::Approx(960 * scale * scale * scale).epsilon(1e-8));
+    const auto* result = OcctShapeView::get(cut.value());
+    REQUIRE(result);
+    BRepClass3d_SolidClassifier center(*result, gp_Pnt(0, 0, 5 * scale), 1e-7);
+    CHECK(center.State() == TopAbs_OUT);
+    BRepClass3d_SolidClassifier material(*result, gp_Pnt(4 * scale, 0, 5 * scale), 1e-7);
+    CHECK(material.State() == TopAbs_IN);
+  } else {
+    REQUIRE(cut.has_error());
+    CHECK(cut.error().category() == ErrorCategory::Geometry);
+    CHECK(cut.error().object_id() == "cut.probe");
+    CHECK(cut.error().message().find("no measurable material") != std::string::npos);
+  }
+  CHECK(body_volume(cache, "body.a") == before);
+  CHECK(RectangleExtrusionAdapter{}.summarize(target).volume_mm3 == before);
+}
+
+TEST_CASE("Cut reports full target removal separately from invalid solid inputs",
+          "[geometry][body-boolean][cut-material-diagnostics]") {
+  const auto document = cut_probe(1, {}, 20, 20);
+  auto cache = make_cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, cache));
+  const auto target = *cache.find_body_shape(BodyId("body.a"));
+  const auto tool = *cache.find_body_shape(BodyId("body.b"));
+  const auto removed = BodyBooleanAdapter{}.combine(FeatureId("cut.full"),
+                                                    BodyBooleanOperation::Subtract, target, {tool});
+  REQUIRE(removed.has_error());
+  CHECK(removed.error().object_id() == "cut.full");
+  CHECK(removed.error().message().find("entire target") != std::string::npos);
+  auto face_ref = SemanticFaceReference::create(FeatureId("feature.a"), SemanticFace::Top);
+  REQUIRE(face_ref);
+  auto face = SurfaceAdapter{}.extract_semantic_face(FeatureId("cut.face"), document, cache,
+                                                     face_ref.value());
+  REQUIRE(face);
+  const auto invalid = BodyBooleanAdapter{}.combine(
+      FeatureId("cut.invalid"), BodyBooleanOperation::Subtract, target, {face.value()});
+  REQUIRE(invalid.has_error());
+  CHECK(invalid.error().message().find("solid") != std::string::npos);
+  CHECK(invalid.error().message().find("no measurable material") == std::string::npos);
+  CHECK(body_volume(cache, "body.a") == Catch::Approx(1000));
+}
+
+TEST_CASE("Cut evaluates all tools together and accepts small real material removal",
+          "[geometry][body-boolean][cut-material-diagnostics]") {
+  auto document = cut_probe(1, {100, 0});
+  add_box(document, "c", 2, 2, 20);
+  add_box(document, "tiny", 0.001, 0.001, 20);
+  auto cache = make_cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, cache));
+  const auto target = *cache.find_body_shape(BodyId("body.a"));
+  const auto disjoint = *cache.find_body_shape(BodyId("body.b"));
+  const auto overlapping = *cache.find_body_shape(BodyId("body.c"));
+  const auto tiny = *cache.find_body_shape(BodyId("body.tiny"));
+  for (const auto& tools :
+       {std::vector{disjoint, overlapping}, std::vector{overlapping, disjoint}}) {
+    auto result = BodyBooleanAdapter{}.combine(FeatureId("cut.multi"),
+                                               BodyBooleanOperation::Subtract, target, tools);
+    REQUIRE(result);
+    CHECK(RectangleExtrusionAdapter{}.summarize(result.value()).volume_mm3 == Catch::Approx(960));
+  }
+  auto result = BodyBooleanAdapter{}.combine(FeatureId("cut.tiny"), BodyBooleanOperation::Subtract,
+                                             target, {tiny});
+  REQUIRE(result);
+  const double volume = RectangleExtrusionAdapter{}.summarize(result.value()).volume_mm3;
+  CHECK(volume < 1000);
+  CHECK(1000 - volume == Catch::Approx(0.00001).margin(1e-10));
+}
+
+TEST_CASE("Legacy Through All validates aggregate holes and replays from the pre-cut producer",
+          "[geometry][body-boolean][cut-material-diagnostics][boolean-cache-isolation]") {
+  const bool pattern = GENERATE(false, true);
+  const bool misses = GENERATE(false, true);
+  auto document = cut_probe(1, {100, 100});
+  REQUIRE(document.add_parameter(length_parameter("hole.diameter", 1)));
+  auto sketch = Sketch::create(SketchId("sketch.hole"), "Hole", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  if (pattern) {
+    REQUIRE(document.add_parameter(length_parameter("hole.radius", 3)));
+    REQUIRE(document.add_parameter(Parameter::create_count(ParameterId("hole.count"), "Count",
+                                                           Quantity::count(2, "Count").value())
+                                       .value()));
+    auto holes = CircularHolePattern::create(
+        ProfileId("holes"), ParameterId("hole.radius"), ParameterId("hole.count"),
+        ParameterId("hole.diameter"), {misses ? 100.0 : 6.0, 0});
+    REQUIRE(holes);
+    REQUIRE(sketch.value().add_profile(holes.value()));
+  } else {
+    auto circle = CircleProfile::create(ProfileId("circle"), ParameterId("hole.diameter"),
+                                        {misses ? 100.0 : 0.0, 0});
+    REQUIRE(circle);
+    REQUIRE(sketch.value().add_profile(circle.value()));
+  }
+  REQUIRE(document.add_sketch(sketch.value()));
+  auto cut = Feature::create_subtractive_extrude(FeatureId("cut.legacy"), "Through All",
+                                                 sketch.value().id(), FeatureId("feature.a"));
+  REQUIRE(cut);
+  auto context = FeatureBodyResultContext::create(FeatureBodyOperationMode::Cut, BodyId("body.a"),
+                                                  std::nullopt);
+  REQUIRE(context);
+  REQUIRE(document.add_feature(cut.value().with_body_result_context(context.value()).value()));
+  auto cache = make_cache();
+  auto result = GeometryRecomputeExecutor{}.execute_document(document, cache);
+  if (misses) {
+    REQUIRE(result.has_error());
+    CHECK(result.error().object_id() == "cut.legacy");
+    CHECK(result.error().message().find("no measurable material") != std::string::npos);
+    CHECK(cache.body_shape_count() == 0);
+  } else {
+    REQUIRE(result);
+    constexpr double pi = 3.14159265358979323846;
+    const double expected = 1000 - pi * 0.25 * 10;
+    CHECK(body_volume(cache, "body.a") == Catch::Approx(expected));
+    const auto* source = cache.find_feature_shape(FeatureId("feature.a"));
+    REQUIRE(source);
+    CHECK(RectangleExtrusionAdapter{}.summarize(*source).volume_mm3 == Catch::Approx(1000));
+    // A second execution must use the source before this feature, not cut the
+    // already-cut body again and misdiagnose a valid feature as ineffective.
+    REQUIRE(GeometryRecomputeExecutor{}.execute_subtractive_extrude(
+        document, FeatureId("cut.legacy"), cache));
+    CHECK(body_volume(cache, "body.a") == Catch::Approx(expected));
+    const auto json = serialize_part_document_to_json(document).value();
+    auto restored = deserialize_part_document_from_json(json);
+    REQUIRE(restored);
+    auto reopened = make_cache();
+    REQUIRE(GeometryRecomputeExecutor{}.execute_document(restored.value(), reopened));
+    CHECK(body_volume(reopened, "body.a") == Catch::Approx(expected));
+  }
+}
+
+TEST_CASE("Curved Cut spans preserve exact circles arcs and nested material across extents",
+          "[geometry][cut-material-diagnostics][extrude-extent][nested-spline-region]") {
+  const bool arcs = GENERATE(false, true);
+  const bool ring = GENERATE(false, true);
+  const auto mode = GENERATE(ExtrudeExtentMode::Distance, ExtrudeExtentMode::Symmetric,
+                             ExtrudeExtentMode::TwoSided, ExtrudeExtentMode::ThroughAll);
+  CAPTURE(arcs, ring, mode);
+  auto document = cut_probe(1, {100, 100});
+  REQUIRE(document.add_parameter(length_parameter("cut.depth", 8)));
+  REQUIRE(document.add_parameter(length_parameter("cut.second", 7)));
+  REQUIRE(document.add_parameter(length_parameter("outer.diameter", 4)));
+  REQUIRE(document.add_parameter(length_parameter("inner.diameter", 2)));
+  auto sketch = Sketch::create(SketchId("sketch.curved"), "Curved Cut", DatumPlaneId("datum.xy"));
+  REQUIRE(sketch);
+  const ProfileId outer("profile.outer");
+  if (arcs) {
+    auto upper =
+        ArcSegment::create_three_point(SketchEntityId("arc.upper"), {-2, 0}, {0, 2}, {2, 0});
+    auto lower =
+        ArcSegment::create_three_point(SketchEntityId("arc.lower"), {2, 0}, {0, -2}, {-2, 0});
+    REQUIRE(upper);
+    REQUIRE(lower);
+    REQUIRE(sketch.value().add_entity(upper.value()));
+    REQUIRE(sketch.value().add_entity(lower.value()));
+    auto profile = ArcClosedProfile::create(outer, {upper.value().id(), lower.value().id()});
+    REQUIRE(profile);
+    REQUIRE(sketch.value().add_profile(profile.value()));
+  } else {
+    auto circle = CircleProfile::create(outer, ParameterId("outer.diameter"));
+    REQUIRE(circle);
+    REQUIRE(sketch.value().add_profile(circle.value()));
+  }
+  if (ring) {
+    auto inner = CircleProfile::create(ProfileId("profile.inner"), ParameterId("inner.diameter"));
+    REQUIRE(inner);
+    REQUIRE(sketch.value().add_profile(inner.value()));
+  }
+  REQUIRE(document.add_sketch(sketch.value()));
+  auto extent = ExtrudeExtentIntent::distance(ParameterId("cut.depth"));
+  if (mode == ExtrudeExtentMode::Symmetric)
+    extent = ExtrudeExtentIntent::symmetric(ParameterId("cut.depth"));
+  else if (mode == ExtrudeExtentMode::TwoSided)
+    extent = ExtrudeExtentIntent::two_sided(ParameterId("cut.depth"), ParameterId("cut.second"));
+  else if (mode == ExtrudeExtentMode::ThroughAll)
+    extent = Result<ExtrudeExtentIntent>::success(ExtrudeExtentIntent::through_all());
+  REQUIRE(extent);
+  auto intent = ExtrudeFeatureIntent::create(extent.value());
+  REQUIRE(intent);
+  auto feature = Feature::create_additive_extrude(FeatureId("cut.curved"), "Curved Cut",
+                                                  sketch.value().id(), intent.value());
+  REQUIRE(feature);
+  auto context = FeatureBodyResultContext::create(FeatureBodyOperationMode::Cut, BodyId("body.a"),
+                                                  std::nullopt);
+  REQUIRE(context);
+  auto profiled = feature.value().with_profile(outer);
+  REQUIRE(profiled);
+  REQUIRE(document.add_feature(profiled.value().with_body_result_context(context.value()).value()));
+  auto cache = make_cache();
+  const auto result = GeometryRecomputeExecutor{}.execute_document(document, cache);
+  INFO((result ? "accepted" : result.error().message()));
+  REQUIRE(result);
+  const double depth = mode == ExtrudeExtentMode::Symmetric    ? 4
+                       : mode == ExtrudeExtentMode::ThroughAll ? 10
+                                                               : 8;
+  constexpr double pi = 3.14159265358979323846;
+  CHECK(body_volume(cache, "body.a") ==
+        Catch::Approx(1000 - pi * (ring ? 3 : 4) * depth).margin(1e-7));
+  const auto* raw = OcctShapeView::get(*cache.find_body_shape(BodyId("body.a")));
+  REQUIRE(raw);
+  CHECK(BRepClass3d_SolidClassifier(*raw, gp_Pnt(0, 0, 2), 1e-7).State() ==
+        (ring ? TopAbs_IN : TopAbs_OUT));
+  CHECK(BRepClass3d_SolidClassifier(*raw, gp_Pnt(1.5, 0, 2), 1e-7).State() == TopAbs_OUT);
+  CHECK(BRepClass3d_SolidClassifier(*raw, gp_Pnt(4, 0, 2), 1e-7).State() == TopAbs_IN);
+  REQUIRE(GeometryRecomputeExecutor{}.execute_additive_extrude(document, FeatureId("cut.curved"),
+                                                               cache));
+  CHECK(body_volume(cache, "body.a") ==
+        Catch::Approx(1000 - pi * (ring ? 3 : 4) * depth).margin(1e-7));
+}
 
 TEST_CASE("Body boolean Geometry executes Add Subtract and Intersect",
           "[geometry][body-boolean][integration][part-construction-mvp]") {
@@ -289,6 +529,36 @@ TEST_CASE("Interleaved translated cut rotate and scale retain geometry across JS
     REQUIRE(GeometryRecomputeExecutor{}.execute_plan(*state, plan.value(), cache));
     check();
     CHECK(serialize_part_document_to_json(*state).value() == serialized.value());
+  }
+}
+
+TEST_CASE("Moving a retained tool out of an associative Cut rejects replay atomically",
+          "[geometry][body-boolean][cut-material-removal][body-transform]") {
+  auto document =
+      make_document(BodyBooleanOperation::Subtract, BodyBooleanResultMode::ModifyTarget, true);
+  auto cache = make_cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, cache));
+  const auto target_volume = body_volume(cache, "body.a");
+  const auto tool_volume = body_volume(cache, "body.b");
+  auto moved = BodyTransform::create_translate(BodyTransformId("move.tool"), BodyId("body.b"),
+                                               BodyTransformCoordinateSpace::World, std::nullopt,
+                                               {100, 0, 0}, false, false);
+  REQUIRE(moved);
+  REQUIRE(document.add_body_transform(moved.value()));
+  const auto serialized = serialize_part_document_to_json(document).value();
+  auto restored = deserialize_part_document_from_json(serialized);
+  REQUIRE(restored);
+  for (auto* state : {&document, &restored.value()}) {
+    const auto rejected = GeometryRecomputeExecutor{}.execute_document(*state, cache);
+    REQUIRE_FALSE(rejected);
+    CHECK(rejected.error().object_id() == "boolean.combine");
+    CHECK(rejected.error().message().find("no measurable material") != std::string::npos);
+    CHECK(body_volume(cache, "body.a") == Catch::Approx(target_volume));
+    CHECK(body_volume(cache, "body.b") == Catch::Approx(tool_volume));
+    const auto bounds = BodyTransformAdapter{}.bounds(*cache.find_body_shape(BodyId("body.b")));
+    REQUIRE(bounds);
+    CHECK(bounds.value().maximum.x < 100);
+    CHECK(serialize_part_document_to_json(*state).value() == serialized);
   }
 }
 

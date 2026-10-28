@@ -19,12 +19,14 @@ file dialogs, and newly generated default names. Existing authored names and per
 remain unchanged when a document is opened. The application sets an English locale with decimal-point
 numeric input, independently of the system display language.
 
-The Hermes-inspired redesign supersedes the initial monochrome theme. `configure_gui_appearance`
-installs the same electric-blue/paper design system in the application and GUI acceptance runner.
-The navigation and primary actions use blue; readable indigo text, white inputs and fine separators
-organize paper panels. The modeling canvas uses solid dark navy and retains semantic geometry,
-selection and reference markings. Controls remain square and use solid fills. Native file dialogs
-are disabled so document dialogs follow the same contract.
+The Hermes-inspired redesign supplies the existing layout and typography. The 2026-10-27 color-only
+follow-up makes `configure_gui_appearance` use the same dark-violet/black palette in the application
+and GUI acceptance runner. Navigation, panels and inputs use the reference's dark violet tones;
+off-white text and light lavender accents keep controls, selection and focus readable. The modeling
+canvas uses charcoal gray (`#181a1b`) and retains semantic geometry, selection and reference markings.
+Controls remain square with solid fills; widget sizes, spacing and interactions remain unchanged.
+Native file dialogs are disabled so document dialogs follow the same contract. The startup splash is
+restored to its pre-redesign Archimedes artwork, italic white title and centered `LOADING` on black.
 
 Bundled Barlow supplies readable body text, Barlow Condensed supplies navigation/section headings,
 and IBM Plex Mono supplies scalar inputs and model readouts. These fonts are registered offline from
@@ -40,6 +42,13 @@ Sketch dimensions, preview/cancel/apply, feature editing, history, Save/Open and
 1024×640, 1280×800 and 1600×1000, bounded to the available native desktop at higher DPI. Compact
 workspace navigation is checked through visible arrows and actual mouse hits. The implementation
 plan, exact visual roles and final native evidence live in `docs/gui-hermes-design.md`.
+
+The 2026-10-28 Pixelarticons follow-up supplies local, theme-colored icons through an explicit
+presentation catalog. Ribbon/menu actions and task buttons keep their existing labels and shortcuts;
+mapped context shortcuts keep those labels in tooltips and accessibility names. Browser icons derive
+from typed node/record metadata, independently of authored names. Functions without a representative
+pack symbol remain text-only. Compact ribbon commands retain the existing horizontal overflow and
+fixed page height. The icon renderer and provenance contract live in `assets/gui/pixelarticons/README.md`.
 
 ## Authority boundary
 
@@ -513,3 +522,213 @@ occurrences and cross-hierarchy records use the explicit hierarchy task editors 
 
 Focused proof: `[block136-assembly-context]`; integrated Qt proof:
 `[shell-combined-assembly-context]` in `gui_shell_combined_workflow_tests.cpp`.
+
+
+## Complex-Part candidate recompute — issue #114 follow-up
+
+Primary Extrude/Revolve, finishing, pattern/Boolean/Body Transform, path/Loft and surface previews
+reuse a copy of the committed Part ShapeCache when the session is Fresh, the Part identity matches,
+committed invalidation entries are Clean and the cached producer-ID set matches the executable
+records exactly. Matching counts alone do not authorize reuse.
+Legacy bodyless, missing/incomplete and stale caches use complete recomputation. The committed cache
+and document remain authoritative; previews never publish their working cache into the session.
+This work builds on issue #113's non-destructive legacy Cut builders so shared source topology is
+preserved during disposable previews.
+
+The candidate still validates reference sources. Explicit feature roots, newly introduced graph
+nodes and all Changed/Dirty/error entries feed the root-inclusive Core plan. It executes affected
+producer/consumer chains in graph order, including Body aliases and associative Boolean tools.
+Pending parameters/profiles/bodies remain candidate-only. Unchanged source backing identities can
+be retained while an edited upstream parameter recomputes its complete dependency branch.
+Failure, cancellation, history and persistence contracts remain unchanged. Existing Apply/history
+and general parameter/feature-edit paths still perform their original validation/recompute work;
+this optimization does not claim that all complex-Part costs have disappeared.
+
+`[preview-cache][complex-part-correctness]` uses one connected, visible rotor: a revolved hub and
+20 exact spline blades, with a hidden editable source blade. It compares cached candidates with
+complete recomputation, verifies retained clean producer identities and changed upstream inputs,
+rejects incomplete or differently identified Fresh caches, checks stale-cache fallback and proves preview/Apply
+volume equality and history. `[complex-part-workflow]` opens the fixture through the actual shell,
+picks a native result edge, corrects an oversized Fillet radius, cancels/applies, translates, edits
+hub height and exercises Undo/Redo, canonical reopening and STEP. Its volume oracles check the analytic source hub/blade volumes, the changed unrounded producer
+and unchanged material removal by the remote tip Fillet.
+
+The opt-in `[complex-part-profile]` probe covers 5/20/40 blades (90/360/720 offered edges), recording
+first-call and repeated p50/p95 values plus raw samples, CPU, architecture, kernel, Qt and build type.
+It separates selection catalog construction, Fillet preview, empty-cache recompute, JSON roundtrip,
+scene building, native publication, redraw with readback and a queued zero-timer's delay during a
+synchronous preview. These are component observations on a deterministic representative fixture;
+queued-timer delay is not a physical-input latency distribution, and redraw/readback includes the
+capture cost. The deep-sequence variant below supplies separate history, solver/drag and native
+picking traces.
+The probe is excluded from CTest and the default binary suite; commands live in
+`docs/development-setup.md`. Timing observations do not impose portable release budgets.
+
+
+### Recorded rotor comparison — 2026-10-28
+
+Native xcb, Debug, GCC 13.3.0, OCCT 7.6.3, Qt 6.4.2, Intel Core i7-1370P,
+Linux 7.0.0-38-generic. Each size has one first call and ten repeated samples; the table uses
+nearest-rank p50/p95 of those ten repeats, in **milliseconds**. The after-run keeps one 1100×700 DIP
+viewport at device-pixel ratio 1, matching the shell's document-replacement lifetime.
+
+| Blades | Offered edges | Preview before p50 / p95 | Preview after p50 / p95 | Selection before p50 / p95 | Selection after p50 / p95 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 5 | 90 | 246.7 / 299.2 | 35.0 / 39.4 | 27.6 / 32.0 | 3.4 / 4.9 |
+| 20 | 360 | 1531.2 / 1582.9 | 61.9 / 69.0 | 400.9 / 432.8 | 16.6 / 18.6 |
+| 40 | 720 | 5017.4 / 5211.7 | 101.9 / 117.2 | 1633.3 / 1679.3 | 41.5 / 47.2 |
+
+Raw samples and environment metadata are committed as
+[before](benchmarks/complex-rotor-preview-before.json) and
+[after](benchmarks/complex-rotor-preview-after.json). The after-data also includes full-candidate
+empty-cache execution and native publication/capture for both candidate implementations, with an
+output-volume comparison on every iteration. Provisional investigation targets for this Debug
+fixture are p95 below 200 ms for the repeated preview and below 60 ms per selection catalog; these
+are observations and local targets, not agreed release budgets or portable CI timing assertions.
+
+In the final persistent-view run, cached-preview Qt event processing plus QWidget capture has
+p95 14.0 / 13.3 / 16.2 ms for 5 / 20 / 40 blades. Capture can itself trigger painting and is reported separately from
+event processing. An initial run that created a new native viewport for each size recorded an
+approximately 1,014 ms event/capture anomaly for the 20-blade cached result. An isolated 20-blade
+probe and the persistent-view series instead measured 10–16 ms. No product renderer change is
+included, and this does not establish the cause of separate multi-window capture behavior. Local
+diagnostic data are retained in `/tmp/blcad-issue114-after-multiwindow.json`,
+`/tmp/blcad-issue114-render-split.json` and `/tmp/blcad-issue114-persistent-view.json`.
+
+The initial preview/selection change is a bounded optimization. Commit/history and existing
+parameter/feature-edit recomputation remain full-model paths. Surface metadata validation now uses
+the same affected-root execution as its shape preview, preserving early geometric diagnostics.
+No worker or cross-thread topology publication is introduced; existing thread ownership and
+modeling validation remain unchanged.
+
+### Deep dependency and interaction acceptance
+
+`rotor_performance_sequence_part` extends the same curved 5/20/40-blade fixtures with 4/12/24 serial
+alignment translations, giving 7/15/27 executable producers. Each positive 0.05 mm translation is
+paired with a negative one; the committed graph retains every operation and the actual rotor
+remains at its original coordinates. These are connected visible solids with a hidden editable
+source blade, rather than many independent boxes or suppressed geometry.
+
+The default `[complex-part-sequence]` correctness test changes upstream hub height and compares
+the complete affected chain against full recomputation. Every transform output must be replaced;
+the independent blade backing must be retained. It authors and edits a driving blade-tip dimension,
+queues 32 pointer positions, solves only the latest one, commits a curved-profile drag, exercises
+Undo/Redo, rejects an older drag after history changes, and reopens the canonical document with
+its accepted dimension catalog. The native shell workflow separately runs both 20 and 40 blades
+through picked Fillet preview, invalid-radius recovery, Cancel/Apply, Body Translate, hub parameter
+editing, complete Undo/Redo, Save/Open and STEP. No geometric tolerance changes support this proof.
+
+With `BLCAD_PROFILE_SEQUENCE=1`, the opt-in profile separates baseline solver, driving-dimension
+preview, latest-pointer drag, actual viewport mouse selection, full preview publication/event
+processing/capture and actual Apply/Undo/Redo. Existing recompute, JSON roundtrip, scene assembly,
+publication and capture distributions remain separate. Apply/history metrics include their own
+serialization and recomputation; they are inclusive totals and must not be added to the standalone
+component timings. Posted zero-timer delay measures event-loop availability during the synchronous
+operation, not physical input or compositor latency. Mouse selection times the actual Qt event
+handlers and OCCT picking but does not include OS input transport.
+
+Local Debug investigation targets for the identified interactive path are warm p95 below **200 ms**
+for geometry preview, **60 ms** for a selection catalog, **16 ms** for solver or a coalesced drag,
+**20 ms** for native picking and JSON roundtrip, and **250 ms** for preview through publication,
+event processing and capture. Queued event delivery should remain below **200 ms** in that path.
+These targets are explicit PR acceptance/review criteria for this hardware and fixture, not
+user-approved release SLAs or portable CI assertions. Normal regression tests enforce geometry,
+history, source identity and final-input correctness regardless of machine speed. Apply/Undo/Redo
+are measured separately to prioritize subsequent work; a passing preview target does not establish
+their responsiveness. Release targets and physical input traces on the user's own model remain
+product validation rather than claims of this deterministic probe.
+
+
+Verification of the initial preview/selection commit `e278188` (2026-10-28): all five targets build. Full Core passes
+**546 cases / 17,061 assertions**, Geometry **459 / 35,243**, and offscreen GUI
+**554 passed / 20 expected native-only skips / 76,545 assertions** (574 cases). Expanded affected
+native feature workflows plus required shell coverage pass **25 / 9,772**, with no skips. The rotor
+workflow at 150% plus supplementary Pattern/Body/Path/Loft controller checks pass **9 / 828**, with
+no skips. The isolated final 11-sample profile passes **1 / 870**, including all full/cached candidate
+volume oracles. A separate native startup reaches the intentional six-second timeout (124).
+
+Inspected the ordinary-scale recovered-preview capture and the 150% reopened-rotor capture. All **739**
+frozen source/test/asset/build-definition hashes matched that tested commit before publication. Builds, source edits, GUI suites
+and startup were serial; timing runs were isolated from other builds/tests. Final native/scaled/
+profile/startup logs contain no High-severity, BadDrawable or BadWindow errors; the X11 visual keeps
+its known OCCT Medium depth/stencil warning. Logs are
+`/tmp/blcad-issue114-{build,core-full,geometry-full,gui-full,native-regression,native-150,after,startup}.log`;
+captures are under `/tmp/blcad-issue114-native{,-150}/`. Reproduction commands are in
+`docs/development-setup.md`. Initial rotor test fixtures were corrected to use the existing list-row
+contract and unitless Parameter Manager values; the analytic volume relation uses `1e-8` relative
+tolerance for the existing ShapeSummary mass integration. Geometry/modeling tolerances were not
+widened. A review regression reproduces the count-only cache-eligibility gap (2 failed assertions
+with the earlier guard); the final guard compares producer identities as well as cardinality.
+
+
+### Recorded deep-sequence components
+
+The isolated native Debug series uses the same CPU/compiler/OCCT/Qt environment as above, one
+persistent 1100×700 DIP viewport at DPR 1, and five samples per size (first plus four repeats).
+Warm p50 / p95 in milliseconds are below; with four repeats, p95 is the maximum observation.
+Raw samples, source fingerprint, metadata and explicit local target assessments are committed in
+[the deep-sequence report](benchmarks/complex-rotor-deep-sequence.json).
+
+| Component | 5 blades / 7 producers | 20 blades / 15 producers | 40 blades / 27 producers |
+| --- | ---: | ---: | ---: |
+| Geometry preview | 35.6 / 38.5 | 64.3 / 66.1 | 116.4 / 131.7 |
+| Selection catalog | 3.1 / 3.2 | 16.2 / 20.0 | 44.1 / 47.9 |
+| Driving dimension preview | 12.7 / 12.9 | 14.4 / 16.4 | 12.2 / 15.3 |
+| 32-pointer coalesced drag | 12.6 / 14.6 | 12.4 / 17.8 | 12.9 / 15.4 |
+| Native mouse pick | 0.2 / 0.3 | 0.4 / 0.6 | 0.6 / 0.6 |
+| JSON roundtrip | 13.8 / 15.7 | 16.9 / 17.8 | 21.4 / 24.0 |
+| Preview + publication/events/capture | 55.8 / 61.0 | 106.6 / 119.2 | 181.9 / 199.3 |
+| Apply including history/recompute | 273.2 / 283.4 | 1595.2 / 1666.4 | 5449.5 / 5558.9 |
+| Undo including recompute | 222.4 / 237.7 | 1524.2 / 1575.2 | 5546.9 / 5831.4 |
+| Redo including recompute | 260.9 / 270.5 | 1575.1 / 1841.1 | 5450.5 / 5706.6 |
+
+The interactive geometry/selection, native-pick, complete preview and queued-event targets pass.
+Two local targets miss: the 20-blade 32-pointer drag has p95 **17.8 ms** against 16 ms, and the
+40-blade JSON roundtrip has p95 **24.0 ms** against 20 ms. These are recorded misses, not targets
+raised after measurement. The baseline curved-Sketch solver is below 0.14 ms; dimension authoring
+includes much more than that solve. No claim of a universal 60 Hz editing budget follows.
+
+Measurements prioritize the work as follows. Full upstream geometry and repeated kernel witness
+sampling dominated the original previews, so incremental candidate execution and single sampling
+address those confirmed hotspots. The extra Surface validation pass now follows that same path.
+Full commit/history reconstruction is the largest remaining measured cost (about 5–6 seconds for
+40 blades) and should be the next optimization area, with atomic state publication and bounded
+BRep retention reviewed explicitly. Native scene publication grows to p95 95.8 ms at 40 blades;
+scene construction is only 2.2 ms and picking is below 0.7 ms. Retaining presentations may reduce
+that publication cost, but no renderer change is justified as the first fix for a five-second
+geometry rebuild. Existing drag coalescing is verified to process only the final sample of 32;
+adding workers or a second coalescer is not part of this fix. These residual costs and soft target
+misses remain visible for PR/product review rather than being hidden by a passing preview metric.
+
+
+The expanded 40-blade workflow exposed an unsupported assumption in the original test oracle.
+Even with adaptive `1e-10` integration, the unrounded 40-blade pattern at hub height 5 measures
+107,822.446984188 mm³ while ideal fused-volume scaling from height 6 predicts 107,822.449022357 mm³.
+The same approximately 0.002 mm³ discrepancy therefore predates Fillet and is not explained by
+ordinary mass quadrature. The test does not require that exact aggregate-scaling assumption.
+Instead it checks the analytic cylinder and source-blade volumes, monotonic valid fused results,
+and unchanged remote Fillet removal against the current unrounded producer. The final comparison
+is tightened from `1e-8`/`1e-5` to `1e-10` relative / `1e-6` absolute. Adaptive integration and its
+reported error are isolated in the test-only Geometry support library; production mass integration,
+modeling tolerances and rendering remain unchanged. The dialog watchdog still grants five seconds
+to discover a modal dialog, then stops on the response so subsequent model evaluation is not
+misclassified as missing test input.
+
+
+Final Surface/deep-sequence verification (2026-10-29): all five targets build, including the
+new private Geometry test-support library. Focused offscreen cache/Surface/dimension/drag gates
+pass **3 cases / 620 assertions**. The isolated native five-sample sequence profile passes
+**1 / 1,349**; final native Surface/Stitch, viewport lifecycle, required shell coverage and both
+20/40-blade workflows pass **8 / 1,858**, without skips. Native recovered-preview and reopened
+40-blade captures were inspected. A separate native startup reaches intentional timeout **124**.
+No High-severity, BadDrawable or BadWindow messages appear in the final logs; the known OCCT Medium
+visual warning remains. Logs are `/tmp/blcad-issue114-{sequence,accept-offscreen,accept-native-final-pass,accept-startup}.log`;
+captures are `/tmp/blcad-issue114-accept-native/`.
+
+The measured production/controller sources are unchanged after profiling. The later source changes
+only refine native test dialog handling and the volume oracle, with a private test-support target.
+The profile records its exact 739-file fingerprint; final native verification and startup preserve
+all **741** final source/test/asset/build-definition hashes. This focused follow-up builds on the
+initial broad Core/Geometry/GUI and scaled native proof above; those entire suites and the 150%
+deep workflow were not repeated after native test-only refinements. Local budgets and the remaining
+full-model history/edit costs are exposed for PR/product review rather than claimed eliminated.

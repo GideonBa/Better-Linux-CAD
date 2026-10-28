@@ -17,6 +17,7 @@
 #include <TColStd_Array1OfReal.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Shape.hxx>
+#include <TopTools_ListOfShape.hxx>
 #include <TopoDS_Wire.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
@@ -306,7 +307,13 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_curves_through_all(
           make_geometry_error("could not build arc profile cut prism"));
     }
 
-    BRepAlgoAPI_Cut cut_builder(target_shape, prism_builder.Shape());
+    BRepAlgoAPI_Cut cut_builder;
+    TopTools_ListOfShape arguments, tools;
+    arguments.Append(target_shape);
+    tools.Append(prism_builder.Shape());
+    cut_builder.SetArguments(arguments);
+    cut_builder.SetTools(tools);
+    cut_builder.SetNonDestructive(true);
     cut_builder.Build();
     if (!cut_builder.IsDone() || cut_builder.HasErrors()) {
       return Result<GeometryShape>::failure(make_geometry_error("arc profile boolean cut failed"));

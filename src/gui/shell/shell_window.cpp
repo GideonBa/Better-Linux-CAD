@@ -1,5 +1,6 @@
 #include "blcad/gui/shell/shell_window.hpp"
 #include "blcad/gui/gui_presentation_visibility.hpp"
+#include "blcad/gui/gui_icons.hpp"
 
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
@@ -82,6 +83,7 @@ QTreeWidgetItem* append_browser_item(QTreeWidgetItem* parent, QTreeWidget* tree,
                                      const GuiBrowserNode& node) {
   auto* item = parent != nullptr ? new QTreeWidgetItem(parent) : new QTreeWidgetItem(tree);
   item->setText(0, QString::fromStdString(node.label));
+  item->setIcon(0, gui_icon_for_browser_node(node));
   item->setData(0, kSemanticIdRole, QString::fromStdString(node.semantic_id));
   item->setData(0, kViewportIdRole, QString::fromStdString(node.viewport_semantic_id));
   if (!node.visibility_semantic_id.empty()) {
@@ -277,6 +279,7 @@ ShellWindow::ShellWindow() {
   for (const auto& [label, filter] : filters)
     selection_filter_->addItem(QString::fromUtf8(label),
                                GuiModelingWorkspace::selection_filter_mask(filter));
+  apply_gui_choice_icons(*selection_filter_);
   statusBar()->addPermanentWidget(selection_filter_);
   connect(selection_filter_, &QComboBox::currentIndexChanged, this,
           [this] { change_selection_filter(); });
@@ -487,6 +490,7 @@ void ShellWindow::build_docks() {
   browser_tree_->setObjectName("blcad.shell.browser");
   browser_tree_->setHeaderLabel(QStringLiteral("No Document"));
   browser_tree_->setUniformRowHeights(true);
+  browser_tree_->setIconSize(QSize(24, 24));
   browser_tree_->setIndentation(16);
   browser_tree_->setMinimumWidth(220);
   browser_tree_->header()->setStretchLastSection(true);
@@ -543,6 +547,9 @@ void ShellWindow::build_docks() {
             if (!id.empty())
               toggle = menu.addAction(visible ? QStringLiteral("Hide") : QStringLiteral("Show"));
             auto* show_all = menu.addAction(QStringLiteral("Show all hidden presentations"));
+            if (toggle)
+              apply_gui_action_icon(*toggle);
+            apply_gui_action_icon(*show_all);
             show_all->setEnabled(!session_.hidden_presentations().empty());
             const auto* chosen = menu.exec(browser_tree_->viewport()->mapToGlobal(point));
             if (chosen == nullptr)

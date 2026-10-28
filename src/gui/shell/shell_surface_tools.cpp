@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 
 #include "blcad/gui/occt_viewport.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -254,7 +255,7 @@ void ShellFeatureTools::build_surface_controls(QWidget* panel) {
   surface_source_ = new QComboBox(surface_controls_);
   surface_source_->setObjectName("blcad.surface.source");
   form->addRow(QStringLiteral("Curve / Contour"), surface_source_);
-  surface_add_ = new QPushButton(QStringLiteral("Add to List"), surface_controls_);
+  surface_add_ = make_gui_button(QStringLiteral("Add to List"), surface_controls_);
   surface_add_->setObjectName("blcad.surface.add");
   form->addRow(surface_add_);
   surface_order_ = new QListWidget(surface_controls_);
@@ -267,7 +268,7 @@ void ShellFeatureTools::build_surface_controls(QWidget* panel) {
   auto* buttons = new QHBoxLayout(surface_order_buttons_);
   buttons->setContentsMargins(0, 0, 0, 0);
   for (int direction : {-1, 1, 0}) {
-    auto* button = new QPushButton(direction < 0   ? QStringLiteral("Up")
+    auto* button = make_gui_button(direction < 0   ? QStringLiteral("Up")
                                    : direction > 0 ? QStringLiteral("Down")
                                                    : QStringLiteral("Remove"),
                                    surface_order_buttons_);

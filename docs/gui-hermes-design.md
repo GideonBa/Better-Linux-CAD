@@ -1,10 +1,12 @@
-# Hermes-inspired desktop redesign
+# Desktop design, dark-violet palette and icons
 
 Reference: [Hermes Agent](https://hermes-agent.nousresearch.com/), inspected 2026-10-26.
-The reference contributes electric blue, paper-colored typography, condensed display lettering,
-technical metadata and carefully spaced, lightly divided sections. BLCAD adapts these principles to
-a dense desktop CAD workspace. The user's latest instruction explicitly releases the previous
-black/white and white-frame requirement. English labels, square geometry and solid fills remain.
+The reference contributed the desktop's typography, spacing and lightly divided sections. The
+2026-10-27 color-only follow-up replaces electric blue and paper panels with the user's dark-violet
+to black reference palette. Layout, widget geometry, typography, labels and interactions remain
+unchanged. The startup splash is restored verbatim from the parent of redesign commit `b6e4f68`.
+The 2026-10-28 follow-up adds a curated Pixelarticons subset to the existing shell, retaining labels
+and text-only fallbacks for CAD functions without a representative symbol.
 
 ## Implementation plan and acceptance
 
@@ -25,16 +27,20 @@ Block-138 STEP reader remains planned.
 
 | Role | Value / rule |
 | --- | --- |
-| Identity and primary actions | Electric blue `#0000f2`, paper/white foreground |
-| Desktop/panel paper | `#f5f4ef`, input surface `#ffffff` |
-| Main text | Deep indigo `#191638` |
-| Secondary text | Muted indigo with a minimum readable text contrast |
-| Quiet separators | Pale indigo; one-pixel rules only at meaningful group boundaries |
-| Interactive field edges and scroll thumbs | Indigo `#8b85a3`, at least 3:1 contrast against paper |
-| Hover / selection | Pale blue hover; blue selected rows with white text |
+| Identity/navigation, menus and headers | Dark violet `#1d0124`, light foreground |
+| Desktop/panels | `#15011a`, input/list surface `#0d0010` |
+| Main text | Off-white `#f5f1f7` |
+| Secondary text | Muted lavender `#b9a9c2`, at least 4.5:1 on the dark surfaces |
+| Quiet separators | `#3f2948`; existing one-pixel rules at group boundaries |
+| Interactive field edges and scroll thumbs | `#887292`, at least 3:1 against panels |
+| Hover / selection / primary actions | `#22012a` hover; `#26012f` selection/primary fill with light text and lavender edges |
+| Selected text in editors | Light lavender `#d7a8ed` background with dark `#0d0010` text |
+| Accent / checked indicators | Light lavender `#d7a8ed` for readable titles, focus, control edges and checked indicators |
 | Focus | Explicit contrasting outline, independent of hover and selection |
-| Disabled | Muted readable text and subdued flat surface; no italic command labels |
-| Modeling canvas | Solid dark navy `#101426`, retaining distinct CAD geometry/selection colors |
+| Disabled | Muted readable text; arrow cells `#19011f`; existing disabled-state rules |
+| Modeling canvas | Solid charcoal gray `#181a1b`, retaining distinct CAD geometry/selection colors |
+| Tooltips | Near-black `#040005` with light text |
+| Startup splash | Original Archimedes artwork, italic white serif title, white progress line/marker and centered `LOADING` on black |
 | Display typography | Bundled Barlow Condensed Medium for identity, navigation and section headings |
 | UI typography | Bundled Barlow Regular/Medium, readable at ordinary CAD control sizes |
 | Numeric typography | Bundled IBM Plex Mono for editable scalar values and technical readouts |
@@ -48,10 +54,32 @@ The upstream license bytes include original line endings and trailing spaces; `.
 preserves these three license files verbatim and scopes whitespace-check exemptions to them.
 Authored sources and documentation retain the repository's normal formatting checks.
 
+## Icon system
+
+[Pixelarticons](https://github.com/halfmage/pixelarticons) 2.4.2 is pinned to commit
+`c9ecc2da61afde85dbe539025e3d931c6152ad75`. The 65 selected public MIT-licensed SVGs, original license,
+lossless 24px XPM masks and checksums live in `assets/gui/pixelarticons/`. All resources are local;
+the QtGui-only renderer needs no SVG plugin or runtime download. Regeneration is documented there.
+
+The explicit catalog supplies representative symbols for file/history actions, common editing,
+selected Sketch shapes/constraints/dimensions, body transforms, parameters, references, exchange,
+navigation and typed model-tree entries. Generic symbols are shared where the meaning is the same.
+Specialized CAD operations such as Extrude, Revolve, Loft and fillets retain their text. Unknown
+actions, feature/joint types and Sketch record families receive no guessed substitute.
+
+Large ribbon commands retain icons above their labels. Mapped compact commands keep labels beside
+24px icons, with two-pixel vertical padding inside the existing ribbon height and horizontal scroll
+surface. Workspace tabs and their overflow arrows use the same icon family. Context shortcuts use
+icons with their original text as tooltip/accessibility label; unsupported shortcuts remain text.
+Task buttons, relevant choices, visibility menus and model-tree entries share the same catalog.
+Normal, active/checked and disabled states use the documented text/accent/muted colors. Pixel masks
+retain hard edges at native and fractional display scales. Action IDs, callbacks, labels, shortcuts,
+selection metadata, persistence and modeling authority remain with their existing owners.
+
 ## Interaction and verification boundaries
 
 - Selection, hover, keyboard focus, checked and disabled states remain distinguishable.
-- Inputs, combo/spin arrows, checkboxes, menu branches and scrollbars remain visible on paper and blue.
+- Inputs, combo/spin arrows, checkboxes, menu branches and scrollbars remain visible on dark surfaces.
 - STEP source checksum readouts must show the complete wrapped SHA-256 text without their own
   horizontal or vertical scrolling at 1280×800. Their height must include the polished font,
   document margins and the actual styled frame/padding.
@@ -59,7 +87,7 @@ Authored sources and documentation retain the repository's normal formatting che
   Workspace tabs have explicit previous/next buttons when space is limited. Their reserved control
   slot keeps both arrows inside the header during native resize; pixel, containment and actual
   mouse-hit tests verify that the last workspace remains reachable.
-- Dark-canvas dimensions and manipulators use coordinated readable overlays, independent of paper panels.
+- Dark-canvas dimensions and manipulators use coordinated readable dark badges and light text.
 - Diagnostics remain available without taking most of the initial modeling canvas.
 - The canvas permits a 360×260 logical-pixel minimum; the combined task workflow checks a compact
   1024×640 window as well as the ordinary and larger layout, bounded to the native available desktop.
@@ -68,7 +96,101 @@ Authored sources and documentation retain the repository's normal formatting che
   visibility, Undo/Redo, Save/Open and existing Part/Surface/Assembly commands at native sizes.
 - Source edits, builds, GUI runs and separate startup remain serial per `development-setup.md`.
 
-## Verification evidence
+## Pixelarticons follow-up verification (2026-10-28)
+
+All five GUI-preset targets were built after the final catalog review. Final verification:
+
+| Check | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full offscreen GUI | 574 | 75,457 | 554 passed; 20 expected native-only skips |
+| Native Qt/OCCT icons, appearance, splash, ribbon, viewport, context/task tools and combined modeling/file workflows | 82 | 23,487 | Passed; no skips |
+| Native icons/appearance/splash/combined workflow at 150% | 9 | 1,469 | Passed; no skips |
+| Separate native application startup | — | — | Ran until intentional six-second timeout, exit 124 |
+
+The new four-case icon proof covers bundled masks/license hashes, exact state colors and display
+scaling, action labels/callbacks/shortcuts, a dynamically labeled Repeat command, typed browser
+metadata and deliberate text fallbacks, including axes and arc records.
+
+All 65 vendored SVGs and the MIT license match the pinned upstream archive byte for byte; all SVG
+and mask SHA-256 values match the manifest. No build or runtime dependency was added.
+`startup_splash.cpp` still matches `b6e4f68^` exactly. Numbered feature status is unchanged.
+
+Native captures were inspected at ordinary and compact sizes and at 150% scaling for command
+labels, tab navigation, task actions, browser entries and pixel edges. The clear native canvas
+pixel `(400, 200)` remains exactly RGB `(24, 26, 27)`. The available X11 visual emits the known OCCT
+Medium depth/stencil warning; final native/scaled/startup logs contain no High-severity,
+BadDrawable or BadWindow errors.
+
+All 877 source/test/asset/build-definition files in
+`/tmp/blcad-pixelart-source-freeze-delivery.json` remained unchanged through the final full GUI,
+native, scaled and startup runs. Logs are
+`/tmp/blcad-pixelart-{build-delivery,gui-delivery,native-delivery,native-150-delivery,startup-delivery}.log`.
+Reproduction commands are in `development-setup.md`.
+
+Native feature preview with the curated icons at 1280×800:
+
+![Pixelarticons on the dark-violet desktop and charcoal canvas](images/pixelart-feature-preview.png)
+
+The same task at 1024×640:
+
+![Compact desktop with Pixelarticons and reachable task actions](images/pixelart-feature-compact.png)
+
+## Color-only follow-up verification (2026-10-27)
+
+All five GUI-preset targets were built. Final verification:
+
+| Check | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full offscreen GUI | 570 | 74,778 | 550 passed; 20 native-only skips |
+| Focused native Qt/OCCT appearance, splash, ribbon, dimensions, Measure and combined modeling/file workflows | 36 | 5,970 | Passed; no skips |
+| Native appearance/splash/combined workflow at 150% | 5 | 791 | Passed on unchanged repeat |
+| Separate native application startup | — | — | Ran until intentional six-second timeout, exit 124 |
+
+The stylesheet comparison confirms identical non-color declarations, including fonts, padding,
+spacing, sizes and border widths/styles. `startup_splash.cpp` matches `b6e4f68^` byte for byte.
+The appearance proof inspects actual rendered text-selection pixels and their contrast, as well as
+field edges, pressed/checked/disabled states, placeholders, arrows and compact tab navigation.
+
+The first sandboxed focused offscreen run passed the appearance/splash checks but could not read the
+published STEP output at the end of the combined workflow; the final full offscreen and native runs
+passed with normal filesystem access. The first 150% run missed a Rapid Dimension hover candidate
+before authoring; all appearance/splash cases passed, and an unchanged repeat passed all five cases. No
+interaction code or test input was modified to address either environment-sensitive result.
+
+Native captures for controls, Sketch, feature tasks, Measure, Assembly and the restored splash were
+inspected at ordinary and compact sizes, including 150% scaling. The available X11 visual emits the
+known OCCT Medium depth/stencil warning; final native/scaled/startup logs contain no High-severity,
+BadDrawable or BadWindow errors. Reproduction commands are in `development-setup.md`.
+
+All 737 source/test/asset/build-definition files in `/tmp/blcad-violet-source-freeze-final.json`
+remained unchanged through the final native, scaled, startup and full offscreen runs. Logs are
+`/tmp/blcad-violet-{build-final,gui-full,native,native-150-retry,startup}.log`; the initial sandboxed
+focused log and first scaled attempt are retained separately. Numbered feature status is unchanged.
+
+### Charcoal canvas follow-up (2026-10-27)
+
+The subsequent user swatch changes only the modeling-canvas constant to `#181a1b`; both the native
+OCCT view and offscreen fallback use it. All five GUI-preset targets were rebuilt. The existing
+`[appearance],[gui][viewport],[hermes-design-workflow],[native-viewer-lifecycle]` selection passed
+offscreen (10 cases, 879 assertions; one expected native-only skip) and natively (11 cases,
+886 assertions; no skips). Both rendered previews have exactly RGB `(24, 26, 27)` at the clear canvas
+pixel `(400, 200)`. Updated native captures below were inspected. Separate native startup reached
+the intentional timeout (124), with no High-severity, BadDrawable or BadWindow errors.
+
+The full-suite and scaled evidence above belongs to the initial palette commit `4b9a0b1`; this
+single-color follow-up used focused rendering/viewport checks. Logs are
+`/tmp/blcad-charcoal-{build,offscreen,native,startup}.log`. The 737 files in
+`/tmp/blcad-charcoal-source-freeze.json` remained unchanged during native and startup verification.
+
+Color-only native feature preview at 1280×800, before the icon follow-up:
+
+![Dark-violet task panels and charcoal-gray modeling canvas](images/dark-violet-feature-preview.png)
+
+The same unchanged layout at 1024×640:
+
+![Compact dark-violet desktop with reachable task actions](images/dark-violet-feature-compact.png)
+
+## Historical redesign verification evidence
 
 Final acceptance passed on 2026-10-26:
 
@@ -114,7 +236,7 @@ protected-branch PR merge into `main`. The delivery gate requires comparing the 
 with `origin/main` after integration and a clean working tree. Numbered feature sequencing remains
 Block 137 complete / Block 138 planned.
 
-The versioned captures below show the implemented design.
+The versioned captures below show the original 2026-10-26 design, before the color-only follow-up.
 
 Native Qt/OCCT feature preview at 1280×800:
 

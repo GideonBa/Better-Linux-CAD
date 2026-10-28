@@ -175,7 +175,7 @@ public:
     if (!added)
       return Result<geometry::GeometryShape>::failure(added.error());
     if (mode_ == GuiPathSweepMode::Sweep)
-      return detail::preview_feature_body(candidate, feature_, result_body_);
+      return detail::preview_feature_body(session, candidate, feature_, result_body_);
     auto cache = geometry::ShapeCache::create(ShapeCacheId(path_id_.value() + ".preview"));
     if (!cache)
       return Result<geometry::GeometryShape>::failure(cache.error());
@@ -426,7 +426,7 @@ public:
     auto added = add_feature(candidate, *session.part_shape_cache());
     if (!added)
       return Result<geometry::GeometryShape>::failure(added.error());
-    return detail::preview_feature_body(candidate, feature_, result_body_);
+    return detail::preview_feature_body(session, candidate, feature_, result_body_);
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {

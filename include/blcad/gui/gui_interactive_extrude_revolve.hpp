@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_pending_feature_inputs.hpp"
 #include "blcad/gui/gui_interactive_profile_materialization.hpp"
 #include "blcad/gui/gui_modeling_workspace.hpp"
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
@@ -352,18 +353,7 @@ public:
       return Result<geometry::GeometryShape>::failure(seeded.error());
     if (auto added = candidate.add_feature(std::move(feature.value())); added.has_error())
       return Result<geometry::GeometryShape>::failure(added.error());
-    auto cache = geometry::ShapeCache::create(
-        ShapeCacheId(feature_.value() + ".interactive_preview"));
-    if (cache.has_error())
-      return Result<geometry::GeometryShape>::failure(cache.error());
-    auto recomputed =
-        geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
-    if (recomputed.has_error())
-      return Result<geometry::GeometryShape>::failure(recomputed.error());
-    const auto* shape = cache.value().find_body_shape(result_body_);
-    if (shape == nullptr || shape->empty())
-      return shape_preview_fail("extrude preview produced no visible Body shape");
-    return Result<geometry::GeometryShape>::success(*shape);
+    return detail::preview_feature_body(session, candidate, feature_, result_body_);
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
@@ -798,18 +788,7 @@ public:
     if (auto added = candidate.add_revolve_feature(std::move(feature.value()));
         added.has_error())
       return Result<geometry::GeometryShape>::failure(added.error());
-    auto cache = geometry::ShapeCache::create(
-        ShapeCacheId(feature_.value() + ".interactive_preview"));
-    if (cache.has_error())
-      return Result<geometry::GeometryShape>::failure(cache.error());
-    auto recomputed =
-        geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
-    if (recomputed.has_error())
-      return Result<geometry::GeometryShape>::failure(recomputed.error());
-    const auto* shape = cache.value().find_body_shape(result_body_);
-    if (shape == nullptr || shape->empty())
-      return shape_preview_fail("revolve preview produced no visible Body shape");
-    return Result<geometry::GeometryShape>::success(*shape);
+    return detail::preview_feature_body(session, candidate, feature_, result_body_);
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {

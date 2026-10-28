@@ -50,10 +50,59 @@ Execution fails closed when:
 - an input shape is empty;
 - OCCT does not complete the operation or reports algorithm errors;
 - the operation produces no solid result or an invalid BRep; or
+- subtraction removes no measurable material from the target; or
 - a cache update fails validation.
 
 Missing inputs identify the relevant `BodyId`. OCCT/operation failures identify the Boolean
 `FeatureId`. No partially updated cache is exposed.
+
+## Cut outcome contract — 2026-10-28, issue #113
+
+Subtraction is a material-removing operation. A disjoint or tangent tool, or a tool entirely inside
+an existing void, is a rejected candidate with the diagnostic **"Cut removes no measurable
+material"** and guidance to check the target, tool position, direction and extent. A completed
+operation that removes every solid is diagnosed separately as **"Cut removes the entire target
+body"**. Non-solid inputs, failed kernel operations, invalid solids, invalid volume measurements
+and inconsistent volume increases remain geometry errors. These outcomes identify the feature and
+never publish a partially changed cache, consume tools or add an interactive history entry.
+
+`BodyBooleanAdapter::validate_subtraction_result` validates the complete feature result. Multi-tool
+subtraction and legacy circular-hole patterns may contain individually ineffective tools as long
+as their combined result removes material. Full-target removal cannot be repaired by a later
+subtractive tool and fails immediately. Add and Intersect retain their existing result rules.
+
+For nonempty valid solids, the check uses exact surface geometry and adaptive OCCT volume
+integration (requested relative accuracy `1e-10`). A decrease must exceed the sum of the two
+reported integration uncertainties plus `64 * machine_epsilon * max(before, after)` for rounding.
+There is no fixed millimeter threshold or prescribed percentage removal. An identical topology
+result is rejected directly. Changes below measurable numerical resolution are reported as such;
+they are not presented as successful machining. A small `1e-5 mm³` cut in a `1000 mm³` target is
+part of the regression proof.
+
+The same validator guards modern Extrude/Revolve/other Boolean-backed Cuts and the legacy
+Through-All circle, line/arc/spline and compound-profile executor paths. Legacy hole patterns are
+checked after all holes. Primitive cut builders enable OCCT non-destructive mode before Build so
+shared source/cache shapes survive previews and failed operations. A repeated legacy Cut resolves
+its pre-Cut producer while retaining the existing requirement for a present target cache; it does
+not subtract from its own previously published result.
+
+This policy also applies when upstream edits make an existing Cut ineffective. Historical saved
+intent containing such a Cut can therefore fail normal recomputation. **Open for Repair** retains
+Core-valid failed intent without publishing partial Geometry; correct the upstream inputs or
+target/operation before returning to a fresh model. The persistence schema is unchanged.
+
+Retained tool Bodies remain associative, as required by the existing Core graph. A later tool
+transformation therefore recomputes the earlier Boolean. Moving it entirely outside the target
+rejects the candidate if it makes that Cut ineffective; the numeric HUD restores its last valid
+value and history is unchanged. A partially overlapping move remains valid and updates the Cut.
+`[shell-combined-bodies]` checks both outcomes, including branching history and reopening;
+`[cut-material-removal]` checks transactional Geometry replay and JSON reconstruction.
+
+The shell presents the diagnostic in its task summary, clears stale previews and disables Apply.
+Apply rechecks through the same Geometry path, including forced command calls. Target/direction/
+extent correction can produce a valid preview in the same task; Cancel preserves the original
+document and model. Interactive proof and the additional curved-profile extent fix are described
+in `docs/gui-interactive-extrude-revolve-mvp9.md`.
 
 ## Proof
 

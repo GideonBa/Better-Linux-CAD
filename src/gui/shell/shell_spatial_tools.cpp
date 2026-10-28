@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 
 #include "blcad/gui/gui_modeling_workspace.hpp"
 #include "blcad/gui/occt_viewport.hpp"
@@ -146,7 +147,7 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   spatial_source_ = new QComboBox(spatial_controls_);
   spatial_source_->setObjectName("blcad.spatial.source");
   form->addRow(QStringLiteral("Profile / Element"), spatial_source_);
-  spatial_add_ = new QPushButton(QStringLiteral("Add to List"), spatial_controls_);
+  spatial_add_ = make_gui_button(QStringLiteral("Add to List"), spatial_controls_);
   spatial_add_->setObjectName("blcad.spatial.add");
   form->addRow(spatial_add_);
   spatial_order_ = new QListWidget(spatial_controls_);
@@ -162,7 +163,7 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   ordering->addLayout(buttons);
   buttons->setContentsMargins(0, 0, 0, 0);
   for (int direction : {-1, 1, 0}) {
-    auto* button = new QPushButton(direction < 0   ? QStringLiteral("Up")
+    auto* button = make_gui_button(direction < 0   ? QStringLiteral("Up")
                                    : direction > 0 ? QStringLiteral("Down")
                                                    : QStringLiteral("Remove"),
                                    spatial_order_buttons_);
@@ -204,7 +205,7 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   spatial_guide_ = new QComboBox(spatial_controls_);
   spatial_guide_->setObjectName("blcad.spatial.guide");
   form->addRow(QStringLiteral("Guide"), spatial_guide_);
-  spatial_add_guide_ = new QPushButton(QStringLiteral("Add Guide"), spatial_controls_);
+  spatial_add_guide_ = make_gui_button(QStringLiteral("Add Guide"), spatial_controls_);
   spatial_add_guide_->setObjectName("blcad.spatial.add_guide");
   form->addRow(spatial_add_guide_);
   spatial_guides_ = new QListWidget(spatial_controls_);
@@ -212,7 +213,7 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   spatial_guides_->setDragDropMode(QAbstractItemView::InternalMove);
   spatial_guides_->setMaximumHeight(75);
   form->addRow(spatial_guides_);
-  spatial_remove_guide_ = new QPushButton(QStringLiteral("Remove Guide"), spatial_controls_);
+  spatial_remove_guide_ = make_gui_button(QStringLiteral("Remove Guide"), spatial_controls_);
   form->addRow(spatial_remove_guide_);
   spatial_closed_ = new QCheckBox(QStringLiteral("Closed Path"), spatial_controls_);
   form->addRow(spatial_closed_);

@@ -271,15 +271,15 @@ protected:
         const auto layout = sketch_annotation_layout(annotation.label, annotation.dimension);
         painter.setFont(layout.font);
         const QRectF badge = layout.bounds.translated(annotation.point.x, annotation.point.y);
-        painter.setPen(QPen(QColor::fromRgb(appearance::blue), 1.0));
-        painter.setBrush(QColor::fromRgb(appearance::paper));
+        painter.setPen(QPen(QColor::fromRgb(appearance::accent), 1.0));
+        painter.setBrush(QColor::fromRgb(appearance::panel));
         if (selected || hovered) {
           painter.setPen(QPen(palette().color(QPalette::Highlight), selected ? 2.0 : 1.5));
           if (selected)
             painter.setBrush(palette().color(QPalette::Highlight));
         }
         painter.drawRect(badge);
-        painter.setPen(QColor::fromRgb(appearance::ink));
+        painter.setPen(QColor::fromRgb(appearance::text));
         if (selected)
           painter.setPen(palette().color(QPalette::HighlightedText));
         painter.setBrush(Qt::NoBrush);
