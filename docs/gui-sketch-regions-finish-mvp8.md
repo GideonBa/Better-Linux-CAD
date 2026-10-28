@@ -90,6 +90,67 @@ with the feature in one transaction; cancel leaves raw geometry and history unch
 
 ## Focused proof
 
+### Coincident repair regression — issue #105
+
+The planar solver projects explicit point-to-point Coincident groups to exact shared coordinates.
+It retains the canonical point identities and checks all remaining constraints in the projected
+solve; incompatible fixed/reference anchors reject. The absolute `1e-9` region/profile connectivity
+tolerance is unchanged. Unrelated nearby endpoints, open components, branches and crossings receive
+no inferred repair. The numeric contract is in `sketch-planar-constraint-solver-mvp8.md`.
+
+`[coincident-closure]` includes:
+
+- Core equality/transitive-group checks at scales `0.001`, `1`, `1000` and `1000000`, including
+  anchored/reference points, simultaneous dimensions, unchanged unrelated points and conflicts.
+- Thirty GUI-controller/session cases: line-only and mixed line/arc/cubic-spline loops at scales
+  `0.01`, `1` and `1000`, each with starting gaps `1`, `0.001`, `1e-6`, `5e-8` and `0` before scaling.
+  The accepted transaction must yield one diagnostic-free strict Finish region, exact endpoint
+  equality, one undo boundary, exact Undo/Redo and canonical Save/Open with the relation catalog.
+- Rejection of genuinely open, branched and self-crossing contours after an unrelated constraint.
+- A real shell input workflow (`[coincident-closure-native]`): draw a numeric Line chain, drag its
+  deliberately independent closing junction open, select both visible endpoints and click
+  Coincident, then place two driving dimensions with Rapid Dimension, Finish and Extrude. Volume is
+  checked independently using the repaired polygon's signed area times depth. A later driving edit
+  must retain closure and recompute the downstream solid; history, Save/Open and STEP export follow.
+
+The shell gesture explicitly exceeds Qt's drag threshold on both native and offscreen projections.
+Numeric coordinate entry at the closing junction accepts no endpoint snap; this regression does not
+depend on the separate automatic endpoint-snap persistence gap tracked by #104.
+
+```bash
+./build/dev-gui/blcad_core_tests "[coincident-closure]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[coincident-closure]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue105-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[coincident-closure],[sketch-drag],[sketch-constraints],[sketch-dimension-workflow],[sketch-finish],[hermes-design-workflow]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[coincident-closure-native]"
+```
+
+Final verification on 2026-10-28:
+
+| Check | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Full Core | 548 | 17,193 | Passed |
+| Full Geometry | 453 | 33,119 | Passed |
+| Full offscreen GUI | 573 | 75,393 | 553 passed; 20 expected native-only skips |
+| Native closure/drag/constraints/dimensions/Finish/combined workflow | 40 | 1,751 | Passed; no skips |
+| Native repair workflow at 150% | 1 | 270 | Passed |
+| Separate native application startup | — | — | Intentional six-second timeout, exit 124 |
+
+All five GUI-preset targets were built. Replaying the original solver against the new tests fails
+the exact-equality checks and again leaves the accepted 100×50 mm repair without a recognized region.
+During fixture development, an initial offscreen drag landed exactly at Qt's drag threshold and did
+not start a drag; the final test asserts that its actual screen displacement exceeds that threshold.
+No production pointer handling was changed. Final native captures of the repaired junction and solid
+were inspected at ordinary and 150% scale. The known OCCT Medium depth/stencil warning remains;
+final native/scaled/startup logs contain no High-severity, BadDrawable or BadWindow errors.
+
+The 739 source/test/asset/build-definition hashes in `/tmp/blcad-issue105-source-freeze.json`
+remained unchanged through full GUI, final native, scaled and startup verification. Logs are
+`/tmp/blcad-issue105-{build-delivery,core-delivery,geometry-full,gui-full,native-delivery,native-150,startup}.log`;
+baseline and fixture-development logs are retained separately. Numbered implementation status is
+unchanged.
+
+### Existing region and shell coverage
+
 ```bash
 ./build/dev-geometry/blcad_geometry_tests "[geometry][sketch-regions]"
 ./build/dev-geometry/blcad_geometry_tests "[gui][sketch-profile-selection]"
