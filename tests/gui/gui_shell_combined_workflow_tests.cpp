@@ -2,6 +2,7 @@
 #include "../support/loft_section_refinement_fixture.hpp"
 #include "../support/mixed_path_loft_fixture.hpp"
 #include "../support/rotor_performance_fixture.hpp"
+#include "../support/geometry_volume_oracle.hpp"
 #include "blcad/core/assembly_leaf_occurrence.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
@@ -436,15 +437,16 @@ public:
     bool handled = false;
     bool timed_out = false;
     QTimer poll;
+    QTimer watchdog;
     poll.setInterval(5);
     QObject::connect(&poll, &QTimer::timeout, &window, [&] {
       if (auto* dialog = qobject_cast<Dialog*>(QApplication::activeModalWidget())) {
         poll.stop();
+        watchdog.stop();
         handled = true;
         respond(*dialog);
       }
     });
-    QTimer watchdog;
     watchdog.setSingleShot(true);
     QObject::connect(&watchdog, &QTimer::timeout, &window, [&] {
       timed_out = true;
@@ -4752,11 +4754,13 @@ TEST_CASE("Combined UI repeated subassemblies share solved motion through qualif
 
 TEST_CASE("Combined UI complex rotor keeps preview recovery history and persistence consistent",
           "[gui][integration][shell-combined-workflow][complex-part-workflow]") {
+  const int blades = GENERATE(20, 40);
+  CAPTURE(blades);
   WorkflowUi ui;
   ui.fit_first_screen();
   QTemporaryDir directory;
   REQUIRE(directory.isValid());
-  const auto fixture = test::rotor_performance_part(20);
+  const auto fixture = test::rotor_performance_sequence_part(blades);
   const auto source = directory.filePath("rotor.blcad");
   {
     QFile file(source);
@@ -4766,7 +4770,21 @@ TEST_CASE("Combined UI complex rotor keeps preview recovery history and persiste
   }
   ui.file("open", source);
   const BodyId body("body.rotor");
-  const double original_volume = ui.summary(body).volume_mm3;
+  const auto integrate = [&](const geometry::GeometryShape& shape) {
+    const auto measured = test::integrated_solid_volume(shape);
+    REQUIRE(std::isfinite(measured.volume_mm3));
+    REQUIRE(measured.relative_error >= 0);
+    REQUIRE(measured.relative_error <= 1e-10);
+    return measured.volume_mm3;
+  };
+  const auto volume = [&] {
+    return integrate(*ui.window.session().part_shape_cache()->find_body_shape(body));
+  };
+  const double original_volume = volume();
+  CHECK(integrate(*ui.window.session().part_shape_cache()->find_feature_shape(
+            FeatureId("feature.blade"))) == Approx(200 * 10).epsilon(1e-10).margin(1e-6));
+  CHECK(integrate(*ui.window.session().part_shape_cache()->find_feature_shape(
+            FeatureId("feature.hub"))) == Approx(std::numbers::pi * 45 * 45 * 6).epsilon(1e-10));
   REQUIRE(ui.summary(body).solid_count == 1);
   std::vector<std::string> states{ui.snapshot()};
   const auto targets = checked(geometry::FinishingSelectionBuilder::build(
@@ -4804,7 +4822,7 @@ TEST_CASE("Combined UI complex rotor keeps preview recovery history and persiste
   CHECK(ui.snapshot() == states.back());
   begin();
   ui.button("blcad.feature.apply");
-  const double rounded = ui.summary(body).volume_mm3;
+  const double rounded = volume();
   REQUIRE(rounded < original_volume);
   states.push_back(ui.snapshot());
   ui.command("body_translate");
@@ -4813,7 +4831,7 @@ TEST_CASE("Combined UI complex rotor keeps preview recovery history and persiste
   REQUIRE(ui.window.viewport().feature_preview_active());
   CHECK(ui.snapshot() == states.back());
   ui.button("blcad.feature.apply");
-  CHECK(ui.summary(body).volume_mm3 == Approx(rounded).epsilon(1e-10));
+  CHECK(volume() == Approx(rounded).epsilon(1e-10));
   states.push_back(ui.snapshot());
   ui.command("parameters");
   ui.data(ui.widget<QComboBox>("blcad.parameters.parameter"), "hub.height");
@@ -4823,16 +4841,22 @@ TEST_CASE("Combined UI complex rotor keeps preview recovery history and persiste
   REQUIRE(ui.widget<QPushButton>("blcad.parameters.apply").isEnabled());
   CHECK(ui.snapshot() == states.back());
   ui.button("blcad.parameters.apply");
-  // Each spline blade has exact area 4*(90-40)=200 mm² and height 10.
-  // The hub/blade overlap is linear in hub height. The tip fillet lies
-  // entirely outside the hub, and Translate preserves volume.
-  const double expected = rounded - (original_volume - 20 * 200 * 10) / 6;
-  // ShapeSummary uses ordinary OCCT mass integration for the spline surfaces.
-  CHECK(ui.summary(body).volume_mm3 == Approx(expected).epsilon(1e-8).margin(1e-5));
+  CHECK(integrate(*ui.window.session().part_shape_cache()->find_feature_shape(
+            FeatureId("feature.hub"))) == Approx(std::numbers::pi * 45 * 45 * 5).epsilon(1e-10));
+  const double unrounded = integrate(
+      *ui.window.session().part_shape_cache()->find_feature_shape(FeatureId("feature.blades")));
+  CHECK(unrounded < original_volume);
+  CHECK(unrounded > blades * 200 * 10);
+  CHECK(original_volume - unrounded < std::numbers::pi * 45 * 45);
+  // The remote tip Fillet removes the same material after the hub edit.
+  // Use the actual unrounded producer: exact fused-volume scaling is not
+  // warranted for OCCT's trimmed curved faces (see the recorded probe).
+  const double expected = unrounded - (original_volume - rounded);
+  CHECK(volume() == Approx(expected).epsilon(1e-10).margin(1e-6));
   states.push_back(ui.snapshot());
   ui.history(states);
   ui.roundtrip(directory.filePath("edited-rotor.blcad"));
-  CHECK(ui.summary(body).volume_mm3 == Approx(expected).epsilon(1e-8).margin(1e-5));
+  CHECK(volume() == Approx(expected).epsilon(1e-10).margin(1e-6));
   ui.file("export_part_step", directory.filePath("rotor.step"));
   CHECK(ui.bytes(directory.filePath("rotor.step")).contains("ISO-10303-21"));
   ui.capture("rotor-edited-reopened");

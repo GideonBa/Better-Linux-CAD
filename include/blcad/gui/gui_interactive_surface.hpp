@@ -214,11 +214,9 @@ public:
     auto candidate = candidate_document(session);
     if (!candidate)
       return Result<GuiPartFeaturePreview>::failure(candidate.error());
-    auto cache = geometry::ShapeCache::create(ShapeCacheId(feature_.value() + ".surface_preview"));
-    if (cache.has_error()) return Result<GuiPartFeaturePreview>::failure(cache.error());
-    auto executed =
-        geometry::GeometryRecomputeExecutor{}.execute_document(candidate.value(), cache.value());
-    if (executed.has_error()) return Result<GuiPartFeaturePreview>::failure(executed.error());
+    auto cache = detail::recompute_preview_geometry(session, candidate.value(), {feature_.value()});
+    if (cache.has_error())
+      return Result<GuiPartFeaturePreview>::failure(cache.error());
     return Result<GuiPartFeaturePreview>::success(
         {feature_, summary(), cache.value().body_shape_count()});
   }
