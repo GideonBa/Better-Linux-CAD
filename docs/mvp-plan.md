@@ -1337,7 +1337,7 @@ missing shell/persistence integration; these tickets do not claim that every rep
 | Area | Issue | Evidence / current status | Suggested priority |
 | --- | --- | --- | --- |
 | Sketch endpoint snaps | [#104](https://github.com/GideonBa/Better-Linux-CAD/issues/104) | Confirmed persistence gap for loop closure / restarted Line | P2 |
-| Coincident → closed region | [#105](https://github.com/GideonBa/Better-Linux-CAD/issues/105) | Runtime reproduction; solver/region tolerance mismatch | P1 |
+| Coincident → closed region | [#105](https://github.com/GideonBa/Better-Linux-CAD/issues/105) | Exact Coincident equality groups implemented; cross-layer/native regression in `gui-sketch-regions-finish-mvp8.md` | P1 |
 | Dimension line layout | [#106](https://github.com/GideonBa/Better-Linux-CAD/issues/106) | Confirmed family-specific rendering gaps; DIN/ISO target recorded | P2 |
 | Dimension double-click editing | [#107](https://github.com/GideonBa/Better-Linux-CAD/issues/107) | Confirmed paint/pick mismatch; exact reported gesture pending | P1 |
 | Dimension deletion | [#108](https://github.com/GideonBa/Better-Linux-CAD/issues/108) | Existing backend; visible-selection/keyboard route needs reproduction | P1 |
@@ -1345,8 +1345,8 @@ missing shell/persistence integration; these tickets do not claim that every rep
 | Sketch-line rotation axes | [#110](https://github.com/GideonBa/Better-Linux-CAD/issues/110) | Missing persistent sketch/entity axis source | P2 |
 | Body Rotate axis parity | [#111](https://github.com/GideonBa/Better-Linux-CAD/issues/111) | Shell omits existing derived-datum/semantic-edge support | P2 |
 | Sketch on planar result face | [#112](https://github.com/GideonBa/Better-Linux-CAD/issues/112) | Direct workflow and general associative support identity missing | P2 |
-| Cut feedback and workflow | [#113](https://github.com/GideonBa/Better-Linux-CAD/issues/113) | Disjoint-tool no-op confirmed; exact reported failure pending | P1 |
-| Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | Synchronous full-model work confirmed and measured; UI profiling pending | P1 |
+| Cut feedback and workflow | [#113](https://github.com/GideonBa/Better-Linux-CAD/issues/113) | Implemented: distinct Cut outcomes, correctable diagnostics and exact curved extents; native regression verified | P1 |
+| Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | Implemented for review: cached previews/Surface validation, single-sampled witnesses and deep-rotor native profiling; residual costs and local target misses documented | P1 |
 
 The independent Coincident probe commits the real GUI constraint intent, then checks Geometry:
 a 100×50 mm outline with a 0.001 mm initial gap retains a 3.85787585e-8 mm gap after an accepted
@@ -1377,6 +1377,11 @@ The suggested P1 queue first restores profile closure and dimension edit/delete 
 clarifies ineffective Cuts and profiles complex-Part interaction. Numbered status remains through
 Block 137; Block 138 and subsequent STEP topology/import work remain planned.
 
+The 2026-10-28 issue follow-up implements exact Coincident equality groups for #105. Its cross-layer,
+mixed-curve, native dimension/drag/Extrude and history/persistence proofs are recorded in
+`gui-sketch-regions-finish-mvp8.md`; the numeric contract is in
+`sketch-planar-constraint-solver-mvp8.md`. This maintenance fix advances no numbered block.
+
 ## Current next technical step — Block 138 (planned)
 
 Implement the OCCT STEP/XDE reader and deterministic product/body definitions over the verified
@@ -1391,3 +1396,54 @@ EditableBody features and structured Assembly import remain Blocks 139–143.
 Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R
 is complete through Block 136. STEP Import MVP-10 has completed source management in Block 137;
 Blocks 138–143 remain planned in `docs/step-import-sequence-mvp10.md`.
+
+
+Issue #113 follow-up (2026-10-28) rejects ineffective/full-target Cuts with distinct correction
+messages, guards aggregate and legacy paths without mutating cached sources, and supports exact
+circle/arc/spline contours through resolved extrusion extents. Native workflows prove wrong-target
+and outward-direction recovery after Fillet, independent material/volume outcomes, transactional
+failure, associative tool edits, history, reopening and STEP. Full Core **545 / 17,037**, Geometry
+**459 / 35,243**, offscreen GUI **552 passed / 20 native-only skips / 76,150 assertions**; expanded
+native **20 / 7,596**, native 150% **3 / 1,918**, all five targets built and separate startup reached
+intentional timeout 124. Exact contracts/evidence live in `docs/part-body-boolean-geometry-mvp6.md`
+and `docs/gui-interactive-extrude-revolve-mvp9.md`. Numbered implementation status is unchanged.
+
+
+Issue #114 preview/selection follow-up (2026-10-28) uses the user's clarified workload: one
+revolved rotor with repeated curved blades. Fresh, complete candidate caches retain clean producers
+and execute explicit changed/new roots plus all dependent Body consumers. Result-edge choices sample
+each edge once while retaining the existing full witness/ambiguity checks. Native Debug warm
+20-blade preview p50/p95 changes **1,531.2 / 1,582.9 ms → 61.9 / 69.0 ms**; 40 blades changes
+**5,017.4 / 5,211.7 ms → 101.9 / 117.2 ms**. Raw before/after samples, environment, diagnostic
+limits and exact contracts live in `docs/gui-modeling-workspace-mvp9.md` and `docs/benchmarks/`.
+
+Validation: Core **546 / 17,061**, Geometry **459 / 35,243**, offscreen GUI **554 passed /
+20 native-only skips / 76,545 assertions**, expanded native **25 / 9,772**, 150% rotor and
+supplementary controller checks **9 / 828**, final native profile **1 / 870**. All five targets build;
+separate startup reaches intentional timeout 124. At this initial stage, full history/edit costs and
+broader input/solver/drag/picking profiling remained outside the proof. No numbered implementation
+block was advanced by this bounded follow-up.
+
+
+Issue #114 interaction acceptance (2026-10-29) adds 5/20/40-blade connected rotors with 4/12/24
+serial transforms (7/15/27 producers), real driving-dimension edits and curved Sketch drag sequences.
+The isolated native profile now separates solver, dimension authoring, coalesced drag, actual mouse
+picking, complete preview publication/events/capture, and Apply/Undo/Redo including history costs.
+Surface metadata validation reuses the same affected-root cache path as shape preview.
+
+Deep 20/40-blade preview p95 is **66.1 / 131.7 ms**; publication/events/capture included is
+**119.2 / 199.3 ms**. Full Apply/Undo/Redo still costs about **5–6 s** at 40 blades. Local targets
+and two recorded misses (20-blade drag **17.8 ms** versus 16 ms; 40-blade JSON **24.0 ms** versus
+20 ms) are explicit review evidence, not user-approved release guarantees. Measurements prioritize
+commit/history next; renderer changes and workers are not introduced by this fix.
+
+Focused offscreen proof passes **3 cases / 620 assertions**, the isolated five-sample native profile
+**1 / 1,349**, and final native proof including both large rotor workflows, Surface/Stitch,
+viewport lifecycle and required shell coverage **8 / 1,858**, without skips. All five targets build;
+a separate startup exits at intentional timeout **124**. Source hub/blade volume checks and remote
+Fillet-removal invariance replace an unsupported exact aggregate-scaling oracle, with the final
+volume tolerance tightened and production tolerances unchanged. The final **741** source/test/
+asset/build-definition fingerprints remain unchanged after native verification. Scope, raw data,
+budget review and residual performance limits are documented in the existing workspace/development
+docs. The implementation is ready for PR review; the issue remains open until review/merge.
+No numbered implementation block is advanced.

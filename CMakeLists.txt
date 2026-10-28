@@ -616,6 +616,9 @@ if(BLCAD_BUILD_TESTS)
   endif()
 
   if(BLCAD_BUILD_GUI)
+    add_library(blcad_geometry_test_support STATIC tests/support/geometry_volume_oracle.cpp)
+    target_link_libraries(blcad_geometry_test_support PRIVATE BLCAD::geometry)
+    target_include_directories(blcad_geometry_test_support SYSTEM PRIVATE ${OpenCASCADE_INCLUDE_DIR})
     add_executable(
       blcad_gui_tests
       tests/gui/gui_test_main.cpp
@@ -673,6 +676,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_sketch_tools_tests.cpp
       tests/gui/gui_shell_sketch_operations_tests.cpp
       tests/gui/gui_shell_sketch_interaction_tests.cpp
+      tests/gui/gui_coincident_closure_tests.cpp
       tests/gui/gui_sketch_interaction_tests.cpp
       tests/gui/gui_sketch_primitive_constraints_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
@@ -680,6 +684,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_spatial_surface_workbench_tests.cpp
       tests/gui/gui_interactive_modeling_mvp9_acceptance_tests.cpp
       tests/gui/gui_interactive_finishing_tests.cpp
+      tests/gui/gui_complex_part_performance_tests.cpp
       tests/gui/gui_interactive_pattern_body_tests.cpp
       tests/gui/gui_interactive_path_sweep_loft_tests.cpp
       tests/gui/gui_interactive_surface_tests.cpp
@@ -687,8 +692,10 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_interactive_assembly_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )
-    target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2)
+    target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2 blcad_geometry_test_support)
     target_compile_definitions(blcad_gui_tests PRIVATE BLCAD_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    set_source_files_properties(tests/gui/gui_complex_part_performance_tests.cpp PROPERTIES
+      COMPILE_DEFINITIONS "BLCAD_PROFILE_BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\"")
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
       target_compile_options(blcad_gui_tests PRIVATE -Wall -Wextra -Wpedantic)
@@ -697,6 +704,7 @@ if(BLCAD_BUILD_TESTS)
     catch_discover_tests(
       blcad_gui_tests
       TEST_PREFIX "gui."
+      TEST_SPEC "~[complex-part-profile]"
       PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" SKIP_RETURN_CODE 4
     )
   endif()

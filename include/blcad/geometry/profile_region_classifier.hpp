@@ -338,10 +338,15 @@ resolve_curved_profile_hole(const PartDocument& document, const Sketch& sketch, 
 // the outer loop. Touching or crossing candidates are intentionally excluded.
 [[nodiscard]] inline Result<std::vector<ContainedProfileHole>>
 classify_contained_profile_holes(const PartDocument& document, const Sketch& sketch,
-                                 const ProfileId& outer_profile,
-                                 const std::vector<Point2>& outer_vertices) {
+                                 const ContainedProfileHole& outer) {
   using namespace profile_region_classifier_detail;
-  if (!polygon_is_simple(outer_vertices)) {
+  const auto& outer_profile = outer.profile;
+  if (outer.kind == ContainedProfileHoleKind::Circle &&
+      (!std::isfinite(outer.radius_mm) || outer.radius_mm <= kTolerance ||
+       !std::isfinite(outer.center.x) || !std::isfinite(outer.center.y)))
+    return Result<std::vector<ContainedProfileHole>>::failure(Error::validation(
+        outer_profile.value(), "outer circle must have a finite positive radius"));
+  if (outer.kind != ContainedProfileHoleKind::Circle && !polygon_is_simple(outer.vertices)) {
     return Result<std::vector<ContainedProfileHole>>::failure(
         Error::validation(outer_profile.value(), "outer profile must be a simple polygon"));
   }
@@ -370,7 +375,8 @@ classify_contained_profile_holes(const PartDocument& document, const Sketch& ske
                                  {center.x + half_width, center.y - half_height},
                                  {center.x + half_width, center.y + half_height},
                                  {center.x - half_width, center.y + half_height}};
-    if (polygon_strictly_inside_polygon(vertices, outer_vertices))
+    if (strictly_contains(outer,
+                          {rectangle.id(), ContainedProfileHoleKind::Polygon, vertices, {}, 0.0}))
       candidates.push_back(
           {rectangle.id(), ContainedProfileHoleKind::Polygon, std::move(vertices), {}, 0.0});
   }
@@ -380,7 +386,8 @@ classify_contained_profile_holes(const PartDocument& document, const Sketch& ske
       continue;
     auto vertices = resolve_closed_profile_vertices(document, sketch, closed);
     if (vertices.has_error() || !polygon_is_simple(vertices.value()) ||
-        !polygon_strictly_inside_polygon(vertices.value(), outer_vertices))
+        !strictly_contains(
+            outer, {closed.id(), ContainedProfileHoleKind::Polygon, vertices.value(), {}, 0.0}))
       continue;
     candidates.push_back(
         {closed.id(), ContainedProfileHoleKind::Polygon, std::move(vertices.value()), {}, 0.0});
@@ -394,7 +401,8 @@ classify_contained_profile_holes(const PartDocument& document, const Sketch& ske
       continue;
     const double radius = diameter->value().millimeters() / 2.0;
     if (!std::isfinite(radius) || radius <= kTolerance ||
-        !circle_strictly_inside_polygon(circle.center(), radius, outer_vertices))
+        !strictly_contains(
+            outer, {circle.id(), ContainedProfileHoleKind::Circle, {}, circle.center(), radius}))
       continue;
     candidates.push_back(
         {circle.id(), ContainedProfileHoleKind::Circle, {}, circle.center(), radius});
@@ -404,7 +412,7 @@ classify_contained_profile_holes(const PartDocument& document, const Sketch& ske
     if (id == outer_profile)
       return;
     auto hole = resolve_curved_profile_hole(document, sketch, id, ids);
-    if (hole && polygon_strictly_inside_polygon(hole.value().vertices, outer_vertices))
+    if (hole && strictly_contains(outer, hole.value()))
       candidates.push_back(std::move(hole.value()));
   };
   for (const auto& profile : sketch.arc_closed_profiles())
@@ -418,7 +426,8 @@ classify_contained_profile_holes(const PartDocument& document, const Sketch& ske
         continue;
       if (!region.curve_segments.empty())
         append_curved(region.id, region.curve_segments);
-      else if (polygon_strictly_inside_polygon(region.vertices, outer_vertices))
+      else if (strictly_contains(
+                   outer, {region.id, ContainedProfileHoleKind::Polygon, region.vertices, {}, 0.0}))
         candidates.push_back(
             {region.id, ContainedProfileHoleKind::Polygon, region.vertices, {}, 0.0, {}});
     }
@@ -456,6 +465,15 @@ classify_contained_profile_holes(const PartDocument& document, const Sketch& ske
     if (immediate[candidate])
       result.push_back(std::move(candidates[candidate]));
   return Result<std::vector<ContainedProfileHole>>::success(std::move(result));
+}
+
+[[nodiscard]] inline Result<std::vector<ContainedProfileHole>>
+classify_contained_profile_holes(const PartDocument& document, const Sketch& sketch,
+                                 const ProfileId& outer_profile,
+                                 const std::vector<Point2>& outer_vertices) {
+  return classify_contained_profile_holes(
+      document, sketch,
+      {outer_profile, ContainedProfileHoleKind::Polygon, outer_vertices, {}, 0.0});
 }
 
 [[nodiscard]] inline Result<std::vector<ContainedCircleHole>>

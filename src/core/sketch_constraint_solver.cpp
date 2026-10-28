@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <numeric>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -154,6 +155,98 @@ struct SolveContext {
   if (found == context.point_variable_base.end()) return point->position();
   const std::size_t base = found->second;
   return Point2{variables[base], variables[base + 1U]};
+}
+
+// Coincident is a topological equality, not a scale-relative proximity test.
+// Project only explicitly related points onto their equality subspace, while
+// preserving their separate persistent identities and the full diagnostic Jacobian.
+struct CoincidentProjection {
+  struct Group {
+    std::vector<SketchPointId> points;
+    std::optional<Point2> anchor;
+  };
+  std::vector<Group> groups;
+  bool compatible{true};
+
+  void apply(const SolveContext& context, NumericVector& variables) const {
+    for (const auto& group : groups) {
+      Point2 position{};
+      if (group.anchor) {
+        position = *group.anchor;
+      } else {
+        long double x = 0.0L, y = 0.0L;
+        for (const auto& id : group.points) {
+          const auto point = point_position(context, variables, id);
+          x += static_cast<long double>(point.x) / group.points.size();
+          y += static_cast<long double>(point.y) / group.points.size();
+        }
+        position = {static_cast<double>(x), static_cast<double>(y)};
+      }
+      for (const auto& id : group.points) {
+        if (const auto found = context.point_variable_base.find(id.value());
+            found != context.point_variable_base.end()) {
+          variables[found->second] = position.x;
+          variables[found->second + 1U] = position.y;
+        }
+      }
+    }
+  }
+};
+
+[[nodiscard]] CoincidentProjection
+coincident_projection(const SolveContext& context,
+                      const std::vector<SketchSolverConstraint>& constraints) {
+  if (std::none_of(constraints.begin(), constraints.end(), [](const auto& constraint) {
+        return constraint.kind() == SketchSolverConstraintKind::Coincident;
+      }))
+    return {};
+  const auto& points = context.topology.points();
+  std::vector<std::size_t> parent(points.size());
+  std::iota(parent.begin(), parent.end(), 0U);
+  std::unordered_map<std::string, std::size_t> indices;
+  std::vector<bool> anchored(points.size(), false);
+  for (std::size_t index = 0; index < points.size(); ++index) {
+    indices.emplace(points[index].id().value(), index);
+    anchored[index] = points[index].reference();
+  }
+  const auto root = [&](std::size_t index) {
+    while (parent[index] != index) {
+      parent[index] = parent[parent[index]];
+      index = parent[index];
+    }
+    return index;
+  };
+  for (const auto& constraint : constraints) {
+    if (constraint.kind() == SketchSolverConstraintKind::Coincident) {
+      const auto first = root(indices.at(constraint.targets()[0].id()));
+      const auto second = root(indices.at(constraint.targets()[1].id()));
+      parent[std::max(first, second)] = std::min(first, second);
+    } else if (constraint.kind() == SketchSolverConstraintKind::Fixed) {
+      const auto& target = constraint.targets()[0];
+      if (target.kind() == SketchSolverTargetKind::Point) {
+        anchored[indices.at(target.id())] = true;
+      } else {
+        for (const auto& id : context.topology.find_entity(target.id())->points())
+          anchored[indices.at(id.value())] = true;
+      }
+    }
+  }
+  std::vector<CoincidentProjection::Group> groups(points.size());
+  CoincidentProjection projection;
+  for (std::size_t index = 0; index < points.size(); ++index) {
+    auto& group = groups[root(index)];
+    group.points.push_back(points[index].id());
+    if (anchored[index]) {
+      const auto position = points[index].position();
+      if (group.anchor && *group.anchor != position)
+        projection.compatible = false;
+      group.anchor = position;
+    }
+  }
+  for (auto& group : groups)
+    if (group.points.size() > 1U)
+      projection.groups.push_back(std::move(group));
+  return projection;
 }
 
 [[nodiscard]] const SketchTopologyPoint*
@@ -940,9 +1033,11 @@ evaluate_constraints(const SolveContext& context, const NumericVector& variables
 [[nodiscard]] Result<NumericMatrix>
 build_jacobian(const SolveContext& context, const NumericVector& variables,
                const std::vector<SketchSolverConstraint>& constraints,
-               const SketchSolverOptions& options) {
+               const SketchSolverOptions& options,
+               const CoincidentProjection* projection = nullptr) {
   auto center = evaluate_constraints(context, variables, constraints);
-  if (center.has_error()) return Result<NumericMatrix>::failure(center.error());
+  if (center.has_error())
+    return Result<NumericMatrix>::failure(center.error());
   NumericMatrix jacobian(center.value().size(), NumericVector(variables.size(), 0.0));
   if (variables.empty() || center.value().empty())
     return Result<NumericMatrix>::success(std::move(jacobian));
@@ -953,6 +1048,10 @@ build_jacobian(const SolveContext& context, const NumericVector& variables,
     NumericVector minus = variables;
     plus[column] += step;
     minus[column] -= step;
+    if (projection != nullptr) {
+      projection->apply(context, plus);
+      projection->apply(context, minus);
+    }
     auto plus_residuals = evaluate_constraints(context, plus, constraints);
     if (plus_residuals.has_error()) return Result<NumericMatrix>::failure(plus_residuals.error());
     auto minus_residuals = evaluate_constraints(context, minus, constraints);
@@ -1065,6 +1164,17 @@ solve_numeric(const SolveContext& context, const std::vector<SketchSolverConstra
     return Result<NumericSolveOutcome>::failure(initial_residuals.error());
   NumericVector variables = initial;
   NumericVector current = initial_residuals.value();
+  const auto projection = coincident_projection(context, constraints);
+  if (!projection.compatible)
+    return Result<NumericSolveOutcome>::success(
+        {NumericSolveState::Stalled, 0U, initial_residuals.value(), current, variables});
+  if (!projection.groups.empty()) {
+    projection.apply(context, variables);
+    auto projected_residuals = evaluate_constraints(context, variables, constraints);
+    if (projected_residuals.has_error())
+      return Result<NumericSolveOutcome>::failure(projected_residuals.error());
+    current = std::move(projected_residuals.value());
+  }
   if (current.empty() || residual_rms(current) <= options.convergence_rms)
     return Result<NumericSolveOutcome>::success(
         {NumericSolveState::Converged, 0U, initial_residuals.value(), current, variables});
@@ -1074,8 +1184,9 @@ solve_numeric(const SolveContext& context, const std::vector<SketchSolverConstra
 
   std::size_t completed_iterations = 0U;
   for (std::size_t iteration = 0U; iteration < options.maximum_iterations; ++iteration) {
-    auto jacobian = build_jacobian(context, variables, constraints, options);
-    if (jacobian.has_error()) return Result<NumericSolveOutcome>::failure(jacobian.error());
+    auto jacobian = build_jacobian(context, variables, constraints, options, &projection);
+    if (jacobian.has_error())
+      return Result<NumericSolveOutcome>::failure(jacobian.error());
     NormalEquations equations;
     if (!build_normal_equations(jacobian.value(), current, equations))
       return Result<NumericSolveOutcome>::failure(Error::internal(
@@ -1086,13 +1197,15 @@ solve_numeric(const SolveContext& context, const std::vector<SketchSolverConstra
          damping_attempt < options.maximum_damping_attempts && !accepted; ++damping_attempt) {
       const double damping = options.initial_damping * std::pow(10.0, damping_attempt);
       NumericVector step;
-      if (!damped_gauss_newton_step(equations, damping, step)) continue;
+      if (!damped_gauss_newton_step(equations, damping, step))
+        continue;
       for (std::size_t line_search = 0U; line_search < options.maximum_line_search_steps;
            ++line_search) {
         const double factor = std::ldexp(1.0, -static_cast<int>(line_search));
         NumericVector candidate = variables;
         for (std::size_t index = 0U; index < candidate.size(); ++index)
           candidate[index] += factor * step[index];
+        projection.apply(context, candidate);
         auto candidate_residuals = evaluate_constraints(context, candidate, constraints);
         if (candidate_residuals.has_error())
           return Result<NumericSolveOutcome>::failure(candidate_residuals.error());
@@ -1107,17 +1220,16 @@ solve_numeric(const SolveContext& context, const std::vector<SketchSolverConstra
       }
     }
     if (residual_rms(current) <= options.convergence_rms)
-      return Result<NumericSolveOutcome>::success(
-          {NumericSolveState::Converged, completed_iterations, initial_residuals.value(), current,
-           variables});
+      return Result<NumericSolveOutcome>::success({NumericSolveState::Converged,
+                                                   completed_iterations, initial_residuals.value(),
+                                                   current, variables});
     if (!accepted)
-      return Result<NumericSolveOutcome>::success(
-          {NumericSolveState::Stalled, completed_iterations, initial_residuals.value(), current,
-           variables});
+      return Result<NumericSolveOutcome>::success({NumericSolveState::Stalled, completed_iterations,
+                                                   initial_residuals.value(), current, variables});
   }
-  return Result<NumericSolveOutcome>::success(
-      {NumericSolveState::MaximumIterations, completed_iterations, initial_residuals.value(), current,
-       variables});
+  return Result<NumericSolveOutcome>::success({NumericSolveState::MaximumIterations,
+                                               completed_iterations, initial_residuals.value(),
+                                               current, variables});
 }
 
 [[nodiscard]] Result<std::size_t> matrix_rank(NumericMatrix matrix, std::size_t column_count,

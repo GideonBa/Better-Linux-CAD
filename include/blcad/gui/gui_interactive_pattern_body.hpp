@@ -226,7 +226,7 @@ public:
     auto added = add_feature(candidate);
     if (!added)
       return Result<geometry::GeometryShape>::failure(added.error());
-    return detail::preview_feature_body(candidate, feature_, result_body_);
+    return detail::preview_feature_body(session, candidate, feature_, result_body_);
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
@@ -627,13 +627,15 @@ public:
     auto added = add_record(candidate);
     if (!added)
       return Result<std::vector<geometry::GeometryShape>>::failure(added.error());
-    auto cache = geometry::ShapeCache::create(ShapeCacheId(feature_.value() + ".preview"));
+    std::vector<std::string> changed;
+    if (kind_ == GuiBodyOperationKind::Boolean)
+      changed.push_back(feature_.value());
+    else
+      for (const auto& target : transform_targets_)
+        changed.push_back(target.first.value());
+    auto cache = detail::recompute_preview_geometry(session, candidate, changed);
     if (!cache)
       return Result<std::vector<geometry::GeometryShape>>::failure(cache.error());
-    auto computed =
-        geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
-    if (!computed)
-      return Result<std::vector<geometry::GeometryShape>>::failure(computed.error());
     std::vector<BodyId> bodies;
     if (kind_ == GuiBodyOperationKind::Boolean)
       bodies.push_back(result_mode_ == BodyBooleanResultMode::NewBody ? *produced_body_

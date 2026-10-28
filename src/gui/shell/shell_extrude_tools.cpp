@@ -104,6 +104,7 @@ void ShellFeatureTools::build_extrude_controls(QWidget* panel) {
   extrude_second_thickness_->setObjectName(QStringLiteral("blcad.extrude.second_thickness"));
   row(QStringLiteral("Right Wall (mm)"), extrude_second_thickness_);
   extrude_hint_ = new QLabel(extrude_controls_);
+  extrude_hint_->setObjectName(QStringLiteral("blcad.extrude.hint"));
   extrude_hint_->setWordWrap(true);
   column->addWidget(extrude_hint_);
   qobject_cast<QVBoxLayout*>(panel->layout())->addWidget(extrude_controls_);
@@ -206,16 +207,21 @@ void ShellFeatureTools::update_extrude_controls() {
   const auto mode = static_cast<ExtrudeExtentMode>(extrude_extent_->currentData().toInt());
   const bool path = extrude_direction_->currentIndex() == 2;
   const bool thin = coordinator_.extrude().uses_open_line();
+  const bool cut = static_cast<FeatureBodyOperationMode>(
+                       extrude_operation_->currentData().toInt()) == FeatureBodyOperationMode::Cut;
   extrude_hint_->setText(
-      thin ? QStringLiteral(
-                 "Left and right follow the line direction in the sketch. With Two Sides, "
-                 "the first thickness acts left, the second right. Centered uses the total "
-                 "wall thickness. Through All and To Next require a target body. "
-                 "All input remains local until Apply.")
-           : QStringLiteral("Through All and To Next require a target body. "
-                            "Limit faces must be perpendicular to the extrusion direction. "
-                            "Along Path uses the orientation of an existing open path. "
-                            "All input remains local until Apply."));
+      (cut ? QStringLiteral("Cut must remove material from the selected target body. Check the "
+                            "target, Normal/Opposite direction and depth or Through All extent. ")
+           : QString{}) +
+      (thin ? QStringLiteral(
+                  "Left and right follow the line direction in the sketch. With Two Sides, "
+                  "the first thickness acts left, the second right. Centered uses the total "
+                  "wall thickness. Through All and To Next require a target body. "
+                  "All input remains local until Apply.")
+            : QStringLiteral("Through All and To Next require a target body. "
+                             "Limit faces must be perpendicular to the extrusion direction. "
+                             "Along Path uses the orientation of an existing open path. "
+                             "All input remains local until Apply.")));
   const bool distance = !path && distance_extent(mode);
   numeric_editor_->setVisible(distance);
   value_label_->setVisible(distance);

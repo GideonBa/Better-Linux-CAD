@@ -8,7 +8,9 @@
 #include <BRepPrimAPI_MakeCylinder.hxx>
 #include <Bnd_Box.hxx>
 #include <Standard_Failure.hxx>
+#include <TopExp_Explorer.hxx>
 #include <TopoDS_Shape.hxx>
+#include <TopTools_ListOfShape.hxx>
 #include <gp_Ax2.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
@@ -142,7 +144,13 @@ CircularCutAdapter::cut_circular_hole_along_axis(const GeometryShape& target,
       return Result<GeometryShape>::failure(make_geometry_error("could not build cut cylinder"));
     }
 
-    BRepAlgoAPI_Cut cut_builder(target_shape, cylinder_builder.Shape());
+    BRepAlgoAPI_Cut cut_builder;
+    TopTools_ListOfShape arguments, tools;
+    arguments.Append(target_shape);
+    tools.Append(cylinder_builder.Shape());
+    cut_builder.SetArguments(arguments);
+    cut_builder.SetTools(tools);
+    cut_builder.SetNonDestructive(true);
     cut_builder.Build();
     if (!cut_builder.IsDone() || cut_builder.HasErrors()) {
       return Result<GeometryShape>::failure(make_geometry_error("boolean cut failed"));
@@ -151,6 +159,11 @@ CircularCutAdapter::cut_circular_hole_along_axis(const GeometryShape& target,
     TopoDS_Shape shape = cut_builder.Shape();
     if (shape.IsNull())
       return Result<GeometryShape>::failure(make_geometry_error("cut produced an empty shape"));
+
+    if (!TopExp_Explorer(shape, TopAbs_SOLID).More() && !TopExp_Explorer(shape, TopAbs_FACE).More())
+      return Result<GeometryShape>::failure(
+          make_geometry_error("Cut removes the entire target body. Reduce the hole diameter or "
+                              "choose a different target."));
 
     return Result<GeometryShape>::success(
         GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape))));

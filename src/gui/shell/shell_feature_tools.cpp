@@ -279,6 +279,7 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   // Dynamic task rows must update the scroll content's minimum size.
   column->setSizeConstraint(QLayout::SetMinAndMaxSize);
   task_summary_ = new QLabel(panel);
+  task_summary_->setObjectName(QStringLiteral("blcad.feature.summary"));
   task_summary_->setWordWrap(true);
   column->addWidget(task_summary_);
   auto* form = new QFormLayout();
