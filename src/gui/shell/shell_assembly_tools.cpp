@@ -4,6 +4,7 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/gui/gui_assembly_workbench.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/gui_step_import_workbench.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
@@ -451,8 +452,8 @@ Result<std::size_t> ShellAssemblyTools::import_definition(const QString& path) {
     if (imported.cross_hierarchy_constraint_count() || imported.cross_hierarchy_joint_count())
       return fail("A project with cross-hierarchy relationships cannot yet be loaded as a "
                   "subassembly");
-    result = session_.commit_project_transaction(
-        "Load Assembly definition", [imported](Project& project) -> Result<std::size_t> {
+    result = commit_project_with_step_import_context(
+        session_, "Load Assembly definition", [imported](Project& project) -> Result<std::size_t> {
           std::size_t count = 0;
           for (const auto& part : imported.part_documents()) {
             if (const auto* existing = project.find_part_document(part.id())) {
@@ -527,7 +528,9 @@ Result<std::size_t> ShellAssemblyTools::begin(Command command) {
   targets_.clear();
   hierarchy_targets_.clear();
   if (command == Command::Relationship || command == Command::Joint) {
-    auto targets = geometry::AssemblyInteractionGeometry::targets(*project);
+    auto targets = query_with_step_import_context(session_, [&](auto* context) {
+      return geometry::AssemblyInteractionGeometry::targets(*project, context);
+    });
     if (!targets) {
       sync_ = false;
       return Result<std::size_t>::failure(targets.error());
@@ -898,8 +901,10 @@ Result<std::size_t> ShellAssemblyTools::rebuild_controller() {
       return begun;
     const auto* joint = session_.project()->assembly().find_joint(
         AssemblyJointId(joint_->currentData().toString().toStdString()));
-    auto resolved = geometry::AssemblyConstraintTargetResolver{}.resolve_geometric(
-        *session_.project(), joint->target_a());
+    auto resolved = query_with_step_import_context(session_, [&](auto* context) {
+      return geometry::AssemblyConstraintTargetResolver{context}.resolve_geometric(
+          *session_.project(), joint->target_a());
+    });
     if (!resolved)
       return Result<std::size_t>::failure(resolved.error());
     auto frame = world_frame(resolved.value());
@@ -913,6 +918,9 @@ Result<std::size_t> ShellAssemblyTools::rebuild_controller() {
 Result<std::size_t> ShellAssemblyTools::preview() {
   valid_ = false;
   apply_->setEnabled(false);
+  auto context = make_step_import_context(session_);
+  if (!context)
+    return Result<std::size_t>::failure(context.error());
   Project candidate = *session_.project();
   QString status;
   if (advanced()) {
@@ -938,8 +946,8 @@ Result<std::size_t> ShellAssemblyTools::preview() {
     auto added = candidate.assembly().add_constraint(checked.value().relationship);
     if (!added)
       return added;
-    auto posed =
-        geometry::AssemblySolveResultApplier{}.apply(candidate, checked.value().solved_pose);
+    auto posed = geometry::AssemblySolveResultApplier{context.value().get()}.apply(
+        candidate, checked.value().solved_pose);
     if (!posed)
       return posed;
     status = QStringLiteral("Relationship solved. Remaining degrees of freedom: %1; RMS: %2")
@@ -958,8 +966,8 @@ Result<std::size_t> ShellAssemblyTools::preview() {
     auto checked = coordinator_.motion().preview(session_);
     if (!checked)
       return Result<std::size_t>::failure(checked.error());
-    auto moved =
-        geometry::AssemblyJointMotionResultApplier{}.apply(candidate, checked.value().motion);
+    auto moved = geometry::AssemblyJointMotionResultApplier{context.value().get()}.apply(
+        candidate, checked.value().motion);
     if (!moved)
       return moved;
     status = QStringLiteral("Motion converged. Joint degrees of freedom: %1; passive: %2; RMS: %3")
@@ -978,7 +986,8 @@ Result<std::size_t> ShellAssemblyTools::preview() {
       return Result<std::size_t>::failure(solved.error());
     if (!solved.value().converged())
       return fail("Selected group could not be solved to convergence");
-    auto posed = geometry::AssemblySolveResultApplier{}.apply(candidate, solved.value());
+    auto posed = geometry::AssemblySolveResultApplier{context.value().get()}.apply(candidate,
+                                                                                   solved.value());
     if (!posed)
       return posed;
     solved_ = std::move(solved.value());
@@ -986,13 +995,18 @@ Result<std::size_t> ShellAssemblyTools::preview() {
                  .arg(inspected.value().rank_summary.remaining_dof)
                  .arg(solved_->residual_summary.final_rms, 0, 'g', 4);
   }
-  geometry::ViewportSceneBuilder builder;
+  geometry::ViewportSceneBuilder builder{context.value().get()};
   auto scene = builder.build_project(candidate);
   if (!scene)
     return Result<std::size_t>::failure(scene.error());
   auto source = builder.build_project(*session_.project());
   if (!source)
     return Result<std::size_t>::failure(source.error());
+  if (context.value()) {
+    auto fresh = context.value()->validate_sources();
+    if (!fresh)
+      return fresh;
+  }
   std::vector<geometry::GeometryShape> shapes;
   std::vector<std::string> replaced;
   std::set<std::string> changed_occurrences;
@@ -1158,7 +1172,9 @@ std::vector<geometry::ViewportSceneItem> ShellAssemblyTools::selection_items() c
   if (!active() && !session_.task().active() && session_.project() &&
       session_.derived_results_fresh() &&
       viewport_.selection_filter_mask() == selection_kind_bit(GuiSelectionKind::AssemblyTarget)) {
-    auto targets = geometry::AssemblyInteractionGeometry::targets(*session_.project());
+    auto targets = query_with_step_import_context(session_, [&](auto* context) {
+      return geometry::AssemblyInteractionGeometry::targets(*session_.project(), context);
+    });
     if (targets)
       for (auto& target : targets.value())
         items.push_back(std::move(target.presentation));

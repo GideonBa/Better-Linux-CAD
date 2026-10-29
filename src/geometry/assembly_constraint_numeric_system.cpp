@@ -144,7 +144,8 @@ append_scaled_residual(const ConcentricResidualDescriptor& concentric,
 
 [[nodiscard]] Result<std::size_t>
 append_constraint_residuals(const Project& project, const AssemblyConstraintId& constraint_id,
-                            double length_residual_scale_mm, NumericVector& residuals) {
+                            double length_residual_scale_mm, NumericVector& residuals,
+                            StepImportTopologyContext* import_context) {
   const AssemblyConstraint* constraint = project.assembly().find_constraint(constraint_id);
   if (constraint == nullptr) {
     return Result<std::size_t>::failure(internal_error(
@@ -155,28 +156,28 @@ append_constraint_residuals(const Project& project, const AssemblyConstraintId& 
       constraint->type() == AssemblyConstraintType::Parallel ||
       constraint->type() == AssemblyConstraintType::Perpendicular ||
       constraint->type() == AssemblyConstraintType::Angle) {
-    const AssemblyGenericRelationshipEquationBuilder builder;
+    const AssemblyGenericRelationshipEquationBuilder builder(import_context);
     auto equation = builder.build(project, *constraint);
     if (equation.has_error())
       return Result<std::size_t>::failure(equation.error());
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
   if (constraint->type() == AssemblyConstraintType::Concentric) {
-    const AssemblyConcentricConstraintEquationBuilder builder;
+    const AssemblyConcentricConstraintEquationBuilder builder(import_context);
     auto equation = builder.build(project, *constraint);
     if (equation.has_error())
       return Result<std::size_t>::failure(equation.error());
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
   if (constraint->type() == AssemblyConstraintType::Insert) {
-    const AssemblyInsertConstraintEquationBuilder builder;
+    const AssemblyInsertConstraintEquationBuilder builder(import_context);
     auto equation = builder.build(project, *constraint);
     if (equation.has_error())
       return Result<std::size_t>::failure(equation.error());
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
 
-  const AssemblyConstraintEquationBuilder builder;
+  const AssemblyConstraintEquationBuilder builder(import_context);
   auto equation = builder.build(project, *constraint);
   if (equation.has_error())
     return Result<std::size_t>::failure(equation.error());
@@ -185,7 +186,8 @@ append_constraint_residuals(const Project& project, const AssemblyConstraintId& 
 
 [[nodiscard]] Result<std::size_t>
 append_joint_drive_residuals(const Project& project, const AssemblyNumericJointDrive& drive,
-                             double length_residual_scale_mm, NumericVector& residuals) {
+                             double length_residual_scale_mm, NumericVector& residuals,
+                             StepImportTopologyContext* import_context) {
   const AssemblyJoint* joint = project.assembly().find_joint(drive.joint);
   if (joint == nullptr) {
     return Result<std::size_t>::failure(
@@ -197,7 +199,7 @@ append_joint_drive_residuals(const Project& project, const AssemblyNumericJointD
     return found == drive.coordinates.end() ? nullptr : &found->requested_value;
   };
   if (joint->type() == AssemblyJointType::Revolute) {
-    const AssemblyRevoluteJointEquationBuilder builder;
+    const AssemblyRevoluteJointEquationBuilder builder(import_context);
     auto equation =
         builder.build(project, *joint, *coordinate(AssemblyJointCoordinateRole::Rotation));
     if (equation.has_error())
@@ -205,7 +207,7 @@ append_joint_drive_residuals(const Project& project, const AssemblyNumericJointD
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
   if (joint->type() == AssemblyJointType::Prismatic) {
-    const AssemblyPrismaticJointEquationBuilder builder;
+    const AssemblyPrismaticJointEquationBuilder builder(import_context);
     auto equation =
         builder.build(project, *joint, *coordinate(AssemblyJointCoordinateRole::Translation));
     if (equation.has_error())
@@ -213,7 +215,7 @@ append_joint_drive_residuals(const Project& project, const AssemblyNumericJointD
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
   if (joint->type() == AssemblyJointType::Cylindrical) {
-    const AssemblyCylindricalJointEquationBuilder builder;
+    const AssemblyCylindricalJointEquationBuilder builder(import_context);
     auto equation =
         builder.build(project, *joint, *coordinate(AssemblyJointCoordinateRole::Translation),
                       *coordinate(AssemblyJointCoordinateRole::Rotation));
@@ -222,7 +224,7 @@ append_joint_drive_residuals(const Project& project, const AssemblyNumericJointD
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
   if (joint->type() == AssemblyJointType::Planar) {
-    const AssemblyPlanarJointEquationBuilder builder;
+    const AssemblyPlanarJointEquationBuilder builder(import_context);
     auto equation =
         builder.build(project, *joint, *coordinate(AssemblyJointCoordinateRole::TranslationU),
                       *coordinate(AssemblyJointCoordinateRole::TranslationV),
@@ -231,7 +233,7 @@ append_joint_drive_residuals(const Project& project, const AssemblyNumericJointD
       return Result<std::size_t>::failure(equation.error());
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
-  const AssemblySphericalJointEquationBuilder builder;
+  const AssemblySphericalJointEquationBuilder builder(import_context);
   auto equation = builder.build(project, *joint);
   if (equation.has_error())
     return Result<std::size_t>::failure(equation.error());
@@ -361,27 +363,29 @@ Result<std::size_t> append_scaled_residuals(const SphericalJointResidualDescript
 
 Result<NumericVector> evaluate_residuals(const Project& project,
                                          const std::vector<AssemblyConstraintId>& constraint_ids,
-                                         double length_residual_scale_mm) {
+                                         double length_residual_scale_mm,
+                                         StepImportTopologyContext* import_context) {
   return evaluate_residuals(project, AssemblyNumericRelationshipSet{constraint_ids, {}},
-                            length_residual_scale_mm);
+                            length_residual_scale_mm, import_context);
 }
 
 Result<NumericVector> evaluate_residuals(const Project& project,
                                          const AssemblyNumericRelationshipSet& relationships,
-                                         double length_residual_scale_mm) {
+                                         double length_residual_scale_mm,
+                                         StepImportTopologyContext* import_context) {
   NumericVector residuals;
   residuals.reserve(relationships.constraint_ids.size() * 7U +
                     relationships.joint_drives.size() * 9U);
 
   for (const auto& constraint_id : relationships.constraint_ids) {
-    auto appended =
-        append_constraint_residuals(project, constraint_id, length_residual_scale_mm, residuals);
+    auto appended = append_constraint_residuals(project, constraint_id, length_residual_scale_mm,
+                                                residuals, import_context);
     if (appended.has_error())
       return Result<NumericVector>::failure(appended.error());
   }
   for (const auto& drive : relationships.joint_drives) {
-    auto appended =
-        append_joint_drive_residuals(project, drive, length_residual_scale_mm, residuals);
+    auto appended = append_joint_drive_residuals(project, drive, length_residual_scale_mm,
+                                                 residuals, import_context);
     if (appended.has_error())
       return Result<NumericVector>::failure(appended.error());
   }
@@ -493,13 +497,14 @@ Result<NumericMatrix> build_central_difference_jacobian(
     const NumericVector& baseline_residuals, const AssemblyNumericSystemOptions& options) {
   const AssemblyNumericResidualEvaluator evaluator =
       [&project, &variable_components, &relationships,
-       length_scale = options.length_residual_scale_mm](const NumericVector& candidate_values) {
+       length_scale = options.length_residual_scale_mm,
+       import_context = options.import_context](const NumericVector& candidate_values) {
         Project candidate_project = project;
         auto applied = apply_variables(candidate_project, variable_components, candidate_values);
         if (applied.has_error()) {
           return Result<NumericVector>::failure(applied.error());
         }
-        return evaluate_residuals(candidate_project, relationships, length_scale);
+        return evaluate_residuals(candidate_project, relationships, length_scale, import_context);
       };
   return build_central_difference_jacobian(variables, baseline_residuals, options, evaluator);
 }

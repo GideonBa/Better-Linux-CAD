@@ -15,6 +15,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct AssemblyLocalJointMotionInputSnapshot {
   DocumentId assembly_document;
   AssemblyJointId joint;
@@ -81,6 +83,9 @@ struct AssemblyCrossHierarchyJointMotionResult {
 // their authored values. The scalar overload is the Revolute adapter.
 class AssemblyCrossHierarchyJointMotionSolver {
 public:
+  AssemblyCrossHierarchyJointMotionSolver() = default;
+  explicit AssemblyCrossHierarchyJointMotionSolver(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyCrossHierarchyJointMotionResult>
   move(const Project& project, AssemblyJointDrive drive,
        AssemblyRigidBodySolverOptions options = {}) const;
@@ -88,6 +93,9 @@ public:
   [[nodiscard]] Result<AssemblyCrossHierarchyJointMotionResult>
   move(const Project& project, AssemblyJointId joint, Quantity requested_coordinate,
        AssemblyRigidBodySolverOptions options = {}) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 // Block-28 atomic application boundary. It revalidates complete transform,
@@ -96,8 +104,14 @@ public:
 // explicitly driven Project-level joint roles on one Project copy.
 class AssemblyCrossHierarchyJointMotionResultApplier {
 public:
+  AssemblyCrossHierarchyJointMotionResultApplier() = default;
+  explicit AssemblyCrossHierarchyJointMotionResultApplier(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<std::size_t>
   apply(Project& project, const AssemblyCrossHierarchyJointMotionResult& result) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

@@ -1060,7 +1060,8 @@ void ShellFeatureTools::reset() noexcept {
 void ShellFeatureTools::refresh_enablement() {
   const bool idle_part =
       !active() && !session_.task().active() && !window_.active_sketch().has_value() &&
-      session_.document_kind() == GuiDocumentKind::Part &&
+      session_.document_kind() == GuiDocumentKind::Part && session_.part_document() &&
+      !session_.part_document()->is_reference_part() &&
       session_.workspace() == GuiWorkspace::Part && !session_.reference_repair_mode();
   const bool profile_available = idle_part && !profile_from_selection().has_error();
   action_extrude_->setEnabled(profile_available ||

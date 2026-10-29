@@ -9,6 +9,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 // Canonical row order: z-direction alignment (3), transverse offset (3),
 // reference-frame sine/cosine alignment (2), and signed translation (1).
 struct PrismaticJointResidualDescriptor {
@@ -45,6 +47,9 @@ struct AssemblyPrismaticJointEquationDescriptor {
 
 class AssemblyPrismaticJointEquationBuilder {
 public:
+  AssemblyPrismaticJointEquationBuilder() = default;
+  explicit AssemblyPrismaticJointEquationBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyPrismaticJointEquationDescriptor>
   build(const Project& project, const AssemblyJoint& joint,
         const Quantity& requested_translation) const;
@@ -54,6 +59,9 @@ public:
         const AssemblyResolvedGeometricTarget& target_a,
         const AssemblyResolvedGeometricTarget& target_b,
         const Quantity& requested_translation) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

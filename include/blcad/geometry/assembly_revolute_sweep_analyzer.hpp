@@ -12,6 +12,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 inline constexpr std::size_t kAssemblyRevoluteSweepMaximumSampleCount = 1001U;
 
 enum class AssemblyRevoluteSweepJointScope {
@@ -65,9 +67,15 @@ struct AssemblyRevoluteSweepAnalysis {
 // is deterministic discrete sampling and is not continuous collision detection.
 class AssemblyRevoluteSweepAnalyzer {
 public:
+  AssemblyRevoluteSweepAnalyzer() = default;
+  explicit AssemblyRevoluteSweepAnalyzer(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyRevoluteSweepAnalysis>
   analyze(const Project& project, const AssemblyRevoluteSweepRequest& request,
           AssemblyRevoluteSweepAnalysisOptions options = {}) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

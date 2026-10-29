@@ -9,6 +9,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct AssemblySpaceAxisConstraintTargetDescriptor {
   ComponentInstanceId component_instance;
   std::string semantic_reference;
@@ -45,8 +47,14 @@ struct AssemblyConcentricConstraintEquationDescriptor {
 // No equation is solved and no component transform or project model intent is mutated.
 class AssemblyConcentricConstraintEquationBuilder {
 public:
+  AssemblyConcentricConstraintEquationBuilder() = default;
+  explicit AssemblyConcentricConstraintEquationBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyConcentricConstraintEquationDescriptor>
   build(const Project& project, const AssemblyConstraint& constraint) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

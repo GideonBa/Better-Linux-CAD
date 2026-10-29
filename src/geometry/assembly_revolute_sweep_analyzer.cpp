@@ -2,6 +2,7 @@
 
 #include "blcad/geometry/assembly_cross_hierarchy_joint_motion_solver.hpp"
 #include "blcad/geometry/assembly_joint_motion_solver.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 
 #include <iomanip>
 #include <sstream>
@@ -112,10 +113,12 @@ constexpr const char* kSweepAnalyzerId = "geometry.assembly_revolute_sweep_analy
   return start_deg + ((end_deg - start_deg) * fraction);
 }
 
-[[nodiscard]] Result<std::size_t> apply_sample_motion(
-    Project& sample_project, const AssemblyRevoluteSweepJointReference& joint_reference,
-    double coordinate_deg, std::size_t sample_index,
-    const AssemblyRigidBodySolverOptions& solver_options) {
+[[nodiscard]] Result<std::size_t>
+apply_sample_motion(Project& sample_project,
+                    const AssemblyRevoluteSweepJointReference& joint_reference,
+                    double coordinate_deg, std::size_t sample_index,
+                    const AssemblyRigidBodySolverOptions& solver_options,
+                    StepImportTopologyContext* import_context) {
   auto coordinate = Quantity::angle_deg(coordinate_deg, joint_reference.joint.value());
   if (coordinate.has_error()) {
     return Result<std::size_t>::failure(
@@ -124,7 +127,7 @@ constexpr const char* kSweepAnalyzerId = "geometry.assembly_revolute_sweep_analy
 
   switch (joint_reference.scope) {
   case AssemblyRevoluteSweepJointScope::RootAssemblyLocal: {
-    const AssemblyJointMotionSolver solver;
+    const AssemblyJointMotionSolver solver(import_context);
     auto moved = solver.move(sample_project, joint_reference.joint, coordinate.value(), solver_options);
     if (moved.has_error()) {
       return Result<std::size_t>::failure(
@@ -135,7 +138,7 @@ constexpr const char* kSweepAnalyzerId = "geometry.assembly_revolute_sweep_analy
           kSweepAnalyzerId,
           sample_text(sample_index, coordinate_deg) + " root-local motion did not converge"));
     }
-    const AssemblyJointMotionResultApplier applier;
+    const AssemblyJointMotionResultApplier applier(import_context);
     auto applied = applier.apply(sample_project, moved.value());
     if (applied.has_error()) {
       return Result<std::size_t>::failure(
@@ -145,7 +148,7 @@ constexpr const char* kSweepAnalyzerId = "geometry.assembly_revolute_sweep_analy
     return applied;
   }
   case AssemblyRevoluteSweepJointScope::ProjectCrossHierarchy: {
-    const AssemblyCrossHierarchyJointMotionSolver solver;
+    const AssemblyCrossHierarchyJointMotionSolver solver(import_context);
     auto moved = solver.move(sample_project, joint_reference.joint, coordinate.value(), solver_options);
     if (moved.has_error()) {
       return Result<std::size_t>::failure(sample_error(
@@ -157,7 +160,7 @@ constexpr const char* kSweepAnalyzerId = "geometry.assembly_revolute_sweep_analy
           sample_text(sample_index, coordinate_deg) +
               " cross-hierarchy motion did not converge"));
     }
-    const AssemblyCrossHierarchyJointMotionResultApplier applier;
+    const AssemblyCrossHierarchyJointMotionResultApplier applier(import_context);
     auto applied = applier.apply(sample_project, moved.value());
     if (applied.has_error()) {
       return Result<std::size_t>::failure(
@@ -191,14 +194,14 @@ Result<AssemblyRevoluteSweepAnalysis> AssemblyRevoluteSweepAnalyzer::analyze(
       request.joint, request.start_coordinate.degrees(), request.end_coordinate.degrees(), {}};
   analysis.samples.reserve(request.sample_count);
 
-  const AssemblyContactAnalyzer contact_analyzer;
+  const AssemblyContactAnalyzer contact_analyzer(import_context_);
   for (std::size_t sample_index = 0U; sample_index < request.sample_count; ++sample_index) {
     const double coordinate_deg = sample_coordinate(
         analysis.start_coordinate_deg, analysis.end_coordinate_deg, sample_index,
         request.sample_count);
     Project sample_project = project;
     auto applied = apply_sample_motion(sample_project, request.joint, coordinate_deg, sample_index,
-                                       options.motion_solver);
+                                       options.motion_solver, import_context_);
     if (applied.has_error()) {
       return Result<AssemblyRevoluteSweepAnalysis>::failure(applied.error());
     }
@@ -212,6 +215,11 @@ Result<AssemblyRevoluteSweepAnalysis> AssemblyRevoluteSweepAnalyzer::analyze(
         sample_index, coordinate_deg, applied.value(), std::move(contact.value())});
   }
 
+  if (import_context_) {
+    auto fresh = import_context_->validate_sources();
+    if (!fresh)
+      return Result<AssemblyRevoluteSweepAnalysis>::failure(fresh.error());
+  }
   return Result<AssemblyRevoluteSweepAnalysis>::success(std::move(analysis));
 }
 

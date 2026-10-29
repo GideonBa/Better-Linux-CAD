@@ -304,8 +304,8 @@ void ShellConstructionTools::fill_references() {
 
 Result<std::size_t> ShellConstructionTools::begin(Kind kind) {
   auto& session = window_.session();
-  if (!session.part_document() || !session.derived_results_fresh() || window_.active_sketch() ||
-      session.task().active())
+  if (!session.part_document() || session.part_document()->is_reference_part() ||
+      !session.derived_results_fresh() || window_.active_sketch() || session.task().active())
     return Result<std::size_t>::failure(
         error("Construction requires a current part without an active command"));
   updating_ = true;
@@ -951,8 +951,9 @@ void ShellConstructionTools::refresh() {
     return;
   }
   const auto& session = window_.session();
-  const bool enabled = session.part_document() && session.derived_results_fresh() &&
-                       !window_.active_sketch() && !session.task().active();
+  const bool enabled = session.part_document() && !session.part_document()->is_reference_part() &&
+                       session.derived_results_fresh() && !window_.active_sketch() &&
+                       !session.task().active();
   construction_action_->setEnabled(enabled);
   workplane_action_->setEnabled(enabled);
 }

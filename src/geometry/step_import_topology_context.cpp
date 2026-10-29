@@ -48,6 +48,40 @@ StepImportTopologyContext::StepImportTopologyContext(StepImportTopologyContext&&
 StepImportTopologyContext&
 StepImportTopologyContext::operator=(StepImportTopologyContext&&) noexcept = default;
 
+const std::filesystem::path& StepImportTopologyContext::root_directory() const noexcept {
+  return impl_->root_directory;
+}
+
+Result<std::size_t> observe_imported_part_sources(const PartDocument& document,
+                                                  StepImportTopologyContext* context) {
+  std::vector<const ImportedPartDefinition*> definitions;
+  if (const auto* definition = document.reference_part_definition())
+    definitions.push_back(definition);
+  for (const auto& feature : document.imported_body_features())
+    definitions.push_back(&feature.definition());
+  if (definitions.empty())
+    return Result<std::size_t>::success(0);
+  if (context == nullptr)
+    return Result<std::size_t>::failure(context_error(
+        document.id().value(), "imported Part requires an explicit verified source context"));
+  std::size_t observed = 0;
+  for (const auto* definition : definitions)
+    for (const auto& output : definition->outputs()) {
+      auto reference = ImportedTopologyReference::create(
+          definition->catalog(), output.imported_body, ImportedTopologyCapability::Body);
+      if (!reference)
+        return Result<std::size_t>::failure(reference.error());
+      auto current = context->resolve(document, reference.value());
+      if (!current)
+        return Result<std::size_t>::failure(current.error());
+      if (!current.value().descriptor || current.value().descriptor->body_kind != output.kind)
+        return Result<std::size_t>::failure(context_error(
+            output.body.value(), "imported body kind differs from its persistent output mapping"));
+      ++observed;
+    }
+  return Result<std::size_t>::success(observed);
+}
+
 Result<std::size_t> StepImportTopologyContext::validate_sources() const {
   for (const auto& [key, cached] : impl_->sources) {
     (void)key;

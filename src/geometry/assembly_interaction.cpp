@@ -3,6 +3,7 @@
 #include "blcad/core/generated_topology_reference.hpp"
 #include "blcad/geometry/assembly_hierarchy_transform_evaluator.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/geometry/surface_adapter.hpp"
 #include "geometry_shape_internal.hpp"
 #include <BRepBuilderAPI_MakeEdge.hxx>
@@ -18,6 +19,7 @@
 #include <gp_Circ.hxx>
 #include <gp_Pln.hxx>
 #include <set>
+#include <type_traits>
 
 namespace blcad::geometry {
 namespace {
@@ -29,7 +31,8 @@ Point3 along(Point3 p, Vector3 v, double scale) {
 }
 } // namespace
 Result<std::vector<AssemblyInteractionTarget>>
-AssemblyInteractionGeometry::targets(const Project& project) {
+AssemblyInteractionGeometry::targets(const Project& project,
+                                     StepImportTopologyContext* import_context) {
   std::vector<AssemblyInteractionTarget> results;
   try {
     for (const auto& component : project.assembly().component_instances()) {
@@ -43,7 +46,8 @@ AssemblyInteractionGeometry::targets(const Project& project) {
           ShapeCache::create(ShapeCacheId("assembly.interaction." + component.id().value()));
       if (!cache)
         return Result<std::vector<AssemblyInteractionTarget>>::failure(cache.error());
-      auto computed = GeometryRecomputeExecutor{}.execute_document(*part, cache.value());
+      auto computed =
+          GeometryRecomputeExecutor{import_context}.execute_document(*part, cache.value());
       if (!computed)
         return Result<std::vector<AssemblyInteractionTarget>>::failure(computed.error());
       std::set<std::string> sources;
@@ -74,20 +78,43 @@ AssemblyInteractionGeometry::targets(const Project& project) {
                 SemanticCylindricalFaceReference::create(feature.id(), circle.id()).value()));
           }
       }
-      for (const auto& record : part->datum_planes())
+      for (const auto& record : part->datum_planes()) {
         add(make_assembly_reference_target_spelling(record.id()));
+        add(make_assembly_frame_target_spelling(record.id()));
+      }
       for (const auto& record : part->datum_axes())
         add(make_assembly_reference_target_spelling(record.id()));
       for (const auto& record : part->construction_lines())
         add(make_assembly_reference_target_spelling(record.id()));
       for (const auto& record : part->construction_points())
         add(make_assembly_reference_target_spelling(record.id()));
+      for (const auto& catalog : part->imported_topology_catalogs())
+        for (const auto& entry : catalog.entries())
+          for (const auto capability : imported_topology_capabilities(entry.descriptor)) {
+            // One presentation per analytic primitive. Its typed descriptor exposes the exact
+            // capability matrix (for example Cylinder also supplies Axis); duplicate native
+            // presentations for every projection would make picking ambiguous.
+            if ((entry.descriptor.geometry == ImportedGeometryClass::Plane &&
+                 capability != ImportedTopologyCapability::Plane) ||
+                (entry.descriptor.geometry == ImportedGeometryClass::Cylinder &&
+                 capability != ImportedTopologyCapability::Axis) ||
+                (entry.descriptor.geometry == ImportedGeometryClass::Line &&
+                 capability != ImportedTopologyCapability::Line) ||
+                (entry.descriptor.geometry == ImportedGeometryClass::Circle &&
+                 capability != ImportedTopologyCapability::Circle) ||
+                (entry.descriptor.geometry == ImportedGeometryClass::Point &&
+                 capability != ImportedTopologyCapability::Point))
+              continue;
+            auto reference = ImportedTopologyReference::create(catalog.id(), entry.id, capability);
+            if (reference && validate_imported_topology_reference(*part, reference.value()))
+              add(make_imported_topology_target_spelling(reference.value()));
+          }
       for (const auto& source : sources) {
         auto target = AssemblyConstraintTarget::create(component.id(), source);
         if (!target)
           continue;
-        auto resolved =
-            AssemblyConstraintTargetResolver{}.resolve_geometric(project, target.value());
+        auto resolved = AssemblyConstraintTargetResolver{import_context}.resolve_geometric(
+            project, target.value());
         if (!resolved)
           continue;
         const auto& value = resolved.value();
@@ -100,7 +127,47 @@ AssemblyInteractionGeometry::targets(const Project& project) {
         };
         TopoDS_Shape shape;
         Point3 anchor{};
-        if (const auto* plane = std::get_if<AssemblyPlanarTargetDescriptor>(&value.descriptor)) {
+        if (value.source_metadata.imported_topology) {
+          // Imported inputs retain the complete trimmed face/edge/vertex for native picking.
+          // Analytic descriptors describe solver capability, never replacement presentation.
+          if (!import_context)
+            continue;
+          auto recovered = import_context->resolve(*part, *value.source_metadata.imported_topology);
+          if (!recovered)
+            continue;
+          auto transformed = recovered.value().shape;
+          for (const auto& transform : value.transforms_inner_to_outer) {
+            for (auto [axis, angle] :
+                 std::vector<std::pair<Vector3, double>>{{{1, 0, 0}, transform.rotation_deg.x},
+                                                         {{0, 1, 0}, transform.rotation_deg.y},
+                                                         {{0, 0, 1}, transform.rotation_deg.z}}) {
+              auto changed = BodyTransformAdapter{}.rotate(transformed, {}, axis, angle);
+              if (!changed)
+                return Result<std::vector<AssemblyInteractionTarget>>::failure(changed.error());
+              transformed = std::move(changed.value());
+            }
+            auto shifted = BodyTransformAdapter{}.translate(transformed, transform.translation_mm);
+            if (!shifted)
+              return Result<std::vector<AssemblyInteractionTarget>>::failure(shifted.error());
+            transformed = std::move(shifted.value());
+          }
+          shape = transformed.impl_->shape;
+          anchor = std::visit(
+              [&](const auto& descriptor) {
+                using Descriptor = std::decay_t<decltype(descriptor)>;
+                if constexpr (std::is_same_v<Descriptor, AssemblyPointTargetDescriptor>)
+                  return world_point(descriptor.point);
+                else if constexpr (std::is_same_v<Descriptor, AssemblyCircularEdgeTargetDescriptor>)
+                  return world_point(descriptor.center);
+                else if constexpr (std::is_same_v<Descriptor,
+                                                  AssemblyCylindricalSurfaceTargetDescriptor>)
+                  return world_point(descriptor.axis_origin);
+                else
+                  return world_point(descriptor.origin);
+              },
+              value.descriptor);
+        } else if (const auto* plane =
+                       std::get_if<AssemblyPlanarTargetDescriptor>(&value.descriptor)) {
           anchor = world_point(plane->origin);
           if (value.source_kind == AssemblyGeometricTargetSourceKind::GeneratedPlanarFace &&
               value.source_metadata.source_feature && value.source_metadata.semantic_face) {
@@ -193,6 +260,11 @@ AssemblyInteractionGeometry::targets(const Project& project) {
     return Result<std::vector<AssemblyInteractionTarget>>::failure(Error::geometry(
         "assembly.interaction",
         failure.GetMessageString() ? failure.GetMessageString() : "OCCT target error"));
+  }
+  if (import_context) {
+    auto fresh = import_context->validate_sources();
+    if (!fresh)
+      return Result<std::vector<AssemblyInteractionTarget>>::failure(fresh.error());
   }
   return Result<std::vector<AssemblyInteractionTarget>>::success(std::move(results));
 }

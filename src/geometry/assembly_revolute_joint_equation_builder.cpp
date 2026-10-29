@@ -57,7 +57,7 @@ AssemblyRevoluteJointEquationBuilder::build(const Project& project, const Assemb
         validation_error(joint.id().value(), "revolute joint drive coordinate must use degrees"));
   }
 
-  const AssemblyConstraintTargetResolver resolver;
+  const AssemblyConstraintTargetResolver resolver(import_context_);
   auto target_a = resolver.resolve_geometric(project, joint.target_a());
   if (target_a.has_error()) {
     return Result<AssemblyRevoluteJointEquationDescriptor>::failure(target_a.error());

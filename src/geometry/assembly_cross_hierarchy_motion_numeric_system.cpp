@@ -28,7 +28,8 @@ namespace {
 [[nodiscard]] Result<std::size_t>
 append_local_joint_drive_residuals(const Project& project,
                                    const AssemblyLocalJointIdentity& identity,
-                                   double length_residual_scale_mm, NumericVector& residuals) {
+                                   double length_residual_scale_mm, NumericVector& residuals,
+                                   StepImportTopologyContext* import_context) {
   auto local_project =
       make_cross_hierarchy_local_evaluation_view(project, identity.assembly_document);
   if (local_project.has_error()) {
@@ -41,7 +42,7 @@ append_local_joint_drive_residuals(const Project& project,
                          "cross-hierarchy motion local joint must exist in containing assembly"));
   }
   if (joint->type() == AssemblyJointType::Revolute) {
-    const AssemblyRevoluteJointEquationBuilder builder;
+    const AssemblyRevoluteJointEquationBuilder builder(import_context);
     auto equation =
         builder.build(local_project.value(), *joint,
                       joint->find_coordinate_slot(AssemblyJointCoordinateRole::Rotation)->value());
@@ -50,7 +51,7 @@ append_local_joint_drive_residuals(const Project& project,
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
   if (joint->type() == AssemblyJointType::Prismatic) {
-    const AssemblyPrismaticJointEquationBuilder builder;
+    const AssemblyPrismaticJointEquationBuilder builder(import_context);
     auto equation = builder.build(
         local_project.value(), *joint,
         joint->find_coordinate_slot(AssemblyJointCoordinateRole::Translation)->value());
@@ -59,7 +60,7 @@ append_local_joint_drive_residuals(const Project& project,
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
   if (joint->type() == AssemblyJointType::Cylindrical) {
-    const AssemblyCylindricalJointEquationBuilder builder;
+    const AssemblyCylindricalJointEquationBuilder builder(import_context);
     auto equation = builder.build(
         local_project.value(), *joint,
         joint->find_coordinate_slot(AssemblyJointCoordinateRole::Translation)->value(),
@@ -69,7 +70,7 @@ append_local_joint_drive_residuals(const Project& project,
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
   if (joint->type() == AssemblyJointType::Planar) {
-    const AssemblyPlanarJointEquationBuilder builder;
+    const AssemblyPlanarJointEquationBuilder builder(import_context);
     auto equation = builder.build(
         local_project.value(), *joint,
         joint->find_coordinate_slot(AssemblyJointCoordinateRole::TranslationU)->value(),
@@ -79,7 +80,7 @@ append_local_joint_drive_residuals(const Project& project,
       return Result<std::size_t>::failure(equation.error());
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
-  const AssemblySphericalJointEquationBuilder builder;
+  const AssemblySphericalJointEquationBuilder builder(import_context);
   auto equation = builder.build(local_project.value(), *joint);
   if (equation.has_error())
     return Result<std::size_t>::failure(equation.error());
@@ -90,7 +91,8 @@ append_local_joint_drive_residuals(const Project& project,
     const Project& project, const AssemblyProjectCrossHierarchyJointIdentity& identity,
     AssemblyJointId selected_joint,
     const std::vector<AssemblyJointCoordinateDrive>& selected_coordinates,
-    double length_residual_scale_mm, NumericVector& residuals) {
+    double length_residual_scale_mm, NumericVector& residuals,
+    StepImportTopologyContext* import_context) {
   const AssemblyHierarchyJoint* joint = project.find_cross_hierarchy_joint(identity.joint);
   if (joint == nullptr) {
     return Result<std::size_t>::failure(validation_error(
@@ -104,7 +106,7 @@ append_local_joint_drive_residuals(const Project& project,
         ->requested_value;
   };
   if (joint->type() == AssemblyJointType::Revolute) {
-    const AssemblyHierarchyRevoluteJointEquationBuilder builder;
+    const AssemblyHierarchyRevoluteJointEquationBuilder builder(import_context);
     auto equation =
         builder.build(project, *joint, requested(AssemblyJointCoordinateRole::Rotation));
     if (equation.has_error())
@@ -112,7 +114,7 @@ append_local_joint_drive_residuals(const Project& project,
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
   if (joint->type() == AssemblyJointType::Prismatic) {
-    const AssemblyHierarchyPrismaticJointEquationBuilder builder;
+    const AssemblyHierarchyPrismaticJointEquationBuilder builder(import_context);
     auto equation =
         builder.build(project, *joint, requested(AssemblyJointCoordinateRole::Translation));
     if (equation.has_error())
@@ -120,7 +122,7 @@ append_local_joint_drive_residuals(const Project& project,
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
   if (joint->type() == AssemblyJointType::Cylindrical) {
-    const AssemblyHierarchyCylindricalJointEquationBuilder builder;
+    const AssemblyHierarchyCylindricalJointEquationBuilder builder(import_context);
     auto equation =
         builder.build(project, *joint, requested(AssemblyJointCoordinateRole::Translation),
                       requested(AssemblyJointCoordinateRole::Rotation));
@@ -129,7 +131,7 @@ append_local_joint_drive_residuals(const Project& project,
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
   if (joint->type() == AssemblyJointType::Planar) {
-    const AssemblyHierarchyPlanarJointEquationBuilder builder;
+    const AssemblyHierarchyPlanarJointEquationBuilder builder(import_context);
     auto equation =
         builder.build(project, *joint, requested(AssemblyJointCoordinateRole::TranslationU),
                       requested(AssemblyJointCoordinateRole::TranslationV),
@@ -138,7 +140,7 @@ append_local_joint_drive_residuals(const Project& project,
       return Result<std::size_t>::failure(equation.error());
     return append_scaled_residuals(equation.value().residual, length_residual_scale_mm, residuals);
   }
-  const AssemblyHierarchySphericalJointEquationBuilder builder;
+  const AssemblyHierarchySphericalJointEquationBuilder builder(import_context);
   auto equation = builder.build(project, *joint);
   if (equation.has_error())
     return Result<std::size_t>::failure(equation.error());
@@ -151,7 +153,7 @@ Result<NumericVector> evaluate_cross_hierarchy_motion_group_residuals(
     const Project& project, const AssemblyCrossHierarchyMotionGroup& motion_group,
     AssemblyJointId selected_cross_hierarchy_joint,
     std::vector<AssemblyJointCoordinateDrive> requested_coordinates,
-    double length_residual_scale_mm) {
+    double length_residual_scale_mm, StepImportTopologyContext* import_context) {
   NumericVector residuals;
   residuals.reserve(motion_group.relationships.size() * 9U);
 
@@ -161,18 +163,18 @@ Result<NumericVector> evaluate_cross_hierarchy_motion_group_residuals(
           using Identity = std::decay_t<decltype(identity)>;
           if constexpr (std::is_same_v<Identity, AssemblyLocalRelationshipIdentity>) {
             return append_cross_hierarchy_local_relationship_residuals(
-                project, identity, length_residual_scale_mm, residuals);
+                project, identity, length_residual_scale_mm, residuals, import_context);
           } else if constexpr (std::is_same_v<Identity, AssemblyLocalJointIdentity>) {
             return append_local_joint_drive_residuals(project, identity, length_residual_scale_mm,
-                                                      residuals);
+                                                      residuals, import_context);
           } else if constexpr (std::is_same_v<Identity,
                                               AssemblyProjectCrossHierarchyRelationshipIdentity>) {
             return append_cross_hierarchy_project_relationship_residuals(
-                project, identity, length_residual_scale_mm, residuals);
+                project, identity, length_residual_scale_mm, residuals, import_context);
           } else {
             return append_cross_joint_drive_residuals(
                 project, identity, selected_cross_hierarchy_joint, requested_coordinates,
-                length_residual_scale_mm, residuals);
+                length_residual_scale_mm, residuals, import_context);
           }
         },
         relationship);

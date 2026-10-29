@@ -9,6 +9,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 // Canonical row order: direction alignment (3), transverse offset (3),
 // translation (1), then signed periodic twist sine/cosine (2).
 struct CylindricalJointResidualDescriptor {
@@ -43,6 +45,9 @@ struct AssemblyCylindricalJointEquationDescriptor {
 
 class AssemblyCylindricalJointEquationBuilder {
 public:
+  AssemblyCylindricalJointEquationBuilder() = default;
+  explicit AssemblyCylindricalJointEquationBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyCylindricalJointEquationDescriptor>
   build(const Project& project, const AssemblyJoint& joint, const Quantity& requested_translation,
         const Quantity& requested_rotation) const;
@@ -52,6 +57,9 @@ public:
         const AssemblyResolvedGeometricTarget& target_a,
         const AssemblyResolvedGeometricTarget& target_b, const Quantity& requested_translation,
         const Quantity& requested_rotation) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

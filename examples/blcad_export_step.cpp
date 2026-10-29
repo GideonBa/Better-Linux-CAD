@@ -1,10 +1,11 @@
 #include "blcad/core/error.hpp"
 #include "blcad/core/part_document_json.hpp"
-#include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/step_exporter.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 
+#include <filesystem>
 #include <iostream>
 #include <string_view>
 
@@ -39,22 +40,22 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  const blcad::geometry::GeometryRecomputeExecutor executor;
+  std::error_code path_error;
+  const auto input_path = std::filesystem::absolute(argv[1], path_error);
+  if (path_error) {
+    std::cerr << "Cannot resolve input document asset root: " << path_error.message() << '\n';
+    return 1;
+  }
+  blcad::geometry::StepImportTopologyContext import_context(input_path.parent_path());
+  const blcad::geometry::GeometryRecomputeExecutor executor{&import_context};
   const auto recompute_summary = executor.execute_document(document.value(), cache.value());
   if (recompute_summary.has_error()) {
     print_error(recompute_summary.error());
     return 1;
   }
 
-  const auto final_shape = blcad::geometry::BodyResultInspector{}.resolve_compatible_final_shape(
-      document.value(), cache.value());
-  if (final_shape.has_error()) {
-    print_error(final_shape.error());
-    return 1;
-  }
-
-  const blcad::geometry::StepExporter exporter;
-  const auto written = exporter.write_step(final_shape.value(), argv[2]);
+  const blcad::geometry::StepExporter exporter{&import_context};
+  const auto written = exporter.write_document_step(document.value(), cache.value(), argv[2]);
   if (written.has_error()) {
     print_error(written.error());
     return 1;

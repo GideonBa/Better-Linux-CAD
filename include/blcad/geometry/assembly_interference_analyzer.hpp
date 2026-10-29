@@ -9,6 +9,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 // Stable posed-leaf identity for interference relationships: assembly id,
 // subassembly path, and component id. Never an OCCT topology id.
 struct AssemblyLeafIdentity {
@@ -55,9 +57,15 @@ struct AssemblyInterferenceAnalysis {
 // and records are derived and unpersisted.
 class AssemblyInterferenceAnalyzer {
 public:
+  AssemblyInterferenceAnalyzer() = default;
+  explicit AssemblyInterferenceAnalyzer(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyInterferenceAnalysis> analyze(
       const Project& project,
       AssemblyInterferenceAnalysisOptions options = AssemblyInterferenceAnalysisOptions{}) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 // One derived clearance violation: two non-interfering posed leaves closer
@@ -97,9 +105,15 @@ struct AssemblyClearanceAnalysis {
 // remaining pairs use the OCCT minimum distance between the posed shapes.
 class AssemblyClearanceAnalyzer {
 public:
+  AssemblyClearanceAnalyzer() = default;
+  explicit AssemblyClearanceAnalyzer(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyClearanceAnalysis>
   analyze(const Project& project,
           AssemblyClearanceAnalysisOptions options = AssemblyClearanceAnalysisOptions{}) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

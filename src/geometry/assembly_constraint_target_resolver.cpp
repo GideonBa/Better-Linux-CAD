@@ -600,6 +600,12 @@ AssemblyConstraintTargetResolver::resolve_geometric(const Project& project,
     return Result<AssemblyResolvedGeometricTarget>::failure(context.error());
   }
 
+  // Explicit BLCAD origin frames remain valid semantic inputs for an immutable imported Part,
+  // but their owning imported geometry still requires a current verified source.
+  auto imported = observe_imported_part_sources(*context.value().part, import_context_);
+  if (!imported)
+    return Result<AssemblyResolvedGeometricTarget>::failure(imported.error());
+
   if (is_imported_topology_target_spelling(target.semantic_reference())) {
     auto identity = parse_imported_topology_target_spelling(target.semantic_reference());
     if (!identity)
@@ -633,6 +639,21 @@ AssemblyConstraintTargetResolver::resolve_geometric(const Project& project,
         assembly_geometric_target_capabilities(kind.value()),
         AssemblyGeometricTargetCoordinateSpace::ComponentLocal,
         {context.value().component->transform()}});
+  }
+
+  if (is_assembly_frame_target_spelling(target.semantic_reference())) {
+    auto identity = parse_assembly_frame_target_spelling(target.semantic_reference());
+    if (!identity)
+      return Result<AssemblyResolvedGeometricTarget>::failure(identity.error());
+    const auto* datum = context.value().part->find_datum_plane(identity.value());
+    if (datum == nullptr)
+      return Result<AssemblyResolvedGeometricTarget>::failure(
+          validation_error(target.semantic_reference(),
+                           "explicit datum-plane frame must resolve to an owned DatumPlane"));
+    return resolved_reference_target(
+        context.value(), target, AssemblyGeometricTargetSourceKind::DatumPlaneFrame,
+        AssemblyFrameTargetDescriptor{datum->origin(), datum->x_axis(), datum->y_axis(),
+                                      datum->normal()});
   }
 
   if (is_assembly_reference_target_spelling(target.semantic_reference())) {

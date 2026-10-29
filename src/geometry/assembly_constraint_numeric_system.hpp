@@ -31,6 +31,7 @@ struct AssemblyNumericSystemOptions {
   double length_residual_scale_mm = 1.0;
   double finite_difference_translation_step_mm = 1.0e-4;
   double finite_difference_rotation_step_deg = 1.0e-4;
+  StepImportTopologyContext* import_context{};
 };
 
 struct AssemblyNumericJointDrive {
@@ -89,11 +90,13 @@ append_scaled_residuals(const SphericalJointResidualDescriptor& residual,
 
 [[nodiscard]] Result<NumericVector>
 evaluate_residuals(const Project& project, const std::vector<AssemblyConstraintId>& constraint_ids,
-                   double length_residual_scale_mm);
+                   double length_residual_scale_mm,
+                   StepImportTopologyContext* import_context = nullptr);
 
 [[nodiscard]] Result<NumericVector>
 evaluate_residuals(const Project& project, const AssemblyNumericRelationshipSet& relationships,
-                   double length_residual_scale_mm);
+                   double length_residual_scale_mm,
+                   StepImportTopologyContext* import_context = nullptr);
 
 [[nodiscard]] double residual_rms(const NumericVector& residuals) noexcept;
 [[nodiscard]] double residual_max_abs(const NumericVector& residuals) noexcept;

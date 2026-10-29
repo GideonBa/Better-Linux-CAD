@@ -18,6 +18,7 @@ public:
   [[nodiscard]] Result<std::size_t> inspect();
   [[nodiscard]] Result<std::size_t> inspect_geometry();
   [[nodiscard]] Result<std::size_t> prepare_topology();
+  [[nodiscard]] Result<std::size_t> prepare_reference();
   [[nodiscard]] bool accept_selection(const GuiSelection&);
   void clear_selected_reference();
   [[nodiscard]] Result<std::size_t> preview();

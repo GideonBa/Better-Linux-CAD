@@ -1289,6 +1289,24 @@ std::size_t OcctViewport::presentation_count() const noexcept {
   return impl_->presentations.size();
 }
 
+std::vector<std::string> OcctViewport::scene_semantic_ids() const {
+  std::vector<std::string> ids;
+  ids.reserve(impl_->presentations.size());
+  for (const auto& presentation : impl_->presentations)
+    ids.push_back(presentation.item.semantic_id);
+  return ids;
+}
+
+bool OcctViewport::scene_presentation_visible(std::string_view semantic_id) const noexcept {
+  if (impl_->context.IsNull())
+    return false;
+  return std::any_of(
+      impl_->presentations.begin(), impl_->presentations.end(), [&](const auto& presentation) {
+        return presentation.item.semantic_id == semantic_id && !presentation.interactive.IsNull() &&
+               impl_->context->IsDisplayed(presentation.interactive);
+      });
+}
+
 std::size_t OcctViewport::feature_preview_count() const noexcept {
   return impl_->feature_previews.size();
 }

@@ -1,5 +1,6 @@
 #include "blcad/gui/gui_assembly_workbench.hpp"
 #include "blcad/gui/gui_step_import_workbench.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 
 #include "blcad/geometry/assembly_rigid_body_solver.hpp"
 
@@ -11,17 +12,28 @@ template <typename Mutation>
 Result<std::size_t> commit(GuiDocumentSession& session, std::string label, Mutation mutation) {
   if (!session.project())
     return Result<std::size_t>::failure(Error::validation("gui.assembly", "operation requires an active Project"));
-  return session.commit_project_transaction(std::move(label), std::move(mutation));
+  return commit_project_with_step_import_context(session, std::move(label), std::move(mutation));
 }
 template <typename Mutation>
 Result<std::size_t> preview(const GuiDocumentSession& session, Mutation mutation) {
   if (!session.project())
     return Result<std::size_t>::failure(Error::validation("gui.assembly", "preview requires an active Project"));
-  Project candidate = *session.project();
-  auto changed = mutation(candidate);
-  if (changed.has_error()) return changed;
-  auto valid = candidate.validate_assembly_structure();
-  return valid.has_error() ? Result<std::size_t>::failure(valid.error()) : changed;
+  return query_with_step_import_context(session, [&](auto* context) {
+    Project candidate = *session.project();
+    auto changed = [&] {
+      if constexpr (std::is_invocable_v<Mutation, Project&, geometry::StepImportTopologyContext*>)
+        return mutation(candidate, context);
+      else
+        return mutation(candidate);
+    }();
+    if (!changed)
+      return changed;
+    auto valid = candidate.validate_assembly_structure();
+    if (!valid)
+      return valid;
+    valid = validate_visible_step_imports(candidate, context);
+    return valid ? changed : valid;
+  });
 }
 } // namespace
 
@@ -57,18 +69,121 @@ Result<std::size_t> GuiAssemblyWorkbench::set_component_visibility(GuiDocumentSe
 Result<std::size_t> GuiAssemblyWorkbench::set_component_suppression(GuiDocumentSession& s, ComponentInstanceId id, ComponentSuppressionState v) const { return commit(s, "Set component suppression", [id,v](Project& p) { return p.assembly().set_component_instance_suppression_state(id,v); }); }
 Result<std::size_t> GuiAssemblyWorkbench::set_component_grounding(GuiDocumentSession& s, ComponentInstanceId id, ComponentGroundingState v) const { return commit(s, "Set component grounding", [id,v](Project& p) { return p.assembly().set_component_instance_grounding_state(id,v); }); }
 
-Result<std::size_t> GuiAssemblyWorkbench::preview_root_constraint(const GuiDocumentSession& s, AssemblyConstraint v) const { return preview(s, [v=std::move(v)](Project& p) mutable { return p.assembly().add_constraint(std::move(v)); }); }
-Result<std::size_t> GuiAssemblyWorkbench::apply_root_constraint(GuiDocumentSession& s, AssemblyConstraint v) const { auto ok=preview_root_constraint(s,v); if(ok.has_error()) return ok; return commit(s,"Apply Assembly relationship",[v=std::move(v)](Project& p) mutable{return p.assembly().add_constraint(std::move(v));}); }
-Result<std::size_t> GuiAssemblyWorkbench::preview_root_joint(const GuiDocumentSession& s, AssemblyJoint v) const { return preview(s, [v=std::move(v)](Project& p) mutable { return p.assembly().add_joint(std::move(v)); }); }
-Result<std::size_t> GuiAssemblyWorkbench::apply_root_joint(GuiDocumentSession& s, AssemblyJoint v) const { auto ok=preview_root_joint(s,v); if(ok.has_error()) return ok; return commit(s,"Apply Assembly joint",[v=std::move(v)](Project& p) mutable{return p.assembly().add_joint(std::move(v));}); }
-Result<std::size_t> GuiAssemblyWorkbench::apply_cross_constraint(GuiDocumentSession& s, AssemblyHierarchyConstraint v) const { return commit(s,"Apply cross-hierarchy relationship",[v=std::move(v)](Project& p) mutable{return p.add_cross_hierarchy_constraint(std::move(v));}); }
-Result<std::size_t> GuiAssemblyWorkbench::apply_cross_joint(GuiDocumentSession& s, AssemblyHierarchyJoint v) const { return commit(s,"Apply cross-hierarchy joint",[v=std::move(v)](Project& p) mutable{return p.add_cross_hierarchy_joint(std::move(v));}); }
+Result<std::size_t> GuiAssemblyWorkbench::preview_root_constraint(const GuiDocumentSession& s,
+                                                                  AssemblyConstraint v) const {
+  return preview(s, [v = std::move(v)](Project& p, auto* context) mutable {
+    auto valid = validate_root_assembly_targets(p, v, context);
+    if (!valid)
+      return valid;
+    return p.assembly().add_constraint(std::move(v));
+  });
+}
+Result<std::size_t> GuiAssemblyWorkbench::apply_root_constraint(GuiDocumentSession& s,
+                                                                AssemblyConstraint v) const {
+  auto ok = preview_root_constraint(s, v);
+  if (ok.has_error())
+    return ok;
+  return commit(s, "Apply Assembly relationship",
+                [v = std::move(v)](Project& p, auto* context) mutable {
+                  auto valid = validate_root_assembly_targets(p, v, context);
+                  if (!valid)
+                    return valid;
+                  return p.assembly().add_constraint(std::move(v));
+                });
+}
+Result<std::size_t> GuiAssemblyWorkbench::preview_root_joint(const GuiDocumentSession& s,
+                                                             AssemblyJoint v) const {
+  return preview(s, [v = std::move(v)](Project& p, auto* context) mutable {
+    auto valid = validate_root_assembly_targets(p, v, context);
+    if (!valid)
+      return valid;
+    return p.assembly().add_joint(std::move(v));
+  });
+}
+Result<std::size_t> GuiAssemblyWorkbench::apply_root_joint(GuiDocumentSession& s,
+                                                           AssemblyJoint v) const {
+  auto ok = preview_root_joint(s, v);
+  if (ok.has_error())
+    return ok;
+  return commit(s, "Apply Assembly joint", [v = std::move(v)](Project& p, auto* context) mutable {
+    auto valid = validate_root_assembly_targets(p, v, context);
+    if (!valid)
+      return valid;
+    return p.assembly().add_joint(std::move(v));
+  });
+}
+Result<std::size_t>
+GuiAssemblyWorkbench::apply_cross_constraint(GuiDocumentSession& s,
+                                             AssemblyHierarchyConstraint v) const {
+  return commit(s, "Apply cross-hierarchy relationship",
+                [v = std::move(v)](Project& p, auto* context) mutable {
+                  auto valid = validate_hierarchy_assembly_targets(p, v, context);
+                  if (!valid)
+                    return valid;
+                  return p.add_cross_hierarchy_constraint(std::move(v));
+                });
+}
+Result<std::size_t> GuiAssemblyWorkbench::apply_cross_joint(GuiDocumentSession& s,
+                                                            AssemblyHierarchyJoint v) const {
+  return commit(s, "Apply cross-hierarchy joint",
+                [v = std::move(v)](Project& p, auto* context) mutable {
+                  auto valid = validate_hierarchy_assembly_targets(p, v, context);
+                  if (!valid)
+                    return valid;
+                  return p.add_cross_hierarchy_joint(std::move(v));
+                });
+}
 Result<std::size_t> GuiAssemblyWorkbench::set_root_joint_coordinate(GuiDocumentSession& s, AssemblyJointId id, AssemblyJointCoordinateRole role, Quantity value) const { return commit(s,"Set joint coordinate",[id,role,value](Project& p){return p.assembly().set_joint_coordinate_value(id,role,value);}); }
 
-Result<geometry::AssemblySolveDiagnostics> GuiAssemblyWorkbench::inspect_root_group(const GuiDocumentSession& s, std::vector<ComponentInstanceId> group) const { if(!s.project()) return Result<geometry::AssemblySolveDiagnostics>::failure(Error::validation("gui.assembly","inspection requires Project")); return geometry::AssemblySolveDiagnosticsAnalyzer{}.analyze(*s.project(),group); }
-Result<geometry::AssemblySolveResult> GuiAssemblyWorkbench::solve_root_group(const GuiDocumentSession& s, std::vector<ComponentInstanceId> group) const { if(!s.project()) return Result<geometry::AssemblySolveResult>::failure(Error::validation("gui.assembly","solve requires Project")); return geometry::AssemblyRigidBodySolver{}.solve(*s.project(),group); }
-Result<std::size_t> GuiAssemblyWorkbench::apply_solve(GuiDocumentSession& s,const geometry::AssemblySolveResult& result) const { if(!result.converged()) return Result<std::size_t>::failure(Error::validation("gui.assembly","only converged solve results can be applied")); return commit(s,"Apply Assembly solve",[result](Project& p){return geometry::AssemblySolveResultApplier{}.apply(p,result);}); }
-Result<geometry::AssemblyJointMotionResult> GuiAssemblyWorkbench::preview_joint_motion(const GuiDocumentSession& s,AssemblyJointId id,Quantity q) const { if(!s.project()) return Result<geometry::AssemblyJointMotionResult>::failure(Error::validation("gui.assembly","motion requires Project")); return geometry::AssemblyJointMotionSolver{}.move(*s.project(),id,q); }
-Result<std::size_t> GuiAssemblyWorkbench::apply_joint_motion(GuiDocumentSession& s,const geometry::AssemblyJointMotionResult& result) const { if(!result.converged()) return Result<std::size_t>::failure(Error::validation("gui.assembly","only converged motion can be applied")); return commit(s,"Apply joint motion",[result](Project& p){return geometry::AssemblyJointMotionResultApplier{}.apply(p,result);}); }
+Result<geometry::AssemblySolveDiagnostics>
+GuiAssemblyWorkbench::inspect_root_group(const GuiDocumentSession& s,
+                                         std::vector<ComponentInstanceId> group) const {
+  if (!s.project())
+    return Result<geometry::AssemblySolveDiagnostics>::failure(
+        Error::validation("gui.assembly", "inspection requires Project"));
+  return query_with_step_import_context(s, [&](auto* context) {
+    return geometry::AssemblySolveDiagnosticsAnalyzer{context}.analyze(*s.project(), group);
+  });
+}
+Result<geometry::AssemblySolveResult>
+GuiAssemblyWorkbench::solve_root_group(const GuiDocumentSession& s,
+                                       std::vector<ComponentInstanceId> group) const {
+  if (!s.project())
+    return Result<geometry::AssemblySolveResult>::failure(
+        Error::validation("gui.assembly", "solve requires Project"));
+  return query_with_step_import_context(s, [&](auto* context) {
+    return geometry::AssemblyRigidBodySolver{context}.solve(*s.project(), group);
+  });
+}
+Result<std::size_t>
+GuiAssemblyWorkbench::apply_solve(GuiDocumentSession& s,
+                                  const geometry::AssemblySolveResult& result) const {
+  if (!result.converged())
+    return Result<std::size_t>::failure(
+        Error::validation("gui.assembly", "only converged solve results can be applied"));
+  return commit(s, "Apply Assembly solve", [result](Project& p, auto* context) {
+    return geometry::AssemblySolveResultApplier{context}.apply(p, result);
+  });
+}
+Result<geometry::AssemblyJointMotionResult>
+GuiAssemblyWorkbench::preview_joint_motion(const GuiDocumentSession& s, AssemblyJointId id,
+                                           Quantity q) const {
+  if (!s.project())
+    return Result<geometry::AssemblyJointMotionResult>::failure(
+        Error::validation("gui.assembly", "motion requires Project"));
+  return query_with_step_import_context(s, [&](auto* context) {
+    return geometry::AssemblyJointMotionSolver{context}.move(*s.project(), id, q);
+  });
+}
+Result<std::size_t>
+GuiAssemblyWorkbench::apply_joint_motion(GuiDocumentSession& s,
+                                         const geometry::AssemblyJointMotionResult& result) const {
+  if (!result.converged())
+    return Result<std::size_t>::failure(
+        Error::validation("gui.assembly", "only converged motion can be applied"));
+  return commit(s, "Apply joint motion", [result](Project& p, auto* context) {
+    return geometry::AssemblyJointMotionResultApplier{context}.apply(p, result);
+  });
+}
 
 } // namespace blcad::gui

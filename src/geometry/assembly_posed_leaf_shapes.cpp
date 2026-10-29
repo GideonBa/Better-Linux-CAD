@@ -2,6 +2,7 @@
 
 #include "assembly_occt_rigid_transform.hpp"
 #include "assembly_part_shape_definitions.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "occt_failure_message.hpp"
 
 #include <BRepBuilderAPI_Transform.hxx>
@@ -66,8 +67,9 @@ std::string leaf_occurrence_key(const AssemblyLeafOccurrenceDescriptor& leaf) {
   return key;
 }
 
-Result<PosedLeafShapesBuild> build_posed_leaf_shapes(const Project& project) {
-  const AssemblyPosedLeafShapeBuilder builder;
+Result<PosedLeafShapesBuild> build_posed_leaf_shapes(const Project& project,
+                                                     StepImportTopologyContext* import_context) {
+  const AssemblyPosedLeafShapeBuilder builder(import_context);
   return builder.build(project);
 }
 
@@ -90,7 +92,7 @@ Result<PosedLeafShapesBuild> AssemblyPosedLeafShapeBuilder::build(const Project&
       referenced_part_ids.push_back(leaf.referenced_part_document);
     }
 
-    const AssemblyPartShapeDefinitionBuilder part_definition_builder;
+    const AssemblyPartShapeDefinitionBuilder part_definition_builder(import_context_);
     auto part_definitions =
         part_definition_builder.build(project, std::move(referenced_part_ids));
     if (part_definitions.has_error()) {
@@ -116,6 +118,11 @@ Result<PosedLeafShapesBuild> AssemblyPosedLeafShapeBuilder::build(const Project&
       build.leaves.push_back(PosedLeafShape{std::move(leaf), std::move(posed.value())});
     }
 
+    if (import_context_) {
+      auto fresh = import_context_->validate_sources();
+      if (!fresh)
+        return Result<PosedLeafShapesBuild>::failure(fresh.error());
+    }
     return Result<PosedLeafShapesBuild>::success(std::move(build));
   } catch (const Standard_Failure& failure) {
     return Result<PosedLeafShapesBuild>::failure(

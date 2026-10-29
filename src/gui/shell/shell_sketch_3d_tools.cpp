@@ -152,8 +152,9 @@ struct ShellSketch3DTools::Impl {
 
   bool available() const {
     const auto& session = window.session();
-    return session.part_document() && session.derived_results_fresh() &&
-           !session.reference_repair_mode() && !window.active_sketch() && !session.task().active();
+    return session.part_document() && !session.part_document()->is_reference_part() &&
+           session.derived_results_fresh() && !session.reference_repair_mode() &&
+           !window.active_sketch() && !session.task().active();
   }
   bool current() const {
     const auto& session = window.session();

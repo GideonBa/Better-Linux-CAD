@@ -1,4 +1,5 @@
 #include "blcad/geometry/assembly_geometric_target.hpp"
+#include "blcad/core/assembly_reference_target.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -151,6 +152,18 @@ validate_source_metadata(const AssemblyResolvedGeometricTarget& target) {
     // Exact reference-geometry source ids/grammar are intentionally introduced in
     // Block 32. The endpoint semantic-reference string remains exact identity here.
     break;
+  case AssemblyGeometricTargetSourceKind::DatumPlaneFrame: {
+    if (source.source_feature || source.source_profile || source.semantic_face ||
+        source.semantic_axis || source.semantic_seating_plane || source.imported_topology)
+      return Result<std::size_t>::failure(validation_error(
+          "DatumPlaneFrame target must not invent a feature or imported topology producer"));
+    const auto spelling = std::visit(
+        [](const auto& endpoint) { return endpoint.semantic_reference; }, target.endpoint);
+    if (!parse_assembly_frame_target_spelling(spelling))
+      return Result<std::size_t>::failure(validation_error(
+          "DatumPlaneFrame target requires its explicit canonical datum-plane frame endpoint"));
+    break;
+  }
   case AssemblyGeometricTargetSourceKind::ImportedPlanarFace:
   case AssemblyGeometricTargetSourceKind::ImportedCylindricalFace:
   case AssemblyGeometricTargetSourceKind::ImportedLinearEdge:
@@ -223,6 +236,7 @@ validate_source_metadata(const AssemblyResolvedGeometricTarget& target) {
   case AssemblyGeometricTargetSourceKind::DatumAxis:
     return std::holds_alternative<AssemblyAxisTargetDescriptor>(target.descriptor);
   case AssemblyGeometricTargetSourceKind::CircularFeatureSeat:
+  case AssemblyGeometricTargetSourceKind::DatumPlaneFrame:
     return std::holds_alternative<AssemblyFrameTargetDescriptor>(target.descriptor);
   }
   return false;
@@ -310,6 +324,8 @@ std::string_view to_string(AssemblyGeometricTargetSourceKind kind) noexcept {
     return "GeneratedVertex";
   case AssemblyGeometricTargetSourceKind::DatumPlane:
     return "DatumPlane";
+  case AssemblyGeometricTargetSourceKind::DatumPlaneFrame:
+    return "DatumPlaneFrame";
   case AssemblyGeometricTargetSourceKind::DatumAxis:
     return "DatumAxis";
   case AssemblyGeometricTargetSourceKind::ConstructionLine:
@@ -380,6 +396,7 @@ assembly_geometric_target_capabilities(AssemblyGeometricTargetSourceKind kind) {
     return {AssemblyGeometricTargetCapability::Axis,
             AssemblyGeometricTargetCapability::Line};
   case AssemblyGeometricTargetSourceKind::CircularFeatureSeat:
+  case AssemblyGeometricTargetSourceKind::DatumPlaneFrame:
     return {AssemblyGeometricTargetCapability::Plane,
             AssemblyGeometricTargetCapability::Axis,
             AssemblyGeometricTargetCapability::Frame};

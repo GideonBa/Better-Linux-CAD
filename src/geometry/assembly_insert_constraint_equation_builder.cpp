@@ -25,13 +25,15 @@ struct ResolvedAssemblySpaceGeometricTarget {
 }
 
 [[nodiscard]] bool legacy_feature_target(std::string_view semantic_reference) noexcept {
-  return !semantic_reference.starts_with("ref:") && !semantic_reference.starts_with("topo:");
+  return !semantic_reference.starts_with("ref:") && !semantic_reference.starts_with("topo:") &&
+         !semantic_reference.starts_with("imported:") && !semantic_reference.starts_with("frame:");
 }
 
 [[nodiscard]] Result<ResolvedAssemblySpaceGeometricTarget>
 resolve_assembly_space_geometric_target(const Project& project,
-                                        const AssemblyConstraintTarget& target) {
-  const AssemblyConstraintTargetResolver target_resolver;
+                                        const AssemblyConstraintTarget& target,
+                                        StepImportTopologyContext* import_context) {
+  const AssemblyConstraintTargetResolver target_resolver(import_context);
   auto resolved_target = target_resolver.resolve_geometric(project, target);
   if (resolved_target.has_error()) {
     if (legacy_feature_target(target.semantic_reference())) {
@@ -91,12 +93,14 @@ AssemblyInsertConstraintEquationBuilder::build(const Project& project,
         constraint.id().value(), "Insert equation construction requires an Insert constraint"));
   }
 
-  auto geometric_target_a = resolve_assembly_space_geometric_target(project, constraint.target_a());
+  auto geometric_target_a =
+      resolve_assembly_space_geometric_target(project, constraint.target_a(), import_context_);
   if (geometric_target_a.has_error()) {
     return Result<AssemblyInsertConstraintEquationDescriptor>::failure(geometric_target_a.error());
   }
 
-  auto geometric_target_b = resolve_assembly_space_geometric_target(project, constraint.target_b());
+  auto geometric_target_b =
+      resolve_assembly_space_geometric_target(project, constraint.target_b(), import_context_);
   if (geometric_target_b.has_error()) {
     return Result<AssemblyInsertConstraintEquationDescriptor>::failure(geometric_target_b.error());
   }

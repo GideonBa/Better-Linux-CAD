@@ -423,6 +423,10 @@ Result<BindingApplication> AssemblyDocument::apply_bindings_to(PartDocument& par
       continue;
     }
 
+    if (part.is_reference_part())
+      return Result<BindingApplication>::failure(
+          Error::validation(part.id().value(), "Reference Part parameters are read-only"));
+
     const Parameter* assembly_parameter = find_parameter(binding.assembly_parameter());
     if (assembly_parameter == nullptr) {
       return Result<BindingApplication>::failure(Error::validation(

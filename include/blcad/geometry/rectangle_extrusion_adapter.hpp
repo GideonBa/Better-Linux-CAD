@@ -64,6 +64,7 @@ private:
   friend class StepExporter;
   friend class StepImportReader;
   friend class StepImportTopology;
+  friend class ReferencePartGeometry;
   friend class AssemblyStepExporter;
   friend class Sketch3DGeometryAdapter;
   friend class OcctShapeView;

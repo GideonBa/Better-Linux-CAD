@@ -10,6 +10,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 // One child-assembly-local rigid-body solve selected through an exact rooted
 // subassembly occurrence path. The local result uses the referenced child
 // AssemblyDocument as its solver root; occurrence boundary transforms remain
@@ -31,11 +33,17 @@ struct AssemblyFlexibleSubassemblySolveResult {
 // the same child document share the same internal authored component pose.
 class AssemblyFlexibleSubassemblySolver {
 public:
+  AssemblyFlexibleSubassemblySolver() = default;
+  explicit AssemblyFlexibleSubassemblySolver(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyFlexibleSubassemblySolveResult> solve(
       const Project& project,
       const std::vector<SubassemblyInstanceId>& occurrence_path,
       const std::vector<ComponentInstanceId>& connected_group,
       AssemblyRigidBodySolverOptions options = {}) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 // Atomically applies a fresh converged child-local solve back to the referenced
@@ -43,8 +51,14 @@ public:
 // are reused against a freshly reconstructed child-as-root solve view.
 class AssemblyFlexibleSubassemblySolveResultApplier {
 public:
+  AssemblyFlexibleSubassemblySolveResultApplier() = default;
+  explicit AssemblyFlexibleSubassemblySolveResultApplier(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<std::size_t>
   apply(Project& project, const AssemblyFlexibleSubassemblySolveResult& result) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

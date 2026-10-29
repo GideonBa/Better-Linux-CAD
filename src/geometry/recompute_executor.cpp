@@ -1,19 +1,20 @@
 #include "blcad/geometry/recompute_executor.hpp"
-#include "blcad/geometry/result_face_support.hpp"
-#include "blcad/core/sketch_profile_roles.hpp"
 #include "blcad/core/sketch_contour.hpp"
+#include "blcad/core/sketch_profile_roles.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 
-#include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/body_rotation_axis_resolver.hpp"
-#include "blcad/geometry/sketch_line_axis_resolver.hpp"
+#include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/dimension_driven_profile_resolver.hpp"
 #include "blcad/geometry/profile_region_classifier.hpp"
 #include "blcad/geometry/reference_generated_profile_resolver.hpp"
+#include "blcad/geometry/reference_part_geometry.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
-#include "blcad/geometry/step_import_topology_context.hpp"
+#include "blcad/geometry/sketch_line_axis_resolver.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
 #include "blcad/geometry/sketch_region_finder.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "loft_section_alignment_internal.hpp"
 
 #include <algorithm>
@@ -28,6 +29,15 @@ namespace {
 
 constexpr double k_tolerance = 1.0e-9;
 constexpr double k_pi = 3.14159265358979323846;
+
+const ImportedBodyFeature* imported_body_feature(const PartDocument& document,
+                                                 const std::string& id) {
+  const auto& features = document.imported_body_features();
+  const auto found = std::find_if(features.begin(), features.end(), [&id](const auto& feature) {
+    return feature.id().value() == id;
+  });
+  return found == features.end() ? nullptr : &*found;
+}
 
 struct LocalCompositeProfileVertices {
   std::vector<Point2> outer;
@@ -4173,13 +4183,44 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_feature(const PartDocumen
       geometry_error(feature.id().value(), "feature type is not supported by geometry recompute"));
 }
 
+Result<std::size_t> GeometryRecomputeExecutor::execute_imported_body_feature(
+    const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  const auto* feature = imported_body_feature(document, feature_id.value());
+  if (feature == nullptr || import_context_ == nullptr)
+    return Result<std::size_t>::failure(validation_error(
+        feature_id.value(),
+        "imported body recompute requires an owned feature and explicit asset-root context"));
+  return ReferencePartGeometry{}.seed_imported_body_feature(document, *feature, *import_context_,
+                                                            shape_cache);
+}
+
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const RecomputePlan& plan,
                                         ShapeCache& shape_cache) const {
+  if (document.is_reference_part()) {
+    if (import_context_ == nullptr)
+      return Result<GeometryRecomputeSummary>::failure(validation_error(
+          document.id().value(), "Reference Part recompute requires explicit asset-root context"));
+    auto seeded = ReferencePartGeometry{}.seed_reference(document, *import_context_, shape_cache);
+    return seeded ? Result<GeometryRecomputeSummary>::success({})
+                  : Result<GeometryRecomputeSummary>::failure(seeded.error());
+  }
+  for (const auto& feature : document.imported_body_features()) {
+    if (import_context_ == nullptr)
+      return Result<GeometryRecomputeSummary>::failure(validation_error(
+          feature.id().value(), "imported body recompute requires explicit asset-root context"));
+    // Even an empty incremental plan must not accept stale external base geometry.
+    auto verified =
+        ReferencePartGeometry{}.resolve_imported_body_feature(document, feature, *import_context_);
+    if (!verified)
+      return Result<GeometryRecomputeSummary>::failure(verified.error());
+  }
   ShapeCache working_cache = shape_cache;
-  const bool transactional_cache = !document.bodies().empty() ||
-                                   !document.imported_topology_catalogs().empty() ||
-                                   import_context_ != nullptr;
+  if (working_cache.reference_result() != nullptr)
+    working_cache.clear();
+  const bool transactional_cache =
+      !document.bodies().empty() || !document.imported_topology_catalogs().empty() ||
+      import_context_ != nullptr || shape_cache.reference_result() != nullptr;
   ShapeCache& execution_cache = transactional_cache ? working_cache : shape_cache;
   GeometryRecomputeSummary summary;
   for (const RecomputeStep& step : plan.steps()) {
@@ -4189,6 +4230,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
         return Result<GeometryRecomputeSummary>::failure(resolved.error());
     }
     const Feature* feature = document.find_feature(FeatureId(step.node_id));
+    const ImportedBodyFeature* imported = imported_body_feature(document, step.node_id);
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(step.node_id));
     const SweepFeature* sweep = document.find_sweep_feature(FeatureId(step.node_id));
     const LoftFeature* loft = document.find_loft_feature(FeatureId(step.node_id));
@@ -4206,13 +4248,15 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
         document.find_body_boolean_feature(FeatureId(step.node_id));
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(step.node_id));
-    if (feature == nullptr && revolve == nullptr && sweep == nullptr && loft == nullptr &&
-        surface == nullptr && linear_pattern == nullptr && circular_pattern == nullptr &&
-        mirror == nullptr && fillet == nullptr && chamfer == nullptr && shell == nullptr &&
-        draft == nullptr && body_boolean == nullptr && body_transform == nullptr)
+    if (feature == nullptr && imported == nullptr && revolve == nullptr && sweep == nullptr &&
+        loft == nullptr && surface == nullptr && linear_pattern == nullptr &&
+        circular_pattern == nullptr && mirror == nullptr && fillet == nullptr &&
+        chamfer == nullptr && shell == nullptr && draft == nullptr && body_boolean == nullptr &&
+        body_transform == nullptr)
       continue;
 
     const FeatureId executable_id = feature != nullptr            ? feature->id()
+                                    : imported != nullptr         ? imported->id()
                                     : revolve != nullptr          ? revolve->id()
                                     : sweep != nullptr            ? sweep->id()
                                     : loft != nullptr             ? loft->id()
@@ -4233,7 +4277,9 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     }
 
     auto executed =
-        feature != nullptr   ? execute_feature(document, *feature, execution_cache)
+        feature != nullptr ? execute_feature(document, *feature, execution_cache)
+        : imported != nullptr
+            ? execute_imported_body_feature(document, imported->id(), execution_cache)
         : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
         : sweep != nullptr   ? execute_sweep(document, sweep->id(), execution_cache)
         : loft != nullptr    ? execute_loft(document, loft->id(), execution_cache)
@@ -4271,10 +4317,23 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
   const auto references = document.validate_reference_sources();
   if (!references)
     return Result<GeometryRecomputeSummary>::failure(references.error());
+  if (document.is_reference_part()) {
+    if (import_context_ == nullptr)
+      return Result<GeometryRecomputeSummary>::failure(validation_error(
+          document.id().value(), "Reference Part recompute requires explicit asset-root context"));
+    auto seeded = ReferencePartGeometry{}.seed_reference(document, *import_context_, shape_cache);
+    return seeded ? Result<GeometryRecomputeSummary>::success({})
+                  : Result<GeometryRecomputeSummary>::failure(seeded.error());
+  }
+  if (!document.imported_body_features().empty() && import_context_ == nullptr)
+    return Result<GeometryRecomputeSummary>::failure(validation_error(
+        document.id().value(), "imported body recompute requires explicit asset-root context"));
   ShapeCache working_cache = shape_cache;
-  const bool transactional_cache = !document.bodies().empty() ||
-                                   !document.imported_topology_catalogs().empty() ||
-                                   import_context_ != nullptr;
+  if (working_cache.reference_result() != nullptr)
+    working_cache.clear();
+  const bool transactional_cache =
+      !document.bodies().empty() || !document.imported_topology_catalogs().empty() ||
+      import_context_ != nullptr || shape_cache.reference_result() != nullptr;
   ShapeCache& execution_cache = transactional_cache ? working_cache : shape_cache;
   GeometryRecomputeSummary summary;
   std::vector<std::string> executable_ids;
@@ -4296,6 +4355,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
         return Result<GeometryRecomputeSummary>::failure(resolved.error());
     }
     const Feature* feature = document.find_feature(FeatureId(executable_id));
+    const ImportedBodyFeature* imported = imported_body_feature(document, executable_id);
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(executable_id));
     const SweepFeature* sweep = document.find_sweep_feature(FeatureId(executable_id));
     const LoftFeature* loft = document.find_loft_feature(FeatureId(executable_id));
@@ -4313,13 +4373,15 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
         document.find_body_boolean_feature(FeatureId(executable_id));
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(executable_id));
-    if (feature == nullptr && revolve == nullptr && sweep == nullptr && loft == nullptr &&
-        surface == nullptr && linear_pattern == nullptr && circular_pattern == nullptr &&
-        mirror == nullptr && fillet == nullptr && chamfer == nullptr && shell == nullptr &&
-        draft == nullptr && body_boolean == nullptr && body_transform == nullptr)
+    if (feature == nullptr && imported == nullptr && revolve == nullptr && sweep == nullptr &&
+        loft == nullptr && surface == nullptr && linear_pattern == nullptr &&
+        circular_pattern == nullptr && mirror == nullptr && fillet == nullptr &&
+        chamfer == nullptr && shell == nullptr && draft == nullptr && body_boolean == nullptr &&
+        body_transform == nullptr)
       continue;
 
     const FeatureId feature_id = feature != nullptr            ? feature->id()
+                                 : imported != nullptr         ? imported->id()
                                  : revolve != nullptr          ? revolve->id()
                                  : sweep != nullptr            ? sweep->id()
                                  : loft != nullptr             ? loft->id()
@@ -4340,7 +4402,9 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     }
 
     auto executed =
-        feature != nullptr   ? execute_feature(document, *feature, execution_cache)
+        feature != nullptr ? execute_feature(document, *feature, execution_cache)
+        : imported != nullptr
+            ? execute_imported_body_feature(document, imported->id(), execution_cache)
         : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
         : sweep != nullptr   ? execute_sweep(document, sweep->id(), execution_cache)
         : loft != nullptr    ? execute_loft(document, loft->id(), execution_cache)

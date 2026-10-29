@@ -150,6 +150,10 @@ public:
   void clear_selection();
 
   [[nodiscard]] std::size_t presentation_count() const noexcept;
+  // Identities of the stored persistent scene, excluding disposable previews.
+  [[nodiscard]] std::vector<std::string> scene_semantic_ids() const;
+  // Actual native presentation visibility; unknown/uninitialized scenes return false.
+  [[nodiscard]] bool scene_presentation_visible(std::string_view semantic_id) const noexcept;
   [[nodiscard]] bool feature_preview_active() const noexcept;
   [[nodiscard]] GuiViewportDisplayMode display_mode() const noexcept;
   [[nodiscard]] GuiViewportProjection projection() const noexcept;

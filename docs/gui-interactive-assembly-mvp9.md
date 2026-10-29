@@ -244,3 +244,29 @@ translated, rotated repeated parent while retaining the exact endpoint path. The
 suite adds actual ribbon, browser, chooser, numeric, Apply and file
 input across repeated child definitions; acceptance evidence is recorded in
 `docs/gui-shell-acceptance-mvp9r.md` after verification.
+
+### STEP Reference Parts — Block 140 integration
+
+The STEP Sources task prepares immutable imported definitions, inserts/repeats their occurrences in
+an explicitly selected Assembly, refreshes shared asset bindings and converts to a separate Editable
+definition. Repeated and nested instances share the original Reference Part. Reference authoring
+commands fail with an explicit read-only diagnostic. Its three fixed BLCAD origin datum planes are
+selectable through explicit `frame:ref:datum_plane:<id>` Frame targets, separately from their
+ordinary Plane-only `ref:` targets; imported analytic topology retains the Block-139 capability matrix.
+
+Assembly commands derive their operation context from the saved document directory. Native imported
+target presentations use the actual recovered trimmed topology. Root and occurrence-qualified
+authoring, solve/motion previews, diagnostics and appliers resolve current source bytes through the
+same operation context. Final candidate validation occurs before model/history publication, so an
+unchanged Project JSON snapshot cannot conceal an externally changed or missing source asset.
+Open and Undo/Redo retain valid persisted imported intent when recompute fails on changed bytes,
+clear derived presentation and preserve history; explicit source refresh remains required.
+
+Reference refresh and conversion previews use product-local coordinates. Their disposable preview
+temporarily hides existing persistent scene presentations, avoiding coplanar overlap and unrelated
+clipped occurrences. Cancel restores the scene and prior camera without changing document intent.
+Child-Assembly insertion/repetition likewise isolates its definition-local preview, since a shared
+definition has no unique rooted pose; root-Assembly placement previews retain the visible context.
+Standalone copy creation also isolates the imported product from the original Part's scene.
+
+Block-140 focused, full and native acceptance is recorded in `docs/development-setup.md`.

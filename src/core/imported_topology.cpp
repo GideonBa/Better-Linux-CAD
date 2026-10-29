@@ -296,6 +296,16 @@ Result<std::size_t> validate_imported_topology_reference(const PartDocument& par
   if (!catalog || !part.find_step_import_source(catalog->source()) || !entry)
     return Result<std::size_t>::failure(
         invalid("imported reference catalog, source and entry must belong to this Part"));
+  if (const auto* definition = part.reference_part_definition()) {
+    const auto owner = entry->descriptor.kind == ImportedTopologyKind::Body
+                           ? std::optional(entry->id)
+                           : entry->parent_body;
+    if (definition->catalog() != ref.catalog() ||
+        std::none_of(definition->outputs().begin(), definition->outputs().end(),
+                     [&](const auto& output) { return owner == output.imported_body; }))
+      return Result<std::size_t>::failure(
+          invalid("imported reference must belong to a selected Reference Part Body"));
+  }
   const auto capabilities = imported_topology_capabilities(entry->descriptor);
   if (std::find(capabilities.begin(), capabilities.end(), ref.capability()) == capabilities.end())
     return Result<std::size_t>::failure(
@@ -348,6 +358,8 @@ Project::find_imported_topology_catalog(ImportedTopologyCatalogId id) const noex
   return find_catalog(*this, std::move(id));
 }
 Result<std::size_t> PartDocument::add_imported_topology_catalog(ImportedTopologyCatalog catalog) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (!find_step_import_source(catalog.source()) || find_imported_topology_catalog(catalog.id()) ||
       dependency_graph_.has_node(catalog.node_id()))
     return Result<std::size_t>::failure(
@@ -372,6 +384,8 @@ Result<std::size_t> Project::add_imported_topology_catalog(ImportedTopologyCatal
   return Result<std::size_t>::success(imported_topology_catalogs_.size() - 1);
 }
 Result<std::size_t> PartDocument::remove_imported_topology_catalog(ImportedTopologyCatalogId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   const auto* catalog = find_imported_topology_catalog(id);
   if (!catalog || !dependency_graph_.direct_dependents(catalog->node_id()).empty())
     return Result<std::size_t>::failure(
@@ -393,11 +407,15 @@ Result<std::size_t> Project::remove_imported_topology_catalog(ImportedTopologyCa
   return Result<std::size_t>::success(1);
 }
 Result<std::size_t> PartDocument::remove_step_import_source(StepImportSourceId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return source_in_use(*this, id) ? Result<std::size_t>::failure(invalid(
                                         "STEP source is owned by an imported topology catalog"))
                                   : step_import_sources_.remove(std::move(id));
 }
 Result<std::size_t> PartDocument::remove_step_import_source(const StepImportSource& expected) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return source_in_use(*this, expected.id())
              ? Result<std::size_t>::failure(
                    invalid("STEP source is owned by an imported topology catalog"))
@@ -416,6 +434,8 @@ Result<std::size_t> Project::remove_step_import_source(const StepImportSource& e
 }
 Result<std::size_t> PartDocument::refresh_step_import_source(const StepImportSource& expected,
                                                              std::string hash) {
+  if (is_reference_part() && reference_part_definition_->source() != expected.id())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   auto candidate = *this;
   auto changed = candidate.step_import_sources_.refresh(expected, std::move(hash));
   if (!changed || changed.value() == 0)

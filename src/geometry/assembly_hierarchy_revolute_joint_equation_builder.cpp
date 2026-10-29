@@ -48,7 +48,7 @@ AssemblyHierarchyRevoluteJointEquationBuilder::build(const Project& project,
         query_target_b.error());
   }
 
-  const AssemblyHierarchyConstraintTargetResolver resolver;
+  const AssemblyHierarchyConstraintTargetResolver resolver(import_context_);
   auto target_a = resolver.resolve_geometric(project, query_target_a.value());
   if (target_a.has_error()) {
     return Result<AssemblyHierarchyRevoluteJointEquationDescriptor>::failure(target_a.error());
@@ -58,7 +58,7 @@ AssemblyHierarchyRevoluteJointEquationBuilder::build(const Project& project,
     return Result<AssemblyHierarchyRevoluteJointEquationDescriptor>::failure(target_b.error());
   }
 
-  const AssemblyRevoluteJointEquationBuilder shared_builder;
+  const AssemblyRevoluteJointEquationBuilder shared_builder(import_context_);
   auto equation = shared_builder.build(joint.id(), joint.type(), target_a.value(), target_b.value(),
                                        requested_coordinate);
   if (equation.has_error()) {

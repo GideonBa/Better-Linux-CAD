@@ -21,14 +21,14 @@ AssemblyHierarchySphericalJointEquationBuilder::build(const Project& project,
                                                            joint.target_b().semantic_reference());
   if (query_b.has_error())
     return Result<AssemblyHierarchySphericalJointEquationDescriptor>::failure(query_b.error());
-  const AssemblyHierarchyConstraintTargetResolver resolver;
+  const AssemblyHierarchyConstraintTargetResolver resolver(import_context_);
   auto a = resolver.resolve_geometric(project, query_a.value());
   if (a.has_error())
     return Result<AssemblyHierarchySphericalJointEquationDescriptor>::failure(a.error());
   auto b = resolver.resolve_geometric(project, query_b.value());
   if (b.has_error())
     return Result<AssemblyHierarchySphericalJointEquationDescriptor>::failure(b.error());
-  const AssemblySphericalJointEquationBuilder builder;
+  const AssemblySphericalJointEquationBuilder builder(import_context_);
   auto equation = builder.build(joint.id(), joint.type(), a.value(), b.value());
   if (equation.has_error())
     return Result<AssemblyHierarchySphericalJointEquationDescriptor>::failure(equation.error());

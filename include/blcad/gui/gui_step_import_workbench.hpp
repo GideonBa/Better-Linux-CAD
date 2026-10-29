@@ -3,7 +3,9 @@
 #include "blcad/core/step_import_freshness.hpp"
 #include "blcad/geometry/step_import_reader.hpp"
 #include "blcad/geometry/step_import_topology.hpp"
+#include "blcad/geometry/step_reference_commands.hpp"
 #include "blcad/gui/gui_document_session.hpp"
+#include <variant>
 
 namespace blcad::gui {
 
@@ -45,6 +47,27 @@ struct GuiStepImportTopologyPreview {
   std::optional<std::size_t> captured_product_index;
 };
 
+enum class GuiStepReferenceOperation { Insert, Repeat, Refresh, Convert };
+struct GuiStepReferenceRequest {
+  GuiStepReferenceOperation operation{GuiStepReferenceOperation::Insert};
+  ImportedTopologyCatalogId catalog;
+  DocumentId reference_part;
+  DocumentId new_part;
+  std::string name;
+  DocumentId target_assembly;
+  ComponentInstanceId instance;
+  RigidTransform transform{identity_rigid_transform()};
+  FeatureId base_feature{"feature.imported.base"};
+};
+struct GuiStepReferencePreview {
+  GuiStepReferenceRequest request;
+  std::filesystem::path document_path;
+  std::string document_json;
+  std::variant<geometry::StepReferencePartCandidate, geometry::StepReferenceProjectCandidate>
+      candidate;
+  std::vector<geometry::GeometryShape> preview_shapes;
+};
+
 class GuiStepImportWorkbench {
 public:
   [[nodiscard]] Result<GuiStepImportPreview>
@@ -74,6 +97,17 @@ public:
   [[nodiscard]] Result<std::size_t> apply_topology(GuiDocumentSession&,
                                                    const GuiStepImportTopologyPreview&) const;
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession&, const GuiStepImportPreview&) const;
+  [[nodiscard]] Result<GuiStepReferencePreview> prepare_reference(const GuiDocumentSession&,
+                                                                  GuiStepReferenceRequest) const;
+  [[nodiscard]] Result<std::size_t> validate_reference(const GuiDocumentSession&,
+                                                       const GuiStepReferencePreview&) const;
+  [[nodiscard]] Result<std::size_t> apply_reference(GuiDocumentSession&,
+                                                    const GuiStepReferencePreview&) const;
+  // A standalone conversion is an explicit new copy, not an in-place mode
+  // change. Existing files and the original Reference document are preserved.
+  [[nodiscard]] Result<std::size_t>
+  save_editable_copy(const GuiDocumentSession&, const GuiStepReferencePreview&,
+                     const std::filesystem::path& destination) const;
 };
 
 // Source protection shared by document saving and export. Existing hardlinks

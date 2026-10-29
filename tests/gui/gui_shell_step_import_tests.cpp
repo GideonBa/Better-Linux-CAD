@@ -1,4 +1,5 @@
 #include "blcad/core/assembly_leaf_occurrence.hpp"
+#include "blcad/core/assembly_reference_target.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/core/step_import_freshness.hpp"
@@ -8,6 +9,7 @@
 #include "blcad/geometry/circular_cut_adapter.hpp"
 #include "blcad/geometry/step_exporter.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
 #include "blcad/gui/shell/shell_step_import_tools.hpp"
@@ -16,6 +18,8 @@
 #include <QAction>
 #include <QApplication>
 #include <QComboBox>
+#include <QCheckBox>
+#include <QDoubleSpinBox>
 #include <QCryptographicHash>
 #include <QCursor>
 #include <QDialog>
@@ -46,9 +50,11 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace blcad;
@@ -174,6 +180,10 @@ public:
   }
   void text(QLineEdit& control, const QString& value) {
     click(control);
+    // Keys are dispatched directly below, so establish the focus that a real
+    // click gives the editor before Tab commits pending spin-box text.
+    control.setFocus(Qt::MouseFocusReason);
+    flush();
     key(control, Qt::Key_A, {}, Qt::ControlModifier);
     if (value.isEmpty())
       key(control, Qt::Key_Backspace);
@@ -203,9 +213,10 @@ public:
     INFO("Ribbon command: " << id.toStdString());
     auto& selected = action(id);
     REQUIRE(selected.isEnabled());
-    const int tab = id.startsWith("sketch.") || id == "finish_sketch" ? 1
-                    : id.startsWith("view_")                          ? 2
-                                                                      : 0;
+    const int tab = id.startsWith("sketch.") || id == "finish_sketch"   ? 1
+                    : id.startsWith("view_") || id == "fit"             ? 2
+                    : id.startsWith("assembly_") || id == "new_project" ? 3
+                                                                        : 0;
     window.ribbon().set_current_tab(tab);
     flush();
     for (auto* button : window.ribbon().findChildren<QToolButton*>()) {
@@ -397,6 +408,48 @@ public:
       return;
     REQUIRE(QDir().mkpath(directory));
     CHECK(window.grab().save(QDir(directory).filePath(QString::fromUtf8(name) + ".png")));
+  }
+
+  using SceneVisibility = std::vector<std::pair<std::string, bool>>;
+  SceneVisibility scene_visibility() {
+    SceneVisibility result;
+    for (const auto& id : window.viewport().scene_semantic_ids())
+      result.emplace_back(id, window.viewport().scene_presentation_visible(id));
+    return result;
+  }
+  void check_scene_visibility(const SceneVisibility& expected) {
+    CHECK(scene_visibility() == expected);
+    for (const auto& [id, visible] : expected) {
+      INFO(id);
+      CHECK_FALSE(window.viewport().feature_preview_replaces(id));
+      CHECK(window.viewport().scene_presentation_visible(id) == visible);
+    }
+  }
+  void check_isolated_preview(const SceneVisibility& scene) {
+    REQUIRE(window.viewport().feature_preview_active());
+    CHECK(window.viewport().presentation_count() == scene.size());
+    for (const auto& item : scene) {
+      const auto& id = item.first;
+      INFO(id);
+      CHECK(window.viewport().feature_preview_replaces(id));
+      CHECK_FALSE(window.viewport().scene_presentation_visible(id));
+    }
+  }
+  void check_camera(const GuiViewportCameraBookmark& expected) {
+    const auto actual = window.viewport().camera_bookmark();
+    const std::array before{expected.eye.x,          expected.eye.y,
+                            expected.eye.z,          expected.target.x,
+                            expected.target.y,       expected.target.z,
+                            expected.up_direction.x, expected.up_direction.y,
+                            expected.up_direction.z, expected.scale};
+    const std::array after{actual.eye.x,          actual.eye.y,          actual.eye.z,
+                           actual.target.x,       actual.target.y,       actual.target.z,
+                           actual.up_direction.x, actual.up_direction.y, actual.up_direction.z,
+                           actual.scale};
+    for (std::size_t index = 0; index < before.size(); ++index)
+      CHECK(after[index] == Approx(before[index]).margin(1e-7));
+    CHECK(actual.projection == expected.projection);
+    CHECK(actual.plane_camera == expected.plane_camera);
   }
 
   ShellWindow window;
@@ -1026,6 +1079,480 @@ TEST_CASE(
   CHECK(ui.snapshot() == refreshed);
   CHECK_FALSE(ui.window.session().dirty());
   CHECK(bytes(asset) == current_asset);
+}
+
+TEST_CASE("Native Reference Parts insert shared nested occurrences, constrain, drive, refresh and "
+          "convert",
+          "[gui][integration][block140-reference-parts][native-step-reference-parts]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native OCCT Reference Part presentation and Assembly interaction");
+  SourceUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto asset = directory.filePath("supplier.step");
+  auto shape = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(
+      checked(Quantity::length_mm(20)), checked(Quantity::length_mm(10)),
+      checked(Quantity::length_mm(5))));
+  shape = checked(
+      geometry::CircularCutAdapter{}.cut_circular_hole(shape, checked(Quantity::length_mm(4))));
+  REQUIRE(geometry::StepExporter{}.write_step(shape, asset.toStdString()));
+  const auto source_bytes = bytes(asset);
+  ui.dialog<QInputDialog>([&] { ui.command("new_project"); },
+                          [&](QInputDialog& dialog) {
+                            dialog.setTextValue("Reference Assembly");
+                            dialog.accept();
+                          });
+  const auto document = directory.filePath("reference.blcad.project.json");
+  ui.file("save_as", document);
+  ui.begin();
+  ui.draft("Supplier", "supplier.step", StepImportMode::Reference);
+  ui.preview();
+  ui.apply();
+  const auto source_id = QString::fromStdString(ui.sources().front().id().value());
+  ui.begin();
+  ui.source(source_id);
+  ui.button("inspect_geometry");
+  ui.button("topology_prepare");
+  INFO(ui.field<QLabel>("summary").text().toStdString());
+  ui.apply();
+  const auto captured = ui.snapshot();
+  ui.begin();
+  ui.source(source_id);
+  ui.text(ui.field<QLineEdit>("reference_name"), "Supplier Part");
+  ui.button("reference_prepare");
+  INFO(ui.field<QLabel>("summary").text().toStdString());
+  REQUIRE(ui.field<QPushButton>("apply").isEnabled());
+  CHECK(ui.window.viewport().feature_preview_count() == 1);
+  CHECK(ui.snapshot() == captured);
+  ui.capture("step-reference-first-preview");
+  ui.apply();
+  REQUIRE(ui.window.session().project()->part_document_count() == 1);
+  const auto reference_id = ui.window.session().project()->part_documents().front().id();
+  REQUIRE(ui.window.session().project()->part_documents().front().is_reference_part());
+  const auto first = ui.window.session().project()->assembly().component_instances().front().id();
+  const auto inserted = ui.snapshot();
+  ui.command("undo");
+  CHECK(ui.snapshot() == captured);
+  ui.command("redo");
+  CHECK(ui.snapshot() == inserted);
+  // Ground the first occurrence through the existing actual placement controls.
+  ui.command("assembly_placement");
+  auto& assembly_tools = ui.window.assembly_tools();
+  ui.choose(assembly_tools.occurrence_editor(),
+            assembly_tools.occurrence_editor().findData(QStringLiteral("component:") +
+                                                        QString::fromStdString(first.value())));
+  auto& grounding = assembly_tools.grounding_editor();
+  ui.reveal(grounding);
+  grounding.setFocus();
+  ui.key(grounding, Qt::Key_Space);
+  REQUIRE(grounding.isChecked());
+  ui.click(ui.widget<QPushButton>("blcad.assembly.apply"));
+  REQUIRE(
+      ui.window.session().project()->assembly().component_instances().front().grounding_state() ==
+      ComponentGroundingState::Grounded);
+  ui.begin();
+  ui.choose(ui.field<QComboBox>("reference_operation"), 1);
+  ui.text(ui.field<QLineEdit>("reference_x"), "40");
+  const auto root_scene = ui.scene_visibility();
+  REQUIRE_FALSE(root_scene.empty());
+  REQUIRE(std::any_of(root_scene.begin(), root_scene.end(),
+                      [](const auto& item) { return item.second; }));
+  ui.button("reference_prepare");
+  // Root-local placement previews retain the existing Assembly context.
+  ui.check_scene_visibility(root_scene);
+  ui.apply();
+  REQUIRE(ui.window.session().project()->part_document_count() == 1);
+  REQUIRE(ui.window.session().project()->assembly().component_instance_count() == 2);
+  const auto second = ui.window.session().project()->assembly().component_instances().back().id();
+  // A real child definition is loaded through the existing UI, then receives
+  // another occurrence of the same immutable owned Part.
+  auto child = checked(Project::create(
+      DocumentId("project.child.fixture"), "Child Fixture",
+      checked(AssemblyDocument::create(DocumentId("assembly.child.fixture"), "Child Assembly"))));
+  const auto child_path = directory.filePath("child.blcad.project.json");
+  REQUIRE(write_project_json_file(child, child_path.toStdString()));
+  ui.file("assembly_import", child_path);
+  REQUIRE(ui.window.session().project()->child_assembly_document_count() == 1);
+  ui.begin();
+  ui.choose(ui.field<QComboBox>("reference_operation"), 1);
+  ui.choose(ui.field<QComboBox>("reference_assembly"), 1);
+  ui.text(ui.field<QLineEdit>("reference_x"), "0");
+  ui.text(ui.field<QLineEdit>("reference_y"), "30");
+  const auto parent_scene = ui.scene_visibility();
+  ui.button("reference_prepare");
+  // A child definition has no unique root occurrence pose yet.
+  ui.check_isolated_preview(parent_scene);
+  ui.apply();
+  ui.check_scene_visibility(parent_scene);
+  REQUIRE(ui.window.session()
+              .project()
+              ->child_assembly_documents()
+              .front()
+              .component_instance_count() == 1);
+  ui.command("assembly_insert_subassembly");
+  ui.choose(assembly_tools.definition_editor(), 1);
+  ui.click(ui.widget<QPushButton>("blcad.assembly.apply"));
+  REQUIRE(ui.window.session().project()->assembly().subassembly_instance_count() == 1);
+  CHECK(ui.window.session().project()->part_document_count() == 1);
+  ui.command("fit");
+  ui.capture("step-reference-repeated-nested");
+  const auto repeated = ui.snapshot();
+  const auto select_target = [&](QComboBox& combo, ComponentInstanceId component,
+                                 std::optional<ImportedTopologyCapability> capability,
+                                 const std::string& exact = {}) {
+    for (std::size_t i = 0; i < assembly_tools.targets().size(); ++i) {
+      const auto& target = assembly_tools.targets()[i];
+      if (target.reference.component_instance() != component)
+        continue;
+      const auto& semantic = target.reference.semantic_reference();
+      bool matches = semantic == exact;
+      if (capability && is_imported_topology_target_spelling(semantic)) {
+        const auto reference = checked(parse_imported_topology_target_spelling(semantic));
+        matches = reference.capability() == *capability;
+      }
+      if (!matches)
+        continue;
+      const auto index = combo.findData(static_cast<int>(i));
+      if (index < 0)
+        continue;
+      ui.choose(combo, index);
+      return;
+    }
+    FAIL("Missing compatible Reference Part target");
+  };
+  // Imported analytic capability filters remain authoritative. Both are
+  // ordinary relationship transactions, followed by real Undo to isolate the joint proof.
+  for (const auto& [type, capability] : {std::pair{6, ImportedTopologyCapability::Plane},
+                                         std::pair{1, ImportedTopologyCapability::Axis}}) {
+    ui.command("assembly_relationship");
+    ui.choose(assembly_tools.relationship_editor(), type);
+    select_target(assembly_tools.first_editor(), first, capability);
+    select_target(assembly_tools.second_editor(), second, capability);
+    INFO(ui.widget<QLabel>("blcad.assembly.summary").text().toStdString());
+    REQUIRE(ui.widget<QPushButton>("blcad.assembly.apply").isEnabled());
+    CHECK(ui.snapshot() == repeated);
+    ui.capture(type == 6 ? "step-reference-plane-relationship"
+                         : "step-reference-axis-relationship");
+    ui.click(ui.widget<QPushButton>("blcad.assembly.apply"));
+    CHECK(ui.window.session().project()->assembly().constraint_count() == 1);
+    ui.command("undo");
+    CHECK(ui.snapshot() == repeated);
+  }
+  ui.command("assembly_joint");
+  ui.choose(assembly_tools.joint_type_editor(), 4);
+  select_target(assembly_tools.first_editor(), first, ImportedTopologyCapability::Point);
+  ui.choose(assembly_tools.pick_editor(), 1);
+  REQUIRE(assembly_tools.second_editor().count() > 1);
+  ui.command("view_isometric");
+  ui.command("fit");
+  auto& viewport = ui.window.viewport();
+  ui.window.raise();
+  ui.window.activateWindow();
+  QEventLoop painted;
+  QTimer::singleShot(50, &painted, &QEventLoop::quit);
+  painted.exec();
+  const auto eye = viewport.camera_bookmark().eye;
+  std::vector<std::size_t> point_targets;
+  for (int row = 1; row < assembly_tools.second_editor().count(); ++row) {
+    const auto index =
+        static_cast<std::size_t>(assembly_tools.second_editor().itemData(row).toInt());
+    const auto& candidate = assembly_tools.targets().at(index);
+    if (!is_imported_topology_target_spelling(candidate.reference.semantic_reference()))
+      continue;
+    const auto reference =
+        checked(parse_imported_topology_target_spelling(candidate.reference.semantic_reference()));
+    // Spherical also accepts derived center Points from circular targets, whose
+    // exact presentation is a rim. This proof clicks an actual imported vertex.
+    if (reference.capability() != ImportedTopologyCapability::Point ||
+        candidate.resolved.source_kind !=
+            geometry::AssemblyGeometricTargetSourceKind::ImportedVertex)
+      continue;
+    REQUIRE(candidate.reference.component_instance() == second);
+    REQUIRE(reference.capability() == ImportedTopologyCapability::Point);
+    point_targets.push_back(index);
+  }
+  REQUIRE_FALSE(point_targets.empty());
+  // Native depth picking cannot select an arbitrary back vertex through the
+  // body. Try actual visible Point candidates, nearest to the camera first.
+  const auto distance_to_eye = [&](std::size_t index) {
+    const auto point = assembly_tools.targets().at(index).anchor;
+    return std::pow(point.x - eye.x, 2) + std::pow(point.y - eye.y, 2) +
+           std::pow(point.z - eye.z, 2);
+  };
+  std::stable_sort(point_targets.begin(), point_targets.end(), [&](auto left, auto right) {
+    return distance_to_eye(left) < distance_to_eye(right);
+  });
+  std::string attempts;
+  std::string mouse_selected_reference;
+  for (const auto index : point_targets) {
+    const auto candidate = assembly_tools.targets().at(index);
+    const auto screen = checked(viewport.model_to_screen(candidate.anchor));
+    REQUIRE(screen.x >= 0);
+    REQUIRE(screen.x < viewport.width());
+    REQUIRE(screen.y >= 0);
+    REQUIRE(screen.y < viewport.height());
+    attempts += candidate.reference.semantic_reference() + " at model(" +
+                std::to_string(candidate.anchor.x) + "," + std::to_string(candidate.anchor.y) +
+                "," + std::to_string(candidate.anchor.z) + ") screen(" + std::to_string(screen.x) +
+                "," + std::to_string(screen.y) + ")\n";
+    ui.capture("step-reference-point-pick-before");
+    const QPoint point(qRound(screen.x), qRound(screen.y));
+    QCursor::setPos(viewport.mapToGlobal(point));
+    QMouseEvent move(QEvent::MouseMove, {screen.x, screen.y}, viewport.mapToGlobal(point),
+                     Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(&viewport, &move);
+    ui.click_at(viewport, {screen.x, screen.y});
+    if (assembly_tools.second_editor().currentIndex() <= 0)
+      continue;
+    mouse_selected_reference = candidate.reference.semantic_reference();
+    break;
+  }
+  INFO("Native Point attempts:\n" << attempts);
+  INFO("Pick mask: " << viewport.selection_filter_mask()
+                     << ", presentations: " << viewport.presentation_count() << ", scope: "
+                     << (viewport.selection_semantic_scope()
+                             ? viewport.selection_semantic_scope()->size()
+                             : 0));
+  REQUIRE(assembly_tools.second_editor().currentIndex() > 0);
+  const auto& picked =
+      assembly_tools.targets().at(assembly_tools.second_editor().currentData().toInt());
+  CHECK(picked.reference.component_instance() == second);
+  CHECK(picked.reference.semantic_reference() == mouse_selected_reference);
+  CHECK(checked(parse_imported_topology_target_spelling(picked.reference.semantic_reference()))
+            .capability() == ImportedTopologyCapability::Point);
+  ui.capture("step-reference-point-picked");
+  REQUIRE(ui.widget<QPushButton>("blcad.assembly.apply").isEnabled());
+  ui.click(ui.widget<QPushButton>("blcad.assembly.apply"));
+  REQUIRE(ui.window.session().project()->assembly().joints().size() == 1);
+  CHECK(ui.window.session().project()->assembly().joints().front().coordinate_slots().empty());
+  ui.command("undo");
+  CHECK(ui.snapshot() == repeated);
+  // Revolute motion uses an explicit immutable BLCAD origin frame. Imported
+  // circles/axes retain their Block-139 capability set without a guessed Frame.
+  ui.command("assembly_joint");
+  ui.choose(assembly_tools.joint_type_editor(), 0);
+  const auto origin_frame = checked(make_assembly_frame_target_spelling(DatumPlaneId("datum.xy")));
+  select_target(assembly_tools.first_editor(), first, std::nullopt, origin_frame);
+  select_target(assembly_tools.second_editor(), second, std::nullopt, origin_frame);
+  INFO(ui.widget<QLabel>("blcad.assembly.summary").text().toStdString());
+  REQUIRE(ui.widget<QPushButton>("blcad.assembly.apply").isEnabled());
+  ui.click(ui.widget<QPushButton>("blcad.assembly.apply"));
+  REQUIRE(ui.window.session().project()->assembly().joints().size() == 1);
+  const auto joint = ui.window.session().project()->assembly().joints().front().id();
+  const auto connected = ui.snapshot();
+  ui.command("assembly_motion");
+  ui.choose(assembly_tools.joint_editor(),
+            assembly_tools.joint_editor().findData(QString::fromStdString(joint.value())));
+  auto* motion_input = assembly_tools.value_editor().findChild<QLineEdit*>();
+  REQUIRE(motion_input);
+  ui.text(*motion_input, "25");
+  REQUIRE(assembly_tools.value_editor().value() == Approx(25));
+  INFO(ui.widget<QLabel>("blcad.assembly.summary").text().toStdString());
+  REQUIRE(ui.widget<QPushButton>("blcad.assembly.apply").isEnabled());
+  CHECK(ui.snapshot() == connected);
+  ui.capture("step-reference-revolute-motion");
+  ui.click(ui.widget<QPushButton>("blcad.assembly.apply"));
+  const auto moved = ui.snapshot();
+  CHECK(moved != connected);
+  const auto* driven_joint = ui.window.session().project()->assembly().find_joint(joint);
+  REQUIRE(driven_joint);
+  CHECK(driven_joint->type() == AssemblyJointType::Revolute);
+  CHECK(driven_joint->coordinate_deg() == Approx(25));
+  ui.command("undo");
+  CHECK(ui.snapshot() == connected);
+  ui.command("redo");
+  CHECK(ui.snapshot() == moved);
+  ui.command("save");
+  // A changed accepted source invalidates the disposable preview; explicit
+  // shared refresh accepts only the bytes shown in its newly prepared candidate.
+  ui.begin();
+  ui.choose(ui.field<QComboBox>("reference_operation"), 2);
+  const auto motion_scene = ui.scene_visibility();
+  REQUIRE_FALSE(motion_scene.empty());
+  const auto motion_camera = ui.window.viewport().camera_bookmark();
+  ui.button("reference_prepare");
+  REQUIRE(ui.field<QPushButton>("apply").isEnabled());
+  ui.check_isolated_preview(motion_scene);
+  ui.button("cancel");
+  ui.check_scene_visibility(motion_scene);
+  ui.check_camera(motion_camera);
+  CHECK(ui.snapshot() == moved);
+  ui.begin();
+  ui.choose(ui.field<QComboBox>("reference_operation"), 2);
+  ui.button("reference_prepare");
+  auto revised = source_bytes;
+  revised.insert(revised.indexOf("ENDSEC;"), "/* revision B */\n");
+  write(asset, revised);
+  ui.flush();
+  CHECK_FALSE(ui.field<QPushButton>("apply").isEnabled());
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == moved);
+  ui.button("reference_prepare");
+  INFO(ui.field<QLabel>("summary").text().toStdString());
+  REQUIRE(ui.field<QPushButton>("apply").isEnabled());
+  CHECK(ui.field<QPlainTextEdit>("geometry_diagnostics").toPlainText().contains("Affected owner:"));
+  ui.capture("step-reference-shared-refresh");
+  ui.apply();
+  const auto refreshed = ui.snapshot();
+  CHECK(refreshed != moved);
+  CHECK(bytes(asset) == revised);
+  ui.command("undo");
+  CHECK(ui.snapshot() == moved);
+  ui.command("redo");
+  CHECK(ui.snapshot() == refreshed);
+  ui.begin();
+  ui.choose(ui.field<QComboBox>("reference_operation"), 3);
+  ui.text(ui.field<QLineEdit>("reference_name"), "Editable Copy");
+  const auto refreshed_scene = ui.scene_visibility();
+  REQUIRE(std::any_of(refreshed_scene.begin(), refreshed_scene.end(),
+                      [](const auto& item) { return item.second; }));
+  const auto refreshed_camera = ui.window.viewport().camera_bookmark();
+  ui.button("reference_prepare");
+  REQUIRE(ui.field<QPushButton>("apply").isEnabled());
+  ui.check_isolated_preview(refreshed_scene);
+  CHECK(ui.snapshot() == refreshed);
+  ui.capture("step-reference-convert-new-editable");
+  ui.button("cancel");
+  ui.check_scene_visibility(refreshed_scene);
+  ui.check_camera(refreshed_camera);
+  CHECK(ui.snapshot() == refreshed);
+  ui.begin();
+  ui.choose(ui.field<QComboBox>("reference_operation"), 3);
+  ui.text(ui.field<QLineEdit>("reference_name"), "Editable Copy");
+  const auto conversion_camera = ui.window.viewport().camera_bookmark();
+  ui.button("reference_prepare");
+  ui.check_isolated_preview(refreshed_scene);
+  ui.apply();
+  // Conversion adds an uninstantiated definition; all original occurrences
+  // and their presentation/camera return unchanged after the preview ends.
+  ui.check_scene_visibility(refreshed_scene);
+  ui.check_camera(conversion_camera);
+  REQUIRE(ui.window.session().project()->part_document_count() == 2);
+  CHECK(ui.window.session().project()->find_part_document(reference_id)->is_reference_part());
+  const auto& editable = ui.window.session().project()->part_documents().back();
+  CHECK_FALSE(editable.is_reference_part());
+  CHECK(editable.imported_body_features().size() == 1);
+  for (const auto& component : ui.window.session().project()->assembly().component_instances())
+    CHECK(component.referenced_part_document() == reference_id);
+  CHECK(ui.window.session()
+            .project()
+            ->child_assembly_documents()
+            .front()
+            .component_instances()
+            .front()
+            .referenced_part_document() == reference_id);
+  ui.roundtrip(document);
+  CHECK(bytes(asset) == revised);
+}
+
+TEST_CASE(
+    "Native standalone Reference and Editable copies preserve the source document and asset root",
+    "[gui][integration][block140-reference-parts][native-step-reference-parts]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native OCCT standalone Reference presentation");
+  SourceUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.dialog<QInputDialog>([&] { ui.command("new_part"); },
+                          [&](QInputDialog& dialog) {
+                            dialog.setTextValue("Reference Source");
+                            dialog.accept();
+                          });
+  const auto original_path = directory.filePath("original.blcad.json");
+  ui.file("save_as", original_path);
+  const auto asset = directory.filePath("supplier.step");
+  write_inspection_geometry(asset);
+  const auto asset_bytes = bytes(asset);
+  ui.begin();
+  ui.draft("Supplier", "supplier.step", StepImportMode::Reference);
+  ui.preview();
+  ui.apply();
+  const auto source_id = QString::fromStdString(ui.sources().front().id().value());
+  ui.begin();
+  ui.source(source_id);
+  ui.button("inspect_geometry");
+  ui.button("topology_prepare");
+  ui.apply();
+  ui.command("save");
+  const auto original = ui.snapshot();
+  const auto original_file = bytes(original_path);
+  ui.begin();
+  ui.source(source_id);
+  ui.text(ui.field<QLineEdit>("reference_name"), "Standalone Reference");
+  const auto original_scene = ui.scene_visibility();
+  REQUIRE(std::any_of(original_scene.begin(), original_scene.end(),
+                      [](const auto& item) { return item.second; }));
+  const auto original_camera = ui.window.viewport().camera_bookmark();
+  ui.button("reference_prepare");
+  INFO(ui.field<QLabel>("summary").text().toStdString());
+  REQUIRE(ui.field<QPushButton>("apply").isEnabled());
+  ui.check_isolated_preview(original_scene);
+  CHECK(ui.snapshot() == original);
+  ui.capture("step-reference-standalone-create");
+  const auto reference_path = directory.filePath("reference.blcad.json");
+  ui.dialog<QFileDialog>([&] { ui.apply(); },
+                         [&](QFileDialog& dialog) {
+                           dialog.selectFile(reference_path);
+                           QMetaObject::invokeMethod(&dialog, "accept", Qt::DirectConnection);
+                         });
+  ui.check_scene_visibility(original_scene);
+  ui.check_camera(original_camera);
+  CHECK(ui.snapshot() == original);
+  CHECK_FALSE(ui.window.session().dirty());
+  CHECK(bytes(original_path) == original_file);
+  ui.file("open", reference_path);
+  REQUIRE(ui.window.session().part_document()->is_reference_part());
+  REQUIRE(ui.window.session().part_shape_cache());
+  CHECK(ui.window.session().part_shape_cache()->reference_result());
+  CHECK(ui.window.session().part_shape_cache()->feature_shapes().empty());
+  const auto reference = ui.snapshot();
+  ui.tree("datum.xy");
+  CHECK_FALSE(ui.action("create_sketch").isEnabled());
+  CHECK_FALSE(ui.action("extrude").isEnabled());
+  ui.begin();
+  ui.choose(ui.field<QComboBox>("reference_operation"), 3);
+  ui.text(ui.field<QLineEdit>("reference_name"), "Standalone Editable Copy");
+  const auto camera = ui.window.viewport().camera_bookmark();
+  const auto reference_scene = ui.scene_visibility();
+  REQUIRE(std::any_of(reference_scene.begin(), reference_scene.end(),
+                      [](const auto& item) { return item.second; }));
+  ui.button("reference_prepare");
+  REQUIRE(ui.field<QPushButton>("apply").isEnabled());
+  REQUIRE(ui.window.viewport().feature_preview_count() == 1);
+  ui.check_isolated_preview(reference_scene);
+  const auto a = checked(ui.window.viewport().model_to_screen({990, 1995, 3005}));
+  const auto b = checked(ui.window.viewport().model_to_screen({1010, 1995, 3005}));
+  CHECK(std::hypot(a.x - b.x, a.y - b.y) >= 80);
+  ui.capture("step-reference-standalone-convert");
+  ui.button("cancel");
+  ui.check_scene_visibility(reference_scene);
+  ui.check_camera(camera);
+  CHECK(ui.snapshot() == reference);
+  CHECK_FALSE(ui.window.session().dirty());
+  ui.begin();
+  ui.choose(ui.field<QComboBox>("reference_operation"), 3);
+  ui.button("reference_prepare");
+  ui.check_isolated_preview(reference_scene);
+  const auto editable_path = directory.filePath("editable.blcad.json");
+  ui.dialog<QFileDialog>([&] { ui.apply(); },
+                         [&](QFileDialog& dialog) {
+                           dialog.selectFile(editable_path);
+                           QMetaObject::invokeMethod(&dialog, "accept", Qt::DirectConnection);
+                         });
+  ui.check_scene_visibility(reference_scene);
+  CHECK(ui.snapshot() == reference);
+  CHECK_FALSE(ui.window.session().dirty());
+  CHECK_FALSE(ui.window.session().can_undo());
+  CHECK(bytes(original_path) == original_file);
+  CHECK(bytes(asset) == asset_bytes);
+  ui.file("open", editable_path);
+  CHECK_FALSE(ui.window.session().part_document()->is_reference_part());
+  REQUIRE(ui.window.session().part_document()->imported_body_features().size() == 1);
+  REQUIRE(ui.window.session().part_shape_cache());
+  CHECK(ui.window.session().part_shape_cache()->feature_shape_count() == 1);
+  CHECK(ui.window.session().part_shape_cache()->body_shape_count() == 1);
+  CHECK_FALSE(ui.window.session().part_shape_cache()->reference_result());
+  ui.roundtrip(editable_path);
 }
 
 TEST_CASE(

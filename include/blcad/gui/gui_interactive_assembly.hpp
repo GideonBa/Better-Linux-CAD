@@ -10,6 +10,7 @@
 #include "blcad/geometry/assembly_solve_diagnostics.hpp"
 #include "blcad/geometry/assembly_target_compatibility.hpp"
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/gui_viewport_manipulator.hpp"
 
 #include <algorithm>
@@ -190,14 +191,19 @@ public:
     if (!active_ || !session.project())
       return Result<Project>::failure(
           Error::validation("assembly.placement", "no active Project placement"));
-    Project candidate = *session.project();
-    auto changed = mutate(candidate);
-    if (!changed)
-      return Result<Project>::failure(changed.error());
-    auto valid = candidate.validate_assembly_structure();
-    if (!valid)
-      return Result<Project>::failure(valid.error());
-    return Result<Project>::success(std::move(candidate));
+    return query_with_step_import_context(session, [&](auto* context) -> Result<Project> {
+      Project candidate = *session.project();
+      auto changed = mutate(candidate);
+      if (!changed)
+        return Result<Project>::failure(changed.error());
+      auto valid = candidate.validate_assembly_structure();
+      if (!valid)
+        return Result<Project>::failure(valid.error());
+      valid = validate_visible_step_imports(candidate, context);
+      if (!valid)
+        return Result<Project>::failure(valid.error());
+      return Result<Project>::success(std::move(candidate));
+    });
   }
 
   [[nodiscard]] Result<GuiAssemblyPlacementPreview>
@@ -207,13 +213,9 @@ public:
     const auto* project = session.project();
     if (project == nullptr)
       return preview_fail("placement preview requires an active Project");
-    Project candidate = *project;
-    auto changed = mutate(candidate);
-    if (changed.has_error())
-      return Result<GuiAssemblyPlacementPreview>::failure(changed.error());
-    auto valid = candidate.validate_assembly_structure();
-    if (valid.has_error())
-      return Result<GuiAssemblyPlacementPreview>::failure(valid.error());
+    auto candidate = preview_project(session);
+    if (!candidate)
+      return Result<GuiAssemblyPlacementPreview>::failure(candidate.error());
     return Result<GuiAssemblyPlacementPreview>::success({kind_, mode_, transform_});
   }
 
@@ -221,7 +223,8 @@ public:
     auto checked = preview(session);
     if (checked.has_error())
       return Result<std::size_t>::failure(checked.error());
-    auto committed = session.commit_project_transaction(
+    auto committed = commit_project_with_step_import_context(
+        session,
         mode_ == GuiAssemblyPlacementMode::Insert ? "Insert Assembly occurrence"
                                                   : "Set Assembly occurrence placement",
         [this](Project& project) { return mutate(project); });
@@ -388,33 +391,55 @@ public:
   compatible_second_targets(const GuiDocumentSession& session,
                             const std::vector<AssemblyConstraintTarget>& candidates) const {
     std::vector<AssemblyConstraintTarget> compatible;
-    if (!active_ || !resolved_a_)
+    if (!active_ || !target_a_)
+      return compatible;
+    auto context = make_step_import_context(session);
+    if (!context || !session.project())
+      return compatible;
+    geometry::AssemblyConstraintTargetResolver resolver{context.value().get()};
+    auto current_a = resolver.resolve_geometric(*session.project(), *target_a_);
+    if (!current_a)
       return compatible;
     for (const auto& candidate : candidates) {
       if (target_a_ && candidate.component_instance() == target_a_->component_instance())
         continue;
-      auto resolved = resolve(session, candidate);
+      auto resolved = resolver.resolve_geometric(*session.project(), candidate);
       if (!resolved.has_error() && !geometry::AssemblyTargetCompatibilityResolver{}
-                                        .resolve(type_, *resolved_a_, resolved.value())
+                                        .resolve(type_, current_a.value(), resolved.value())
                                         .has_error())
         compatible.push_back(candidate);
     }
+    if (context.value() && !context.value()->validate_sources())
+      return {};
     return compatible;
   }
 
   [[nodiscard]] Result<std::size_t> select_second(const GuiDocumentSession& session,
                                                   AssemblyConstraintTarget target) {
-    if (!active_ || !resolved_a_)
+    if (!active_ || !resolved_a_ || !session.project())
       return fail("select the first relationship target first");
     if (target.component_instance() == target_a_->component_instance())
       return fail("relationship targets must belong to different component occurrences");
-    auto resolved = resolve(session, target);
-    if (resolved.has_error())
+    auto context = make_step_import_context(session);
+    if (!context)
+      return Result<std::size_t>::failure(context.error());
+    geometry::AssemblyConstraintTargetResolver resolver{context.value().get()};
+    auto current_a = resolver.resolve_geometric(*session.project(), *target_a_);
+    if (!current_a)
+      return Result<std::size_t>::failure(current_a.error());
+    auto resolved = resolver.resolve_geometric(*session.project(), target);
+    if (!resolved)
       return Result<std::size_t>::failure(resolved.error());
     auto compatibility = geometry::AssemblyTargetCompatibilityResolver{}.resolve(
-        type_, *resolved_a_, resolved.value());
+        type_, current_a.value(), resolved.value());
     if (compatibility.has_error())
       return Result<std::size_t>::failure(compatibility.error());
+    if (context.value()) {
+      auto fresh = context.value()->validate_sources();
+      if (!fresh)
+        return Result<std::size_t>::failure(fresh.error());
+    }
+    resolved_a_ = std::move(current_a.value());
     target_b_ = std::move(target);
     compatibility_ = compatibility.value();
     return Result<std::size_t>::success(2);
@@ -427,6 +452,20 @@ public:
     const auto* project = session.project();
     if (project == nullptr)
       return preview_fail("relationship preview requires an active Project");
+    auto context = make_step_import_context(session);
+    if (!context)
+      return Result<GuiAssemblyRelationshipPreview>::failure(context.error());
+    geometry::AssemblyConstraintTargetResolver resolver{context.value().get()};
+    auto a = resolver.resolve_geometric(*project, *target_a_);
+    auto b = resolver.resolve_geometric(*project, *target_b_);
+    if (!a)
+      return Result<GuiAssemblyRelationshipPreview>::failure(a.error());
+    if (!b)
+      return Result<GuiAssemblyRelationshipPreview>::failure(b.error());
+    auto current_compatibility =
+        geometry::AssemblyTargetCompatibilityResolver{}.resolve(type_, a.value(), b.value());
+    if (!current_compatibility)
+      return Result<GuiAssemblyRelationshipPreview>::failure(current_compatibility.error());
     auto relationship = build();
     if (relationship.has_error())
       return Result<GuiAssemblyRelationshipPreview>::failure(relationship.error());
@@ -436,30 +475,38 @@ public:
       return Result<GuiAssemblyRelationshipPreview>::failure(added.error());
     const std::vector<ComponentInstanceId> group{target_a_->component_instance(),
                                                  target_b_->component_instance()};
-    auto diagnostics = geometry::AssemblySolveDiagnosticsAnalyzer{}.analyze(candidate, group);
+    auto diagnostics =
+        geometry::AssemblySolveDiagnosticsAnalyzer{context.value().get()}.analyze(candidate, group);
     if (diagnostics.has_error())
       return Result<GuiAssemblyRelationshipPreview>::failure(diagnostics.error());
-    auto solved = geometry::AssemblyRigidBodySolver{}.solve(candidate, group);
+    auto solved = geometry::AssemblyRigidBodySolver{context.value().get()}.solve(candidate, group);
     if (solved.has_error())
       return Result<GuiAssemblyRelationshipPreview>::failure(solved.error());
     if (!solved.value().converged())
       return preview_fail("relationship candidate solve did not converge");
+    if (context.value()) {
+      auto fresh = context.value()->validate_sources();
+      if (!fresh)
+        return Result<GuiAssemblyRelationshipPreview>::failure(fresh.error());
+    }
     return Result<GuiAssemblyRelationshipPreview>::success(
-        {std::move(relationship.value()), *compatibility_, std::move(diagnostics.value()),
-         std::move(solved.value())});
+        {std::move(relationship.value()), current_compatibility.value(),
+         std::move(diagnostics.value()), std::move(solved.value())});
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
     auto candidate = preview(session);
     if (candidate.has_error())
       return Result<std::size_t>::failure(candidate.error());
-    auto committed = session.commit_project_transaction(
-        "Apply Assembly relationship",
-        [preview = candidate.value()](Project& project) mutable -> Result<std::size_t> {
+    auto committed = commit_project_with_step_import_context(
+        session, "Apply Assembly relationship",
+        [preview = candidate.value()](Project& project,
+                                      auto* context) mutable -> Result<std::size_t> {
           auto added = project.assembly().add_constraint(std::move(preview.relationship));
           if (added.has_error())
             return added;
-          auto posed = geometry::AssemblySolveResultApplier{}.apply(project, preview.solved_pose);
+          auto posed =
+              geometry::AssemblySolveResultApplier{context}.apply(project, preview.solved_pose);
           if (posed.has_error())
             return posed;
           return Result<std::size_t>::success(added.value() + posed.value());
@@ -482,8 +529,10 @@ private:
     if (session.project() == nullptr)
       return Result<geometry::AssemblyResolvedGeometricTarget>::failure(Error::validation(
           "gui.interactive_assembly_relationship", "an active Project is required"));
-    return geometry::AssemblyConstraintTargetResolver{}.resolve_geometric(*session.project(),
-                                                                          target);
+    return query_with_step_import_context(session, [&](auto* context) {
+      return geometry::AssemblyConstraintTargetResolver{context}.resolve_geometric(
+          *session.project(), target);
+    });
   }
 
   [[nodiscard]] Result<AssemblyConstraint> build() const {
@@ -562,33 +611,55 @@ public:
   compatible_second_targets(const GuiDocumentSession& session,
                             const std::vector<AssemblyConstraintTarget>& candidates) const {
     std::vector<AssemblyConstraintTarget> compatible;
-    if (!active_ || !resolved_a_)
+    if (!active_ || !target_a_)
+      return compatible;
+    auto context = make_step_import_context(session);
+    if (!context || !session.project())
+      return compatible;
+    geometry::AssemblyConstraintTargetResolver resolver{context.value().get()};
+    auto current_a = resolver.resolve_geometric(*session.project(), *target_a_);
+    if (!current_a)
       return compatible;
     for (const auto& candidate : candidates) {
       if (target_a_ && candidate.component_instance() == target_a_->component_instance())
         continue;
-      auto resolved = resolve(session, candidate);
+      auto resolved = resolver.resolve_geometric(*session.project(), candidate);
       if (!resolved.has_error() && !geometry::AssemblyJointTargetCompatibilityResolver{}
-                                        .resolve(type_, *resolved_a_, resolved.value())
+                                        .resolve(type_, current_a.value(), resolved.value())
                                         .has_error())
         compatible.push_back(candidate);
     }
+    if (context.value() && !context.value()->validate_sources())
+      return {};
     return compatible;
   }
 
   [[nodiscard]] Result<std::size_t> select_second(const GuiDocumentSession& session,
                                                   AssemblyConstraintTarget target) {
-    if (!active_ || !resolved_a_)
+    if (!active_ || !resolved_a_ || !session.project())
       return fail("select the first joint target first");
     if (target.component_instance() == target_a_->component_instance())
       return fail("joint targets must belong to different component occurrences");
-    auto resolved = resolve(session, target);
-    if (resolved.has_error())
+    auto context = make_step_import_context(session);
+    if (!context)
+      return Result<std::size_t>::failure(context.error());
+    geometry::AssemblyConstraintTargetResolver resolver{context.value().get()};
+    auto current_a = resolver.resolve_geometric(*session.project(), *target_a_);
+    if (!current_a)
+      return Result<std::size_t>::failure(current_a.error());
+    auto resolved = resolver.resolve_geometric(*session.project(), target);
+    if (!resolved)
       return Result<std::size_t>::failure(resolved.error());
     auto compatibility = geometry::AssemblyJointTargetCompatibilityResolver{}.resolve(
-        type_, *resolved_a_, resolved.value());
+        type_, current_a.value(), resolved.value());
     if (compatibility.has_error())
       return Result<std::size_t>::failure(compatibility.error());
+    if (context.value()) {
+      auto fresh = context.value()->validate_sources();
+      if (!fresh)
+        return Result<std::size_t>::failure(fresh.error());
+    }
+    resolved_a_ = std::move(current_a.value());
     target_b_ = std::move(target);
     resolved_b_ = std::move(resolved.value());
     compatibility_ = compatibility.value();
@@ -609,19 +680,37 @@ public:
     auto added = candidate.assembly().add_joint(joint.value());
     if (added.has_error())
       return Result<GuiAssemblyJointPreview>::failure(added.error());
-    auto frame_a = frame(*resolved_a_);
-    auto frame_b = frame(*resolved_b_);
-    return Result<GuiAssemblyJointPreview>::success({std::move(joint.value()), *compatibility_,
-                                                     *resolved_a_, *resolved_b_, std::move(frame_a),
-                                                     std::move(frame_b)});
+    return query_with_step_import_context(
+        session, [&](auto* context) -> Result<GuiAssemblyJointPreview> {
+          geometry::AssemblyConstraintTargetResolver resolver{context};
+          auto a = resolver.resolve_geometric(*project, *target_a_);
+          auto b = resolver.resolve_geometric(*project, *target_b_);
+          if (!a)
+            return Result<GuiAssemblyJointPreview>::failure(a.error());
+          if (!b)
+            return Result<GuiAssemblyJointPreview>::failure(b.error());
+          auto compatibility = geometry::AssemblyJointTargetCompatibilityResolver{}.resolve(
+              type_, a.value(), b.value());
+          if (!compatibility)
+            return Result<GuiAssemblyJointPreview>::failure(compatibility.error());
+          auto frame_a = frame(a.value());
+          auto frame_b = frame(b.value());
+          return Result<GuiAssemblyJointPreview>::success(
+              {joint.value(), compatibility.value(), std::move(a.value()), std::move(b.value()),
+               std::move(frame_a), std::move(frame_b)});
+        });
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
     auto candidate = preview(session);
     if (candidate.has_error())
       return Result<std::size_t>::failure(candidate.error());
-    auto committed = session.commit_project_transaction(
-        "Apply Assembly joint", [joint = candidate.value().joint](Project& project) mutable {
+    auto committed = commit_project_with_step_import_context(
+        session, "Apply Assembly joint",
+        [joint = candidate.value().joint](Project& project, auto* context) mutable {
+          auto valid = validate_root_assembly_targets(project, joint, context);
+          if (!valid)
+            return valid;
           return project.assembly().add_joint(std::move(joint));
         });
     if (!committed.has_error())
@@ -639,8 +728,10 @@ private:
     if (!active_ || session.project() == nullptr)
       return Result<geometry::AssemblyResolvedGeometricTarget>::failure(Error::validation(
           "gui.interactive_assembly_joint", "an active joint and Project are required"));
-    return geometry::AssemblyConstraintTargetResolver{}.resolve_geometric(*session.project(),
-                                                                          target);
+    return query_with_step_import_context(session, [&](auto* context) {
+      return geometry::AssemblyConstraintTargetResolver{context}.resolve_geometric(
+          *session.project(), target);
+    });
   }
 
   [[nodiscard]] static std::optional<geometry::AssemblyFrameTargetDescriptor>
@@ -820,8 +911,12 @@ public:
     const auto* joint = find_joint(session);
     if (project == nullptr || joint == nullptr)
       return preview_fail("joint motion preview requires an active joint and Project");
+    auto context = make_step_import_context(session);
+    if (!context)
+      return Result<GuiAssemblyMotionPreview>::failure(context.error());
     geometry::AssemblyJointDrive drive{joint_, {{role_, requested_}}};
-    auto motion = geometry::AssemblyJointMotionSolver{}.move(*project, std::move(drive));
+    auto motion =
+        geometry::AssemblyJointMotionSolver{context.value().get()}.move(*project, std::move(drive));
     if (motion.has_error())
       return Result<GuiAssemblyMotionPreview>::failure(motion.error());
     if (!motion.value().converged())
@@ -832,6 +927,11 @@ public:
     hud.undriven_dof = hud.joint_dof > 0U ? hud.joint_dof - 1U : 0U;
     hud.proposed_component_count = motion.value().solve_result.proposed_transforms.size();
     hud.final_rms = motion.value().solve_result.residual_summary.final_rms;
+    if (context.value()) {
+      auto fresh = context.value()->validate_sources();
+      if (!fresh)
+        return Result<GuiAssemblyMotionPreview>::failure(fresh.error());
+    }
     return Result<GuiAssemblyMotionPreview>::success({std::move(motion.value()), hud});
   }
 
@@ -839,9 +939,10 @@ public:
     auto candidate = preview(session);
     if (candidate.has_error())
       return Result<std::size_t>::failure(candidate.error());
-    auto committed = session.commit_project_transaction(
-        "Apply joint motion", [motion = candidate.value().motion](Project& project) {
-          return geometry::AssemblyJointMotionResultApplier{}.apply(project, motion);
+    auto committed = commit_project_with_step_import_context(
+        session, "Apply joint motion",
+        [motion = candidate.value().motion](Project& project, auto* context) {
+          return geometry::AssemblyJointMotionResultApplier{context}.apply(project, motion);
         });
     if (!committed.has_error())
       active_ = false;

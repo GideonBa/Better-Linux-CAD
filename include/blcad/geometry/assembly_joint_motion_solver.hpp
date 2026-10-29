@@ -11,6 +11,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct AssemblyJointMotionInputSnapshot {
   AssemblyJointId joint;
   AssemblyJointType type = AssemblyJointType::Revolute;
@@ -47,6 +49,9 @@ struct AssemblyJointMotionResult {
 // assembly numeric solve engine. The scalar overload is the Revolute adapter.
 class AssemblyJointMotionSolver {
 public:
+  AssemblyJointMotionSolver() = default;
+  explicit AssemblyJointMotionSolver(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyJointMotionResult>
   move(const Project& project, AssemblyJointDrive drive,
        AssemblyRigidBodySolverOptions options = {}) const;
@@ -54,6 +59,9 @@ public:
   [[nodiscard]] Result<AssemblyJointMotionResult>
   move(const Project& project, AssemblyJointId joint, Quantity requested_coordinate,
        AssemblyRigidBodySolverOptions options = {}) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 // Atomic motion application boundary. It validates the embedded component solve
@@ -62,8 +70,14 @@ public:
 // Project copy.
 class AssemblyJointMotionResultApplier {
 public:
+  AssemblyJointMotionResultApplier() = default;
+  explicit AssemblyJointMotionResultApplier(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<std::size_t> apply(Project& project,
                                           const AssemblyJointMotionResult& result) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

@@ -30,7 +30,7 @@ AssemblyCylindricalJointEquationBuilder::build(const Project& project, const Ass
   if (joint.state() != AssemblyJointState::Active)
     return Result<AssemblyCylindricalJointEquationDescriptor>::failure(validation_error(
         joint.id().value(), "cylindrical equation construction requires an active joint"));
-  const AssemblyConstraintTargetResolver resolver;
+  const AssemblyConstraintTargetResolver resolver(import_context_);
   auto a = resolver.resolve_geometric(project, joint.target_a());
   if (a.has_error())
     return Result<AssemblyCylindricalJointEquationDescriptor>::failure(a.error());

@@ -27,11 +27,17 @@ public:
   [[nodiscard]] Result<ImportedTopologyResolution>
   resolve(const PartDocument& document, const ImportedTopologyReference& reference);
   [[nodiscard]] Result<std::size_t> validate_sources() const;
+  [[nodiscard]] const std::filesystem::path& root_directory() const noexcept;
 
 private:
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };
+
+// Observe actual imported result authorities, including a converted editable base. Opaque source
+// registration alone does not imply that external geometry participates in this operation.
+[[nodiscard]] Result<std::size_t> observe_imported_part_sources(const PartDocument& document,
+                                                                StepImportTopologyContext* context);
 
 // Canonical analytic frames are derived from the recovered normalized descriptor. Generic
 // topology has no analytic fallback; it cannot be approximated as a plane, line or cylinder.

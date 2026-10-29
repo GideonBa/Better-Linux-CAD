@@ -15,6 +15,6 @@ struct AssemblyInteractionTarget {
 class AssemblyInteractionGeometry {
 public:
   [[nodiscard]] static Result<std::vector<AssemblyInteractionTarget>>
-  targets(const Project& project);
+  targets(const Project& project, StepImportTopologyContext* import_context = nullptr);
 };
 } // namespace blcad::geometry

@@ -3,8 +3,10 @@
 #include "blcad/geometry/step_exporter.hpp"
 
 #include "assembly_posed_leaf_shapes.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "geometry_shape_internal.hpp"
 #include "occt_failure_message.hpp"
+#include "step_export_transaction.hpp"
 
 #include <BRep_Builder.hxx>
 #include <Standard_Failure.hxx>
@@ -33,7 +35,7 @@ constexpr const char* kAssemblyStepExporterId = "geometry.assembly_step_exporter
 
 Result<AssemblyStepExporter::PosedAssemblyBuild>
 AssemblyStepExporter::build(const Project& project) const {
-  auto posed_leaves = detail::build_posed_leaf_shapes(project);
+  auto posed_leaves = detail::build_posed_leaf_shapes(project, import_context_);
   if (posed_leaves.has_error()) {
     return Result<PosedAssemblyBuild>::failure(posed_leaves.error());
   }
@@ -57,6 +59,11 @@ AssemblyStepExporter::build(const Project& project) const {
     }
 
     GeometryShape shape(std::make_shared<GeometryShape::Impl>(TopoDS_Shape(compound)));
+    if (import_context_) {
+      auto fresh = import_context_->validate_sources();
+      if (!fresh)
+        return Result<PosedAssemblyBuild>::failure(fresh.error());
+    }
     return Result<PosedAssemblyBuild>::success(
         PosedAssemblyBuild{std::move(shape), posed_leaves.value().recomputed_part_count,
                            posed_leaves.value().leaves.size()});
@@ -81,20 +88,27 @@ Result<GeometryShape> AssemblyStepExporter::build_posed_shape(const Project& pro
 
 Result<AssemblyStepExportSummary> AssemblyStepExporter::write_step(const Project& project,
                                                                    const std::string& path) const {
+  auto transaction = detail::StepExportTransaction::create(project, import_context_, path);
+  if (!transaction)
+    return Result<AssemblyStepExportSummary>::failure(transaction.error());
   auto built = build(project);
   if (built.has_error()) {
     return Result<AssemblyStepExportSummary>::failure(built.error());
   }
 
   const StepExporter step_exporter;
-  const auto written = step_exporter.write_step(built.value().shape, path);
+  const auto written =
+      step_exporter.write_step(built.value().shape, transaction.value().writer_path().string());
   if (written.has_error()) {
     return Result<AssemblyStepExportSummary>::failure(written.error());
   }
+  auto committed = transaction.value().commit();
+  if (!committed)
+    return Result<AssemblyStepExportSummary>::failure(committed.error());
 
   return Result<AssemblyStepExportSummary>::success(
       AssemblyStepExportSummary{built.value().recomputed_part_count,
-                                built.value().exported_component_count, written.value()});
+                                built.value().exported_component_count, committed.value()});
 }
 
 } // namespace blcad::geometry

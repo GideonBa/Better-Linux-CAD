@@ -28,6 +28,7 @@ enum class AssemblyGeometricTargetSourceKind {
   ImportedCircularEdge,
   ImportedVertex,
   DatumPlane,
+  DatumPlaneFrame,
   DatumAxis,
   ConstructionLine,
   ConstructionPoint,

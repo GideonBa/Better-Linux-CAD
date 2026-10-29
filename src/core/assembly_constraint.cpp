@@ -1,4 +1,5 @@
 #include "blcad/core/assembly_constraint.hpp"
+#include "blcad/core/assembly_reference_target.hpp"
 
 #include <utility>
 
@@ -48,6 +49,11 @@ AssemblyConstraintTarget::create(ComponentInstanceId component_instance,
   if (semantic_reference.empty()) {
     return Result<AssemblyConstraintTarget>::failure(Error::validation(
         object_id, "assembly constraint target semantic reference must not be empty"));
+  }
+  if (is_assembly_frame_target_spelling(semantic_reference)) {
+    auto frame = parse_assembly_frame_target_spelling(semantic_reference);
+    if (!frame)
+      return Result<AssemblyConstraintTarget>::failure(frame.error());
   }
   return Result<AssemblyConstraintTarget>::success(
       AssemblyConstraintTarget(std::move(component_instance), std::move(semantic_reference)));

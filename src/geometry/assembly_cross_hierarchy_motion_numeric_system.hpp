@@ -13,6 +13,6 @@ namespace blcad::geometry::detail {
     const Project& project, const AssemblyCrossHierarchyMotionGroup& motion_group,
     AssemblyJointId selected_cross_hierarchy_joint,
     std::vector<AssemblyJointCoordinateDrive> requested_coordinates,
-    double length_residual_scale_mm);
+    double length_residual_scale_mm, StepImportTopologyContext* import_context = nullptr);
 
 } // namespace blcad::geometry::detail

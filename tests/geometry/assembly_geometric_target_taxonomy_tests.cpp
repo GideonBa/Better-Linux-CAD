@@ -142,6 +142,9 @@ AssemblyGeometricTargetSourceMetadata synthetic_metadata(AssemblyGeometricTarget
   case AssemblyGeometricTargetSourceKind::ImportedVertex:
     FAIL("Imported sources use the verified STEP fixtures in step_import_target_tests.cpp");
     break;
+  case AssemblyGeometricTargetSourceKind::DatumPlaneFrame:
+    FAIL("Explicit datum Frames use owned datum fixtures in reference_part_geometry_tests.cpp");
+    break;
   }
   return metadata;
 }

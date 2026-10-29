@@ -8,6 +8,9 @@
 #include "blcad/core/sketch_dimension_authoring_json.hpp"
 #include "blcad/core/sketch_dimension_catalog_system.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/reference_part_geometry.hpp"
+#include "blcad/geometry/assembly_import_validation.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/gui/gui_step_import_workbench.hpp"
 #include "blcad/gui/gui_pending_feature_inputs.hpp"
 
@@ -28,6 +31,139 @@ namespace {
 
 Error session_error(std::string message) {
   return Error::validation("gui.document_session", std::move(message));
+}
+
+std::optional<Error> imported_result_failure(const PartDocument& part,
+                                             const std::filesystem::path& root) {
+  if (!part.is_reference_part() && part.imported_body_features().empty())
+    return std::nullopt;
+  if (root.empty())
+    return session_error("Save the document before resolving imported Part geometry");
+  geometry::StepImportTopologyContext context(root);
+  const geometry::ReferencePartGeometry adapter;
+  if (part.is_reference_part()) {
+    auto result = adapter.resolve(part, context);
+    if (!result)
+      return result.error();
+  }
+  for (const auto& feature : part.imported_body_features()) {
+    auto result = adapter.resolve_imported_body_feature(part, feature, context);
+    if (!result)
+      return result.error();
+  }
+  auto valid = context.validate_sources();
+  return valid ? std::nullopt : std::optional<Error>(valid.error());
+}
+bool same_error(const Error& first, const std::optional<Error>& second) {
+  return second && first.category() == second->category() &&
+         first.object_id() == second->object_id() && first.message() == second->message();
+}
+bool imported_endpoint_recovery_failure(const Project& project, const std::filesystem::path& root,
+                                        const Error& failure) {
+  struct Endpoint {
+    const PartDocument* part{};
+    bool active{};
+    std::string_view spelling;
+  };
+  const auto local = [&](const AssemblyDocument& assembly, const ComponentInstanceId& id,
+                         std::string_view spelling) -> Endpoint {
+    const auto* component = assembly.find_component_instance(id);
+    return component ? Endpoint{project.find_part_document(component->referenced_part_document()),
+                                component->suppression_state() == ComponentSuppressionState::Active,
+                                spelling}
+                     : Endpoint{};
+  };
+  const auto hierarchical = [&](const AssemblyHierarchyConstraintEndpoint& endpoint) -> Endpoint {
+    const auto* assembly = &project.assembly();
+    for (const auto& occurrence : endpoint.occurrence_path()) {
+      const auto* instance = assembly->find_subassembly_instance(occurrence);
+      if (!instance || instance->suppression_state() != ComponentSuppressionState::Active)
+        return {};
+      assembly = project.find_assembly_document(instance->referenced_assembly_document());
+      if (!assembly)
+        return {};
+    }
+    return local(*assembly, endpoint.component_instance(), endpoint.semantic_reference());
+  };
+  std::vector<std::pair<const PartDocument*, ImportedTopologyReference>> references;
+  bool malformed{};
+  const auto append = [&](const Endpoint& endpoint) {
+    if (!is_imported_topology_target_spelling(endpoint.spelling))
+      return;
+    auto reference = parse_imported_topology_target_spelling(endpoint.spelling);
+    if (!reference || !validate_imported_topology_reference(*endpoint.part, reference.value())) {
+      malformed = true;
+      return;
+    }
+    references.emplace_back(endpoint.part, std::move(reference.value()));
+  };
+  const auto pair = [&](Endpoint first, Endpoint second) {
+    if (!first.part || !second.part || !first.active || !second.active)
+      return;
+    append(first);
+    append(second);
+  };
+  const auto assembly = [&](const AssemblyDocument& owner) {
+    const auto endpoints = [&](const auto& relationship) {
+      pair(local(owner, relationship.target_a().component_instance(),
+                 relationship.target_a().semantic_reference()),
+           local(owner, relationship.target_b().component_instance(),
+                 relationship.target_b().semantic_reference()));
+    };
+    for (const auto& constraint : owner.constraints())
+      if (constraint.state() == AssemblyConstraintState::Active)
+        endpoints(constraint);
+    for (const auto& joint : owner.joints())
+      if (joint.state() == AssemblyJointState::Active)
+        endpoints(joint);
+  };
+  assembly(project.assembly());
+  for (const auto& owner : project.child_assembly_documents())
+    assembly(owner);
+  for (const auto& constraint : project.cross_hierarchy_constraints())
+    if (constraint.state() == AssemblyConstraintState::Active)
+      pair(hierarchical(constraint.target_a()), hierarchical(constraint.target_b()));
+  for (const auto& joint : project.cross_hierarchy_joints())
+    if (joint.state() == AssemblyJointState::Active)
+      pair(hierarchical(joint.target_a()), hierarchical(joint.target_b()));
+  if (malformed || references.empty() || root.empty())
+    return false;
+  geometry::StepImportTopologyContext context(root);
+  for (const auto& [part, reference] : references) {
+    auto recovery = context.recover(*part, reference.catalog());
+    if (!recovery)
+      continue;
+    const auto* entry = recovery.value()->find(reference.entry());
+    if (!entry || (entry->status != ImportedTopologyRecoveryStatus::Lost &&
+                   entry->status != ImportedTopologyRecoveryStatus::Ambiguous))
+      continue;
+    auto resolved = geometry::StepImportTopology{}.resolve(*recovery.value(), reference);
+    if (!resolved && same_error(failure, resolved.error()))
+      return true;
+  }
+  return false;
+}
+Result<std::size_t> validate_reference_update(const PartDocument& before,
+                                              const PartDocument& after) {
+  if (!before.is_reference_part())
+    return Result<std::size_t>::success(0);
+  const auto* binding = before.reference_part_definition();
+  const auto* source = binding ? before.find_step_import_source(binding->source()) : nullptr;
+  const auto* updated = source ? after.find_step_import_source(source->id()) : nullptr;
+  if (!source || !updated)
+    return Result<std::size_t>::failure(
+        session_error("Reference Parts are immutable; create a new Editable copy"));
+  auto permitted = before;
+  auto refresh = permitted.refresh_step_import_source(*source, updated->sha256_digest());
+  if (!refresh)
+    return refresh;
+  auto expected = serialize_part_document_to_json(permitted);
+  auto candidate = serialize_part_document_to_json(after);
+  if (!expected || !candidate || expected.value() != candidate.value())
+    return Result<std::size_t>::failure(
+        session_error("Reference Parts permit only explicit bound-source refresh; create a new "
+                      "Editable copy to model"));
+  return Result<std::size_t>::success(1);
 }
 
 // Compare canonical intent, rather than trusting a mutation callback's dirty
@@ -569,6 +705,8 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
 
   std::optional<geometry::ShapeCache> part_cache;
   std::vector<ProjectPartCache> project_caches;
+  std::optional<Error> import_failure;
+  const auto asset_root = std::filesystem::absolute(path).lexically_normal().parent_path();
   if (auto* part = std::get_if<PartDocument>(&candidate)) {
     auto migrated =
         migrate_sketch_sidecar_points(*part, candidate_constraints, candidate_dimensions);
@@ -589,20 +727,25 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
     auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.part." + part->id().value()));
     if (cache.has_error())
       return Result<std::size_t>::failure(cache.error());
-    auto result = recompute_part(*part, cache.value());
+    auto result = recompute_part(*part, cache.value(), asset_root);
     if (result.has_error()) {
-      if (mode != GuiDocumentOpenMode::ReferenceRepair) {
+      import_failure = imported_result_failure(*part, asset_root);
+      if (!same_error(result.error(), import_failure))
+        import_failure.reset();
+      if (!import_failure && mode != GuiDocumentOpenMode::ReferenceRepair) {
         record_error(result.error());
         return result;
       }
-      repair_failure = result.error();
+      if (!import_failure)
+        repair_failure = result.error();
+      part->mark_all_clean();
     } else {
       part->mark_all_clean();
       part_cache = std::move(cache.value());
     }
   } else {
     auto* active_project = std::get_if<Project>(&candidate);
-    auto caches = recompute_project(*active_project);
+    auto caches = recompute_project(*active_project, asset_root, &import_failure);
     if (caches.has_error()) {
       record_error(caches.error());
       return Result<std::size_t>::failure(caches.error());
@@ -620,7 +763,8 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
   project_part_caches_ = std::move(project_caches);
   ++presentation_revision_;
   reference_repair_mode_ = repair_failure.has_value();
-  recompute_status_ = repair_failure ? GuiRecomputeStatus::Failed : GuiRecomputeStatus::Fresh;
+  recompute_status_ =
+      repair_failure || import_failure ? GuiRecomputeStatus::Failed : GuiRecomputeStatus::Fresh;
   if (auto* part = part_document()) {
     display_name_ = part->name();
     workspace_ = GuiWorkspace::Part;
@@ -636,6 +780,8 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
   diagnose_step_import_sources();
   if (repair_failure)
     record_error(*repair_failure);
+  if (import_failure)
+    record_error(*import_failure);
   return Result<std::size_t>::success(1U);
 }
 
@@ -744,6 +890,7 @@ Result<std::size_t> GuiDocumentSession::recompute() {
     }
     const auto result = recompute_part(*part, cache.value());
     if (result.has_error()) {
+      part_shape_cache_.reset();
       recompute_status_ = GuiRecomputeStatus::Failed;
       record_error(result.error());
       return result;
@@ -759,6 +906,7 @@ Result<std::size_t> GuiDocumentSession::recompute() {
   if (auto* active_project = project()) {
     auto caches = recompute_project(*active_project);
     if (caches.has_error()) {
+      project_part_caches_.clear();
       recompute_status_ = GuiRecomputeStatus::Failed;
       record_error(caches.error());
       return Result<std::size_t>::failure(caches.error());
@@ -895,6 +1043,24 @@ GuiDocumentSession::commit_project_transaction(std::string label,
     record_error(changed.error());
     return changed;
   }
+  if (const auto* current = project())
+    for (const auto& part : current->part_documents()) {
+      if (!part.is_reference_part())
+        continue;
+      const auto* updated = cloned.value().find_part_document(part.id());
+      if (!updated) {
+        // Deleting an unreferenced owned definition is Project lifecycle, not
+        // an edit to that definition. Core still rejects dangling memberships,
+        // occurrences, parameter bindings and relationship endpoints.
+        auto structure = cloned.value().validate_assembly_structure();
+        if (!structure)
+          return structure;
+        continue;
+      }
+      auto valid = validate_reference_update(part, *updated);
+      if (!valid)
+        return valid;
+    }
   auto caches = recompute_project(cloned.value());
   if (caches.has_error()) {
     recompute_status_ = GuiRecomputeStatus::Failed;
@@ -1140,26 +1306,62 @@ Result<std::string> GuiDocumentSession::serialize_current() const {
   return Result<std::string>::failure(session_error("no active document"));
 }
 
-Result<std::size_t> GuiDocumentSession::recompute_part(PartDocument& document,
-                                                       geometry::ShapeCache& cache) const {
-  const auto summary = geometry::GeometryRecomputeExecutor{}.execute_document(document, cache);
+Result<std::size_t>
+GuiDocumentSession::recompute_part(PartDocument& document, geometry::ShapeCache& cache,
+                                   const std::filesystem::path& asset_root) const {
+  const auto root = !asset_root.empty() ? asset_root
+                    : file_path_.empty()
+                        ? std::filesystem::path{}
+                        : std::filesystem::absolute(file_path_).lexically_normal().parent_path();
+  std::optional<geometry::StepImportTopologyContext> context;
+  if (!root.empty())
+    context.emplace(root);
+  const auto summary =
+      geometry::GeometryRecomputeExecutor{context ? &*context : nullptr}.execute_document(document,
+                                                                                          cache);
   if (summary.has_error())
     return Result<std::size_t>::failure(summary.error());
   return Result<std::size_t>::success(summary.value().executed_feature_count);
 }
 
 Result<std::vector<GuiDocumentSession::ProjectPartCache>>
-GuiDocumentSession::recompute_project(Project& active_project) const {
+GuiDocumentSession::recompute_project(Project& active_project,
+                                      const std::filesystem::path& asset_root,
+                                      std::optional<Error>* import_failure) const {
+  const auto root = !asset_root.empty() ? asset_root
+                    : file_path_.empty()
+                        ? std::filesystem::path{}
+                        : std::filesystem::absolute(file_path_).lexically_normal().parent_path();
   std::vector<ProjectPartCache> caches;
   caches.reserve(active_project.part_document_count());
   for (auto& part : active_project.part_documents()) {
     auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.project." + part.id().value()));
     if (cache.has_error())
       return Result<std::vector<ProjectPartCache>>::failure(cache.error());
-    const auto result = recompute_part(part, cache.value());
-    if (result.has_error())
+    const auto result = recompute_part(part, cache.value(), root);
+    if (result.has_error()) {
+      const auto failure = import_failure ? imported_result_failure(part, root) : std::nullopt;
+      if (same_error(result.error(), failure)) {
+        if (!*import_failure)
+          *import_failure = failure;
+        continue;
+      }
       return Result<std::vector<ProjectPartCache>>::failure(result.error());
+    }
     caches.push_back(ProjectPartCache{part.id(), std::move(cache.value())});
+  }
+  if ((!import_failure || !*import_failure) && !root.empty()) {
+    geometry::StepImportTopologyContext context(root);
+    auto valid = geometry::validate_imported_assembly_inputs(active_project, context);
+    if (!valid) {
+      if (import_failure &&
+          imported_endpoint_recovery_failure(active_project, root, valid.error())) {
+        *import_failure = valid.error();
+        caches.clear();
+        return Result<std::vector<ProjectPartCache>>::success(std::move(caches));
+      }
+      return Result<std::vector<ProjectPartCache>>::failure(valid.error());
+    }
   }
   return Result<std::vector<ProjectPartCache>>::success(std::move(caches));
 }
@@ -1190,6 +1392,10 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
   std::optional<geometry::ShapeCache> restored_cache;
   std::vector<ProjectPartCache> restored_project_caches;
   std::optional<Error> repair_failure;
+  std::optional<Error> import_failure;
+  const auto asset_root =
+      file_path_.empty() ? std::filesystem::path{}
+                         : std::filesystem::absolute(file_path_).lexically_normal().parent_path();
   if (auto* part = std::get_if<PartDocument>(&restored)) {
     const auto retained =
         std::find_if(part_history_geometry_.begin(), part_history_geometry_.end(),
@@ -1203,17 +1409,22 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
       return Result<std::size_t>::failure(cache.error());
     auto computed = reuse ? Result<std::size_t>::success(0) : recompute_part(*part, cache.value());
     if (!computed) {
-      if (!entry.allow_failed_recompute) {
+      import_failure = imported_result_failure(*part, asset_root);
+      if (!same_error(computed.error(), import_failure))
+        import_failure.reset();
+      if (!import_failure && !entry.allow_failed_recompute) {
         record_error(computed.error());
         return computed;
       }
-      repair_failure = computed.error();
+      if (!import_failure)
+        repair_failure = computed.error();
+      part->mark_all_clean();
     } else {
       part->mark_all_clean();
       restored_cache = std::move(cache.value());
     }
   } else {
-    auto caches = recompute_project(std::get<Project>(restored));
+    auto caches = recompute_project(std::get<Project>(restored), asset_root, &import_failure);
     if (!caches) {
       record_error(caches.error());
       return Result<std::size_t>::failure(caches.error());
@@ -1228,10 +1439,13 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
   part_shape_cache_ = std::move(restored_cache);
   project_part_caches_ = std::move(restored_project_caches);
   reference_repair_mode_ = repair_failure.has_value();
-  recompute_status_ = repair_failure ? GuiRecomputeStatus::Failed : GuiRecomputeStatus::Fresh;
+  recompute_status_ =
+      repair_failure || import_failure ? GuiRecomputeStatus::Failed : GuiRecomputeStatus::Fresh;
   ++presentation_revision_;
   if (repair_failure)
     record_error(*repair_failure);
+  if (import_failure)
+    record_error(*import_failure);
   history_index_ = index;
   remember_part_history_geometry();
   selection_.clear();
@@ -1330,6 +1544,11 @@ Result<std::size_t> GuiDocumentSession::validate_dimension_catalogs(
 Result<std::size_t> GuiDocumentSession::publish_part_state(
     PartDocument document, std::vector<SketchConstraintCatalog> constraints,
     std::vector<SketchDimensionCatalog> dimensions, std::string label, std::size_t changed_count) {
+  if (const auto* current = part_document()) {
+    auto valid = validate_reference_update(*current, document);
+    if (!valid)
+      return valid;
+  }
   sort_catalogs(constraints);
   sort_catalogs(dimensions);
   auto valid_constraints = validate_constraint_catalogs(document, constraints);

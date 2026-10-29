@@ -9,6 +9,10 @@
 #include <cstddef>
 #include <vector>
 
+namespace blcad::geometry {
+class StepImportTopologyContext;
+}
+
 namespace blcad::geometry::detail {
 
 // One flattened visible-active leaf occurrence together with its posed OCCT
@@ -30,10 +34,18 @@ struct PosedLeafShapesBuild {
 // authored transform chain with X-then-Y-then-Z semantics per level.
 class AssemblyPosedLeafShapeBuilder {
 public:
+  AssemblyPosedLeafShapeBuilder() = default;
+  explicit AssemblyPosedLeafShapeBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<PosedLeafShapesBuild> build(const Project& project) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
-[[nodiscard]] Result<PosedLeafShapesBuild> build_posed_leaf_shapes(const Project& project);
+[[nodiscard]] Result<PosedLeafShapesBuild>
+build_posed_leaf_shapes(const Project& project,
+                        StepImportTopologyContext* import_context = nullptr);
 
 // Stable leaf occurrence identity key: assembly id, subassembly path, and
 // component id joined with '/'. Never an OCCT topology id.

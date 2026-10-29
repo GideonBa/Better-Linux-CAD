@@ -2,6 +2,7 @@
 
 #include "blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <utility>
@@ -46,12 +47,36 @@ Result<Project> make_cross_hierarchy_local_evaluation_view(
       return Result<Project>::failure(added.error());
     }
   }
+  // A child becomes this view's root, so retain its descendant definitions.
+  // Snapshot/source validation must still see a structurally complete hierarchy.
+  std::vector<DocumentId> visited{assembly->id()};
+  std::vector<DocumentId> pending;
+  for (const auto& occurrence : assembly->subassembly_instances())
+    pending.push_back(occurrence.referenced_assembly_document());
+  for (std::size_t index = 0; index < pending.size(); ++index) {
+    if (std::find(visited.begin(), visited.end(), pending[index]) != visited.end())
+      continue;
+    const auto* descendant = project.find_assembly_document(pending[index]);
+    if (descendant == nullptr)
+      return Result<Project>::failure(validation_error(
+          pending[index].value(), "local evaluation view descendant assembly must exist"));
+    auto added = local_project.value().add_child_assembly_document(*descendant);
+    if (!added)
+      return Result<Project>::failure(added.error());
+    visited.push_back(descendant->id());
+    for (const auto& occurrence : descendant->subassembly_instances())
+      pending.push_back(occurrence.referenced_assembly_document());
+  }
+  auto valid = local_project.value().validate_assembly_structure();
+  if (!valid)
+    return Result<Project>::failure(valid.error());
   return local_project;
 }
 
 Result<std::size_t> append_cross_hierarchy_local_relationship_residuals(
     const Project& project, const AssemblyLocalRelationshipIdentity& identity,
-    double length_residual_scale_mm, NumericVector& residuals) {
+    double length_residual_scale_mm, NumericVector& residuals,
+    StepImportTopologyContext* import_context) {
   auto local_project =
       make_cross_hierarchy_local_evaluation_view(project, identity.assembly_document);
   if (local_project.has_error()) {
@@ -63,9 +88,9 @@ Result<std::size_t> append_cross_hierarchy_local_relationship_residuals(
         "cross-hierarchy solve-group local relationship must exist in containing assembly"));
   }
 
-  auto local_residuals = evaluate_residuals(
-      local_project.value(), std::vector<AssemblyConstraintId>{identity.constraint},
-      length_residual_scale_mm);
+  auto local_residuals = evaluate_residuals(local_project.value(),
+                                            std::vector<AssemblyConstraintId>{identity.constraint},
+                                            length_residual_scale_mm, import_context);
   if (local_residuals.has_error()) {
     return Result<std::size_t>::failure(local_residuals.error());
   }
@@ -76,9 +101,9 @@ Result<std::size_t> append_cross_hierarchy_local_relationship_residuals(
 }
 
 Result<std::size_t> append_cross_hierarchy_project_relationship_residuals(
-    const Project& project,
-    const AssemblyProjectCrossHierarchyRelationshipIdentity& identity,
-    double length_residual_scale_mm, NumericVector& residuals) {
+    const Project& project, const AssemblyProjectCrossHierarchyRelationshipIdentity& identity,
+    double length_residual_scale_mm, NumericVector& residuals,
+    StepImportTopologyContext* import_context) {
   const AssemblyHierarchyConstraint* constraint =
       project.find_cross_hierarchy_constraint(identity.constraint);
   if (constraint == nullptr) {
@@ -91,7 +116,7 @@ Result<std::size_t> append_cross_hierarchy_project_relationship_residuals(
   if (query.has_error()) {
     return Result<std::size_t>::failure(query.error());
   }
-  const AssemblyHierarchyConstraintEquationBuilder builder;
+  const AssemblyHierarchyConstraintEquationBuilder builder(import_context);
   auto equation = builder.build(project, query.value());
   if (equation.has_error()) {
     return Result<std::size_t>::failure(equation.error());
@@ -167,7 +192,7 @@ Result<std::size_t> apply_cross_hierarchy_authority_variables(
 
 Result<NumericVector> evaluate_cross_hierarchy_group_residuals(
     const Project& project, const AssemblyCrossHierarchySolveGroup& solve_group,
-    double length_residual_scale_mm) {
+    double length_residual_scale_mm, StepImportTopologyContext* import_context) {
   NumericVector residuals;
   residuals.reserve(solve_group.relationships.size() * 7U);
 
@@ -176,11 +201,11 @@ Result<NumericVector> evaluate_cross_hierarchy_group_residuals(
         std::holds_alternative<AssemblyLocalRelationshipIdentity>(relationship)
             ? append_cross_hierarchy_local_relationship_residuals(
                   project, std::get<AssemblyLocalRelationshipIdentity>(relationship),
-                  length_residual_scale_mm, residuals)
+                  length_residual_scale_mm, residuals, import_context)
             : append_cross_hierarchy_project_relationship_residuals(
                   project,
                   std::get<AssemblyProjectCrossHierarchyRelationshipIdentity>(relationship),
-                  length_residual_scale_mm, residuals);
+                  length_residual_scale_mm, residuals, import_context);
     if (appended.has_error()) {
       return Result<NumericVector>::failure(appended.error());
     }

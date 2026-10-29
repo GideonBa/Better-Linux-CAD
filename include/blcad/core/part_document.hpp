@@ -12,6 +12,7 @@
 #include "blcad/core/edge_treatment_feature.hpp"
 #include "blcad/core/feature.hpp"
 #include "blcad/core/id.hpp"
+#include "blcad/core/imported_part.hpp"
 #include "blcad/core/invalidation_state.hpp"
 #include "blcad/core/loft_feature.hpp"
 #include "blcad/core/mirror_feature.hpp"
@@ -33,6 +34,7 @@
 #include "blcad/core/sweep_feature.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -44,6 +46,26 @@ enum class PartDocumentReadMode;
 class PartDocument {
 public:
   [[nodiscard]] static Result<PartDocument> create(DocumentId id, std::string name);
+  [[nodiscard]] static Result<PartDocument> create_reference(DocumentId id, std::string name,
+                                                             StepImportSource source,
+                                                             ImportedTopologyCatalog catalog,
+                                                             ImportedPartDefinition definition);
+  [[nodiscard]] PartDocumentMode mode() const noexcept {
+    return reference_part_definition_ ? PartDocumentMode::Reference : PartDocumentMode::Editable;
+  }
+  [[nodiscard]] bool is_reference_part() const noexcept {
+    return reference_part_definition_.has_value();
+  }
+  [[nodiscard]] const ImportedPartDefinition* reference_part_definition() const noexcept {
+    return reference_part_definition_ ? &*reference_part_definition_ : nullptr;
+  }
+  [[nodiscard]] const std::vector<ImportedBodyFeature>& imported_body_features() const noexcept {
+    return imported_body_features_;
+  }
+  [[nodiscard]] Result<std::size_t> add_imported_body_feature(ImportedBodyFeature feature);
+  [[nodiscard]] Result<PartDocument>
+  convert_reference_to_editable(DocumentId new_id, std::string new_name, FeatureId base_feature_id,
+                                std::vector<BodyId> new_body_ids) const;
 
   [[nodiscard]] Result<std::size_t> add_parameter(Parameter parameter);
   // Adds a computed parameter whose value derives from a unit-aware formula
@@ -170,6 +192,8 @@ public:
     return step_import_sources_.find(std::move(id));
   }
   [[nodiscard]] Result<std::size_t> add_step_import_source(StepImportSource source) {
+    if (is_reference_part())
+      return Result<std::size_t>::failure(reference_part_edit_error());
     return step_import_sources_.add(std::move(source));
   }
   [[nodiscard]] Result<std::size_t> remove_step_import_source(StepImportSourceId id);
@@ -307,6 +331,10 @@ private:
   add_result_face_workplane_impl(ResultFaceWorkplane workplane,
                                  const std::vector<std::string>& retained_missing_sources);
   PartDocument(DocumentId id, std::string name);
+  [[nodiscard]] Error reference_part_edit_error() const;
+  [[nodiscard]] Result<std::size_t>
+  validate_imported_part_definition(const ImportedPartDefinition& definition) const;
+  [[nodiscard]] Result<std::size_t> seal_reference_part(ImportedPartDefinition definition);
 
   [[nodiscard]] Result<std::size_t>
   reevaluate_affected_expressions(const std::vector<std::string>& affected_nodes);
@@ -364,6 +392,8 @@ private:
 
   StepImportSourceRegistry step_import_sources_;
   std::vector<ImportedTopologyCatalog> imported_topology_catalogs_;
+  std::optional<ImportedPartDefinition> reference_part_definition_;
+  std::vector<ImportedBodyFeature> imported_body_features_;
   DocumentId id_;
   std::string name_;
   std::vector<Parameter> parameters_;

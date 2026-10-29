@@ -102,6 +102,7 @@ add_library(
   src/core/step_import_source.cpp
   src/core/step_import_freshness.cpp
   src/core/imported_topology.cpp
+  src/core/imported_part.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
 
@@ -136,6 +137,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_constraint_numeric_system.cpp
     src/geometry/assembly_constraint_target_resolver.cpp
     src/geometry/assembly_interaction.cpp
+    src/geometry/assembly_import_validation.cpp
     src/geometry/assembly_contact_analyzer.cpp
     src/geometry/assembly_cross_hierarchy_constraint_solver.cpp
     src/geometry/assembly_cross_hierarchy_freshness.cpp
@@ -217,9 +219,12 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/sketch_reference_projector.cpp
     src/geometry/sketch_region_finder.cpp
     src/geometry/step_exporter.cpp
+    src/geometry/step_export_transaction.cpp
     src/geometry/step_import_reader.cpp
     src/geometry/step_import_topology.cpp
     src/geometry/step_import_topology_context.cpp
+    src/geometry/reference_part_geometry.cpp
+    src/geometry/step_reference_commands.cpp
     src/geometry/workplane_resolver.cpp
   )
   add_library(BLCAD::geometry ALIAS blcad_geometry)
@@ -412,6 +417,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/feature_update_command_tests.cpp
     tests/core/step_import_source_tests.cpp
     tests/core/imported_topology_tests.cpp
+    tests/core/step_reference_part_tests.cpp
     tests/core/assembly_angle_constraint_tests.cpp
     tests/core/assembly_constraint_graph_tests.cpp
     tests/core/assembly_constraint_tests.cpp
@@ -611,6 +617,11 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/step_import_profile_tests.cpp
       tests/geometry/viewport_scene_tests.cpp
       tests/geometry/assembly_interaction_tests.cpp
+      tests/geometry/reference_part_geometry_tests.cpp
+      tests/geometry/reference_part_interaction_tests.cpp
+      tests/geometry/reference_part_export_tests.cpp
+      tests/geometry/assembly_step_reference_part_tests.cpp
+      tests/geometry/step_reference_commands_tests.cpp
       tests/geometry/workplane_resolver_tests.cpp
       tests/geometry/workplane_resolver_recovery_tests.cpp
     )

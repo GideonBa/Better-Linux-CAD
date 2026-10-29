@@ -11,6 +11,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 enum class AssemblyGenericRelationshipTargetRole { TargetA, TargetB };
 
 struct CoincidentPointPointResidualDescriptor {
@@ -99,6 +101,9 @@ struct AssemblyGenericRelationshipEquationDescriptor {
 // read-only and owns no graph, optimizer, finite-difference, or transform state.
 class AssemblyGenericRelationshipEquationBuilder {
 public:
+  AssemblyGenericRelationshipEquationBuilder() = default;
+  explicit AssemblyGenericRelationshipEquationBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyGenericRelationshipEquationDescriptor>
   build(const Project& project, const AssemblyConstraint& constraint) const;
 
@@ -107,6 +112,9 @@ public:
         const AssemblyResolvedGeometricTarget& target_a,
         const AssemblyResolvedGeometricTarget& target_b,
         std::optional<Quantity> angle = std::nullopt) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

@@ -10,6 +10,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 enum class AssemblyContactClassification {
   Separated,
   Touching,
@@ -57,9 +59,15 @@ struct AssemblyContactAnalysis {
 // key or OCCT topology id. All records are derived and unpersisted.
 class AssemblyContactAnalyzer {
 public:
+  AssemblyContactAnalyzer() = default;
+  explicit AssemblyContactAnalyzer(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyContactAnalysis>
   analyze(const Project& project,
           AssemblyContactAnalysisOptions options = AssemblyContactAnalysisOptions{}) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

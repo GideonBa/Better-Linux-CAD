@@ -5,6 +5,7 @@
 #include "assembly_occt_rigid_transform.hpp"
 #include "assembly_part_shape_definitions.hpp"
 #include "occt_failure_message.hpp"
+#include "step_export_transaction.hpp"
 
 #include <IFSelect_ReturnStatus.hxx>
 #include <Interface_Static.hxx>
@@ -78,6 +79,9 @@ Result<AssemblyStructuredStepExportSummary> AssemblyStructuredStepExporter::writ
     return Result<AssemblyStructuredStepExportSummary>::failure(
         make_export_error("structured step export path must not be empty"));
   }
+  auto transaction = detail::StepExportTransaction::create(project, import_context_, path);
+  if (!transaction)
+    return Result<AssemblyStructuredStepExportSummary>::failure(transaction.error());
 
   auto exchange_graph = AssemblyExchangeGraph::build(project);
   if (exchange_graph.has_error()) {
@@ -95,7 +99,7 @@ Result<AssemblyStructuredStepExportSummary> AssemblyStructuredStepExporter::writ
     part_documents.push_back(definition.identity.part_document);
   }
 
-  const detail::AssemblyPartShapeDefinitionBuilder part_definition_builder;
+  const detail::AssemblyPartShapeDefinitionBuilder part_definition_builder(import_context_);
   auto part_shapes = part_definition_builder.build(project, std::move(part_documents));
   if (part_shapes.has_error()) {
     return Result<AssemblyStructuredStepExportSummary>::failure(part_shapes.error());
@@ -210,14 +214,16 @@ Result<AssemblyStructuredStepExportSummary> AssemblyStructuredStepExporter::writ
           make_export_error("could not transfer structured XDE assembly to step model"));
     }
 
-    const IFSelect_ReturnStatus write_status = writer.Write(path.c_str());
+    const IFSelect_ReturnStatus write_status =
+        writer.Write(transaction.value().writer_path().c_str());
     if (write_status != IFSelect_RetDone) {
       return Result<AssemblyStructuredStepExportSummary>::failure(
           make_export_error("could not write structured step file"));
     }
 
     std::error_code error_code;
-    const std::uintmax_t size = std::filesystem::file_size(path, error_code);
+    const std::uintmax_t size =
+        std::filesystem::file_size(transaction.value().writer_path(), error_code);
     if (error_code) {
       return Result<AssemblyStructuredStepExportSummary>::failure(
           make_export_error("could not read back written structured step file"));
@@ -227,13 +233,14 @@ Result<AssemblyStructuredStepExportSummary> AssemblyStructuredStepExporter::writ
           make_export_error("structured step export produced an empty file"));
     }
 
-    return Result<AssemblyStructuredStepExportSummary>::success(
-        AssemblyStructuredStepExportSummary{
-            part_shapes.value().recomputed_part_count,
-            exchange_graph.value().assembly_occurrence_count(),
-            exchange_graph.value().component_occurrence_count(),
-            exchange_graph.value().part_product_definition_count(),
-            static_cast<std::size_t>(size)});
+    auto committed = transaction.value().commit();
+    if (!committed)
+      return Result<AssemblyStructuredStepExportSummary>::failure(committed.error());
+    return Result<AssemblyStructuredStepExportSummary>::success(AssemblyStructuredStepExportSummary{
+        part_shapes.value().recomputed_part_count,
+        exchange_graph.value().assembly_occurrence_count(),
+        exchange_graph.value().component_occurrence_count(),
+        exchange_graph.value().part_product_definition_count(), committed.value()});
   } catch (const Standard_Failure& failure) {
     return Result<AssemblyStructuredStepExportSummary>::failure(
         make_export_error(standard_failure_message(failure)));

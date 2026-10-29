@@ -4,6 +4,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct AssemblyHierarchyCylindricalJointEquationDescriptor {
   AssemblyJointId joint;
   AssemblyJointTargetCompatibility compatibility;
@@ -16,9 +18,16 @@ struct AssemblyHierarchyCylindricalJointEquationDescriptor {
 
 class AssemblyHierarchyCylindricalJointEquationBuilder {
 public:
+  AssemblyHierarchyCylindricalJointEquationBuilder() = default;
+  explicit AssemblyHierarchyCylindricalJointEquationBuilder(
+      StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyHierarchyCylindricalJointEquationDescriptor>
   build(const Project& project, const AssemblyHierarchyJoint& joint,
         const Quantity& requested_translation, const Quantity& requested_rotation) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

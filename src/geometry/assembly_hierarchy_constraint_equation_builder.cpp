@@ -152,13 +152,14 @@ evaluate_geometric_descriptor(const std::vector<RigidTransform>& transforms,
 
 [[nodiscard]] Result<ResolvedHierarchyGeometricTarget>
 resolve_hierarchy_geometric_target(const Project& project,
-                                   const AssemblyHierarchyConstraintTarget& target) {
+                                   const AssemblyHierarchyConstraintTarget& target,
+                                   StepImportTopologyContext* import_context) {
   auto occurrence = resolve_occurrence(project, target.occurrence_path());
   if (occurrence.has_error()) {
     return Result<ResolvedHierarchyGeometricTarget>::failure(occurrence.error());
   }
 
-  const AssemblyHierarchyConstraintTargetResolver resolver;
+  const AssemblyHierarchyConstraintTargetResolver resolver(import_context);
   auto resolved = resolver.resolve_geometric(project, target);
   if (resolved.has_error()) {
     return Result<ResolvedHierarchyGeometricTarget>::failure(resolved.error());
@@ -497,18 +498,20 @@ Result<AssemblyHierarchyConstraintEquationDescriptor>
 AssemblyHierarchyConstraintEquationBuilder::build(
     const Project& project, const AssemblyHierarchyConstraintQuery& query) const {
   if (generic_relationship_type(query.type())) {
-    auto geometric_target_a = resolve_hierarchy_geometric_target(project, query.target_a());
+    auto geometric_target_a =
+        resolve_hierarchy_geometric_target(project, query.target_a(), import_context_);
     if (geometric_target_a.has_error()) {
       return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
           geometric_target_a.error());
     }
-    auto geometric_target_b = resolve_hierarchy_geometric_target(project, query.target_b());
+    auto geometric_target_b =
+        resolve_hierarchy_geometric_target(project, query.target_b(), import_context_);
     if (geometric_target_b.has_error()) {
       return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
           geometric_target_b.error());
     }
 
-    const AssemblyGenericRelationshipEquationBuilder generic_builder;
+    const AssemblyGenericRelationshipEquationBuilder generic_builder(import_context_);
     auto equation =
         generic_builder.build(query.id(), query.type(), geometric_target_a.value().target,
                               geometric_target_b.value().target, query.angle());
@@ -524,12 +527,14 @@ AssemblyHierarchyConstraintEquationBuilder::build(
   }
 
   if (query.type() == AssemblyConstraintType::Concentric) {
-    auto geometric_target_a = resolve_hierarchy_geometric_target(project, query.target_a());
+    auto geometric_target_a =
+        resolve_hierarchy_geometric_target(project, query.target_a(), import_context_);
     if (geometric_target_a.has_error()) {
       return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
           geometric_target_a.error());
     }
-    auto geometric_target_b = resolve_hierarchy_geometric_target(project, query.target_b());
+    auto geometric_target_b =
+        resolve_hierarchy_geometric_target(project, query.target_b(), import_context_);
     if (geometric_target_b.has_error()) {
       return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
           geometric_target_b.error());
@@ -561,12 +566,14 @@ AssemblyHierarchyConstraintEquationBuilder::build(
   }
 
   if (query.type() == AssemblyConstraintType::Insert) {
-    auto geometric_target_a = resolve_hierarchy_geometric_target(project, query.target_a());
+    auto geometric_target_a =
+        resolve_hierarchy_geometric_target(project, query.target_a(), import_context_);
     if (geometric_target_a.has_error()) {
       return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
           geometric_target_a.error());
     }
-    auto geometric_target_b = resolve_hierarchy_geometric_target(project, query.target_b());
+    auto geometric_target_b =
+        resolve_hierarchy_geometric_target(project, query.target_b(), import_context_);
     if (geometric_target_b.has_error()) {
       return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
           geometric_target_b.error());
@@ -600,12 +607,14 @@ AssemblyHierarchyConstraintEquationBuilder::build(
                 dot(seat_origin_delta, target_a.value().seating_plane.normal)}});
   }
 
-  auto geometric_target_a = resolve_hierarchy_geometric_target(project, query.target_a());
+  auto geometric_target_a =
+      resolve_hierarchy_geometric_target(project, query.target_a(), import_context_);
   if (geometric_target_a.has_error()) {
     return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
         geometric_target_a.error());
   }
-  auto geometric_target_b = resolve_hierarchy_geometric_target(project, query.target_b());
+  auto geometric_target_b =
+      resolve_hierarchy_geometric_target(project, query.target_b(), import_context_);
   if (geometric_target_b.has_error()) {
     return Result<AssemblyHierarchyConstraintEquationDescriptor>::failure(
         geometric_target_b.error());
@@ -619,7 +628,7 @@ AssemblyHierarchyConstraintEquationBuilder::build(
   }
   if (query.type() == AssemblyConstraintType::Angle &&
       !selected_plane_pair(compatibility.value())) {
-    const AssemblyGenericRelationshipEquationBuilder generic_builder;
+    const AssemblyGenericRelationshipEquationBuilder generic_builder(import_context_);
     auto equation =
         generic_builder.build(query.id(), query.type(), geometric_target_a.value().target,
                               geometric_target_b.value().target, query.angle());

@@ -2,6 +2,9 @@
 
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
+#include "blcad/geometry/reference_part_geometry.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
+#include <QFile>
 #include <algorithm>
 
 namespace blcad::gui {
@@ -508,6 +511,241 @@ Result<std::size_t> GuiStepImportWorkbench::apply(GuiDocumentSession& session,
                                                                             : "Remove STEP source";
   return session.part_document() ? session.commit_part_transaction(label, mutation)
                                  : session.commit_project_transaction(label, mutation);
+}
+
+namespace {
+Result<std::string> reference_candidate_json(const GuiStepReferencePreview& value) {
+  return std::visit(
+      [](const auto& candidate) -> Result<std::string> {
+        if constexpr (requires { candidate.project; })
+          return serialize_project_to_json(candidate.project);
+        else
+          return serialize_part_document_to_json(candidate.part);
+      },
+      value.candidate);
+}
+} // namespace
+Result<GuiStepReferencePreview>
+GuiStepImportWorkbench::prepare_reference(const GuiDocumentSession& session,
+                                          GuiStepReferenceRequest request) const {
+  auto path = document_path(session);
+  auto json = snapshot(session);
+  if (!path || !json)
+    return Result<GuiStepReferencePreview>::failure(!path ? path.error() : json.error());
+  const auto root = path.value().parent_path();
+  const geometry::StepReferenceCommands commands;
+  auto candidate = [&]() -> Result<std::variant<geometry::StepReferencePartCandidate,
+                                                geometry::StepReferenceProjectCandidate>> {
+    using Value =
+        std::variant<geometry::StepReferencePartCandidate, geometry::StepReferenceProjectCandidate>;
+    if (const auto* project = session.project()) {
+      const auto result = [&]() -> Result<geometry::StepReferenceProjectCandidate> {
+        switch (request.operation) {
+        case GuiStepReferenceOperation::Insert:
+          return commands.insert(*project, request.catalog, request.new_part, request.name,
+                                 request.target_assembly, request.instance, request.transform,
+                                 root);
+        case GuiStepReferenceOperation::Repeat:
+          return commands.repeat(*project, request.reference_part, request.target_assembly,
+                                 request.instance, request.transform, root);
+        case GuiStepReferenceOperation::Refresh:
+          return commands.refresh(*project, request.reference_part, root);
+        case GuiStepReferenceOperation::Convert:
+          return commands.convert(*project, request.reference_part, request.new_part, request.name,
+                                  request.base_feature, root);
+        }
+        return Result<geometry::StepReferenceProjectCandidate>::failure(
+            invalid("Unknown Reference Part operation"));
+      }();
+      return result ? Result<Value>::success(Value(result.value()))
+                    : Result<Value>::failure(result.error());
+    }
+    const auto& part = *session.part_document();
+    auto result = [&]() -> Result<geometry::StepReferencePartCandidate> {
+      switch (request.operation) {
+      case GuiStepReferenceOperation::Insert: {
+        const auto* catalog = part.find_imported_topology_catalog(request.catalog);
+        const auto* source = catalog ? part.find_step_import_source(catalog->source()) : nullptr;
+        if (!source)
+          return Result<geometry::StepReferencePartCandidate>::failure(
+              invalid("Choose a saved Reference topology catalog"));
+        auto created =
+            commands.create_definition(*source, *catalog, request.new_part, request.name, root);
+        if (!created)
+          return Result<geometry::StepReferencePartCandidate>::failure(created.error());
+        return Result<geometry::StepReferencePartCandidate>::success(
+            {std::move(created.value()),
+             {},
+             {"Create a new immutable Reference Part file. The current Part is preserved."}});
+      }
+      case GuiStepReferenceOperation::Refresh:
+        return commands.refresh(part, root);
+      case GuiStepReferenceOperation::Convert:
+        return commands.convert(part, request.new_part, request.name, request.base_feature, root);
+      case GuiStepReferenceOperation::Repeat:
+        return Result<geometry::StepReferencePartCandidate>::failure(
+            invalid("Occurrences require a Project"));
+      }
+      return Result<geometry::StepReferencePartCandidate>::failure(
+          invalid("Unknown Reference Part operation"));
+    }();
+    return result ? Result<Value>::success(Value(result.value()))
+                  : Result<Value>::failure(result.error());
+  }();
+  if (!candidate)
+    return Result<GuiStepReferencePreview>::failure(candidate.error());
+  const auto* selected = std::visit(
+      [](const auto& value) -> const PartDocument* {
+        if constexpr (requires { value.project; })
+          return value.project.find_part_document(value.part);
+        else
+          return &value.part;
+      },
+      candidate.value());
+  if (!selected)
+    return Result<GuiStepReferencePreview>::failure(invalid("Prepared Reference Part is missing"));
+  geometry::StepImportTopologyContext context(root);
+  const geometry::ReferencePartGeometry adapter;
+  std::vector<geometry::GeometryShape> shapes;
+  if (selected->is_reference_part()) {
+    auto resolved = adapter.resolve(*selected, context);
+    if (!resolved)
+      return Result<GuiStepReferencePreview>::failure(resolved.error());
+    for (const auto& body : resolved.value().bodies)
+      shapes.push_back(body.shape);
+  } else {
+    for (const auto& feature : selected->imported_body_features()) {
+      auto resolved = adapter.resolve_imported_body_feature(*selected, feature, context);
+      if (!resolved)
+        return Result<GuiStepReferencePreview>::failure(resolved.error());
+      for (const auto& body : resolved.value().bodies)
+        shapes.push_back(body.shape);
+    }
+  }
+  auto valid = context.validate_sources();
+  if (!valid)
+    return Result<GuiStepReferencePreview>::failure(valid.error());
+  if (session.project() && (request.operation == GuiStepReferenceOperation::Insert ||
+                            request.operation == GuiStepReferenceOperation::Repeat)) {
+    const geometry::BodyTransformAdapter transforms;
+    for (auto& shape : shapes) {
+      const auto& rotation = request.transform.rotation_deg;
+      for (const auto& [axis, angle] : std::array<std::pair<Vector3, double>, 3>{
+               std::pair{Vector3{1, 0, 0}, rotation.x}, std::pair{Vector3{0, 1, 0}, rotation.y},
+               std::pair{Vector3{0, 0, 1}, rotation.z}}) {
+        if (angle == 0)
+          continue;
+        auto rotated = transforms.rotate(shape, {}, axis, angle);
+        if (!rotated)
+          return Result<GuiStepReferencePreview>::failure(rotated.error());
+        shape = std::move(rotated.value());
+      }
+      auto translated = transforms.translate(shape, request.transform.translation_mm);
+      if (!translated)
+        return Result<GuiStepReferencePreview>::failure(translated.error());
+      shape = std::move(translated.value());
+    }
+  }
+  return Result<GuiStepReferencePreview>::success({std::move(request), path.value(), json.value(),
+                                                   std::move(candidate.value()),
+                                                   std::move(shapes)});
+}
+Result<std::size_t>
+GuiStepImportWorkbench::validate_reference(const GuiDocumentSession& session,
+                                           const GuiStepReferencePreview& preview) const {
+  auto path = document_path(session);
+  auto json = snapshot(session);
+  if (!path || !json || path.value() != preview.document_path ||
+      json.value() != preview.document_json)
+    return Result<std::size_t>::failure(invalid("Reference Part preview is stale; prepare again"));
+  auto fresh = prepare_reference(session, preview.request);
+  if (!fresh)
+    return Result<std::size_t>::failure(fresh.error());
+  auto expected = reference_candidate_json(fresh.value());
+  auto actual = reference_candidate_json(preview);
+  if (!expected || !actual || expected.value() != actual.value())
+    return Result<std::size_t>::failure(
+        invalid("Reference Part candidate or source changed; prepare again"));
+  return Result<std::size_t>::success(preview.preview_shapes.size());
+}
+Result<std::size_t>
+GuiStepImportWorkbench::apply_reference(GuiDocumentSession& session,
+                                        const GuiStepReferencePreview& preview) const {
+  auto valid = validate_reference(session, preview);
+  if (!valid)
+    return valid;
+  if (session.part_document() && preview.request.operation != GuiStepReferenceOperation::Refresh)
+    return Result<std::size_t>::failure(
+        invalid("Choose a new copy destination; the current Part is preserved"));
+  auto fresh = prepare_reference(session, preview.request);
+  if (!fresh)
+    return Result<std::size_t>::failure(fresh.error());
+  auto candidate_json = reference_candidate_json(fresh.value());
+  if (candidate_json && candidate_json.value() == preview.document_json)
+    return Result<std::size_t>::success(0);
+  const auto label = preview.request.operation == GuiStepReferenceOperation::Insert
+                         ? "Insert STEP Reference Part"
+                     : preview.request.operation == GuiStepReferenceOperation::Repeat
+                         ? "Insert Reference Part occurrence"
+                     : preview.request.operation == GuiStepReferenceOperation::Refresh
+                         ? "Refresh STEP Reference Parts"
+                         : "Convert Reference to new Editable Part";
+  if (const auto* project =
+          std::get_if<geometry::StepReferenceProjectCandidate>(&fresh.value().candidate))
+    return session.commit_project_transaction(label, [&](Project& target) {
+      target = project->project;
+      return Result<std::size_t>::success(1);
+    });
+  const auto& part = std::get<geometry::StepReferencePartCandidate>(fresh.value().candidate);
+  return session.commit_part_transaction(label, [&](PartDocument& target) {
+    target = part.part;
+    return Result<std::size_t>::success(1);
+  });
+}
+Result<std::size_t>
+GuiStepImportWorkbench::save_editable_copy(const GuiDocumentSession& session,
+                                           const GuiStepReferencePreview& preview,
+                                           const std::filesystem::path& destination) const {
+  auto valid = validate_reference(session, preview);
+  if (!valid)
+    return valid;
+  if (!session.part_document() ||
+      (preview.request.operation != GuiStepReferenceOperation::Convert &&
+       preview.request.operation != GuiStepReferenceOperation::Insert))
+    return Result<std::size_t>::failure(
+        invalid("Only a new standalone Part copy can be saved here"));
+  std::error_code error;
+  const auto output = std::filesystem::absolute(destination, error).lexically_normal();
+  if (error || output.empty() || output == preview.document_path)
+    return Result<std::size_t>::failure(invalid("Choose a new Part file"));
+  const auto output_root = std::filesystem::weakly_canonical(output.parent_path(), error);
+  if (error)
+    return Result<std::size_t>::failure(invalid("New Part directory cannot be resolved"));
+  const auto original_root =
+      std::filesystem::weakly_canonical(preview.document_path.parent_path(), error);
+  if (error || output_root != original_root)
+    return Result<std::size_t>::failure(
+        invalid("Save the new copy beside the original document to preserve its STEP asset root"));
+  valid = validate_step_import_save_as(session, output);
+  if (!valid)
+    return valid;
+  for (const auto& file : save_files(session, output))
+    if (std::filesystem::exists(std::filesystem::symlink_status(file, error)))
+      return Result<std::size_t>::failure(
+          invalid("New Part copy must not overwrite an existing file or sidecar"));
+  auto json = reference_candidate_json(preview);
+  if (!json)
+    return Result<std::size_t>::failure(json.error());
+  QFile file(QString::fromStdString(output.string()));
+  if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly))
+    return Result<std::size_t>::failure(
+        invalid("New Part destination already exists or cannot be created"));
+  const auto count = file.write(json.value().data(), static_cast<qint64>(json.value().size()));
+  if (count != static_cast<qint64>(json.value().size()) || !file.flush()) {
+    file.remove();
+    return Result<std::size_t>::failure(invalid("New Part copy could not be written"));
+  }
+  return Result<std::size_t>::success(1);
 }
 Result<std::size_t> validate_step_import_output_path(const GuiDocumentSession& session,
                                                      const std::filesystem::path& output) {

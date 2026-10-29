@@ -31,6 +31,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <tuple>
 
@@ -119,6 +120,11 @@ struct ShellStepImportTools::Impl {
   QTreeWidget* topology_entries{};
   QPlainTextEdit* topology_reference{};
   QPushButton* topology_prepare{};
+  QComboBox* reference_operation{};
+  QComboBox* reference_part{};
+  QComboBox* reference_assembly{};
+  QLineEdit* reference_name{};
+  std::array<QLineEdit*, 6> reference_placement{};
   bool active{};
   bool loading{};
   bool undo_available{};
@@ -130,6 +136,7 @@ struct ShellStepImportTools::Impl {
   std::optional<GuiStepImportGeometryPreview> inspection;
   std::optional<GuiViewportCameraBookmark> inspection_camera;
   std::optional<GuiStepImportTopologyPreview> topology;
+  std::optional<GuiStepReferencePreview> reference;
   std::vector<std::pair<std::string, ImportedTopologyReference>> topology_targets;
   std::optional<std::uint32_t> previous_pick_mask;
   std::optional<std::vector<std::string>> previous_pick_scope;
@@ -165,6 +172,7 @@ struct ShellStepImportTools::Impl {
   }
   void invalidate() {
     candidate.reset();
+    reference.reset();
     topology.reset();
     topology_targets.clear();
     window.viewport().clear_preview_selection_targets();
@@ -451,16 +459,35 @@ struct ShellStepImportTools::Impl {
             .arg(ambiguous));
   }
   void watch_inspection() {
-    if (!inspection)
-      return;
-    const auto root = inspection->document_path.parent_path();
-    const auto asset = root / inspection->source.project_relative_asset_path();
-    QStringList paths{QString::fromStdString(asset.string())};
-    for (auto parent = asset.parent_path(); !parent.empty(); parent = parent.parent_path()) {
-      paths.push_back(QString::fromStdString(parent.string()));
-      if (parent == root)
-        break;
-    }
+    QStringList paths;
+    const auto root = original_path.parent_path();
+    const auto append = [&](const StepImportSource& source) {
+      const auto asset = root / source.project_relative_asset_path();
+      paths.push_back(QString::fromStdString(asset.string()));
+      for (auto parent = asset.parent_path(); !parent.empty(); parent = parent.parent_path()) {
+        paths.push_back(QString::fromStdString(parent.string()));
+        if (parent == root)
+          break;
+      }
+    };
+    if (inspection)
+      append(inspection->source);
+    if (reference)
+      std::visit(
+          [&](const auto& value) {
+            const auto owner = [&](const auto& part) {
+              for (const auto& source : part.step_import_sources())
+                append(source);
+            };
+            if constexpr (requires { value.project; }) {
+              owner(value.project);
+              for (const auto& part : value.project.part_documents())
+                owner(part);
+            } else
+              owner(value.part);
+          },
+          reference->candidate);
+    paths.removeDuplicates();
     watcher->addPaths(paths);
   }
   Result<std::size_t> catalog_status() {
@@ -692,6 +719,50 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   ui.topology_reference->setPlaceholderText(
       QStringLiteral("Select a resolved imported face, edge or vertex."));
   content_layout->addWidget(ui.topology_reference);
+  content_layout->addWidget(new QLabel(QStringLiteral("Reference Parts"), content));
+  auto* reference_hint = new QLabel(
+      QStringLiteral(
+          "Insert a saved Reference product as an immutable Part. Repeated occurrences share its "
+          "definition. Refresh reports every affected asset binding; conversion creates a new "
+          "Editable Part."),
+      content);
+  reference_hint->setWordWrap(true);
+  reference_hint->setMinimumWidth(0);
+  reference_hint->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+  content_layout->addWidget(reference_hint);
+  auto* reference_form = new QFormLayout;
+  const auto combo = [&](const char* id) {
+    auto* widget = new QComboBox(content);
+    widget->setObjectName(QStringLiteral("blcad.step_import.") + id);
+    widget->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    widget->setMinimumContentsLength(12);
+    return widget;
+  };
+  ui.reference_operation = combo("reference_operation");
+  ui.reference_operation->addItems({"Insert Selected Product", "Repeat Reference Part",
+                                    "Refresh Shared STEP Asset", "Convert to New Editable Part"});
+  reference_form->addRow("Part Change", ui.reference_operation);
+  ui.reference_part = combo("reference_part");
+  reference_form->addRow("Reference Part", ui.reference_part);
+  ui.reference_assembly = combo("reference_assembly");
+  reference_form->addRow("Target Assembly", ui.reference_assembly);
+  ui.reference_name = new QLineEdit(QStringLiteral("Imported Part"), content);
+  ui.reference_name->setObjectName("blcad.step_import.reference_name");
+  reference_form->addRow("New Part Name", ui.reference_name);
+  for (std::size_t i = 0; i < ui.reference_placement.size(); ++i) {
+    const std::array<const char*, 6> ids{"reference_x",  "reference_y",  "reference_z",
+                                         "reference_rx", "reference_ry", "reference_rz"};
+    const std::array<const char*, 6> labels{"X (mm)",         "Y (mm)",         "Z (mm)",
+                                            "Rotation X (°)", "Rotation Y (°)", "Rotation Z (°)"};
+    ui.reference_placement[i] = new QLineEdit(QStringLiteral("0"), content);
+    ui.reference_placement[i]->setObjectName(QStringLiteral("blcad.step_import.") + ids[i]);
+    reference_form->addRow(labels[i], ui.reference_placement[i]);
+  }
+  content_layout->addLayout(reference_form);
+  auto* reference_prepare =
+      make_gui_button(QStringLiteral("Prepare Reference Part Change"), content);
+  reference_prepare->setObjectName("blcad.step_import.reference_prepare");
+  content_layout->addWidget(reference_prepare);
   content_layout->addStretch();
   scroll->setWidget(content);
   layout->addWidget(scroll);
@@ -715,19 +786,29 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   ui.watcher = new QFileSystemWatcher(this);
   const auto source_changed = [this] {
     auto& ui = *impl_;
-    if (!ui.active || !ui.inspection)
+    if (!ui.active || (!ui.inspection && !ui.reference))
       return;
     if (!ui.current()) {
       cancel();
       return;
     }
-    auto current = ui.workbench.validate_inspection(ui.window.session(), *ui.inspection);
+    auto current = ui.reference
+                       ? ui.workbench.validate_reference(ui.window.session(), *ui.reference)
+                       : ui.workbench.validate_inspection(ui.window.session(), *ui.inspection);
     if (!current) {
-      const auto report =
-          inspect_step_import_source(ui.inspection->source, ui.original_path.parent_path());
+      const bool reference_preview = ui.reference.has_value();
+      const auto selected =
+          ui.inspection ? std::optional<StepImportSource>(ui.inspection->source) : std::nullopt;
       ui.invalidate();
-      if (report)
-        ui.report(report.value());
+      if (reference_preview) {
+        (void)ui.window.session().recompute();
+        ui.window.refresh();
+      }
+      if (selected) {
+        const auto report = inspect_step_import_source(*selected, ui.original_path.parent_path());
+        if (report)
+          ui.report(report.value());
+      }
       ui.summary->setText(text(current.error().message()));
     } else {
       // An atomic replacement can keep accepted bytes while removing the old inode's watch.
@@ -788,6 +869,13 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
           [this, report] { report(inspect_geometry()); });
   connect(ui.topology_prepare, &QPushButton::clicked, this,
           [this, report] { report(prepare_topology()); });
+  connect(reference_prepare, &QPushButton::clicked, this,
+          [this, report] { report(prepare_reference()); });
+  for (auto* combo : {ui.reference_operation, ui.reference_part, ui.reference_assembly})
+    connect(combo, &QComboBox::currentIndexChanged, this, [this] { impl_->edited(); });
+  connect(ui.reference_name, &QLineEdit::textChanged, this, [this] { impl_->edited(); });
+  for (auto* input : ui.reference_placement)
+    connect(input, &QLineEdit::textChanged, this, [this] { impl_->edited(); });
   connect(ui.topology_catalog, &QComboBox::currentIndexChanged, this, [this] {
     auto& ui = *impl_;
     if (ui.loading || !ui.active)
@@ -852,6 +940,24 @@ Result<std::size_t> ShellStepImportTools::begin() {
   ui.source->addItem(QStringLiteral("New Source"), QString());
   for (const auto& entry : sources(ui.window.session()))
     ui.source->addItem(text(entry.name()), text(entry.id().value()));
+  ui.reference_part->clear();
+  ui.reference_assembly->clear();
+  if (const auto* project = ui.window.session().project()) {
+    for (const auto& part : project->part_documents())
+      if (part.is_reference_part())
+        ui.reference_part->addItem(text(part.name()), text(part.id().value()));
+    ui.reference_assembly->addItem(text(project->assembly().name()),
+                                   text(project->assembly().id().value()));
+    for (const auto& assembly : project->child_assembly_documents())
+      ui.reference_assembly->addItem(text(assembly.name()), text(assembly.id().value()));
+  } else if (const auto* part = ui.window.session().part_document();
+             part && part->is_reference_part()) {
+    ui.reference_part->addItem(text(part->name()), text(part->id().value()));
+  }
+  ui.reference_assembly->setEnabled(ui.window.session().project());
+  auto* reference_operations = static_cast<QStandardItemModel*>(ui.reference_operation->model());
+  reference_operations->item(1)->setEnabled(ui.window.session().project());
+  ui.reference_operation->setCurrentIndex(0);
   ui.loading = false;
   ui.select();
   const auto catalog = ui.catalog_status();
@@ -1039,6 +1145,100 @@ Result<std::size_t> ShellStepImportTools::prepare_topology() {
                            "It does not create imported Part geometry."));
   return Result<std::size_t>::success(ui.topology->catalog.entries().size());
 }
+Result<std::size_t> ShellStepImportTools::prepare_reference() {
+  auto& ui = *impl_;
+  if (!ui.current()) {
+    cancel();
+    return Result<std::size_t>::failure(error("Document changed. Reopen source management."));
+  }
+  GuiStepReferenceRequest request;
+  request.operation =
+      static_cast<GuiStepReferenceOperation>(ui.reference_operation->currentIndex());
+  request.catalog =
+      ImportedTopologyCatalogId(ui.topology_catalog->currentData().toString().toStdString());
+  request.reference_part = DocumentId(ui.reference_part->currentData().toString().toStdString());
+  request.target_assembly =
+      DocumentId(ui.reference_assembly->currentData().toString().toStdString());
+  request.name = ui.reference_name->text().trimmed().toStdString();
+  const auto& session = ui.window.session();
+  std::size_t number = 1;
+  const auto part_exists = [&](const DocumentId& id) {
+    return session.project()
+               ? session.project()->id() == id || session.project()->find_part_document(id) ||
+                     session.project()->find_assembly_document(id)
+               : session.part_document()->id() == id;
+  };
+  do
+    request.new_part = DocumentId("part.step.gui." + std::to_string(number++));
+  while (part_exists(request.new_part));
+  if (const auto* project = session.project()) {
+    const auto* assembly = project->find_assembly_document(request.target_assembly);
+    if (assembly) {
+      number = 1;
+      do
+        request.instance = ComponentInstanceId("component.step.gui." + std::to_string(number++));
+      while (assembly->find_component_instance(request.instance));
+    }
+  }
+  std::array<double, 6> placement{};
+  for (std::size_t i = 0; i < placement.size(); ++i) {
+    bool valid{};
+    placement[i] = ui.reference_placement[i]->text().toDouble(&valid);
+    if (!valid || !std::isfinite(placement[i]))
+      return Result<std::size_t>::failure(error("Placement must contain finite numbers"));
+  }
+  request.transform = {{placement[0], placement[1], placement[2]},
+                       {placement[3], placement[4], placement[5]}};
+  ui.invalidate();
+  auto result = ui.workbench.prepare_reference(session, std::move(request));
+  if (!result)
+    return Result<std::size_t>::failure(result.error());
+  ui.inspection_camera = ui.window.viewport().camera_bookmark();
+  const auto& prepared = result.value();
+  const bool local_preview =
+      !session.project() || prepared.request.operation == GuiStepReferenceOperation::Refresh ||
+      prepared.request.operation == GuiStepReferenceOperation::Convert ||
+      (session.project() && prepared.request.target_assembly != session.project()->assembly().id());
+  // Product-local and child-definition coordinates do not describe a root
+  // occurrence pose. Hide the surrounding scene for this disposable preview;
+  // clearing it restores the unchanged scene and the task's saved camera.
+  auto replaced =
+      local_preview ? ui.window.viewport().scene_semantic_ids() : std::vector<std::string>{};
+  auto shown =
+      ui.window.viewport().set_feature_previews(prepared.preview_shapes, std::move(replaced));
+  if (!shown) {
+    ui.invalidate();
+    return shown;
+  }
+  ui.reference = std::move(result.value());
+  QStringList diagnostics;
+  std::visit(
+      [&](const auto& value) {
+        for (const auto& owner : value.affected_owners)
+          diagnostics.push_back(QStringLiteral("Affected owner: ") + text(owner.value()));
+        for (const auto& diagnostic : value.diagnostics)
+          diagnostics.push_back(text(diagnostic));
+      },
+      ui.reference->candidate);
+  ui.geometry_diagnostics->setPlainText(diagnostics.join('\n'));
+  ui.geometry_summary->setText(
+      QStringLiteral("%1 imported bodies. Preview uses the target Assembly's coordinates for "
+                     "insertion and product-local coordinates for refresh/conversion. Prepared "
+                     "geometry is read-only until Apply.")
+          .arg(ui.reference->preview_shapes.size()));
+  ui.summary->setText(
+      session.project()
+          ? QStringLiteral("Apply commits this Reference Part change in one history step.")
+      : ui.reference->request.operation == GuiStepReferenceOperation::Refresh
+          ? QStringLiteral("Apply accepts the validated source refresh in one history step.")
+          : QStringLiteral("Apply asks for a new Part file beside this document. The current "
+                           "document is preserved."));
+  ui.watch_inspection();
+  ui.apply->setEnabled(true);
+  (void)ui.window.session().task().show_preview();
+  ui.window.viewport().fit_feature_preview();
+  return shown;
+}
 bool ShellStepImportTools::accept_selection(const GuiSelection& selection) {
   auto& ui = *impl_;
   if (!ui.current() || !ui.topology ||
@@ -1081,10 +1281,29 @@ Result<std::size_t> ShellStepImportTools::apply() {
     cancel();
     return Result<std::size_t>::failure(error("Document changed. Reopen source management."));
   }
-  if (!ui.candidate && (!ui.topology || ui.topology->accepted_catalog))
+  if (!ui.reference && !ui.candidate && (!ui.topology || ui.topology->accepted_catalog))
     return Result<std::size_t>::failure(error("Prepare the change first"));
-  const auto result = ui.topology ? ui.workbench.apply_topology(ui.window.session(), *ui.topology)
-                                  : ui.workbench.apply(ui.window.session(), *ui.candidate);
+  const auto result = [&]() -> Result<std::size_t> {
+    if (ui.reference) {
+      if (ui.window.session().part_document() &&
+          ui.reference->request.operation != GuiStepReferenceOperation::Refresh) {
+        const auto destination = QFileDialog::getSaveFileName(
+            &ui.window, QStringLiteral("Save New Part Copy"),
+            QString::fromStdString(
+                (ui.original_path.parent_path() / "imported-copy.blcad.json").string()),
+            QStringLiteral("BLCAD Part (*.blcad.json)"), nullptr,
+            QFileDialog::DontConfirmOverwrite);
+        if (destination.isEmpty())
+          return Result<std::size_t>::failure(
+              error("Choose a new Part destination to apply the copy"));
+        return ui.workbench.save_editable_copy(ui.window.session(), *ui.reference,
+                                               destination.toStdString());
+      }
+      return ui.workbench.apply_reference(ui.window.session(), *ui.reference);
+    }
+    return ui.topology ? ui.workbench.apply_topology(ui.window.session(), *ui.topology)
+                       : ui.workbench.apply(ui.window.session(), *ui.candidate);
+  }();
   if (!result) {
     ui.invalidate();
     return result;
@@ -1120,6 +1339,16 @@ void ShellStepImportTools::refresh() {
       impl_->invalidate();
       if (report)
         impl_->report(report.value());
+      impl_->summary->setText(text(current.error().message()));
+    }
+  }
+  if (impl_->active && impl_->reference) {
+    const auto current =
+        impl_->workbench.validate_reference(impl_->window.session(), *impl_->reference);
+    if (!current) {
+      impl_->invalidate();
+      (void)impl_->window.session().recompute();
+      impl_->window.refresh();
       impl_->summary->setText(text(current.error().message()));
     }
   }

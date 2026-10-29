@@ -9,6 +9,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct AssemblySpaceInsertConstraintTargetDescriptor {
   ComponentInstanceId component_instance;
   std::string semantic_reference;
@@ -49,8 +51,14 @@ struct AssemblyInsertConstraintEquationDescriptor {
 // No equation is solved and no component transform or project model intent is mutated.
 class AssemblyInsertConstraintEquationBuilder {
 public:
+  AssemblyInsertConstraintEquationBuilder() = default;
+  explicit AssemblyInsertConstraintEquationBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyInsertConstraintEquationDescriptor>
   build(const Project& project, const AssemblyConstraint& constraint) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

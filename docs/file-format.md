@@ -1013,13 +1013,101 @@ removed silently. Assembly endpoint spelling is canonical
 `imported:<encoded-catalog-id>:<encoded-entry-id>:<capability>` with uppercase percent escapes for
 bytes outside `[A-Za-z0-9_-]`; it is disjoint from existing `ref:`, `topo:` and dotted feature targets.
 
-## Remaining STEP import persistence — Blocks 140–143
+## Reference Parts and conversion base intent — Block 140
+
+A Part may contain optional `reference_part` intent with exactly `source`, `catalog` and `outputs`:
+
+```json
+{
+  "reference_part": {
+    "source": "source.supplier",
+    "catalog": "catalog.supplier.part",
+    "outputs": [
+      {"imported_body": "imported.body.1", "body": "body.supplier.1", "kind": "solid"}
+    ]
+  }
+}
+```
+
+The source and catalog belong to that Part; the catalog must reference the same source. A catalog
+already identifies one product definition. `outputs` is a nonempty ordered selection of its Body
+entries, each mapped to a persistent BLCAD BodyId and exact `solid` or `surface` kind. Imported Body
+identities and output BodyIds are individually unique. Body declarations in the existing `bodies`
+array must match the mapping exactly, with no additional or missing Bodies. Their canonical BodyId
+sort does not change the explicit output order. Source mode must be `reference`. The selected
+catalog may retain evidence for unselected Bodies; those Bodies and their subtopology cannot be
+used as semantic targets of this Reference Part.
+
+Reference Parts own exactly the bound source and catalog and the three immutable BLCAD origin datum
+planes `datum.xy`/`XY`, `datum.xz`/`XZ` and `datum.yz`/`YZ`, in that order. Their complete records
+equal the normal `DatumPlane::xy/xz/yz` factories: coordinate origin, right-handed principal axes and
+normals, fixed identities and names, with no extra fields or altered geometry. Reference loading
+validates those exact records before principal-plane reconstruction. Additional, missing, reordered
+or modified datums fail closed. Their ordinary `ref:datum_plane:<encoded-id>` targets retain
+Plane-only capability. A user separately chooses explicit oriented-frame intent through
+`frame:ref:datum_plane:<encoded-id>`, for example `frame:ref:datum_plane:datum%2Exy`, for joint motion.
+Only an existing authored DatumPlane supplies this frame; its complete finite, right-handed axes
+remain runtime-derived from Core datum intent. The inner reference retains canonical uppercase
+percent escapes; other families, empty ids, double frame prefixes and malformed/noncanonical
+escapes fail closed in parsing and Assembly endpoint creation. Project/Assembly JSON retains this
+exact endpoint spelling without saving resolved axes. These BLCAD origin frames are independent of
+STEP geometry and add no Frame capability to imported faces, axes, edges or vertices.
+
+Reference Parts contain no authored parameters, additional datums, construction geometry, sketches,
+features, Body transforms, ownership or repair records, and have no feature producer. They
+participate in Project ownership and component/subassembly occurrences
+through their ordinary DocumentId. Reference mode derives from this validated binding; no writable
+mode field is persisted. All authored Part mutations fail explicitly. Derived clean state is not
+persisted. Explicit accepted-source refresh can change the bound source digest after runtime
+verification and recovery, retaining catalog capture evidence, selected identities and Body mapping.
+
+Conversion creates a separate EditableBody Part with a new DocumentId, explicit base FeatureId and
+explicit ordered output BodyIds. It copies the three BLCAD origin datums unchanged and copies the
+source asset path/digest into that Part's registry
+with `editable_body` mode and retains the catalog baseline. It changes neither the original Part nor
+any existing Assembly occurrence or source file. The resulting optional `imported_body_features`
+array contains real persistent base intent:
+
+```json
+{
+  "imported_body_features": [
+    {
+      "id": "feature.imported.base",
+      "name": "Imported body",
+      "definition": {
+        "source": "source.supplier",
+        "catalog": "catalog.supplier.part",
+        "outputs": [
+          {"imported_body": "imported.body.1", "body": "body.editable.1", "kind": "solid"}
+        ]
+      }
+    }
+  ]
+}
+```
+
+Each feature has exactly `id`, `name` and `definition`; its definition follows the same strict schema.
+Its source mode must be `editable_body`, output Bodies must already exist with matching kinds and
+have no other producer, and the FeatureId is unique across all executable families. Catalog-to-
+feature-to-Body dependencies are rebuilt on loading; source refresh invalidates these descendants.
+`feature_order`, when present, includes the imported base exactly once. This Block-140 conversion
+foundation supplies usable imported base geometry; Block 141 owns the full downstream authoring,
+incremental recompute and editable import acceptance contract.
+
+Both new fields are omitted for historical authored Parts. Nested payloads reject missing/unknown
+fields, wrong containers/types/enums, duplicate identities, foreign ownership and mismatched Body
+selection/kinds. Mixing `reference_part` with authored intent fails in strict and repair loading,
+including the result-face workplane replay path. Project JSON embeds this same Part payload; no
+shared definition is duplicated per occurrence. Import source/catalog identities remain scoped to
+their Part owner, so separate definitions may retain the same source identity without conflation.
+
+## Remaining STEP import persistence — Blocks 141–143
 
 Planned persistent import intent includes:
 
 ```text
-selected imported product/body definitions
-persistent BLCAD BodyId outputs for EditableBody
+full EditableBody authoring and incremental recompute integration
+structured foreign assembly definition/occurrence import
 ```
 
 Planned persistence must not include:

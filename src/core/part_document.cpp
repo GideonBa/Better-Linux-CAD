@@ -974,6 +974,8 @@ Result<PartDocument> PartDocument::create(DocumentId id, std::string name) {
 }
 
 Result<std::size_t> PartDocument::add_parameter(Parameter parameter) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_parameter_id(parameter.id()))
     return Result<std::size_t>::failure(Error::validation(
         parameter.id().value(), "parameter id must be unique within part document"));
@@ -996,6 +998,8 @@ Result<std::size_t> PartDocument::add_parameter(Parameter parameter) {
 Result<std::size_t> PartDocument::add_expression_parameter(ParameterId id, std::string name,
                                                            ParameterType type,
                                                            std::string formula) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   const auto object_id = id.empty() ? std::string("parameter") : id.value();
   if (has_parameter_id(id))
     return Result<std::size_t>::failure(
@@ -1037,6 +1041,8 @@ Result<std::size_t> PartDocument::add_expression_parameter(ParameterId id, std::
 }
 
 Result<std::size_t> PartDocument::add_datum_plane(DatumPlane datum_plane) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_datum_plane_id(datum_plane.id()))
     return Result<std::size_t>::failure(Error::validation(
         datum_plane.id().value(), "datum plane id must be unique within part document"));
@@ -1049,6 +1055,8 @@ Result<std::size_t> PartDocument::add_datum_plane(DatumPlane datum_plane) {
 }
 
 Result<std::size_t> PartDocument::add_datum_axis(DatumAxis datum_axis) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_datum_axis_id(datum_axis.id()))
     return Result<std::size_t>::failure(Error::validation(
         datum_axis.id().value(), "datum axis id must be unique within part document"));
@@ -1085,6 +1093,8 @@ Result<std::size_t> PartDocument::add_datum_axis(DatumAxis datum_axis) {
 }
 
 Result<std::size_t> PartDocument::add_construction_point(ConstructionPoint point) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_construction_point_id(point.id()))
     return Result<std::size_t>::failure(Error::validation(
         point.id().value(), "construction point id must be unique within part document"));
@@ -1123,6 +1133,8 @@ Result<std::size_t> PartDocument::add_construction_point(ConstructionPoint point
 }
 
 Result<std::size_t> PartDocument::add_construction_line(ConstructionLine line) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_construction_line_id(line.id()))
     return Result<std::size_t>::failure(Error::validation(
         line.id().value(), "construction line id must be unique within part document"));
@@ -1174,6 +1186,8 @@ Result<std::size_t> PartDocument::add_construction_line(ConstructionLine line) {
 }
 
 Result<std::size_t> PartDocument::add_construction_plane(ConstructionPlane plane) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_construction_plane_id(plane.id()))
     return Result<std::size_t>::failure(Error::validation(
         plane.id().value(), "construction plane id must be unique within part document"));
@@ -1229,11 +1243,15 @@ Result<std::size_t> PartDocument::add_construction_plane(ConstructionPlane plane
 }
 
 Result<std::size_t> PartDocument::add_derived_workplane(DerivedWorkplane workplane) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return add_derived_workplane_impl(std::move(workplane), false);
 }
 
 Result<std::size_t> PartDocument::add_derived_workplane_impl(DerivedWorkplane workplane,
                                                              bool allow_missing_source) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_workplane_id(workplane.id()))
     return Result<std::size_t>::failure(Error::validation(
         workplane.id().value(), "workplane id must be unique within part document"));
@@ -1273,11 +1291,15 @@ Result<std::size_t> validate_result_face_workplane_reference(const PartDocument&
 }
 
 Result<std::size_t> PartDocument::add_result_face_workplane(ResultFaceWorkplane workplane) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return add_result_face_workplane_impl(std::move(workplane), {});
 }
 
 Result<std::size_t> PartDocument::add_result_face_workplane_impl(
     ResultFaceWorkplane workplane, const std::vector<std::string>& retained_missing_sources) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_workplane_id(workplane.id()) || dependency_graph_.has_node(workplane.id().value()))
     return Result<std::size_t>::failure(Error::validation(
         workplane.id().value(), "workplane id must be unique within part document"));
@@ -1313,6 +1335,8 @@ Result<std::size_t> PartDocument::add_result_face_workplane_impl(
 
 Result<std::size_t> PartDocument::add_face_supported_sketch(ResultFaceWorkplane workplane,
                                                             Sketch sketch) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (sketch.workplane() != workplane.id())
     return Result<std::size_t>::failure(Error::validation(
         sketch.id().value(), "Sketch must reference its new result-face support"));
@@ -1331,6 +1355,8 @@ template <typename T>
 Result<std::size_t>
 PartDocument::update_construction_record(std::vector<T> PartDocument::*member, T replacement,
                                          Result<std::size_t> (PartDocument::*adder)(T)) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   const auto node_id = replacement.id().value();
   const auto& records = this->*member;
   const auto found = std::find_if(records.begin(), records.end(),
@@ -1369,35 +1395,51 @@ PartDocument::update_construction_record(std::vector<T> PartDocument::*member, T
 }
 
 Result<std::size_t> PartDocument::update_datum_axis(DatumAxis axis) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_construction_record(&PartDocument::datum_axes_, std::move(axis),
                                     &PartDocument::add_datum_axis);
 }
 Result<std::size_t> PartDocument::update_construction_point(ConstructionPoint point) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_construction_record(&PartDocument::construction_points_, std::move(point),
                                     &PartDocument::add_construction_point);
 }
 Result<std::size_t> PartDocument::update_construction_line(ConstructionLine line) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_construction_record(&PartDocument::construction_lines_, std::move(line),
                                     &PartDocument::add_construction_line);
 }
 Result<std::size_t> PartDocument::update_construction_plane(ConstructionPlane plane) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_construction_record(&PartDocument::construction_planes_, std::move(plane),
                                     &PartDocument::add_construction_plane);
 }
 Result<std::size_t> PartDocument::update_result_face_workplane(ResultFaceWorkplane workplane) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_construction_record(&PartDocument::result_face_workplanes_, std::move(workplane),
                                     &PartDocument::add_result_face_workplane);
 }
 Result<std::size_t> PartDocument::update_derived_workplane(DerivedWorkplane workplane) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_construction_record(&PartDocument::derived_workplanes_, std::move(workplane),
                                     &PartDocument::add_derived_workplane);
 }
 
 Result<std::size_t> PartDocument::add_sketch(Sketch sketch) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return add_sketch_impl(std::move(sketch), nullptr);
 }
 
 Result<std::size_t> PartDocument::add_sketch_impl(Sketch sketch, const Sketch* retained) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_sketch_id(sketch.id()) || has_sketch_3d_id(Sketch3DId(sketch.id().value())))
     return Result<std::size_t>::failure(
         Error::validation(sketch.id().value(), "sketch id must be unique within part document"));
@@ -1529,6 +1571,8 @@ Result<std::size_t> PartDocument::validate_reference_sources() const {
 }
 
 Result<std::size_t> PartDocument::update_sketch(Sketch sketch) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   const auto found = std::find_if(sketches_.begin(), sketches_.end(), [&sketch](const Sketch& item) {
     return item.id() == sketch.id();
   });
@@ -1581,6 +1625,8 @@ Result<std::size_t> PartDocument::update_sketch(Sketch sketch) {
 }
 
 Result<std::size_t> PartDocument::add_sketch_3d(Sketch3D sketch) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_sketch_3d_id(sketch.id()) || has_sketch_id(SketchId(sketch.id().value())))
     return Result<std::size_t>::failure(Error::validation(
         sketch.id().value(), "sketch id must be unique across planar and 3D sketches"));
@@ -1674,6 +1720,8 @@ Result<std::size_t> PartDocument::add_sketch_3d(Sketch3D sketch) {
 }
 
 Result<std::size_t> PartDocument::update_sketch_3d(Sketch3D sketch) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (!find_sketch_3d(sketch.id()))
     return Result<std::size_t>::failure(
         Error::validation(sketch.id().value(), "3D sketch to update must exist in part document"));
@@ -1697,6 +1745,8 @@ Result<std::size_t> PartDocument::update_sketch_3d(Sketch3D sketch) {
 }
 
 Result<std::size_t> PartDocument::remove_sketch_3d(Sketch3DId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (id.empty())
     return Result<std::size_t>::failure(
         Error::validation("sketch_3d", "3D sketch id must not be empty"));
@@ -1722,6 +1772,8 @@ Result<std::size_t> PartDocument::remove_sketch_3d(Sketch3DId id) {
 }
 
 Result<std::size_t> PartDocument::add_path_curve(PathCurve path_curve) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_path_curve_id(path_curve.id()))
     return Result<std::size_t>::failure(
         Error::validation(path_curve.id().value(), "path curve id must be unique"));
@@ -1749,6 +1801,8 @@ Result<std::size_t> PartDocument::add_path_curve(PathCurve path_curve) {
 }
 
 Result<std::size_t> PartDocument::remove_path_curve(PathCurveId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   const auto found = std::find_if(path_curves_.begin(), path_curves_.end(),
                                   [&id](const PathCurve& path) { return path.id() == id; });
   if (found == path_curves_.end())
@@ -1771,6 +1825,8 @@ Result<std::size_t> PartDocument::remove_path_curve(PathCurveId id) {
 }
 
 Result<std::size_t> PartDocument::add_feature(Feature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
@@ -1871,6 +1927,8 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
 }
 
 Result<std::size_t> PartDocument::add_revolve_feature(RevolveFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
@@ -1939,6 +1997,8 @@ Result<std::size_t> PartDocument::add_revolve_feature(RevolveFeature feature) {
 }
 
 Result<std::size_t> PartDocument::add_sweep_feature(SweepFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
@@ -2057,6 +2117,8 @@ Result<std::size_t> PartDocument::add_sweep_feature(SweepFeature feature) {
 }
 
 Result<std::size_t> PartDocument::add_loft_feature(LoftFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
@@ -2206,6 +2268,8 @@ Result<std::size_t> PartDocument::add_loft_feature(LoftFeature feature) {
 }
 
 Result<std::size_t> PartDocument::add_surface_feature(SurfaceFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   const FeatureId id = surface_feature_id(feature);
   if (has_any_feature_id(id))
     return Result<std::size_t>::failure(
@@ -2331,6 +2395,8 @@ Result<std::size_t> PartDocument::add_surface_feature(SurfaceFeature feature) {
 }
 
 Result<std::size_t> PartDocument::remove_surface_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   const auto found = std::find_if(surface_features_.begin(), surface_features_.end(),
                                   [&id](const auto& feature) {
                                     return surface_feature_id(feature) == id;
@@ -2362,6 +2428,8 @@ Result<std::size_t> PartDocument::remove_surface_feature(FeatureId id) {
 }
 
 Result<std::size_t> PartDocument::add_linear_pattern_feature(LinearPatternFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
@@ -2453,6 +2521,8 @@ Result<std::size_t> PartDocument::add_linear_pattern_feature(LinearPatternFeatur
 }
 
 Result<std::size_t> PartDocument::add_circular_pattern_feature(CircularPatternFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
@@ -2539,6 +2609,8 @@ Result<std::size_t> PartDocument::add_circular_pattern_feature(CircularPatternFe
 }
 
 Result<std::size_t> PartDocument::add_mirror_feature(MirrorFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
@@ -2621,6 +2693,8 @@ Result<std::size_t>
 PartDocument::add_edge_treatment_dependencies(const FeatureId& id, const BodyId& target_body,
                                               const std::vector<EdgeReference>& edges,
                                               const std::vector<ParameterId>& parameters) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   auto graph = dependency_graph_;
   auto added_node = graph.add_node(id.value());
   if (added_node.has_error())
@@ -2658,6 +2732,8 @@ PartDocument::add_edge_treatment_dependencies(const FeatureId& id, const BodyId&
 }
 
 Result<std::size_t> PartDocument::add_fillet_feature(FilletFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
@@ -2682,6 +2758,8 @@ Result<std::size_t> PartDocument::add_fillet_feature(FilletFeature feature) {
 }
 
 Result<std::size_t> PartDocument::add_chamfer_feature(ChamferFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
@@ -2723,6 +2801,8 @@ Result<std::size_t> PartDocument::add_chamfer_feature(ChamferFeature feature) {
 }
 
 Result<std::size_t> PartDocument::add_shell_dependencies(const ShellFeature& feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   auto graph = dependency_graph_;
   auto added_node = graph.add_node(feature.id().value());
   if (added_node.has_error())
@@ -2760,6 +2840,8 @@ Result<std::size_t> PartDocument::add_shell_dependencies(const ShellFeature& fea
 }
 
 Result<std::size_t> PartDocument::add_shell_feature(ShellFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
@@ -2784,6 +2866,8 @@ Result<std::size_t> PartDocument::add_shell_feature(ShellFeature feature) {
 }
 
 Result<std::size_t> PartDocument::add_draft_dependencies(const DraftFeature& feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   auto graph = dependency_graph_;
   auto added_node = graph.add_node(feature.id().value());
   if (added_node.has_error())
@@ -2824,6 +2908,8 @@ Result<std::size_t> PartDocument::add_draft_dependencies(const DraftFeature& fea
 }
 
 Result<std::size_t> PartDocument::add_draft_feature(DraftFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
@@ -2856,6 +2942,8 @@ Result<std::size_t> PartDocument::add_draft_feature(DraftFeature feature) {
 }
 
 Result<std::size_t> PartDocument::add_body_boolean_feature(BodyBooleanFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
@@ -2917,6 +3005,8 @@ Result<std::size_t> PartDocument::add_body_boolean_feature(BodyBooleanFeature fe
 }
 
 Result<std::size_t> PartDocument::add_sketch_ownership(SketchOwnership ownership) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_sketch_ownership_id(ownership.sketch()))
     return Result<std::size_t>::failure(Error::validation(
         ownership.sketch().value(), "sketch ownership must be unique per sketch"));
@@ -2972,6 +3062,8 @@ Result<std::size_t> PartDocument::add_sketch_ownership(SketchOwnership ownership
 }
 
 Result<std::size_t> PartDocument::add_body_transform(BodyTransform transform) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_body_transform_id(transform.id()) || dependency_graph_.has_node(transform.id().value()))
     return Result<std::size_t>::failure(Error::validation(
         transform.id().value(), "body transform id must be unique within part document"));
@@ -3071,6 +3163,8 @@ Result<std::size_t> PartDocument::add_body_transform(BodyTransform transform) {
 }
 
 Result<std::size_t> PartDocument::add_body(Body body) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_body_id(body.id())) {
     return Result<std::size_t>::failure(
         Error::validation(body.id().value(), "body id must be unique within part document"));
@@ -3094,6 +3188,8 @@ Result<std::size_t> PartDocument::add_body(Body body) {
 }
 
 Result<std::size_t> PartDocument::remove_body(BodyId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (id.empty()) {
     return Result<std::size_t>::failure(Error::validation("body", "body id must not be empty"));
   }
@@ -3103,6 +3199,11 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
     return Result<std::size_t>::failure(
         Error::validation(id.value(), "body must exist in part document"));
   }
+  for (const auto& feature : imported_body_features_)
+    if (std::any_of(feature.definition().outputs().begin(), feature.definition().outputs().end(),
+                    [&](const auto& output) { return output.body == id; }))
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "body is owned by an imported base feature"));
   for (const auto& feature : features_) {
     if (!feature.body_result_context().has_value())
       continue;
@@ -3221,6 +3322,8 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
 }
 
 Result<std::size_t> PartDocument::set_body_visibility(BodyId id, BodyVisibility visibility) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (id.empty()) {
     return Result<std::size_t>::failure(Error::validation("body", "body id must not be empty"));
   }
@@ -3240,6 +3343,8 @@ Result<std::size_t> PartDocument::set_body_visibility(BodyId id, BodyVisibility 
 }
 
 Result<std::size_t> PartDocument::add_reference_status(ReferenceStatusRecord status) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_reference_status_id(status.id()))
     return Result<std::size_t>::failure(Error::validation(
         status.id().value(), "reference status id must be unique within part document"));
@@ -3269,6 +3374,8 @@ Result<std::size_t> PartDocument::add_reference_status(ReferenceStatusRecord sta
 }
 
 Result<std::size_t> PartDocument::add_reference_remap(ReferenceRemapRecord remap) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_reference_remap_id(remap.id()))
     return Result<std::size_t>::failure(Error::validation(
         remap.id().value(), "reference remap id must be unique within part document"));
@@ -3301,6 +3408,8 @@ Result<std::size_t> PartDocument::add_reference_remap(ReferenceRemapRecord remap
 
 Result<std::size_t>
 PartDocument::add_sketch_origin_override(SketchOriginOverrideRecord origin_override) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   if (has_sketch_origin_override_id(origin_override.sketch()))
     return Result<std::size_t>::failure(Error::validation(
         origin_override.sketch().value(), "sketch origin override must be unique per sketch"));
@@ -3326,6 +3435,8 @@ PartDocument::add_sketch_origin_override(SketchOriginOverrideRecord origin_overr
 }
 
 Result<std::vector<std::string>> PartDocument::mark_parameter_changed(ParameterId id) {
+  if (is_reference_part())
+    return Result<std::vector<std::string>>::failure(reference_part_edit_error());
   if (id.empty())
     return Result<std::vector<std::string>>::failure(
         Error::validation("parameter", "parameter id must not be empty"));
@@ -3335,6 +3446,8 @@ Result<std::vector<std::string>> PartDocument::mark_parameter_changed(ParameterI
   return invalidation_state_.mark_changed(dependency_graph_, id.value());
 }
 Result<std::vector<std::string>> PartDocument::mark_feature_changed(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::vector<std::string>>::failure(reference_part_edit_error());
   if (id.empty())
     return Result<std::vector<std::string>>::failure(
         Error::validation("feature", "feature id must not be empty"));
@@ -3344,6 +3457,8 @@ Result<std::vector<std::string>> PartDocument::mark_feature_changed(FeatureId id
   return invalidation_state_.mark_changed(dependency_graph_, id.value());
 }
 Result<std::vector<std::string>> PartDocument::mark_body_changed(BodyId id) {
+  if (is_reference_part())
+    return Result<std::vector<std::string>>::failure(reference_part_edit_error());
   if (id.empty())
     return Result<std::vector<std::string>>::failure(
         Error::validation("body", "body id must not be empty"));
@@ -3354,6 +3469,8 @@ Result<std::vector<std::string>> PartDocument::mark_body_changed(BodyId id) {
 }
 
 Result<std::vector<std::string>> PartDocument::mark_body_transform_changed(BodyTransformId id) {
+  if (is_reference_part())
+    return Result<std::vector<std::string>>::failure(reference_part_edit_error());
   if (id.empty())
     return Result<std::vector<std::string>>::failure(
         Error::validation("body_transform", "body transform id must not be empty"));
@@ -3363,6 +3480,8 @@ Result<std::vector<std::string>> PartDocument::mark_body_transform_changed(BodyT
   return invalidation_state_.mark_changed(dependency_graph_, id.value());
 }
 Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId id, Quantity value) {
+  if (is_reference_part())
+    return Result<std::vector<std::string>>::failure(reference_part_edit_error());
   if (id.empty())
     return Result<std::vector<std::string>>::failure(
         Error::validation("parameter", "parameter id must not be empty"));
@@ -3392,6 +3511,8 @@ Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId i
 
 Result<std::vector<std::string>> PartDocument::set_parameter_formula(ParameterId id,
                                                                      std::string formula) {
+  if (is_reference_part())
+    return Result<std::vector<std::string>>::failure(reference_part_edit_error());
   if (id.empty())
     return Result<std::vector<std::string>>::failure(
         Error::validation("parameter", "parameter id must not be empty"));
@@ -3965,12 +4086,13 @@ bool PartDocument::has_body_transform_id(const BodyTransformId& id) const noexce
   return find_body_transform(id) != nullptr;
 }
 bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
-  return has_feature_id(id) || has_revolve_feature_id(id) || has_sweep_feature_id(id) ||
+  return std::any_of(imported_body_features_.begin(), imported_body_features_.end(),
+                     [&](const auto& feature) { return feature.id() == id; }) ||
+         has_feature_id(id) || has_revolve_feature_id(id) || has_sweep_feature_id(id) ||
          has_loft_feature_id(id) || has_surface_feature_id(id) ||
-         has_linear_pattern_feature_id(id) ||
-         has_circular_pattern_feature_id(id) || has_mirror_feature_id(id) ||
-         has_fillet_feature_id(id) || has_chamfer_feature_id(id) || has_shell_feature_id(id) ||
-         has_draft_feature_id(id) || has_body_boolean_feature_id(id);
+         has_linear_pattern_feature_id(id) || has_circular_pattern_feature_id(id) ||
+         has_mirror_feature_id(id) || has_fillet_feature_id(id) || has_chamfer_feature_id(id) ||
+         has_shell_feature_id(id) || has_draft_feature_id(id) || has_body_boolean_feature_id(id);
 }
 bool PartDocument::has_body_id(const BodyId& id) const noexcept {
   return find_body(id) != nullptr;
@@ -3993,6 +4115,8 @@ Result<std::size_t>
 PartDocument::update_feature_record(std::vector<FeatureT> PartDocument::*member,
                                     FeatureT replacement,
                                     Result<std::size_t> (PartDocument::*adder)(FeatureT)) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   const std::string node_id = record_feature_id(replacement).value();
   std::vector<FeatureT>& records = this->*member;
   const auto found = std::find_if(records.begin(), records.end(), [&node_id](const FeatureT& item) {
@@ -4107,6 +4231,8 @@ template <typename FeatureT>
 Result<std::size_t>
 PartDocument::remove_feature_record(std::vector<FeatureT> PartDocument::*member,
                                     const FeatureId& id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   std::vector<FeatureT>& records = this->*member;
   const auto found = std::find_if(records.begin(), records.end(), [&id](const FeatureT& item) {
     return record_feature_id(item) == id;
@@ -4135,91 +4261,141 @@ PartDocument::remove_feature_record(std::vector<FeatureT> PartDocument::*member,
 }
 
 Result<std::size_t> PartDocument::update_feature(Feature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::features_, std::move(feature),
                                &PartDocument::add_feature);
 }
 Result<std::size_t> PartDocument::remove_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::features_, id);
 }
 Result<std::size_t> PartDocument::update_revolve_feature(RevolveFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::revolve_features_, std::move(feature),
                                &PartDocument::add_revolve_feature);
 }
 Result<std::size_t> PartDocument::remove_revolve_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::revolve_features_, id);
 }
 Result<std::size_t> PartDocument::update_sweep_feature(SweepFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::sweep_features_, std::move(feature),
                                &PartDocument::add_sweep_feature);
 }
 Result<std::size_t> PartDocument::remove_sweep_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::sweep_features_, id);
 }
 Result<std::size_t> PartDocument::update_loft_feature(LoftFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::loft_features_, std::move(feature),
                                &PartDocument::add_loft_feature);
 }
 Result<std::size_t> PartDocument::remove_loft_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::loft_features_, id);
 }
 Result<std::size_t> PartDocument::update_surface_feature(SurfaceFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::surface_features_, std::move(feature),
                                &PartDocument::add_surface_feature);
 }
 Result<std::size_t> PartDocument::update_linear_pattern_feature(LinearPatternFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::linear_pattern_features_, std::move(feature),
                                &PartDocument::add_linear_pattern_feature);
 }
 Result<std::size_t> PartDocument::remove_linear_pattern_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::linear_pattern_features_, id);
 }
 Result<std::size_t> PartDocument::update_circular_pattern_feature(CircularPatternFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::circular_pattern_features_, std::move(feature),
                                &PartDocument::add_circular_pattern_feature);
 }
 Result<std::size_t> PartDocument::remove_circular_pattern_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::circular_pattern_features_, id);
 }
 Result<std::size_t> PartDocument::update_mirror_feature(MirrorFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::mirror_features_, std::move(feature),
                                &PartDocument::add_mirror_feature);
 }
 Result<std::size_t> PartDocument::remove_mirror_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::mirror_features_, id);
 }
 Result<std::size_t> PartDocument::update_fillet_feature(FilletFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::fillet_features_, std::move(feature),
                                &PartDocument::add_fillet_feature);
 }
 Result<std::size_t> PartDocument::remove_fillet_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::fillet_features_, id);
 }
 Result<std::size_t> PartDocument::update_chamfer_feature(ChamferFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::chamfer_features_, std::move(feature),
                                &PartDocument::add_chamfer_feature);
 }
 Result<std::size_t> PartDocument::remove_chamfer_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::chamfer_features_, id);
 }
 Result<std::size_t> PartDocument::update_shell_feature(ShellFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::shell_features_, std::move(feature),
                                &PartDocument::add_shell_feature);
 }
 Result<std::size_t> PartDocument::remove_shell_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::shell_features_, id);
 }
 Result<std::size_t> PartDocument::update_draft_feature(DraftFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::draft_features_, std::move(feature),
                                &PartDocument::add_draft_feature);
 }
 Result<std::size_t> PartDocument::remove_draft_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::draft_features_, id);
 }
 Result<std::size_t> PartDocument::update_body_boolean_feature(BodyBooleanFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return update_feature_record(&PartDocument::body_boolean_features_, std::move(feature),
                                &PartDocument::add_body_boolean_feature);
 }
 Result<std::size_t> PartDocument::remove_body_boolean_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::body_boolean_features_, id);
 }
 

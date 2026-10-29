@@ -101,3 +101,18 @@ flat/structured nested occurrence output, read-only results, positive clearance/
 DOF selection, stale/busy rejection, failure preservation and source-file protection. The native-only
 case uses Qt file dialogs, verifies action/task reachability at 1280×800, dialog accept/cancel, Escape
 and the resulting STEP file. `BLCAD_UI_CAPTURE_DIR` enables captures.
+
+### Imported Reference geometry — Block 140 integration
+
+Reference Parts participate in the same visible/active posed-leaf inclusion, exact transform chains,
+contact, interference, clearance, sampled Revolute analysis and flat/structured exports. A saved
+document supplies the explicit asset root. Queries and final publication revalidate actual imported
+source bytes, and a stale/missing asset fails without applying poses, changing history or replacing
+existing output. Every registered source path, including embedded Part registries and canonical or
+existing hardlink aliases, is protected as an export destination. The document-aware headless STEP
+export APIs use the same protection and stage complete output before publication. The CLI derives
+its root from the input document and preserves historical single-result Part export support.
+
+The detailed immutable definition, refresh and conversion boundaries are maintained in
+`docs/step-import-sequence-mvp10.md`; accepted Block-140 validation is recorded in
+`docs/development-setup.md`.
