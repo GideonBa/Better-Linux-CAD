@@ -1589,7 +1589,8 @@ All five targets build; focused Core **6 / 247**, Geometry **15 / 1,878** and GU
 fingerprints remain unchanged. Reviewed regression cases protect duplicate capture, independent
 products, fixed asset roots, exact analytic limits and prior cache retention after source failure.
 Contracts, local build-artifact repair and complete evidence live in `docs/development-setup.md`
-and the STEP import sequence. Delivery uses one PR, merged before Block 140 starts.
+and the STEP import sequence. Delivery: [PR #131](https://github.com/GideonBa/Better-Linux-CAD/pull/131),
+verified implementation commit `95f15a6`. This single PR is merged before Block 140 starts.
 
 ## Current numbered technical step — Block 140 (planned)
 

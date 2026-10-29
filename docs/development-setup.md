@@ -2285,3 +2285,5 @@ OpenGL or drawable/context failure is present. All 914 final runtime fingerprint
 Final documentation/coverage inventory passes **3 / 309**
 (`/tmp/blcad139-final-inventory.log`) after advancing the plan through Block 139; historical
 Block-136 coverage ownership is preserved.
+Delivery: [PR #131](https://github.com/GideonBa/Better-Linux-CAD/pull/131), verified implementation
+commit `95f15a6`; its documentation-only follow-up preserves all 914 runtime fingerprints.

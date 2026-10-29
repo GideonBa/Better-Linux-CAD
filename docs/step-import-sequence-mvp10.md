@@ -500,6 +500,8 @@ startup reaches intentional **124**. All **914** runtime fingerprints remain unc
 commands, unchanged red-to-green regressions, local artifact repair and visually reviewed captures
 live in `docs/development-setup.md`. Blocks 140–143 remain planned, and the next branch starts only
 after this block is merged.
+Delivery: [PR #131](https://github.com/GideonBa/Better-Linux-CAD/pull/131), verified implementation
+commit `95f15a6`; the delivery-documentation follow-up changes no runtime source.
 
 ## Block 140 — Reference Part integration with assemblies
 
