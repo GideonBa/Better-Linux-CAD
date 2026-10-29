@@ -356,7 +356,7 @@ classify_contained_profile_holes(const PartDocument& document, const Sketch& ske
                      sketch.circle_profiles().size());
 
   for (const RectangleProfile& rectangle : sketch.rectangle_profiles()) {
-    if (rectangle.id() == outer_profile)
+    if (rectangle.id() == outer_profile || sketch.profile_has_construction(rectangle.id()))
       continue;
     const Parameter* width = document.find_parameter(rectangle.width_parameter());
     const Parameter* height = document.find_parameter(rectangle.height_parameter());
@@ -382,7 +382,7 @@ classify_contained_profile_holes(const PartDocument& document, const Sketch& ske
   }
 
   for (const ClosedProfile& closed : sketch.closed_profiles()) {
-    if (closed.id() == outer_profile)
+    if (closed.id() == outer_profile || sketch.profile_has_construction(closed.id()))
       continue;
     auto vertices = resolve_closed_profile_vertices(document, sketch, closed);
     if (vertices.has_error() || !polygon_is_simple(vertices.value()) ||
@@ -394,7 +394,7 @@ classify_contained_profile_holes(const PartDocument& document, const Sketch& ske
   }
 
   for (const CircleProfile& circle : sketch.circle_profiles()) {
-    if (circle.id() == outer_profile)
+    if (circle.id() == outer_profile || sketch.profile_has_construction(circle.id()))
       continue;
     const Parameter* diameter = document.find_parameter(circle.diameter_parameter());
     if (diameter == nullptr || diameter->type() != ParameterType::Length)
@@ -409,7 +409,7 @@ classify_contained_profile_holes(const PartDocument& document, const Sketch& ske
   }
 
   const auto append_curved = [&](const ProfileId& id, const std::vector<SketchEntityId>& ids) {
-    if (id == outer_profile)
+    if (id == outer_profile || sketch.profile_has_construction(id))
       return;
     auto hole = resolve_curved_profile_hole(document, sketch, id, ids);
     if (hole && strictly_contains(outer, hole.value()))

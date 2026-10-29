@@ -504,6 +504,10 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
   if (!has_profile)
     return Result<std::size_t>::failure(validation_error(
         reference.profile().value(), "profile region profile must belong to referenced sketch"));
+  if (sketch->profile_has_construction(reference.profile()))
+    return Result<std::size_t>::failure(validation_error(
+        reference.profile().value(),
+        "Construction geometry cannot bound a solid profile; convert it back to geometry"));
   return Result<std::size_t>::success(1U);
 }
 

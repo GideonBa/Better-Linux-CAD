@@ -63,6 +63,16 @@ void ShellSketchTools::build_operation_group() {
     ribbon_.add_small_button(group, action);
     operation_actions_.push_back(action);
   }
+  construction_action_ = new QAction(QStringLiteral("Construction Geometry"), this);
+  construction_action_->setObjectName(QStringLiteral("sketch.operation.construction"));
+  construction_action_->setCheckable(true);
+  connect(construction_action_, &QAction::triggered, this, [this](bool construction) {
+    auto converted = convert_construction(construction);
+    if (!converted)
+      report(converted.error());
+    refresh_enablement();
+  });
+  ribbon_.add_small_button(group, construction_action_);
   auto* reference_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Project"));
   project_action_ = new QAction(QStringLiteral("Project Geometry"), this);
   project_action_->setObjectName(QStringLiteral("sketch.operation.project"));
@@ -74,6 +84,35 @@ void ShellSketchTools::build_operation_group() {
   connect(break_link_action_, &QAction::triggered, this,
           [this] { show_operation_dialog(Kind::BreakLinkLine); });
   ribbon_.add_small_button(reference_group, break_link_action_);
+}
+
+Result<std::size_t> ShellSketchTools::convert_construction(bool construction) {
+  auto candidate = construction_candidate(construction);
+  if (!candidate)
+    return Result<std::size_t>::failure(candidate.error());
+  if (candidate.value().second == 0)
+    return Result<std::size_t>::success(0);
+  const auto selection = session_.selection().entries();
+  auto committed = session_.commit_part_transaction(
+      construction ? "Convert sketch geometry to construction"
+                   : "Convert construction to sketch geometry",
+      [candidate = std::move(candidate.value().first)](PartDocument& part) mutable {
+        return part.update_sketch(std::move(candidate));
+      });
+  if (!committed)
+    return committed;
+  publish_scene();
+  arm_drag_controller();
+  window_.refresh();
+  // A 3D presentation rebuild publishes an empty model pick. Role-only edits
+  // retain every selected Sketch identity, so keep the command selection.
+  session_.selection().clear();
+  for (const auto& selected : selection)
+    (void)session_.selection().add(selected);
+  refresh_enablement();
+  report_message(construction ? "Selection converted to construction geometry."
+                              : "Selection restored to sketch geometry.");
+  return committed;
 }
 
 Result<GuiSketchOperationRequest>
@@ -121,13 +160,26 @@ ShellSketchTools::prepare_operation(GuiSketchOperationRequest request) const {
           return id;
       }
     };
+    const auto* source_circle =
+        source->find_circle_profile(ProfileId(request.source_entity->value()));
+    // Follow the same typed source precedence as geometry projection below.
+    // Profile and curve ids can have equal text in their distinct namespaces.
+    const bool source_construction = [&] {
+      if (const auto* line = source->find_line_segment(*request.source_entity))
+        return line->construction();
+      if (const auto* spline = source->find_spline_segment(*request.source_entity))
+        return spline->construction();
+      if (const auto* arc = source->find_arc_segment(*request.source_entity))
+        return arc->construction();
+      return source_circle && source_circle->construction();
+    }();
     const auto append = [&](const SplineSegment& s) -> Result<std::size_t> {
       auto curve =
           SplineSegment::create_cubic_bezier(next_id(), project(s.start()), project(s.control1()),
                                              project(s.control2()), project(s.end()), s.weights());
       if (!curve)
         return Result<std::size_t>::failure(curve.error());
-      request.projected_splines.push_back(std::move(curve.value()));
+      request.projected_splines.push_back(curve.value().with_construction(source_construction));
       return Result<std::size_t>::success(1);
     };
     if (const auto* line = source->find_line_segment(*request.source_entity)) {

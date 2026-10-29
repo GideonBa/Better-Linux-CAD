@@ -96,6 +96,9 @@ struct ExpectedCircle {
   if (sketch == nullptr || profile == nullptr)
     return Result<ExpectedCircle>::failure(
         edge_error(id, concat("circular ", feature_label, " edge profile must exist")));
+  if (profile->construction())
+    return Result<ExpectedCircle>::failure(edge_error(
+        id, "Construction circle cannot supply solid topology; convert it back to geometry"));
   const Parameter* diameter = document.find_parameter(profile->diameter_parameter());
   if (diameter == nullptr || diameter->type() != ParameterType::Length)
     return Result<ExpectedCircle>::failure(edge_error(

@@ -1341,7 +1341,7 @@ missing shell/persistence integration; these tickets do not claim that every rep
 | Dimension line layout | [#106](https://github.com/GideonBa/Better-Linux-CAD/issues/106) | Confirmed family-specific rendering gaps; DIN/ISO target recorded | P2 |
 | Dimension double-click editing | [#107](https://github.com/GideonBa/Better-Linux-CAD/issues/107) | Implemented: shared badge rectangle and independent double-click resolution; native proof | P1 |
 | Dimension deletion | [#108](https://github.com/GideonBa/Better-Linux-CAD/issues/108) | Implemented: visible selection, multi-selection enablement and real Delete/Backspace proof | P1 |
-| Construction conversion | [#109](https://github.com/GideonBa/Better-Linux-CAD/issues/109) | Missing shell toggle and curved-flag compatibility persistence | P2 |
+| Construction conversion | [#109](https://github.com/GideonBa/Better-Linux-CAD/issues/109) | Implemented: reversible typed curve/group conversion, lossless curved roles, region exclusion and native modeling/history/persistence proof | P2 |
 | Sketch-line rotation axes | [#110](https://github.com/GideonBa/Better-Linux-CAD/issues/110) | Missing persistent sketch/entity axis source | P2 |
 | Body Rotate axis parity | [#111](https://github.com/GideonBa/Better-Linux-CAD/issues/111) | Shell omits existing derived-datum/semantic-edge support | P2 |
 | Sketch on planar result face | [#112](https://github.com/GideonBa/Better-Linux-CAD/issues/112) | Direct workflow and general associative support identity missing | P2 |
@@ -1424,8 +1424,9 @@ remain unchanged through validation. Exact raw measurements, provenance and chec
 fallbacks still perform real full geometry work. No release SLA or universal latency bound is claimed.
 
 **Implementation and acceptance complete: #104**, branch `fix/persistent-line-endpoint-snaps`,
-based on verified main `736f100`; deliver its single PR before starting #109 from verified merged
-main. Stable canonical endpoint evidence replaces coordinate-based post-commit chain coupling.
+based on verified main `736f100`. Delivered by [PR #124](https://github.com/GideonBa/Better-Linux-CAD/pull/124),
+merge `4f655c1`; issue #104 is closed and the delivered tree equals tested commit `a5c8a8a`.
+Stable canonical endpoint evidence replaces coordinate-based post-commit chain coupling.
 Geometry and automatic Coincident recipes share one history transaction. Closure, restart, overlap,
 twelve segments, persistence/drag, stale-target rejection and queued input are covered by **6 / 313**
 offscreen and **6 / 331** natively at both 100% and 150%. The full GUI suite passes **578 / 20
@@ -1434,6 +1435,22 @@ pass **82 / 3,609**, without skips. Five targets build; Core/Geometry remain unc
 main. The input manifest and exact checks live in `docs/development-setup.md`, with behavior in
 `docs/gui-sketch-basic-creation-mvp8.md`. Remaining order: **#109 → #111 → #110 → #112 → #106**;
 Blocks 138–143 remain planned.
+
+**Implementation and acceptance complete: #109**, branch `fix/reversible-sketch-construction`,
+based on verified main `4f655c1`; deliver its single PR before starting #111 from verified merged
+main. Role-only conversion retains geometry, canonical ids, exact rational weights, parameters,
+constraints, dimensions and references; nested/generated groups expand without duplicating members.
+PartDocument persistence now carries curved roles. Geometry excludes auxiliary boundaries/holes;
+whole-selection read-only checks and downstream rejection stay atomic. Native proof covers a
+rectangle with curved inner geometry, conversion/reconversion, diameter authoring, drag, Extrude/Cut,
+exact history, reopen, empty-cache volume equivalence and non-mutating STEP export. Unlinked editable
+projection snapshots inherit the actual source type's role; associative references remain read-only.
+Full Core **555 / 17,463**, Geometry **461 / 35,315** and final GUI **582 passed / 21 expected
+native-only skips / 81,234 assertions** pass. Native affected-family and required shell coverage
+pass **101 / 7,086**; final 150% construction/projection proof passes **5 / 614**, without skips.
+All five targets build; final source/inventory fingerprints and exact evidence are in
+`docs/development-setup.md`. Remaining issue order is **#111 → #110 → #112 → #106**. This fix
+advances no numbered implementation block; Blocks 138–143 remain planned.
 
 After all open issues are complete and merged, execute **Blocks 138 → 139 → 140 → 141 → 142 →
 143**, each with the architecture boundaries, GUI access and acceptance gates in

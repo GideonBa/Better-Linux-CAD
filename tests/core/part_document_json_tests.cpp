@@ -245,3 +245,50 @@ TEST_CASE("Sketch free points migrate to free topology and round-trip through JS
   CHECK(restored_sketch->points().front().position().x == Catch::Approx(3.0));
   CHECK(restored_sketch->points().front().position().y == Catch::Approx(4.0));
 }
+
+TEST_CASE("PartDocument preserves curved construction roles and rejects malformed flags",
+          "[core][json][construction-conversion]") {
+  auto document = make_reference_part_document();
+  auto auxiliary =
+      Sketch::create(SketchId("auxiliary"), "Auxiliary", DatumPlaneId("datum.xy")).value();
+  REQUIRE(auxiliary.add_entity(
+      ArcSegment::create_three_point(SketchEntityId("arc"), {0, 0}, {5, 5}, {10, 0}).value()));
+  REQUIRE(auxiliary.add_entity(SplineSegment::create_cubic_bezier(SketchEntityId("spline"), {20, 0},
+                                                                  {22, 5}, {28, 5}, {30, 0},
+                                                                  {1, .75, .75, 1})
+                                   .value()));
+  REQUIRE(auxiliary.add_profile(
+      CircleProfile::create(ProfileId("circle"), ParameterId("part.hole_diameter"), {40, 20})
+          .value()));
+  REQUIRE(auxiliary.add_profile(RectangleProfile::create(ProfileId("rectangle"),
+                                                         ParameterId("part.width"),
+                                                         ParameterId("part.height"))
+                                    .value()));
+  REQUIRE(document.add_sketch(auxiliary));
+  const auto original = serialize_part_document_to_json(document).value();
+  REQUIRE(auxiliary.set_construction({SketchEntityId("arc"), SketchEntityId("spline")},
+                                     {ProfileId("circle"), ProfileId("rectangle")}, true));
+  REQUIRE(document.update_sketch(auxiliary));
+  const auto saved = serialize_part_document_to_json(document).value();
+  auto reopened = deserialize_part_document_from_json(saved);
+  REQUIRE(reopened);
+  CHECK(serialize_part_document_to_json(reopened.value()).value() == saved);
+  const auto* restored = reopened.value().find_sketch(auxiliary.id());
+  REQUIRE(restored);
+  CHECK(restored->find_arc_segment(SketchEntityId("arc"))->construction());
+  CHECK(restored->find_spline_segment(SketchEntityId("spline"))->construction());
+  CHECK(restored->find_spline_segment(SketchEntityId("spline"))->weights() ==
+        auxiliary.spline_segments().front().weights());
+  CHECK(restored->find_circle_profile(ProfileId("circle"))->construction());
+  CHECK(restored->find_rectangle_profile(ProfileId("rectangle"))->construction());
+  REQUIRE(auxiliary.set_construction({SketchEntityId("arc"), SketchEntityId("spline")},
+                                     {ProfileId("circle"), ProfileId("rectangle")}, false));
+  REQUIRE(reopened.value().update_sketch(auxiliary));
+  CHECK(serialize_part_document_to_json(reopened.value()).value() == original);
+  auto malformed = saved;
+  const auto flag = malformed.find("\"construction\": true");
+  REQUIRE(flag != std::string::npos);
+  malformed.replace(flag, std::string("\"construction\": true").size(),
+                    "\"construction\": \"yes\"");
+  CHECK_FALSE(deserialize_part_document_from_json(malformed));
+}

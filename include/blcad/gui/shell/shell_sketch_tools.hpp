@@ -83,6 +83,7 @@ public:
   [[nodiscard]] Result<std::size_t> apply_chamfer(double distance);
   [[nodiscard]] Result<GuiSketchOperationPreview> preview_operation(GuiSketchOperationRequest request);
   [[nodiscard]] Result<std::size_t> apply_operation(GuiSketchOperationRequest request);
+  [[nodiscard]] Result<std::size_t> convert_construction(bool construction);
   void cancel_operation_preview();
   // Arms a modal Trim/Extend/Split tool; the next curve click runs the op.
   void begin_modify_tool(SketchModifyKind kind);
@@ -104,6 +105,8 @@ private:
   void show_operation_dialog(GuiSketchOperationKind kind);
   [[nodiscard]] Result<GuiSketchOperationRequest> prepare_operation(GuiSketchOperationRequest request) const;
   [[nodiscard]] Result<std::vector<SketchEntityId>> selected_operation_entities() const;
+  [[nodiscard]] Result<std::pair<Sketch, std::size_t>>
+  construction_candidate(bool construction) const;
   void wire_viewport_callbacks();
   [[nodiscard]] GuiSketchGridConfig grid_config() const;
   void apply_grid_config();
@@ -182,6 +185,7 @@ private:
   std::vector<QAction*> tool_actions_;
   std::vector<QAction*> modify_actions_;
   std::vector<QAction*> operation_actions_;
+  QAction* construction_action_{nullptr};
   QAction* project_action_{nullptr};
   QAction* break_link_action_{nullptr};
   bool operation_preview_active_{false};

@@ -237,6 +237,13 @@ reference entities.
 Canonical topology JSON persists both flags. A state not representable by historical PartDocument
 Sketch JSON is not silently flattened through the compatibility bridge.
 
+Issue #109 extends the historical bridge with lossless construction state for authored arcs,
+rational/polynomial spline spans and parameter-backed circles/rectangles. Shared profile junctions
+keep their canonical point ids when only one owner changes role. Point construction state is true
+only when every owning usage is construction; geometry/construction sharing does not weld or split
+points. Editable/reference sharing still fails. Other unrepresentable canonical-only states continue
+to fail closed. Existing constraint/dimension catalogs and reference ids remain separate authorities.
+
 The issue #104 line-creation follow-up retains distinct endpoint ids and persists automatic
 Coincident intent in the existing constraint catalog. Picked `(SketchId, SketchPointId)` evidence
 is transient; raw snap-candidate strings and coordinate equality do not establish identity.

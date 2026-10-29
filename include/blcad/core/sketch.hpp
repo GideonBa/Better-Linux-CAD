@@ -277,6 +277,14 @@ private:
 
 class ArcSegment {
 public:
+  [[nodiscard]] bool construction() const noexcept {
+    return construction_;
+  }
+  [[nodiscard]] ArcSegment with_construction(bool value) const {
+    auto result = *this;
+    result.construction_ = value;
+    return result;
+  }
   [[nodiscard]] static Result<ArcSegment> create_three_point(SketchEntityId id, Point2 start,
                                                              Point2 mid, Point2 end);
   [[nodiscard]] const SketchEntityId& id() const noexcept;
@@ -285,6 +293,7 @@ public:
   [[nodiscard]] Point2 end() const noexcept;
 
 private:
+  bool construction_{false};
   ArcSegment(SketchEntityId id, Point2 start, Point2 mid, Point2 end);
   SketchEntityId id_;
   Point2 start_;
@@ -294,6 +303,14 @@ private:
 
 class SplineSegment {
 public:
+  [[nodiscard]] bool construction() const noexcept {
+    return construction_;
+  }
+  [[nodiscard]] SplineSegment with_construction(bool value) const {
+    auto result = *this;
+    result.construction_ = value;
+    return result;
+  }
   // Exact ellipse span; each span is at most a quarter turn.
   [[nodiscard]] static Result<SplineSegment> create_elliptical_arc(
       SketchEntityId id, Point2 center, Point2 major_axis, double minor_radius,
@@ -315,6 +332,7 @@ public:
   }
 
 private:
+  bool construction_{false};
   SplineSegment(SketchEntityId id, Point2 start, Point2 control1, Point2 control2, Point2 end,
                 std::array<double, 4> weights);
   SketchEntityId id_;
@@ -366,6 +384,14 @@ private:
 
 class RectangleProfile {
 public:
+  [[nodiscard]] bool construction() const noexcept {
+    return construction_;
+  }
+  [[nodiscard]] RectangleProfile with_construction(bool value) const {
+    auto result = *this;
+    result.construction_ = value;
+    return result;
+  }
   [[nodiscard]] static Result<RectangleProfile> create(ProfileId id, ParameterId width_parameter,
                                                        ParameterId height_parameter,
                                                        Point2 center = {});
@@ -375,6 +401,7 @@ public:
   [[nodiscard]] const ParameterId& height_parameter() const noexcept;
 
 private:
+  bool construction_{false};
   RectangleProfile(ProfileId id, ParameterId width_parameter, ParameterId height_parameter,
                    Point2 center);
   ProfileId id_;
@@ -384,6 +411,14 @@ private:
 };
 class CircleProfile {
 public:
+  [[nodiscard]] bool construction() const noexcept {
+    return construction_;
+  }
+  [[nodiscard]] CircleProfile with_construction(bool value) const {
+    auto result = *this;
+    result.construction_ = value;
+    return result;
+  }
   [[nodiscard]] static Result<CircleProfile> create(ProfileId id, ParameterId diameter_parameter,
                                                     Point2 center = {});
   [[nodiscard]] const ProfileId& id() const noexcept;
@@ -391,6 +426,7 @@ public:
   [[nodiscard]] const ParameterId& diameter_parameter() const noexcept;
 
 private:
+  bool construction_{false};
   CircleProfile(ProfileId id, ParameterId diameter_parameter, Point2 center);
   ProfileId id_;
   ParameterId diameter_parameter_;
@@ -516,6 +552,13 @@ public:
   composite_closed_profiles() const noexcept;
   [[nodiscard]] const std::vector<CircularHolePattern>& circular_hole_patterns() const noexcept;
   [[nodiscard]] std::size_t profile_count() const noexcept;
+  // Validate the whole selection before changing roles. Profile selections
+  // expand to their persistent source curves; intent and ids remain intact.
+  [[nodiscard]] Result<std::size_t> set_construction(std::vector<SketchEntityId> curves,
+                                                     const std::vector<ProfileId>& profiles,
+                                                     bool construction);
+  [[nodiscard]] bool curve_is_construction(const SketchEntityId& id) const noexcept;
+  [[nodiscard]] bool profile_has_construction(const ProfileId& id) const noexcept;
   [[nodiscard]] const LineSegment* find_line_segment(SketchEntityId id) const noexcept;
   [[nodiscard]] const ArcSegment* find_arc_segment(SketchEntityId id) const noexcept;
   [[nodiscard]] const SplineSegment* find_spline_segment(SketchEntityId id) const noexcept;

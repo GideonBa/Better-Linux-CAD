@@ -988,4 +988,101 @@ Result<std::vector<Point2>> Sketch::validate_closed_profile(const ClosedProfile&
   return Result<std::vector<Point2>>::success(std::move(vertices));
 }
 
+bool Sketch::curve_is_construction(const SketchEntityId& id) const noexcept {
+  if (const auto* curve = find_line_segment(id))
+    return curve->construction();
+  if (const auto* curve = find_arc_segment(id))
+    return curve->construction();
+  if (const auto* curve = find_spline_segment(id))
+    return curve->construction();
+  return false;
+}
+
+bool Sketch::profile_has_construction(const ProfileId& id) const noexcept {
+  if (const auto* profile = find_rectangle_profile(id))
+    return profile->construction();
+  if (const auto* profile = find_circle_profile(id))
+    return profile->construction();
+  const auto contains = [&](const auto& curves) {
+    return std::any_of(curves.begin(), curves.end(),
+                       [&](const auto& curve) { return curve_is_construction(curve); });
+  };
+  if (const auto* profile = find_closed_profile(id))
+    return contains(profile->line_segments());
+  if (const auto* profile = find_arc_closed_profile(id))
+    return contains(profile->curve_segments());
+  if (const auto* profile = find_composite_closed_profile(id)) {
+    if (contains(profile->outer_contour()))
+      return true;
+    for (const auto& contour : profile->inner_contours())
+      if (contains(contour))
+        return true;
+  }
+  return false;
+}
+
+Result<std::size_t> Sketch::set_construction(std::vector<SketchEntityId> curves,
+                                             const std::vector<ProfileId>& profiles,
+                                             bool construction) {
+  if (curves.empty() && profiles.empty())
+    return Result<std::size_t>::failure(
+        Error::validation(id_.value(), "Select editable sketch geometry"));
+  const auto append = [&](const auto& ids) { curves.insert(curves.end(), ids.begin(), ids.end()); };
+  for (const auto& id : profiles) {
+    if (find_rectangle_profile(id) || find_circle_profile(id))
+      continue;
+    if (const auto* profile = find_closed_profile(id))
+      append(profile->line_segments());
+    else if (const auto* profile = find_arc_closed_profile(id))
+      append(profile->curve_segments());
+    else if (const auto* profile = find_composite_closed_profile(id)) {
+      append(profile->outer_contour());
+      for (const auto& contour : profile->inner_contours())
+        append(contour);
+    } else
+      return Result<std::size_t>::failure(Error::validation(
+          id.value(), "Select a line, arc, circle, spline or supported closed profile"));
+  }
+  std::sort(curves.begin(), curves.end(),
+            [](const auto& a, const auto& b) { return a.value() < b.value(); });
+  curves.erase(std::unique(curves.begin(), curves.end()), curves.end());
+  for (const auto& id : curves) {
+    if (find_projected_point(id) || find_projected_line(id) || find_reference_generated_line(id))
+      return Result<std::size_t>::failure(Error::validation(
+          id.value(),
+          "Projected/reference geometry is read-only; detach its reference before converting"));
+    if (!find_line_segment(id) && !find_arc_segment(id) && !find_spline_segment(id))
+      return Result<std::size_t>::failure(
+          Error::validation(id.value(), "Select an editable line, arc, circle or spline"));
+  }
+  // All validation precedes mutation, including generated-group expansion.
+  std::size_t changed = 0;
+  const auto selected_curve = [&](const auto& id) {
+    return std::find(curves.begin(), curves.end(), id) != curves.end();
+  };
+  for (auto& line : line_segments_)
+    if (selected_curve(line.id()) && line.construction() != construction) {
+      line = LineSegment::create(line.id(), line.start(), line.end(),
+                                 construction ? SketchLineRole::Construction
+                                              : SketchLineRole::Geometry)
+                 .value();
+      ++changed;
+    }
+  const auto convert = [&](auto& values, const auto& selected) {
+    for (auto& value : values)
+      if (selected(value.id()) && value.construction() != construction) {
+        value = value.with_construction(construction);
+        ++changed;
+      }
+  };
+  convert(arc_segments_, selected_curve);
+  convert(spline_segments_, selected_curve);
+  const auto selected_profile = [&](const auto& id) {
+    return std::find(profiles.begin(), profiles.end(), id) != profiles.end();
+  };
+  convert(rectangle_profiles_, selected_profile);
+  convert(circle_profiles_, selected_profile);
+  return Result<std::size_t>::success(changed);
+}
+
 } // namespace blcad

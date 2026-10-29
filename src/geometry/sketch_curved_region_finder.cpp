@@ -152,6 +152,8 @@ SketchRegionFinder::find_single_curve_region(const PartDocument& document, const
       curves.push_back({line.id, line.start, line.end, Handle(Geom2d_Curve)(segment.Value())});
     }
     for (const auto& arc : sketch.arc_segments()) {
+      if (arc.construction())
+        continue;
       GCE2d_MakeArcOfCircle circle(gp_Pnt2d(arc.start().x, arc.start().y),
                                   gp_Pnt2d(arc.mid().x, arc.mid().y),
                                   gp_Pnt2d(arc.end().x, arc.end().y));
@@ -159,6 +161,8 @@ SketchRegionFinder::find_single_curve_region(const PartDocument& document, const
       curves.push_back({arc.id(), arc.start(), arc.end(), Handle(Geom2d_Curve)(circle.Value())});
     }
     for (const auto& spline : sketch.spline_segments()) {
+      if (spline.construction())
+        continue;
       TColgp_Array1OfPnt2d poles(1, 4);
       TColStd_Array1OfReal weights(1, 4);
       const auto controls = spline.curve().poles;

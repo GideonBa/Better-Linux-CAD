@@ -1,5 +1,8 @@
 #include "blcad/core/sketch.hpp"
 #include "blcad/core/sketch_contour.hpp"
+#include "blcad/core/sketch_transform_pattern.hpp"
+#include "blcad/core/sketch_spline_edit.hpp"
+#include "blcad/core/sketch_modify.hpp"
 #include "blcad/core/sketch_topology_part_document.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -136,4 +139,208 @@ TEST_CASE("Two circular arcs can bound a full circle and open contours still fai
   auto doubled = ArcClosedProfile::create(ProfileId("overlap"), {SketchEntityId("a"), SketchEntityId("b")});
   REQUIRE(doubled);
   CHECK_FALSE(overlap.add_profile(doubled.value()));
+}
+
+TEST_CASE("Curved construction flags survive the PartDocument topology bridge",
+          "[core][sketch][construction-conversion]") {
+  auto sketch = make_arc_sketch();
+  REQUIRE(sketch.add_entity(SplineSegment::create_cubic_bezier(SketchEntityId("spline"), {20, 0},
+                                                               {22, 5}, {28, 5}, {30, 0},
+                                                               {1, .8, .8, 1})
+                                .value()));
+  const auto topology = SketchTopology::migrate_legacy(sketch).value();
+  std::vector<SketchTopologyEntity> entities;
+  for (const auto& entity : topology.entities())
+    entities.push_back(entity.reference() ? entity
+                                          : SketchTopologyEntity::create(
+                                                entity.id(), entity.kind(), entity.points(),
+                                                entity.entity_dependencies(),
+                                                {.construction = true}, entity.weights())
+                                                .value());
+  auto changed = SketchTopology::create(sketch.id(), topology.points(), std::move(entities),
+                                        topology.dependencies());
+  REQUIRE(changed);
+  auto restored = SketchTopologyLegacyMaterializer{}.materialize(sketch, changed.value());
+  REQUIRE(restored);
+  const auto migrated = SketchTopology::migrate_legacy(restored.value()).value();
+  CHECK(migrated.find_entity("entity/arc.top")->construction());
+  CHECK(migrated.find_entity("entity/spline")->construction());
+  CHECK(migrated.find_entity("entity/spline")->weights() ==
+        topology.find_entity("entity/spline")->weights());
+  CHECK(migrated.find_entity("entity/arc.top")->points() ==
+        topology.find_entity("entity/arc.top")->points());
+}
+
+TEST_CASE("Circle construction state is not silently flattened by legacy materialization",
+          "[core][sketch][construction-conversion]") {
+  auto sketch = Sketch::create(SketchId("circle"), "Circle", DatumPlaneId("datum.xy")).value();
+  REQUIRE(sketch.add_profile(
+      CircleProfile::create(ProfileId("circle"), ParameterId("diameter"), {30, 40}).value()));
+  const auto topology = SketchTopology::migrate_legacy(sketch).value();
+  const auto* circle = topology.find_entity("profile/circle");
+  auto entities = topology.entities();
+  for (auto& entity : entities)
+    if (entity.id() == circle->id())
+      entity = SketchTopologyEntity::create(entity.id(), entity.kind(), entity.points(), {},
+                                            {.construction = true})
+                   .value();
+  const auto changed = SketchTopology::create(sketch.id(), topology.points(), std::move(entities),
+                                              topology.dependencies())
+                           .value();
+  auto restored = SketchTopologyLegacyMaterializer{}.materialize(sketch, changed);
+  REQUIRE(restored);
+  const auto migrated = SketchTopology::migrate_legacy(restored.value()).value();
+  CHECK(migrated.find_entity("profile/circle")->construction());
+  CHECK(migrated.find_entity("profile/circle")->points() == circle->points());
+}
+
+TEST_CASE("Construction conversion preserves mixed curve and generated-profile identity",
+          "[core][sketch][construction-conversion]") {
+  auto sketch = make_arc_sketch();
+  REQUIRE(sketch.add_profile(
+      ArcClosedProfile::create(ProfileId("group"),
+                               {SketchEntityId("line.left"), SketchEntityId("line.bottom"),
+                                SketchEntityId("line.right"), SketchEntityId("arc.top")})
+          .value()));
+  REQUIRE(sketch.add_entity(SplineSegment::create_cubic_bezier(SketchEntityId("spline"), {20, 0},
+                                                               {22, 5}, {28, 5}, {30, 0},
+                                                               {1, .8, .8, 1})
+                                .value()));
+  REQUIRE(sketch.add_profile(CircleProfile::create(ProfileId("circle"), ParameterId("d")).value()));
+  REQUIRE(sketch.add_profile(
+      RectangleProfile::create(ProfileId("rectangle"), ParameterId("w"), ParameterId("h"))
+          .value()));
+  const auto original = SketchTopology::migrate_legacy(sketch).value();
+  SECTION("Mixed selection and generated group convert together and return exactly") {
+    auto changed = sketch.set_construction(
+        {SketchEntityId("spline"), SketchEntityId("spline")},
+        {ProfileId("group"), ProfileId("circle"), ProfileId("rectangle")}, true);
+    REQUIRE(changed);
+    CHECK(changed.value() == 7);
+    CHECK(sketch.profile_has_construction(ProfileId("group")));
+    const auto converted = SketchTopology::migrate_legacy(sketch);
+    REQUIRE(converted);
+    for (const auto& entity : original.entities()) {
+      const auto* current = converted.value().find_entity(entity.id());
+      REQUIRE(current);
+      CHECK(current->points() == entity.points());
+      CHECK(current->weights() == entity.weights());
+      for (const auto& point : entity.points())
+        CHECK(converted.value().find_point(point)->position() ==
+              original.find_point(point)->position());
+    }
+    REQUIRE(sketch.set_construction(
+        {SketchEntityId("spline")},
+        {ProfileId("group"), ProfileId("circle"), ProfileId("rectangle")}, false));
+    CHECK(SketchTopology::migrate_legacy(sketch).value() == original);
+  }
+  SECTION("Composite inner contours and overlapping group selections expand exactly once") {
+    auto composite =
+        Sketch::create(SketchId("composite"), "Composite", DatumPlaneId("datum.xy")).value();
+    add_line(composite, "outer.a", {-10, -10}, {10, -10});
+    add_line(composite, "outer.b", {10, -10}, {10, 10});
+    add_line(composite, "outer.c", {10, 10}, {-10, 10});
+    add_line(composite, "outer.d", {-10, 10}, {-10, -10});
+    add_line(composite, "inner.a", {0, -5}, {1, -5});
+    add_line(composite, "inner.b", {1, -5}, {0, -4});
+    add_line(composite, "inner.c", {0, -4}, {0, -5});
+    const std::vector<SketchEntityId> outer{SketchEntityId("outer.a"), SketchEntityId("outer.b"),
+                                            SketchEntityId("outer.c"), SketchEntityId("outer.d")};
+    const std::vector<std::vector<SketchEntityId>> inner{
+        {SketchEntityId("inner.a"), SketchEntityId("inner.b"), SketchEntityId("inner.c")}};
+    REQUIRE(composite.add_profile(ClosedProfile::create(ProfileId("group"), outer).value()));
+    auto added = composite.add_profile(
+        CompositeClosedProfile::create(ProfileId("composite"), outer, inner).value());
+    INFO((added ? std::string("Composite fixture accepted") : added.error().message()));
+    REQUIRE(added);
+    const auto before = SketchTopology::migrate_legacy(composite).value();
+    auto converted =
+        composite.set_construction({}, {ProfileId("group"), ProfileId("composite")}, true);
+    REQUIRE(converted);
+    CHECK(converted.value() == 7);
+    CHECK(composite.profile_has_construction(ProfileId("composite")));
+    CHECK(composite.find_composite_closed_profile(ProfileId("composite"))->outer_contour() ==
+          outer);
+    CHECK(composite.find_composite_closed_profile(ProfileId("composite"))->inner_contours() ==
+          inner);
+    for (const auto& id : inner.front())
+      CHECK(composite.curve_is_construction(id));
+    REQUIRE(composite.set_construction({}, {ProfileId("composite")}, false));
+    CHECK(SketchTopology::migrate_legacy(composite).value() == before);
+  }
+  SECTION("One construction edge keeps the existing shared point ids") {
+    REQUIRE(sketch.set_construction({SketchEntityId("arc.top")}, {}, true));
+    auto mixed = SketchTopology::migrate_legacy(sketch);
+    REQUIRE(mixed);
+    CHECK(mixed.value().find_entity("entity/arc.top")->points() ==
+          original.find_entity("entity/arc.top")->points());
+    CHECK(sketch.profile_has_construction(ProfileId("group")));
+    REQUIRE(sketch.set_construction({SketchEntityId("arc.top")}, {}, false));
+    CHECK(SketchTopology::migrate_legacy(sketch).value() == original);
+  }
+  SECTION("An invalid mixed target leaves the whole selection unchanged") {
+    REQUIRE_FALSE(
+        sketch.set_construction({SketchEntityId("arc.top"), SketchEntityId("missing")}, {}, true));
+    CHECK(SketchTopology::migrate_legacy(sketch).value() == original);
+  }
+}
+
+TEST_CASE("Projected curves cannot change role even in a mixed selection",
+          "[core][sketch][construction-conversion]") {
+  auto sketch = make_arc_sketch();
+  REQUIRE(sketch.add_reference(ProjectedSketchLine::create_from_construction_line(
+                                   SketchEntityId("reference"), ConstructionLineId("source"))
+                                   .value()));
+  const auto original = SketchTopology::migrate_legacy(sketch).value();
+  auto converted =
+      sketch.set_construction({SketchEntityId("arc.top"), SketchEntityId("reference")}, {}, true);
+  REQUIRE_FALSE(converted);
+  CHECK(converted.error().message().find("read-only") != std::string::npos);
+  CHECK(converted.error().message().find("detach") != std::string::npos);
+  CHECK(SketchTopology::migrate_legacy(sketch).value() == original);
+}
+
+TEST_CASE("Construction roles survive curved transforms copies splits and control edits",
+          "[core][sketch][construction-conversion]") {
+  auto sketch = Sketch::create(SketchId("aux"), "Auxiliary", DatumPlaneId("datum.xy")).value();
+  REQUIRE(sketch.add_entity(
+      ArcSegment::create_three_point(SketchEntityId("arc"), {0, 0}, {5, 5}, {10, 0})
+          .value()
+          .with_construction(true)));
+  const auto spline = SplineSegment::create_cubic_bezier(SketchEntityId("spline"), {20, 0}, {22, 5},
+                                                         {28, 5}, {30, 0}, {1, .8, .8, 1})
+                          .value()
+                          .with_construction(true);
+  REQUIRE(sketch.add_entity(spline));
+  SECTION("Move and copy retain roles and rational weights") {
+    auto moved =
+        SketchTransformPatternService::move(sketch, {SketchEntityId("arc"), spline.id()}, {5, 8});
+    REQUIRE(moved);
+    CHECK(moved.value().sketch.find_arc_segment(SketchEntityId("arc"))->construction());
+    CHECK(moved.value().sketch.find_spline_segment(spline.id())->construction());
+    CHECK(moved.value().sketch.find_spline_segment(spline.id())->weights() == spline.weights());
+    auto copied = SketchTransformPatternService::copy(
+        moved.value().sketch, {SketchEntityId("arc"), spline.id()}, {40, 0});
+    REQUIRE(copied);
+    REQUIRE(copied.value().created_entities.size() == 2);
+    for (const auto& id : copied.value().created_entities)
+      CHECK(copied.value().sketch.curve_is_construction(id));
+  }
+  SECTION("Spline split keeps both exact auxiliary subcurves") {
+    auto split = SketchModifyService::split(sketch, spline.id(), spline.curve().point(.4));
+    REQUIRE(split);
+    REQUIRE(split.value().sketch.spline_segments().size() == 2);
+    for (const auto& segment : split.value().sketch.spline_segments())
+      CHECK(segment.construction());
+  }
+  SECTION("A rational control edit does not reset the role") {
+    auto edit = SketchSplineEditModel::from_segments(sketch, {spline.id()});
+    REQUIRE(edit);
+    REQUIRE(edit.value().move_control_point(0, 1, {22, 8}));
+    const auto preview = edit.value().preview();
+    REQUIRE(preview.segments.size() == 1);
+    CHECK(preview.segments.front().construction());
+    CHECK(preview.segments.front().weights() == spline.weights());
+    CHECK(preview.segments.front().control1() == Point2{22, 8});
+  }
 }

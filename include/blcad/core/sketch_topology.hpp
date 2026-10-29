@@ -351,18 +351,33 @@ public:
                             {},
                             {.construction = line.construction()}});
     for (const auto& arc : sketch.arc_segments())
-      candidates.push_back({entity_id(arc.id()), SketchTopologyEntityKind::Arc,
-                            {{"start", arc.start()}, {"mid", arc.mid()}, {"end", arc.end()}}, {}, {}});
+      candidates.push_back({entity_id(arc.id()),
+                            SketchTopologyEntityKind::Arc,
+                            {{"start", arc.start()}, {"mid", arc.mid()}, {"end", arc.end()}},
+                            {},
+                            {.construction = arc.construction()}});
     for (const auto& spline : sketch.spline_segments())
-      candidates.push_back({entity_id(spline.id()), SketchTopologyEntityKind::Spline,
-                            {{"start", spline.start()}, {"control1", spline.control1()},
-                             {"control2", spline.control2()}, {"end", spline.end()}}, {}, {}, spline.weights()});
+      candidates.push_back({entity_id(spline.id()),
+                            SketchTopologyEntityKind::Spline,
+                            {{"start", spline.start()},
+                             {"control1", spline.control1()},
+                             {"control2", spline.control2()},
+                             {"end", spline.end()}},
+                            {},
+                            {.construction = spline.construction()},
+                            spline.weights()});
     for (const auto& profile : sketch.rectangle_profiles())
-      candidates.push_back({profile_id(profile.id()), SketchTopologyEntityKind::RectangleProfile,
-                            {{"center", profile.center()}}, {}, {}});
+      candidates.push_back({profile_id(profile.id()),
+                            SketchTopologyEntityKind::RectangleProfile,
+                            {{"center", profile.center()}},
+                            {},
+                            {.construction = profile.construction()}});
     for (const auto& profile : sketch.circle_profiles())
-      candidates.push_back({profile_id(profile.id()), SketchTopologyEntityKind::CircleProfile,
-                            {{"center", profile.center()}}, {}, {}});
+      candidates.push_back({profile_id(profile.id()),
+                            SketchTopologyEntityKind::CircleProfile,
+                            {{"center", profile.center()}},
+                            {},
+                            {.construction = profile.construction()}});
     for (const auto& profile : sketch.closed_profiles()) {
       std::vector<std::string> ordered_dependencies;
       for (const auto& line : profile.line_segments()) ordered_dependencies.push_back(entity_id(line));
@@ -534,12 +549,22 @@ public:
       const auto first = usage_indices.find(first_id);
       const auto second = usage_indices.find(second_id);
       if (first == usage_indices.end() || second == usage_indices.end()) continue;
-      if (usages[first->second].flags != usages[second->second].flags ||
+      if (usages[first->second].flags.reference != usages[second->second].flags.reference ||
           !same_position(usages[first->second].position, usages[second->second].position))
         return Result<SketchTopology>::failure(Error::validation(
             sketch.id().value(),
             "legacy profile connectivity does not resolve to coincident compatible endpoint usages"));
       unite(first->second, second->second);
+    }
+
+    // A point shared by geometry and construction remains the same point.
+    // Construction is an entity role; a shared point is auxiliary only when
+    // all its owners are auxiliary. Reference/editable sharing still fails.
+    std::vector<SketchTopologyFlags> merged_flags(usages.size(), {.construction = true});
+    for (std::size_t index = 0; index < usages.size(); ++index) {
+      auto& flags = merged_flags[root(index)];
+      flags.construction = flags.construction && usages[index].flags.construction;
+      flags.reference = usages[index].flags.reference;
     }
 
     std::vector<std::string> canonical_ids(usages.size());
@@ -560,7 +585,7 @@ public:
       point_by_usage.emplace(usages[index].proposed_id, SketchPointId(canonical));
       if (!point_created[canonical]) {
         auto point = SketchTopologyPoint::create(SketchPointId(canonical), usages[index].position,
-                                                 usages[index].flags);
+                                                 merged_flags[root(index)]);
         if (point.has_error()) return Result<SketchTopology>::failure(point.error());
         points.push_back(std::move(point.value()));
         point_created[canonical] = true;

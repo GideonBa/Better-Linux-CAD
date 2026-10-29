@@ -1,4 +1,6 @@
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/sketch_constraint_authoring_json.hpp"
+#include "blcad/core/sketch_dimension_authoring_json.hpp"
 #include "blcad/geometry/sketch_region_finder.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/gui_interactive_profile_materialization.hpp"
@@ -26,6 +28,8 @@
 #include <QTemporaryDir>
 #include <QTimer>
 #include <QToolButton>
+#include <QTreeWidget>
+#include <QTreeWidgetItemIterator>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <numbers>
@@ -1439,4 +1443,301 @@ TEST_CASE("Copy preview reports dimensions that remain on the original geometry 
   action->trigger();
   REQUIRE(visited);
   CHECK(json(window) == before);
+}
+
+TEST_CASE(
+    "Construction action converts generated groups with unchanged intent and one history entry",
+    "[gui][construction-conversion][construction-groups]") {
+  ShellWindow window;
+  enter_empty_spline_sketch(window);
+  const auto sketch_id = *window.active_sketch();
+  auto& tools = window.sketch_tools();
+  auto tool = GuiSketchCreateTool::CornerRectangle;
+  std::vector<Point2> picks{{0, 0}, {40, 30}};
+  SECTION("rectangle") {}
+  SECTION("circle") {
+    tool = GuiSketchCreateTool::CenterRadiusCircle;
+    picks = {{30, 30}, {40, 30}};
+  }
+  SECTION("slot") {
+    tool = GuiSketchCreateTool::CenterSlot;
+    picks = {{0, 0}, {30, 0}, {0, 5}};
+  }
+  SECTION("ellipse") {
+    tool = GuiSketchCreateTool::Ellipse;
+    picks = {{30, 30}, {50, 30}, {30, 40}};
+  }
+  REQUIRE(tools.begin_tool(tool));
+  for (const auto& point : picks)
+    REQUIRE(tools.add_pick(point));
+  tools.cancel_tool();
+  const auto* source = window.session().part_document()->find_sketch(sketch_id);
+  REQUIRE(source->profile_count() == 1);
+  const auto profile = !source->closed_profiles().empty() ? source->closed_profiles().front().id()
+                       : !source->arc_closed_profiles().empty()
+                           ? source->arc_closed_profiles().front().id()
+                           : source->circle_profiles().front().id();
+  const auto original = json(window);
+  const auto constraints = serialize_sketch_constraint_catalog_to_json(
+                               window.session().sketch_constraint_catalog(sketch_id).value())
+                               .value();
+  const auto dimensions = serialize_sketch_dimension_catalog_to_json(
+                              window.session().sketch_dimension_catalog(sketch_id).value())
+                              .value();
+  window.session().selection().clear();
+  REQUIRE(window.session().selection().add(
+      {GuiSelectionKind::SketchEntity, "profile/" + profile.value()}));
+  tools.refresh_enablement();
+  auto* action = window.findChild<QAction*>("sketch.operation.construction");
+  REQUIRE(action);
+  REQUIRE(action->isEnabled());
+  CHECK_FALSE(action->isChecked());
+  action->trigger();
+  const auto converted = json(window);
+  CHECK(converted != original);
+  CHECK(
+      window.session().part_document()->find_sketch(sketch_id)->profile_has_construction(profile));
+  CAPTURE(action->toolTip().toStdString(), window.session().selection().size(),
+          window.active_sketch().has_value());
+  CHECK(action->isChecked());
+  CHECK(serialize_sketch_constraint_catalog_to_json(
+            window.session().sketch_constraint_catalog(sketch_id).value())
+            .value() == constraints);
+  CHECK(serialize_sketch_dimension_catalog_to_json(
+            window.session().sketch_dimension_catalog(sketch_id).value())
+            .value() == dimensions);
+  REQUIRE(tools.convert_construction(true)); // An unchanged role adds no duplicate history entry.
+  CHECK(json(window) == converted);
+  REQUIRE(window.undo());
+  CHECK(json(window) == original);
+  REQUIRE(window.redo());
+  CHECK(json(window) == converted);
+  // Undo may leave the sketch workspace; re-enter it through the persisted browser item.
+  if (!window.active_sketch()) {
+    auto& browser = window.model_browser();
+    for (QTreeWidgetItemIterator it(&browser); *it; ++it)
+      if ((*it)->data(0, Qt::UserRole).toString() == QString::fromStdString(sketch_id.value())) {
+        browser.setCurrentItem(*it);
+        browser.itemDoubleClicked(*it, 0);
+        break;
+      }
+  }
+  window.session().selection().clear();
+  REQUIRE(window.session().selection().add(
+      {GuiSelectionKind::SketchEntity, "profile/" + profile.value()}));
+  tools.refresh_enablement();
+  REQUIRE(tools.convert_construction(false));
+  CHECK(json(window) == original);
+}
+
+TEST_CASE(
+    "Mixed construction conversion retains dimensions and rejects projected selections atomically",
+    "[gui][construction-conversion][construction-selection]") {
+  ShellWindow window;
+  enter(window);
+  const auto sketch = *window.active_sketch();
+  auto& tools = window.sketch_tools();
+  select_line(window);
+  REQUIRE(tools.apply_dimension(SketchDimensionKind::Length, false));
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::CenterRadiusCircle));
+  REQUIRE(tools.add_pick({30, 30}));
+  REQUIRE(tools.add_pick({40, 30}));
+  tools.cancel_tool();
+  const auto circle =
+      window.session().part_document()->find_sketch(sketch)->circle_profiles().front().id();
+  REQUIRE(window.session().commit_part_transaction("Projection source", [](PartDocument& part) {
+    return part.add_construction_line(
+        ConstructionLine::create_explicit(ConstructionLineId("source"), "Source", {0, 20, 0},
+                                          {1, 0, 0})
+            .value());
+  }));
+  GuiSketchOperationRequest project;
+  project.kind = Kind::ProjectLine;
+  project.projected_line = ProjectedSketchLine::create_from_construction_line(
+                               SketchEntityId("reference"), ConstructionLineId("source"))
+                               .value();
+  REQUIRE(tools.apply_operation(project));
+  const auto dimensions = serialize_sketch_dimension_catalog_to_json(
+                              window.session().sketch_dimension_catalog(sketch).value())
+                              .value();
+  window.session().selection().clear();
+  REQUIRE(window.session().selection().add({GuiSelectionKind::SketchEntity, "entity/line"}));
+  REQUIRE(window.session().selection().add(
+      {GuiSelectionKind::SketchEntity, "profile/" + circle.value()}));
+  tools.refresh_enablement();
+  auto* action = window.findChild<QAction*>("sketch.operation.construction");
+  REQUIRE(action);
+  REQUIRE(action->isEnabled());
+  const auto before = json(window);
+  REQUIRE(tools.convert_construction(true));
+  CHECK(window.session()
+            .part_document()
+            ->find_sketch(sketch)
+            ->find_line_segment(SketchEntityId("line"))
+            ->construction());
+  CHECK(window.session()
+            .part_document()
+            ->find_sketch(sketch)
+            ->find_circle_profile(circle)
+            ->construction());
+  CHECK(serialize_sketch_dimension_catalog_to_json(
+            window.session().sketch_dimension_catalog(sketch).value())
+            .value() == dimensions);
+  const auto converted = json(window);
+  REQUIRE(window.undo());
+  CHECK(json(window) == before);
+  REQUIRE(window.redo());
+  CHECK(json(window) == converted);
+  if (!window.active_sketch()) {
+    auto& browser = window.model_browser();
+    for (QTreeWidgetItemIterator it(&browser); *it; ++it)
+      if ((*it)->data(0, Qt::UserRole).toString() == QString::fromStdString(sketch.value())) {
+        browser.itemDoubleClicked(*it, 0);
+        break;
+      }
+  }
+  window.session().selection().clear();
+  REQUIRE(window.session().selection().add({GuiSelectionKind::SketchEntity, "entity/line"}));
+  REQUIRE(window.session().selection().add({GuiSelectionKind::SketchEntity, "entity/reference"}));
+  tools.refresh_enablement();
+  CHECK_FALSE(action->isEnabled());
+  CHECK(action->toolTip().contains("read-only"));
+  CHECK(action->toolTip().contains("detach"));
+  const std::string history(window.session().undo_label());
+  auto rejected = tools.convert_construction(false);
+  REQUIRE_FALSE(rejected);
+  CHECK(rejected.error().message().find("read-only") != std::string::npos);
+  CHECK(json(window) == converted);
+  CHECK(window.session().undo_label() == history);
+}
+
+TEST_CASE("Construction conversion updates implicit holes and rejects invalid downstream profiles "
+          "atomically",
+          "[gui][construction-conversion][construction-downstream]") {
+  ShellWindow window;
+  enter_empty_spline_sketch(window);
+  const auto sketch = *window.active_sketch();
+  auto& tools = window.sketch_tools();
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::CornerRectangle));
+  REQUIRE(tools.add_pick({0, 0}));
+  REQUIRE(tools.add_pick({40, 30}));
+  tools.cancel_tool();
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::CenterRadiusCircle));
+  REQUIRE(tools.add_pick({20, 15}));
+  REQUIRE(tools.add_pick({25, 15}));
+  tools.cancel_tool();
+  const auto outer =
+      window.session().part_document()->find_sketch(sketch)->closed_profiles().front().id();
+  const auto inner =
+      window.session().part_document()->find_sketch(sketch)->circle_profiles().front().id();
+  REQUIRE(window.finish_active_sketch());
+  REQUIRE(window.feature_tools().select_profile(sketch, outer));
+  REQUIRE(window.feature_tools().begin_extrude());
+  REQUIRE(window.feature_tools().set_numeric_value(5));
+  REQUIRE(window.feature_tools().apply());
+  const auto body = window.session().part_document()->bodies().front().id();
+  const auto volume = [&] {
+    return geometry::RectangleExtrusionAdapter{}
+        .summarize(*window.session().part_shape_cache()->find_body_shape(body))
+        .volume_mm3;
+  };
+  const auto initial_volume = volume();
+  const auto enter_existing = [&] {
+    if (window.active_sketch())
+      return;
+    auto& browser = window.model_browser();
+    for (QTreeWidgetItemIterator it(&browser); *it; ++it)
+      if ((*it)->data(0, Qt::UserRole).toString() == QString::fromStdString(sketch.value())) {
+        browser.itemDoubleClicked(*it, 0);
+        break;
+      }
+    REQUIRE(window.active_sketch() == sketch);
+  };
+  enter_existing();
+  window.session().selection().clear();
+  REQUIRE(window.session().selection().add(
+      {GuiSelectionKind::SketchEntity, "profile/" + inner.value()}));
+  REQUIRE(tools.convert_construction(true));
+  CHECK(volume() == Catch::Approx(6000));
+  CHECK(volume() > initial_volume);
+  REQUIRE(window.undo());
+  CHECK(volume() == Catch::Approx(initial_volume));
+  REQUIRE(window.redo());
+  CHECK(volume() == Catch::Approx(6000));
+  enter_existing();
+  window.session().selection().clear();
+  REQUIRE(window.session().selection().add(
+      {GuiSelectionKind::SketchEntity, "profile/" + outer.value()}));
+  const auto before = json(window);
+  const std::string history(window.session().undo_label());
+  auto rejected = tools.convert_construction(true);
+  REQUIRE_FALSE(rejected);
+  CHECK(rejected.error().message().find("Construction") != std::string::npos);
+  CHECK(json(window) == before);
+  CHECK(volume() == Catch::Approx(6000));
+  CHECK(window.session().undo_label() == history);
+  CHECK(window.feature_tools().select_profile(sketch, outer));
+  CHECK_FALSE(window.feature_tools().select_profile(sketch, inner));
+}
+
+TEST_CASE("Unlinked projection inherits the selected curve role across equal profile id text",
+          "[gui][construction-conversion][construction-projection]") {
+  ShellWindow window;
+  enter(window);
+  const auto target = *window.active_sketch();
+  bool arc = false, has_curve = true, curve_construction = false, circle_construction = true;
+  SECTION("Normal spline shadows an auxiliary circle") {}
+  SECTION("Normal arc shadows an auxiliary circle") {
+    arc = true;
+  }
+  SECTION("Auxiliary spline shadows a normal circle") {
+    curve_construction = true;
+    circle_construction = false;
+  }
+  SECTION("An auxiliary circle alone produces auxiliary conic spans") {
+    has_curve = false;
+  }
+  REQUIRE(window.session().commit_part_transaction(
+      "Projection role sources", [&](PartDocument& part) -> Result<std::size_t> {
+        auto added = part.add_parameter(Parameter::create_length(ParameterId("projection.diameter"),
+                                                                 "Projection diameter",
+                                                                 Quantity::length_mm(10).value())
+                                            .value());
+        if (!added)
+          return added;
+        auto source = Sketch::create(SketchId("source.projection"), "Projection source",
+                                     DatumPlaneId("datum.xy"))
+                          .value();
+        if (has_curve) {
+          added = arc ? source.add_entity(ArcSegment::create_three_point(SketchEntityId("shared"),
+                                                                         {20, 0}, {25, 5}, {30, 0})
+                                              .value()
+                                              .with_construction(curve_construction))
+                      : source.add_entity(SplineSegment::create_cubic_bezier(
+                                              SketchEntityId("shared"), {20, 0}, {22, 5}, {28, 5},
+                                              {30, 0}, {1, .8, .8, 1})
+                                              .value()
+                                              .with_construction(curve_construction));
+          if (!added)
+            return added;
+        }
+        added = source.add_profile(
+            CircleProfile::create(ProfileId("shared"), ParameterId("projection.diameter"), {60, 60})
+                .value()
+                .with_construction(circle_construction));
+        if (!added)
+          return added;
+        return part.add_sketch(std::move(source));
+      }));
+  GuiSketchOperationRequest request;
+  request.kind = Kind::ProjectGeometry;
+  request.source_sketch = SketchId("source.projection");
+  request.source_entity = SketchEntityId("shared");
+  REQUIRE(window.sketch_tools().apply_operation(request));
+  const auto* projected = window.session().part_document()->find_sketch(target);
+  REQUIRE_FALSE(projected->spline_segments().empty());
+  for (const auto& spline : projected->spline_segments()) {
+    CHECK(spline.construction() == (has_curve ? curve_construction : circle_construction));
+    CHECK(spline.rational());
+  }
 }

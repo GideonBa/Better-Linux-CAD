@@ -7,6 +7,9 @@
 
 #include <BRepGProp.hxx>
 #include <GProp_GProps.hxx>
+#include "blcad/core/sketch_topology.hpp"
+#include "blcad/core/rectangular_extrude_profile.hpp"
+#include <numbers>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -479,4 +482,94 @@ TEST_CASE("Nested rational spline regions expose the outer material face with an
   REQUIRE(GeometryRecomputeExecutor{}.execute_document(restored.value(), cache));
   CHECK(RectangleExtrusionAdapter{}.summarize(*cache.final_shape()).volume_mm3 ==
         Catch::Approx(material_area * 6).epsilon(1e-8));
+}
+
+TEST_CASE(
+    "Construction curves remain visible while raw and materialized solid boundaries exclude them",
+    "[geometry][sketch-region][construction-conversion]") {
+  auto document = make_additive_region_document();
+  const auto id = SketchId("sketch.region");
+  auto sketch = *document.find_sketch(id);
+  REQUIRE(sketch.add_entity(
+      ArcSegment::create_three_point(SketchEntityId("helper.arc"), {-5, 5}, {10, 15}, {25, 5})
+          .value()));
+  REQUIRE(sketch.add_entity(SplineSegment::create_cubic_bezier(SketchEntityId("helper.spline"),
+                                                               {-5, 4}, {5, 14}, {15, -4}, {25, 6},
+                                                               {1, .8, .8, 1})
+                                .value()));
+  REQUIRE(sketch.set_construction({SketchEntityId("helper.arc"), SketchEntityId("helper.spline")},
+                                  {}, true));
+  REQUIRE(document.update_sketch(sketch));
+  const auto analysis = SketchFinishService::analyze(document, sketch);
+  REQUIRE(analysis);
+  CHECK(analysis.value().diagnostics.empty());
+  REQUIRE(analysis.value().regions.size() == 1);
+  auto cache = ShapeCache::create(ShapeCacheId("construction.cache")).value();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, cache));
+  CHECK(RectangleExtrusionAdapter{}.summarize(*cache.final_shape()).volume_mm3 ==
+        Catch::Approx(1000));
+  auto scene = ViewportSceneBuilder{}.build_part(document, cache);
+  REQUIRE(scene);
+  for (const auto* name : {"helper.arc", "helper.spline"}) {
+    const auto found =
+        std::find_if(scene.value().begin(), scene.value().end(), [&](const auto& item) {
+          return item.semantic_id == "sketch/" + id.value() + "/entity/" + name;
+        });
+    REQUIRE(found != scene.value().end());
+    CHECK(found->line_role == SketchLineRole::Construction);
+  }
+  REQUIRE(SketchRegionFinder{}.materialize_profile(sketch, analysis.value().regions.front()));
+  const auto profile = sketch.closed_profiles().front().id();
+  const auto before = SketchTopology::migrate_legacy(sketch).value();
+  REQUIRE(sketch.set_construction({}, {profile}, true));
+  REQUIRE(document.update_sketch(sketch));
+  auto rejected = GeometryRecomputeExecutor{}.execute_additive_extrude(
+      document, FeatureId("feature.region"), cache);
+  REQUIRE_FALSE(rejected);
+  CHECK(rejected.error().message().find("Construction") != std::string::npos);
+  CHECK(RectangleExtrusionAdapter{}.summarize(*cache.final_shape()).volume_mm3 ==
+        Catch::Approx(1000));
+  REQUIRE(sketch.set_construction({}, {profile}, false));
+  CHECK(SketchTopology::migrate_legacy(sketch).value() == before);
+  REQUIRE(document.update_sketch(sketch));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, cache));
+  CHECK(RectangleExtrusionAdapter{}.summarize(*cache.final_shape()).volume_mm3 ==
+        Catch::Approx(1000));
+}
+
+TEST_CASE(
+    "A construction circle neither cuts an outer profile hole nor becomes an implicit solid input",
+    "[geometry][construction-conversion]") {
+  auto document =
+      PartDocument::create(DocumentId("construction.circle"), "Construction circle").value();
+  REQUIRE(document.add_datum_plane(DatumPlane::xy().value()));
+  for (const auto& parameter :
+       {make_length_parameter("w", "Width", 60), make_length_parameter("h", "Height", 40),
+        make_length_parameter("d", "Diameter", 10), make_length_parameter("depth", "Depth", 5)})
+    REQUIRE(document.add_parameter(parameter));
+  auto sketch = Sketch::create(SketchId("sketch"), "Sketch", DatumPlaneId("datum.xy")).value();
+  REQUIRE(sketch.add_profile(
+      RectangleProfile::create(ProfileId("outer"), ParameterId("w"), ParameterId("h")).value()));
+  REQUIRE(sketch.add_profile(CircleProfile::create(ProfileId("inner"), ParameterId("d")).value()));
+  REQUIRE(sketch.set_construction({}, {ProfileId("inner")}, true));
+  REQUIRE(document.add_sketch(sketch));
+  REQUIRE(document.add_feature(Feature::create_additive_extrude(FeatureId("extrude"), "Extrude",
+                                                                sketch.id(), ParameterId("depth"))
+                                   .value()));
+  auto cache = ShapeCache::create(ShapeCacheId("construction.cache")).value();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, cache));
+  CHECK(RectangleExtrusionAdapter{}.summarize(*cache.final_shape()).volume_mm3 ==
+        Catch::Approx(12000));
+  auto box_roles = resolve_rectangular_extrude_profile(document, document.features().front());
+  REQUIRE(box_roles);
+  CHECK(box_roles.value().width == 60);
+  CHECK(box_roles.value().height == 40);
+  REQUIRE(sketch.set_construction({}, {ProfileId("inner")}, false));
+  REQUIRE(document.update_sketch(sketch));
+  auto explicit_feature = document.features().front().with_profile(ProfileId("outer"));
+  REQUIRE(explicit_feature);
+  REQUIRE(document.update_feature(explicit_feature.value()));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, cache));
+  CHECK(RectangleExtrusionAdapter{}.summarize(*cache.final_shape()).volume_mm3 ==
+        Catch::Approx(12000 - 125 * std::numbers::pi));
 }

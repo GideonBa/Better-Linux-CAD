@@ -386,8 +386,10 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
         if (!curve.IsDone())
           return Result<std::vector<ViewportSceneItem>>::failure(
               scene_error("could not build planar sketch arc presentation"));
-        items.push_back({ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, arc.id()),
-                         wrap(BRepBuilderAPI_MakeEdge(curve.Value()).Shape())});
+        items.push_back(
+            {ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, arc.id()),
+             wrap(BRepBuilderAPI_MakeEdge(curve.Value()).Shape()),
+             arc.construction() ? SketchLineRole::Construction : SketchLineRole::Geometry});
       }
       for (const SplineSegment& spline : sketch.spline_segments()) {
         TColgp_Array1OfPnt poles(1, 4);
@@ -398,8 +400,10 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
         TColStd_Array1OfReal weights(1, 4);
         for (int i = 1; i <= 4; ++i) weights.SetValue(i, spline.weights()[i-1]);
         const Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles, weights);
-        items.push_back({ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, spline.id()),
-                         wrap(BRepBuilderAPI_MakeEdge(curve).Shape())});
+        items.push_back(
+            {ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, spline.id()),
+             wrap(BRepBuilderAPI_MakeEdge(curve).Shape()),
+             spline.construction() ? SketchLineRole::Construction : SketchLineRole::Geometry});
       }
 
       const SketchReferenceProjector projector;
@@ -446,6 +450,14 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
                                              {center.x + half_width, center.y + half_height},
                                              {center.x - half_width, center.y + half_height}}};
         const std::vector<Point2> outer_vertices(corners.begin(), corners.end());
+        if (profile.construction()) {
+          auto wire = make_polygon_wire(outer_vertices, point);
+          if (!wire)
+            return Result<std::vector<ViewportSceneItem>>::failure(wire.error());
+          items.push_back({ViewportSceneKind::SketchEntity, profile_prefix + profile.id().value(),
+                           wrap(wire.value()), SketchLineRole::Construction});
+          continue;
+        }
         auto holes =
             classify_contained_profile_holes(document, sketch, profile.id(), outer_vertices);
         if (holes.has_error())
@@ -463,6 +475,11 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
         auto wire = make_circle_wire(profile.center(), *diameter * 0.5, point);
         if (wire.has_error())
           return Result<std::vector<ViewportSceneItem>>::failure(wire.error());
+        if (profile.construction()) {
+          items.push_back({ViewportSceneKind::SketchEntity, profile_prefix + profile.id().value(),
+                           wrap(wire.value()), SketchLineRole::Construction});
+          continue;
+        }
         BRepBuilderAPI_MakeFace face(wire.value());
         if (!face.IsDone())
           return Result<std::vector<ViewportSceneItem>>::failure(
@@ -541,6 +558,28 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
         auto outer_wire = make_wire(outer);
         if (outer_wire.has_error())
           return Result<std::size_t>::failure(outer_wire.error());
+        if (sketch.profile_has_construction(id)) {
+          const auto auxiliary = [&](const auto& contour) {
+            return std::all_of(contour.begin(), contour.end(), [&](const auto& curve) {
+              return sketch.curve_is_construction(curve);
+            });
+          };
+          if (!auxiliary(outer) || !std::all_of(inner.begin(), inner.end(), auxiliary))
+            return Result<std::size_t>::success(0); // source curves retain their individual roles
+          BRep_Builder builder;
+          TopoDS_Compound wires;
+          builder.MakeCompound(wires);
+          builder.Add(wires, outer_wire.value());
+          for (const auto& contour : inner) {
+            auto wire = make_wire(contour);
+            if (!wire)
+              return Result<std::size_t>::failure(wire.error());
+            builder.Add(wires, wire.value());
+          }
+          items.push_back({ViewportSceneKind::SketchEntity, profile_prefix + id.value(),
+                           wrap(wires), SketchLineRole::Construction});
+          return Result<std::size_t>::success(1);
+        }
         const std::optional<bool> outer_is_counter_clockwise = contour_is_counter_clockwise(outer);
         BRepBuilderAPI_MakeFace face(outer_wire.value());
         for (const auto& contour : inner) {
@@ -586,6 +625,13 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
         return Result<std::size_t>::success(1U + inner.size() + holes.size());
       };
       for (const ClosedProfile& profile : sketch.closed_profiles()) {
+        if (sketch.profile_has_construction(profile.id())) {
+          auto appended = append_curve_profile(profile.id(), profile.line_segments(),
+                                               no_inner_contours, no_profile_holes);
+          if (!appended)
+            return Result<std::vector<ViewportSceneItem>>::failure(appended.error());
+          continue;
+        }
         auto vertices = sketch.closed_profile_vertices(profile);
         if (vertices.has_error())
           return Result<std::vector<ViewportSceneItem>>::failure(vertices.error());
@@ -599,6 +645,13 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
           return Result<std::vector<ViewportSceneItem>>::failure(appended.error());
       }
       for (const ArcClosedProfile& profile : sketch.arc_closed_profiles()) {
+        if (sketch.profile_has_construction(profile.id())) {
+          auto appended = append_curve_profile(profile.id(), profile.curve_segments(),
+                                               no_inner_contours, no_profile_holes);
+          if (!appended)
+            return Result<std::vector<ViewportSceneItem>>::failure(appended.error());
+          continue;
+        }
         auto contour =
             resolve_curved_profile_hole(document, sketch, profile.id(), profile.curve_segments());
         if (!contour)

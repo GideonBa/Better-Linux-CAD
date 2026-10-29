@@ -73,6 +73,10 @@ prepare_interactive_profile(const PartDocument& part, const SketchId& sketch_id,
   if (source == nullptr)
     return Result<std::optional<GuiPendingProfileMaterialization>>::failure(
         Error::validation(sketch_id.value(), "interactive feature Sketch must exist"));
+  if (source->profile_has_construction(profile_id))
+    return Result<std::optional<GuiPendingProfileMaterialization>>::failure(Error::validation(
+        profile_id.value(),
+        "Construction geometry cannot bound a solid profile; convert it back to geometry"));
   if (GuiModelingWorkspace::has_materialized_profile(*source, profile_id))
     return Result<std::optional<GuiPendingProfileMaterialization>>::success(std::nullopt);
 

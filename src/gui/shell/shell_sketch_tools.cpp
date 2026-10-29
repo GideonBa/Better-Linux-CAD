@@ -17,6 +17,7 @@
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QStatusBar>
+#include <QSignalBlocker>
 #include <QTimer>
 
 #include <algorithm>
@@ -966,6 +967,17 @@ void ShellSketchTools::refresh_enablement() {
     }
     action->setEnabled(active && (session_.selection().empty() || compatible));
   }
+  if (construction_action_) {
+    auto candidate = construction_candidate(true);
+    const QSignalBlocker blocker(construction_action_);
+    construction_action_->setEnabled(active && candidate.has_value());
+    construction_action_->setChecked(candidate && candidate.value().second == 0);
+    construction_action_->setToolTip(
+        candidate
+            ? QStringLiteral(
+                  "Convert the whole selection to construction; click again to restore geometry")
+            : QString::fromStdString(candidate.error().message()));
+  }
   if (project_action_) project_action_->setEnabled(active);
   if (break_link_action_) {
     const auto ids = selected_sketch_entity_ids();
@@ -1571,6 +1583,49 @@ std::vector<SketchEntityId> ShellSketchTools::selected_sketch_entity_ids() const
       ids.push_back(std::move(*id));
   }
   return ids;
+}
+
+Result<std::pair<Sketch, std::size_t>>
+ShellSketchTools::construction_candidate(bool construction) const {
+  const auto fail = [](const std::string& id, const std::string& reason) {
+    return Result<std::pair<Sketch, std::size_t>>::failure(Error::validation(id, reason));
+  };
+  if (!sketch_context_ready() ||
+      (workspace_.stage() != GuiSketchInteractionStage::Idle &&
+       workspace_.stage() != GuiSketchInteractionStage::Hover) ||
+      session_.task().active())
+    return fail("sketch.construction",
+                "Finish or cancel the current command before converting sketch geometry");
+  auto topology = active_topology();
+  if (!topology)
+    return Result<std::pair<Sketch, std::size_t>>::failure(topology.error());
+  std::vector<SketchEntityId> curves;
+  std::vector<ProfileId> profiles;
+  for (const auto& selected : session_.selection().entries()) {
+    if (selected.kind != GuiSelectionKind::SketchEntity)
+      return fail(selected.semantic_id, "Select editable sketch curves or their closed profiles");
+    auto target = selection_target(topology.value(), selected.semantic_id);
+    if (!target || target->kind() != SketchConstraintIntentTargetKind::Entity)
+      return fail(selected.semantic_id, "Select the curve rather than its endpoint or annotation");
+    const auto* entity = topology.value().find_entity(target->id());
+    if (!entity)
+      return fail(selected.semantic_id, "Selected sketch geometry no longer exists");
+    if (entity->reference())
+      return fail(
+          entity->id(),
+          "Projected/reference geometry is read-only; detach its reference before converting");
+    if (entity->id().starts_with("entity/"))
+      curves.emplace_back(entity->id().substr(7));
+    else if (entity->id().starts_with("profile/"))
+      profiles.emplace_back(entity->id().substr(8));
+    else
+      return fail(entity->id(), "Select an editable line, arc, circle or spline");
+  }
+  Sketch candidate = *session_.part_document()->find_sketch(*window_.active_sketch());
+  auto changed = candidate.set_construction(std::move(curves), profiles, construction);
+  if (!changed)
+    return Result<std::pair<Sketch, std::size_t>>::failure(changed.error());
+  return Result<std::pair<Sketch, std::size_t>>::success({std::move(candidate), changed.value()});
 }
 
 Result<std::vector<SketchEntityId>> ShellSketchTools::selected_operation_entities() const {
