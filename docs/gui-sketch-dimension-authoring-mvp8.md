@@ -500,3 +500,7 @@ exact history and reopen at 100%/150%; the existing edit/delete/overlap suite re
 Manual label placement can still create overlaps; the existing selected-badge priority and
 selection cycling resolve those stacks. No automatic label-collision solver is introduced.
 Full verification commands and exact results are recorded in `docs/development-setup.md`.
+
+Delivery: [PR #129](https://github.com/GideonBa/Better-Linux-CAD/pull/129), implementation
+commit `8dd28dc`. The delivery-link commit changes only Markdown and preserves the verified
+runtime fingerprints.

@@ -1533,8 +1533,9 @@ Selected editor conventions and the official DIN EN ISO 129-1:2022-02 metadata/p
 review are documented in `docs/gui-sketch-dimension-authoring-mvp8.md`. Full DIN/ISO conformity
 requires a separate review of the complete applicable text and is not claimed here. Manual label
 placement retains existing overlap cycling; no automatic caption-collision solver is introduced.
-Merge the single issue PR and verify main before starting Block 138. No numbered implementation
-block is advanced by this fix.
+Delivery: [PR #129](https://github.com/GideonBa/Better-Linux-CAD/pull/129), verified implementation
+commit `8dd28dc`. Merge this single PR and verify main before starting Block 138. No numbered
+implementation block is advanced by this fix.
 
 After all open issues are complete and merged, execute **Blocks 138 → 139 → 140 → 141 → 142 →
 143**, each with the architecture boundaries, GUI access and acceptance gates in

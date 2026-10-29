@@ -2112,3 +2112,7 @@ skips / 81,956 assertions** (`/tmp/blcad-issue106-gui-full-final.log`). The fina
 runtime manifest remains unchanged after all completed gates. The platform skips are
 reported explicitly; affected native dimension/Sketch/desktop/viewer cases were exercised
 as listed above. No numbered implementation block is advanced by this issue.
+
+Delivery: [PR #129](https://github.com/GideonBa/Better-Linux-CAD/pull/129), implementation
+commit `8dd28dc`. The delivery-link commit changes only Markdown and preserves the verified
+runtime fingerprints.
