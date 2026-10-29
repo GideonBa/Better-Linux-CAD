@@ -4,6 +4,7 @@
 #include "blcad/geometry/step_import_reader.hpp"
 #include "blcad/geometry/step_import_topology.hpp"
 #include "blcad/geometry/step_reference_commands.hpp"
+#include "blcad/geometry/step_structured_import_commands.hpp"
 #include "blcad/gui/gui_document_session.hpp"
 #include <variant>
 
@@ -69,6 +70,23 @@ struct GuiStepReferencePreview {
   std::vector<geometry::GeometryShape> preview_shapes;
 };
 
+struct GuiStructuredStepImportRequest {
+  StepImportSourceId source;
+  DocumentId new_project;
+  std::string name;
+};
+
+// A structured import always creates a new Project file. The current registry
+// document and its history remain unchanged, even when it is itself a Project.
+struct GuiStructuredStepImportPreview {
+  GuiStructuredStepImportRequest request;
+  std::filesystem::path document_path;
+  std::string document_json;
+  StepImportSource source;
+  geometry::StepStructuredImportCandidate candidate;
+  std::vector<geometry::GeometryShape> preview_shapes;
+};
+
 class GuiStepImportWorkbench {
 public:
   [[nodiscard]] Result<GuiStepImportPreview>
@@ -109,6 +127,14 @@ public:
   [[nodiscard]] Result<std::size_t>
   save_editable_copy(const GuiDocumentSession&, const GuiStepReferencePreview&,
                      const std::filesystem::path& destination) const;
+  [[nodiscard]] Result<GuiStructuredStepImportPreview>
+  prepare_structured_project(const GuiDocumentSession&, GuiStructuredStepImportRequest) const;
+  [[nodiscard]] Result<std::size_t>
+  validate_structured_project(const GuiDocumentSession&,
+                              const GuiStructuredStepImportPreview&) const;
+  [[nodiscard]] Result<std::size_t>
+  save_structured_project_copy(const GuiDocumentSession&, const GuiStructuredStepImportPreview&,
+                               const std::filesystem::path& destination) const;
 };
 
 // Source protection shared by document saving and export. Existing hardlinks

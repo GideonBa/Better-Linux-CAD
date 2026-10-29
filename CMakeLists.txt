@@ -103,6 +103,7 @@ add_library(
   src/core/step_import_freshness.cpp
   src/core/imported_topology.cpp
   src/core/imported_part.cpp
+  src/core/structured_step_import.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
 
@@ -226,6 +227,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/reference_part_geometry.cpp
     src/geometry/step_reference_commands.cpp
     src/geometry/step_editable_commands.cpp
+    src/geometry/step_structured_import_commands.cpp
     src/geometry/workplane_resolver.cpp
   )
   add_library(BLCAD::geometry ALIAS blcad_geometry)
@@ -420,6 +422,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/imported_topology_tests.cpp
     tests/core/step_reference_part_tests.cpp
     tests/core/imported_body_feature_tests.cpp
+    tests/core/structured_step_import_tests.cpp
     tests/core/assembly_angle_constraint_tests.cpp
     tests/core/assembly_constraint_graph_tests.cpp
     tests/core/assembly_constraint_tests.cpp
@@ -625,6 +628,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_step_reference_part_tests.cpp
       tests/geometry/step_reference_commands_tests.cpp
       tests/geometry/step_editable_commands_tests.cpp
+      tests/geometry/structured_step_import_tests.cpp
       tests/geometry/imported_body_recompute_tests.cpp
       tests/geometry/imported_body_downstream_feature_tests.cpp
       tests/geometry/workplane_resolver_tests.cpp
@@ -660,6 +664,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_step_import_workbench_tests.cpp
       tests/gui/gui_imported_body_preview_tests.cpp
       tests/gui/gui_shell_step_import_tests.cpp
+      tests/gui/gui_shell_step_structured_import_tests.cpp
       tests/gui/gui_document_browser_tests.cpp
       tests/gui/gui_occt_viewport_tests.cpp
       tests/gui/gui_part_foundation_workbench_tests.cpp

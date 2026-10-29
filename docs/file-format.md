@@ -1138,15 +1138,30 @@ and current-result edge producer validation recognize a real imported base throu
 Body authority. The immutable base cache, transformed recovery witnesses and current topology
 handles remain runtime-only.
 
-## Remaining STEP import persistence — Blocks 142–143
+## Structured STEP Project persistence — Block 142
 
-Planned persistent import intent includes:
+Structured import uses the existing Project envelope, AssemblyDocument member/occurrence records
+and imported Part payloads. One synthetic BLCAD root owns the source's explicit root occurrences;
+every imported assembly definition remains one shared child AssemblyDocument and every part
+remains one shared imported PartDocument. Direct Component/Subassembly transforms retain placement
+without flattening. Repeated occurrences have distinct BLCAD instance IDs, including identical
+placements. The source's supported product/occurrence names become normal BLCAD names.
 
-```text
-structured foreign assembly definition/occurrence import
-```
+The Project owns one exact source registry copy; each Part owns the same source intent and its own
+product topology catalog and ordered output mapping. Reference/EditableBody mode comes from the
+explicit selected source. No additional structured-import JSON field or foreign reader identity is
+introduced. Deterministically generated BLCAD document/catalog/body/instance identities become the
+persistent authority, independently of runtime STEP/XDE graph keys and indices.
 
-Planned persistence must not include:
+Initial-only candidate validation requires complete reachable definitions, exact member/occurrence
+ownership, fresh source/catalog/base mappings and no inferred parameters, constraints, joints or
+grounding/suppression intent. Post-import authoring and loading follow existing Project/Part
+contracts. Imported structure and placements are initial Core intent: refreshing source geometry
+does not silently replace hierarchy, names or authored placements. Reimporting creates a distinct
+Project when the user wants a changed foreign structure. Numbered completion remains in
+`docs/mvp-plan.md`.
+
+Remaining integration acceptance is Block 143. Persistent import data must not include:
 
 ```text
 STEP file bytes

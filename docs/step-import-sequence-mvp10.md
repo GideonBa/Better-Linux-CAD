@@ -1,8 +1,8 @@
 # STEP Import Sequence MVP-10
 
-Status: Blocks 137–141 complete; Blocks 142–143 planned. Block 141 is accepted on 2026-10-29;
-its PR must merge and main be verified before Block 142 starts. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
-`docs/gui-shell-reset-sequence-mvp9r.md`); `docs/mvp-plan.md` is the status authority. An earlier
+Status: Blocks 137–142 complete; Block 143 planned. Block 142 is accepted on 2026-10-29;
+its PR must merge and main be verified before Block 143 starts. The sequence follows GUI Shell Reset MVP-9R
+(Blocks 132–136, `docs/gui-shell-reset-sequence-mvp9r.md`); `docs/mvp-plan.md` is the status authority. An earlier
 revision numbered these blocks 132–138, before MVP-9R took that range; only the numbering moved,
 never the content or the ordering.
 
@@ -670,9 +670,16 @@ Focused tags:
 Delivery: [PR #133](https://github.com/GideonBa/Better-Linux-CAD/pull/133), verified implementation
 commit `c4fc431`. Runtime fingerprints remain unchanged; this PR must merge before Block 142 starts.
 
+PR #133 merged as `525c98f`; main exactly matches tested head `2db9891` and all **970** runtime
+fingerprints. Fresh GitHub searches find no open issues or PRs before Block 142 begins.
+
 ## Block 142 — Structured STEP assembly import
 
 Primary boundary: foreign product structure to BLCAD Project hierarchy.
+
+Status: complete and accepted on 2026-10-29, on `feat/structured-step-assembly-import` from verified
+main `525c98f`. Its protected PR must merge before Block 143 starts. Numbered completion advances
+through Block 142 only.
 
 Import an XDE/STEP product graph into:
 
@@ -688,6 +695,24 @@ Repeated STEP product definitions remain shared definitions with distinct occurr
 generated ids, and collision handling are deterministic. Cycles, malformed product graphs, missing
 definitions, invalid transforms, and duplicate generated identities fail closed.
 
+The implementation uses one explicit synthetic BLCAD root. Every foreign assembly definition
+becomes a child AssemblyDocument; all foreign root placements remain actual occurrences beneath
+the synthetic root. Multiple roots and part-only STEP files therefore retain their exact direct
+transforms without flattening. Identical repeated occurrences retain multiplicity with distinct
+BLCAD instance IDs. Part/Body definitions must recover uniquely. Equal-geometry Assembly products
+remain distinct and use metadata names plus rooted incoming occurrence contexts for deterministic
+ordering; unresolved ties fail closed. No geometric deduplication replaces foreign definitions.
+
+The initial-only Core import-candidate validator rejects orphan/missing definitions, duplicate
+identities, inconsistent memberships, cycles and authored relationships/parameters in a fresh
+candidate. Later authoring/opening uses ordinary Project validation. Part-owned source catalogs and
+one exact Project source registry copy use existing JSON payloads. Geometry reads its own verified
+snapshot, converts each rigid direct matrix with a checked roundtrip, and validates sources again
+before publication. A pre-transfer check rejects missing/cyclic STEP usage relationships and bounds
+the complete DAG path depth before XDE transfer. The Sources task appends a separate
+structured-import operation and saves a new same-root Project copy through protected exclusive
+publication; the original session is retained.
+
 The user chooses Reference or EditableBody for imported part definitions. Structured import creates
 no inferred assembly constraints or joints; imported occurrence transforms are initial placement
 only. BLCAD relationships and joints may be authored afterward using Block-139 semantic imported
@@ -698,11 +723,31 @@ Focused tags:
 ```text
 [core][structured-step-import]
 [geometry][structured-step-import]
+[integration][step-structured-import]
+[native-step-structured-import]
 ```
+
+Acceptance: five targets build with **507** valid nonempty dependency records. Focused Core
+**7 / 1,651**, Geometry **10 / 1,313**, GUI **7 cases — 6 passed, 1 native-only skip / 1,590
+assertions** pass. Full Core **596 / 22,501**, Geometry **560 / 43,872**, GUI **647 cases —
+614 passed, 33 native-only skips / 85,200 assertions** pass. Native 100% **11 / 5,238** and 150%
+**1 / 1,414** pass without skips; captures were reviewed at both scales. Both modes retain all
+five posed leaves and actual STEP product/occurrence names, save/open a distinct protected Project,
+and reject modal and consuming-session source changes without altering original Core intent/history.
+Legacy CLI writes **19,170 bytes**. All gates use the final **978-file** runtime freeze
+`a39896f9dac3f7bb6ecbcdfcb8bf61a7d8007bea99ac042e4ed5b36c70c980c0`; exact commands and final
+startup/inventory evidence are in `docs/development-setup.md`.
+
+Delivery: [PR #134](https://github.com/GideonBa/Better-Linux-CAD/pull/134), verified implementation
+commit `dbe6560`. Runtime fingerprints remain unchanged; this PR must merge before Block 143 starts.
 
 ## Block 143 — Integrated STEP import acceptance and application workflows
 
 Primary boundary: end-to-end import proof and application commands.
+
+Status: planned. Implementation begins only after the accepted Block-142 PR merges and main is
+verified against its tested tree. Existing shared commands/tasks provide the application actions;
+this block closes their integrated proof and any defects that proof exposes.
 
 Add shared commands/APIs and matching GUI tasks for:
 

@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 141
-current_block: 142
-current_boundary: Structured STEP assembly import (planned; starts after Block 141 merge)
-current_tag: "[core][structured-step-import]"
+implemented_through: Block 142
+current_block: 143
+current_boundary: Integrated STEP import acceptance (planned; starts after Block 142 merge)
+current_tag: "[integration][step-import-mvp]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -19,7 +19,7 @@ phase_status:
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 implemented; MVP complete"
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
-  mvp_10: "STEP Import — Blocks 137–141 implemented; Blocks 142–143 planned"
+  mvp_10: "STEP Import — Blocks 137–142 implemented; Block 143 planned"
 ---
 
 # MVP Plan
@@ -31,10 +31,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 141
-current block        Block 142 (planned; starts after Block 141 merge)
+implemented through  Block 142
+current block        Block 143 (planned; starts after Block 142 merge)
 current phase        STEP Import MVP-10
-current boundary     Structured STEP assembly import (planned)
+current boundary     Integrated STEP import acceptance (planned)
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
@@ -63,7 +63,10 @@ on 2026-10-29: immutable Reference Parts support shared/nested Assembly occurren
 constraints and motion, analysis/export, explicit shared-source refresh and conversion to a new
 Editable Part. Block 141 is complete on 2026-10-29: direct EditableBody creation, immutable ordered
 base outputs, incremental downstream history, imported face/edge authoring and strict full modeled
-refresh are accepted. Its PR must merge before Block 142 starts; Blocks 142–143 remain planned.
+refresh are accepted. Block 142 is complete on 2026-10-29: structured STEP import preserves shared
+definitions, exact direct occurrences and supported names beneath an explicit synthetic root, using
+the existing Reference/EditableBody and Project JSON contracts. Its PR must merge before Block 143
+starts; Block 143 remains planned.
 
 ## Phase map
 
@@ -78,7 +81,7 @@ MVP-7   GUI Feature Validation                        Blocks 95–105 implemente
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
 MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 implemented
 MVP-9R  GUI Shell Reset                                 Blocks 132–136 implemented
-MVP-10  STEP Import            Blocks 137–141 implemented; Blocks 142–143 planned
+MVP-10  STEP Import            Blocks 137–142 implemented; Block 143 planned
 ```
 
 Canonical phase sequences:
@@ -1550,8 +1553,7 @@ GitHub search finds no open issues or PRs. No numbered implementation block is a
 With the issue queue complete and merged, execute **Blocks 138 → 139 → 140 → 141 → 142 →
 143**, each with the architecture boundaries, GUI access and acceptance gates in
 `docs/step-import-sequence-mvp10.md`. This queue is a plan, not evidence that any later block is
-complete; Blocks 137–141 are complete and Blocks 142–143 remain planned. The Block-141 PR must
-merge before Block 142 starts.
+complete; Blocks 137–142 are complete and Block 143 remains planned until the Block-142 merge.
 
 ## Implemented Block 138 — STEP/XDE reader and geometry inspection (2026-10-29)
 
@@ -1661,20 +1663,51 @@ Exact commands and final inventory evidence live in `docs/development-setup.md`.
 Delivery: [PR #133](https://github.com/GideonBa/Better-Linux-CAD/pull/133), verified implementation
 commit `c4fc431`. Runtime fingerprints remain unchanged; this PR must merge before Block 142 starts.
 
-## Current numbered technical step — Block 142 (planned)
+PR #133 merged as `525c98f`; main exactly matches tested head `2db9891` and all **970** runtime
+fingerprints. Fresh GitHub searches find no open issues or PRs before Block 142 begins.
 
-Block 141 implementation and acceptance are complete; PR #133 is the pending protected merge. Block 142 must not start until that PR is merged and main verified. Block 142 will
-import the verified product graph into shared Part/Assembly definitions and exact occurrences;
-Blocks 142–143 remain planned. Exact boundaries and focused tags remain in
-`docs/step-import-sequence-mvp10.md`.
+## Implemented Block 142 — Structured STEP assembly import (2026-10-29)
+
+Branch `feat/structured-step-assembly-import` starts from verified main `525c98f` after PR #133.
+Creates one shared imported Part/Assembly per unique product definition, exact direct occurrences
+beneath an explicit synthetic BLCAD root, deterministic generated identities and names, and strict
+candidate validation. The existing Sources task creates a distinct protected Project copy using
+explicit Reference/EditableBody source mode and the shared headless command. No new JSON payload
+or inferred assembly constraints/joints are introduced. Malformed usage endpoints/cycles/depth,
+ambiguous Part/Body recovery and unresolved Assembly ordering fail closed. Equal-geometry Assembly
+products remain distinct and receive deterministic IDs from supported metadata and rooted context.
+Source geometry refresh retains ordinary authored structure and placements.
+
+All five targets build; all **507** Ninja dependency records are valid and nonempty. Focused Core
+**7 / 1,651**, Geometry **10 / 1,313**, and GUI **7 cases — 6 passed, 1 native-only skip / 1,590
+assertions** pass. Full Core **596 / 22,501**, Geometry **560 / 43,872**, and GUI **647 cases —
+614 passed, 33 native-only skips / 85,200 assertions** pass. Native 100% **11 / 5,238** and 150%
+**1 / 1,414** pass without skips. Native input proves both modes, all five posed leaves, protected
+copy/open, unchanged original session, modal-source races and stale consuming geometry clearing.
+Reviewed captures show the hierarchy and posed preview at both scales. Legacy CLI writes
+**19,170 bytes**. Final runtime freeze: **978 files**,
+`a39896f9dac3f7bb6ecbcdfcb8bf61a7d8007bea99ac042e4ed5b36c70c980c0`.
+Separate native startup reaches intentional **124**; final Shell inventory passes **3 / 313**.
+Exact commands and final inventory/startup evidence live in `docs/development-setup.md`.
+
+Delivery: [PR #134](https://github.com/GideonBa/Better-Linux-CAD/pull/134), verified implementation
+commit `dbe6560`. Runtime fingerprints remain unchanged; this PR must merge before Block 143 starts.
+
+## Current numbered technical step — Block 143 (planned)
+
+Block 142 implementation and acceptance are complete; its PR must merge and main be verified
+before Block 143 starts. Block 143 adds continuous import/relationship/motion/analysis/refresh/edit/
+re-export acceptance and exact GUI/headless equivalence using the shared commands already delivered.
+It must prove atomic failure and immutable source assets across complete workflows. Boundaries and
+focused tags remain in `docs/step-import-sequence-mvp10.md`.
 
 ## Later phases
 
 Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R
-is complete through Block 136. STEP Import MVP-10 is complete through Block 141, including source
+is complete through Block 136. STEP Import MVP-10 is complete through Block 142, including source
 management, geometry inspection, semantic topology/recovery, immutable Reference Parts in
-assemblies and EditableBody downstream modeling. Blocks 142–143 remain planned in
-`docs/step-import-sequence-mvp10.md`.
+assemblies, EditableBody downstream modeling and structured STEP Projects. Block 143 remains
+planned in `docs/step-import-sequence-mvp10.md`.
 
 
 Issue #113 follow-up (2026-10-28) rejects ineffective/full-target Cuts with distinct correction
