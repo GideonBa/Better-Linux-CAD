@@ -12,6 +12,10 @@
 #include "blcad/geometry/assembly_joint_motion_solver.hpp"
 #include "blcad/geometry/assembly_revolute_sweep_analyzer.hpp"
 #include "blcad/geometry/assembly_rigid_body_solver.hpp"
+#include "blcad/geometry/assembly_step_exporter.hpp"
+#include "blcad/geometry/assembly_structured_step_exporter.hpp"
+#include "blcad/geometry/occt_shape_view.hpp"
+#include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/step_exporter.hpp"
 #include "blcad/geometry/step_import_reader.hpp"
 #include "blcad/geometry/step_import_topology.hpp"
@@ -19,13 +23,39 @@
 #include "blcad/geometry/step_reference_commands.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 
+#include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
+#include <BRepGProp.hxx>
+#include <BRepPrimAPI_MakeBox.hxx>
+#include <BRep_Builder.hxx>
+#include <Bnd_Box.hxx>
+#include <GProp_GProps.hxx>
+#include <IFSelect_ReturnStatus.hxx>
+#include <Interface_Static.hxx>
+#include <STEPCAFControl_Controller.hxx>
+#include <STEPCAFControl_Writer.hxx>
+#include <TCollection_ExtendedString.hxx>
+#include <TDataStd_Name.hxx>
+#include <TDocStd_Document.hxx>
+#include <TopExp.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
+#include <TopoDS_Compound.hxx>
+#include <UnitsMethods_LengthUnit.hxx>
+#include <XCAFDoc_DocumentTool.hxx>
+#include <XCAFDoc_ShapeTool.hxx>
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <nlohmann/json.hpp>
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <fstream>
 #include <iterator>
+#include <limits>
+#include <set>
 #include <unistd.h>
 
 using namespace blcad;
@@ -91,13 +121,40 @@ Point3 world_point(const Project& project, const char* component,
                                                               local);
 }
 
+constexpr auto supplier_literal_name = "Supplier product_definition TDF_Label TopoDS_Shape #42";
+
+std::string file_bytes(const std::filesystem::path& path) {
+  std::ifstream input(path, std::ios::binary);
+  REQUIRE(input.good());
+  return {std::istreambuf_iterator<char>(input), {}};
+}
+
+void write_supplier_shape(const std::filesystem::path& path, const TopoDS_Shape& shape,
+                          const char* name = "Revised supplier") {
+  Handle(TDocStd_Document) document = new TDocStd_Document("BinXCAF");
+  XCAFDoc_DocumentTool::Set(document->Main());
+  XCAFDoc_DocumentTool::SetLengthUnit(document, 1, UnitsMethods_LengthUnit_Millimeter);
+  const auto tool = XCAFDoc_DocumentTool::ShapeTool(document->Main());
+  const auto product = tool->AddShape(shape, false, false);
+  REQUIRE(!product.IsNull());
+  TDataStd_Name::Set(product, TCollection_ExtendedString(name, true));
+  STEPCAFControl_Controller::Init();
+  const std::string previous_unit = Interface_Static::CVal("write.step.unit");
+  REQUIRE(Interface_Static::SetCVal("write.step.unit", "MM"));
+  STEPCAFControl_Writer writer;
+  const bool transferred = writer.Transfer(document, STEPControl_AsIs);
+  Interface_Static::SetCVal("write.step.unit", previous_unit.c_str());
+  REQUIRE(transferred);
+  REQUIRE(writer.Write(path.c_str()) == IFSelect_RetDone);
+}
+
 struct Fixture {
   std::filesystem::path root;
   StepImportSource source;
   ImportedTopologyCatalog catalog;
   PartDocument part;
-  Fixture()
-      : root(directory()), source(write_source()), catalog(capture()),
+  explicit Fixture(bool named_source = false)
+      : root(directory()), source(write_source(named_source)), catalog(capture()),
         part(value(StepReferenceCommands{}.create_definition(
             source, catalog, DocumentId("part.reference"), "Shared Reference", root))) {}
   ~Fixture() {
@@ -112,11 +169,16 @@ struct Fixture {
     REQUIRE(std::filesystem::create_directories(path));
     return path;
   }
-  StepImportSource write_source() const {
+  StepImportSource write_source(bool named_source) const {
     auto shape = value(RectangleExtrusionAdapter{}.make_extruded_rectangle(
         value(Quantity::length_mm(20)), value(Quantity::length_mm(10)),
         value(Quantity::length_mm(5))));
-    REQUIRE(StepExporter{}.write_step(shape, (root / "supplier.step").string()));
+    if (named_source) {
+      const auto* topology = OcctShapeView::get(shape);
+      REQUIRE(topology);
+      write_supplier_shape(root / "supplier.step", *topology, supplier_literal_name);
+    } else
+      REQUIRE(StepExporter{}.write_step(shape, (root / "supplier.step").string()));
     auto report = value(inspect_step_import_asset(root, "supplier.step"));
     REQUIRE(report.observed_sha256_digest());
     return value(StepImportSource::create(StepImportSourceId("source.supplier"), "Supplier",
@@ -230,6 +292,175 @@ AssemblyCrossHierarchySolveGroup cross_group(const Project& project) {
   auto graph = value(AssemblyCrossHierarchyConstraintGraph::build(project));
   REQUIRE(graph.solve_group_count() == 1);
   return graph.solve_groups().front();
+}
+
+Project command_reference_project(const Fixture& fixture) {
+  const auto inspected = value(inspect_step_import_source(fixture.source, fixture.root));
+  REQUIRE(inspected.state() == StepImportFreshness::Available);
+  const auto imported = value(StepImportReader{}.read(fixture.source, fixture.root));
+  REQUIRE(imported.products.size() == 1);
+  REQUIRE(imported.body_count() == 1);
+  CHECK(value(StepImportTopology{}.create_catalog(fixture.catalog.id(), imported, 0)) ==
+        fixture.catalog);
+  auto assembly = value(AssemblyDocument::create(DocumentId("assembly.root"), "Imported workflow"));
+  auto project = value(Project::create(DocumentId("project.reference"), "Reference acceptance",
+                                       std::move(assembly)));
+  REQUIRE(project.add_step_import_source(fixture.source));
+  REQUIRE(project.add_imported_topology_catalog(fixture.catalog));
+  REQUIRE(project.add_child_assembly_document(
+      value(AssemblyDocument::create(DocumentId("assembly.grand"), "Shared leaf assembly"))));
+  auto child = value(AssemblyDocument::create(DocumentId("assembly.child"), "Nested carrier"));
+  REQUIRE(
+      child.add_subassembly_instance(boundary("inner", "assembly.grand", {{3, 7, 2}, {90, 0, 0}})));
+  REQUIRE(project.add_child_assembly_document(std::move(child)));
+  REQUIRE(project.assembly().add_subassembly_instance(
+      boundary("outer.left", "assembly.child", {{45, 12, 3}, {20, 0, 25}})));
+  REQUIRE(project.assembly().add_subassembly_instance(
+      boundary("outer.right", "assembly.child", {{-55, 30, 12}, {0, 30, -40}})));
+
+  const StepReferenceCommands commands;
+  const auto initial = json(project);
+  auto inserted = value(commands.insert(project, fixture.catalog.id(), fixture.part.id(),
+                                        imported.products.front().name, project.assembly().id(),
+                                        ComponentInstanceId("fixed"), identity_rigid_transform(),
+                                        fixture.root));
+  CHECK(json(project) == initial);
+  project = std::move(inserted.project);
+  project = value(commands.repeat(project, fixture.part.id(), project.assembly().id(),
+                                  ComponentInstanceId("moving"), identity_rigid_transform(),
+                                  fixture.root))
+                .project;
+  project =
+      value(commands.repeat(project, fixture.part.id(), DocumentId("assembly.grand"),
+                            ComponentInstanceId("nested"), {{3, 4, 5}, {0, 90, 0}}, fixture.root))
+          .project;
+  REQUIRE(project.assembly().set_component_instance_grounding_state(
+      ComponentInstanceId("fixed"), ComponentGroundingState::Grounded));
+  const auto plane = std::find_if(
+      fixture.catalog.entries().begin(), fixture.catalog.entries().end(), [](const auto& entry) {
+        const auto& d = entry.descriptor;
+        return d.kind == ImportedTopologyKind::Face && d.geometry == ImportedGeometryClass::Plane &&
+               std::abs(d.centroid.z - 5) < 1e-7 && std::abs(d.direction.z - 1) < 1e-7;
+      });
+  REQUIRE(plane != fixture.catalog.entries().end());
+  const auto semantic =
+      value(make_imported_topology_target_spelling(value(ImportedTopologyReference::create(
+          fixture.catalog.id(), plane->id, ImportedTopologyCapability::Plane))));
+  // Co-directed imported planes remain parallel throughout motion about the
+  // explicitly authored origin Frame. No Frame is inferred from the STEP face.
+  REQUIRE(project.assembly().add_constraint(value(AssemblyConstraint::create(
+      AssemblyConstraintId("plane.parallel"), "Imported top planes",
+      AssemblyConstraintType::Parallel, target("fixed", semantic), target("moving", semantic)))));
+  REQUIRE(project.assembly().add_joint(value(AssemblyJoint::create(
+      AssemblyJointId("joint.local"), "Explicit origin Frame", AssemblyJointType::Revolute,
+      target("fixed", frame()), target("moving", frame()), AssemblyJointState::Active, angle(-60),
+      angle(60), angle(0)))));
+  REQUIRE(project.validate_assembly_structure());
+  REQUIRE(project.part_document_count() == 1);
+  const auto leaves = value(AssemblyLeafOccurrenceResolver{}.resolve(project));
+  REQUIRE(leaves.size() == 4);
+  for (const auto& leaf : leaves)
+    CHECK(leaf.referenced_part_document == fixture.part.id());
+  return project;
+}
+
+using PhysicalRecord = std::array<double, 11>;
+
+std::vector<PhysicalRecord> box_occurrence_oracle(const Project& project) {
+  std::vector<PhysicalRecord> result;
+  for (const auto& leaf : value(AssemblyLeafOccurrenceResolver{}.resolve(project))) {
+    PhysicalRecord record{
+        std::numeric_limits<double>::infinity(),  std::numeric_limits<double>::infinity(),
+        std::numeric_limits<double>::infinity(),  -std::numeric_limits<double>::infinity(),
+        -std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity()};
+    for (const double x : {-10.0, 10.0})
+      for (const double y : {-5.0, 5.0})
+        for (const double z : {0.0, 5.0}) {
+          const auto point = AssemblyHierarchyTransformEvaluator{}.evaluate_point(
+              leaf.transforms_inner_to_outer, {x, y, z});
+          record[0] = std::min(record[0], point.x);
+          record[1] = std::min(record[1], point.y);
+          record[2] = std::min(record[2], point.z);
+          record[3] = std::max(record[3], point.x);
+          record[4] = std::max(record[4], point.y);
+          record[5] = std::max(record[5], point.z);
+        }
+    const auto center = AssemblyHierarchyTransformEvaluator{}.evaluate_point(
+        leaf.transforms_inner_to_outer, {0, 0, 2.5});
+    record[6] = center.x;
+    record[7] = center.y;
+    record[8] = center.z;
+    record[9] = 1000;
+    record[10] = 700;
+    result.push_back(record);
+  }
+  std::sort(result.begin(), result.end());
+  return result;
+}
+
+std::vector<PhysicalRecord> physical_solids(const std::vector<GeometryShape>& shapes) {
+  std::vector<PhysicalRecord> result;
+  for (const auto& shape : shapes) {
+    const auto* topology = OcctShapeView::get(shape);
+    REQUIRE(topology);
+    TopTools_IndexedMapOfShape solids;
+    TopExp::MapShapes(*topology, TopAbs_SOLID, solids);
+    for (int index = 1; index <= solids.Extent(); ++index) {
+      PhysicalRecord record{};
+      Bnd_Box bounds;
+      BRepBndLib::AddOptimal(solids(index), bounds, false, false);
+      bounds.Get(record[0], record[1], record[2], record[3], record[4], record[5]);
+      GProp_GProps properties;
+      BRepGProp::VolumeProperties(solids(index), properties);
+      const auto center = properties.CentreOfMass();
+      record[6] = center.X();
+      record[7] = center.Y();
+      record[8] = center.Z();
+      record[9] = properties.Mass();
+      BRepGProp::SurfaceProperties(solids(index), properties);
+      record[10] = properties.Mass();
+      result.push_back(record);
+    }
+  }
+  std::sort(result.begin(), result.end());
+  return result;
+}
+
+void same_physical_solids(const std::vector<PhysicalRecord>& actual,
+                          const std::vector<PhysicalRecord>& expected) {
+  REQUIRE(actual.size() == expected.size());
+  for (std::size_t index = 0; index < actual.size(); ++index)
+    for (std::size_t field = 0; field < actual[index].size(); ++field) {
+      CAPTURE(index, field);
+      CHECK(actual[index][field] == Approx(expected[index][field]).margin(1e-5));
+    }
+}
+
+std::vector<PhysicalRecord> exported_solids(const std::filesystem::path& root,
+                                            const char* filename) {
+  const auto source = value(StepImportSource::create(
+      StepImportSourceId("readback"), "Re-exported result", filename,
+      value(step_import_sha256(file_bytes(root / filename))), StepImportMode::Reference));
+  const auto imported = value(StepImportReader{}.read(source, root));
+  return physical_solids(value(StepImportReader{}.preview_shapes(imported)));
+}
+
+void check_persistent_identity_fields(const nlohmann::json& node) {
+  // Literal foreign names may contain these words. Only raw identity fields,
+  // runtime indices and kernel payload records are forbidden in persistence.
+  static const std::set<std::string> forbidden{
+      "definition_key", "product_definition", "parent_definition", "product_index",
+      "body_index",     "occurrence_index",   "tdf_label",         "xde_label",
+      "topods_shape",   "occt_shape",         "brep_payload",      "step_payload"};
+  if (node.is_object())
+    for (const auto& item : node.items()) {
+      INFO(item.key());
+      CHECK_FALSE(forbidden.contains(item.key()));
+      check_persistent_identity_fields(item.value());
+    }
+  else if (node.is_array())
+    for (const auto& item : node)
+      check_persistent_identity_fields(item);
 }
 } // namespace
 
@@ -484,4 +715,300 @@ TEST_CASE("Fresh contexts reject every Reference solve and motion publication af
                angle(-10),
                angle(10),
                3}));
+}
+
+TEST_CASE("STEP Reference acceptance shares command-created Parts through motion refresh and "
+          "physical re-export",
+          "[geometry][integration][step-import-mvp][assembly-step-reference-part]") {
+  Fixture fixture(true);
+  const auto asset = fixture.root / "supplier.step";
+  const auto supplier_bytes = file_bytes(asset);
+  const StepReferenceCommands commands;
+  auto project = command_reference_project(fixture);
+  const auto* reference = project.find_part_document(fixture.part.id());
+  REQUIRE(reference);
+  REQUIRE(reference->reference_part_definition());
+  CHECK(reference->name() == supplier_literal_name);
+  const auto binding = *reference->reference_part_definition();
+  REQUIRE(binding.outputs().size() == 1);
+  const auto output = binding.outputs().front();
+  CHECK(reference->imported_body_features().empty());
+  const auto initial = json(project);
+  CHECK(file_bytes(asset) == supplier_bytes);
+
+  auto shapes = value(ShapeCache::create(ShapeCacheId("mvp.reference")));
+  StepImportTopologyContext initial_context(fixture.root);
+  REQUIRE(GeometryRecomputeExecutor{&initial_context}.execute_document(*reference, shapes));
+  REQUIRE(shapes.reference_result());
+  CHECK(shapes.feature_shape_count() == 0);
+  CHECK(shapes.body_shape_count() == 0);
+  REQUIRE(shapes.reference_result()->bodies.size() == 1);
+  CHECK(shapes.find_body_shape(output.body) == &shapes.reference_result()->bodies.front().shape);
+  CHECK(shapes.reference_result()->definition == binding);
+  auto proposed = value(AssemblyJointMotionSolver{&initial_context}.move(
+      project, AssemblyJointId("joint.local"), angle(25)));
+  REQUIRE(proposed.converged());
+  CHECK(json(project) == initial);
+  StepImportTopologyContext motion_context(fixture.root);
+  REQUIRE(AssemblyJointMotionResultApplier{&motion_context}.apply(project, proposed));
+  CHECK(project.assembly().joints().front().coordinate_deg() == Approx(25));
+  CHECK(std::abs(project.assembly()
+                     .find_component_instance(ComponentInstanceId("moving"))
+                     ->transform()
+                     .rotation_deg.z) == Approx(25).margin(1e-5));
+  CHECK(project.assembly().constraints().front().target_a().semantic_reference() ==
+        project.assembly().constraints().front().target_b().semantic_reference());
+  const auto moved = json(project);
+  const auto moved_leaves = value(AssemblyLeafOccurrenceResolver{}.resolve(project));
+  const auto expected = box_occurrence_oracle(project);
+  REQUIRE(expected.size() == 4);
+  StepImportTopologyContext analysis_context(fixture.root);
+  const auto contacts = value(AssemblyContactAnalyzer{&analysis_context}.analyze(project));
+  CHECK(contacts.component_occurrence_count == 4);
+  CHECK(contacts.recomputed_part_count == 1);
+  CHECK(contacts.evaluated_pair_count == 6);
+  const auto root_pair =
+      std::find_if(contacts.records.begin(), contacts.records.end(), [](const auto& record) {
+        return record.pair.occurrence_a.component_instance == ComponentInstanceId("fixed") &&
+               record.pair.occurrence_b.component_instance == ComponentInstanceId("moving");
+      });
+  REQUIRE(root_pair != contacts.records.end());
+  CHECK(root_pair->classification == AssemblyContactClassification::Interfering);
+  CHECK(root_pair->overlap_volume_mm3 > 0);
+  CHECK(root_pair->overlap_volume_mm3 < 1000);
+  same_physical_solids(
+      physical_solids({value(AssemblyStepExporter{&analysis_context}.build_posed_shape(project))}),
+      expected);
+  CHECK(json(project) == moved);
+  CHECK(file_bytes(asset) == supplier_bytes);
+
+  const auto saved = fixture.root / "reference.blcad.project.json";
+  REQUIRE(write_project_json_file(project, saved));
+  auto reopened = value(read_project_json_file(saved));
+  CHECK(json(reopened) == moved);
+  CHECK(value(AssemblyLeafOccurrenceResolver{}.resolve(reopened)) == moved_leaves);
+  check_persistent_identity_fields(nlohmann::json::parse(moved));
+  CHECK(moved.find(supplier_literal_name) != std::string::npos);
+  CHECK(moved.find(fixture.root.string()) == std::string::npos);
+
+  // Only the supplier changes the asset. An explicit accepted refresh then
+  // preserves every selection, output id, relationship and placed occurrence.
+  fixture.change_source();
+  const auto revised_bytes = file_bytes(asset);
+  REQUIRE(revised_bytes != supplier_bytes);
+  CHECK_FALSE(commands.repeat(reopened, fixture.part.id(), reopened.assembly().id(),
+                              ComponentInstanceId("unaccepted"), identity_rigid_transform(),
+                              fixture.root));
+  CHECK(json(reopened) == moved);
+  const auto observed = value(inspect_step_import_source(fixture.source, fixture.root));
+  REQUIRE(observed.state() == StepImportFreshness::Changed);
+  REQUIRE(observed.observed_sha256_digest());
+  auto refreshed = value(commands.refresh(reopened, fixture.part.id(), fixture.root));
+  CHECK(json(reopened) == moved);
+  CHECK(refreshed.affected_owners.size() == 2);
+  project = std::move(refreshed.project);
+  reference = project.find_part_document(fixture.part.id());
+  REQUIRE(reference);
+  CHECK(reference->name() == supplier_literal_name);
+  CHECK(*reference->reference_part_definition() == binding);
+  CHECK(reference->imported_topology_catalogs() == std::vector{fixture.catalog});
+  CHECK(project.imported_topology_catalogs() == std::vector{fixture.catalog});
+  REQUIRE(project.find_step_import_source(fixture.source.id()));
+  REQUIRE(reference->find_step_import_source(fixture.source.id()));
+  const auto accepted = *reference->find_step_import_source(fixture.source.id());
+  CHECK(accepted.sha256_digest() == *observed.observed_sha256_digest());
+  CHECK(*project.find_step_import_source(fixture.source.id()) == accepted);
+  CHECK(accepted.sha256_digest() != fixture.source.sha256_digest());
+  CHECK(value(AssemblyLeafOccurrenceResolver{}.resolve(project)) == moved_leaves);
+  CHECK(project.assembly().joints().front().coordinate_deg() == Approx(25));
+  CHECK(project.assembly().constraints().front().target_a() ==
+        reopened.assembly().constraints().front().target_a());
+  StepImportTopologyContext refreshed_context(fixture.root);
+  REQUIRE(GeometryRecomputeExecutor{&refreshed_context}.execute_document(*reference, shapes));
+  CHECK(value(shapes.validated_reference_result(*reference))->definition == binding);
+  const auto refreshed_contacts =
+      value(AssemblyContactAnalyzer{&refreshed_context}.analyze(project));
+  CHECK(refreshed_contacts.component_occurrence_count == contacts.component_occurrence_count);
+  CHECK(refreshed_contacts.recomputed_part_count == contacts.recomputed_part_count);
+  REQUIRE(refreshed_contacts.records.size() == contacts.records.size());
+  for (std::size_t index = 0; index < contacts.records.size(); ++index) {
+    const auto& before = contacts.records[index];
+    const auto& after = refreshed_contacts.records[index];
+    CHECK(after.pair == before.pair);
+    CHECK(after.classification == before.classification);
+    CHECK(after.overlap_volume_mm3 == Approx(before.overlap_volume_mm3).margin(1e-5));
+    REQUIRE(after.minimum_distance_mm.has_value() == before.minimum_distance_mm.has_value());
+    if (before.minimum_distance_mm)
+      CHECK(*after.minimum_distance_mm == Approx(*before.minimum_distance_mm).margin(1e-5));
+  }
+  const auto refreshed_json = json(project);
+  const auto loaded = value(deserialize_project_from_json(refreshed_json));
+  CHECK(json(loaded) == refreshed_json);
+  CHECK(file_bytes(asset) == revised_bytes);
+
+  StepImportTopologyContext export_context(fixture.root);
+  const auto flat = value(AssemblyStepExporter{&export_context}.write_step(
+      loaded, (fixture.root / "reference-flat.step").string()));
+  CHECK(flat.recomputed_part_count == 1);
+  CHECK(flat.exported_component_count == 4);
+  const auto structured = value(AssemblyStructuredStepExporter{&export_context}.write_step(
+      loaded, (fixture.root / "reference-structured.step").string()));
+  CHECK(structured.part_product_definition_count == 1);
+  CHECK(structured.exported_component_occurrence_count == 4);
+  CHECK(structured.exported_assembly_occurrence_count == 5);
+  same_physical_solids(exported_solids(fixture.root, "reference-flat.step"), expected);
+  same_physical_solids(exported_solids(fixture.root, "reference-structured.step"), expected);
+  CHECK(json(loaded) == refreshed_json);
+  CHECK(file_bytes(asset) == revised_bytes);
+
+  const auto reference_json = value(serialize_part_document_to_json(*reference));
+  auto converted =
+      value(commands.convert(loaded, fixture.part.id(), DocumentId("part.converted"),
+                             "Editable copy", FeatureId("feature.converted"), fixture.root));
+  CHECK(json(loaded) == refreshed_json);
+  REQUIRE(converted.project.part_document_count() == 2);
+  const auto* preserved_reference = converted.project.find_part_document(fixture.part.id());
+  REQUIRE(preserved_reference);
+  CHECK(value(serialize_part_document_to_json(*preserved_reference)) == reference_json);
+  CHECK(value(AssemblyLeafOccurrenceResolver{}.resolve(converted.project)) == moved_leaves);
+  const auto* editable = converted.project.find_part_document(converted.part);
+  REQUIRE(editable);
+  CHECK_FALSE(editable->is_reference_part());
+  REQUIRE(editable->imported_body_features().size() == 1);
+  const auto& base = editable->imported_body_features().front();
+  CHECK(base.id() == FeatureId("feature.converted"));
+  REQUIRE(base.definition().outputs().size() == 1);
+  CHECK(base.definition().outputs().front().imported_body == output.imported_body);
+  CHECK(base.definition().outputs().front().body != output.body);
+  CHECK(editable->imported_topology_catalogs() == reference->imported_topology_catalogs());
+  auto converted_cache = value(ShapeCache::create(ShapeCacheId("mvp.converted")));
+  StepImportTopologyContext converted_context(fixture.root);
+  REQUIRE(
+      GeometryRecomputeExecutor{&converted_context}.execute_document(*editable, converted_cache));
+  CHECK(converted_cache.reference_result() == nullptr);
+  CHECK(converted_cache.feature_shape_count() == 1);
+  REQUIRE(converted_cache.find_feature_shape(base.id()));
+  CHECK(RectangleExtrusionAdapter{}
+            .summarize(*converted_cache.find_feature_shape(base.id()))
+            .volume_mm3 == Approx(1000));
+  const auto converted_json = json(converted.project);
+  CHECK(json(value(deserialize_project_from_json(converted_json))) == converted_json);
+  check_persistent_identity_fields(nlohmann::json::parse(converted_json));
+  CHECK(file_bytes(asset) == revised_bytes);
+}
+
+TEST_CASE("STEP Reference acceptance rejects unavailable and unresolved revisions without "
+          "publishing model cache or export changes",
+          "[geometry][integration][step-import-mvp][assembly-step-reference-part]") {
+  const int failure = GENERATE(0, 1, 2, 3);
+  CAPTURE(failure);
+  Fixture fixture;
+  const auto asset = fixture.root / "supplier.step";
+  const auto supplier_bytes = file_bytes(asset);
+  const StepReferenceCommands commands;
+  const auto project = command_reference_project(fixture);
+  const auto original_json = json(project);
+  const auto* reference = project.find_part_document(fixture.part.id());
+  REQUIRE(reference);
+  const auto output = reference->reference_part_definition()->outputs().front();
+  auto shapes = value(ShapeCache::create(ShapeCacheId("mvp.atomic")));
+  StepImportTopologyContext original_context(fixture.root);
+  REQUIRE(GeometryRecomputeExecutor{&original_context}.execute_document(*reference, shapes));
+  const auto* original_shape = OcctShapeView::get(*shapes.find_body_shape(output.body));
+  REQUIRE(original_shape);
+  const TopoDS_Shape original_topology = *original_shape;
+  const auto original_physical = physical_solids({*shapes.find_body_shape(output.body)});
+  auto proposed = value(AssemblyJointMotionSolver{&original_context}.move(
+      project, AssemblyJointId("joint.local"), angle(25)));
+  REQUIRE(proposed.converged());
+  const auto flat_path = fixture.root / "accepted-flat.step";
+  const auto structured_path = fixture.root / "accepted-structured.step";
+  REQUIRE(AssemblyStepExporter{&original_context}.write_step(project, flat_path.string()));
+  REQUIRE(AssemblyStructuredStepExporter{&original_context}.write_step(project,
+                                                                       structured_path.string()));
+  const auto prior_flat = file_bytes(flat_path), prior_structured = file_bytes(structured_path);
+  auto attempted = project;
+  if (failure == 0) {
+    std::filesystem::rename(asset, fixture.root / "supplier-held.step");
+    CHECK(value(inspect_step_import_source(fixture.source, fixture.root)).state() ==
+          StepImportFreshness::Missing);
+  } else if (failure == 1) {
+    fixture.change_source();
+    const auto stale_refresh = value(inspect_step_import_source(fixture.source, fixture.root));
+    REQUIRE(stale_refresh.state() == StepImportFreshness::Changed);
+    fixture.change_source();
+    CHECK_FALSE(refresh_step_import_source(attempted, fixture.root, stale_refresh));
+    CHECK(json(attempted) == original_json);
+  } else {
+    if (failure == 2)
+      write_supplier_shape(asset, BRepPrimAPI_MakeBox(gp_Pnt(100, 200, 300), 2, 3, 4).Shape());
+    else {
+      TopoDS_Compound duplicate;
+      BRep_Builder builder;
+      builder.MakeCompound(duplicate);
+      builder.Add(duplicate, original_topology);
+      builder.Add(duplicate, BRepBuilderAPI_Copy(original_topology).Shape());
+      write_supplier_shape(asset, duplicate);
+    }
+    const auto report = value(inspect_step_import_source(fixture.source, fixture.root));
+    REQUIRE(report.observed_sha256_digest());
+    REQUIRE(report.state() == StepImportFreshness::Changed);
+    // Accept into a disposable Core copy to prove semantic Lost/Ambiguous
+    // rejection with the current digest, independently of the stale-byte gate.
+    REQUIRE(attempted.refresh_step_import_source(fixture.source, *report.observed_sha256_digest()));
+    auto* owner = attempted.find_part_document(fixture.part.id());
+    REQUIRE(owner);
+    REQUIRE(owner->refresh_step_import_source(fixture.source, *report.observed_sha256_digest()));
+    StepImportTopologyContext recovery_context(fixture.root);
+    const auto* recovery = value(recovery_context.recover(*owner, fixture.catalog.id()));
+    REQUIRE(recovery->find(output.imported_body));
+    CHECK(recovery->find(output.imported_body)->status ==
+          (failure == 2 ? ImportedTopologyRecoveryStatus::Lost
+                        : ImportedTopologyRecoveryStatus::Ambiguous));
+  }
+  const auto attempted_json = json(attempted);
+  const auto external_bytes =
+      failure == 0 ? file_bytes(fixture.root / "supplier-held.step") : file_bytes(asset);
+  const auto* attempted_part = attempted.find_part_document(fixture.part.id());
+  REQUIRE(attempted_part);
+  StepImportTopologyContext cache_context(fixture.root);
+  CHECK_FALSE(GeometryRecomputeExecutor{&cache_context}.execute_document(*attempted_part, shapes));
+  REQUIRE(shapes.find_body_shape(output.body));
+  const auto* unchanged_shape = OcctShapeView::get(*shapes.find_body_shape(output.body));
+  REQUIRE(unchanged_shape);
+  CHECK(unchanged_shape->IsEqual(original_topology));
+  same_physical_solids(physical_solids({*shapes.find_body_shape(output.body)}), original_physical);
+  REQUIRE(shapes.reference_result());
+  CHECK(shapes.reference_result()->source == fixture.source);
+  CHECK(shapes.reference_result()->definition == *reference->reference_part_definition());
+  CHECK(shapes.feature_shape_count() == 0);
+  CHECK(shapes.body_shape_count() == 0);
+  REQUIRE(shapes.reference_result()->bodies.size() == 1);
+  CHECK(shapes.find_body_shape(output.body) == &shapes.reference_result()->bodies.front().shape);
+
+  StepImportTopologyContext apply_context(fixture.root);
+  CHECK_FALSE(AssemblyJointMotionResultApplier{&apply_context}.apply(attempted, proposed));
+  CHECK_FALSE(commands.repeat(attempted, fixture.part.id(), attempted.assembly().id(),
+                              ComponentInstanceId("rejected"), identity_rigid_transform(),
+                              fixture.root));
+  CHECK_FALSE(commands.convert(attempted, fixture.part.id(), DocumentId("rejected.copy"),
+                               "Rejected copy", FeatureId("rejected.base"), fixture.root));
+  if (failure != 1)
+    CHECK_FALSE(commands.refresh(project, fixture.part.id(), fixture.root));
+  StepImportTopologyContext analysis_context(fixture.root);
+  CHECK_FALSE(AssemblyContactAnalyzer{&analysis_context}.analyze(attempted));
+  CHECK_FALSE(ViewportSceneBuilder{&analysis_context}.build_project(attempted));
+  StepImportTopologyContext export_context(fixture.root);
+  CHECK_FALSE(AssemblyStepExporter{&export_context}.write_step(attempted, flat_path.string()));
+  CHECK_FALSE(AssemblyStructuredStepExporter{&export_context}.write_step(attempted,
+                                                                         structured_path.string()));
+  CHECK(file_bytes(flat_path) == prior_flat);
+  CHECK(file_bytes(structured_path) == prior_structured);
+  CHECK(json(project) == original_json);
+  CHECK(json(attempted) == attempted_json);
+  if (failure == 0) {
+    CHECK_FALSE(std::filesystem::exists(asset));
+    CHECK(file_bytes(fixture.root / "supplier-held.step") == supplier_bytes);
+  } else
+    CHECK(file_bytes(asset) == external_bytes);
 }

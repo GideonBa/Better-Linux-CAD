@@ -263,7 +263,8 @@ std::vector<Point3> centers(const Project& project) {
 
 TEST_CASE("Native structured STEP source workflow saves nested shared Reference and Editable "
           "Projects without replacing the registry",
-          "[gui][integration][block142-structured-step-import][native-step-structured-import]") {
+          "[gui][integration][gui-step-import][block142-structured-step-import][native-step-"
+          "structured-import]") {
   if (QApplication::platformName() != "xcb")
     SKIP("Requires native Qt/OCCT STEP assembly preview");
   const auto mode = GENERATE(StepImportMode::Reference, StepImportMode::EditableBody);
@@ -403,6 +404,19 @@ TEST_CASE("Native structured STEP source workflow saves nested shared Reference 
   ui.file("export_assembly_structured_step", structured);
   CHECK(QFile::exists(flattened));
   CHECK(QFile::exists(structured));
+  const auto expected_world = structured_test::project_shapes(*ui.window.session().project(),
+                                                              directory.path().toStdString());
+  REQUIRE(expected_world.size() == 5);
+  structured_test::check_export(flattened.toStdString(), expected_world);
+  structured_test::check_export(structured.toStdString(), expected_world);
+  const auto exported_bodies =
+      structured_test::physical_bodies(structured_test::read_export(structured.toStdString()));
+  REQUIRE(exported_bodies.size() == 5);
+  for (const auto& body : exported_bodies) {
+    CHECK(body.solids == 1);
+    CHECK(body.volume == Approx(1000).margin(1e-4));
+  }
+  structured_test::check_portable_json(ui.snapshot());
   CHECK(bytes(asset) == original_asset);
   // The original document for this second preview now consumes the source in
   // five real occurrences. Invalidation must clear its derived scene too,

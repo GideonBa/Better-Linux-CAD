@@ -2,10 +2,15 @@
 #include "blcad/core/project_json.hpp"
 #include "blcad/core/step_import_freshness.hpp"
 #include "blcad/core/structured_step_import.hpp"
+#include "blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp"
+#include "blcad/geometry/assembly_hierarchy_spherical_joint_equation_builder.hpp"
+#include "blcad/geometry/assembly_import_validation.hpp"
 #include "blcad/geometry/assembly_step_exporter.hpp"
 #include "blcad/geometry/assembly_structured_step_exporter.hpp"
+#include "blcad/geometry/body_transform_adapter.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/step_editable_commands.hpp"
 #include "blcad/geometry/step_import_reader.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/geometry/step_structured_import_commands.hpp"
@@ -84,6 +89,7 @@ struct Fixture {
   std::filesystem::path root;
   Handle(TDocStd_Document) document = new TDocStd_Document("BinXCAF");
   Handle(XCAFDoc_ShapeTool) tool;
+  TDF_Label nested_rotor;
   Fixture() {
     char name[] = "/tmp/blcad-step-structured-XXXXXX";
     const auto* directory = ::mkdtemp(name);
@@ -125,6 +131,7 @@ struct Fixture {
       box = part(BRepPrimAPI_MakeBox(2, 3, 5).Shape(), "Rotor");
       pin = part(BRepPrimAPI_MakeCylinder(1, 4).Shape(), "Pin");
     }
+    nested_rotor = box;
     auto module = assembly("Module");
     const auto rotor = [&] {
       occurrence(module, box, "Rotor seat", pose({7, 1, 3}, {11, 22, 33}));
@@ -475,6 +482,149 @@ TEST_CASE("Public structured STEP export imports every Assembly definition and s
   same_solids(project_solids(candidate.project, fixture.root), oracle);
   same_solids(project_solids(reopened, fixture.root), oracle);
   CHECK(bytes(fixture.path()) == original);
+}
+
+TEST_CASE(
+    "Structured Editable import retains authored hierarchy through modeling and explicit refresh",
+    "[geometry][structured-step-import][integration][step-import-mvp]") {
+  Fixture fixture;
+  fixture.nested();
+  fixture.write();
+  const auto source = fixture.source(StepImportMode::EditableBody);
+  auto project = fixture.create(StepImportMode::EditableBody).project;
+  const auto hierarchy = [](const Project& value) {
+    const auto json = nlohmann::json::parse(checked(serialize_project_to_json(value)));
+    return nlohmann::json{{"assembly", json.at("assembly")}, {"assemblies", json.at("assemblies")}};
+  };
+  const auto initial_hierarchy = hierarchy(project);
+  const auto rotor = std::find_if(project.part_documents().begin(), project.part_documents().end(),
+                                  [](const auto& part) { return part.name() == "Rotor"; });
+  const auto pin = std::find_if(project.part_documents().begin(), project.part_documents().end(),
+                                [](const auto& part) { return part.name() == "Pin"; });
+  REQUIRE(rotor != project.part_documents().end());
+  REQUIRE(pin != project.part_documents().end());
+  const auto rotor_id = rotor->id();
+  const auto body = rotor->imported_body_features().front().definition().outputs().front().body;
+  constexpr Vector3 offset{2, -1, 0.5};
+  REQUIRE(rotor->add_body_transform(checked(BodyTransform::create_translate(
+      BodyTransformId("authored.move.rotor"), body, BodyTransformCoordinateSpace::World,
+      std::nullopt, offset, false, false))));
+  // Genuine imported Point intent is authored after import. The repeated Pin
+  // occurrences share their definition, but retain distinct rooted endpoints.
+  const auto& catalog = pin->imported_topology_catalogs().front();
+  const auto point =
+      std::find_if(catalog.entries().begin(), catalog.entries().end(), [](const auto& entry) {
+        return entry.descriptor.kind == ImportedTopologyKind::Vertex;
+      });
+  REQUIRE(point != catalog.entries().end());
+  const auto semantic =
+      checked(make_imported_topology_target_spelling(checked(ImportedTopologyReference::create(
+          catalog.id(), point->id, ImportedTopologyCapability::Point))));
+  std::vector<AssemblyLeafOccurrenceDescriptor> pins;
+  for (const auto& occurrence : checked(AssemblyLeafOccurrenceResolver{}.resolve(project)))
+    if (occurrence.referenced_part_document == pin->id())
+      pins.push_back(occurrence);
+  REQUIRE(pins.size() == 2);
+  const auto endpoint = [&](std::size_t index) {
+    return checked(AssemblyHierarchyConstraintEndpoint::create(
+        pins[index].subassembly_path, pins[index].component_instance, semantic));
+  };
+  REQUIRE(project.add_cross_hierarchy_constraint(checked(AssemblyHierarchyConstraint::create(
+      AssemblyConstraintId("authored.point.relationship"), "Imported Pin centers",
+      AssemblyConstraintType::Coincident, endpoint(0), endpoint(1)))));
+  REQUIRE(project.add_cross_hierarchy_joint(checked(AssemblyHierarchyJoint::create(
+      AssemblyJointId("authored.passive.spherical"), "Imported Point joint",
+      AssemblyJointType::Spherical, endpoint(0), endpoint(1), AssemblyJointState::Active,
+      std::vector<AssemblyJointCoordinateSlot>{}))));
+  CHECK(hierarchy(project) == initial_hierarchy);
+  StepImportTopologyContext before_context(fixture.root);
+  REQUIRE(validate_imported_assembly_inputs(project, before_context));
+  const auto relationship_before =
+      checked(AssemblyHierarchyConstraintEquationBuilder{&before_context}.build(
+          project, checked(AssemblyHierarchyConstraintQuery::create(
+                       project.cross_hierarchy_constraints().front()))));
+  const auto joint_before =
+      checked(AssemblyHierarchySphericalJointEquationBuilder{&before_context}.build(
+          project, project.cross_hierarchy_joints().front()));
+  CHECK(joint_before.target_a.selected_capability == AssemblyGeometricTargetCapability::Point);
+  CHECK(joint_before.target_b.selected_capability == AssemblyGeometricTargetCapability::Point);
+  auto shapes = checked(ShapeCache::create(ShapeCacheId("structured.authored")));
+  REQUIRE(GeometryRecomputeExecutor{&before_context}.execute_document(*rotor, shapes));
+  CHECK(shapes.find_body_result(body)->source_feature_id == FeatureId("authored.move.rotor"));
+  CHECK(RectangleExtrusionAdapter{}.summarize(*shapes.find_body_shape(body)).volume_mm3 ==
+        Approx(30));
+  const auto before_json = checked(serialize_project_to_json(project));
+
+  // The supplier changes actual geometry, retaining the complete bottom face
+  // as a unique Body witness. Existing BLCAD structure remains authored intent.
+  REQUIRE(!fixture.nested_rotor.IsNull());
+  fixture.tool->SetShape(fixture.nested_rotor, BRepPrimAPI_MakeBox(2, 3, 7).Shape());
+  fixture.write();
+  const auto revised_bytes = bytes(fixture.path());
+  CHECK_FALSE(AssemblyStepExporter{&before_context}.build_posed_shape(project));
+  CHECK(checked(serialize_project_to_json(project)) == before_json);
+  const auto refreshed =
+      checked(StepEditableCommands{}.refresh(project, rotor_id, source.id(), fixture.root));
+  CHECK(refreshed.affected_owners.size() == 3);
+  CHECK(checked(serialize_project_to_json(project)) == before_json);
+  CHECK(hierarchy(refreshed.project) == initial_hierarchy);
+  CHECK(refreshed.project.cross_hierarchy_constraints().size() == 1);
+  CHECK(refreshed.project.cross_hierarchy_joints() == project.cross_hierarchy_joints());
+  for (const auto& old_part : project.part_documents()) {
+    const auto* current = refreshed.project.find_part_document(old_part.id());
+    REQUIRE(current);
+    CHECK(current->name() == old_part.name());
+    CHECK(current->imported_topology_catalogs() == old_part.imported_topology_catalogs());
+    CHECK(current->imported_body_features() == old_part.imported_body_features());
+    CHECK(current->step_import_sources().front().sha256_digest() != source.sha256_digest());
+  }
+  StepImportTopologyContext refreshed_context(fixture.root);
+  const auto relationship_after =
+      checked(AssemblyHierarchyConstraintEquationBuilder{&refreshed_context}.build(
+          refreshed.project, checked(AssemblyHierarchyConstraintQuery::create(
+                                 refreshed.project.cross_hierarchy_constraints().front()))));
+  const auto joint_after =
+      checked(AssemblyHierarchySphericalJointEquationBuilder{&refreshed_context}.build(
+          refreshed.project, refreshed.project.cross_hierarchy_joints().front()));
+  CHECK(relationship_after.residual == relationship_before.residual);
+  CHECK(joint_after.residual.center_offset_mm == joint_before.residual.center_offset_mm);
+  auto refreshed_shapes = checked(ShapeCache::create(ShapeCacheId("structured.refreshed")));
+  REQUIRE(GeometryRecomputeExecutor{&refreshed_context}.execute_document(
+      *refreshed.project.find_part_document(rotor_id), refreshed_shapes));
+  CHECK(refreshed_shapes.find_body_result(body)->source_feature_id ==
+        FeatureId("authored.move.rotor"));
+  CHECK(RectangleExtrusionAdapter{}.summarize(*refreshed_shapes.find_body_shape(body)).volume_mm3 ==
+        Approx(42));
+  const auto json = checked(serialize_project_to_json(refreshed.project));
+  const auto reopened = checked(deserialize_project_from_json(json));
+  CHECK(checked(serialize_project_to_json(reopened)) == json);
+  CHECK(hierarchy(reopened) == initial_hierarchy);
+  CHECK_FALSE(validate_structured_step_import_candidate(reopened, source.id()));
+  REQUIRE(reopened.validate_assembly_structure());
+
+  // Independent geometry oracle: apply only the authored product-local edit
+  // to the freshly verified source shapes, then compose original direct poses.
+  const auto& current_source = *refreshed.project.find_step_import_source(source.id());
+  auto oracle_geometry = checked(StepImportReader{}.read(current_source, fixture.root));
+  for (auto& product : oracle_geometry.products)
+    if (product.name == "Rotor")
+      for (auto& local_body : product.bodies)
+        local_body.shape = checked(BodyTransformAdapter{}.translate(local_body.shape, offset));
+  const auto oracle = solids(checked(StepImportReader{}.preview_shapes(oracle_geometry)));
+  REQUIRE(oracle.size() == 5);
+  same_solids(project_solids(refreshed.project, fixture.root), oracle);
+  same_solids(project_solids(reopened, fixture.root), oracle);
+  REQUIRE(AssemblyStepExporter{&refreshed_context}.write_step(
+      reopened, (fixture.root / "authored-flat.step").string()));
+  REQUIRE(AssemblyStructuredStepExporter{&refreshed_context}.write_step(
+      reopened, (fixture.root / "authored-structured.step").string()));
+  for (const auto* name : {"authored-flat.step", "authored-structured.step"}) {
+    const auto exported = checked(StepImportSource::create(
+        StepImportSourceId(name), "Authored export", name,
+        checked(step_import_sha256(bytes(fixture.root / name))), StepImportMode::Reference));
+    same_solids(source_solids(exported, fixture.root), oracle);
+  }
+  CHECK(bytes(fixture.path()) == revised_bytes);
 }
 
 TEST_CASE("Structured STEP placed roots preserve gimbal and near-gimbal direct transforms in mm",

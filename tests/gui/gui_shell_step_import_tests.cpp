@@ -9,13 +9,17 @@
 #include "blcad/geometry/circular_cut_adapter.hpp"
 #include "blcad/geometry/step_exporter.hpp"
 #include "blcad/geometry/result_face_support.hpp"
+#include "blcad/geometry/step_editable_commands.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
+#include "blcad/geometry/step_reference_commands.hpp"
+#include "blcad/gui/gui_analysis_export_workbench.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
 #include "blcad/gui/shell/shell_step_import_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
+#include "gui_step_structured_import_fixture.hpp"
 
 #include <QAction>
 #include <QAbstractItemModel>
@@ -223,10 +227,11 @@ public:
     INFO("Ribbon command: " << id.toStdString());
     auto& selected = action(id);
     REQUIRE(selected.isEnabled());
-    const int tab = id.startsWith("sketch.") || id == "finish_sketch"   ? 1
-                    : id.startsWith("view_") || id == "fit"             ? 2
-                    : id.startsWith("assembly_") || id == "new_project" ? 3
-                                                                        : 0;
+    const int tab =
+        id.startsWith("sketch.") || id == "finish_sketch"                                       ? 1
+        : id.startsWith("view_") || id == "fit"                                                 ? 2
+        : id.startsWith("assembly_") || id.startsWith("export_assembly") || id == "new_project" ? 3
+                                                                                                : 0;
     window.ribbon().set_current_tab(tab);
     flush();
     for (auto* button : window.ribbon().findChildren<QToolButton*>()) {
@@ -1117,9 +1122,10 @@ TEST_CASE(
   CHECK(bytes(asset) == current_asset);
 }
 
-TEST_CASE("Native Reference Parts insert shared nested occurrences, constrain, drive, refresh and "
-          "convert",
-          "[gui][integration][block140-reference-parts][native-step-reference-parts]") {
+TEST_CASE(
+    "Native Reference Parts insert shared nested occurrences, constrain, drive, refresh and "
+    "convert",
+    "[gui][integration][gui-step-import][block140-reference-parts][native-step-reference-parts]") {
   if (QApplication::platformName() != "xcb")
     SKIP("Requires native OCCT Reference Part presentation and Assembly interaction");
   SourceUi ui;
@@ -1152,6 +1158,7 @@ TEST_CASE("Native Reference Parts insert shared nested occurrences, constrain, d
   INFO(ui.field<QLabel>("summary").text().toStdString());
   ui.apply();
   const auto captured = ui.snapshot();
+  const auto registered_project = *ui.window.session().project();
   ui.begin();
   ui.source(source_id);
   ui.text(ui.field<QLineEdit>("reference_name"), "Supplier Part");
@@ -1167,6 +1174,14 @@ TEST_CASE("Native Reference Parts insert shared nested occurrences, constrain, d
   REQUIRE(ui.window.session().project()->part_documents().front().is_reference_part());
   const auto first = ui.window.session().project()->assembly().component_instances().front().id();
   const auto inserted = ui.snapshot();
+  const auto& imported_part = ui.window.session().project()->part_documents().front();
+  const auto& first_occurrence =
+      ui.window.session().project()->assembly().component_instances().front();
+  const auto direct_reference = checked(geometry::StepReferenceCommands{}.insert(
+      registered_project, imported_part.reference_part_definition()->catalog(), imported_part.id(),
+      imported_part.name(), ui.window.session().project()->assembly().id(), first,
+      first_occurrence.transform(), directory.path().toStdString()));
+  CHECK(inserted == checked(serialize_project_to_json(direct_reference.project)));
   ui.command("undo");
   CHECK(ui.snapshot() == captured);
   ui.command("redo");
@@ -1478,6 +1493,40 @@ TEST_CASE("Native Reference Parts insert shared nested occurrences, constrain, d
             .front()
             .referenced_part_document() == reference_id);
   ui.roundtrip(document);
+  structured_test::check_portable_json(ui.snapshot());
+  const auto accepted_project = ui.snapshot();
+  const auto accepted_history = std::string(ui.window.session().undo_label());
+  const auto expected_world = structured_test::project_shapes(*ui.window.session().project(),
+                                                              directory.path().toStdString());
+  REQUIRE(expected_world.size() == 3);
+  const GuiAnalysisExportWorkbench analysis;
+  const auto interference = checked(analysis.analyze_interference(ui.window.session()));
+  const auto clearance = checked(analysis.analyze_clearance(ui.window.session()));
+  const auto contact = checked(analysis.analyze_contact(ui.window.session()));
+  ui.command("assembly_analysis");
+  for (int kind = 0; kind < 3; ++kind) {
+    ui.choose(ui.widget<QComboBox>("blcad.inspect.kind"), kind);
+    ui.click(ui.widget<QPushButton>("blcad.inspect.run"));
+    const std::array expected_rows{interference.interferences.size(),
+                                   clearance.interferences.size() +
+                                       clearance.clearance_violations.size(),
+                                   contact.records.size()};
+    INFO(ui.widget<QLabel>("blcad.inspect.summary").text().toStdString());
+    CHECK(ui.widget<QLabel>("blcad.inspect.summary").text().contains("3 occurrences"));
+    CHECK(ui.widget<QTableWidget>("blcad.inspect.results").rowCount() ==
+          static_cast<int>(expected_rows[kind]));
+    CHECK(ui.snapshot() == accepted_project);
+  }
+  ui.capture("step-reference-integrated-analysis");
+  ui.click(ui.widget<QPushButton>("blcad.inspect.close"));
+  CHECK(ui.window.session().undo_label() == accepted_history);
+  const auto flat = directory.filePath("reference-refreshed-flat.step");
+  const auto structured = directory.filePath("reference-refreshed-structured.step");
+  ui.file("export_assembly_flat_step", flat);
+  ui.file("export_assembly_structured_step", structured);
+  structured_test::check_export(flat.toStdString(), expected_world);
+  structured_test::check_export(structured.toStdString(), expected_world);
+  CHECK(ui.snapshot() == accepted_project);
   CHECK(bytes(asset) == revised);
 }
 
@@ -1591,9 +1640,10 @@ TEST_CASE(
   ui.roundtrip(editable_path);
 }
 
-TEST_CASE("Native direct EditableBody imports support face sketches, modeling, refresh and "
-          "protected STEP export",
-          "[gui][integration][block141-editable-parts][native-step-editable-parts]") {
+TEST_CASE(
+    "Native direct EditableBody imports support face sketches, modeling, refresh and "
+    "protected STEP export",
+    "[gui][integration][gui-step-import][block141-editable-parts][native-step-editable-parts]") {
   if (QApplication::platformName() != "xcb")
     SKIP("Requires native OCCT imported-base picking and Part authoring");
   SourceUi ui;
@@ -1653,6 +1703,13 @@ TEST_CASE("Native direct EditableBody imports support face sketches, modeling, r
                         .body;
   const auto imported_intent =
       checked(serialize_part_document_to_json(*ui.window.session().part_document()));
+  const auto& initial_part = *ui.window.session().part_document();
+  const auto direct_editable = checked(geometry::StepEditableCommands{}.create_definition(
+      *initial_part.find_step_import_source(base_intent.definition().source()),
+      *initial_part.find_imported_topology_catalog(base_intent.definition().catalog()),
+      initial_part.id(), initial_part.name(), base, directory.path().toStdString()));
+  CHECK(imported_intent == checked(serialize_part_document_to_json(direct_editable)));
+  structured_test::check_portable_json(imported_intent);
   const auto body_volume = [&] {
     const auto* shape = ui.window.session().part_shape_cache()->find_body_shape(body);
     REQUIRE(shape);
@@ -1781,6 +1838,17 @@ TEST_CASE("Native direct EditableBody imports support face sketches, modeling, r
   const auto exported = directory.filePath("modeled.step");
   ui.file("export_part_step", exported);
   CHECK(bytes(exported).contains("ISO-10303-21"));
+  const auto* modeled_shape = ui.window.session().part_shape_cache()->find_body_shape(body);
+  REQUIRE(modeled_shape);
+  structured_test::check_export(exported.toStdString(), {*modeled_shape});
+  const auto readback =
+      structured_test::physical_bodies(structured_test::read_export(exported.toStdString()));
+  REQUIRE(readback.size() == 1);
+  CHECK(readback.front().volume == Approx(modeled_volume).margin(1e-4));
+  const std::array expected_bounds{-10.0, -5.0, 0.0, 10.0, 5.0, 9.0};
+  for (std::size_t axis = 0; axis < expected_bounds.size(); ++axis)
+    CHECK(readback.front().vertex_bounds[axis] == Approx(expected_bounds[axis]).margin(1e-5));
+  structured_test::check_portable_json(modeled);
   CHECK(ui.snapshot() == modeled);
   CHECK(bytes(asset) == supplier_bytes);
   // Explicit refresh previews the complete modeled result, accepts only its
@@ -1802,6 +1870,12 @@ TEST_CASE("Native direct EditableBody imports support face sketches, modeling, r
   ui.command("redo");
   CHECK(ui.snapshot() == refreshed);
   ui.roundtrip(document);
+  const auto refreshed_export = directory.filePath("modeled-refreshed.step");
+  ui.file("export_part_step", refreshed_export);
+  const auto* refreshed_shape = ui.window.session().part_shape_cache()->find_body_shape(body);
+  REQUIRE(refreshed_shape);
+  structured_test::check_export(refreshed_export.toStdString(), {*refreshed_shape});
+  CHECK(bytes(asset) == revised);
   // A changed top face breaks the real face-supported sketch; accepting the
   // new digest alone cannot publish a partially recomputed document.
   supplier = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(

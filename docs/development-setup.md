@@ -2588,3 +2588,85 @@ before that PR merges and main matches the tested tree and runtime fingerprints.
 
 Delivery: [PR #134](https://github.com/GideonBa/Better-Linux-CAD/pull/134), verified implementation
 commit `dbe6560`. Runtime fingerprints remain unchanged; this PR must merge before Block 143 starts.
+
+PR #134 merged as `c61f5fe`. Main exactly matches tested head `d930a9a`, tree
+`5a2aad73ad0a76398fd131c0ee12253329acde4f`, and all **978** frozen runtime inputs. Fresh GitHub
+searches find no open issues or PRs before Block 143 begins.
+
+### Block 143 — Integrated STEP import acceptance (accepted 2026-10-29)
+
+Branch `test/integrated-step-import-acceptance` starts from verified main `c61f5fe` after PR #134.
+The shared commands/tasks from Blocks 137–142 remain the application authorities. Extend continuous
+Reference, direct/converted Editable and structured workflows with read-back export geometry,
+ordinary post-import authoring, exact GUI/headless equivalence and atomic failure evidence. The
+execution matrix is in the STEP sequence. Source owners edit disjoint Geometry/GUI test files;
+all owners must freeze before the shared five-target build and focused/full/native gates. No
+Block-143 acceptance is claimed yet; numbered completion remains through Block 142.
+
+All source owners freeze before the first five-target build. The initial **978-file** fingerprint is
+`b450ea1d0106297b3f9465f798285294bcaef45be1dfaa3e1afc0a8adbcb1c6f`.
+Changes extend existing Geometry/GUI integration tests and current documentation/coverage scope;
+application and library implementation remain unchanged. Continuous Reference acceptance includes
+actual command insert/repeat, imported relationships, 25-degree joint motion, analysis, JSON,
+grouped explicit refresh, conversion and physical read-back of both export forms. Editable acceptance
+uses direct and converted command entries through the same ordered additive/subtractive/finishing
+history. Structured Editable acceptance adds normal post-import relationships, a Body edit, actual supplier
+height refresh, exact hierarchy/placement retention and posed export read-back. GUI acceptance uses
+actual analysis/export controls, canonical headless parity and missing/stale/Lost/Ambiguous matrices.
+The first build and independent read-only peer reviews are running; no gate outcome is assumed.
+
+The first five-target build passes (`/tmp/blcad143-build-1.log`). Peer review identifies two new
+Reference cache-count assumptions: Reference Bodies are stored in `reference_result`, separately
+from authored `body_shapes`. The assertions now require **zero authored entries, one Reference
+entry and the exact resolved Body shape**. This test-only correction is built by the second
+five-target build (`/tmp/blcad143-build-2.log`). Other independent Geometry/GUI peer reviews find
+no blocker. The current **978-file** freeze is
+`e0942e2c06a4aa15f79ce60597a12a764a9fa36f24e8b3a2fc7f0789615d8722`.
+
+Full Core passes **596 / 22,501** (`/tmp/blcad143-core-full.log`). Focused integrated Geometry
+passes **5 / 5,978** (`/tmp/blcad143-geometry-focused.log`); focused GUI passes **8 cases — 5 passed,
+3 native-only skips / 1,765 assertions** (`/tmp/blcad143-gui-focused.log`). Full Geometry and native
+100% workflows run next; no full/native completion is assumed.
+
+Full Geometry passes **564 / 49,787** (`/tmp/blcad143-geometry-full.log`). Native 100% passes
+**13 / 7,391**, without skips (`/tmp/blcad143-native-100.log`), including the continuous
+Reference/Editable/structured workflows, source/topology inspection, viewer lifecycle, headless
+failure matrix and current Shell inventory. The native Reference workflow opens actual interference,
+clearance and contact tasks after save/reopen/refresh and compares their result counts to headless
+analysis; flattened and structured exports are re-read for all three posed leaves. Direct Editable
+and structured exports likewise compare real solid count, volume and footprint/world placements.
+Reviewed 100% captures show analysis controls, modeled refresh and the five posed structured leaves.
+Native 150% is still running. All **507** dependency records are nonempty and valid
+(`/tmp/blcad143-ninja-deps.log`); legacy CLI again writes **19,170 bytes**
+(`/tmp/blcad143-cli-legacy.log`). Final GUI/startup/inventory acceptance remains pending.
+
+Native 150% passes **4 / 3,875**, without skips (`/tmp/blcad143-native-150.log`). Captures in
+`/tmp/blcad143-native-{100,150}` were reviewed for reachable analysis/source controls, current
+modeled results and posed structured previews. Both native scales prove real UI analysis, physical
+export read-back and unchanged source assets. Full GUI now runs against the same frozen inputs;
+startup and final numbered-documentation inventory follow its result.
+
+```sh
+./build/dev-gui/blcad_geometry_tests "[integration][step-import-mvp]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[integration][gui-step-import],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad143-native-100 QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[integration][gui-step-import],[native-step-reference-parts],[native-step-topology],[native-step-inspection],[native-viewer-lifecycle],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad143-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[native-step-reference-parts],[native-step-editable-parts],[native-step-structured-import]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests
+```
+
+Final acceptance: full GUI passes **648 cases — 615 passed, 33 expected native-only skips /
+85,528 assertions** (`/tmp/blcad143-gui-full.log`). Separate native startup reaches intentional
+timeout **124** without a crash (`/tmp/blcad143-startup.log`). After the plan records completed
+Block 143 and the unassigned numeric successor 144, final Shell inventory passes **3 / 313**
+(`/tmp/blcad143-final-inventory.log`). No Block-144 implementation scope or work is introduced.
+Independent requirement review maps every canonical import action, both import modes, direct and
+converted modeling, physical export equivalence, source-byte/schema proofs and the complete
+negative matrix to actual tests. Reused Block-142 malformed-structure fixtures remain in full
+regression; their pure candidate construction is distinguished from session/cache/output failure
+transactions. All runtime inputs remain the final **978-file** freeze recorded above.
+
+STEP Import MVP-10 is complete through Block 143. Final delivery stops at this requested boundary.
+
+Delivery: [PR #135](https://github.com/GideonBa/Better-Linux-CAD/pull/135), verified implementation
+commit `220d030`. All runtime fingerprints remain unchanged. The branch contains only this
+integrated acceptance slice and its documentation; later implementation remains unassigned.

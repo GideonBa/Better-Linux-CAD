@@ -1161,7 +1161,10 @@ does not silently replace hierarchy, names or authored placements. Reimporting c
 Project when the user wants a changed foreign structure. Numbered completion remains in
 `docs/mvp-plan.md`.
 
-Remaining integration acceptance is Block 143. Persistent import data must not include:
+Block-143 integrated acceptance verifies canonical JSON roundtrips and rejects runtime-authority
+keys across Reference, direct/converted Editable and structured workflows. Literal foreign product
+names remain supported display metadata; normalized catalog witnesses remain semantic import
+intent. No Block-143 JSON schema field is added. Persistent import data must not include:
 
 ```text
 STEP file bytes

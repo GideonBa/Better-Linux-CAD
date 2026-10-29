@@ -270,3 +270,27 @@ definition has no unique rooted pose; root-Assembly placement previews retain th
 Standalone copy creation also isolates the imported product from the original Part's scene.
 
 Block-140 focused, full and native acceptance is recorded in `docs/development-setup.md`.
+
+### Structured STEP Projects — Blocks 142–143 integration
+
+The same Sources task offers Import Structured Assembly for an explicitly registered source. Its
+Reference/EditableBody mode applies to every imported Part definition. No separately captured
+catalog is required: the shared import command creates each product's owned catalog from the same
+verified source. Prepare displays all posed leaf occurrences and the imported hierarchy. Save the
+new Project beside the current document, then explicitly open it. The original document remains
+open, including its existing dirty state and history. Cancellation restores its camera and scene.
+
+The Project has an explicit synthetic root, one shared definition per actual STEP Part/Assembly
+product and distinct direct occurrences, retaining supported actual foreign names and placements.
+The import creates visible active occurrences without inferred relationships or joints. Existing
+Assembly tools author those afterward using the same source-verified target, solve, motion and
+analysis contracts. The importer candidate validator applies only to initial creation; ordinary
+post-import authoring and JSON reopening use the normal Project contracts.
+
+A changed source invalidates the preview; changes during destination selection reject publication.
+When the original session consumes that source, stale derived geometry is cleared while its Core
+intent/history is retained. Explicit geometry refresh validates all active downstream consumers
+and preserves the authored hierarchy, names and direct placements. A changed foreign structure is
+imported as another distinct Project. Re-export uses the current verified posed result and protects
+the source file and its aliases. Integrated acceptance and physical STEP read-back evidence belong
+to Block 143 in `docs/step-import-sequence-mvp10.md` and `docs/development-setup.md`.
