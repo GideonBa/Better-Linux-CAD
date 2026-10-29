@@ -1700,3 +1700,37 @@ above and the explicit completion gate pass. GUI Shell Reset MVP-9R is complete;
 Blocks 137–143 remain planned. Existing feature-specific bounds, including shared child-component
 placement authority, discrete Revolute sampling and the absence of constrained free-drag or imported
 cross-intent remapping, are unchanged.
+
+## Issue #111 — typed Body Rotate reference parity (2026-10-29)
+
+The chooser now exposes the existing explicit and line-derived DatumAxis, ConstructionLine and
+supported straight SemanticEdge variants with distinct source labels and typed identities. Both
+manipulator placement and Geometry execution reuse `BodyRotationAxisResolver`. Its explicit numeric
+axis branch remains in the executor so consuming coordinate-frame semantics are preserved. The
+cache-aware Body Rotate edge builder leaves historical construction-source resolution unchanged.
+
+The original chooser regression reproduces two missing entries before the production change.
+Focused Geometry compares five equivalent off-origin 90° axis representations, invalid datum
+references and posed edge presentations; focused GUI compares the corresponding four referenced
+variants with unchanged persistent preview state, exact history and saved identity.
+
+`[body-axis-native]` passes at 100% and 150% (**1 case / 320 assertions** each). Two solids are
+created through actual ribbon authoring; construction/datum records supply the reference fixture.
+The user path selects the derived datum through the real popup, cancels without changes, applies a
+rotation, then collects the exact producer/TopBack edge in the native viewport and rotates again.
+The selected Body list survives axis collection; Datum/Edge scope suspends grips and returns to Body
+scope. Increasing the source Extrude from 8 to 12 mm moves the downstream referenced pivot and
+result bounds while retaining the rotated Body's 512 mm³ volume. Exact local Undo/Redo, canonical
+Save/Open, empty-cache recompute bounds and STEP export pass. Preview and reopened-result captures
+were inspected at both scales. The same native input assertions remain strict.
+
+Contracts and reproducible commands are recorded in `gui-interactive-pattern-body-mvp9.md`,
+`part-body-transform-geometry-mvp6.md` and `development-setup.md`. New Sketch-line references remain
+Issue #110; this fix advances no numbered implementation block.
+
+Final full Geometry passes **463 / 35,442**; full offscreen GUI passes **606 cases — 584 passed,
+22 expected native-only skips / 81,444 assertions**. Affected native workflows plus required shell
+coverage pass **34 / 7,497**, without skips. Separate startup reaches intentional timeout **124**.
+All 890 final runtime fingerprints remain unchanged. Native/scaled/broad/startup logs have no
+High-severity, BadDrawable or BadWindow errors; the pre-existing OCCT Medium visual-depth warning
+remains. Core code/tests/binary are unchanged from verified main `d32edff` (**555 / 17,463**).

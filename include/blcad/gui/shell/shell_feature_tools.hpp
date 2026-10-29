@@ -506,8 +506,6 @@ private:
 
   struct BodyAxisChoice {
     BodyTransformRotationAxis reference;
-    Point3 origin;
-    Vector3 direction;
     std::string semantic_id;
   };
   std::vector<BodyAxisChoice> body_axes_;

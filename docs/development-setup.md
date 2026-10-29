@@ -1866,3 +1866,57 @@ from final proof. Final logs use `/tmp/blcad-issue109-{core-full-final,geometry-
 gui-full-final,native-final-2,native-150-review-final,native-broad-final,startup-final}.log`;
 final build logs are `/tmp/blcad-issue109-build-review-final.log` (all requested targets after review)
 and `/tmp/blcad-issue109-build-final-core.log` (Core fixture/all requested targets).
+
+## Issue #111 — Body Rotate reference parity (2026-10-29)
+
+Body Rotate offers resolvable explicit/line-derived datum axes, construction lines and supported
+straight semantic edges, with typed identities and source labels. `BodyRotationAxisResolver` owns
+referenced model-space resolution for the chooser, manipulator frame and Geometry execution;
+explicit numeric axes retain the consuming transform's existing coordinate-frame handling.
+Task-only edge presentations use the same cache-aware semantic geometry. The contracts live in
+`gui-interactive-pattern-body-mvp9.md` and `part-body-transform-geometry-mvp6.md`.
+
+Keep source edits, builds, GUI suites and startup serial. Geometry correctness tests may accompany
+one GUI suite; no timing profile is part of this issue.
+
+```bash
+cmake --build --preset dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app blcad_export_step -j6
+./build/dev-gui/blcad_geometry_tests "[body-axis-parity]"
+./build/dev-gui/blcad_geometry_tests
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][shell-body][body-axis-parity],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue111-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[body-axis-native]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue111-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[body-axis-native]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue111-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-body],[block136-body-context],[shell-combined-bodies],[shell-combined-body-context],[shell-combined-revolve-pattern],[shell-combined-surface-solid],[block136-pattern-context],[shell-combined-pattern-context],[shell-combined-revolve-controls],[shell-combined-construction],[native-viewer-lifecycle],[integration][gui-feature-coverage]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+All five targets build. The initial red GUI chooser test fails on both missing derived-datum and
+semantic-edge entries (**1 case / 24 assertions, 2 failures**). Final focused Geometry passes
+**2 / 127** and focused GUI plus inventory passes **5 / 508**. Full Geometry passes **463 / 35,442**.
+Core production/tests and binary remain unchanged from verified main `d32edff`, retaining its full
+Core result **555 / 17,463**. The final native-cancel fixture refinement changes only the combined
+GUI test file, leaving the accepted full Geometry inputs/binary unchanged.
+
+The native workflow passes **1 / 320** at both 100% and 150%, with no skips. It creates two solids
+through the ribbon, seeds authored construction/datum reference records, uses actual popup input
+for the derived datum and actual viewport picking for a supported semantic edge, preserves the
+selected Body list and restores masks/temporary presentations. It checks cancellation without
+persistence changes, two off-origin rotations, upstream depth 8 → 12 mm, exact local Undo/Redo,
+empty-cache full-recompute bounds, canonical Save/Open and STEP. Native captures were inspected at
+both scales. The strict existing native pointer, focus, visible-input and popup checks remain.
+
+The final runtime input manifest has **890** files, SHA-256
+`4bb421f9630f0e9f2d2d27f032e2984b723cac349020ec208115dc998d04ad1c`, stored at
+`/tmp/blcad-issue111-source-freeze.json`. The check script is
+`/tmp/blcad-issue111-freeze.py check`. Logs use `/tmp/blcad-issue111-{build-3,build-4,
+build-native-2,geometry-focused-2,gui-focused-2,geometry-full,native-2,native-150,gui-full}.log`.
+
+The full offscreen GUI suite passes **606 cases: 584 passed, 22 expected native-only skips;
+81,444 assertions**. The affected native Body/pattern/Revolve/construction workflows plus required
+shell gate pass **34 / 7,497**, without skips. Separate startup reaches intentional timeout **124**.
+Final native/scaled/broad/startup logs contain no High-severity, BadDrawable or BadWindow errors.
+The pre-existing OCCT Medium visual-depth/stencil warning remains (90 entries in the broad batch).
+All 890 runtime fingerprints remain unchanged through the final focused-native, scaled, full GUI,
+broad and startup checks. Broad/startup logs are `/tmp/blcad-issue111-native-broad.log` and
+`/tmp/blcad-issue111-startup.log`. No new numbered implementation block is claimed.

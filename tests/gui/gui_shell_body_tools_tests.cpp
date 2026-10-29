@@ -1,5 +1,8 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
+#include "blcad/geometry/semantic_reference_evaluator.hpp"
+#include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/body_rotation_axis_resolver.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -275,7 +278,9 @@ TEST_CASE("Changing Boolean target and rotation reference preserves unrelated pi
     REQUIRE(tools.begin_body_operation(Command::BodyRotate));
     pick(window, "body.1");
     tools.body_reference_button().click();
-    CHECK(window.viewport().selection_filter_mask() == selection_kind_bit(GuiSelectionKind::Datum));
+    CHECK(
+        window.viewport().selection_filter_mask() ==
+        (selection_kind_bit(GuiSelectionKind::Datum) | selection_kind_bit(GuiSelectionKind::Edge)));
     REQUIRE(window.viewport().select_semantic("datum-axis/datum.axis.x"));
     CHECK(tools.body_source_editor().selectedItems().size() == 1);
     CHECK_FALSE(tools.body_reference_button().isChecked());
@@ -564,4 +569,128 @@ TEST_CASE("Repeated translation drags accumulate and scale drags use a dimension
     CHECK(layer.numeric_text().find("mm") == std::string::npos);
   }
   REQUIRE(controller.apply(window.session()));
+}
+
+TEST_CASE("Body Rotate exposes typed derived datum and supported generated edge sources",
+          "[gui][shell-body][body-axis-parity]") {
+  ShellWindow window;
+  bodies(window, false);
+  REQUIRE(window.session().commit_part_transaction(
+      "Derived rotation datum", [](PartDocument& part) -> Result<std::size_t> {
+        auto line = ConstructionLine::create_explicit(ConstructionLineId("rotation.line"),
+                                                      "Off-origin line", {24, -4, 8}, {1, 0, 0});
+        if (!line)
+          return Result<std::size_t>::failure(line.error());
+        auto added = part.add_construction_line(line.value());
+        if (!added)
+          return added;
+        auto axis = DatumAxis::create_from_construction_line(
+            DatumAxisId("rotation.derived"), "Off-origin derived axis", line.value().id());
+        if (!axis)
+          return Result<std::size_t>::failure(axis.error());
+        return part.add_datum_axis(axis.value());
+      }));
+  window.refresh();
+  REQUIRE(window.feature_tools().begin_body_operation(Command::BodyRotate));
+  auto* choices = window.findChild<QComboBox*>("blcad.body.axis");
+  REQUIRE(choices);
+  CHECK(choices->findData("datum-axis/rotation.derived") >= 0);
+  const auto feature = window.session().part_document()->features().front().id().value();
+  const auto semantic =
+      "construction-source/" + std::to_string(feature.size()) + ":" + feature + "/edge/top_front";
+  CHECK(choices->findData(QString::fromStdString(semantic)) >= 0);
+}
+
+TEST_CASE(
+    "Body Rotate uses equivalent off-origin references with atomic history and persistent identity",
+    "[gui][shell-body][body-axis-parity]") {
+  ShellWindow window;
+  bodies(window, false);
+  const auto feature = window.session().part_document()->features().front().id();
+  const auto edge = SemanticEdgeReference::create(feature, SemanticEdge::TopFront).value();
+  const auto resolved = geometry::SemanticReferenceEvaluator{}
+                            .resolve_edge(*window.session().part_document(), edge,
+                                          *window.session().part_shape_cache())
+                            .value();
+  const auto origin = resolved.start;
+  const Vector3 direction = normalized(
+      Vector3{resolved.end.x - origin.x, resolved.end.y - origin.y, resolved.end.z - origin.z});
+  REQUIRE(window.session().commit_part_transaction(
+      "Equivalent rotation sources", [&](PartDocument& part) -> Result<std::size_t> {
+        auto added = part.add_construction_line(
+            ConstructionLine::create_explicit(ConstructionLineId("rotation.line"),
+                                              "Off-origin line", origin, direction)
+                .value());
+        if (!added)
+          return added;
+        added =
+            part.add_datum_axis(DatumAxis::create_explicit(DatumAxisId("rotation.explicit"),
+                                                           "Off-origin explicit", origin, direction)
+                                    .value());
+        if (!added)
+          return added;
+        return part.add_datum_axis(DatumAxis::create_from_construction_line(
+                                       DatumAxisId("rotation.derived"), "Off-origin derived",
+                                       ConstructionLineId("rotation.line"))
+                                       .value());
+      }));
+  const auto semantic = "construction-source/" + std::to_string(feature.value().size()) + ":" +
+                        feature.value() + "/edge/top_front";
+  std::string choice = "datum-axis/rotation.explicit";
+  SECTION("explicit datum") {}
+  SECTION("construction line") {
+    choice = "construction-line/rotation.line";
+  }
+  SECTION("derived datum") {
+    choice = "datum-axis/rotation.derived";
+  }
+  SECTION("semantic edge") {
+    choice = semantic;
+  }
+  const auto before = snapshot(window);
+  auto oracle = *window.session().part_document();
+  REQUIRE(oracle.add_body_transform(
+      BodyTransform::create_rotate(
+          BodyTransformId("expected.rotation"), BodyId("body.2"),
+          BodyTransformCoordinateSpace::World, std::nullopt,
+          BodyTransformRotationAxis::create_explicit(origin, direction).value(), 90, false, false)
+          .value()));
+  auto oracle_cache = geometry::ShapeCache::create(ShapeCacheId("expected")).value();
+  REQUIRE(geometry::GeometryRecomputeExecutor{}.execute_document(oracle, oracle_cache));
+  const auto expected = geometry::BodyTransformAdapter{}
+                            .bounds(*oracle_cache.find_body_shape(BodyId("body.2")))
+                            .value();
+  REQUIRE(window.feature_tools().begin_body_operation(Command::BodyRotate));
+  auto* choices = window.findChild<QComboBox*>("blcad.body.axis");
+  REQUIRE(choices);
+  const auto index = choices->findData(QString::fromStdString(choice));
+  REQUIRE(index >= 0);
+  choices->setCurrentIndex(index);
+  pick(window, "body.2");
+  REQUIRE(window.feature_tools().set_numeric_value(90));
+  CHECK(snapshot(window) == before);
+  REQUIRE(window.feature_tools().apply());
+  const auto actual =
+      geometry::BodyTransformAdapter{}.bounds(shape(window, BodyId("body.2"))).value();
+  for (const auto& pair : {std::pair{actual.minimum.x, expected.minimum.x},
+                           {actual.minimum.y, expected.minimum.y},
+                           {actual.minimum.z, expected.minimum.z},
+                           {actual.maximum.x, expected.maximum.x},
+                           {actual.maximum.y, expected.maximum.y},
+                           {actual.maximum.z, expected.maximum.z}})
+    CHECK(pair.first == Catch::Approx(pair.second).margin(1e-7));
+  const auto& stored = *window.session().part_document()->body_transforms().back().rotation_axis();
+  CHECK(stored.kind() == (choice == semantic ? BodyTransformRotationAxisKind::SemanticEdge
+                          : choice.starts_with("construction-line/")
+                              ? BodyTransformRotationAxisKind::ConstructionLine
+                              : BodyTransformRotationAxisKind::DatumAxis));
+  if (choice == semantic) {
+    REQUIRE(stored.semantic_edge());
+    CHECK(stored.semantic_edge()->source_feature() == edge.source_feature());
+    CHECK(stored.semantic_edge()->edge() == edge.edge());
+  } else if (choice.starts_with("datum-axis/"))
+    CHECK(stored.datum_axis().value() == choice.substr(11));
+  else
+    CHECK(stored.construction_line() == ConstructionLineId("rotation.line"));
+  history_and_save(window, before);
 }

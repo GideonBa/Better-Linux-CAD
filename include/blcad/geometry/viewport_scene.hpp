@@ -48,6 +48,9 @@ public:
   // infer persistent semantic references from kernel subshape ordinals.
   [[nodiscard]] Result<std::vector<ConstructionSelectionTarget>>
   build_construction_sources(const PartDocument& document, const ShapeCache& shape_cache) const;
+  // Supported semantic edge axes at the same cache-aware positions used by Body Rotate.
+  [[nodiscard]] Result<std::vector<ConstructionSelectionTarget>>
+  build_body_rotation_sources(const PartDocument& document, const ShapeCache& shape_cache) const;
   [[nodiscard]] Result<std::vector<ViewportSceneItem>> build_project(const Project& project) const;
 };
 

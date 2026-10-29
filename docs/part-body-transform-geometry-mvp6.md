@@ -24,6 +24,13 @@ shape, advances the target Body result, and commits transactionally. This preven
 incremental execution from applying a transform twice. Cumulative affine state interprets World,
 BodyLocal, SketchLocal, and construction-reference coordinates without adding OCCT types to Core.
 Explicit, datum-axis, construction-line, and semantic-edge rotation axes resolve at execution time.
+Referenced axes share `BodyRotationAxisResolver` with the shell: explicit and line-derived datum
+axes, construction lines and cache-aware semantic edges resolve to a model-space point and unit
+direction. Missing datum identities and unresolved/degenerate sources fail with diagnostics. The
+public reference resolver rejects explicit numeric axes, whose interpretation still belongs to the
+consuming transform's World/BodyLocal/SketchLocal/construction-reference frame. The body-rotation
+viewport source builder uses that same cache-aware semantic authority; it does not change the older
+construction-source builder's historical feature-coordinate contract.
 
 Stack order is the persistent insertion/graph order and is intentionally non-commutative. Focused
 proof compares translate-then-rotate with rotate-then-translate.

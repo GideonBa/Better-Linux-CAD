@@ -1,4 +1,6 @@
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/body_rotation_axis_resolver.hpp"
+#include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
 
@@ -241,4 +243,95 @@ TEST_CASE("Ownership state crosses transforms that do not move owned references"
   REQUIRE(frame);
   CHECK(frame.value().origin == Point3{10.0, 2.0, 0.0});
   CHECK(frame.value().x_axis == Vector3{1.0, 0.0, 0.0});
+}
+
+TEST_CASE("Body rotation references share an off-origin execution axis and preserve explicit frame "
+          "handling",
+          "[geometry][body-transform][body-axis-parity]") {
+  auto document = box_document(false);
+  auto base_cache = cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, base_cache));
+  const auto edge =
+      SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront).value();
+  const auto resolved =
+      SemanticReferenceEvaluator{}.resolve_edge(document, edge, base_cache).value();
+  const auto origin = resolved.start;
+  const Vector3 direction = normalized(
+      Vector3{resolved.end.x - origin.x, resolved.end.y - origin.y, resolved.end.z - origin.z});
+  REQUIRE(document.add_construction_line(
+      ConstructionLine::create_explicit(ConstructionLineId("axis.line"), "Axis line", origin,
+                                        direction)
+          .value()));
+  REQUIRE(document.add_datum_axis(
+      DatumAxis::create_explicit(DatumAxisId("axis.explicit"), "Explicit", origin, direction)
+          .value()));
+  REQUIRE(document.add_datum_axis(
+      DatumAxis::create_from_construction_line(DatumAxisId("axis.derived"), "Derived",
+                                               ConstructionLineId("axis.line"))
+          .value()));
+  const std::vector<BodyTransformRotationAxis> axes{
+      BodyTransformRotationAxis::create_explicit(origin, direction).value(),
+      BodyTransformRotationAxis::create_datum_axis(DatumAxisId("axis.explicit")).value(),
+      BodyTransformRotationAxis::create_construction_line(ConstructionLineId("axis.line")).value(),
+      BodyTransformRotationAxis::create_datum_axis(DatumAxisId("axis.derived")).value(),
+      BodyTransformRotationAxis::create_semantic_edge(edge).value()};
+  std::optional<GeometryShapeBounds> expected;
+  for (const auto& axis : axes) {
+    auto candidate = document;
+    REQUIRE(candidate.add_body_transform(
+        BodyTransform::create_rotate(BodyTransformId("rotation"), BodyId("body.base"),
+                                     BodyTransformCoordinateSpace::World, std::nullopt, axis, 90,
+                                     false, false)
+            .value()));
+    auto result = cache();
+    REQUIRE(GeometryRecomputeExecutor{}.execute_document(candidate, result));
+    const auto actual = bounds(result);
+    if (!expected)
+      expected = actual;
+    for (const auto& pair : {std::pair{actual.minimum.x, expected->minimum.x},
+                             {actual.minimum.y, expected->minimum.y},
+                             {actual.minimum.z, expected->minimum.z},
+                             {actual.maximum.x, expected->maximum.x},
+                             {actual.maximum.y, expected->maximum.y},
+                             {actual.maximum.z, expected->maximum.z}})
+      CHECK(pair.first == Catch::Approx(pair.second).margin(1e-7));
+    CHECK(RectangleExtrusionAdapter{}
+              .summarize(*result.find_body_shape(BodyId("body.base")))
+              .volume_mm3 == Catch::Approx(1000));
+  }
+  auto missing = BodyRotationAxisResolver{}.resolve(
+      document, BodyTransformRotationAxis::create_datum_axis(DatumAxisId("missing")).value(),
+      base_cache);
+  REQUIRE_FALSE(missing);
+  CHECK(missing.error().message().find("no longer exists") != std::string::npos);
+  CHECK_FALSE(BodyRotationAxisResolver{}.resolve(document, axes.front(), base_cache));
+}
+
+TEST_CASE("Body rotation edge collection matches cache-aware moved semantic geometry",
+          "[geometry][body-transform][body-axis-parity]") {
+  auto document = box_document();
+  REQUIRE(document.add_body_transform(translation("move", {15, 8, 3})));
+  auto result = cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, result));
+  const auto edge =
+      SemanticEdgeReference::create(FeatureId("feature.base"), SemanticEdge::TopFront).value();
+  const auto expected = SemanticReferenceEvaluator{}.resolve_edge(document, edge, result).value();
+  const auto axis = BodyRotationAxisResolver{}.resolve(
+      document, BodyTransformRotationAxis::create_semantic_edge(edge).value(), result);
+  REQUIRE(axis);
+  CHECK(axis.value().first == expected.start);
+  auto sources = ViewportSceneBuilder{}.build_body_rotation_sources(document, result);
+  REQUIRE(sources);
+  const auto found =
+      std::find_if(sources.value().begin(), sources.value().end(), [&](const auto& source) {
+        const auto* reference = std::get_if<SemanticEdgeReference>(&source.reference);
+        return reference && reference->source_feature() == edge.source_feature() &&
+               reference->edge() == edge.edge();
+      });
+  REQUIRE(found != sources.value().end());
+  const auto shape_bounds = BodyTransformAdapter{}.bounds(found->item.shape).value();
+  CHECK(shape_bounds.minimum.x ==
+        Catch::Approx(std::min(expected.start.x, expected.end.x)).margin(1e-7));
+  CHECK(shape_bounds.minimum.y == Catch::Approx(expected.start.y).margin(1e-7));
+  CHECK(shape_bounds.minimum.z == Catch::Approx(expected.start.z).margin(1e-7));
 }

@@ -1343,7 +1343,7 @@ missing shell/persistence integration; these tickets do not claim that every rep
 | Dimension deletion | [#108](https://github.com/GideonBa/Better-Linux-CAD/issues/108) | Implemented: visible selection, multi-selection enablement and real Delete/Backspace proof | P1 |
 | Construction conversion | [#109](https://github.com/GideonBa/Better-Linux-CAD/issues/109) | Implemented: reversible typed curve/group conversion, lossless curved roles, region exclusion and native modeling/history/persistence proof | P2 |
 | Sketch-line rotation axes | [#110](https://github.com/GideonBa/Better-Linux-CAD/issues/110) | Missing persistent sketch/entity axis source | P2 |
-| Body Rotate axis parity | [#111](https://github.com/GideonBa/Better-Linux-CAD/issues/111) | Shell omits existing derived-datum/semantic-edge support | P2 |
+| Body Rotate axis parity | [#111](https://github.com/GideonBa/Better-Linux-CAD/issues/111) | Implemented: typed derived datum and supported semantic-edge choices, shared resolver and native upstream/history/persistence proof | P2 |
 | Sketch on planar result face | [#112](https://github.com/GideonBa/Better-Linux-CAD/issues/112) | Direct workflow and general associative support identity missing | P2 |
 | Cut feedback and workflow | [#113](https://github.com/GideonBa/Better-Linux-CAD/issues/113) | Implemented: distinct Cut outcomes, correctable diagnostics and exact curved extents; native regression verified | P1 |
 | Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | Completed: affected-root previews/transactions, bounded validated history geometry and native deep-rotor acceptance; conservative fallbacks and local JSON target miss documented | P1 |
@@ -1437,8 +1437,8 @@ main. The input manifest and exact checks live in `docs/development-setup.md`, w
 Blocks 138–143 remain planned.
 
 **Implementation and acceptance complete: #109**, branch `fix/reversible-sketch-construction`,
-based on verified main `4f655c1`; deliver its single PR before starting #111 from verified merged
-main. Role-only conversion retains geometry, canonical ids, exact rational weights, parameters,
+based on verified main `4f655c1`. Delivered by [PR #125](https://github.com/GideonBa/Better-Linux-CAD/pull/125),
+merge `d32edff`; issue #109 is closed and the delivered tree equals tested commit `ab4da06`. Role-only conversion retains geometry, canonical ids, exact rational weights, parameters,
 constraints, dimensions and references; nested/generated groups expand without duplicating members.
 PartDocument persistence now carries curved roles. Geometry excludes auxiliary boundaries/holes;
 whole-selection read-only checks and downstream rejection stay atomic. Native proof covers a
@@ -1451,6 +1451,21 @@ pass **101 / 7,086**; final 150% construction/projection proof passes **5 / 614*
 All five targets build; final source/inventory fingerprints and exact evidence are in
 `docs/development-setup.md`. Remaining issue order is **#111 → #110 → #112 → #106**. This fix
 advances no numbered implementation block; Blocks 138–143 remain planned.
+
+**Implementation and acceptance complete: #111**, branch `fix/body-rotate-axis-parity`, based
+on verified main `d32edff`. Body Rotate exposes typed explicit/derived datum, construction-line and
+supported semantic-edge sources with clear labels. Scoped native edge collection shares cache-aware
+Geometry resolution with the chooser, manipulator frame, preview and Apply; explicit numeric axes
+retain the consuming coordinate-frame contract. Five off-origin 90-degree axis representations,
+invalid references and posed edge presentations pass Geometry proof. The native 100%/150% workflow
+covers derived selection, cancellation, viewport edge selection, source depth 8 → 12 mm, exact local
+Undo/Redo, canonical reopen, full recompute and STEP. Full Geometry **463 / 35,442** and full GUI
+**606 cases: 584 passed, 22 expected native-only skips / 81,444** pass. Native workflow **1 / 320**
+at each scale, affected native/required shell gate **34 / 7,497**, and separate startup **124** pass;
+all 890 final runtime fingerprints remain unchanged. Exact contracts and logs are recorded in
+`docs/development-setup.md`. Its single PR is the delivery boundary; the next issue **#110** starts
+only after merge and exact-tree verification on main. New Sketch-line persistence is that separate
+issue; this fix advances no numbered block. Remaining issue order: **#110 → #112 → #106**.
 
 After all open issues are complete and merged, execute **Blocks 138 → 139 → 140 → 141 → 142 →
 143**, each with the architecture boundaries, GUI access and acceptance gates in

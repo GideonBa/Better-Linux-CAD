@@ -5,6 +5,7 @@
 #include "geometry_shape_internal.hpp"
 
 #include "blcad/geometry/construction_line_resolver.hpp"
+#include "blcad/geometry/body_rotation_axis_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/profile_region_classifier.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
@@ -207,6 +208,46 @@ Result<TopoDS_Shape> make_profile_face(const PointRange& points, PointMapper map
 }
 
 } // namespace
+
+Result<std::vector<ConstructionSelectionTarget>>
+ViewportSceneBuilder::build_body_rotation_sources(const PartDocument& document,
+                                                  const ShapeCache& cache) const {
+  std::vector<ConstructionSelectionTarget> targets;
+  try {
+    for (const auto& feature : document.features()) {
+      if (!cache.find_feature_shape(feature.id()))
+        continue;
+      const auto prefix = "construction-source/" + std::to_string(feature.id().value().size()) +
+                          ":" + feature.id().value() + "/edge/";
+      const auto owner = feature.body_result_context()
+                             ? feature.body_result_context()->effective_produced_body().value()
+                             : std::string{};
+      for (int index = 0; index < 12; ++index) {
+        auto edge = SemanticEdgeReference::create(feature.id(), static_cast<SemanticEdge>(index));
+        if (!edge)
+          continue;
+        auto axis = BodyTransformRotationAxis::create_semantic_edge(edge.value());
+        if (!axis || !BodyRotationAxisResolver{}.resolve(document, axis.value(), cache))
+          continue;
+        auto resolved = SemanticReferenceEvaluator{}.resolve_edge(document, edge.value(), cache);
+        if (!resolved)
+          continue;
+        targets.push_back(
+            {{ViewportSceneKind::Edge, prefix + std::string(to_string(edge.value().edge())),
+              GeometryShape(std::make_shared<GeometryShape::Impl>(
+                  BRepBuilderAPI_MakeEdge(to_point(resolved.value().start),
+                                          to_point(resolved.value().end))
+                      .Shape())),
+              SketchLineRole::Geometry, owner},
+             edge.value()});
+      }
+    }
+  } catch (const Standard_Failure& error) {
+    return Result<std::vector<ConstructionSelectionTarget>>::failure(
+        scene_error(error.GetMessageString()));
+  }
+  return Result<std::vector<ConstructionSelectionTarget>>::success(std::move(targets));
+}
 
 Result<std::vector<ConstructionSelectionTarget>>
 ViewportSceneBuilder::build_construction_sources(const PartDocument& document,

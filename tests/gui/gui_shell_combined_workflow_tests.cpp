@@ -7,6 +7,7 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
+#include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/gui/gui_sketch_dimensions.hpp"
@@ -5475,4 +5476,159 @@ TEST_CASE("Native construction conversion retains curved intent through dimensio
   ui.file("export_part_step", step);
   CHECK(ui.bytes(step).startsWith("ISO-10303-21;"));
   CHECK(state() == after_cut);
+}
+
+TEST_CASE("Native Body Rotate selects derived and semantic axes and follows upstream edits",
+          "[gui][integration][shell-combined-workflow][body-axis-native]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native Qt/OCCT viewport picking");
+  WorkflowUi ui;
+  ui.fit_first_screen();
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Referenced body rotation");
+  ui.rectangle("datum.xy", {24, -4}, {32, 4});
+  const auto source = ui.extrude(8);
+  const auto source_feature = ui.window.session().part_document()->features().back().id();
+  ui.rectangle("datum.xy", {24, 20}, {32, 28});
+  const auto target = ui.extrude(8);
+  const auto datum = DatumAxisId("rotation.derived");
+  checked(ui.window.session().commit_part_transaction(
+      "Rotation reference fixture", [&](PartDocument& part) -> Result<std::size_t> {
+        auto added = part.add_construction_line(checked(ConstructionLine::create_explicit(
+            ConstructionLineId("rotation.line"), "Off-origin axis line", {24, -4, 8}, {1, 0, 0})));
+        if (!added)
+          return added;
+        return part.add_datum_axis(checked(DatumAxis::create_from_construction_line(
+            datum, "Derived rotation axis", ConstructionLineId("rotation.line"))));
+      }));
+  ui.window.refresh();
+  const auto exact_history = [&](const std::string& before, const std::string& after) {
+    ui.command("undo");
+    CHECK(ui.snapshot() == before);
+    ui.command("redo");
+    CHECK(ui.snapshot() == after);
+  };
+  const auto begin = [&] {
+    ui.command("body_rotate");
+    ui.list_data(ui.widget<QListWidget>("blcad.body.sources"),
+                 QString::fromStdString(target.value()));
+  };
+  const auto before = ui.snapshot();
+  begin();
+  ui.data(ui.widget<QComboBox>("blcad.body.axis"), "datum-axis/rotation.derived");
+  ui.scalar("90 deg");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == before);
+  ui.button("blcad.feature.cancel");
+  CHECK(ui.snapshot() == before);
+  ui.idle();
+  begin();
+  ui.data(ui.widget<QComboBox>("blcad.body.axis"), "datum-axis/rotation.derived");
+  ui.scalar("90 deg");
+  ui.capture("body-axis-derived-preview");
+  ui.button("blcad.feature.apply");
+  REQUIRE(ui.window.session().part_document()->body_transforms().back().rotation_axis());
+  CHECK(
+      ui.window.session().part_document()->body_transforms().back().rotation_axis()->datum_axis() ==
+      datum);
+  exact_history(before, ui.snapshot());
+  const auto before_edge = ui.snapshot();
+  begin();
+  ui.button("blcad.body.pick_reference");
+  CHECK(ui.window.viewport().selection_filter_mask() ==
+        (selection_kind_bit(GuiSelectionKind::Datum) | selection_kind_bit(GuiSelectionKind::Edge)));
+  CHECK_FALSE(ui.window.feature_tools().extrude_selection_items().empty());
+  const auto edge = checked(SemanticEdgeReference::create(source_feature, SemanticEdge::TopBack));
+  const auto resolved = checked(geometry::SemanticReferenceEvaluator{}.resolve_edge(
+      *ui.window.session().part_document(), edge, *ui.window.session().part_shape_cache()));
+  const Point3 midpoint{(resolved.start.x + resolved.end.x) / 2,
+                        (resolved.start.y + resolved.end.y) / 2,
+                        (resolved.start.z + resolved.end.z) / 2};
+  const auto pixel = checked(ui.window.viewport().model_to_screen(midpoint));
+  REQUIRE(ui.window.viewport().rect().contains(QPoint(pixel.x, pixel.y)));
+  ui.click_at(ui.window.viewport(), {pixel.x, pixel.y});
+  const auto identity = "construction-source/" + std::to_string(source_feature.value().size()) +
+                        ":" + source_feature.value() + "/edge/top_back";
+  REQUIRE(ui.widget<QComboBox>("blcad.body.axis").currentData().toString() ==
+          QString::fromStdString(identity));
+  CHECK(ui.window.viewport().selection_filter_mask() == selection_kind_bit(GuiSelectionKind::Body));
+  CHECK(ui.window.feature_tools().extrude_selection_items().empty());
+  ui.scalar("90 deg");
+  ui.capture("body-axis-edge-preview");
+  ui.button("blcad.feature.apply");
+  REQUIRE(ui.window.session()
+              .part_document()
+              ->body_transforms()
+              .back()
+              .rotation_axis()
+              ->semantic_edge());
+  CHECK(ui.window.session()
+            .part_document()
+            ->body_transforms()
+            .back()
+            .rotation_axis()
+            ->semantic_edge()
+            ->source_feature() == edge.source_feature());
+  CHECK(ui.window.session()
+            .part_document()
+            ->body_transforms()
+            .back()
+            .rotation_axis()
+            ->semantic_edge()
+            ->edge() == edge.edge());
+  CHECK(ui.summary(target).volume_mm3 == Approx(512).margin(1e-6));
+  exact_history(before_edge, ui.snapshot());
+  const auto old_bounds = ui.bounds(target);
+  const auto before_edit = ui.snapshot();
+  ui.tree(source_feature.value(), true);
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.feature_edit.field/length_parameter"), "12");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.feature_edit.apply");
+  CHECK(ui.summary(source).volume_mm3 == Approx(768).margin(1e-6));
+  CHECK(ui.summary(target).volume_mm3 == Approx(512).margin(1e-6));
+  const auto changed = ui.bounds(target);
+  CHECK(std::abs(changed.minimum.y - old_bounds.minimum.y) > 1);
+  CHECK(std::abs(changed.minimum.z - old_bounds.minimum.z) > 1);
+  const auto after_edit = ui.snapshot();
+  exact_history(before_edit, after_edit);
+  auto full = checked(geometry::ShapeCache::create(ShapeCacheId("rotation.full")));
+  checked(geometry::GeometryRecomputeExecutor{}.execute_document(
+      *ui.window.session().part_document(), full));
+  const auto expected =
+      checked(geometry::BodyTransformAdapter{}.bounds(*full.find_body_shape(target)));
+  for (const auto& pair : {std::pair{changed.minimum.x, expected.minimum.x},
+                           {changed.minimum.y, expected.minimum.y},
+                           {changed.minimum.z, expected.minimum.z},
+                           {changed.maximum.x, expected.maximum.x},
+                           {changed.maximum.y, expected.maximum.y},
+                           {changed.maximum.z, expected.maximum.z}})
+    CHECK(pair.first == Approx(pair.second).margin(1e-6));
+  ui.roundtrip(directory.filePath("rotation.blcad.json"));
+  CHECK(ui.snapshot() == after_edit);
+  REQUIRE(ui.window.session()
+              .part_document()
+              ->body_transforms()
+              .back()
+              .rotation_axis()
+              ->semantic_edge());
+  CHECK(ui.window.session()
+            .part_document()
+            ->body_transforms()
+            .back()
+            .rotation_axis()
+            ->semantic_edge()
+            ->source_feature() == edge.source_feature());
+  CHECK(ui.window.session()
+            .part_document()
+            ->body_transforms()
+            .back()
+            .rotation_axis()
+            ->semantic_edge()
+            ->edge() == edge.edge());
+  ui.capture("body-axis-upstream-edited");
+  ui.file("export_part_step", directory.filePath("rotation.step"));
+  CHECK(ui.bytes(directory.filePath("rotation.step")).startsWith("ISO-10303-21;"));
+  CHECK(ui.snapshot() == after_edit);
+  ui.idle();
 }

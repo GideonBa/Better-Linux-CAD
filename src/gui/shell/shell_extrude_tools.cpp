@@ -309,6 +309,19 @@ bool ShellFeatureTools::accept_extrude_selection(const GuiSelection& selection) 
 }
 
 std::vector<geometry::ViewportSceneItem> ShellFeatureTools::extrude_selection_items() const {
+  if (command_ == Command::BodyRotate && body_reference_picking_ && session_.part_document() &&
+      session_.part_shape_cache()) {
+    std::vector<geometry::ViewportSceneItem> items;
+    auto sources = geometry::ViewportSceneBuilder{}.build_body_rotation_sources(
+        *session_.part_document(), *session_.part_shape_cache());
+    if (sources)
+      for (const auto& source : sources.value())
+        if (std::any_of(body_axes_.begin(), body_axes_.end(), [&](const auto& axis) {
+              return axis.semantic_id == source.item.semantic_id;
+            }))
+          items.push_back(source.item);
+    return items;
+  }
   return command_ == Command::Extrude && extrude_reference_picking_
              ? extrude_face_items_
              : std::vector<geometry::ViewportSceneItem>{};
