@@ -1,16 +1,50 @@
 #include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/result_face_support.hpp"
+#include "blcad/geometry/step_editable_commands.hpp"
 #include "imported_body_test_fixture.hpp"
 
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
+
+#include <catch2/generators/catch_generators.hpp>
 
 #include <array>
 #include <cmath>
 #include <numbers>
+#include <utility>
 
 using namespace imported_body_test;
 
 namespace {
+PartDocument command_import(const Fixture& fixture, bool from_reference) {
+  const auto source = checked(StepImportSource::create(
+      StepImportSourceId("supplier"), "Supplier", "supplier.step",
+      checked(step_import_sha256(fixture.source_bytes())),
+      from_reference ? StepImportMode::Reference : StepImportMode::EditableBody));
+  const auto imported = checked(StepImportReader{}.read(source, fixture.root));
+  REQUIRE(imported.products.size() == 1);
+  const auto catalog = checked(
+      StepImportTopology{}.create_catalog(ImportedTopologyCatalogId("catalog"), imported, 0));
+  if (!from_reference)
+    return checked(StepEditableCommands{}.create_definition(
+        source, catalog, DocumentId("editable.direct"), "Direct editable", FeatureId("import.base"),
+        fixture.root));
+  const auto reference = checked(StepReferenceCommands{}.create_definition(
+      source, catalog, DocumentId("reference.original"), "Original Reference", fixture.root));
+  const auto original = checked(serialize_part_document_to_json(reference));
+  const auto converted = checked(StepReferenceCommands{}.convert(
+      reference, DocumentId("editable.converted"), "Converted editable", FeatureId("import.base"),
+      fixture.root));
+  CHECK(converted.part.id() != reference.id());
+  CHECK_FALSE(converted.part.is_reference_part());
+  CHECK(reference.is_reference_part());
+  CHECK(reference.imported_body_features().empty());
+  CHECK(converted.part.imported_body_features().front().definition().outputs().front().body !=
+        reference.reference_part_definition()->outputs().front().body);
+  CHECK(checked(serialize_part_document_to_json(reference)) == original);
+  return converted.part;
+}
+
 void rectangle(PartDocument& document, const std::string& id, Point2 center, double width,
                double height) {
   REQUIRE(document.add_parameter(length(id + ".width", width)));
@@ -120,15 +154,31 @@ void reexport(const PartDocument& document, const ShapeCache& shapes, const Fixt
   const auto preview = checked(StepImportReader{}.preview_shapes(imported));
   REQUIRE(preview.size() == 1);
   CHECK(volume(preview.front()) == Approx(expected_volume).margin(1e-5));
+  const auto* result = shapes.find_body_shape(document.bodies().front().id());
+  REQUIRE(result);
+  const auto actual_bounds = checked(BodyTransformAdapter{}.bounds(*result));
+  const auto readback_bounds = checked(BodyTransformAdapter{}.bounds(preview.front()));
+  for (const auto& [actual, readback] : std::array<std::pair<double, double>, 6>{
+           {{actual_bounds.minimum.x, readback_bounds.minimum.x},
+            {actual_bounds.minimum.y, readback_bounds.minimum.y},
+            {actual_bounds.minimum.z, readback_bounds.minimum.z},
+            {actual_bounds.maximum.x, readback_bounds.maximum.x},
+            {actual_bounds.maximum.y, readback_bounds.maximum.y},
+            {actual_bounds.maximum.z, readback_bounds.maximum.z}}})
+    CHECK(actual == Approx(readback).margin(1e-6));
 }
 } // namespace
 
 TEST_CASE("Editable STEP base supports additive subtractive hole and imported-edge fillet history",
-          "[geometry][imported-body-downstream-feature]") {
+          "[geometry][imported-body-downstream-feature][integration][step-import-mvp]") {
+  const bool from_reference = GENERATE(false, true);
+  INFO("Public command entry: " << (from_reference ? "Reference conversion" : "direct Editable"));
   Fixture fixture;
   fixture.write(BRepPrimAPI_MakeBox(20, 20, 10).Shape());
   const auto original = fixture.source_bytes();
-  auto document = fixture.editable();
+  auto document = command_import(fixture, from_reference);
+  REQUIRE(document.imported_body_features().size() == 1);
+  CHECK(document.step_import_sources().front().mode() == StepImportMode::EditableBody);
   const auto base_id = document.imported_body_features().front().id();
   const auto body = document.imported_body_features().front().definition().outputs().front().body;
   add_boss(document, body);
@@ -171,6 +221,14 @@ TEST_CASE("Editable STEP base supports additive subtractive hole and imported-ed
   CHECK(checked(GeometryRecomputeExecutor{&context}.execute_plan(document, plan, shapes))
             .executed_feature_count == 2);
   CHECK(body_volume(shapes, body) == Approx(expected(16, 4)).margin(1e-5));
+  auto full_shapes = cache();
+  StepImportTopologyContext full_context(fixture.root);
+  CHECK(checked(GeometryRecomputeExecutor{&full_context}.execute_document(document, full_shapes))
+            .executed_feature_count == 5);
+  CHECK(body_volume(full_shapes, body) == Approx(body_volume(shapes, body)).margin(1e-6));
+  CHECK(full_shapes.find_body_result(body)->source_feature_id == FeatureId("fillet"));
+  CHECK(full_shapes.final_feature_id() == shapes.final_feature_id());
+  CHECK(full_shapes.feature_shape_count() == shapes.feature_shape_count());
   const auto json = checked(serialize_part_document_to_json(document));
   auto reopened = checked(deserialize_part_document_from_json(json));
   auto fresh_shapes = cache();
@@ -178,9 +236,106 @@ TEST_CASE("Editable STEP base supports additive subtractive hole and imported-ed
   REQUIRE(GeometryRecomputeExecutor{&reopened_context}.execute_document(reopened, fresh_shapes));
   CHECK(body_volume(fresh_shapes, body) == Approx(body_volume(shapes, body)).margin(1e-6));
   CHECK(fresh_shapes.find_body_result(body)->source_feature_id == FeatureId("fillet"));
+  CHECK(fresh_shapes.final_feature_id() == FeatureId("fillet"));
+  CHECK(volume(*fresh_shapes.find_imported_body_shape(base_id, body)) == Approx(4000));
   CHECK(checked(serialize_part_document_to_json(reopened)) == json);
   reexport(reopened, fresh_shapes, fixture, expected(16, 4));
   CHECK(fixture.source_bytes() == original);
+}
+
+TEST_CASE("Modeled import failures preserve intent cache and previously exported output",
+          "[geometry][imported-body-downstream-feature][integration][step-import-mvp]") {
+  enum class Failure { Changed, Missing, Lost, Ambiguous };
+  const auto failure =
+      GENERATE(Failure::Changed, Failure::Missing, Failure::Lost, Failure::Ambiguous);
+  Fixture fixture;
+  const auto box = BRepPrimAPI_MakeBox(20, 20, 10).Shape();
+  fixture.write(box);
+  auto document = command_import(fixture, false);
+  const auto base = document.imported_body_features().front();
+  const auto output = base.definition().outputs().front();
+  add_boss(document, output.body);
+  add_cut(document, output.body);
+  add_hole(document, output.body);
+  add_imported_fillet(document, output.body);
+  auto shapes = cache();
+  StepImportTopologyContext initial(fixture.root);
+  REQUIRE(GeometryRecomputeExecutor{&initial}.execute_document(document, shapes));
+  reexport(document, shapes, fixture, expected());
+  document.mark_all_clean();
+  const auto plan = checked(document.create_recompute_plan());
+  REQUIRE(plan.empty());
+  const auto before = checked(serialize_part_document_to_json(document));
+  const auto* body_before = topology(*shapes.find_body_shape(output.body));
+  const auto* base_before = topology(*shapes.find_feature_shape(base.id()));
+  const auto* final_before = topology(*shapes.final_shape());
+  const auto exported = bytes(fixture.root / "modeled.step");
+  if (failure == Failure::Missing)
+    REQUIRE(std::filesystem::remove(fixture.path()));
+  else if (failure == Failure::Changed)
+    fixture.write_bytes(fixture.source_bytes() + "\n/* unaccepted supplier revision */\n");
+  else if (failure == Failure::Lost)
+    fixture.write(BRepPrimAPI_MakeBox(20, 20, 14).Shape());
+  else
+    fixture.write(compound({box, BRepBuilderAPI_Copy(box).Shape()}));
+  const auto supplier_after_external_edit =
+      failure == Failure::Missing ? std::string{} : fixture.source_bytes();
+  StepImportTopologyContext current(fixture.root);
+  CHECK_FALSE(GeometryRecomputeExecutor{&current}.execute_document(document, shapes));
+  CHECK_FALSE(GeometryRecomputeExecutor{&current}.execute_plan(document, plan, shapes));
+  CHECK_FALSE(StepExporter{&current}.write_document_step(document, shapes,
+                                                         (fixture.root / "modeled.step").string()));
+  CHECK(bytes(fixture.root / "modeled.step") == exported);
+
+  const auto refreshed = StepEditableCommands{}.refresh(document, {}, fixture.root);
+  if (failure == Failure::Changed) {
+    // Explicit refresh may accept metadata-only changes, but returning a
+    // disposable candidate must not publish it into the input Part or cache.
+    REQUIRE(refreshed);
+    CHECK(refreshed.value().part.imported_body_features() == document.imported_body_features());
+    CHECK(refreshed.value().part.imported_topology_catalogs() ==
+          document.imported_topology_catalogs());
+  } else {
+    CHECK_FALSE(refreshed);
+  }
+  if (failure == Failure::Lost || failure == Failure::Ambiguous) {
+    auto accepted = document;
+    accept_current(accepted, fixture);
+    const auto accepted_json = checked(serialize_part_document_to_json(accepted));
+    StepImportTopologyContext accepted_context(fixture.root);
+    const auto* recovery = checked(accepted_context.recover(accepted, base.definition().catalog()));
+    const auto* body = recovery->find(output.imported_body);
+    REQUIRE(body);
+    if (failure == Failure::Ambiguous) {
+      CHECK(body->status == ImportedTopologyRecoveryStatus::Ambiguous);
+    } else {
+      CHECK(body->status == ImportedTopologyRecoveryStatus::Resolved);
+      const auto& reference = std::get<ImportedTopologyReference>(
+          accepted.fillet_features().front().edges().front().source());
+      REQUIRE(recovery->find(reference.entry()));
+      CHECK(recovery->find(reference.entry())->status == ImportedTopologyRecoveryStatus::Lost);
+    }
+    CHECK_FALSE(GeometryRecomputeExecutor{&accepted_context}.execute_document(accepted, shapes));
+    CHECK_FALSE(GeometryRecomputeExecutor{&accepted_context}.execute_plan(
+        accepted, checked(accepted.create_recompute_plan()), shapes));
+    CHECK_FALSE(StepExporter{&accepted_context}.write_document_step(
+        accepted, shapes, (fixture.root / "modeled.step").string()));
+    CHECK(checked(serialize_part_document_to_json(accepted)) == accepted_json);
+  }
+  CHECK(checked(serialize_part_document_to_json(document)) == before);
+  CHECK(topology(*shapes.find_body_shape(output.body)) == body_before);
+  CHECK(topology(*shapes.find_feature_shape(base.id())) == base_before);
+  CHECK(topology(*shapes.final_shape()) == final_before);
+  CHECK(body_volume(shapes, output.body) == Approx(expected()).margin(1e-5));
+  CHECK(shapes.feature_shape_count() == 5);
+  CHECK(shapes.body_shape_count() == 1);
+  CHECK(shapes.find_body_result(output.body)->source_feature_id == FeatureId("fillet"));
+  CHECK(shapes.final_feature_id() == FeatureId("fillet"));
+  CHECK(bytes(fixture.root / "modeled.step") == exported);
+  if (failure == Failure::Missing)
+    CHECK_FALSE(std::filesystem::exists(fixture.path()));
+  else
+    CHECK(fixture.source_bytes() == supplier_after_external_edit);
 }
 
 TEST_CASE("Direct imported target accepts a hole and rectangular cut without an authored extrude",

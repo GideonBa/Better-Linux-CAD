@@ -119,7 +119,7 @@ std::size_t product_index(const geometry::StepImportGeometry& imported, double w
 
 TEST_CASE("Structured STEP GUI preparation matches shared commands and saves a new Project without "
           "changing its registry",
-          "[gui][step-structured-import][step-import-workbench]") {
+          "[gui][integration][gui-step-import][step-structured-import][step-import-workbench]") {
   const bool registry_project = GENERATE(false, true);
   const auto mode = GENERATE(StepImportMode::Reference, StepImportMode::EditableBody);
   CAPTURE(registry_project, static_cast<int>(mode));
@@ -173,6 +173,153 @@ TEST_CASE("Structured STEP GUI preparation matches shared commands and saves a n
   REQUIRE(opened.project());
   CHECK(snapshot(opened) == checked(serialize_project_to_json(direct.project)));
   CHECK(bytes(directory.filePath("nested.step")) == asset);
+}
+
+TEST_CASE("Integrated GUI and headless imported relationship failures preserve accepted intent "
+          "history and protected exports",
+          "[gui][integration][gui-step-import][step-import-failure-matrix]") {
+  const std::string scenario = GENERATE("missing", "stale-preview", "lost", "ambiguous");
+  CAPTURE(scenario);
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto asset = directory.filePath("supplier.step");
+  write_geometry(asset);
+  GuiDocumentSession session;
+  create(session, true);
+  const auto document = directory.filePath("accepted.blcad.project.json");
+  REQUIRE(session.save_as(document.toStdString()));
+  const GuiStepImportWorkbench imports;
+  const auto registration = checked(
+      imports.prepare_register(session, "Supplier", "supplier.step", StepImportMode::Reference));
+  REQUIRE(imports.apply(session, registration));
+  const auto topology = checked(imports.prepare_topology(session, registration.source.id(), 0));
+  REQUIRE(imports.apply_topology(session, topology));
+  GuiStepReferenceRequest request;
+  request.catalog = topology.catalog.id();
+  request.new_part = DocumentId("part.reference.acceptance");
+  request.name = "Accepted Reference";
+  request.target_assembly = session.project()->assembly().id();
+  request.instance = ComponentInstanceId("component.fixed");
+  const auto headless = checked(geometry::StepReferenceCommands{}.insert(
+      *session.project(), request.catalog, request.new_part, request.name, request.target_assembly,
+      request.instance, request.transform, directory.path().toStdString()));
+  REQUIRE(imports.apply_reference(session, checked(imports.prepare_reference(session, request))));
+  CHECK(snapshot(session) == checked(serialize_project_to_json(headless.project)));
+  request.operation = GuiStepReferenceOperation::Repeat;
+  request.reference_part = request.new_part;
+  request.instance = ComponentInstanceId("component.moving");
+  REQUIRE(imports.apply_reference(session, checked(imports.prepare_reference(session, request))));
+  const auto top = std::find_if(
+      topology.catalog.entries().begin(), topology.catalog.entries().end(), [](const auto& entry) {
+        return entry.descriptor.kind == ImportedTopologyKind::Face &&
+               entry.descriptor.geometry == ImportedGeometryClass::Plane &&
+               std::abs(entry.descriptor.centroid.z - 5) < 1e-7;
+      });
+  REQUIRE(top != topology.catalog.entries().end());
+  const auto reference = checked(ImportedTopologyReference::create(
+      topology.catalog.id(), top->id, ImportedTopologyCapability::Plane));
+  const auto spelling = checked(make_imported_topology_target_spelling(reference));
+  REQUIRE(session.commit_project_transaction("Use imported face", [&](Project& project) {
+    return project.assembly().add_constraint(checked(AssemblyConstraint::create(
+        AssemblyConstraintId("constraint.imported"), "Imported Mate", AssemblyConstraintType::Mate,
+        checked(AssemblyConstraintTarget::create(ComponentInstanceId("component.fixed"), spelling)),
+        checked(
+            AssemblyConstraintTarget::create(ComponentInstanceId("component.moving"), spelling)))));
+  }));
+  REQUIRE(session.save());
+  const auto before = snapshot(session);
+  const auto saved = bytes(document);
+  const auto undo = std::string(session.undo_label()), redo = std::string(session.redo_label());
+  const auto revision = session.presentation_revision();
+  REQUIRE(session.derived_results_fresh());
+  request.operation = GuiStepReferenceOperation::Refresh;
+  request.refresh_source = registration.source.id();
+  auto prepared = checked(imports.prepare_reference(session, request));
+  const auto revise = [&](const char* marker) {
+    auto data = bytes(asset);
+    REQUIRE(data.indexOf("ENDSEC;") >= 0);
+    data.insert(data.indexOf("ENDSEC;"), marker);
+    write(asset, data);
+  };
+  if (scenario == "missing") {
+    REQUIRE(QFile::remove(asset));
+  } else if (scenario == "stale-preview") {
+    revise("/* supplier revision B */\n");
+    prepared = checked(imports.prepare_reference(session, request));
+    revise("/* supplier revision C */\n");
+    const auto current_headless = checked(geometry::StepEditableCommands{}.refresh(
+        *session.project(), request.reference_part, request.refresh_source,
+        directory.path().toStdString()));
+    const auto current_gui = checked(imports.prepare_reference(session, request));
+    CHECK(checked(serialize_project_to_json(current_headless.project)) ==
+          checked(serialize_project_to_json(
+              std::get<geometry::StepReferenceProjectCandidate>(current_gui.candidate).project)));
+    CHECK(checked(serialize_project_to_json(current_headless.project)) !=
+          checked(serialize_project_to_json(
+              std::get<geometry::StepReferenceProjectCandidate>(prepared.candidate).project)));
+  } else {
+    if (scenario == "lost") {
+      const auto changed = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(
+          checked(Quantity::length_mm(20)), checked(Quantity::length_mm(10)),
+          checked(Quantity::length_mm(8))));
+      REQUIRE(geometry::StepExporter{}.write_step(changed, asset.toStdString()));
+    } else {
+      write_product_geometry(asset, {{20, 5}, {20, 5}});
+    }
+    auto current = *session.project();
+    const auto observed =
+        checked(inspect_step_import_asset(directory.path().toStdString(), "supplier.step"));
+    REQUIRE(observed.observed_sha256_digest());
+    auto* part = current.find_part_document(request.reference_part);
+    REQUIRE(part);
+    REQUIRE(
+        part->refresh_step_import_source(registration.source, *observed.observed_sha256_digest()));
+    REQUIRE(current.refresh_step_import_source(registration.source,
+                                               *observed.observed_sha256_digest()));
+    geometry::StepImportTopologyContext context(directory.path().toStdString());
+    const auto recovery = checked(context.recover(*part, topology.catalog.id()));
+    REQUIRE(recovery->find(top->id));
+    CHECK(recovery->find(top->id)->status == (scenario == "lost"
+                                                  ? ImportedTopologyRecoveryStatus::Lost
+                                                  : ImportedTopologyRecoveryStatus::Ambiguous));
+  }
+  const auto changed_bytes = QFile::exists(asset) ? bytes(asset) : QByteArray{};
+  CHECK_FALSE(imports.apply_reference(session, prepared));
+  if (scenario != "stale-preview") {
+    CHECK_FALSE(imports.prepare_reference(session, request));
+    CHECK_FALSE(geometry::StepEditableCommands{}.refresh(*session.project(), request.reference_part,
+                                                         request.refresh_source,
+                                                         directory.path().toStdString()));
+  }
+  const GuiAnalysisExportWorkbench exports;
+  const auto existing_output = directory.filePath("existing.step");
+  write(existing_output, "existing user export");
+  const auto new_output = directory.filePath("rejected.step");
+  CHECK_FALSE(exports.export_step(
+      session, {GuiStepExportMode::AssemblyFlattened, existing_output.toStdString()}));
+  CHECK_FALSE(exports.export_step(
+      session, {GuiStepExportMode::AssemblyStructured, new_output.toStdString()}));
+  CHECK(bytes(existing_output) == "existing user export");
+  CHECK_FALSE(QFile::exists(new_output));
+  CHECK(snapshot(session) == before);
+  CHECK(bytes(document) == saved);
+  CHECK(session.undo_label() == undo);
+  CHECK(session.redo_label() == redo);
+  CHECK(session.presentation_revision() == revision);
+  CHECK(session.derived_results_fresh()); // Failed commands preserve the accepted cache state.
+  CHECK_FALSE(session.dirty());
+  structured_test::check_portable_json(before);
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(document.toStdString()));
+  CHECK(snapshot(reopened) == before);
+  CHECK(reopened.recompute_status() == GuiRecomputeStatus::Failed);
+  CHECK_FALSE(reopened.part_shape_cache());
+  CHECK_FALSE(reopened.can_undo());
+  CHECK_FALSE(reopened.dirty());
+  if (scenario == "missing")
+    CHECK_FALSE(QFile::exists(asset));
+  else
+    CHECK(bytes(asset) == changed_bytes);
 }
 
 TEST_CASE("Structured STEP copy rejects forged candidates and protected or existing destinations "

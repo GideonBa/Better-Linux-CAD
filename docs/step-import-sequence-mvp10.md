@@ -1,7 +1,8 @@
 # STEP Import Sequence MVP-10
 
-Status: Blocks 137–142 complete; Block 143 planned. Block 142 is accepted on 2026-10-29;
-its PR must merge and main be verified before Block 143 starts. The sequence follows GUI Shell Reset MVP-9R
+Status: Blocks 137–143 complete; STEP Import MVP-10 is accepted on 2026-10-29. PR #134 is merged
+and its verified main tree is the base for Block-143 integrated acceptance. The sequence follows
+GUI Shell Reset MVP-9R
 (Blocks 132–136, `docs/gui-shell-reset-sequence-mvp9r.md`); `docs/mvp-plan.md` is the status authority. An earlier
 revision numbered these blocks 132–138, before MVP-9R took that range; only the numbering moved,
 never the content or the ordering.
@@ -745,11 +746,14 @@ commit `dbe6560`. Runtime fingerprints remain unchanged; this PR must merge befo
 
 Primary boundary: end-to-end import proof and application commands.
 
-Status: planned. Implementation begins only after the accepted Block-142 PR merges and main is
-verified against its tested tree. Existing shared commands/tasks provide the application actions;
-this block closes their integrated proof and any defects that proof exposes.
+Status: complete and accepted on 2026-10-29, on `test/integrated-step-import-acceptance`, after
+PR #134 merges as `c61f5fe`. Main exactly matches tested head `d930a9a`, tree
+`5a2aad73ad0a76398fd131c0ee12253329acde4f`, and all **978** runtime fingerprints; fresh searches
+find no open issues or PRs. Existing shared commands/tasks provide the application actions; this
+block closes their integrated proof. Numbered completion advances through Block 143 only; the next
+planning boundary has no assigned implementation scope.
 
-Add shared commands/APIs and matching GUI tasks for:
+Shared commands/APIs and matching GUI tasks cover:
 
 ```text
 inspect STEP source
@@ -762,7 +766,7 @@ convert Reference Part to a new EditableBody Part
 re-export imported or edited results
 ```
 
-Representative acceptance must prove:
+Representative acceptance proves:
 
 - one Reference Part can be inserted repeatedly, constrained, moved by a supported joint, analyzed,
   saved, loaded, refreshed, and re-exported;
@@ -783,7 +787,55 @@ Focused tag:
 [integration][gui-step-import]
 ```
 
-After Block 143, the first STEP Import MVP is complete.
+The integrated application contract uses the existing commands and Sources task:
+
+| Action | Shared authority | Application workflow |
+| --- | --- | --- |
+| Inspect/register | verified `StepImportReader`, source inspection and transactional registry intent | Save the containing document, inspect a relative STEP asset, choose its explicit mode and apply registration. |
+| Reference or Editable Part | `StepReferenceCommands` / `StepEditableCommands` | Capture the intended product catalog and prepare the Part change. A Project applies its owned definition/occurrence in one history step. A standalone registry saves a new Part beside itself, followed by explicit Open. Repeated Reference occurrences share one definition. |
+| Structured assembly | `StepStructuredImportCommands::create_project` | Choose Import Structured Assembly, prepare its posed hierarchy and save a new Project beside the registry document; explicitly open that copy. |
+| Freshness/refresh | source inspection, verified topology context and complete candidate refresh | Geometry/Apply/export consumers revalidate current bytes before publication. Active Sources previews invalidate stale presentation and clear consumed stale derived geometry. Explicit refresh validates every same-asset owner and its active modeled/Assembly consumers before Apply. |
+| Reference conversion | `StepReferenceCommands::convert` | Create a distinct Editable Part; existing Reference occurrences keep their original definition. Standalone conversion saves a new copy. |
+| Re-export | document-aware Part/flattened/structured STEP exporters | Export the current verified modeled/posed result to a distinct output; source aliases and stale sources reject publication. |
+
+Block-143 execution extends continuous workflows rather than adding another import authority:
+
+| Integrated story | Required final oracle |
+| --- | --- |
+| Reference insert/repeat, constraints, joint motion, analysis, save/load, refresh, conversion and export | Shared definition and occurrence identities survive; actual read-back geometry matches the posed result; the converted definition is new. |
+| Direct and converted Editable bases, ordered additive/subtractive/finishing history, replay and export | Expected physical result, immutable base, incremental/full/reopened equivalence and actual STEP read-back equivalence. |
+| Structured Reference/Editable hierarchy; subsequent Editable authoring and grouped refresh | Shared definitions, actual foreign names, direct/world placements and both export forms remain equivalent; initial-only import validation does not prohibit subsequent authoring. Reference refresh is covered by the separate continuous Reference story. |
+| Missing/changed sources, lost/ambiguous targets and stale prepared candidates | Input Core JSON/history, caller-owned caches and preexisting output sentinels remain intact on rejected operations; presentation invalidation clears stale derived values. |
+| Malformed initial structures | Candidate creation rejects without publishing a Project or changing source bytes. Pure candidate construction owns no session/cache/output transaction. |
+| Native GUI and shared headless commands | Canonical created intent and physical results agree; source bytes remain unchanged; JSON carries semantic BLCAD/import intent without runtime kernel/reader identity fields. |
+
+Proof locations for this integrated boundary:
+
+| Requirement | Executable evidence |
+| --- | --- |
+| Continuous Reference command workflow and atomic source/topology failures | `tests/geometry/assembly_step_reference_part_tests.cpp`, `[integration][step-import-mvp]` |
+| Direct/converted Editable entry, ordered modeling, replay/read-back and modeled failure matrix | `tests/geometry/imported_body_downstream_feature_tests.cpp`, `[integration][step-import-mvp]` |
+| Shared structured hierarchy, actual geometry refresh and ordinary post-import authoring | `tests/geometry/structured_step_import_tests.cpp`, `[integration][step-import-mvp]` |
+| Malformed graph endpoints, cycles and complete DAG depth | The same structured test file, `[structured-step-import-malformed]`, retained from Block 142 and included in full regression; candidate rejection and unchanged source bytes |
+| Actual Reference analysis/export and Editable modeling/export controls, canonical command parity | `tests/gui/gui_shell_step_import_tests.cpp`, `[integration][gui-step-import]`, native Qt/OCCT at both scales |
+| Structured copy/open and five posed physical export leaves | `tests/gui/gui_shell_step_structured_import_tests.cpp`, `[integration][gui-step-import]`, native Qt/OCCT at both scales |
+| Headless/GUI structured candidate equivalence, missing/stale/Lost/Ambiguous prepared-operation atomicity | `tests/gui/gui_step_import_workbench_tests.cpp`, `[integration][gui-step-import]` |
+| Source bytes and portable semantic JSON | Assertions throughout those continuous stories and shared GUI physical/JSON helpers; literal foreign display names remain allowed |
+
+Acceptance: all five targets build with **507** valid nonempty dependency records. Focused
+Geometry passes **5 / 5,978** and focused GUI **8 cases — 5 passed, 3 native-only skips / 1,765
+assertions**. Full Core **596 / 22,501**, Geometry **564 / 49,787**, and GUI **648 cases —
+615 passed, 33 expected native-only skips / 85,528 assertions** pass. Native 100% **13 / 7,391**
+and 150% **4 / 3,875** pass without skips; captures were reviewed at both scales. A separate native
+startup reaches intentional **124** and legacy CLI exports **19,170 bytes**. All gates use the
+**978-file** freeze `e0942e2c06a4aa15f79ce60597a12a764a9fa36f24e8b3a2fc7f0789615d8722`;
+the development setup owns exact commands, logs and final numbered-documentation inventory.
+Only tests and documentation/coverage scope change in this slice; shared application commands
+and persistence authorities remain those delivered through Block 142.
+Final Shell inventory passes **3 / 313** after the numbered plan records completion through 143.
+
+The first STEP Import MVP is complete through Block 143. Subsequent phases remain unassigned;
+the numbered successor 144 is a future planning boundary, with no implementation started here.
 
 ## Explicit deferrals after Block 143
 
