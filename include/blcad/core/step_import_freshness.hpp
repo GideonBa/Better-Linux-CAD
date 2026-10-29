@@ -85,6 +85,13 @@ inspect_step_import_asset(const std::filesystem::path& root_directory,
 inspect_step_import_source(const StepImportSource& source,
                            const std::filesystem::path& root_directory);
 
+// Return a runtime-only byte snapshot from the same verified read used by inspection. The source
+// must be available, unchanged throughout the read, and match its accepted SHA-256 digest. No path
+// is exposed for a later unchecked parser read, and neither the source nor its host is modified.
+[[nodiscard]] Result<std::string>
+read_verified_step_import_source(const StepImportSource& source,
+                                 const std::filesystem::path& root_directory);
+
 // Re-read the source and compare both accepted intent and the previously observed digest/root.
 // Missing, unreadable, changed-since-preview or stale-intent results cannot mutate the registry.
 [[nodiscard]] Result<std::size_t>

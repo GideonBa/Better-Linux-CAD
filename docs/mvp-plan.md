@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 137
-current_block: 138
-current_boundary: OCCT STEP/XDE reader and deterministic imported body definitions
-current_tag: "[geometry][step-import-reader]"
+implemented_through: Block 138
+current_block: 139
+current_boundary: Stable imported topology identity and recovery
+current_tag: "[core][step-import-topology]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -19,7 +19,7 @@ phase_status:
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 implemented; MVP complete"
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
-  mvp_10: "STEP Import — Block 137 implemented; Blocks 138–143 planned"
+  mvp_10: "STEP Import — Blocks 137–138 implemented; Blocks 139–143 planned"
 ---
 
 # MVP Plan
@@ -31,10 +31,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 137
-current block        Block 138 (planned)
+implemented through  Block 138
+current block        Block 139 (planned)
 current phase        STEP Import MVP-10
-current boundary     OCCT STEP/XDE reader and deterministic imported body definitions
+current boundary     Stable imported topology identity and recovery
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
@@ -54,7 +54,9 @@ entries below retain the acceptance state at the time of each slice.
 Block 137 is complete on 2026-10-26: persistent STEP source identity, explicit modes, canonical JSON,
 freshness and transactional source management are implemented and verified. Its Core/GUI contracts,
 complex workflows, full regression and native evidence live in `docs/step-import-sequence-mvp10.md`.
-The actual STEP/XDE geometry reader remains the next planned boundary, Block 138.
+Block 138 is complete on 2026-10-29: verified immutable STEP bytes feed the deterministic XDE
+reader and read-only product/body/unit inspection. Its full regression, native proofs and realistic
+rotor measurements are recorded in the same sequence and `docs/development-setup.md`.
 
 ## Phase map
 
@@ -69,7 +71,7 @@ MVP-7   GUI Feature Validation                        Blocks 95–105 implemente
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
 MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 implemented
 MVP-9R  GUI Shell Reset                                 Blocks 132–136 implemented
-MVP-10  STEP Import                         Block 137 implemented; Blocks 138–143 planned
+MVP-10  STEP Import                         Blocks 137–138 implemented; Blocks 139–143 planned
 ```
 
 Canonical phase sequences:
@@ -1510,7 +1512,7 @@ Imported supports remain outside this issue and no numbered implementation block
 PR #128 merged as `c9d203b`; the delivered main tree exactly matches head `de270a9`, all runtime
 fingerprints match, issue #112 is closed with its seven acceptance checks complete and no PR remains.
 
-**Verified for delivery: #106**, branch `fix/sketch-dimension-presentation`, from main
+**Completed: #106**, branch `fix/sketch-dimension-presentation`, from main
 `c9d203b`. Dimensions now separate true measured references, placed measure/extension lines,
 angle/arc-length arcs, leaders, origin marks and terminators. A shared projected layout supplies
 painted strokes, triangles, caption bounds, picking and inline-editor placement. Horizontal/vertical
@@ -1534,28 +1536,49 @@ review are documented in `docs/gui-sketch-dimension-authoring-mvp8.md`. Full DIN
 requires a separate review of the complete applicable text and is not claimed here. Manual label
 placement retains existing overlap cycling; no automatic caption-collision solver is introduced.
 Delivery: [PR #129](https://github.com/GideonBa/Better-Linux-CAD/pull/129), verified implementation
-commit `8dd28dc`. Merge this single PR and verify main before starting Block 138. No numbered
-implementation block is advanced by this fix.
+commit `8dd28dc`. PR #129 merged as `61e60b6`; main exactly matches tested head `9b929e7`,
+all 900 runtime fingerprints match, all six issue acceptance checks are complete, and a fresh
+GitHub search finds no open issues or PRs. No numbered implementation block is advanced by this fix.
 
-After all open issues are complete and merged, execute **Blocks 138 → 139 → 140 → 141 → 142 →
+With the issue queue complete and merged, execute **Blocks 138 → 139 → 140 → 141 → 142 →
 143**, each with the architecture boundaries, GUI access and acceptance gates in
 `docs/step-import-sequence-mvp10.md`. This queue is a plan, not evidence that any later block is
-complete; Block 137 remains complete and Blocks 138–143 remain planned.
+complete; Blocks 137–138 are complete and Blocks 139–143 remain planned.
 
-## Next numbered technical step — Block 138 (planned)
+## Implemented Block 138 — STEP/XDE reader and geometry inspection (2026-10-29)
 
-Implement the OCCT STEP/XDE reader and deterministic product/body definitions over the verified
-external-source contract. Normalize declared units to millimeters, preserve supported names and
-hierarchy diagnostics, and reject empty/invalid transfer or ambiguous units before mutation. Add real
-STEP fixtures and GUI inspection previews with product/body/unit diagnostics. Measure inspection cost
-on realistic assets while keeping explicit source revalidation. Imported topology, Reference Parts,
-EditableBody features and structured Assembly import remain Blocks 139–143.
+Branch `feat/step-xde-inspection` starts from verified main `61e60b6`, after all open issues and
+PRs are closed. Secure byte snapshots, the Geometry reader and the existing headless/Shell
+inspection clients are delivered together on this branch; no additional PR is opened in parallel.
+
+The reader normalizes declared units to millimeters, preserves supported names and shared product
+definitions, separates product-local bodies from direct occurrences, and rejects invalid/empty
+transfer, ambiguous units, external references and invalid composed placements before publication.
+Inspection is read-only and disposable, with explicit source revalidation and reliable invalidation
+after atomic file replacement. Core JSON and authored history contracts remain unchanged.
+
+All five targets build. Full Core **560 / 17,987**, Geometry **491 / 36,718** and GUI
+**625 cases — 597 passed, 28 expected native-only skips / 82,197 assertions** pass. Native source,
+inspection, viewer and required coverage pass **21 / 3,267** at 100%; the two new inspection cases
+also pass at 150% **2 / 673**. Separate startup reaches intentional **124**. The isolated 20-blade
+rotor profile passes **1 / 64**, with five warm reader samples at **169.8 ms median / 173.2 ms
+observed maximum**, without a portable budget claim. All **904** runtime fingerprints remain
+unchanged. Exact commands, red-before-fix regressions, captures and raw timing observations live in
+`docs/development-setup.md` and `docs/benchmarks/block138-step-inspection.json`.
+
+## Next numbered technical step — Block 139 (planned)
+
+After the single Block-138 PR is merged and main is verified, introduce persisted imported
+body/face/edge/vertex identities with normalized recovery descriptors and explicit
+Resolved/Lost/Ambiguous outcomes. Freeze supported analytic capabilities and resolve imported
+semantic references for downstream Part inputs and local/cross-hierarchy Assembly targets.
+Exact boundaries and focused tags live in `docs/step-import-sequence-mvp10.md`.
 
 ## Later phases
 
 Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R
-is complete through Block 136. STEP Import MVP-10 has completed source management in Block 137;
-Blocks 138–143 remain planned in `docs/step-import-sequence-mvp10.md`.
+is complete through Block 136. STEP Import MVP-10 has completed source management and geometry
+inspection in Blocks 137–138; Blocks 139–143 remain planned in `docs/step-import-sequence-mvp10.md`.
 
 
 Issue #113 follow-up (2026-10-28) rejects ineffective/full-target Cuts with distinct correction

@@ -216,6 +216,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/sketch_reference_projector.cpp
     src/geometry/sketch_region_finder.cpp
     src/geometry/step_exporter.cpp
+    src/geometry/step_import_reader.cpp
     src/geometry/workplane_resolver.cpp
   )
   add_library(BLCAD::geometry ALIAS blcad_geometry)
@@ -600,6 +601,8 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/sketch_region_finder_tests.cpp
       tests/geometry/spline_profile_pipeline_tests.cpp
       tests/geometry/step_exporter_tests.cpp
+      tests/geometry/step_import_reader_tests.cpp
+      tests/geometry/step_import_profile_tests.cpp
       tests/geometry/viewport_scene_tests.cpp
       tests/geometry/assembly_interaction_tests.cpp
       tests/geometry/workplane_resolver_tests.cpp
@@ -614,7 +617,7 @@ if(BLCAD_BUILD_TESTS)
       target_compile_options(blcad_geometry_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
-    catch_discover_tests(blcad_geometry_tests)
+    catch_discover_tests(blcad_geometry_tests TEST_SPEC "~[step-import-profile]")
   endif()
 
   if(BLCAD_BUILD_GUI)

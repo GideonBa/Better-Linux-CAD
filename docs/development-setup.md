@@ -498,8 +498,9 @@ Blocks 132 (QOpenGLWidget viewport), 133 (`ShellWindow` + `ShellRibbon`, origin 
 (`ShellSketchTools`), and 135 (`ShellFeatureTools`, Extrude/Revolve, manipulator overlay) are
 implemented; Block 136 restores full bounded feature coverage and is accepted with full offscreen,
 native Qt/OCCT and closure checks. Block 137 adds verified STEP source intent, freshness and shell
-management. All Blocks through 137 are complete; Block 138 (STEP/XDE reader) is next. Source contracts
-and acceptance evidence live in `docs/step-import-sequence-mvp10.md`; the completed shell milestone
+management. Block 138 adds the verified STEP/XDE reader and read-only geometry inspection.
+All Blocks through 138 are complete; Block 139 (imported topology identity/recovery) is next.
+Source contracts and acceptance evidence live in `docs/step-import-sequence-mvp10.md`; the completed shell milestone
 lives in `docs/gui-shell-acceptance-mvp9r.md`. Dated proof sections below retain their original
 incremental status.
 
@@ -2116,3 +2117,95 @@ as listed above. No numbered implementation block is advanced by this issue.
 Delivery: [PR #129](https://github.com/GideonBa/Better-Linux-CAD/pull/129), implementation
 commit `8dd28dc`. The delivery-link commit changes only Markdown and preserves the verified
 runtime fingerprints.
+
+### Block 138 — STEP/XDE geometry inspection
+
+The reader consumes the secure immutable source snapshot and keeps product-local body
+geometry separate from direct occurrence placements. The existing source task adds a
+separate read-only geometry inspection; metadata registration/refresh/removal retain their
+Block-137 contracts. Exact reader, unit, ordering, repair-policy and inspection lifecycle
+boundaries live in `docs/step-import-sequence-mvp10.md`. Block 138 is accepted on 2026-10-29
+with the complete gates below; imported topology identity remains the next planned boundary.
+
+```bash
+cmake --build build/dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app blcad_export_step -j 8
+./build/dev-gui/blcad_core_tests "[step-import-source],[step-import-json],[step-import-freshness],[step-import-snapshot]"
+./build/dev-gui/blcad_geometry_tests "[step-import-reader]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[step-import-inspection],[step-import-workbench],[block137-step-import],[block138-step-inspection],[integration][gui-feature-coverage]"
+mkdir -p /tmp/blcad138-native-100 /tmp/blcad138-native-150
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad138-native-100 QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[step-import-inspection],[step-import-workbench],[block137-step-import],[block138-step-inspection],[native-viewer-lifecycle],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad138-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[native-step-inspection]"
+BLCAD_STEP_IMPORT_PROFILE_OUTPUT=/tmp/blcad138-inspection-profile.json ./build/dev-gui/blcad_geometry_tests "[step-import-profile]"
+./build/dev-gui/blcad_core_tests
+./build/dev-gui/blcad_geometry_tests
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+Create the capture directories before native runs. Keep builds, source edits, GUI suites
+and timing runs serial; the opt-in rotor profile excludes fixture creation/export from
+its timings and is excluded from ordinary CTest discovery. It records the first measured
+inspection and five repeated inspections of an already-written source, with a warm OS
+cache; these are observations, not portable correctness/performance budgets. This host
+uses Debug GCC, OCCT **7.6.3**, Qt **6.4.2**, an Intel **i7-1370P** with 20 logical CPUs,
+and Linux **7.0.0-38-generic**. No background Geometry worker is introduced.
+
+The first native capture exposed a real far-origin preview problem: fitting all origin
+references and imported geometry left the translated body about two pixels wide. The
+inspection now uses an explicit preview-only fit and the native test requires at least
+80 logical DIPs of projected model width, while preserving camera restoration. History
+assertions use the actual Shell Undo/Redo availability during a task and verify the real
+history after cancellation; `GuiDocumentSession::can_undo`/labels intentionally suppress
+history while any task is active. Existing session guards are preserved.
+
+The initial generated unit fixtures created the writer before changing its unit setting;
+OCCT had already captured its output scale. Corrected fixtures set the unit before writer
+creation and independently parse raw STEP point spans × declared scale, retaining the
+original physical bounds/volume expectations. Reversed-definition fixtures use a nonidentity
+placement so the OCCT writer preserves the authored occurrence name. Located-root fixtures
+assert the writer's actual auxiliary assembly plus direct placement and exact posed bounds;
+they do not assume a flattened source product. The duplicate-unit fixture accepts the
+writer's whitespace. Intermediate failing logs are development evidence, not final checks.
+
+Final review added regressions before fixing two concrete defects. Two finite `1e308`
+translations overflowed only after hierarchy composition or combination with a body-local
+placement; both new checks failed in `/tmp/blcad138-transform-red.log`. Reading and preview
+now share rooted placement validation before publishing geometry. The native atomic-replacement
+case failed four checks in `/tmp/blcad138-watcher-red.log`: after an identical-byte replacement,
+the old file watch disappeared and a later in-place change left stale geometry visible. Valid
+notifications now rearm the replacement watch. The unchanged regression first drains replacement
+events and uses independently prepared changed bytes, so no later directory/export event masks
+the lost watch. Both fixes are included in every closure gate below.
+
+Final runtime freeze: **904 files**, SHA-256
+`c465168447c31608584d4f7109c74b3ba6c1274d3f447c8d97808e961859118b`,
+`/tmp/blcad138-source-freeze.json`; verify with `python3 /tmp/blcad138-freeze.py check`.
+All five targets build (`/tmp/blcad138-build-closure.log`). Focused Core passes
+**12 / 681**, Geometry **12 / 634**; focused
+GUI/required inventory passes **20 cases — 17 passed, 3 expected native-only skips /
+2,402 assertions** (`core-focused-closure`, `geometry-focused-closure`, `gui-focused-closure`).
+Complete Core passes **560 / 17,987** and Geometry **491 / 36,718**
+(`/tmp/blcad138-{core-closure,geometry-closure}.log`).
+Complete offscreen GUI passes **625 cases — 597 passed, 28 expected native-only skips /
+82,197 assertions** (`/tmp/blcad138-gui-closure.log`).
+After the final numbered-status update, the required Shell inventory passes **3 / 306**
+(`/tmp/blcad138-final-inventory.log`); historical Block-136 acceptance ownership is preserved.
+
+Final native 100% source/inspection/workbench/viewer/required inventory passes **21 / 3,267**
+(`/tmp/blcad138-native-closure-100.log`), including both new native inspection cases. Those cases
+also pass at 150% **2 / 673** (`native-closure-150`). Empty Part/Project, changed-source
+rejection and explicit-refresh captures were inspected across both scales. Separate startup
+reaches intentional timeout **124** (`startup-closure`). No High-severity, BadDrawable, BadWindow
+or unmatched-filter message appears; the existing OCCT Medium incomplete visual warning remains.
+
+The isolated final rotor profile passes **1 / 64** (`/tmp/blcad138-profile-closure.log`).
+Raw samples, host, workload and timing scope are retained in
+`docs/benchmarks/block138-step-inspection.json`: **615,000 bytes**, one product/body/root
+occurrence, **122 faces**, source-volume agreement at **75,778.64478 mm³**. First measured
+reader time is **167.5 ms**; the five repeated reader samples have median **169.8 ms** and
+observed maximum/nearest-rank p95 **173.2 ms**. Separate snapshot median is **0.560 ms**;
+posed-preview composition median is **0.021 ms**. Full reader time includes its own secure
+snapshot; these columns are not additive. Fixture creation/export, rendering, GUI events
+and native publication are excluded. Five warm samples do not establish a reliable tail
+budget, and the already-written file was in the OS cache. The generated STEP header timestamp
+changes its byte digest across exports; the code recreates the same geometric workload.

@@ -8,13 +8,14 @@ namespace blcad::gui {
 class ShellWindow;
 class ShellRibbon;
 
-// Owns the source-registration task; geometry import follows in Block 138.
+// Owns source registration and disposable STEP geometry inspection.
 class ShellStepImportTools final : public QObject {
 public:
   ShellStepImportTools(ShellWindow&, ShellRibbon&, int model_tab, int assembly_tab);
   ~ShellStepImportTools() override;
   [[nodiscard]] Result<std::size_t> begin();
   [[nodiscard]] Result<std::size_t> inspect();
+  [[nodiscard]] Result<std::size_t> inspect_geometry();
   [[nodiscard]] Result<std::size_t> preview();
   [[nodiscard]] Result<std::size_t> apply();
   [[nodiscard]] bool active() const noexcept;

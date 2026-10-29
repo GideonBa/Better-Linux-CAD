@@ -4,6 +4,8 @@
 #include "blcad/core/step_import_freshness.hpp"
 #include "blcad/core/step_import_source.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
+#include "blcad/geometry/body_transform_adapter.hpp"
+#include "blcad/geometry/step_exporter.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
@@ -17,6 +19,7 @@
 #include <QDialog>
 #include <QDir>
 #include <QDockWidget>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileDialog>
 #include <QInputDialog>
@@ -27,6 +30,7 @@
 #include <QMouseEvent>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QSaveFile>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QTableWidget>
@@ -39,6 +43,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <string>
 #include <vector>
@@ -75,6 +80,14 @@ std::string digest(const QByteArray& value) {
 const QByteArray first_asset("ISO-10303-21;\n/* supplier revision A */\nEND-ISO-10303-21;\n");
 const QByteArray second_asset("ISO-10303-21;\n/* supplier revision B */\nEND-ISO-10303-21;\n");
 const QByteArray third_asset("ISO-10303-21;\n/* supplier revision C */\nEND-ISO-10303-21;\n");
+
+void write_inspection_geometry(const QString& path, double width = 20) {
+  auto shape = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(
+      checked(Quantity::length_mm(width)), checked(Quantity::length_mm(10)),
+      checked(Quantity::length_mm(5))));
+  shape = checked(geometry::BodyTransformAdapter{}.translate(shape, {1000, 2000, 3000}));
+  REQUIRE(geometry::StepExporter{}.write_step(shape, path.toStdString()));
+}
 
 // User-facing workflows stop at Qt input. Core/session reads below are oracles;
 // external file writes simulate supplier changes, not authoring shortcuts.
@@ -785,6 +798,220 @@ TEST_CASE("Native STEP source dialog and explicit mode controls remain reachable
   ui.key(ui.window.viewport(), Qt::Key_Escape);
   CHECK_FALSE(ui.window.step_import_tools().active());
   CHECK(bytes(asset) == first_asset);
+}
+
+TEST_CASE("Native STEP geometry inspection previews an empty document without accepting intent",
+          "[gui][integration][block138-step-inspection][native-step-inspection]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native STEP preview rendering and task layout");
+  const bool project = GENERATE(false, true);
+  SourceUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto document =
+      directory.filePath(project ? "empty.blcad.project.json" : "empty.blcad.json");
+  const auto asset = directory.filePath("supplier.step");
+  write_inspection_geometry(asset);
+  const auto original_asset = bytes(asset);
+  REQUIRE((project ? ui.window.new_project("Empty inspection")
+                   : ui.window.new_part("Empty inspection")));
+  ui.file("save_as", document);
+  const auto before = ui.snapshot();
+  const auto undo = ui.window.session().can_undo();
+  const auto redo = ui.window.session().can_redo();
+  const auto undo_label = std::string(ui.window.session().undo_label());
+  const auto redo_label = std::string(ui.window.session().redo_label());
+  const auto normal_presentations = ui.window.viewport().presentation_count();
+  ui.begin();
+  ui.draft("Supplier geometry", "supplier.step", StepImportMode::Reference);
+  const auto camera = ui.window.viewport().camera_bookmark();
+  ui.button("inspect_geometry");
+  INFO(ui.field<QLabel>("summary").text().toStdString());
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.window.viewport().feature_preview_count() == 1);
+  CHECK(ui.window.viewport().presentation_count() == normal_presentations);
+  CHECK_FALSE(ui.field<QPushButton>("apply").isEnabled());
+  CHECK(ui.field<QLabel>("geometry_summary").text().contains("1 body definitions"));
+  CHECK(ui.field<QLabel>("geometry_units").text().contains(QString::fromUtf8("→ mm")));
+  CHECK_FALSE(ui.field<QPlainTextEdit>("geometry_diagnostics").toPlainText().isEmpty());
+  CHECK(ui.field<QPlainTextEdit>("geometry_diagnostics").isReadOnly());
+  auto& products = ui.field<QTreeWidget>("geometry_products");
+  REQUIRE(products.topLevelItemCount() == 2);
+  REQUIRE(products.topLevelItem(0)->childCount() == 1);
+  CHECK(products.topLevelItem(0)->child(0)->text(1) == "Part / Solid");
+  REQUIRE(products.topLevelItem(0)->child(0)->childCount() == 1);
+  CHECK(products.topLevelItem(0)->child(0)->child(0)->text(1) == "Solid");
+  CHECK_FALSE(products.topLevelItem(0)->child(0)->child(0)->flags() & Qt::ItemIsEditable);
+  const auto center = checked(ui.window.viewport().model_to_screen({1000, 2000, 3002.5}));
+  CHECK(center.x > 0);
+  CHECK(center.x < ui.window.viewport().width());
+  CHECK(center.y > 0);
+  CHECK(center.y < ui.window.viewport().height());
+  const auto left = checked(ui.window.viewport().model_to_screen({990, 2000, 3002.5}));
+  const auto right = checked(ui.window.viewport().model_to_screen({1010, 2000, 3002.5}));
+  CHECK(std::hypot(right.x - left.x, right.y - left.y) >= 80);
+  ui.click_at(ui.window.viewport(), {center.x, center.y});
+  CHECK_FALSE(ui.window.viewport().selected_semantic());
+  CHECK(ui.window.session().selection().empty());
+  CHECK(ui.snapshot() == before);
+  CHECK(ui.sources().empty());
+  CHECK_FALSE(ui.window.session().dirty());
+  CHECK(ui.action("undo").isEnabled() == undo);
+  CHECK(ui.action("redo").isEnabled() == redo);
+  CHECK(ui.window.step_import_tools().can_undo_after_cancel() == undo);
+  CHECK(ui.window.step_import_tools().can_redo_after_cancel() == redo);
+  ui.reveal(products);
+  CHECK(ui.field<QScrollArea>("scroll").horizontalScrollBar()->maximum() == 0);
+  CHECK(products.horizontalScrollBar()->maximum() == 0);
+  ui.capture(project ? "step-inspection-empty-project" : "step-inspection-empty-part");
+  ui.command("save");
+  REQUIRE(ui.window.step_import_tools().active());
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == before);
+  ui.text(ui.field<QLineEdit>("name"), "Edited draft");
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.field<QTreeWidget>("geometry_products").topLevelItemCount() == 0);
+  CHECK(ui.window.viewport().camera_bookmark().scale == Approx(camera.scale).margin(1e-7));
+  CHECK(ui.snapshot() == before);
+  for (int route = 0; route < 3; ++route) {
+    CAPTURE(route);
+    if (!ui.window.step_import_tools().active()) {
+      ui.begin();
+      ui.draft("Supplier geometry", "supplier.step", StepImportMode::Reference);
+    }
+    ui.button("inspect_geometry");
+    REQUIRE(ui.window.viewport().feature_preview_active());
+    if (route == 0)
+      ui.button("cancel");
+    else if (route == 1)
+      ui.key(ui.window.viewport(), Qt::Key_Escape);
+    else
+      ui.field<QDockWidget>("task").close();
+    ui.flush();
+    CHECK_FALSE(ui.window.step_import_tools().active());
+    CHECK_FALSE(ui.window.viewport().feature_preview_active());
+    CHECK(ui.window.viewport().presentation_count() == normal_presentations);
+    CHECK(ui.snapshot() == before);
+    CHECK_FALSE(ui.window.session().dirty());
+    CHECK(ui.window.session().can_undo() == undo);
+    CHECK(ui.window.session().can_redo() == redo);
+    CHECK(ui.window.session().undo_label() == undo_label);
+    CHECK(ui.window.session().redo_label() == redo_label);
+  }
+  CHECK(bytes(asset) == original_asset);
+}
+
+TEST_CASE(
+    "Native STEP geometry inspection invalidates changed assets and respects explicit refresh",
+    "[gui][integration][block138-step-inspection][native-step-inspection]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native STEP preview and filesystem notifications");
+  SourceUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto document = directory.filePath("inspection.blcad.json");
+  const auto asset = directory.filePath("supplier.step");
+  write_inspection_geometry(asset);
+  REQUIRE(ui.window.new_part("Source freshness inspection"));
+  QTemporaryDir changed_geometry_directory;
+  REQUIRE(changed_geometry_directory.isValid());
+  const auto changed_geometry = changed_geometry_directory.filePath("changed.step");
+  write_inspection_geometry(changed_geometry, 40);
+  const auto changed_bytes = bytes(changed_geometry);
+  ui.file("save_as", document);
+  ui.begin();
+  ui.draft("Supplier", "supplier.step", StepImportMode::EditableBody);
+  ui.preview();
+  ui.apply();
+  const auto source_id = QString::fromStdString(ui.sources().front().id().value());
+  ui.command("save");
+  const auto registered = ui.snapshot();
+  const auto undo_label = std::string(ui.window.session().undo_label());
+  ui.begin();
+  ui.source(source_id);
+  const auto camera = ui.window.viewport().camera_bookmark();
+  ui.button("inspect_geometry");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  const auto accepted_bytes = bytes(asset);
+  {
+    QSaveFile replacement(asset);
+    REQUIRE(replacement.open(QIODevice::WriteOnly));
+    REQUIRE(replacement.write(accepted_bytes) == accepted_bytes.size());
+    REQUIRE(replacement.commit());
+  }
+  // Finish the atomic-replacement notifications before modifying the replacement inode.
+  // A pending directoryChanged event must not mask a lost file watch in the next step.
+  ui.flush();
+  QEventLoop replacement_events;
+  QTimer::singleShot(25, &replacement_events, &QEventLoop::quit);
+  replacement_events.exec();
+  ui.flush();
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.field<QLabel>("status").property("freshness").toInt() ==
+        static_cast<int>(StepImportFreshness::Available));
+  CHECK(bytes(asset) == accepted_bytes);
+  CHECK(ui.snapshot() == registered);
+  CHECK_FALSE(ui.window.session().dirty());
+  CHECK(ui.action("undo").isEnabled());
+  CHECK(ui.window.step_import_tools().can_undo_after_cancel());
+  write(asset, changed_bytes);
+  ui.flush();
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.field<QLabel>("status").property("freshness").toInt() ==
+        static_cast<int>(StepImportFreshness::Changed));
+  CHECK(ui.field<QTreeWidget>("geometry_products").topLevelItemCount() == 0);
+  CHECK(ui.window.viewport().camera_bookmark().scale == Approx(camera.scale).margin(1e-7));
+  CHECK(ui.snapshot() == registered);
+  CHECK_FALSE(ui.window.session().dirty());
+  CHECK(ui.action("undo").isEnabled());
+  CHECK(ui.window.step_import_tools().can_undo_after_cancel());
+  ui.button("inspect_geometry");
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK_FALSE(ui.field<QPushButton>("apply").isEnabled());
+  CHECK(ui.field<QLabel>("summary").text().contains("digest"));
+  CHECK(ui.snapshot() == registered);
+  ui.capture("step-inspection-changed-source-rejected");
+  ui.button("cancel");
+  CHECK(ui.window.session().undo_label() == undo_label);
+  ui.begin();
+  ui.source(source_id);
+  ui.preview();
+  ui.apply();
+  const auto refreshed = ui.snapshot();
+  REQUIRE(refreshed != registered);
+  ui.command("save");
+  ui.begin();
+  ui.source(source_id);
+  ui.button("inspect_geometry");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.reveal(ui.field<QTreeWidget>("geometry_products"));
+  ui.capture("step-inspection-explicit-refresh");
+  const auto current_asset = bytes(asset);
+  ui.command("undo");
+  CHECK_FALSE(ui.window.step_import_tools().active());
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == registered);
+  ui.command("redo");
+  CHECK(ui.snapshot() == refreshed);
+  ui.begin();
+  ui.source(source_id);
+  ui.button("inspect_geometry");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  const auto moved = directory.filePath("renamed.blcad.json");
+  ui.file("save_as", moved);
+  CHECK_FALSE(ui.window.step_import_tools().active());
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == refreshed);
+  ui.begin();
+  ui.source(source_id);
+  ui.button("inspect_geometry");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.file("open", moved);
+  CHECK_FALSE(ui.window.step_import_tools().active());
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == refreshed);
+  CHECK_FALSE(ui.window.session().dirty());
+  CHECK(bytes(asset) == current_asset);
 }
 
 TEST_CASE("Embedded STEP source catalog rows cannot apply a prepared Project source operation",

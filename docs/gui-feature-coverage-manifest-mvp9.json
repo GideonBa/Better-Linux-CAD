@@ -16,7 +16,7 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/gui-shell-reset-sequence-mvp9r.md",
-        "scope": "Document create/open/save, dirty-work protection, undo/redo and presentation reset.",
+        "scope": "Document create/open/save, dirty-work protection, undo/redo and presentation reset. STEP source geometry inspection reads digest-verified snapshots and displays product/body/unit diagnostics with temporary posed occurrence previews, without changing document intent; cancellation, lifecycle changes and changed assets invalidate the preview.",
         "gaps": [],
         "proofs": [
           {
@@ -26,6 +26,14 @@
           {
             "filter": "[shell-combined-cancel]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[block138-step-inspection]",
+            "source": "tests/gui/gui_shell_step_import_tests.cpp"
+          },
+          {
+            "filter": "[native-step-inspection]",
+            "source": "tests/gui/gui_shell_step_import_tests.cpp"
           }
         ],
         "actions": [
@@ -34,9 +42,14 @@
           "save",
           "save_as",
           "undo",
-          "redo"
+          "redo",
+          "step_sources"
         ],
-        "widgets": []
+        "widgets": [
+          "blcad.step_import.task",
+          "blcad.step_import.inspect_geometry",
+          "blcad.step_import.geometry_products"
+        ]
       }
     },
     {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blcad/core/step_import_freshness.hpp"
+#include "blcad/geometry/step_import_reader.hpp"
 #include "blcad/gui/gui_document_session.hpp"
 
 namespace blcad::gui {
@@ -23,6 +24,18 @@ struct GuiStepImportSourceStatus {
   bool embedded_part{false};
 };
 
+// Read-only geometry evidence, separate from an applicable registry operation.
+// Products, bodies and posed preview shapes remain disposable Geometry data.
+struct GuiStepImportGeometryPreview {
+  StepImportSource source;
+  StepImportFreshnessReport report;
+  std::filesystem::path document_path;
+  std::string document_json;
+  bool registered_source{false};
+  geometry::StepImportGeometry geometry;
+  std::vector<geometry::GeometryShape> preview_shapes;
+};
+
 class GuiStepImportWorkbench {
 public:
   [[nodiscard]] Result<GuiStepImportPreview>
@@ -36,6 +49,13 @@ public:
                                                           StepImportSourceId) const;
   [[nodiscard]] Result<std::vector<GuiStepImportSourceStatus>>
   inspect_sources(const GuiDocumentSession&) const;
+  [[nodiscard]] Result<GuiStepImportGeometryPreview> inspect_geometry(const GuiDocumentSession&,
+                                                                      StepImportSourceId) const;
+  [[nodiscard]] Result<GuiStepImportGeometryPreview>
+  inspect_geometry(const GuiDocumentSession&, std::string name,
+                   std::string project_relative_asset_path, StepImportMode) const;
+  [[nodiscard]] Result<std::size_t> validate_inspection(const GuiDocumentSession&,
+                                                        const GuiStepImportGeometryPreview&) const;
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession&, const GuiStepImportPreview&) const;
 };
 

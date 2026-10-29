@@ -273,6 +273,106 @@ TEST_CASE("STEP freshness rejects external and in-root symlinks without escaping
   CHECK_FALSE(inspect_step_import_asset(directory.path, "../outside.step"));
   CHECK_FALSE(inspect_step_import_asset(directory.path, external.path.string() + "/outside.step"));
 }
+TEST_CASE(
+    "Verified STEP snapshots retain exact accepted binary bytes without changing source intent",
+    "[core][step-import-freshness][step-import-snapshot]") {
+  const auto mode = GENERATE(StepImportMode::Reference, StepImportMode::EditableBody);
+  const auto size = GENERATE(std::size_t(0), std::size_t(3), std::size_t(131079));
+  CAPTURE(mode, size);
+  std::string bytes(size, '\0');
+  for (std::size_t i = 0; i < size; ++i)
+    bytes[i] = static_cast<char>(i % 256);
+  AssetDirectory directory;
+  directory.write("assets/part.step", bytes);
+  const auto original = source("source", "assets/part.step", mode, bytes);
+  auto standalone = part();
+  auto assembly = project();
+  REQUIRE(standalone.add_step_import_source(original));
+  REQUIRE(assembly.add_step_import_source(original));
+  const auto initial_part = json(standalone);
+  const auto initial_project = json(assembly);
+  struct stat before {
+  }, after{};
+  REQUIRE(::stat((directory.path / "assets/part.step").c_str(), &before) == 0);
+  const auto snapshot = checked(read_verified_step_import_source(original, directory.path));
+  CHECK(snapshot == bytes);
+  CHECK(snapshot.size() == size);
+  REQUIRE(::stat((directory.path / "assets/part.step").c_str(), &after) == 0);
+  CHECK(before.st_dev == after.st_dev);
+  CHECK(before.st_ino == after.st_ino);
+  CHECK(before.st_mode == after.st_mode);
+  CHECK(before.st_size == after.st_size);
+  CHECK(before.st_mtim.tv_sec == after.st_mtim.tv_sec);
+  CHECK(before.st_mtim.tv_nsec == after.st_mtim.tv_nsec);
+  CHECK(before.st_ctim.tv_sec == after.st_ctim.tv_sec);
+  CHECK(before.st_ctim.tv_nsec == after.st_ctim.tv_nsec);
+  CHECK(checked(inspect_step_import_source(original, directory.path)).state() ==
+        StepImportFreshness::Available);
+  directory.write("assets/part.step", "replacement after snapshot");
+  CHECK(snapshot == bytes);
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path));
+  std::filesystem::remove(directory.path / "assets/part.step");
+  CHECK(snapshot == bytes);
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path));
+  CHECK(standalone.step_import_sources() == std::vector{original});
+  CHECK(assembly.step_import_sources() == std::vector{original});
+  CHECK(json(standalone) == initial_part);
+  CHECK(json(assembly) == initial_project);
+}
+TEST_CASE(
+    "Verified STEP snapshots fail closed for changed missing unreadable and nonregular assets",
+    "[core][step-import-freshness][step-import-snapshot]") {
+  AssetDirectory directory;
+  const auto original = source();
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path));
+  directory.write("assets/part.step", "abd");
+  const auto mismatch = read_verified_step_import_source(original, directory.path);
+  REQUIRE_FALSE(mismatch);
+  CHECK(mismatch.error().message() ==
+        "STEP source content differs from its registered SHA-256 digest");
+  CHECK(checked(inspect_step_import_source(original, directory.path)).state() ==
+        StepImportFreshness::Changed);
+  directory.write("assets/part.step", "abc");
+  REQUIRE(::chmod((directory.path / "assets/part.step").c_str(), 0000) == 0);
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path));
+  REQUIRE(::chmod((directory.path / "assets/part.step").c_str(), 0600) == 0);
+  CHECK(checked(read_verified_step_import_source(original, directory.path)) == "abc");
+  std::filesystem::remove(directory.path / "assets/part.step");
+  std::filesystem::create_directory(directory.path / "assets/part.step");
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path));
+  std::filesystem::remove(directory.path / "assets/part.step");
+  REQUIRE(::mkfifo((directory.path / "assets/part.step").c_str(), 0600) == 0);
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path));
+  CHECK_FALSE(read_verified_step_import_source(original, {}));
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path / "missing-root"));
+  directory.write("not-a-root", "abc");
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path / "not-a-root"));
+}
+TEST_CASE("Verified STEP snapshots reject symlink roots ancestors and asset paths",
+          "[core][step-import-freshness][step-import-snapshot]") {
+  AssetDirectory directory, external;
+  const auto original = source();
+  external.write("assets/part.step", "abc");
+  directory.write("inside.step", "abc");
+  std::filesystem::create_directory(directory.path / "assets");
+  std::filesystem::create_symlink(external.path / "assets/part.step",
+                                  directory.path / "assets/part.step");
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path));
+  std::filesystem::remove(directory.path / "assets/part.step");
+  std::filesystem::create_symlink(directory.path / "inside.step",
+                                  directory.path / "assets/part.step");
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path));
+  std::filesystem::remove_all(directory.path / "assets");
+  std::filesystem::create_directory_symlink(external.path / "assets", directory.path / "assets");
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path));
+  std::filesystem::create_directory_symlink(external.path, directory.path / "root-link");
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path / "root-link"));
+  CHECK_FALSE(read_verified_step_import_source(original, directory.path / "root-link/unused/.."));
+  for (const auto& path :
+       {"../assets/part.step", "/assets/part.step", "assets/../part.step", "assets\\part.step"})
+    CHECK_FALSE(StepImportSource::create(original.id(), original.name(), path,
+                                         original.sha256_digest(), original.mode()));
+}
 TEST_CASE("STEP explicit refresh rechecks source bytes and full intent on both hosts",
           "[core][step-import-freshness]") {
   const auto exercise = [](auto host) {
