@@ -1357,15 +1357,21 @@ missing shell/persistence integration; these tickets do not claim that every rep
 | --- | --- | --- | --- |
 | Sketch endpoint snaps | [#104](https://github.com/GideonBa/Better-Linux-CAD/issues/104) | Implemented: stable picked endpoint identity; automatic Coincident geometry/history transaction; native loop/restart/overlap/12-segment and persistence/drag proof | P2 |
 | Coincident → closed region | [#105](https://github.com/GideonBa/Better-Linux-CAD/issues/105) | Exact Coincident equality groups implemented; cross-layer/native regression in `gui-sketch-regions-finish-mvp8.md` | P1 |
-| Dimension line layout | [#106](https://github.com/GideonBa/Better-Linux-CAD/issues/106) | Confirmed family-specific rendering gaps; DIN/ISO target recorded | P2 |
+| Dimension line layout | [#106](https://github.com/GideonBa/Better-Linux-CAD/issues/106) | Implemented: explicit family geometry and projected strokes/terminators, shared paint/picking/editor bounds, native normal/oblique neighboring-dimension and history/persistence proof; delivered in PR #129 | P2 |
 | Dimension double-click editing | [#107](https://github.com/GideonBa/Better-Linux-CAD/issues/107) | Implemented: shared badge rectangle and independent double-click resolution; native proof | P1 |
 | Dimension deletion | [#108](https://github.com/GideonBa/Better-Linux-CAD/issues/108) | Implemented: visible selection, multi-selection enablement and real Delete/Backspace proof | P1 |
 | Construction conversion | [#109](https://github.com/GideonBa/Better-Linux-CAD/issues/109) | Implemented: reversible typed curve/group conversion, lossless curved roles, region exclusion and native modeling/history/persistence proof | P2 |
 | Sketch-line rotation axes | [#110](https://github.com/GideonBa/Better-Linux-CAD/issues/110) | Implemented: scoped Sketch-line persistence, current transformed-plane resolution, associative source edits and native modeling/history/persistence proof | P2 |
 | Body Rotate axis parity | [#111](https://github.com/GideonBa/Better-Linux-CAD/issues/111) | Implemented: typed derived datum and supported semantic-edge choices, shared resolver and native upstream/history/persistence proof | P2 |
-| Sketch on planar result face | [#112](https://github.com/GideonBa/Better-Linux-CAD/issues/112) | Direct workflow and general associative support identity missing | P2 |
+| Sketch on planar result face | [#112](https://github.com/GideonBa/Better-Linux-CAD/issues/112) | Implemented: direct planar result-face Sketch creation, associative producer-owned support, strict recovery/invalidation/repair and native modeling/history/persistence proof; delivered in PR #128 | P2 |
 | Cut feedback and workflow | [#113](https://github.com/GideonBa/Better-Linux-CAD/issues/113) | Implemented: distinct Cut outcomes, correctable diagnostics and exact curved extents; native regression verified | P1 |
 | Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | Completed: affected-root previews/transactions, bounded validated history geometry and native deep-rotor acceptance; conservative fallbacks and local JSON target miss documented | P1 |
+
+Completion audit on 2026-10-29 reconciles the two previously stale #106/#112 status cells with their
+accepted implementations and delivery records below. The original issue queue is closed; PRs
+#123–#135 were created and merged serially, with each branch based on the preceding merge. Numbered
+completion remains through Block 143. The documented performance measurement limits and later
+STEP-import deferrals retain their existing scope.
 
 The 2026-10-28 dimension-input follow-up implements #107/#108 with shared painted/picked badge
 bounds, independent double-click resolution, visible selection and multi-dimension Delete/Backspace
