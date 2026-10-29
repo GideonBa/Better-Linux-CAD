@@ -1690,3 +1690,63 @@ Both freezes cover **886** tracked source/test/asset/build-definition inputs. Th
 Only `tests/gui/gui_dimension_label_interaction_tests.cpp` differs between them. Documentation
 records the actual results afterward. Before delivery, require the final integration tree to match
 the tested branch plus these documentation updates, then verify the merged main tree and ancestry.
+
+## Complex-Part transaction/history completion — issue #114
+
+Build all five targets. Run correctness suites with one GUI process at a time. Source edits/builds,
+native GUI suites and separate startup stay serial. Run timing profiles alone, without concurrent
+builds or tests; they are explicit opt-in measurements, excluded from default GUI/CTest selection.
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests blcad_export_step -j6
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[part-history-cache],[preview-cache]"
+BLCAD_PROFILE_SEQUENCE=1 BLCAD_PROFILE_SAMPLES=5 BLCAD_PROFILE_OUTPUT=/tmp/blcad-issue114-history-after.json QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[complex-part-profile]"
+./build/dev-gui/blcad_core_tests
+./build/dev-gui/blcad_geometry_tests
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+mkdir -p /tmp/blcad-issue114-history-native /tmp/blcad-issue114-history-native-150
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue114-history-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[part-history-cache],[preview-cache],[complex-part-workflow],[shell-combined-part],[shell-combined-finishing-context],[shell-combined-bodies],[shell-combined-body-context],[shell-combined-extrude-extents],[shell-combined-revolve-controls],[shell-combined-path-extrude],[shell-combined-thin-extrude],[shell-combined-extrude-limit-picking],[shell-combined-pattern-context],[shell-combined-surface-context],[interactive-finishing],[interactive-surface],[stitch-diagnostic-overlay],[cut-material-workflow],[coincident-closure],[dimension-label-input],[native-viewer-lifecycle],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue114-history-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[complex-part-workflow],[dimension-label-input]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+The canonical intent comparison and four-state history LRU contract, raw before/after benchmarks,
+measurement scope and unchanged/local review targets are in `docs/gui-modeling-workspace-mvp9.md`.
+In particular, assert actual upstream backing reuse during Apply, full-recompute volume equality,
+cached and evicted history, stale provenance, atomic failures, Redo branching and document reset.
+Parts with STEP registrations, repair, unsupported structural edits or legacy Extrude records
+(even alongside Body declarations) retain full recomputation.
+Do not add timing assertions that turn machine load into correctness failures.
+
+Final focused history/preview proof: **7 / 969**. Isolated native 5/20/40-blade profile: **1 / 1,379**.
+The fresh before-run has 40 blades only and uses main `8e72a8e`; reproduce with
+`BLCAD_PROFILE_BLADES=40` and the same five-sample command before applying the change. Keep before
+and after build/source identities separate. The final source freeze is
+`/tmp/blcad-issue114-history-source-freeze.json` (**886** inputs, SHA-256
+`0c9363d37a0e497b43215fa77814cfd25d119c3f6b20d8b3af9eae306190d4ee`).
+The intermediate profile showing fast history but slow Apply is preserved separately as
+`/tmp/blcad-issue114-history-intermediate.{json,log}`; it is not the final performance result.
+The subsequent Apply-fixed series before the last legacy guard is
+`/tmp/blcad-issue114-history-apply-fixed-prelegacy.{json,log}`. A targeted review regression
+reproduced the legacy mixed-model final-result defect before that guard. The initial scaled
+workflow also caught a native pointer mismatch after popup-loop unwinding. The fixture now
+revalidates pointer/hover/row agreement after unwinding using the same original two-second deadline
+and four pointer requests; failure captures include post-loop mismatches. Final scaled rotor/input
+proof passes **8 / 2,435**. No focus, row, actual-click or geometry requirement was relaxed.
+All five targets build. Full Core **549 / 17,217**, Geometry **459 / 35,243** and final offscreen GUI
+**594 cases — 574 passed, 20 expected native-only skips; 80,765 assertions** pass. Core/Geometry
+sources/binaries were unchanged by the final GUI-only guard and fixture refinements. Final native
+affected-family/rotor and required shell gate passes **39 / 12,547**, without skips; final 150%
+rotor/dimension input passes **8 / 2,435**, without skips. Separate native startup reaches intentional
+timeout **124**. Inspected normal/scaled rotor and selected-dimension captures. Final profile,
+native, scaled and startup logs contain no High-severity, BadDrawable or BadWindow errors; the
+available X11 visual retains the known Medium depth/stencil warning. All **886** frozen source
+inputs remain unchanged throughout the final focused/scaled/profile/full GUI/native/startup checks.
+
+Exact logs: `/tmp/blcad-issue114-history-build-final.log`,
+`/tmp/blcad-issue114-history-focused-final.log`, `/tmp/blcad-issue114-history-after.log`,
+`/tmp/blcad-issue114-history-{core,geometry,gui,native,startup}.log` and
+`/tmp/blcad-issue114-history-native-150-final.log`. Earlier full/native runs before the final legacy
+guard are retained separately as `/tmp/blcad-issue114-history-prelegacy-{gui,native}.log`.
+The initial scaled mismatch is `/tmp/blcad-issue114-history-native-150.log`; it is superseded by
+the final scaled proof. No later numbered block is completed by this issue.

@@ -149,6 +149,10 @@ TEST_CASE("Complex rotor previews reuse clean producers and recompute changed de
   REQUIRE(preview);
   const auto volume = geometry::RectangleExtrusionAdapter{}.summarize(preview.value()).volume_mm3;
   REQUIRE(controller.apply(session));
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_feature_shape(
+            FeatureId("feature.hub"))) == cached_hub);
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_feature_shape(
+            FeatureId("feature.blade"))) == cached_blade);
   CHECK(geometry::RectangleExtrusionAdapter{}
             .summarize(*session.part_shape_cache()->find_body_shape(BodyId("body.rotor")))
             .volume_mm3 == Catch::Approx(volume).margin(1e-6));
@@ -260,6 +264,279 @@ TEST_CASE("Deep curved rotor dimension and drag sequences preserve history and s
     CHECK(serialize_part_document_to_json(*reopened.part_document()).value() == dragged);
     CHECK(reopened.sketch_dimension_catalogs() == session.sketch_dimension_catalogs());
   }
+}
+
+namespace {
+Result<std::size_t> set_history_parameter(PartDocument& part, const char* id, double value) {
+  auto changed = part.set_parameter_value(ParameterId(id), Quantity::length_mm(value, id).value());
+  if (!changed)
+    return Result<std::size_t>::failure(changed.error());
+  return Result<std::size_t>::success(1);
+}
+
+void check_history_geometry_oracle(const GuiDocumentSession& session) {
+  auto cold = geometry::ShapeCache::create(ShapeCacheId("history.full.oracle")).value();
+  REQUIRE(geometry::GeometryRecomputeExecutor{}.execute_document(*session.part_document(), cold));
+  REQUIRE(session.part_shape_cache()->feature_shape_count() == cold.feature_shape_count());
+  REQUIRE(session.part_shape_cache()->body_shape_count() == cold.body_shape_count());
+  REQUIRE(session.part_shape_cache()->has_final_shape() == cold.has_final_shape());
+  CHECK(session.part_shape_cache()->final_feature_id() == cold.final_feature_id());
+  if (cold.has_final_shape())
+    CHECK(geometry::RectangleExtrusionAdapter{}
+              .summarize(*session.part_shape_cache()->final_shape())
+              .volume_mm3 ==
+          Catch::Approx(
+              geometry::RectangleExtrusionAdapter{}.summarize(*cold.final_shape()).volume_mm3)
+              .epsilon(1e-10)
+              .margin(1e-6));
+  for (const auto& body : cold.body_shapes()) {
+    const auto* shape = session.part_shape_cache()->find_body_shape(body.body_id);
+    REQUIRE(shape);
+    const auto actual = geometry::RectangleExtrusionAdapter{}.summarize(*shape);
+    const auto expected = geometry::RectangleExtrusionAdapter{}.summarize(body.shape);
+    CHECK(actual.solid_count == expected.solid_count);
+    CHECK(actual.volume_mm3 == Catch::Approx(expected.volume_mm3).epsilon(1e-10).margin(1e-6));
+  }
+}
+} // namespace
+
+TEST_CASE("Part transaction roots and exact history reuse preserve deep rotor geometry",
+          "[gui][document-transaction][part-history-cache][complex-part-correctness]") {
+  const auto fixture = test::rotor_performance_sequence_part(5);
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(fixture.id(), fixture.name()));
+  REQUIRE(session.commit_part_transaction("Rotor", [&](PartDocument& part) {
+    part = fixture;
+    return Result<std::size_t>::success(1);
+  }));
+  const auto original = serialize_part_document_to_json(*session.part_document()).value();
+  const auto body = *session.part_shape_cache()->find_body_shape(BodyId("body.rotor"));
+  const auto hub = *session.part_shape_cache()->find_feature_shape(FeatureId("feature.hub"));
+  const auto blade = *session.part_shape_cache()->find_feature_shape(FeatureId("feature.blade"));
+  REQUIRE(session.commit_part_transaction("Hub height", [](PartDocument& part) {
+    auto changed = set_history_parameter(part, "hub.height", 5.8);
+    // Public mutation callbacks may supply clean replacement intent. Cache roots
+    // must come from the actual accepted intent, not just dirty bookkeeping.
+    part.mark_all_clean();
+    return changed;
+  }));
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_feature_shape(
+            FeatureId("feature.hub"))) != geometry::OcctShapeView::get(hub));
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_feature_shape(
+            FeatureId("feature.blade"))) == geometry::OcctShapeView::get(blade));
+  check_history_geometry_oracle(session);
+  const auto edited = serialize_part_document_to_json(*session.part_document()).value();
+  const auto edited_body = *session.part_shape_cache()->find_body_shape(BodyId("body.rotor"));
+  REQUIRE(session.undo());
+  CHECK(serialize_part_document_to_json(*session.part_document()).value() == original);
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_body_shape(
+            BodyId("body.rotor"))) == geometry::OcctShapeView::get(body));
+  check_history_geometry_oracle(session);
+  REQUIRE(session.redo());
+  CHECK(serialize_part_document_to_json(*session.part_document()).value() == edited);
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_body_shape(
+            BodyId("body.rotor"))) == geometry::OcctShapeView::get(edited_body));
+  check_history_geometry_oracle(session);
+
+  const auto* accepted_cache = session.part_shape_cache();
+  REQUIRE_FALSE(session.commit_part_transaction("Rejected", [](PartDocument& part) {
+    REQUIRE(part.set_parameter_value(ParameterId("hub.height"),
+                                     Quantity::length_mm(5.5, "hub.height").value()));
+    return Result<std::size_t>::failure(Error::validation("rejected", "atomic failure"));
+  }));
+  CHECK(session.part_shape_cache() == accepted_cache);
+  CHECK(serialize_part_document_to_json(*session.part_document()).value() == edited);
+  CHECK(session.undo_label() == "Hub height");
+
+  auto replacement = *session.part_document();
+  REQUIRE(replacement.set_parameter_value(ParameterId("blade.height"),
+                                          Quantity::length_mm(10.5, "blade.height").value()));
+  replacement.mark_all_clean();
+  const auto edited_hub = *session.part_shape_cache()->find_feature_shape(FeatureId("feature.hub"));
+  REQUIRE(session.commit_part_transaction("Replace clean intent", [&](PartDocument& part) {
+    part = replacement;
+    return Result<std::size_t>::success(1);
+  }));
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_feature_shape(
+            FeatureId("feature.hub"))) == geometry::OcctShapeView::get(edited_hub));
+  check_history_geometry_oracle(session);
+}
+
+TEST_CASE("Part transactions reject stale provenance and rebuild after node removal",
+          "[gui][document-transaction][part-history-cache]") {
+  const auto fixture = test::rotor_performance_sequence_part(5);
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(fixture.id(), fixture.name()));
+  REQUIRE(session.commit_part_transaction("Rotor", [&](PartDocument& part) {
+    part = fixture;
+    return Result<std::size_t>::success(1);
+  }));
+  const auto blade = *session.part_shape_cache()->find_feature_shape(FeatureId("feature.blade"));
+  REQUIRE(session.part_document()->set_parameter_value(
+      ParameterId("hub.height"), Quantity::length_mm(5.6, "hub.height").value()));
+  session.part_document()->mark_all_clean();
+  REQUIRE(session.recompute_status() == GuiRecomputeStatus::Fresh);
+  REQUIRE(session.commit_part_transaction("Unused radius", [](PartDocument& part) {
+    return set_history_parameter(part, "fillet.radius", .3);
+  }));
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_feature_shape(
+            FeatureId("feature.blade"))) != geometry::OcctShapeView::get(blade));
+  check_history_geometry_oracle(session);
+  auto replacement = test::rotor_performance_part(5);
+  REQUIRE(session.commit_part_transaction("Remove transform chain", [&](PartDocument& part) {
+    part = replacement;
+    return Result<std::size_t>::success(1);
+  }));
+  for (const auto& transform : fixture.body_transforms())
+    CHECK_FALSE(session.part_shape_cache()->find_feature_shape(FeatureId(transform.id().value())));
+  check_history_geometry_oracle(session);
+}
+
+TEST_CASE("Bounded Part history evicts old geometry and cannot resurrect discarded Redo",
+          "[gui][document-session][part-history-cache]") {
+  const auto fixture = test::rotor_performance_part(5);
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(fixture.id(), fixture.name()));
+  REQUIRE(session.commit_part_transaction("Rotor", [&](PartDocument& part) {
+    part = fixture;
+    return Result<std::size_t>::success(1);
+  }));
+  const auto original_body = *session.part_shape_cache()->find_body_shape(BodyId("body.rotor"));
+  for (int index = 0; index < 5; ++index)
+    REQUIRE(session.commit_part_transaction("Unused radius", [&](PartDocument& part) {
+      return set_history_parameter(part, "fillet.radius", .3 + index * .01);
+    }));
+  for (int index = 0; index < 3; ++index) {
+    REQUIRE(session.undo());
+    CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_body_shape(
+              BodyId("body.rotor"))) == geometry::OcctShapeView::get(original_body));
+  }
+  REQUIRE(session.undo());
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_body_shape(
+            BodyId("body.rotor"))) != geometry::OcctShapeView::get(original_body));
+  CHECK(session.part_document()
+            ->find_parameter(ParameterId("fillet.radius"))
+            ->value()
+            .millimeters() == Catch::Approx(.3));
+  check_history_geometry_oracle(session);
+  REQUIRE(session.commit_part_transaction("New history branch", [](PartDocument& part) {
+    return set_history_parameter(part, "hub.height", 5.4);
+  }));
+  CHECK_FALSE(session.can_redo());
+  const auto branch = serialize_part_document_to_json(*session.part_document()).value();
+  REQUIRE(session.undo());
+  REQUIRE(session.redo());
+  CHECK(serialize_part_document_to_json(*session.part_document()).value() == branch);
+  check_history_geometry_oracle(session);
+  REQUIRE(session.create_part(fixture.id(), fixture.name(), true));
+  REQUIRE(session.commit_part_transaction("New document", [&](PartDocument& part) {
+    part = fixture;
+    return set_history_parameter(part, "hub.height", 5.2);
+  }));
+  REQUIRE(session.undo());
+  CHECK(session.part_shape_cache()->feature_shape_count() == 0);
+  REQUIRE(session.redo());
+  check_history_geometry_oracle(session);
+}
+
+TEST_CASE("An independent Body edit retains the canonical Part final result",
+          "[gui][document-transaction][part-history-cache]") {
+  auto fixture = PartDocument::create(DocumentId("part.independent"), "Independent bodies").value();
+  REQUIRE(fixture.add_datum_plane(DatumPlane::xy().value()));
+  for (const auto& [id, value] : std::vector<std::pair<std::string, double>>{
+           {"width", 10}, {"height", 8}, {"first.depth", 3}, {"second.depth", 5}})
+    REQUIRE(fixture.add_parameter(
+        Parameter::create_length(ParameterId(id), id, Quantity::length_mm(value, id).value())
+            .value()));
+  for (const std::string name : {"first", "second"}) {
+    const BodyId body("body." + name);
+    REQUIRE(fixture.add_body(Body::create(body, name, BodyKind::Solid).value()));
+    auto sketch =
+        Sketch::create(SketchId("sketch." + name), name, DatumPlaneId("datum.xy")).value();
+    REQUIRE(sketch.add_profile(RectangleProfile::create(ProfileId("profile." + name),
+                                                        ParameterId("width"), ParameterId("height"),
+                                                        {0, 0})
+                                   .value()));
+    REQUIRE(fixture.add_sketch(sketch));
+    REQUIRE(fixture.add_feature(
+        Feature::create_additive_extrude(FeatureId("feature." + name), name, sketch.id(),
+                                         ParameterId(name + ".depth"))
+            .value()
+            .with_body_result_context(FeatureBodyResultContext::create(
+                                          FeatureBodyOperationMode::NewBody, std::nullopt, body)
+                                          .value())
+            .value()));
+  }
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(fixture.id(), fixture.name()));
+  REQUIRE(session.commit_part_transaction("Two bodies", [&](PartDocument& part) {
+    part = fixture;
+    return Result<std::size_t>::success(1);
+  }));
+  // A multi-body Part has independent Body authority, not a legacy singleton
+  // final shape. Editing one Body must preserve that contract and the other.
+  REQUIRE_FALSE(session.part_shape_cache()->has_final_shape());
+  const auto other = *session.part_shape_cache()->find_body_shape(BodyId("body.second"));
+  REQUIRE(session.commit_part_transaction("Edit independent body", [&](PartDocument& part) {
+    return set_history_parameter(part, "first.depth", 7);
+  }));
+  CHECK_FALSE(session.part_shape_cache()->has_final_shape());
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_body_shape(
+            BodyId("body.second"))) == geometry::OcctShapeView::get(other));
+  check_history_geometry_oracle(session);
+  REQUIRE(session.undo());
+  REQUIRE(session.redo());
+  check_history_geometry_oracle(session);
+}
+
+TEST_CASE("Declared Bodies do not make legacy aggregate transactions incremental",
+          "[gui][document-transaction][part-history-cache]") {
+  auto fixture = PartDocument::create(DocumentId("part.legacy.mixed"), "Legacy mixed").value();
+  REQUIRE(fixture.add_datum_plane(DatumPlane::xy().value()));
+  REQUIRE(fixture.add_body(
+      Body::create(BodyId("body.unused"), "Declared body", BodyKind::Solid).value()));
+  for (const auto& [id, value] : std::vector<std::pair<std::string, double>>{
+           {"width", 10}, {"height", 8}, {"first.depth", 3}, {"second.depth", 5}})
+    REQUIRE(fixture.add_parameter(
+        Parameter::create_length(ParameterId(id), id, Quantity::length_mm(value, id).value())
+            .value()));
+  for (const std::string name : {"first", "second"}) {
+    auto sketch =
+        Sketch::create(SketchId("sketch." + name), name, DatumPlaneId("datum.xy")).value();
+    REQUIRE(sketch.add_profile(RectangleProfile::create(ProfileId("profile." + name),
+                                                        ParameterId("width"), ParameterId("height"),
+                                                        {0, 0})
+                                   .value()));
+    REQUIRE(fixture.add_sketch(sketch));
+    REQUIRE(fixture.add_feature(Feature::create_additive_extrude(FeatureId("feature." + name), name,
+                                                                 sketch.id(),
+                                                                 ParameterId(name + ".depth"))
+                                    .value()));
+  }
+  GuiDocumentSession session;
+  REQUIRE(session.create_part(fixture.id(), fixture.name()));
+  REQUIRE(
+      session.commit_part_transaction("Legacy Part with declared Body", [&](PartDocument& part) {
+        part = fixture;
+        return Result<std::size_t>::success(1);
+      }));
+  REQUIRE(session.part_shape_cache()->has_final_shape());
+  const auto final = session.part_shape_cache()->final_feature_id();
+  const auto unchanged = *session.part_shape_cache()->find_feature_shape(final);
+  const std::string changed = final == FeatureId("feature.first") ? "second.depth" : "first.depth";
+  REQUIRE(session.commit_part_transaction("Legacy upstream edit", [&](PartDocument& part) {
+    return set_history_parameter(part, changed.c_str(), 7);
+  }));
+  // Legacy features use the singleton result rather than explicit Body
+  // dependency chains. Their complete execution order must stay authoritative.
+  CHECK(session.part_shape_cache()->final_feature_id() == final);
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_feature_shape(final)) !=
+        geometry::OcctShapeView::get(unchanged));
+  check_history_geometry_oracle(session);
+  REQUIRE(session.undo());
+  check_history_geometry_oracle(session);
+  REQUIRE(session.redo());
+  check_history_geometry_oracle(session);
 }
 
 // Explicit opt-in: timing observations are not portable correctness budgets.
@@ -461,7 +738,15 @@ TEST_CASE("Profile one curved rotor through finishing preview and native publica
         }));
         REQUIRE(event_delivered);
         viewport.clear_feature_preview();
+        const auto preserved_hub =
+            *session.part_shape_cache()->find_feature_shape(FeatureId("feature.hub"));
+        const auto preserved_blade =
+            *session.part_shape_cache()->find_feature_shape(FeatureId("feature.blade"));
         apply.push_back(measured_ms([&] { REQUIRE(fillet.apply(session)); }));
+        CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_feature_shape(
+                  FeatureId("feature.hub"))) == geometry::OcctShapeView::get(preserved_hub));
+        CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_feature_shape(
+                  FeatureId("feature.blade"))) == geometry::OcctShapeView::get(preserved_blade));
         CHECK(
             geometry::RectangleExtrusionAdapter{}
                 .summarize(*session.part_shape_cache()->find_body_shape(BodyId("body.rotor")))
