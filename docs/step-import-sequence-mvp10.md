@@ -667,6 +667,9 @@ Focused tags:
 [native-step-editable-parts]
 ```
 
+Delivery: [PR #133](https://github.com/GideonBa/Better-Linux-CAD/pull/133), verified implementation
+commit `c4fc431`. Runtime fingerprints remain unchanged; this PR must merge before Block 142 starts.
+
 ## Block 142 — Structured STEP assembly import
 
 Primary boundary: foreign product structure to BLCAD Project hierarchy.

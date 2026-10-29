@@ -2503,3 +2503,8 @@ Final focused GUI plus serialized Shell/documentation inventory passes **14 case
 3 expected native-only skips / 849 assertions** (`/tmp/blcad141-gui-focused-final.log`) after the
 numbered boundary is updated. Runtime freeze is unchanged; only Markdown changed after the
 successful full/native gates. Block 141 is ready for one reviewed commit/PR and protected merge.
+
+Delivery: [PR #133](https://github.com/GideonBa/Better-Linux-CAD/pull/133), verified implementation
+commit `c4fc431`. Runtime fingerprints remain unchanged; this PR must merge before Block 142 starts.
+Final serialized documentation/GUI inventory passes **3 / 313** after PR references are added
+(`/tmp/blcad141-final-inventory.log`); all 970 runtime fingerprints remain unchanged.

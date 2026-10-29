@@ -1658,10 +1658,12 @@ CLI export writes **19,170 bytes**. Runtime freeze: **970 files**,
 Core/Geometry gates precede the final GUI-only correction; their sources/binaries remain unchanged.
 Exact commands and final inventory evidence live in `docs/development-setup.md`.
 
+Delivery: [PR #133](https://github.com/GideonBa/Better-Linux-CAD/pull/133), verified implementation
+commit `c4fc431`. Runtime fingerprints remain unchanged; this PR must merge before Block 142 starts.
+
 ## Current numbered technical step — Block 142 (planned)
 
-Block 141 implementation and acceptance are complete; its commit/push and one PR are the pending
-delivery step. Block 142 must not start until that PR is merged and main verified. Block 142 will
+Block 141 implementation and acceptance are complete; PR #133 is the pending protected merge. Block 142 must not start until that PR is merged and main verified. Block 142 will
 import the verified product graph into shared Part/Assembly definitions and exact occurrences;
 Blocks 142–143 remain planned. Exact boundaries and focused tags remain in
 `docs/step-import-sequence-mvp10.md`.
