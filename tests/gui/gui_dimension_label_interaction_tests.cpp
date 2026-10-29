@@ -16,6 +16,7 @@
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QStatusBar>
+#include <QScreen>
 #include <QTemporaryDir>
 #include <QTimer>
 #include <QTreeWidget>
@@ -44,20 +45,26 @@ void events() {
 }
 
 bool await_ui(const std::function<bool()>& ready) {
-  if (!ready()) {
+  const bool native = QApplication::platformName() == "xcb";
+  int stable_turns = 0;
+  if (native || !ready()) {
     QEventLoop loop;
     QTimer poll, deadline;
     deadline.setSingleShot(true);
     QObject::connect(&poll, &QTimer::timeout, &loop, [&] {
-      if (ready())
-        loop.quit();
+      if (ready()) {
+        if (!native || ++stable_turns >= 2)
+          loop.quit();
+      } else {
+        stable_turns = 0;
+      }
     });
     QObject::connect(&deadline, &QTimer::timeout, &loop, &QEventLoop::quit);
     poll.start(5);
     deadline.start(2000);
     loop.exec();
   }
-  return ready();
+  return ready() && (!native || stable_turns >= 2);
 }
 
 // Only fixture preparation uses authoring APIs. Selection, editing and deletion
@@ -68,9 +75,18 @@ struct DimensionUi {
 
   DimensionUi() {
     window.resize(1280, 800);
+    if (QApplication::platformName() == "xcb") {
+      auto* screen = QGuiApplication::screenAt(QPoint(0, 0));
+      REQUIRE(screen);
+      const auto available = screen->availableGeometry().adjusted(12, 12, -12, -12);
+      window.move(available.topLeft());
+      window.resize(std::min(1280, available.width()), std::min(800, available.height()));
+    }
     window.show();
     window.raise();
     window.activateWindow();
+    if (QApplication::platformName() == "xcb")
+      QGuiApplication::sync();
     events();
     REQUIRE(await_ui([&] { return QApplication::activeWindow() == &window; }));
     if (QApplication::platformName() == "xcb")
@@ -187,9 +203,18 @@ struct DimensionUi {
     events();
   }
   void type(QLineEdit& editor, const QString& text) {
+    // Drain native activation before selecting text; a delayed FocusIn must
+    // not change selection halfway through a synthetic keyboard sequence.
+    if (QApplication::platformName() == "xcb") {
+      QGuiApplication::sync();
+      events();
+      REQUIRE(
+          await_ui([&] { return editor.hasFocus() && QApplication::activeWindow() == &window; }));
+    }
     editor.selectAll();
     for (const auto character : text)
       key(editor, character.unicode(), QString(character));
+    REQUIRE(editor.text() == text);
   }
   double value(const SketchDimensionId& id) {
     const auto dimension = *catalog().find(id);
@@ -251,7 +276,9 @@ TEST_CASE("Visible dimension edges double click edit atomically through mouse an
   REQUIRE(editor.isVisible());
   CHECK(editor.text().toDouble() == Catch::Approx(old_value));
   ui.type(editor, kind == SketchDimensionKind::Angle ? "60 deg" : "42 mm");
+  INFO("Typed editor text: " << editor.text().toStdString());
   ui.key(editor, Qt::Key_Return);
+  INFO("Editor diagnostic after Enter: " << editor.toolTip().toStdString());
   CHECK(editor.isHidden());
   CHECK(ui.value(dimension.id()) == Catch::Approx(kind == SketchDimensionKind::Angle ? 60 : 42));
   CHECK(ui.catalog().find(dimension.id())->label_offset() == Point2{0, 35});

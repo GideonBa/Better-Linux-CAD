@@ -230,7 +230,8 @@ its border) is selectable at every zoom and display scale. A visible dimension b
 precedence over underlying points and curves. Overlapping badges prefer the nearest projected
 anchor, with deterministic distance/identity tie-breaking; repeated clicks cycle the complete hit
 stack. An unchanged badge click preserves that cycle and creates no document/history transaction.
-Selected badges use the application highlight/text colors and paint above overlapping labels;
+Normal badges use the theme accent border, panel background and readable text color. Selected
+badges use the application highlight/text colors and paint above overlapping labels;
 hovered badges receive an outline. Existing dimension lines and their midpoint-to-badge extensions
 are selectable within the curve pick tolerance, below real geometry in the hit order. The
 family-specific dimension line/arc presentation follow-up remains tracked by issue #106.
@@ -404,6 +405,30 @@ Exact final logs: `/tmp/blcad-issue107-build-final.log`, `/tmp/blcad-issue107-gu
 `/tmp/blcad-issue107-native-150`; frozen inputs are recorded in
 `/tmp/blcad-issue107-source-freeze.json`. Reproduction commands live in
 `docs/development-setup.md`. Numbered status remains through Block 137; Block 138 stays planned.
+
+## Combined PR integration validation — 2026-10-29
+
+The #116/#118 conflict resolution combines the dark theme's badge colors with the shared font
+bounds, three-layer annotation painting and actual dimension input behavior from #118. It preserves
+the existing editor, picking order, transactions and persistence. Full combined-source verification
+passed before a test-only native fixture adjustment: Core **549 / 17,217**, Geometry **459 / 35,243**,
+offscreen GUI **569 passed / 20 native-only skips / 80,332 assertions**, and native affected-feature
+and required shell coverage **136 / 29,127**, without skips.
+
+An initial scaled run exposed native focus readiness in the dimension fixture; a subsequent ordinary
+run also missed keyboard delivery. The fixture now fits the available first screen, synchronizes
+native activation and requires focus readiness on two event turns within the unchanged two-second
+deadline. It still requires actual editor focus, routes every key through Qt and additionally checks
+the complete typed text. No production input behavior or focus requirement was weakened.
+
+After that test-only change, all five targets rebuilt; dimension input passed offscreen
+**7 / 1,618** and natively **7 / 1,739**. The final 150% icons/appearance/splash/combined desktop/
+dimension suite passed **16 / 3,209**, without skips. Separate native startup reached timeout 124.
+Selected/overlapping badge and original splash captures were inspected at both scales; final native
+logs have no High-severity, BadDrawable or BadWindow errors. The known Medium X11 visual warning
+remains. All **886** frozen inputs stayed unchanged during the final focused/scaled/startup checks;
+only this fixture differs from the earlier broad-run source freeze. Commands and exact logs are in
+`docs/development-setup.md`. No numbered implementation block advances.
 
 ## Next boundary
 

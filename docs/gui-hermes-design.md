@@ -190,6 +190,24 @@ The same unchanged layout at 1024×640:
 
 ![Compact dark-violet desktop with reachable task actions](images/dark-violet-feature-compact.png)
 
+## Combined PR integration verification — 2026-10-29
+
+Integration with dimension interaction, Coincident closure, Cut diagnostics and the complete rotor
+performance follow-up preserves the dark violet palette, `#181a1b` canvas, curated Pixelarticons and
+byte-identical pre-redesign splash source. The viewport conflict retains measured badge picking and
+selection layering while using the theme's accent/panel/text colors for ordinary badges.
+
+All five GUI-preset targets built. The combined full checks passed: Core **549 / 17,217**, Geometry
+**459 / 35,243**, offscreen GUI **569 passed / 20 native-only skips / 80,332 assertions**, and native
+affected features plus required shell coverage **136 / 29,127**, without skips. A subsequent
+test-only native dimension fixture adjustment passed focused offscreen/native input and the final
+150% appearance/icons/splash/desktop/dimension suite (**16 / 3,209**, no skips). Separate startup
+reached intentional timeout 124. The normal and 150% badge, original splash and 40-blade rotor
+captures were inspected. Final native logs retain only the known Medium depth/stencil warning and
+contain no High-severity, BadDrawable or BadWindow errors. The exact source-freeze boundary,
+fixture adjustment and logs are recorded in `development-setup.md` and the dimension contract.
+Historical isolated performance measurements were not rerun during this correctness integration.
+
 ## Historical redesign verification evidence
 
 Final acceptance passed on 2026-10-26:

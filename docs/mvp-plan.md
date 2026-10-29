@@ -1346,7 +1346,7 @@ missing shell/persistence integration; these tickets do not claim that every rep
 | Body Rotate axis parity | [#111](https://github.com/GideonBa/Better-Linux-CAD/issues/111) | Shell omits existing derived-datum/semantic-edge support | P2 |
 | Sketch on planar result face | [#112](https://github.com/GideonBa/Better-Linux-CAD/issues/112) | Direct workflow and general associative support identity missing | P2 |
 | Cut feedback and workflow | [#113](https://github.com/GideonBa/Better-Linux-CAD/issues/113) | Implemented: distinct Cut outcomes, correctable diagnostics and exact curved extents; native regression verified | P1 |
-| Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | Implemented for review: cached previews/Surface validation, single-sampled witnesses and deep-rotor native profiling; residual costs and local target misses documented | P1 |
+| Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | Implemented: cached previews/Surface validation, single-sampled witnesses and deep-rotor native profiling; residual costs and local target misses documented | P1 |
 
 The 2026-10-28 dimension-input follow-up implements #107/#108 with shared painted/picked badge
 bounds, independent double-click resolution, visible selection and multi-dimension Delete/Backspace
@@ -1453,5 +1453,18 @@ Fillet-removal invariance replace an unsupported exact aggregate-scaling oracle,
 volume tolerance tightened and production tolerances unchanged. The final **741** source/test/
 asset/build-definition fingerprints remain unchanged after native verification. Scope, raw data,
 budget review and residual performance limits are documented in the existing workspace/development
-docs. The implementation is ready for PR review; the issue remains open until review/merge.
+docs. This acceptance follow-up is included in the combined PR integration recorded below;
+the documented full-history costs and local target misses remain follow-up work.
 No numbered implementation block is advanced.
+
+PR integration (2026-10-29) resolves #116/#118 against current main and recovers the #121
+acceptance follow-up that had been merged into an already-merged performance branch. The native
+badge renderer retains both dimension interaction and dark theme colors. Full combined verification:
+Core **549 / 17,217**, Geometry **459 / 35,243**, offscreen GUI **569 passed / 20 native-only
+skips / 80,332 assertions**, native affected workflows and required shell coverage **136 / 29,127**.
+After a test-only focus/screen-fit adjustment, dimension input passes offscreen **7 / 1,618** and
+natively **7 / 1,739**; final 150% UI/dimension proof passes **16 / 3,209**, without skips.
+All five targets build and separate native startup reaches timeout 124. Existing contracts and
+`development-setup.md` record the exact boundaries; no timing profile was rerun and the known
+40-blade full Apply/Undo/Redo cost remains about **5–6 s**. Block 137 remains complete and
+Block 138 remains planned.
