@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_sketch_diagnostics_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/core/sketch_repair_commands.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
@@ -217,7 +218,7 @@ ShellSketchDiagnosticsTools::ShellSketchDiagnosticsTools(ShellWindow& window, Sh
   layout->addStretch();
   auto* buttons = new QHBoxLayout;
   const auto button = [&](const char* name, const QString& label) {
-    auto* result = new QPushButton(label, panel);
+    auto* result = make_gui_button(label, panel);
     result->setObjectName(QStringLiteral("blcad.sketch_diagnostics.") + name);
     if (QString::fromLatin1(name) == QStringLiteral("apply"))
       result->setProperty("guiRole", "primary");

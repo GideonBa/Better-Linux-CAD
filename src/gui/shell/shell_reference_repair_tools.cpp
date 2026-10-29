@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_reference_repair_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
@@ -357,7 +358,7 @@ ShellReferenceRepairTools::ShellReferenceRepairTools(ShellWindow& window, ShellR
   layout->addWidget(ui.pending_list);
   auto* queue_buttons = new QHBoxLayout;
   const auto queue_button = [&](const char* id, const QString& label) {
-    auto* result = new QPushButton(label, panel);
+    auto* result = make_gui_button(label, panel);
     result->setObjectName(QStringLiteral("blcad.reference_repair.") + id);
     queue_buttons->addWidget(result);
     return result;
@@ -369,7 +370,7 @@ ShellReferenceRepairTools::ShellReferenceRepairTools(ShellWindow& window, ShellR
   layout->addStretch();
   auto* buttons = new QHBoxLayout;
   const auto button = [&](const char* id, const QString& label) {
-    auto* result = new QPushButton(label, panel);
+    auto* result = make_gui_button(label, panel);
     result->setObjectName(QStringLiteral("blcad.reference_repair.") + id);
     if (QString::fromLatin1(id) == QStringLiteral("apply"))
       result->setProperty("guiRole", "primary");

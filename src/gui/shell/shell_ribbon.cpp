@@ -1,5 +1,6 @@
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/gui_appearance.hpp"
+#include "blcad/gui/gui_icons.hpp"
 
 #include <QAction>
 #include <QFrame>
@@ -78,8 +79,8 @@ ShellRibbon::ShellRibbon(QWidget* parent) : QWidget(parent) {
     auto* button = new QToolButton(tab_navigation_buttons_);
     button->setObjectName(QString::fromLatin1(id));
     button->setProperty("guiRole", "tabNavigation");
-    button->setIcon(QIcon(QStringLiteral(":/blcad/gui/") + QString::fromLatin1(asset)));
-    button->setIconSize(QSize(5, 9));
+    button->setIcon(pixelart_icon(QString::fromLatin1(asset)));
+    button->setIconSize(QSize(24, 24));
     button->setFixedSize(24, 32);
     button->setAccessibleName(text);
     button->setToolTip(text);
@@ -87,9 +88,9 @@ ShellRibbon::ShellRibbon(QWidget* parent) : QWidget(parent) {
     return button;
   };
   previous_tab_ = arrow("blcad.ribbon.tab_previous", QStringLiteral("Scroll workspace tabs left"),
-                        "arrow-left.xpm");
+                        "chevron-left");
   next_tab_ = arrow("blcad.ribbon.tab_next", QStringLiteral("Scroll workspace tabs right"),
-                    "arrow-right.xpm");
+                    "chevron-right");
   navigation->addWidget(tab_navigation_buttons_);
   const auto scroll_tabs = [this](int direction) {
     auto* bar = tab_navigation_->horizontalScrollBar();
@@ -146,7 +147,9 @@ int ShellRibbon::add_tab(const QString& title) {
   row->addStretch(1);
   scroll->setWidget(page);
   pages_->addWidget(scroll);
-  const int index = tabs_->addTab(title);
+  const int index = tabs_->addTab(gui_icon_for_label(title), title);
+  tabs_->setTabToolTip(index, title);
+  tabs_->setIconSize(QSize(24, 24));
   update_tab_navigation();
   return index;
 }
@@ -178,10 +181,12 @@ QWidget* ShellRibbon::add_group(int tab_index, const QString& title) {
 }
 
 QToolButton* ShellRibbon::add_button(QWidget* group, QAction* action) {
+  apply_gui_action_icon(*action);
   auto* button = new QToolButton(group);
   button->setProperty("guiRole", "ribbonCommand");
   button->setDefaultAction(action);
   button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+  button->setIconSize(QSize(24, 24));
   button->setAutoRaise(true);
   button->setMinimumSize(56, 64);
   button->setMinimumWidth(std::max(56, button->sizeHint().width()));
@@ -194,13 +199,17 @@ QToolButton* ShellRibbon::add_menu_button(QWidget* group, const QString& title,
   auto* button = new QToolButton(group);
   button->setProperty("guiRole", "ribbonCommand");
   button->setText(title);
+  button->setIcon(gui_icon_for_label(title));
+  button->setIconSize(QSize(24, 24));
   button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
   button->setAutoRaise(true);
   button->setMinimumSize(56, 64);
   button->setPopupMode(QToolButton::InstantPopup);
   auto* menu = new QMenu(button);
-  for (QAction* action : actions)
+  for (QAction* action : actions) {
+    apply_gui_action_icon(*action);
     menu->addAction(action);
+  }
   button->setMenu(menu);
   button->setMinimumWidth(std::max(56, button->sizeHint().width()));
   button_row(group)->addWidget(button);
@@ -208,6 +217,7 @@ QToolButton* ShellRibbon::add_menu_button(QWidget* group, const QString& title,
 }
 
 QToolButton* ShellRibbon::add_small_button(QWidget* group, QAction* action) {
+  apply_gui_action_icon(*action);
   // Compact buttons live in one grid at the end of the button row, filled
   // column-major with two rows.
   auto* row = button_row(group);
@@ -220,8 +230,11 @@ QToolButton* ShellRibbon::add_small_button(QWidget* group, QAction* action) {
     row->addLayout(grid);
   }
   auto* button = new QToolButton(group);
+  button->setProperty("guiRole", "ribbonCompact");
   button->setDefaultAction(action);
-  button->setToolButtonStyle(Qt::ToolButtonTextOnly);
+  button->setToolButtonStyle(action->icon().isNull() ? Qt::ToolButtonTextOnly
+                                                     : Qt::ToolButtonTextBesideIcon);
+  button->setIconSize(QSize(24, 24));
   button->setAutoRaise(true);
   const int count = grid->count();
   grid->addWidget(button, count % 2, count / 2);

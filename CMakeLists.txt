@@ -296,6 +296,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_step_import_workbench.cpp
     src/gui/gui_document_browser.cpp
     src/gui/gui_appearance.cpp
+    src/gui/gui_icons.cpp
     src/gui/gui_document_session.cpp
     src/gui/gui_part_foundation_workbench.cpp
     src/gui/gui_part_operations_workbench.cpp
@@ -349,6 +350,7 @@ if(BLCAD_BUILD_GUI)
       $<INSTALL_INTERFACE:include>
   )
   target_compile_features(blcad_gui PUBLIC cxx_std_20)
+  include(assets/gui/pixelarticons/resources.cmake)
   qt_add_resources(
     blcad_gui blcad_gui_assets
     PREFIX "/blcad/gui"
@@ -366,6 +368,7 @@ if(BLCAD_BUILD_GUI)
       assets/gui/fonts/Barlow-OFL.txt
       assets/gui/fonts/BarlowCondensed-OFL.txt
       assets/gui/fonts/IBMPlexMono-OFL.txt
+      ${BLCAD_PIXELARTICON_RESOURCES}
   )
   target_link_libraries(
     blcad_gui
@@ -620,6 +623,7 @@ if(BLCAD_BUILD_TESTS)
       blcad_gui_tests
       tests/gui/gui_test_main.cpp
       tests/gui/gui_appearance_tests.cpp
+      tests/gui/gui_icons_tests.cpp
       tests/gui/gui_rapid_dimension_tests.cpp
       tests/gui/gui_shell_reference_visibility_workflow_tests.cpp
       tests/gui/gui_assembly_workbench_tests.cpp

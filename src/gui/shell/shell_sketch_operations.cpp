@@ -1,4 +1,5 @@
 #include "blcad/geometry/sketch_reference_projector.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -357,11 +358,11 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
   QPushButton *elements_button = nullptr, *axis_button = nullptr, *center_button = nullptr,
               *drag_button = nullptr;
   if (!projection && kind != Kind::BreakLinkLine) {
-    elements_button = new QPushButton(QStringLiteral("Select Elements"), &dialog);
+    elements_button = make_gui_button(QStringLiteral("Select Elements"), &dialog);
     elements_button->setObjectName(QStringLiteral("sketch.operation.elements"));
     layout->addWidget(elements_button);
     if (has_axis) {
-      axis_button = new QPushButton(QStringLiteral("Select Symmetry Axis"), &dialog);
+      axis_button = make_gui_button(QStringLiteral("Select Symmetry Axis"), &dialog);
       axis_button->setObjectName(QStringLiteral("sketch.operation.axis"));
       layout->insertWidget(0, axis_button);
       auto* note = new QLabel(
@@ -375,11 +376,11 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
       layout->addWidget(note);
     } else {
       if (kind == Kind::Rotate || kind == Kind::Scale || kind == Kind::CircularPattern) {
-        center_button = new QPushButton(QStringLiteral("Pick Center in Viewport"), &dialog);
+        center_button = make_gui_button(QStringLiteral("Pick Center in Viewport"), &dialog);
         center_button->setObjectName(QStringLiteral("sketch.operation.center"));
         layout->addWidget(center_button);
       }
-      drag_button = new QPushButton(QStringLiteral("Drag with Mouse"), &dialog);
+      drag_button = make_gui_button(QStringLiteral("Drag with Mouse"), &dialog);
       drag_button->setObjectName(QStringLiteral("sketch.operation.drag"));
       layout->addWidget(drag_button);
     }
@@ -539,6 +540,7 @@ void ShellSketchTools::show_operation_dialog(Kind kind) {
   controls->button(QDialogButtonBox::Ok)->setText(QStringLiteral("Apply"));
   controls->button(QDialogButtonBox::Ok)->setProperty("guiRole", "primary");
   controls->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("Cancel"));
+  apply_gui_dialog_icons(*controls);
   layout->addWidget(controls);
   const auto request = [&] {
     auto r = base;

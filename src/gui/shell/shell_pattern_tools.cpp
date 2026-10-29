@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 
 #include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
@@ -108,7 +109,7 @@ void ShellFeatureTools::build_pattern_controls(QWidget* panel) {
   pattern_reference_->setObjectName(QStringLiteral("blcad.pattern.reference"));
   form->addRow(QStringLiteral("Axis / Plane"), pattern_reference_);
   pattern_reference_button_ =
-      new QPushButton(QStringLiteral("Pick Reference in Model"), pattern_controls_);
+      make_gui_button(QStringLiteral("Pick Reference in Model"), pattern_controls_);
   pattern_reference_button_->setObjectName(QStringLiteral("blcad.pattern.pick_reference"));
   pattern_reference_button_->setCheckable(true);
   form->addRow(pattern_reference_button_);

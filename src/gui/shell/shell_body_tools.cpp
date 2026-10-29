@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 
 #include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/gui/occt_viewport.hpp"
@@ -67,7 +68,7 @@ void ShellFeatureTools::build_body_controls(QWidget* panel) {
   body_axis_ = new QComboBox(body_controls_);
   body_axis_->setObjectName("blcad.body.axis");
   form->addRow(QStringLiteral("Rotation Axis"), body_axis_);
-  body_reference_button_ = new QPushButton(body_controls_);
+  body_reference_button_ = make_gui_button(body_controls_);
   body_reference_button_->setObjectName("blcad.body.pick_reference");
   body_reference_button_->setCheckable(true);
   form->addRow(body_reference_button_);
@@ -332,6 +333,7 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
   body_reference_button_->setText(command == Command::BodyBoolean
                                       ? QStringLiteral("Pick Target Body in Model")
                                       : QStringLiteral("Pick Rotation Axis in Model"));
+  apply_gui_button_icon(*body_reference_button_);
   for (auto* editor : body_translation_editors_)
     form->setRowVisible(editor, command == Command::BodyTranslate);
   for (auto* editor : body_center_editors_)

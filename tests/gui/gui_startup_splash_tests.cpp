@@ -1,4 +1,3 @@
-#include "blcad/gui/gui_appearance.hpp"
 #include "blcad/gui/startup_splash.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -26,14 +25,14 @@ TEST_CASE("GUI startup splash embeds artwork and bounds progress", "[gui][startu
   rendered.fill(Qt::transparent);
   QPainter painter(&rendered);
   splash.render(&painter);
-  const QColor blue = QColor::fromRgb(appearance::blue);
-  const QColor paper = QColor::fromRgb(appearance::paper);
-  CHECK(rendered.pixelColor(10, 410) == blue);
-  CHECK(rendered.pixelColor(0, 0) == blue);
-  CHECK(rendered.pixelColor(rendered.width() - 1, rendered.height() - 1) == blue);
-  CHECK(rendered.pixelColor(100, 516) == paper);
-  CHECK(rendered.pixelColor(700, 516) == blue);
-  CHECK(rendered.pixelColor(700, 518) == paper);
+  CHECK(rendered.pixelColor(10, 410) == QColor(Qt::black));
+  CHECK(rendered.pixelColor(100, 497) == QColor(Qt::black));
+  CHECK(rendered.pixelColor(200, 497) == QColor(Qt::white));
+  CHECK(rendered.pixelColor(700, 497) == QColor(Qt::black));
+  CHECK(rendered.pixelColor(380, 491) == QColor(Qt::white));
+  CHECK(rendered.pixelColor(380, 503) == QColor(Qt::white));
+  CHECK(rendered.pixelColor(379, 491) == QColor(Qt::black));
+  CHECK(rendered.pixelColor(381, 503) == QColor(Qt::black));
 
   const QString screenshot_path = qEnvironmentVariable("BLCAD_SPLASH_SCREENSHOT");
   if (!screenshot_path.isEmpty())

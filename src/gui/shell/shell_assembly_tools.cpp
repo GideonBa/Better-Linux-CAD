@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/core/assembly_leaf_occurrence.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
@@ -289,10 +290,10 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   scroll->setWidget(panel);
   column->addWidget(scroll, 1);
   auto* footer = new QHBoxLayout;
-  apply_ = new QPushButton(QStringLiteral("Apply"), contents);
+  apply_ = make_gui_button(QStringLiteral("Apply"), contents);
   apply_->setObjectName("blcad.assembly.apply");
   apply_->setProperty("guiRole", "primary");
-  auto* cancel = new QPushButton(QStringLiteral("Cancel"), contents);
+  auto* cancel = make_gui_button(QStringLiteral("Cancel"), contents);
   cancel->setObjectName("blcad.assembly.cancel");
   footer->addWidget(apply_);
   footer->addWidget(cancel);

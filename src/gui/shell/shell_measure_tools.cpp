@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_measure_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_appearance.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -77,10 +78,10 @@ protected:
         painter.drawEllipse(point, 4, 4);
       const auto middle = (projected[0] + projected[1]) / 2;
       const QRectF label(middle + QPointF(8, -26), QSizeF(210, 24));
-      painter.fillRect(label, QColor::fromRgb(appearance::paper));
-      painter.setPen(QColor::fromRgb(appearance::blue));
+      painter.fillRect(label, QColor::fromRgb(appearance::panel));
+      painter.setPen(QColor::fromRgb(appearance::accent));
       painter.drawRect(label);
-      painter.setPen(QColor::fromRgb(appearance::ink));
+      painter.setPen(QColor::fromRgb(appearance::text));
       painter.drawText(label, Qt::AlignLeft | Qt::AlignVCenter, value);
     }
     for (const auto& [label, point] : markers) {
@@ -88,7 +89,7 @@ protected:
       if (!screen)
         continue;
       const QPointF p(screen.value().x, screen.value().y);
-      painter.setPen(QColor::fromRgb(appearance::paper));
+      painter.setPen(QColor::fromRgb(appearance::text));
       painter.drawEllipse(p, 6, 6);
       painter.setPen(Qt::white);
       painter.drawText(p + QPointF(8, 16), label);
@@ -157,11 +158,11 @@ ShellMeasureTools::ShellMeasureTools(ShellWindow& window, GuiDocumentSession& se
   column->addWidget(readout_);
   column->addStretch();
   auto* buttons = new QHBoxLayout;
-  auto* clear = new QPushButton(QStringLiteral("Select Again"), panel);
+  auto* clear = make_gui_button(QStringLiteral("Select Again"), panel);
   clear->setObjectName("blcad.measure.clear");
-  copy_ = new QPushButton(QStringLiteral("Copy"), panel);
+  copy_ = make_gui_button(QStringLiteral("Copy"), panel);
   copy_->setObjectName("blcad.measure.copy");
-  auto* close = new QPushButton(QStringLiteral("Close"), panel);
+  auto* close = make_gui_button(QStringLiteral("Close"), panel);
   close->setObjectName("blcad.measure.close");
   for (auto* button : {clear, copy_, close})
     buttons->addWidget(button);
