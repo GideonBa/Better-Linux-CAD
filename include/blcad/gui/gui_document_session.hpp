@@ -133,6 +133,11 @@ private:
     geometry::ShapeCache cache;
   };
 
+  struct PartHistoryGeometry {
+    std::size_t history_index;
+    geometry::ShapeCache cache;
+  };
+
   using Document = std::variant<std::monostate, PartDocument, Project>;
 
   [[nodiscard]] Result<std::string> serialize_current() const;
@@ -140,6 +145,9 @@ private:
                                                    geometry::ShapeCache& cache) const;
   [[nodiscard]] Result<std::vector<ProjectPartCache>> recompute_project(Project& project) const;
   [[nodiscard]] Result<std::size_t> restore_history(std::size_t index);
+  [[nodiscard]] Result<geometry::ShapeCache>
+  recompute_part_candidate(PartDocument& document, const std::string& json) const;
+  void remember_part_history_geometry();
   [[nodiscard]] Result<std::size_t> reject_replacement_if_needed(bool discard_dirty) const;
   [[nodiscard]] Result<std::size_t>
   validate_constraint_catalogs(const PartDocument& document,
@@ -169,6 +177,7 @@ private:
   std::vector<SketchConstraintCatalog> sketch_constraint_catalogs_;
   std::vector<SketchDimensionCatalog> sketch_dimension_catalogs_;
   std::vector<HistoryEntry> history_;
+  std::vector<PartHistoryGeometry> part_history_geometry_;
   std::size_t history_index_{0};
   std::optional<std::string> saved_json_;
   std::optional<std::vector<SketchConstraintCatalog>> saved_sketch_constraint_catalogs_;

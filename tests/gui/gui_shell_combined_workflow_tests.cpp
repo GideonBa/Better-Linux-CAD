@@ -322,8 +322,21 @@ public:
         }
       });
       deadline.start(2000);
-      tick.start(0);
-      transition.exec();
+      do {
+        tick.start(5);
+        transition.exec();
+        // Popup activation can restore the pre-popup pointer while the nested
+        // loop unwinds. Require agreement after unwinding too, using the same
+        // original deadline and four-warp limit if another settling pass is needed.
+        QGuiApplication::sync();
+        flush();
+        pointer_ready = !timed_out && pointer_ready && QCursor::pos() == global &&
+                        view->isVisible() &&
+                        view->viewport()->mapToGlobal(rectangle.center()) == global &&
+                        view->indexAt(rectangle.center()) == index && view->currentIndex() == index;
+        if (!pointer_ready)
+          stable_ticks = 0;
+      } while (!pointer_ready && !timed_out);
     }
     const auto actual = QCursor::pos();
     const auto popup_geometry = view->window()->geometry();
@@ -331,6 +344,8 @@ public:
     const auto available_geometry = view->screen()->availableGeometry();
     INFO("Requested cursor: " << global.x() << ',' << global.y());
     INFO("Actual cursor: " << actual.x() << ',' << actual.y());
+    const auto control_global = control.mapToGlobal(control.rect().center());
+    INFO("Control center: " << control_global.x() << ',' << control_global.y());
     INFO("Pointer warp requests: " << pointer_warps);
     INFO("Stable cursor/hover ticks: " << stable_ticks);
     const auto current_global = view->viewport()->mapToGlobal(rectangle.center());
@@ -344,7 +359,8 @@ public:
     INFO("Available geometry: " << available_geometry.x() << ',' << available_geometry.y() << ' '
                                 << available_geometry.width() << 'x'
                                 << available_geometry.height());
-    if (!pointer_ready && qEnvironmentVariableIsSet("BLCAD_UI_CAPTURE_DIR")) {
+    if ((!pointer_ready || actual != global || current_global != global) &&
+        qEnvironmentVariableIsSet("BLCAD_UI_CAPTURE_DIR")) {
       capture("assembly-popup-pointer-mismatch");
       const auto path = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR") +
                         QStringLiteral("/assembly-popup-pointer-mismatch-popup.png");

@@ -540,9 +540,9 @@ nodes and all Changed/Dirty/error entries feed the root-inclusive Core plan. It 
 producer/consumer chains in graph order, including Body aliases and associative Boolean tools.
 Pending parameters/profiles/bodies remain candidate-only. Unchanged source backing identities can
 be retained while an edited upstream parameter recomputes its complete dependency branch.
-Failure, cancellation, history and persistence contracts remain unchanged. Existing Apply/history
-and general parameter/feature-edit paths still perform their original validation/recompute work;
-this optimization does not claim that all complex-Part costs have disappeared.
+Failure, cancellation, history and persistence contracts remain unchanged. The initial preview-only
+stage left Apply/history and general parameter/feature edits on full recomputation. The transaction
+and history follow-up below extends reuse to those paths with separate provenance and memory bounds.
 
 `[preview-cache][complex-part-correctness]` uses one connected, visible rotor: a revolved hub and
 20 exact spline blades, with a hidden editable source blade. It compares cached candidates with
@@ -692,8 +692,9 @@ Measurements prioritize the work as follows. Full upstream geometry and repeated
 sampling dominated the original previews, so incremental candidate execution and single sampling
 address those confirmed hotspots. The extra Surface validation pass now follows that same path.
 Full commit/history reconstruction is the largest remaining measured cost (about 5–6 seconds for
-40 blades) and should be the next optimization area, with atomic state publication and bounded
-BRep retention reviewed explicitly. Native scene publication grows to p95 95.8 ms at 40 blades;
+40 blades) at this initial acceptance stage; the later transaction/history follow-up below addresses
+that hotspot with atomic publication and bounded BRep retention. Native scene publication grows to
+p95 95.8 ms at 40 blades;
 scene construction is only 2.2 ms and picking is below 0.7 ms. Retaining presentations may reduce
 that publication cost, but no renderer change is justified as the first fix for a five-second
 geometry rebuild. Existing drag coalescing is verified to process only the final sample of 32;
@@ -732,3 +733,97 @@ all **741** final source/test/asset/build-definition hashes. This focused follow
 initial broad Core/Geometry/GUI and scaled native proof above; those entire suites and the 150%
 deep workflow were not repeated after native test-only refinements. Local budgets and the remaining
 full-model history/edit costs are exposed for PR/product review rather than claimed eliminated.
+
+## Complex-Part transaction and history reuse — issue #114, 2026-10-29
+
+Part transactions retain strict JSON cloning, constraint/dimension-catalog validation and atomic
+publication. Before geometry execution, canonical candidate intent is compared with the accepted
+history JSON. Reuse requires a Fresh, clean, complete committed producer cache, matching Part
+identity and an unchanged committed-intent/history fingerprint. A public mutation callback may
+replace intent or clear its dirty flags; changed roots therefore come from supported canonical
+records, not only dirty bookkeeping. Parameter, Sketch, path, construction and supported feature
+records identify graph roots; the normal root-inclusive plan executes their complete consumer chains.
+
+Appending a feature redirects its Body result alias from the previous producer to the new one.
+That expected alias change seeds both the alias and its new producer; it does not invalidate the
+unchanged upstream branch. If an existing producer becomes final through reordering, that producer
+is also recomputed. Other changed existing input edges, removed nodes/records, unknown fields,
+Body-registry changes, legacy Extrude records (including mixed models with declared Bodies),
+bodyless models, incomplete/stale caches and reference-repair state
+use a fresh full recompute. Registered STEP sources also retain the full path until imported cache
+freshness has its own authority. Every candidate still validates reference sources. No derived
+geometry is accepted solely because ids or counts happen to match.
+
+Undo/Redo retain strict history JSON and sidecar validation. A runtime-only LRU holds at most
+**four recently visited successful Part geometry states**, keyed by exact history position. It
+shares immutable source geometry with the working cache; BReps never enter Core or saved JSON.
+Restoring a retained state republishes its verified geometry after intent/catalog validation.
+Evicted states reconstruct from intent, so deep history can still require a full kernel pass.
+New/Open/reset clear the retained states; a new edit drops cached states from the discarded Redo
+branch. Failed mutations publish neither intent nor geometry/history. Project recomputation,
+reference-repair snapshots and Parts with registered STEP assets keep their full validation path.
+No worker, ownership transfer, asynchronous result path or renderer change is introduced.
+
+### Isolated native measurements
+
+The fresh baseline is main `8e72a8e`, five samples of the 40-blade deep rotor. The after-run uses
+the same controller timing boundaries for all 5/20/40-blade fixtures. New source-backing assertions
+are outside the measured Apply interval. Raw samples and environment metadata are versioned in
+`docs/benchmarks/complex-rotor-history-before.json` and
+`docs/benchmarks/complex-rotor-history-after.json`. The former contains 40 blades only; older
+5/20-blade measurements above are a separate historical series. Values below are warm p50 / p95
+in milliseconds, over four repeats; p95 is the largest repeat, not a population estimate.
+
+| Measured operation | 5 blades after | 20 blades after | 40 blades before | 40 blades after |
+| --- | ---: | ---: | ---: | ---: |
+| Apply including JSON/history/recompute | 50.2 / 51.9 | 77.1 / 86.4 | 4906.4 / 5080.7 | 120.4 / 126.3 |
+| Undo including validation | 12.3 / 13.5 | 13.1 / 13.8 | 4945.2 / 5256.0 | 15.4 / 15.9 |
+| Redo including validation | 13.3 / 14.1 | 14.5 / 15.0 | 5049.5 / 5071.9 | 17.9 / 18.4 |
+| Geometry preview | 31.9 / 33.2 | 58.4 / 61.3 | 100.8 / 107.0 | 96.8 / 97.8 |
+| Preview/publication/events/capture | 50.7 / 53.8 | 93.9 / 95.3 | — | 155.2 / 161.9 |
+
+The additional local delivery criteria are warm p95 below **250 ms for controller Apply** and
+**50 ms for a retained Undo/Redo state** on this Debug fixture/hardware. All three sizes meet
+them. These are engineering review criteria under the user's delegated issue work, not a
+user-approved release SLA or portable CI timing assertion. Apply here excludes the shell's later
+browser/scene publication; the preview/publication metric includes event processing and capture.
+Posted zero-timer delay is event-loop availability, not physical OS input latency.
+
+The existing local preview, selection, solver, drag, picking and complete-preview targets remain
+unchanged. The 40-blade JSON roundtrip p95 is **22.949 ms**, a miss against **20 ms**; record
+it rather than widening the target. Cold recomputation, cache-miss history and conservative
+fallbacks can still cost seconds. The measured repeated Fillet Apply/history hotspot is removed;
+this is not a claim that all possible large-Part actions have bounded physical input latency.
+
+### Correctness and verification boundary
+
+Five new transaction/history cases cover clean replacement intent, stale provenance, failed
+mutation, removed transforms, independent Bodies, mixed legacy aggregate results, eviction,
+discarded Redo and New/reset. They
+compare complete body counts, solid counts, final-result contracts and volumes against empty-cache
+execution, including restored history. Existing preview and native rotor workflows retain their
+stale-input, cancellation, recovery, dimension/drag, Save/Open and STEP proofs. Actual Fillet Apply
+and the profile now require unchanged hub/blade backing identity as well as preview/Apply equality.
+
+The initial three new cases reproduce the missing reuse (**7 failed assertions / 274 evaluated**).
+Final focused history/preview checks pass **7 cases / 969 assertions**. The isolated native profile
+passes **1 / 1,379**. An intermediate profile exposed the alias guard's unwanted Apply fallback;
+it was corrected before the final series. A final review regression also reproduced a mixed legacy
+result of **560 instead of 400 mm³** (**6 failed / 38 assertions**); legacy Feature records now
+retain full execution even when Body declarations exist. The scaled popup fixture additionally
+rechecks pointer/hover agreement after its nested event loop unwinds, within the original two-second
+deadline and four-warp bound. This preserves strict actual-pointer/row assertions. The measured
+final **886** source/test/asset/build
+inputs have manifest SHA-256
+`0c9363d37a0e497b43215fa77814cfd25d119c3f6b20d8b3af9eae306190d4ee`.
+Full Core **549 / 17,217**, Geometry **459 / 35,243** and final offscreen GUI **594 cases —
+574 passed, 20 expected native-only skips; 80,765 assertions** pass. Core/Geometry sources and
+binaries remain unchanged by the final GUI-only safety and native-fixture refinements.
+Final native affected-family/large-rotor/required shell coverage passes **39 / 12,547**, without
+skips. Final 150% rotor/dimension input passes **8 / 2,435**, without skips. Separate native startup
+reaches intentional timeout **124**. Ordinary and scaled rotor/selection captures were inspected;
+final profile/native/scaled/startup logs have no High-severity, BadDrawable or BadWindow errors.
+The known Medium X11 visual depth/stencil warning remains. All five targets build; all **886**
+source fingerprints remain unchanged through the final checks. Exact commands/logs are in
+`docs/development-setup.md`; `docs/mvp-plan.md` records serial delivery. No numbered implementation
+block advances.
