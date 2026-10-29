@@ -86,11 +86,11 @@ std::optional<std::vector<std::string>> transaction_geometry_roots(const PartDoc
     return std::nullopt;
   const std::unordered_set<std::string> records{
       "parameters",         "datum_planes",        "datum_axes",         "construction_points",
-      "construction_lines", "construction_planes", "derived_workplanes", "sketches",
-      "sketches_3d",        "path_curves",         "features",           "revolve_features",
-      "sweep_features",     "loft_features",       "surface_features",   "part_patterns",
-      "mirror_features",    "edge_treatments",     "shell_features",     "draft_features",
-      "body_booleans",      "body_transforms"};
+      "construction_lines", "construction_planes", "derived_workplanes", "result_face_workplanes",
+      "sketches",           "sketches_3d",         "path_curves",        "features",
+      "revolve_features",   "sweep_features",      "loft_features",      "surface_features",
+      "part_patterns",      "mirror_features",     "edge_treatments",    "shell_features",
+      "draft_features",     "body_booleans",       "body_transforms"};
   std::unordered_set<std::string> keys;
   for (const auto& [key, value] : previous.items())
     keys.insert(key);
@@ -917,6 +917,17 @@ GuiDocumentSession::commit_project_transaction(std::string label,
   append_history(json.value(), std::move(label));
   selection_.clear();
   return changed;
+}
+
+void GuiDocumentSession::restore_creation_checkpoint(GuiDocumentSession checkpoint) {
+  checkpoint.file_path_ = std::move(file_path_);
+  checkpoint.saved_json_ = std::move(saved_json_);
+  checkpoint.saved_sketch_constraint_catalogs_ = std::move(saved_sketch_constraint_catalogs_);
+  checkpoint.saved_sketch_dimension_catalogs_ = std::move(saved_sketch_dimension_catalogs_);
+  const auto next_model_revision = std::max(model_revision(), checkpoint.model_revision()) + 1;
+  checkpoint.visibility_revision_ = std::max(visibility_revision_, checkpoint.visibility_revision_);
+  checkpoint.presentation_revision_ = checkpoint.visibility_revision_ + next_model_revision;
+  *this = std::move(checkpoint);
 }
 
 Result<std::size_t> GuiDocumentSession::undo() {

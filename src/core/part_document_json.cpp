@@ -3714,6 +3714,48 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
       *orientation, fixed_up, continuity, value.at("connection_tolerance_mm").get<double>());
 }
 
+[[nodiscard]] json result_face_workplane_to_json(const ResultFaceWorkplane& plane) {
+  const auto& ref = plane.reference();
+  json origins = json::array();
+  for (const auto& origin : ref.origins())
+    origins.push_back(json{{"feature", origin.feature.value()}, {"role", origin.role}});
+  return json{{"id", plane.id().value()},
+              {"name", plane.name()},
+              {"reference",
+               {{"producer", ref.producer().value()},
+                {"body", ref.body().value()},
+                {"origins", std::move(origins)}}}};
+}
+[[nodiscard]] Result<ResultFaceWorkplane> result_face_workplane_from_json(const json& value) {
+  const auto fail = [] {
+    return Result<ResultFaceWorkplane>::failure(
+        json_error("malformed result-face workplane reference"));
+  };
+  if (!has_exact_fields(value, {"id", "name", "reference"}) || !value.at("id").is_string() ||
+      !value.at("name").is_string())
+    return fail();
+  const auto& ref = value.at("reference");
+  if (!has_exact_fields(ref, {"producer", "body", "origins"}) || !ref.at("producer").is_string() ||
+      !ref.at("body").is_string() || !ref.at("origins").is_array())
+    return fail();
+  std::vector<ResultFaceOrigin> origins;
+  for (const auto& origin : ref.at("origins")) {
+    if (!has_exact_fields(origin, {"feature", "role"}) || !origin.at("feature").is_string() ||
+        !origin.at("role").is_string())
+      return fail();
+    origins.push_back(
+        {FeatureId(origin.at("feature").get<std::string>()), origin.at("role").get<std::string>()});
+  }
+  auto reference =
+      ResultFaceReference::create(FeatureId(ref.at("producer").get<std::string>()),
+                                  BodyId(ref.at("body").get<std::string>()), std::move(origins));
+  if (!reference)
+    return Result<ResultFaceWorkplane>::failure(reference.error());
+  return ResultFaceWorkplane::create(DatumPlaneId(value.at("id").get<std::string>()),
+                                     value.at("name").get<std::string>(),
+                                     std::move(reference.value()));
+}
+
 } // namespace
 
 Result<std::string> serialize_part_document_to_json(const PartDocument& document) {
@@ -3819,6 +3861,11 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
              {"kind", "feature_face"},
              {"source_feature", workplane.face_reference().source_feature().value()},
              {"face", std::string(to_string(workplane.face_reference().face()))}});
+  if (!document.result_face_workplanes().empty()) {
+    root["result_face_workplanes"] = json::array();
+    for (const auto& plane : document.result_face_workplanes())
+      root["result_face_workplanes"].push_back(result_face_workplane_to_json(plane));
+  }
   root["sketches"] = json::array();
   for (const auto& sketch : document.sketches()) {
     json sketch_json{{"id", sketch.id().value()},
@@ -4108,7 +4155,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     latest_ancestor_position[node] = latest;
   }
-  if (interleaved)
+  if (interleaved || !document.result_face_workplanes().empty())
     root["feature_order"] = std::move(feature_order);
   root["reference_statuses"] = json::array();
   for (const auto& status : document.reference_statuses())
@@ -4136,6 +4183,287 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       return Result<PartDocument>::failure(json_error("unsupported part document json schema"));
     if (root.at("version").get<int>() != k_version)
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
+    if (root.contains("result_face_workplanes")) {
+      const auto& supports = root.at("result_face_workplanes");
+      if (!supports.is_array())
+        return Result<PartDocument>::failure(json_error("result_face_workplanes must be an array"));
+      if (supports.empty()) {
+        auto legacy = root;
+        legacy.erase("result_face_workplanes");
+        return deserialize_part_document_from_json(legacy.dump(), mode);
+      }
+      if (!root.contains("feature_order") || !root.at("feature_order").is_array())
+        return Result<PartDocument>::failure(
+            json_error("result-face workplanes require explicit feature_order"));
+      // Keep the historical reader unchanged for old files. Seed only the
+      // independent document/parameter/datum/Body/asset records, then interleave
+      // metadata with the authored executable order. A support can depend on
+      // any preceding Loft/Boolean/finishing/transform producer.
+      const std::vector<std::string> dependent_arrays{
+          "construction_points", "construction_lines", "construction_planes",
+          "derived_workplanes",  "datum_axes",         "sketches",
+          "sketches_3d",         "path_curves",        "features",
+          "revolve_features",    "sweep_features",     "loft_features",
+          "surface_features",    "body_booleans",      "part_patterns",
+          "mirror_features",     "edge_treatments",    "shell_features",
+          "draft_features",      "body_transforms",    "sketch_ownerships",
+          "reference_statuses",  "reference_remaps",   "sketch_origin_overrides"};
+      auto prelude = root;
+      prelude.erase("result_face_workplanes");
+      prelude.erase("feature_order");
+      for (const auto& key : dependent_arrays) {
+        if (root.contains(key) && !root.at(key).is_array())
+          return Result<PartDocument>::failure(json_error(key + " must be an array"));
+        prelude[key] = json::array();
+      }
+      auto document = deserialize_part_document_from_json(prelude.dump(), mode);
+      if (!document)
+        return document;
+      auto& part = document.value();
+      std::unordered_set<std::string> authored;
+      for (const auto& field : root)
+        if (field.is_array())
+          for (const auto& record : field)
+            if (record.is_object() && record.contains("id") && record.at("id").is_string())
+              authored.insert(record.at("id").get<std::string>());
+      const auto* retained = mode == PartDocumentReadMode::ReferenceRepair ? &authored : nullptr;
+      using Add = std::function<Result<std::size_t>()>;
+      std::vector<Add> metadata;
+      std::unordered_map<std::string, Add> executables;
+      std::optional<Error> parse_error;
+      const auto enqueue = [&](const char* key, auto parser, auto adder, bool executable = false) {
+        for (const auto& record : root.value(key, json::array())) {
+          auto parsed = parser(record);
+          if (!parsed) {
+            if (!parse_error)
+              parse_error = parsed.error();
+            continue;
+          }
+          Add add = [&, value = std::move(parsed.value()), adder] { return adder(part, value); };
+          if (!executable)
+            metadata.push_back(std::move(add));
+          else {
+            const auto id = record.at("id").template get<std::string>();
+            if (!executables.emplace(id, std::move(add)).second && !parse_error)
+              parse_error = json_error("duplicate executable identity in result-face document");
+          }
+        }
+      };
+      enqueue("construction_points", construction_point_from_json,
+              [](auto& doc, const auto& value) { return doc.add_construction_point(value); });
+      enqueue("construction_lines", construction_line_from_json,
+              [](auto& doc, const auto& value) { return doc.add_construction_line(value); });
+      enqueue("construction_planes", construction_plane_from_json,
+              [](auto& doc, const auto& value) { return doc.add_construction_plane(value); });
+      enqueue("datum_axes", datum_axis_from_json,
+              [](auto& doc, const auto& value) { return doc.add_datum_axis(value); });
+      enqueue("derived_workplanes", derived_workplane_from_json, [&](auto& doc, const auto& value) {
+        const bool missing =
+            retained && !authored.contains(value.face_reference().source_feature().value());
+        return doc.add_derived_workplane_impl(value, missing);
+      });
+      std::unordered_set<std::string> missing_executables;
+      enqueue("result_face_workplanes", result_face_workplane_from_json,
+              [&](auto& doc, const auto& value) {
+                std::vector<std::string> missing;
+                if (retained) {
+                  const auto& ref = value.reference();
+                  if (!authored.contains(ref.producer().value()))
+                    missing.push_back(ref.producer().value());
+                  for (const auto& origin : ref.origins())
+                    if (!authored.contains(origin.feature.value()))
+                      missing.push_back(origin.feature.value());
+                }
+                return doc.add_result_face_workplane_impl(value, missing);
+              });
+      for (const auto& record : supports) {
+        auto value = result_face_workplane_from_json(record);
+        if (!value) {
+          if (!parse_error)
+            parse_error = value.error();
+          continue;
+        }
+        const auto& ref = value.value().reference();
+        if (retained && !authored.contains(ref.producer().value()))
+          missing_executables.insert(ref.producer().value());
+        if (retained)
+          for (const auto& origin : ref.origins())
+            if (!authored.contains(origin.feature.value()))
+              missing_executables.insert(origin.feature.value());
+      }
+      enqueue("sketches", sketch_from_json, [&](auto& doc, const auto& value) {
+        if (!sketch_dependencies_available(doc, value, retained))
+          return Result<std::size_t>::failure(
+              json_error("Sketch workplane or reference sources are not ready"));
+        return doc.add_sketch_impl(value, retained ? &value : nullptr);
+      });
+      enqueue("sketches_3d", sketch_3d_from_json,
+              [](auto& doc, const auto& value) { return doc.add_sketch_3d(value); });
+      enqueue("path_curves", path_curve_from_json,
+              [](auto& doc, const auto& value) { return doc.add_path_curve(value); });
+      enqueue("sketch_ownerships", sketch_ownership_from_json,
+              [](auto& doc, const auto& value) { return doc.add_sketch_ownership(value); });
+      enqueue("reference_statuses", reference_status_from_json,
+              [](auto& doc, const auto& value) { return doc.add_reference_status(value); });
+      enqueue("reference_remaps", reference_remap_from_json,
+              [](auto& doc, const auto& value) { return doc.add_reference_remap(value); });
+      enqueue("sketch_origin_overrides", sketch_origin_override_from_json,
+              [](auto& doc, const auto& value) { return doc.add_sketch_origin_override(value); });
+      enqueue(
+          "features", feature_from_json,
+          [](auto& doc, const auto& value) { return doc.add_feature(value); }, true);
+      enqueue(
+          "revolve_features", revolve_feature_from_json,
+          [](auto& doc, const auto& value) { return doc.add_revolve_feature(value); }, true);
+      enqueue(
+          "sweep_features", sweep_feature_from_json,
+          [](auto& doc, const auto& value) { return doc.add_sweep_feature(value); }, true);
+      enqueue(
+          "loft_features", loft_feature_from_json,
+          [](auto& doc, const auto& value) { return doc.add_loft_feature(value); }, true);
+      enqueue(
+          "surface_features", surface_feature_from_json,
+          [](auto& doc, const auto& value) { return doc.add_surface_feature(value); }, true);
+      enqueue(
+          "body_booleans", body_boolean_feature_from_json,
+          [](auto& doc, const auto& value) { return doc.add_body_boolean_feature(value); }, true);
+      enqueue(
+          "part_patterns", part_pattern_from_json,
+          [](auto& doc, const auto& value) {
+            return std::visit(
+                [&](const auto& feature) {
+                  using T = std::decay_t<decltype(feature)>;
+                  if constexpr (std::is_same_v<T, LinearPatternFeature>)
+                    return doc.add_linear_pattern_feature(feature);
+                  else
+                    return doc.add_circular_pattern_feature(feature);
+                },
+                value);
+          },
+          true);
+      enqueue(
+          "mirror_features", mirror_feature_from_json,
+          [](auto& doc, const auto& value) { return doc.add_mirror_feature(value); }, true);
+      enqueue(
+          "edge_treatments", edge_treatment_from_json,
+          [](auto& doc, const auto& value) {
+            return std::visit(
+                [&](const auto& feature) {
+                  using T = std::decay_t<decltype(feature)>;
+                  if constexpr (std::is_same_v<T, FilletFeature>)
+                    return doc.add_fillet_feature(feature);
+                  else
+                    return doc.add_chamfer_feature(feature);
+                },
+                value);
+          },
+          true);
+      enqueue(
+          "shell_features", shell_feature_from_json,
+          [](auto& doc, const auto& value) { return doc.add_shell_feature(value); }, true);
+      enqueue(
+          "draft_features", draft_feature_from_json,
+          [](auto& doc, const auto& value) { return doc.add_draft_feature(value); }, true);
+      enqueue(
+          "body_transforms", body_transform_from_json,
+          [](auto& doc, const auto& value) { return doc.add_body_transform(value); }, true);
+      if (parse_error)
+        return Result<PartDocument>::failure(*parse_error);
+      std::vector<std::string> order;
+      std::unordered_set<std::string> seen;
+      for (const auto& entry : root.at("feature_order")) {
+        if (!entry.is_string())
+          return Result<PartDocument>::failure(json_error("feature_order entries must be strings"));
+        const auto id = entry.get<std::string>();
+        if (!seen.insert(id).second)
+          return Result<PartDocument>::failure(
+              json_error("feature_order contains duplicate executable identity"));
+        if (!executables.contains(id)) {
+          if (missing_executables.contains(id))
+            continue;
+          return Result<PartDocument>::failure(
+              json_error("feature_order names an unknown executable"));
+        }
+        order.push_back(id);
+      }
+      if (order.size() != executables.size())
+        return Result<PartDocument>::failure(
+            json_error("feature_order must name every executable exactly once"));
+      std::vector<bool> loaded(metadata.size());
+      std::size_t remaining = metadata.size(), next = 0;
+      std::optional<Error> last_error;
+      while (remaining || next < order.size()) {
+        bool progress = false;
+        for (std::size_t i = 0; i < metadata.size(); ++i) {
+          if (loaded[i])
+            continue;
+          auto added = metadata[i]();
+          if (!added) {
+            last_error = added.error();
+            continue;
+          }
+          loaded[i] = true;
+          --remaining;
+          progress = true;
+        }
+        if (next < order.size()) {
+          auto added = executables.at(order[next])();
+          if (added) {
+            ++next;
+            progress = true;
+          } else
+            last_error = added.error();
+        }
+        if (!progress)
+          return Result<PartDocument>::failure(
+              last_error ? *last_error
+                         : json_error("result-face support dependencies cannot be resolved"));
+      }
+      const auto restore = [&](auto& records, const char* key) {
+        std::unordered_map<std::string, std::size_t> positions;
+        const auto array = root.value(key, json::array());
+        for (std::size_t i = 0; i < array.size(); ++i)
+          positions.emplace(array.at(i).at("id").template get<std::string>(), i);
+        std::sort(records.begin(), records.end(), [&](const auto& a, const auto& b) {
+          const auto id = [](const auto& record) {
+            if constexpr (requires { record.id(); })
+              return record.id().value();
+            else
+              return surface_feature_id(record).value();
+          };
+          return positions.at(id(a)) < positions.at(id(b));
+        });
+      };
+      restore(part.construction_points_, "construction_points");
+      restore(part.construction_lines_, "construction_lines");
+      restore(part.construction_planes_, "construction_planes");
+      restore(part.derived_workplanes_, "derived_workplanes");
+      restore(part.result_face_workplanes_, "result_face_workplanes");
+      restore(part.datum_axes_, "datum_axes");
+      restore(part.sketches_, "sketches");
+      restore(part.sketches_3d_, "sketches_3d");
+      restore(part.path_curves_, "path_curves");
+      restore(part.features_, "features");
+      restore(part.revolve_features_, "revolve_features");
+      restore(part.sweep_features_, "sweep_features");
+      restore(part.loft_features_, "loft_features");
+      restore(part.surface_features_, "surface_features");
+      restore(part.body_boolean_features_, "body_booleans");
+      restore(part.linear_pattern_features_, "part_patterns");
+      restore(part.circular_pattern_features_, "part_patterns");
+      restore(part.mirror_features_, "mirror_features");
+      restore(part.fillet_features_, "edge_treatments");
+      restore(part.chamfer_features_, "edge_treatments");
+      restore(part.shell_features_, "shell_features");
+      restore(part.draft_features_, "draft_features");
+      restore(part.body_transforms_, "body_transforms");
+      if (!retained) {
+        auto valid = part.validate_reference_sources();
+        if (!valid)
+          return Result<PartDocument>::failure(valid.error());
+      }
+      return document;
+    }
     // A record that is present later in the file must still resolve normally.
     // IDs belonging to another record kind are never treated as absent sources.
     std::unordered_set<std::string> authored_ids;

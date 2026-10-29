@@ -280,3 +280,24 @@ The separate Sketch constraint-diagnostic suggestion surface is now restored thr
 `ShellSketchDiagnosticsTools`; its bounded explicit repair, preview, catalog and active-Sketch
 contracts live in `docs/gui-sketch-workbench-mvp7.md`. It does not enlarge the source-reference
 recovery kinds above. `docs/mvp-plan.md` records Sketch3D authoring/editing as the next step.
+
+## Current-result-face Sketch supports (issue #112)
+
+`ResultFaceWorkplane` has a separate typed producer/origin reference; it does not expand
+or reinterpret the historical six-face semantic enums. Geometry follows OCCT face
+history through the captured producer. Every saved contributor must resolve to one
+common planar descendant. Missing, deleted and nonplanar descendants diagnose **Lost**;
+split descendants diagnose **Ambiguous**, with no automatic attachment to a similar face.
+
+The shell's existing **Open for Repair → Repair References** workflow lists these supports
+alongside projected references and historical workplanes. Replacement choices use
+eligible current solid-Body faces. Rebinding preserves the support ID, name and attached
+Sketch/local coordinates. Selection or staging alone does not alter the document;
+Preview recomputes the complete candidate and Apply publishes one history entry. Cyclic
+replacements, including choosing a downstream pocket as its own Sketch support, fail.
+
+When normal geometry is unavailable, the repair tool builds a provisional cache by
+trying individual executable steps in graph order. Successful preceding Loft, Boolean,
+finishing and transform outputs can therefore supply repair choices. This partial cache
+is confined to the repair tool: it is never published as fresh document geometry. Apply
+still requires complete reference validation and recompute.

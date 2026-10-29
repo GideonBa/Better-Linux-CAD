@@ -29,6 +29,10 @@ public:
   [[nodiscard]] Result<ResolvedWorkplane> resolve(const PartDocument& document,
                                                   DatumPlaneId workplane_id) const;
 
+  [[nodiscard]] Result<ResolvedWorkplane> resolve(const PartDocument& document,
+                                                  DatumPlaneId workplane_id,
+                                                  const ShapeCache& shape_cache) const;
+
   [[nodiscard]] Result<ResolvedWorkplane>
   resolve_generated_face(const PartDocument& document,
                          const SemanticFaceReference& face_reference) const;

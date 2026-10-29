@@ -78,6 +78,54 @@ template <typename FeatureT>
   return transform && transform->body() == body;
 }
 
+[[nodiscard]] Result<std::size_t>
+validate_result_face_source(const PartDocument& document, const ResultFaceWorkplane& plane,
+                            const std::vector<std::string>& retained_missing = {}) {
+  const auto& reference = plane.reference();
+  const auto& graph = document.dependency_graph();
+  const auto fail = [&](const std::string& message) {
+    return Result<std::size_t>::failure(
+        Error::dependency(plane.id().value(), "Lost result-face support: " + message));
+  };
+  const auto may_retain = [&](const std::string& id) {
+    return !graph.has_node(id) && std::find(retained_missing.begin(), retained_missing.end(), id) !=
+                                      retained_missing.end();
+  };
+  const auto ancestor = [&](const std::string& dependency) {
+    if (dependency == reference.producer().value())
+      return true;
+    const auto dependents = graph.transitive_dependents(dependency);
+    return std::find(dependents.begin(), dependents.end(), reference.producer().value()) !=
+           dependents.end();
+  };
+  const auto* body = document.find_body(reference.body());
+  if (!body || body->kind() != BodyKind::Solid)
+    return fail("source Body must exist and be solid");
+  const bool producer =
+      record_produces_body(document, reference.producer().value(), reference.body());
+  if (!producer && !may_retain(reference.producer().value()))
+    return fail("producer must exist and produce the referenced Body");
+  for (const auto& origin : reference.origins()) {
+    const bool exists =
+        document.find_feature(origin.feature) || document.find_revolve_feature(origin.feature) ||
+        document.find_sweep_feature(origin.feature) || document.find_loft_feature(origin.feature) ||
+        document.find_surface_feature(origin.feature) ||
+        document.find_linear_pattern_feature(origin.feature) ||
+        document.find_circular_pattern_feature(origin.feature) ||
+        document.find_mirror_feature(origin.feature) ||
+        document.find_fillet_feature(origin.feature) ||
+        document.find_chamfer_feature(origin.feature) ||
+        document.find_shell_feature(origin.feature) ||
+        document.find_draft_feature(origin.feature) ||
+        document.find_body_boolean_feature(origin.feature);
+    if (!exists && !may_retain(origin.feature.value()))
+      return fail("semantic face origin no longer exists");
+    if (exists && producer && !ancestor(origin.feature.value()))
+      return fail("semantic face origin must precede the captured producer");
+  }
+  return Result<std::size_t>::success(1);
+}
+
 [[nodiscard]] std::string sketch_ownership_node_id(const SketchId& id) {
   return "sketch_ownership:" + id.value();
 }
@@ -1211,6 +1259,66 @@ Result<std::size_t> PartDocument::add_derived_workplane_impl(DerivedWorkplane wo
   return Result<std::size_t>::success(derived_workplanes_.size() - 1U);
 }
 
+Result<std::size_t> validate_result_face_workplane_reference(const PartDocument& document,
+                                                             const ResultFaceWorkplane& plane) {
+  return validate_result_face_source(document, plane);
+}
+
+Result<std::size_t> PartDocument::add_result_face_workplane(ResultFaceWorkplane workplane) {
+  return add_result_face_workplane_impl(std::move(workplane), {});
+}
+
+Result<std::size_t> PartDocument::add_result_face_workplane_impl(
+    ResultFaceWorkplane workplane, const std::vector<std::string>& retained_missing_sources) {
+  if (has_workplane_id(workplane.id()) || dependency_graph_.has_node(workplane.id().value()))
+    return Result<std::size_t>::failure(Error::validation(
+        workplane.id().value(), "workplane id must be unique within part document"));
+  auto valid = validate_result_face_source(*this, workplane, retained_missing_sources);
+  if (!valid)
+    return valid;
+  auto graph = dependency_graph_;
+  auto node = graph.add_node(workplane.id().value());
+  if (!node)
+    return Result<std::size_t>::failure(node.error());
+  const auto& reference = workplane.reference();
+  std::vector<std::string> sources{reference.producer().value()};
+  for (const auto& origin : reference.origins())
+    sources.push_back(origin.feature.value());
+  for (const auto& source : sources) {
+    if (!graph.has_node(source))
+      continue; // Only explicitly retained repair sources may be absent.
+    auto linked = add_dependency_if_missing(graph, source, workplane.id().value());
+    if (!linked)
+      return Result<std::size_t>::failure(linked.error());
+  }
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(Error::dependency(
+        workplane.id().value(), "result-face support must not create a dependency cycle"));
+  auto invalidation = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation, dependency_graph_);
+  if (!synced)
+    return synced;
+  invalidation_state_ = std::move(invalidation);
+  result_face_workplanes_.push_back(std::move(workplane));
+  return Result<std::size_t>::success(result_face_workplanes_.size() - 1);
+}
+
+Result<std::size_t> PartDocument::add_face_supported_sketch(ResultFaceWorkplane workplane,
+                                                            Sketch sketch) {
+  if (sketch.workplane() != workplane.id())
+    return Result<std::size_t>::failure(Error::validation(
+        sketch.id().value(), "Sketch must reference its new result-face support"));
+  auto candidate = *this;
+  auto added = candidate.add_result_face_workplane(std::move(workplane));
+  if (!added)
+    return added;
+  added = candidate.add_sketch(std::move(sketch));
+  if (!added)
+    return added;
+  *this = std::move(candidate);
+  return added;
+}
+
 template <typename T>
 Result<std::size_t>
 PartDocument::update_construction_record(std::vector<T> PartDocument::*member, T replacement,
@@ -1267,6 +1375,10 @@ Result<std::size_t> PartDocument::update_construction_line(ConstructionLine line
 Result<std::size_t> PartDocument::update_construction_plane(ConstructionPlane plane) {
   return update_construction_record(&PartDocument::construction_planes_, std::move(plane),
                                     &PartDocument::add_construction_plane);
+}
+Result<std::size_t> PartDocument::update_result_face_workplane(ResultFaceWorkplane workplane) {
+  return update_construction_record(&PartDocument::result_face_workplanes_, std::move(workplane),
+                                    &PartDocument::add_result_face_workplane);
 }
 Result<std::size_t> PartDocument::update_derived_workplane(DerivedWorkplane workplane) {
   return update_construction_record(&PartDocument::derived_workplanes_, std::move(workplane),
@@ -1327,6 +1439,7 @@ Result<std::size_t> PartDocument::add_sketch_impl(Sketch sketch, const Sketch* r
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   if (has_derived_workplane_id(sketch.workplane()) ||
+      find_result_face_workplane(sketch.workplane()) ||
       has_construction_plane_id(ConstructionPlaneId(sketch.workplane().value()))) {
     auto workplane_dependency =
         add_dependency_if_missing(graph, sketch.workplane().value(), sketch.id().value());
@@ -1375,6 +1488,11 @@ Result<std::size_t> PartDocument::add_sketch_impl(Sketch sketch, const Sketch* r
 }
 
 Result<std::size_t> PartDocument::validate_reference_sources() const {
+  for (const auto& plane : result_face_workplanes_) {
+    auto valid = validate_result_face_source(*this, plane);
+    if (!valid)
+      return valid;
+  }
   for (const auto& feature : revolve_features_)
     if (const auto* line = std::get_if<SketchLineReference>(&feature.axis().source())) {
       auto valid = validate_sketch_line_reference(*this, *line);
@@ -2812,6 +2930,16 @@ Result<std::size_t> PartDocument::add_sketch_ownership(SketchOwnership ownership
   for (const BodyTransform& transform : body_transforms_) {
     if (transform.body() != ownership.owning_body() || !transform.apply_to_owned_sketches())
       continue;
+    const auto* sketch = find_sketch(ownership.sketch());
+    if (const auto* support = find_result_face_workplane(sketch->workplane())) {
+      const auto downstream = graph.transitive_dependents(transform.id().value());
+      // A face supported by this already-applied pose carries that frame.
+      // Ownership must not add a backedge from its downstream Sketch.
+      if (transform.id().value() == support->reference().producer().value() ||
+          std::find(downstream.begin(), downstream.end(),
+                    support->reference().producer().value()) != downstream.end())
+        continue;
+    }
     auto dependency = add_dependency_if_missing(graph, node_id, transform.id().value());
     if (dependency.has_error())
       return Result<std::size_t>::failure(dependency.error());
@@ -3372,6 +3500,19 @@ const std::vector<ConstructionLine>& PartDocument::construction_lines() const no
 const std::vector<ConstructionPlane>& PartDocument::construction_planes() const noexcept {
   return construction_planes_;
 }
+const std::vector<ResultFaceWorkplane>& PartDocument::result_face_workplanes() const noexcept {
+  return result_face_workplanes_;
+}
+std::size_t PartDocument::result_face_workplane_count() const noexcept {
+  return result_face_workplanes_.size();
+}
+const ResultFaceWorkplane*
+PartDocument::find_result_face_workplane(DatumPlaneId id) const noexcept {
+  const auto found = std::find_if(result_face_workplanes_.begin(), result_face_workplanes_.end(),
+                                  [&](const auto& plane) { return plane.id() == id; });
+  return found == result_face_workplanes_.end() ? nullptr : &*found;
+}
+
 const std::vector<DerivedWorkplane>& PartDocument::derived_workplanes() const noexcept {
   return derived_workplanes_;
 }
@@ -3730,8 +3871,8 @@ PartDocument::find_sketch_origin_override(SketchId id) const noexcept {
   return nullptr;
 }
 bool PartDocument::has_workplane_id(const DatumPlaneId& id) const noexcept {
-  return has_datum_plane_id(id) || has_derived_workplane_id(id) ||
-         has_construction_plane_id(ConstructionPlaneId(id.value()));
+  return find_result_face_workplane(id) != nullptr || has_datum_plane_id(id) ||
+         has_derived_workplane_id(id) || has_construction_plane_id(ConstructionPlaneId(id.value()));
 }
 PartDocument::PartDocument(DocumentId id, std::string name)
     : id_(std::move(id)), name_(std::move(name)) {}

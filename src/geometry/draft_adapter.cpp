@@ -71,8 +71,10 @@ Result<GeometryShape> DraftAdapter::apply(const PartDocument& document, const Dr
     if (result.IsNull() || solid_count != 1U || !BRepCheck_Analyzer(result, true).IsValid())
       return Result<GeometryShape>::failure(
           draft_error(feature.id(), "draft produced an invalid or self-intersecting solid result"));
-    return Result<GeometryShape>::success(
-        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(result))));
+    auto backing = std::make_shared<GeometryShape::Impl>(std::move(result));
+    backing->face_lineage =
+        detail::map_lineage(builder, backing->shape, target.impl_->face_lineage);
+    return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
   } catch (const Standard_Failure& failure) {
     const char* message = failure.GetMessageString();
     return Result<GeometryShape>::failure(

@@ -174,3 +174,47 @@ Geometry tests cover:
 - projecting generated-reference construction points and construction lines into sketch-local reference geometry
 - checking generated-face workplane movement when source feature dimensions change
 - rejecting out-of-plane projected sketch references
+
+## Producer-bound result-face supports (issue #112)
+
+`ResultFaceWorkplane` extends the historical six-face `DerivedWorkplane`; it does not
+reinterpret old records. Core stores a captured producer, its solid Body and a sorted,
+unique set of authored face origins (`FeatureId` plus semantic role). OCCT topology and
+face lineage remain transient Geometry data.
+
+`ResultFaceSupportGeometry` tags fresh extrusion caps, explicit rectangle/line-profile
+sides and planar first/last Loft caps. Loft section identities use length-delimited
+Sketch/Profile IDs. Boolean simplification history, Body transformations and finishing
+carry original/modified face descendants and the authored orientation frame forward.
+Historical through-all cuts also preserve surviving origins. Newly generated untracked
+faces, curved faces and initially nonunique descendants are not offered as supports.
+
+Recovery resolves the **captured producer's feature shape**, never the evolving final
+Body alias. Every saved origin must still exist there and their union must identify
+exactly one planar face. A missing contributor reports **Lost**; multiple descendants
+report **Ambiguous**. There is no closest-face, bounding-box or traversal-index fallback.
+This preserves producer intent while allowing thickness, profile, source-plane and
+upstream Body-transform edits. The resulting frame projects the authored origin onto
+the face and retains its transported X direction. Sketch-local geometry remains stored
+in its original coordinates.
+
+Use `WorkplaneResolver::resolve(document, id, cache)` for these supports and construction
+planes derived from them. `resolve_for_sketch(document, sketch, cache)` additionally
+handles local origin overrides and owned-Sketch poses, applying only the owned pose after
+the captured producer. A producer's existing Body pose is not applied twice. Core links
+producer/origin → support → Sketch → consumer, rejects repair cycles and invalidates
+downstream consumers. Full and incremental executors validate support nodes even when
+the attached Sketch is empty; failed recovery does not publish a partial Body cache.
+
+Linear/circular Pattern and Mirror outputs scope each copied face to the copy feature,
+its typed source identity and authored instance ordinal (or reflection). This ordinal
+identifies a modeling instance, never an OCCT face position. Coplanar unification retains
+all contributing copy origins. Removing one copy therefore reports Lost or Ambiguous
+rather than attaching the Sketch to a remaining similar copy; changing its spacing moves
+the same authored support. Metadata scoping detaches the Geometry backing and preserves
+the earlier source cache.
+
+Owning a directly face-supported Sketch does not add a reverse ownership dependency to
+an ancestor Body transform already contained in its producer. Its support already
+supplies that pose. Later owned transforms keep their normal dependency and use the
+relative pose described above; unrelated ownership cycles remain rejected.

@@ -310,3 +310,14 @@ Block 109:
 Block 111 is implemented (`docs/gui-sketch-basic-creation-mvp8.md`): basic creation walks this
 command/task lifecycle, including numeric-input and preview stages, Esc stage backout, and one
 transaction per completed tool. Block 112 adds the conic and slot creation families.
+
+### Creation cancellation for result-face Sketches (issue #112)
+
+Direct creation from an eligible planar current Body face owns a creation checkpoint
+until Finish Sketch. Cancel Sketch (or idle Escape) restores model, authoring catalogs,
+history and cached geometry from that checkpoint. Active drawing and drag commands are
+cancelled first. Undo that removes the creation drops the checkpoint without destroying
+Redo. Existing Sketch editing retains its established history behavior. Save/Save As
+markers and destination remain current when cancelling; presentation revisions advance
+so the restored document is rebuilt visibly. See `gui-sketch-workbench-mvp7.md` and
+`workplane-resolver-mvp2.md` for the support identity and eligibility boundaries.

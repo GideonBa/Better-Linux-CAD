@@ -25,9 +25,14 @@ constexpr double kPi = 3.14159265358979323846;
   return Error::geometry("body_transform", std::move(message));
 }
 
-[[nodiscard]] TopoDS_Shape apply_occt(const TopoDS_Shape& shape, const gp_Trsf& transform) {
+[[nodiscard]] TopoDS_Shape apply_occt(const TopoDS_Shape& shape, const gp_Trsf& transform,
+                                      std::vector<detail::FaceLineage>& lineage) {
   BRepBuilderAPI_Transform operation(shape, transform, true);
-  return operation.IsDone() ? operation.Shape() : TopoDS_Shape{};
+  if (!operation.IsDone())
+    return {};
+  lineage = detail::map_lineage(operation, operation.Shape(), lineage);
+  detail::transform_frames(lineage, transform);
+  return operation.Shape();
 }
 
 } // namespace
@@ -119,12 +124,14 @@ Result<GeometryShape> BodyTransformAdapter::translate(const GeometryShape& shape
     return Result<GeometryShape>::failure(transform_error("input shape must not be empty"));
   gp_Trsf transform;
   transform.SetTranslation(gp_Vec(offset.x, offset.y, offset.z));
-  TopoDS_Shape result = apply_occt(shape.impl_->shape, transform);
+  auto lineage = shape.impl_->face_lineage;
+  TopoDS_Shape result = apply_occt(shape.impl_->shape, transform, lineage);
   if (result.IsNull())
     return Result<GeometryShape>::failure(
         transform_error("OCCT transform did not produce a shape"));
-  return Result<GeometryShape>::success(
-      GeometryShape(std::make_shared<GeometryShape::Impl>(result)));
+  auto backing = std::make_shared<GeometryShape::Impl>(result);
+  backing->face_lineage = std::move(lineage);
+  return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
 }
 
 Result<GeometryShape> BodyTransformAdapter::rotate(const GeometryShape& shape, Point3 origin,
@@ -138,12 +145,14 @@ Result<GeometryShape> BodyTransformAdapter::rotate(const GeometryShape& shape, P
   transform.SetRotation(
       gp_Ax1(gp_Pnt(origin.x, origin.y, origin.z), gp_Dir(axis.x, axis.y, axis.z)),
       angle_deg * kPi / 180.0);
-  TopoDS_Shape result = apply_occt(shape.impl_->shape, transform);
+  auto lineage = shape.impl_->face_lineage;
+  TopoDS_Shape result = apply_occt(shape.impl_->shape, transform, lineage);
   if (result.IsNull())
     return Result<GeometryShape>::failure(
         transform_error("OCCT transform did not produce a shape"));
-  return Result<GeometryShape>::success(
-      GeometryShape(std::make_shared<GeometryShape::Impl>(result)));
+  auto backing = std::make_shared<GeometryShape::Impl>(result);
+  backing->face_lineage = std::move(lineage);
+  return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
 }
 
 Result<GeometryShape> BodyTransformAdapter::mirror(const GeometryShape& shape, Point3 plane_origin,
@@ -159,11 +168,13 @@ Result<GeometryShape> BodyTransformAdapter::mirror(const GeometryShape& shape, P
   gp_Trsf transform;
   transform.SetMirror(gp_Ax2(gp_Pnt(plane_origin.x, plane_origin.y, plane_origin.z),
                              gp_Dir(plane_normal.x, plane_normal.y, plane_normal.z)));
-  TopoDS_Shape result = apply_occt(shape.impl_->shape, transform);
+  auto lineage = shape.impl_->face_lineage;
+  TopoDS_Shape result = apply_occt(shape.impl_->shape, transform, lineage);
   if (result.IsNull())
     return Result<GeometryShape>::failure(transform_error("OCCT mirror did not produce a shape"));
-  return Result<GeometryShape>::success(
-      GeometryShape(std::make_shared<GeometryShape::Impl>(result)));
+  auto backing = std::make_shared<GeometryShape::Impl>(result);
+  backing->face_lineage = std::move(lineage);
+  return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
 }
 
 Result<GeometryShape> BodyTransformAdapter::uniform_scale(const GeometryShape& shape, Point3 center,
@@ -174,12 +185,14 @@ Result<GeometryShape> BodyTransformAdapter::uniform_scale(const GeometryShape& s
     return Result<GeometryShape>::failure(transform_error("uniform scale factor must be positive"));
   gp_Trsf transform;
   transform.SetScale(gp_Pnt(center.x, center.y, center.z), factor);
-  TopoDS_Shape result = apply_occt(shape.impl_->shape, transform);
+  auto lineage = shape.impl_->face_lineage;
+  TopoDS_Shape result = apply_occt(shape.impl_->shape, transform, lineage);
   if (result.IsNull())
     return Result<GeometryShape>::failure(
         transform_error("OCCT transform did not produce a shape"));
-  return Result<GeometryShape>::success(
-      GeometryShape(std::make_shared<GeometryShape::Impl>(result)));
+  auto backing = std::make_shared<GeometryShape::Impl>(result);
+  backing->face_lineage = std::move(lineage);
+  return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
 }
 
 Result<GeometryShapeBounds> BodyTransformAdapter::bounds(const GeometryShape& shape) const {

@@ -53,10 +53,9 @@ VolumeMeasurement solid_volume(const TopoDS_Shape& shape) {
 }
 
 template <typename Algorithm>
-[[nodiscard]] Result<TopoDS_Shape> execute_algorithm(const FeatureId& feature_id,
-                                                     const TopoDS_Shape& left,
-                                                     const TopoDS_Shape& right,
-                                                     std::string_view operation) {
+[[nodiscard]] Result<TopoDS_Shape>
+execute_algorithm(const FeatureId& feature_id, const TopoDS_Shape& left, const TopoDS_Shape& right,
+                  std::string_view operation, std::vector<detail::FaceLineage>& lineage) {
   // GeometryShape copies share OCCT topology with earlier cached results.
   // Set safe-input mode before the first build: the two-shape constructors
   // execute eagerly, and simplification would otherwise mutate shared faces.
@@ -93,6 +92,7 @@ template <typename Algorithm>
   if (!BRepCheck_Analyzer(result, true).IsValid())
     return Result<TopoDS_Shape>::failure(
         boolean_error(feature_id, std::string(operation) + " operation produced an invalid solid"));
+  lineage = detail::map_lineage(algorithm, result, lineage);
   return Result<TopoDS_Shape>::success(std::move(result));
 }
 
@@ -123,11 +123,14 @@ Result<GeometryShape> BodyBooleanAdapter::combine(FeatureId feature_id,
 
   try {
     TopoDS_Shape current = target.impl_->shape;
+    auto lineage = target.impl_->face_lineage;
     if (operation == BodyBooleanOperation::Subtract &&
         !TopExp_Explorer(current, TopAbs_SOLID).More())
       return Result<GeometryShape>::failure(
           boolean_error(feature_id, "Cut target must be a valid solid body."));
     for (const GeometryShape& tool : tools) {
+      lineage.insert(lineage.end(), tool.impl_->face_lineage.begin(),
+                     tool.impl_->face_lineage.end());
       if (operation == BodyBooleanOperation::Subtract &&
           !TopExp_Explorer(tool.impl_->shape, TopAbs_SOLID).More())
         return Result<GeometryShape>::failure(
@@ -135,14 +138,14 @@ Result<GeometryShape> BodyBooleanAdapter::combine(FeatureId feature_id,
       Result<TopoDS_Shape> combined = [&]() {
         switch (operation) {
         case BodyBooleanOperation::Add:
-          return execute_algorithm<BRepAlgoAPI_Fuse>(feature_id, current, tool.impl_->shape,
-                                                     "add");
+          return execute_algorithm<BRepAlgoAPI_Fuse>(feature_id, current, tool.impl_->shape, "add",
+                                                     lineage);
         case BodyBooleanOperation::Subtract:
           return execute_algorithm<BRepAlgoAPI_Cut>(feature_id, current, tool.impl_->shape,
-                                                    "subtract");
+                                                    "subtract", lineage);
         case BodyBooleanOperation::Intersect:
           return execute_algorithm<BRepAlgoAPI_Common>(feature_id, current, tool.impl_->shape,
-                                                       "intersect");
+                                                       "intersect", lineage);
         }
         return Result<TopoDS_Shape>::failure(
             boolean_error(feature_id, "unsupported body boolean operation"));
@@ -153,6 +156,7 @@ Result<GeometryShape> BodyBooleanAdapter::combine(FeatureId feature_id,
     }
 
     GeometryShape result(std::make_shared<GeometryShape::Impl>(std::move(current)));
+    result.impl_->face_lineage = std::move(lineage);
     if (operation == BodyBooleanOperation::Subtract) {
       auto validation = validate_subtraction_result(feature_id, target, result);
       if (!validation)

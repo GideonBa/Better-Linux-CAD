@@ -1,5 +1,9 @@
+#include <QFile>
+#include <nlohmann/json.hpp>
+#include "blcad/gui/shell/shell_reference_repair_tools.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
+#include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/gui/shell/shell_construction_tools.hpp"
@@ -1658,4 +1662,110 @@ TEST_CASE("Construction drag expiry releases mouse capture and preserves only co
   CHECK(window.construction_tools().manipulators().handles().empty());
   CHECK_FALSE(window.viewport().feature_preview_active());
   CHECK(window.viewport().mouseGrabber() != &window.viewport());
+}
+
+TEST_CASE("Selected planar result faces offer direct Sketch creation",
+          "[gui][shell-construction][result-face-sketch]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Planar face Sketch"));
+  authored_body(window);
+  auto* filter = window.findChild<QComboBox*>("blcad.selection.filter");
+  REQUIRE(filter);
+  const auto row = filter->findData(selection_kind_bit(GuiSelectionKind::Face));
+  REQUIRE(row >= 0);
+  filter->setCurrentIndex(row);
+  const auto& part = *window.session().part_document();
+  const auto body = part.bodies().front().id();
+  auto targets = checked(geometry::FinishingSelectionBuilder::build(
+      part, *window.session().part_shape_cache(), body, PartFeatureInputRole::ShellRemovalFace));
+  std::string top;
+  for (const auto& target : targets)
+    if (const auto* face = std::get_if<FaceReference>(&target.reference))
+      if (const auto* reference = std::get_if<SemanticFaceReference>(&face->source());
+          reference && reference->face() == SemanticFace::Top)
+        top = target.semantic_id;
+  REQUIRE_FALSE(top.empty());
+  REQUIRE(window.viewport().select_semantic(top));
+  REQUIRE(action(window, "create_sketch").isEnabled());
+  const auto before = snapshot(window);
+  const std::string undo_label(window.session().undo_label());
+  REQUIRE(window.create_sketch_on_selection());
+  REQUIRE(window.active_sketch());
+  const auto sketch = *window.active_sketch();
+  const auto plane = window.session().part_document()->result_face_workplanes().back();
+  CHECK(window.session().part_document()->result_face_workplane_count() == 1);
+  SECTION("Cancel discards the pair and committed Sketch geometry") {
+    REQUIRE(window.sketch_tools().begin_tool(GuiSketchCreateTool::CornerRectangle));
+    REQUIRE(window.sketch_tools().add_pick({5, 4}));
+    REQUIRE(window.sketch_tools().add_pick({9, 7}));
+    const auto model_revision = window.session().model_revision();
+    const auto presentation_revision = window.session().presentation_revision();
+    REQUIRE(window.cancel_face_supported_sketch());
+    CHECK(window.session().model_revision() > model_revision);
+    CHECK(window.session().presentation_revision() > presentation_revision);
+    CHECK(snapshot(window) == before);
+    CHECK(window.session().undo_label() == undo_label);
+    CHECK_FALSE(window.session().can_redo());
+    CHECK(window.viewport().selection_filter_mask() == selection_kind_bit(GuiSelectionKind::Face));
+  }
+  SECTION("Cancel preserves Save As destination and accurately remains dirty") {
+    QTemporaryDir directory;
+    REQUIRE(directory.isValid());
+    const auto path = directory.filePath("active.blcad.json");
+    REQUIRE(window.save_to(path));
+    CHECK_FALSE(window.session().dirty());
+    REQUIRE(window.cancel_face_supported_sketch());
+    CHECK(snapshot(window) == before);
+    CHECK(window.session().file_path() == std::filesystem::path(path.toStdString()));
+    CHECK(window.session().dirty());
+    CHECK(checked(read_part_document_json_file(path.toStdString())).find_sketch(sketch));
+  }
+  SECTION("The support and Sketch share one Undo boundary") {
+    const auto created = snapshot(window);
+    REQUIRE(window.undo());
+    CHECK(snapshot(window) == before);
+    CHECK_FALSE(window.active_sketch());
+    REQUIRE(window.redo());
+    CHECK(snapshot(window) == created);
+    CHECK(window.session().part_document()->find_result_face_workplane(plane.id()));
+    CHECK(window.session().part_document()->find_sketch(sketch));
+  }
+  SECTION("Missing sources have an explicit previewed repair route") {
+    QTemporaryDir directory;
+    REQUIRE(directory.isValid());
+    const auto path = directory.filePath("repair.blcad.json");
+    REQUIRE(window.save_to(path));
+    auto root = nlohmann::json::parse(snapshot(window));
+    root["result_face_workplanes"][0]["reference"]["producer"] = "deleted";
+    root["result_face_workplanes"][0]["reference"]["origins"][0]["feature"] = "deleted";
+    QFile file(path);
+    REQUIRE(file.open(QIODevice::WriteOnly));
+    const auto bytes = root.dump();
+    REQUIRE(file.write(bytes.data(), bytes.size()) == static_cast<qint64>(bytes.size()));
+    file.close();
+    REQUIRE(window.open_path(path, GuiDocumentOpenMode::ReferenceRepair));
+    REQUIRE(window.session().reference_repair_mode());
+    action(window, "repair_references").trigger();
+    REQUIRE(window.reference_repair_tools().active());
+    const auto combo = [&](const char* name) -> QComboBox& {
+      auto* control =
+          window.findChild<QComboBox*>(QStringLiteral("blcad.reference_repair.") + name);
+      REQUIRE(control);
+      return *control;
+    };
+    select(combo("reference"), plane.id().value() + "/");
+    select(combo("replacement"), plane.reference().identity());
+    auto* preview = window.findChild<QPushButton*>("blcad.reference_repair.preview");
+    REQUIRE(preview);
+    REQUIRE(preview->isEnabled());
+    preview->click();
+    auto* apply = window.findChild<QPushButton*>("blcad.reference_repair.apply");
+    REQUIRE(apply);
+    REQUIRE(apply->isEnabled());
+    apply->click();
+    CHECK_FALSE(window.session().reference_repair_mode());
+    CHECK(window.session().derived_results_fresh());
+    CHECK(window.session().part_document()->find_result_face_workplane(plane.id())->reference() ==
+          plane.reference());
+  }
 }

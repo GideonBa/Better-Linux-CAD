@@ -2,6 +2,8 @@
 
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 
+#include "face_lineage.hpp"
+
 #include <TopoDS_Shape.hxx>
 
 #include <utility>
@@ -16,6 +18,7 @@ struct GeometryShape::Impl {
   explicit Impl(TopoDS_Shape shape_in) : shape(std::move(shape_in)) {}
 
   TopoDS_Shape shape;
+  std::vector<detail::FaceLineage> face_lineage;
 };
 
 } // namespace blcad::geometry

@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_window.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 #include "blcad/gui/gui_presentation_visibility.hpp"
 #include "blcad/gui/gui_icons.hpp"
 
@@ -445,6 +446,11 @@ void ShellWindow::build_ribbon() {
   connect(action_finish_sketch_, &QAction::triggered, this,
           [this] { (void)finish_active_sketch(); });
   ribbon_->add_button(finish_group, action_finish_sketch_);
+  action_cancel_face_sketch_ = new QAction(QStringLiteral("Cancel Sketch"), this);
+  action_cancel_face_sketch_->setObjectName("blcad.action.cancel_face_sketch");
+  connect(action_cancel_face_sketch_, &QAction::triggered, this,
+          [this] { (void)cancel_face_supported_sketch(); });
+  ribbon_->add_button(finish_group, action_cancel_face_sketch_);
   ribbon_->set_tab_enabled(tab_sketch_, false);
 
   navigation_tools_ = std::make_unique<ShellNavigationTools>(*this, *ribbon_, tab_view_);
@@ -831,6 +837,12 @@ void ShellWindow::reset_document_interaction() {
     (void)session_.task().cancel();
   }
 
+  if (face_sketch_checkpoint_) {
+    auto checkpoint = std::move(*face_sketch_checkpoint_);
+    face_sketch_checkpoint_.reset();
+    session_.restore_creation_checkpoint(std::move(checkpoint));
+  }
+
   viewport_->clear_sketch_interaction();
   viewport_->clear_sketch_focus();
   if (sketch_camera_bookmark_ && !viewport_->restore_camera_bookmark(*sketch_camera_bookmark_))
@@ -859,6 +871,7 @@ void ShellWindow::reconcile_active_sketch() {
     sketch_tools_->activate();
     return;
   }
+  face_sketch_checkpoint_.reset(); // Undo must retain the removed creation in Redo.
   reset_document_interaction();
 }
 
@@ -880,27 +893,73 @@ std::optional<DatumPlaneId> ShellWindow::selected_datum_plane() const {
   if (!part)
     return std::nullopt;
   for (const std::string_view prefix :
-       {"datum-plane/", "construction-plane/", "derived-workplane/"}) {
+       {"datum-plane/", "construction-plane/", "derived-workplane/", "result-face-workplane/"}) {
     if (!selected_semantic_id_.starts_with(prefix))
       continue;
     const DatumPlaneId id(selected_semantic_id_.substr(prefix.size()));
-    if (geometry::WorkplaneResolver{}.resolve(*part, id))
+    if (session_.part_shape_cache()
+            ? static_cast<bool>(
+                  geometry::WorkplaneResolver{}.resolve(*part, id, *session_.part_shape_cache()))
+            : static_cast<bool>(geometry::WorkplaneResolver{}.resolve(*part, id)))
       return id;
   }
   return std::nullopt;
 }
 
+std::optional<ResultFaceReference> ShellWindow::selected_result_face() const {
+  const auto* part = session_.part_document();
+  const auto* cache = session_.part_shape_cache();
+  if (!part || !cache || !session_.derived_results_fresh() ||
+      (!selected_semantic_id_.starts_with("finishing/face/") &&
+       !selected_semantic_id_.starts_with("support/result-face/")))
+    return std::nullopt;
+  for (const auto& body : part->bodies()) {
+    auto targets = geometry::ResultFaceSupportGeometry::selectable_faces(*part, *cache, body.id());
+    if (targets)
+      for (const auto& target : targets.value())
+        if (target.semantic_id == selected_semantic_id_)
+          return target.reference;
+  }
+  return std::nullopt;
+}
+
+bool ShellWindow::cancel_face_supported_sketch() {
+  if (!face_sketch_checkpoint_ || !active_sketch_)
+    return false;
+  reset_document_interaction();
+  refresh();
+  return true;
+}
+
 bool ShellWindow::create_sketch_on_selection() {
   const auto* part = session_.part_document();
-  const auto plane = selected_datum_plane();
+  auto plane = selected_datum_plane();
+  const auto face = plane ? std::optional<ResultFaceReference>{} : selected_result_face();
   if (session_.reference_repair_mode() || active_sketch_ || session_.task().active() ||
-      part == nullptr || !plane) {
+      part == nullptr || (!plane && !face)) {
     statusBar()->showMessage(QStringLiteral("Select a workplane first, then create a 2D sketch"));
     return false;
   }
   std::size_t number = 1;
   while (part->find_sketch(SketchId("sketch.skizze" + std::to_string(number))) != nullptr)
     ++number;
+  std::optional<ResultFaceWorkplane> support;
+  if (face) {
+    std::size_t support_number = 1;
+    while (
+        part->has_workplane_id(DatumPlaneId("workplane.face." + std::to_string(support_number))) ||
+        part->dependency_graph().has_node("workplane.face." + std::to_string(support_number)))
+      ++support_number;
+    auto created = ResultFaceWorkplane::create(
+        DatumPlaneId("workplane.face." + std::to_string(support_number)),
+        "Face Workplane " + std::to_string(support_number), *face);
+    if (!created) {
+      show_error(created.error());
+      return false;
+    }
+    support = std::move(created.value());
+    plane = support->id();
+  }
   auto sketch = Sketch::create(SketchId("sketch.skizze" + std::to_string(number)),
                                "Sketch" + std::to_string(number), *plane);
   if (sketch.has_error()) {
@@ -908,13 +967,30 @@ bool ShellWindow::create_sketch_on_selection() {
     return false;
   }
   const SketchId sketch_id = sketch.value().id();
-  const auto created = sketch_workbench_.create_sketch(session_, std::move(sketch.value()));
+  if (support)
+    face_sketch_checkpoint_ = session_;
+  const auto created =
+      support ? session_.commit_part_transaction(
+                    "Create face-supported sketch",
+                    [support = *support, sketch = sketch.value()](PartDocument& candidate) {
+                      return candidate.add_face_supported_sketch(support, sketch);
+                    })
+              : sketch_workbench_.create_sketch(session_, std::move(sketch.value()));
   if (created.has_error()) {
+    face_sketch_checkpoint_.reset();
     show_error(created.error());
     refresh();
     return false;
   }
-  return enter_sketch(sketch_id);
+  if (enter_sketch(sketch_id))
+    return true;
+  if (face_sketch_checkpoint_) {
+    auto checkpoint = std::move(*face_sketch_checkpoint_);
+    face_sketch_checkpoint_.reset();
+    session_.restore_creation_checkpoint(std::move(checkpoint));
+    refresh();
+  }
+  return false;
 }
 
 bool ShellWindow::enter_sketch(SketchId sketch) {
@@ -1050,6 +1126,7 @@ bool ShellWindow::finish_active_sketch() {
   const auto finished = sketch_workspace_.complete_validated_finish(session_);
   if (finished.has_error())
     return reject_finish(finished.error());
+  face_sketch_checkpoint_.reset();
   viewport_->clear_sketch_interaction();
   viewport_->clear_sketch_focus();
   if (sketch_camera_bookmark_ && !viewport_->restore_camera_bookmark(*sketch_camera_bookmark_))
@@ -1379,10 +1456,12 @@ void ShellWindow::refresh() {
                            (step_import_tools_ && step_import_tools_->can_undo_after_cancel()));
   action_redo_->setEnabled(session_.can_redo() ||
                            (step_import_tools_ && step_import_tools_->can_redo_after_cancel()));
-  action_create_sketch_->setEnabled(has_document && !session_.reference_repair_mode() &&
-                                    !sketch_active && !session_.task().active() &&
-                                    selected_datum_plane().has_value());
+  action_create_sketch_->setEnabled(
+      has_document && !session_.reference_repair_mode() && !sketch_active &&
+      !session_.task().active() &&
+      (selected_datum_plane().has_value() || selected_result_face().has_value()));
   action_finish_sketch_->setEnabled(sketch_active);
+  action_cancel_face_sketch_->setEnabled(sketch_active && face_sketch_checkpoint_.has_value());
   action_perspective_->setEnabled(!sketch_active);
 
   const QString name = has_document

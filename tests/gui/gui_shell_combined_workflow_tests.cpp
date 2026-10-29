@@ -1,3 +1,4 @@
+#include "blcad/geometry/result_face_support.hpp"
 #include "../support/loft_alignment_fixture.hpp"
 #include "../support/loft_section_refinement_fixture.hpp"
 #include "../support/mixed_path_loft_fixture.hpp"
@@ -544,6 +545,10 @@ public:
                          << second.y);
     tree(plane);
     command("create_sketch");
+    return rectangle_in_active(first, second, preview_point);
+  }
+  SketchId rectangle_in_active(Point2 first, Point2 second,
+                               std::optional<Point2> preview_point = std::nullopt) {
     REQUIRE(window.active_sketch());
     const auto id = *window.active_sketch();
     // Numeric geometry assertions use unsnapped coordinates. Toggle the real
@@ -5778,5 +5783,253 @@ TEST_CASE(
   ui.file("export_part_step", directory.filePath("sketch-axis.step"));
   CHECK(ui.bytes(directory.filePath("sketch-axis.step")).startsWith("ISO-10303-21;"));
   CHECK(ui.snapshot() == after_pattern);
+  ui.idle();
+}
+
+TEST_CASE("Native face-supported Sketch follows thickness with a pocket and exact history",
+          "[gui][integration][shell-combined-workflow][result-face-native]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native Qt/OCCT face picking and Sketch input");
+  WorkflowUi ui;
+  ui.fit_first_screen();
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Associative face Sketch");
+  ui.rectangle("datum.xy", {0, 0}, {20, 10});
+  const auto body = ui.extrude(8);
+  const auto source = ui.window.session().part_document()->features().back().id();
+  const auto before = ui.snapshot();
+  const auto pick_top = [&] {
+    ui.standard_view("Top");
+    ui.data(ui.widget<QComboBox>("blcad.selection.filter"),
+            selection_kind_bit(GuiSelectionKind::Face));
+    ui.window.viewport().fit_all();
+    ui.flush();
+    const auto p = checked(ui.window.viewport().model_to_screen({10, 5, 8}));
+    REQUIRE(ui.window.viewport().rect().contains(QPoint(qRound(p.x), qRound(p.y))));
+    ui.click_at(ui.window.viewport(), {p.x, p.y});
+    REQUIRE(ui.window.viewport().selected_semantic());
+    REQUIRE(ui.action("create_sketch").isEnabled());
+  };
+  pick_top();
+  ui.command("create_sketch");
+  REQUIRE(ui.window.active_sketch());
+  CHECK(ui.window.session().part_document()->result_face_workplane_count() == 1);
+  ui.command("cancel_face_sketch", 1);
+  CHECK(ui.snapshot() == before);
+  CHECK_FALSE(ui.window.active_sketch());
+  pick_top();
+  ui.command("create_sketch");
+  ui.key(ui.window, Qt::Key_Escape);
+  ui.flush();
+  CHECK(ui.snapshot() == before);
+  CHECK_FALSE(ui.window.active_sketch());
+  pick_top();
+  ui.command("create_sketch");
+  const auto sketch = *ui.window.active_sketch();
+  const auto support = ui.window.session().part_document()->result_face_workplanes().back();
+  const auto created = ui.snapshot();
+  ui.command("undo");
+  CHECK(ui.snapshot() == before);
+  CHECK(ui.window.session().part_document()->result_face_workplane_count() == 0);
+  ui.command("redo");
+  CHECK(ui.snapshot() == created);
+  CHECK(ui.window.session().part_document()->find_sketch(sketch));
+  ui.tree(sketch.value(), true);
+  ui.rectangle_in_active({5, 4}, {9, 7});
+  const auto before_pocket = ui.snapshot();
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.data(ui.widget<QComboBox>("blcad.extrude.target"), QString::fromStdString(body.value()));
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.direction"), 1);
+  ui.scalar("2 mm");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.capture("result-face-pocket-preview");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(20 * 10 * 8 - 4 * 3 * 2).margin(1e-5));
+  const auto pocket = ui.snapshot();
+  ui.command("undo");
+  CHECK(ui.snapshot() == before_pocket);
+  ui.command("redo");
+  CHECK(ui.snapshot() == pocket);
+  const auto lines = ui.window.session().part_document()->find_sketch(sketch)->line_segments();
+  ui.tree(source.value(), true);
+  ui.number(ui.widget<QDoubleSpinBox>("blcad.feature_edit.field/length_parameter"), "20");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.feature_edit.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(20 * 10 * 20 - 4 * 3 * 2).margin(1e-5));
+  const auto frame = checked(geometry::WorkplaneResolver{}.resolve(
+      *ui.window.session().part_document(), support.id(), *ui.window.session().part_shape_cache()));
+  CHECK(frame.origin.z == Approx(20));
+  const auto& unchanged = ui.window.session().part_document()->find_sketch(sketch)->line_segments();
+  REQUIRE(unchanged.size() == lines.size());
+  for (std::size_t i = 0; i < lines.size(); ++i) {
+    CHECK(unchanged[i].id() == lines[i].id());
+    CHECK(unchanged[i].start() == lines[i].start());
+    CHECK(unchanged[i].end() == lines[i].end());
+  }
+  const auto edited = ui.snapshot();
+  ui.command("undo");
+  CHECK(ui.snapshot() == pocket);
+  ui.command("redo");
+  CHECK(ui.snapshot() == edited);
+  auto full = checked(geometry::ShapeCache::create(ShapeCacheId("face.full")));
+  checked(geometry::GeometryRecomputeExecutor{}.execute_document(
+      *ui.window.session().part_document(), full));
+  REQUIRE(full.find_body_shape(body));
+  CHECK(geometry::RectangleExtrusionAdapter{}.summarize(*full.find_body_shape(body)).volume_mm3 ==
+        Approx(ui.summary(body).volume_mm3).margin(1e-5));
+  ui.capture("result-face-thickness-edited");
+  ui.roundtrip(directory.filePath("face-support.blcad.json"));
+  CHECK(ui.snapshot() == edited);
+  CHECK(ui.window.session().part_document()->result_face_workplanes().back().reference() ==
+        support.reference());
+  ui.file("export_part_step", directory.filePath("face-support.step"));
+  CHECK(ui.bytes(directory.filePath("face-support.step")).startsWith("ISO-10303-21;"));
+  CHECK(ui.snapshot() == edited);
+  ui.idle();
+}
+
+TEST_CASE(
+    "Native planar polygon Loft Boolean and finishing results support downstream Sketch features",
+    "[gui][integration][shell-combined-workflow][result-face-producers-native]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native Qt/OCCT result-face picking");
+  const auto scenario = GENERATE("oblique-polygon", "loft", "boolean", "fillet");
+  CAPTURE(scenario);
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  // The source model is a serialized Core fixture. Selection, Sketch creation,
+  // geometry authoring, the downstream feature and file workflows use the UI.
+  auto part = checked(PartDocument::create(DocumentId("face.producer"), scenario));
+  const bool oblique = std::string_view(scenario) == "oblique-polygon";
+  REQUIRE(part.add_construction_plane(checked(ConstructionPlane::create_explicit(
+      ConstructionPlaneId("source.plane"), "Source plane", {3, 4, 5},
+      oblique ? Vector3{.8, 0, -.6} : Vector3{1, 0, 0}, {0, 1, 0},
+      oblique ? Vector3{.6, 0, .8} : Vector3{0, 0, 1}))));
+  REQUIRE(part.add_parameter(checked(
+      Parameter::create_length(ParameterId("depth"), "Depth", checked(Quantity::length_mm(8))))));
+  REQUIRE(part.add_parameter(checked(
+      Parameter::create_length(ParameterId("radius"), "Radius", checked(Quantity::length_mm(1))))));
+  const auto add_outline = [&](const std::string& id, const std::string& plane, bool polygon) {
+    auto sketch = checked(Sketch::create(SketchId(id), id, DatumPlaneId(plane)));
+    const std::vector<Point2> points{{0, 0}, {20, 0}, {polygon ? 18.0 : 20.0, 10}, {0, 10}};
+    std::vector<SketchEntityId> edges;
+    for (std::size_t i = 0; i < points.size(); ++i) {
+      edges.emplace_back("edge." + std::to_string(i));
+      REQUIRE(sketch.add_entity(
+          checked(LineSegment::create(edges.back(), points[i], points[(i + 1) % points.size()]))));
+    }
+    REQUIRE(sketch.add_profile(checked(ClosedProfile::create(ProfileId(id + ".profile"), edges))));
+    REQUIRE(part.add_sketch(sketch));
+  };
+  add_outline("source", "source.plane", oblique);
+  REQUIRE(part.add_body(checked(Body::create(BodyId("body"), "Source Body", BodyKind::Solid))));
+  const auto context = checked(FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody,
+                                                                std::nullopt, BodyId("body")));
+  if (std::string_view(scenario) == "loft") {
+    REQUIRE(part.add_construction_plane(checked(
+        ConstructionPlane::create_explicit(ConstructionPlaneId("last.plane"), "Last section",
+                                           {3, 4, 25}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}))));
+    add_outline("last", "last.plane", false);
+    std::vector<ProfileSectionReference> sections;
+    for (const std::string id : {"source", "last"})
+      sections.push_back(checked(
+          ProfileSectionReference::create_closed_region(checked(ProfileRegionReference::create(
+              SketchId(id), ProfileId(id + ".profile"), PartFeatureInputRole::LoftSection)))));
+    REQUIRE(part.add_loft_feature(
+        checked(LoftFeature::create_loft(FeatureId("loft"), "Loft", sections, context))));
+  } else {
+    auto feature = checked(Feature::create_additive_extrude(
+        FeatureId("base"), "Base", SketchId("source"), ParameterId("depth")));
+    REQUIRE(part.add_feature(checked(checked(feature.with_profile(ProfileId("source.profile")))
+                                         .with_body_result_context(context))));
+  }
+  if (std::string_view(scenario) == "boolean") {
+    REQUIRE(part.add_construction_plane(
+        checked(ConstructionPlane::create_explicit(ConstructionPlaneId("tool.plane"), "Tool plane",
+                                                   {13, 9, 10}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}))));
+    REQUIRE(part.add_parameter(checked(Parameter::create_length(
+        ParameterId("tool.width"), "Tool width", checked(Quantity::length_mm(2))))));
+    auto sketch =
+        checked(Sketch::create(SketchId("tool.sketch"), "Tool", DatumPlaneId("tool.plane")));
+    REQUIRE(sketch.add_profile(checked(RectangleProfile::create(
+        ProfileId("tool.profile"), ParameterId("tool.width"), ParameterId("tool.width")))));
+    REQUIRE(part.add_sketch(sketch));
+    REQUIRE(part.add_body(
+        checked(Body::create(BodyId("tool"), "Tool", BodyKind::Solid, BodyVisibility::Hidden))));
+    auto feature = checked(Feature::create_additive_extrude(FeatureId("tool"), "Tool", sketch.id(),
+                                                            ParameterId("depth")));
+    REQUIRE(part.add_feature(
+        checked(feature.with_body_result_context(checked(FeatureBodyResultContext::create(
+            FeatureBodyOperationMode::NewBody, std::nullopt, BodyId("tool")))))));
+    REQUIRE(part.add_body_boolean_feature(checked(BodyBooleanFeature::create(
+        FeatureId("boolean"), BodyBooleanOperation::Subtract, BodyId("body"), {BodyId("tool")},
+        BodyBooleanResultMode::ModifyTarget, std::nullopt, true))));
+  }
+  if (std::string_view(scenario) == "fillet") {
+    const auto edge = checked(EdgeReference::create_linear(
+        PartFeatureInputRole::FilletEdge,
+        checked(SemanticEdgeReference::create(FeatureId("base"), SemanticEdge::TopFront))));
+    REQUIRE(part.add_fillet_feature(checked(FilletFeature::create(
+        FeatureId("fillet"), "Fillet", BodyId("body"), {edge}, ParameterId("radius")))));
+  }
+  auto cache = checked(geometry::ShapeCache::create(ShapeCacheId("fixture")));
+  checked(geometry::GeometryRecomputeExecutor{}.execute_document(part, cache));
+  auto targets =
+      checked(geometry::ResultFaceSupportGeometry::selectable_faces(part, cache, BodyId("body")));
+  const auto expected = std::find_if(targets.begin(), targets.end(), [&](const auto& target) {
+    const auto& role = target.reference.origins().front().role;
+    return std::string_view(scenario) == "loft" ? role == "loft/cap/4:last/12:last.profile"
+                                                : role == "extrude/upper-cap";
+  });
+  REQUIRE(expected != targets.end());
+  const auto preview_plane =
+      checked(ResultFaceWorkplane::create(DatumPlaneId("pick"), "Pick", expected->reference));
+  const auto frame =
+      checked(geometry::ResultFaceSupportGeometry::resolve(part, preview_plane, cache));
+  const auto input = directory.filePath("producer.blcad.json");
+  checked(write_part_document_json_file(part, input.toStdString()));
+  WorkflowUi ui;
+  ui.fit_first_screen();
+  ui.file("open", input);
+  REQUIRE(ui.window.viewport().set_plane_camera(frame.origin, frame.normal, frame.y_axis));
+  ui.data(ui.widget<QComboBox>("blcad.selection.filter"),
+          selection_kind_bit(GuiSelectionKind::Face));
+  ui.window.viewport().fit_all();
+  ui.flush();
+  const auto point = geometry::WorkplaneResolver{}.evaluate_point(frame, {3, 3});
+  const auto screen = checked(ui.window.viewport().model_to_screen(point));
+  REQUIRE(ui.window.viewport().rect().contains(QPoint(qRound(screen.x), qRound(screen.y))));
+  ui.click_at(ui.window.viewport(), {screen.x, screen.y});
+  REQUIRE(ui.window.viewport().selected_semantic());
+  CHECK(ui.window.viewport().selected_semantic()->semantic_id == expected->semantic_id);
+  const auto before = ui.snapshot();
+  const auto old_volume = ui.summary(BodyId("body")).volume_mm3;
+  ui.command("create_sketch");
+  REQUIRE(ui.window.active_sketch());
+  CHECK(ui.window.session().part_document()->result_face_workplanes().back().reference() ==
+        expected->reference);
+  ui.rectangle_in_active({3, 3}, {5, 4});
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 1);
+  ui.data(ui.widget<QComboBox>("blcad.extrude.target"), QStringLiteral("body"));
+  ui.scalar("1 mm");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(BodyId("body")).volume_mm3 == Approx(old_volume + 2).margin(1e-5));
+  const auto modeled = ui.snapshot();
+  REQUIRE(modeled != before);
+  ui.capture(QString("result-face-%1").arg(scenario));
+  auto full = checked(geometry::ShapeCache::create(ShapeCacheId("producer.full")));
+  checked(geometry::GeometryRecomputeExecutor{}.execute_document(
+      *ui.window.session().part_document(), full));
+  CHECK(geometry::RectangleExtrusionAdapter{}
+            .summarize(*full.find_body_shape(BodyId("body")))
+            .volume_mm3 == Approx(old_volume + 2).margin(1e-5));
+  ui.roundtrip(directory.filePath("supported.blcad.json"));
+  CHECK(ui.snapshot() == modeled);
+  ui.file("export_part_step", directory.filePath("supported.step"));
+  CHECK(ui.bytes(directory.filePath("supported.step")).startsWith("ISO-10303-21;"));
   ui.idle();
 }

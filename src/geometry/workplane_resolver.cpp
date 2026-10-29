@@ -2,8 +2,10 @@
 #include "blcad/core/rectangular_extrude_profile.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/shape_cache.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 
 #include <cmath>
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -160,17 +162,17 @@ resolve_additive_extrude_face_workplane(const PartDocument& document,
                                        "derived workplane");
 }
 
-[[nodiscard]] Result<ResolvedWorkplane>
-resolve_relation_driven_construction_plane(const PartDocument& document,
-                                           const WorkplaneResolver& resolver,
-                                           const ConstructionPlane& plane) {
+[[nodiscard]] Result<ResolvedWorkplane> resolve_relation_driven_construction_plane(
+    const PartDocument& document, const WorkplaneResolver& resolver, const ConstructionPlane& plane,
+    const ShapeCache* cache = nullptr) {
   if (!plane.relation().has_value()) {
     return Result<ResolvedWorkplane>::failure(validation_error(
         plane.id().value(), "relation-driven construction plane must carry a relation"));
   }
   const ConstructionRelation& relation = plane.relation().value();
   if (plane.kind() == ConstructionPlaneKind::OffsetFromPlane) {
-    auto source = resolver.resolve(document, relation.source_plane());
+    auto source = cache ? resolver.resolve(document, relation.source_plane(), *cache)
+                        : resolver.resolve(document, relation.source_plane());
     if (source.has_error())
       return Result<ResolvedWorkplane>::failure(source.error());
     const Parameter* offset = find_parameter(document, relation.offset_parameter());
@@ -207,7 +209,8 @@ resolve_relation_driven_construction_plane(const PartDocument& document,
                           RectangularWorkplaneBounds{}});
   }
   if (plane.kind() == ConstructionPlaneKind::ParallelToPlaneThroughPoint) {
-    auto source = resolver.resolve(document, relation.source_plane());
+    auto source = cache ? resolver.resolve(document, relation.source_plane(), *cache)
+                        : resolver.resolve(document, relation.source_plane());
     if (source.has_error())
       return Result<ResolvedWorkplane>::failure(source.error());
     auto point = ConstructionPointResolver{}.resolve(document, relation.first_point());
@@ -250,6 +253,16 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& documen
       validation_error(workplane_id.value(), "workplane must exist in part document"));
 }
 
+Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& document, DatumPlaneId id,
+                                                     const ShapeCache& cache) const {
+  if (const auto* support = document.find_result_face_workplane(id))
+    return ResultFaceSupportGeometry::resolve(document, *support, cache);
+  if (const auto* construction = document.find_construction_plane(ConstructionPlaneId(id.value()));
+      construction && construction->kind() != ConstructionPlaneKind::Explicit)
+    return resolve_relation_driven_construction_plane(document, *this, *construction, &cache);
+  return resolve(document, std::move(id));
+}
+
 Result<ResolvedWorkplane>
 WorkplaneResolver::resolve_generated_face(const PartDocument& document,
                                           const SemanticFaceReference& face_reference) const {
@@ -279,10 +292,20 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve_for_sketch(const PartDocume
 Result<ResolvedWorkplane>
 WorkplaneResolver::resolve_for_sketch(const PartDocument& document, const Sketch& sketch,
                                       const ShapeCache& shape_cache) const {
-  auto workplane = resolve_for_sketch(document, sketch);
+  auto workplane = resolve(document, sketch.workplane(), shape_cache);
+  if (workplane && document.find_sketch_origin_override(sketch.id())) {
+    const auto offset = document.find_sketch_origin_override(sketch.id())->local_origin();
+    workplane.value().origin = evaluate_point(workplane.value(), offset);
+    if (workplane.value().bounds.enabled) {
+      workplane.value().bounds.center.x -= offset.x;
+      workplane.value().bounds.center.y -= offset.y;
+    }
+  }
   if (workplane.has_error())
     return workplane;
   std::optional<BodyId> semantic_source_body;
+  if (const auto* support = document.find_result_face_workplane(sketch.workplane()))
+    semantic_source_body = support->reference().body();
   if (const DerivedWorkplane* derived = document.find_derived_workplane(sketch.workplane())) {
     const Feature* source = document.find_feature(derived->face_reference().source_feature());
     if (source != nullptr && source->body_result_context().has_value()) {
@@ -304,6 +327,42 @@ WorkplaneResolver::resolve_for_sketch(const PartDocument& document, const Sketch
       shape_cache.find_reference_transform(sketch.id().value());
   if (transform == nullptr)
     return workplane;
+  if (const auto* support = document.find_result_face_workplane(sketch.workplane());
+      support && transform->body_id == support->reference().body()) {
+    // The producer's face is already posed. Apply only owned-Sketch operations
+    // after that producer, subtracting the prefix already present in its frame.
+    GeometryAffineTransform prefix = GeometryAffineTransform::identity();
+    for (const auto& pose : document.body_transforms()) {
+      if (pose.body() != transform->body_id)
+        continue;
+      const auto downstream = document.dependency_graph().transitive_dependents(pose.id().value());
+      if (pose.id().value() != support->reference().producer().value() &&
+          std::find(downstream.begin(), downstream.end(),
+                    support->reference().producer().value()) == downstream.end())
+        continue;
+      if (const auto* prior = shape_cache.find_reference_transform(sketch.id().value(), pose.id()))
+        prefix = prior->cumulative_transform;
+    }
+    GeometryAffineTransform inverse;
+    const auto& m = prefix.matrix;
+    const double squared = m[0] * m[0] + m[4] * m[4] + m[8] * m[8];
+    if (!std::isfinite(squared) || squared <= 0)
+      return Result<ResolvedWorkplane>::failure(
+          validation_error(sketch.id().value(), "result-face ownership pose must be invertible"));
+    for (int row = 0; row < 3; ++row)
+      for (int column = 0; column < 3; ++column)
+        inverse.matrix[row * 4 + column] = m[column * 4 + row] / squared;
+    const auto offset = inverse.transform_vector({m[3], m[7], m[11]});
+    inverse.matrix[3] = -offset.x;
+    inverse.matrix[7] = -offset.y;
+    inverse.matrix[11] = -offset.z;
+    const auto delta = inverse.followed_by(transform->cumulative_transform);
+    workplane.value().origin = delta.transform_point(workplane.value().origin);
+    workplane.value().x_axis = delta.transform_vector(workplane.value().x_axis);
+    workplane.value().y_axis = delta.transform_vector(workplane.value().y_axis);
+    workplane.value().normal = delta.transform_vector(workplane.value().normal);
+    return workplane;
+  }
   if (semantic_source_body.has_value() && transform->body_id == *semantic_source_body)
     return workplane;
   workplane.value().origin =

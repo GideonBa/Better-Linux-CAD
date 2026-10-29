@@ -185,6 +185,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/construction_point_resolver.cpp
     src/geometry/dimension_driven_profile_resolver.cpp
     src/geometry/finishing_selection.cpp
+    src/geometry/result_face_support.cpp
     src/geometry/fillet_adapter.cpp
     src/geometry/geometry_measure.cpp
     src/geometry/measure_selection.cpp

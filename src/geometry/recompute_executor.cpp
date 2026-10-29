@@ -1,4 +1,5 @@
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 #include "blcad/core/sketch_profile_roles.hpp"
 #include "blcad/core/sketch_contour.hpp"
 
@@ -204,9 +205,22 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
   return resolve_cached_body_input(document, shape_cache, feature.target_body(), "target");
 }
 
+[[nodiscard]] GeometryShape tag_extrude_faces(const PartDocument& document, const Feature& feature,
+                                              GeometryShape shape, const ResolvedWorkplane& frame);
+
 [[nodiscard]] Result<std::size_t> store_feature_result(const PartDocument& document,
                                                        const Feature& feature, GeometryShape shape,
                                                        ShapeCache& shape_cache) {
+  if (feature.type() == FeatureType::AdditiveExtrude &&
+      feature.direction() != ExtrudeDirection::Path &&
+      (!feature.body_result_context() ||
+       feature.body_result_context()->operation_mode() == FeatureBodyOperationMode::NewBody)) {
+    if (const auto* sketch = document.find_sketch(feature.input_sketch())) {
+      auto frame = WorkplaneResolver{}.resolve_for_sketch(document, *sketch, shape_cache);
+      if (frame)
+        shape = tag_extrude_faces(document, feature, std::move(shape), frame.value());
+    }
+  }
   if (!feature.body_result_context().has_value())
     return shape_cache.set_final_shape(feature.id(), std::move(shape));
 
@@ -2065,6 +2079,48 @@ extrude_composite_profile(const Sketch& sketch, const Feature& feature) noexcept
   return sole_sketch_geometry_profile(sketch, sketch.composite_closed_profiles());
 }
 
+GeometryShape tag_extrude_faces(const PartDocument& document, const Feature& feature,
+                                GeometryShape shape, const ResolvedWorkplane& frame) {
+  shape = ResultFaceSupportGeometry::tag_prismatic_caps(shape, feature.id(), frame);
+  const auto* sketch = document.find_sketch(feature.input_sketch());
+  if (!sketch)
+    return shape;
+  const auto side = [&](Point2 a, Point2 b, const std::string& role) {
+    const auto first = WorkplaneResolver{}.evaluate_point(frame, a);
+    const auto second = WorkplaneResolver{}.evaluate_point(frame, b);
+    const Vector3 edge{second.x - first.x, second.y - first.y, second.z - first.z};
+    const auto normal = cross(edge, frame.normal);
+    if (length(normal) < 1e-7)
+      return;
+    shape = ResultFaceSupportGeometry::tag_plane(shape, feature.id(), role, first, frame.normal,
+                                                 normal);
+  };
+  if (const auto* rectangle = extrude_rectangle_profile(*sketch, feature)) {
+    const auto* width = document.find_parameter(rectangle->width_parameter());
+    const auto* height = document.find_parameter(rectangle->height_parameter());
+    if (width && height) {
+      const auto vertices = rectangle_local_vertices(*rectangle, width->value(), height->value());
+      const std::array<std::string, 4> roles{"front", "right", "back", "left"};
+      for (std::size_t i = 0; i < 4; ++i)
+        side(vertices[i], vertices[(i + 1) % 4],
+             "extrude/rectangle/" + rectangle->id().value() + "/" + roles[i]);
+    }
+  } else {
+    std::vector<SketchEntityId> boundary;
+    if (const auto* closed = extrude_closed_profile(*sketch, feature))
+      boundary = closed->line_segments();
+    else if (const auto* arc = extrude_arc_profile(*sketch, feature))
+      boundary = arc->curve_segments();
+    for (const auto& line : sketch->line_segments()) {
+      if (line.construction() ||
+          std::find(boundary.begin(), boundary.end(), line.id()) == boundary.end())
+        continue;
+      side(line.start(), line.end(), "extrude/line/" + line.id().value());
+    }
+  }
+  return shape;
+}
+
 [[nodiscard]] Result<std::size_t>
 validate_extrude_construction_profile(const PartDocument& document, const Feature& feature) {
   const auto* sketch = document.find_sketch(feature.input_sketch());
@@ -2441,6 +2497,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_richer_extrude(
       span.value().end_mm, std::move(tool.value()), closed_profile_adapter_, body_boolean_adapter_);
   if (region_tool.has_error())
     return Result<std::size_t>::failure(region_tool.error());
+
+  region_tool.value() =
+      tag_extrude_faces(document, feature, region_tool.value(), workplane.value());
 
   const FeatureBodyOperationMode mode =
       feature.body_result_context().has_value()
@@ -2845,6 +2904,38 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
     tool = loft_adapter_.loft_closed_sections(feature->id(), sections,
                                               feature->kind() != LoftFeatureKind::LoftSurface,
                                               center_path, guide_segments, feature->continuity());
+    if (tool && feature->kind() != LoftFeatureKind::LoftSurface) {
+      for (const auto index : {std::size_t{0}, sections.size() - 1}) {
+        const auto& curves = sections[index];
+        if (curves.size() < 2)
+          continue;
+        const auto a = curves.front().start, b = curves.front().end;
+        Vector3 x{b.x - a.x, b.y - a.y, b.z - a.z};
+        for (const auto& curve : curves) {
+          Vector3 other{curve.end.x - a.x, curve.end.y - a.y, curve.end.z - a.z};
+          const auto normal = cross(x, other);
+          if (length(normal) <= 1e-7)
+            continue;
+          const auto& section = feature->sections()[index];
+          const auto& ref = std::get<ProfileRegionReference>(section.source());
+          const std::string role = "loft/cap/" + std::to_string(ref.sketch().value().size()) + ":" +
+                                   ref.sketch().value() + "/" +
+                                   std::to_string(ref.profile().value().size()) + ":" +
+                                   ref.profile().value();
+          const auto* source_sketch = document.find_sketch(ref.sketch());
+          auto frame =
+              source_sketch
+                  ? workplane_resolver_.resolve_for_sketch(document, *source_sketch, working_cache)
+                  : Result<ResolvedWorkplane>::failure(
+                        geometry_error(ref.sketch().value(), "Loft cap Sketch must exist"));
+          if (frame)
+            tool.value() = ResultFaceSupportGeometry::tag_plane(tool.value(), feature->id(), role,
+                                                                frame.value().origin,
+                                                                frame.value().x_axis, normal);
+          break;
+        }
+      }
+    }
   }
   if (tool.has_error())
     return Result<std::size_t>::failure(tool.error());
@@ -3029,6 +3120,13 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
       feature->id(), sources.value(), signed_direction, instance_count, spacing_mm);
   if (instances.has_error())
     return Result<std::size_t>::failure(instances.error());
+  for (std::size_t i = 0; i < instances.value().size(); ++i) {
+    const auto& source = feature->sources()[i % feature->sources().size()];
+    const auto key = std::string(to_string(source.kind())) + "/" + source.source_node_id() + "/" +
+                     std::to_string(i / feature->sources().size());
+    instances.value()[i] =
+        ResultFaceSupportGeometry::scope_copy(instances.value()[i], feature->id(), key);
+  }
 
   std::vector<GeometryShape> tools;
   const auto& context = feature->body_result_context();
@@ -3112,6 +3210,13 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_circular_pattern(
       count->value().count_value(), feature->total_angle_deg());
   if (instances.has_error())
     return Result<std::size_t>::failure(instances.error());
+  for (std::size_t i = 0; i < instances.value().size(); ++i) {
+    const auto& source = feature->sources()[i % feature->sources().size()];
+    const auto key = std::string(to_string(source.kind())) + "/" + source.source_node_id() + "/" +
+                     std::to_string(i / feature->sources().size());
+    instances.value()[i] =
+        ResultFaceSupportGeometry::scope_copy(instances.value()[i], feature->id(), key);
+  }
 
   std::vector<GeometryShape> tools;
   const auto& context = feature->body_result_context();
@@ -3187,6 +3292,13 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_mirror(const PartDocument
                                                    plane.value().first, plane.value().second);
   if (reflected.has_error())
     return Result<std::size_t>::failure(reflected.error());
+  for (std::size_t i = 0; i < reflected.value().size(); ++i) {
+    const auto& source = feature->sources()[i];
+    const auto key =
+        std::string(to_string(source.kind())) + "/" + source.source_node_id() + "/mirror";
+    reflected.value()[i] =
+        ResultFaceSupportGeometry::scope_copy(reflected.value()[i], feature->id(), key);
+  }
   auto tool_union = fuse_pattern_shapes(*feature, reflected.value(), body_boolean_adapter_);
   if (tool_union.has_error())
     return Result<std::size_t>::failure(tool_union.error());
@@ -3979,6 +4091,11 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
   ShapeCache& execution_cache = document.bodies().empty() ? shape_cache : working_cache;
   GeometryRecomputeSummary summary;
   for (const RecomputeStep& step : plan.steps()) {
+    if (const auto* support = document.find_result_face_workplane(DatumPlaneId(step.node_id))) {
+      auto resolved = ResultFaceSupportGeometry::resolve(document, *support, execution_cache);
+      if (!resolved)
+        return Result<GeometryRecomputeSummary>::failure(resolved.error());
+    }
     const Feature* feature = document.find_feature(FeatureId(step.node_id));
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(step.node_id));
     const SweepFeature* sweep = document.find_sweep_feature(FeatureId(step.node_id));
@@ -4075,6 +4192,11 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
   }
 
   for (const std::string& executable_id : executable_ids) {
+    if (const auto* support = document.find_result_face_workplane(DatumPlaneId(executable_id))) {
+      auto resolved = ResultFaceSupportGeometry::resolve(document, *support, execution_cache);
+      if (!resolved)
+        return Result<GeometryRecomputeSummary>::failure(resolved.error());
+    }
     const Feature* feature = document.find_feature(FeatureId(executable_id));
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(executable_id));
     const SweepFeature* sweep = document.find_sweep_feature(FeatureId(executable_id));

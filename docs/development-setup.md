@@ -1980,3 +1980,67 @@ BadDrawable or BadWindow errors. The pre-existing OCCT Medium visual-depth/stenc
 (112 entries in the broad batch). All 892 runtime fingerprints remain unchanged through the final
 full Core/Geometry, native, scaled, full GUI, broad and startup checks. Final broad/startup logs are
 `/tmp/blcad-issue110-native-broad-final.log` and `/tmp/blcad-issue110-startup-final.log`.
+
+### Issue #112 — associative current-result-face Sketch verification
+
+The regression for the initial selection gate failed **2 of 15 assertions** before
+implementation (`/tmp/blcad-issue112-red.log`). Intermediate checks passed Geometry
+**8 / 302**, UI cancellation/history/repair **1 / 110**, and native workflows **2 / 1,021**.
+These intermediate counts precede the final source freeze and do not substitute for the
+final checks below. Native scenarios include actual face clicks and visible controls;
+the producer-family test explicitly opens serialized Core source fixtures.
+
+```bash
+cmake --build build/dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app blcad_export_step -j 8
+./build/dev-gui/blcad_geometry_tests "[result-face-support]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[result-face-sketch],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue112-native-100 QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[result-face-native],[result-face-producers-native]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue112-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[result-face-native],[result-face-producers-native]"
+```
+
+The final gate also runs complete Core, Geometry and offscreen GUI suites, affected native
+construction/repair/feature-edit/finishing workflows with the required shell inventory,
+and a separate native startup. Runtime fingerprints include tracked/untracked source,
+tests, assets, build definitions and both GUI coverage manifests. Plain Markdown evidence
+can be completed after the runtime freeze; runtime changes require renewed verification.
+
+Final runtime freeze: **896 files**, SHA-256
+`2f5d9b0bcc891440258b6387a503cda01b27fba5ad5d49a9564073130e67ff4a`,
+`/tmp/blcad-issue112-source-freeze.json`; verify with
+`python3 /tmp/blcad-issue112-freeze.py check`. All five targets build
+(`/tmp/blcad-issue112-build-11.log`; full formatted rebuild and copy-origin integration
+are logged in `build-final`/`build-9`). Final targeted Geometry passes **12 / 420**,
+including copy removal, curved walls, lost empty-Sketch freshness and owned pose prefixes.
+UI cancellation/repair plus the inventory pass **4 / 412**. Complete Core passes
+**557 / 17,711** and Geometry **478 / 36,075**. Exact logs:
+`/tmp/blcad-issue112-{geometry-focused-3,gui-focused-final-2,core-full-final,geometry-full-final}.log`.
+
+On the final freeze, native pointer/visible-control workflows pass **2 / 1,021** at both
+100% and 150%; captures for pocket preview/edited thickness and oblique polygon/Loft/
+Boolean/Fillet were inspected across the two scales. The affected native construction,
+repair, feature-edit and selection gate passes **39 / 6,975**, without skips or unmatched
+filters. A separate native startup reaches intentional timeout **124**. Logs:
+`/tmp/blcad-issue112-{native-final-100,native-final-150,native-broad,startup}.log`.
+No High-severity, BadDrawable or BadWindow message appears; the existing OCCT Medium
+visual-depth/stencil warning remains. The registered gate is:
+
+```bash
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue112-native-broad QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[block136-construction],[shell-combined-workplane-edit],[shell-combined-construction],[block136-reference-repair-batches],[block136-repair-open],[block136-feature-edit],[shell-combined-finishing-context],[block136-selection-filters],[result-face-sketch],[native-viewer-lifecycle],[integration][gui-feature-coverage]"
+```
+
+The creation checkpoint advances both model and presentation revisions when cancelling;
+its final regression explicitly checks these cache invalidation contracts. Complete GUI
+validation is repeated after that final correction (`gui-full-final`), rather than using
+the preceding **612 cases / 81,683 assertions** run as final-source evidence.
+
+Final complete GUI passes **612 cases — 587 passed, 25 expected native-only skips /
+81,685 assertions** (`/tmp/blcad-issue112-gui-full-final.log`). Complete Core and Geometry
+also pass on the same final freeze (`core-full-final`, `geometry-full-final`), and the
+896-file manifest remains unchanged after every native/full/startup gate. No required
+check is skipped. The 25 GUI skips are expected platform guards; the affected native
+cases were exercised separately as listed above.
+No numbered implementation block is advanced.
+
+Delivery: [PR #128](https://github.com/GideonBa/Better-Linux-CAD/pull/128), implementation
+commit `76b68ed`. The final documentation-link commit changes only Markdown; runtime
+fingerprints and the verified implementation remain unchanged.

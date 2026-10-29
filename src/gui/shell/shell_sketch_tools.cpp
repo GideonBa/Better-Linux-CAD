@@ -2745,6 +2745,8 @@ bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
                drag_stage(workspace_.stage())) {
       cancel_drag(true, {});
       return true;
+    } else if (key->key() == Qt::Key_Escape && window_.cancel_face_supported_sketch()) {
+      return true;
     }
   }
   return QObject::eventFilter(watched, event);

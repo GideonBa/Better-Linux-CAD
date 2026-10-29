@@ -6,6 +6,7 @@
 #include "blcad/core/construction_geometry.hpp"
 #include "blcad/core/datum_axis.hpp"
 #include "blcad/core/datum_plane.hpp"
+#include "blcad/core/result_face_workplane.hpp"
 #include "blcad/core/dependency_graph.hpp"
 #include "blcad/core/draft_feature.hpp"
 #include "blcad/core/edge_treatment_feature.hpp"
@@ -56,6 +57,11 @@ public:
   [[nodiscard]] Result<std::size_t> add_construction_line(ConstructionLine line);
   [[nodiscard]] Result<std::size_t> add_construction_plane(ConstructionPlane plane);
   [[nodiscard]] Result<std::size_t> add_derived_workplane(DerivedWorkplane workplane);
+  [[nodiscard]] Result<std::size_t> add_result_face_workplane(ResultFaceWorkplane workplane);
+  [[nodiscard]] Result<std::size_t> update_result_face_workplane(ResultFaceWorkplane workplane);
+  // Adds both records on a candidate; failure never leaves an unused support.
+  [[nodiscard]] Result<std::size_t> add_face_supported_sketch(ResultFaceWorkplane workplane,
+                                                              Sketch sketch);
   // Replace existing construction intent without changing identity or ordered
   // position. Revalidate references, reject cycles and invalidate dependents.
   [[nodiscard]] Result<std::size_t> update_datum_axis(DatumAxis axis);
@@ -185,6 +191,10 @@ public:
   [[nodiscard]] const std::vector<ConstructionLine>& construction_lines() const noexcept;
   [[nodiscard]] const std::vector<ConstructionPlane>& construction_planes() const noexcept;
   [[nodiscard]] const std::vector<DerivedWorkplane>& derived_workplanes() const noexcept;
+  [[nodiscard]] const std::vector<ResultFaceWorkplane>& result_face_workplanes() const noexcept;
+  [[nodiscard]] std::size_t result_face_workplane_count() const noexcept;
+  [[nodiscard]] const ResultFaceWorkplane*
+  find_result_face_workplane(DatumPlaneId id) const noexcept;
   [[nodiscard]] const std::vector<Sketch>& sketches() const noexcept;
   [[nodiscard]] const std::vector<Sketch3D>& sketches_3d() const noexcept;
   [[nodiscard]] const std::vector<PathCurve>& path_curves() const noexcept;
@@ -290,6 +300,9 @@ private:
   [[nodiscard]] Result<std::size_t> add_sketch_impl(Sketch sketch, const Sketch* retained);
   [[nodiscard]] Result<std::size_t> add_derived_workplane_impl(DerivedWorkplane workplane,
                                                                bool allow_missing_source);
+  [[nodiscard]] Result<std::size_t>
+  add_result_face_workplane_impl(ResultFaceWorkplane workplane,
+                                 const std::vector<std::string>& retained_missing_sources);
   PartDocument(DocumentId id, std::string name);
 
   [[nodiscard]] Result<std::size_t>
@@ -356,6 +369,7 @@ private:
   std::vector<ConstructionLine> construction_lines_;
   std::vector<ConstructionPlane> construction_planes_;
   std::vector<DerivedWorkplane> derived_workplanes_;
+  std::vector<ResultFaceWorkplane> result_face_workplanes_;
   std::vector<Sketch> sketches_;
   std::vector<Sketch3D> sketches_3d_;
   std::vector<PathCurve> path_curves_;
