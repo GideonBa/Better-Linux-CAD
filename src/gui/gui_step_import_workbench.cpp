@@ -6,7 +6,9 @@
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/step_editable_commands.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
+#include "blcad/geometry/viewport_scene.hpp"
 #include <QFile>
+#include <QTemporaryFile>
 #include <algorithm>
 
 namespace blcad::gui {
@@ -766,6 +768,120 @@ GuiStepImportWorkbench::save_editable_copy(const GuiDocumentSession& session,
   }
   return Result<std::size_t>::success(1);
 }
+Result<GuiStructuredStepImportPreview>
+GuiStepImportWorkbench::prepare_structured_project(const GuiDocumentSession& session,
+                                                   GuiStructuredStepImportRequest request) const {
+  auto path = document_path(session);
+  auto json = snapshot(session);
+  if (!path || !json)
+    return Result<GuiStructuredStepImportPreview>::failure(!path ? path.error() : json.error());
+  const auto* selected = source(session, request.source);
+  if (!selected)
+    return Result<GuiStructuredStepImportPreview>::failure(
+        invalid("Choose a registered source owned by the current document"));
+  auto candidate = geometry::StepStructuredImportCommands{}.create_project(
+      *selected, request.new_project, request.name, path.value().parent_path());
+  if (!candidate)
+    return Result<GuiStructuredStepImportPreview>::failure(candidate.error());
+  geometry::StepImportTopologyContext context(path.value().parent_path());
+  auto scene = geometry::ViewportSceneBuilder{&context}.build_project(candidate.value().project);
+  if (!scene)
+    return Result<GuiStructuredStepImportPreview>::failure(scene.error());
+  std::vector<geometry::GeometryShape> shapes;
+  for (auto& item : scene.value())
+    if (item.kind == geometry::ViewportSceneKind::Component)
+      shapes.push_back(std::move(item.shape));
+  if (shapes.empty())
+    return Result<GuiStructuredStepImportPreview>::failure(
+        invalid("Structured STEP project has no visible body occurrences"));
+  auto valid = context.validate_sources();
+  if (!valid)
+    return Result<GuiStructuredStepImportPreview>::failure(valid.error());
+  return Result<GuiStructuredStepImportPreview>::success(
+      {std::move(request), path.value(), json.value(), *selected, std::move(candidate.value()),
+       std::move(shapes)});
+}
+
+Result<std::size_t> GuiStepImportWorkbench::validate_structured_project(
+    const GuiDocumentSession& session, const GuiStructuredStepImportPreview& preview) const {
+  const auto path = document_path(session);
+  const auto json = snapshot(session);
+  if (!path || !json || path.value() != preview.document_path ||
+      json.value() != preview.document_json)
+    return Result<std::size_t>::failure(
+        invalid("Structured Project preview is stale; prepare again"));
+  auto fresh = prepare_structured_project(session, preview.request);
+  if (!fresh)
+    return Result<std::size_t>::failure(fresh.error());
+  const auto expected = serialize_project_to_json(fresh.value().candidate.project);
+  const auto actual = serialize_project_to_json(preview.candidate.project);
+  if (fresh.value().source != preview.source || !expected || !actual ||
+      expected.value() != actual.value())
+    return Result<std::size_t>::failure(
+        invalid("Structured Project candidate or source changed; prepare again"));
+  return Result<std::size_t>::success(fresh.value().preview_shapes.size());
+}
+
+Result<std::size_t> GuiStepImportWorkbench::save_structured_project_copy(
+    const GuiDocumentSession& session, const GuiStructuredStepImportPreview& preview,
+    const std::filesystem::path& destination) const {
+  auto valid = validate_structured_project(session, preview);
+  if (!valid)
+    return valid;
+  std::error_code error;
+  const auto output = std::filesystem::absolute(destination, error).lexically_normal();
+  if (error || output.empty() || same_file(output, preview.document_path))
+    return Result<std::size_t>::failure(invalid("Choose a new Project file"));
+  const auto output_root = std::filesystem::weakly_canonical(output.parent_path(), error);
+  if (error)
+    return Result<std::size_t>::failure(invalid("New Project directory cannot be resolved"));
+  const auto original_root =
+      std::filesystem::weakly_canonical(preview.document_path.parent_path(), error);
+  if (error || output_root != original_root)
+    return Result<std::size_t>::failure(invalid(
+        "Save the new Project beside the current document to preserve its STEP asset root"));
+  valid = validate_step_import_output_path(session, output);
+  if (!valid)
+    return valid;
+  // Preserve any existing user file, dangling symlink or standalone sidecar.
+  for (const auto& file :
+       std::vector<std::filesystem::path>{output, output.string() + ".sketch-constraints.json",
+                                          output.string() + ".sketch-dimensions.json"}) {
+    const auto status = std::filesystem::symlink_status(file, error);
+    if (std::filesystem::exists(status))
+      return Result<std::size_t>::failure(
+          invalid("New Project copy must not overwrite an existing file or sidecar"));
+    if (error && error != std::errc::no_such_file_or_directory)
+      return Result<std::size_t>::failure(invalid("New Project destination cannot be inspected"));
+    error.clear();
+  }
+  auto json = serialize_project_to_json(preview.candidate.project);
+  if (!json)
+    return Result<std::size_t>::failure(json.error());
+  QTemporaryFile staged(
+      QString::fromStdString((output_root / ".blcad-structured-project-XXXXXX").string()));
+  if (!staged.open() ||
+      staged.write(json.value().data(), static_cast<qint64>(json.value().size())) !=
+          static_cast<qint64>(json.value().size()) ||
+      !staged.flush())
+    return Result<std::size_t>::failure(invalid("New Project copy could not be staged"));
+  staged.close();
+  // Re-read the source and compare the entire public candidate immediately
+  // before publication. A hard-link publish is atomic and refuses overwrites;
+  // the temporary name is removed by QTemporaryFile on every exit path.
+  valid = validate_structured_project(session, preview);
+  if (!valid)
+    return valid;
+  valid = validate_step_import_output_path(session, output);
+  if (!valid)
+    return valid;
+  std::filesystem::create_hard_link(staged.fileName().toStdString(), output, error);
+  if (error)
+    return Result<std::size_t>::failure(
+        invalid("New Project destination already exists or cannot be published"));
+  return Result<std::size_t>::success(1);
+}
+
 Result<std::size_t> validate_step_import_output_path(const GuiDocumentSession& session,
                                                      const std::filesystem::path& output) {
   const auto values = sources(session);

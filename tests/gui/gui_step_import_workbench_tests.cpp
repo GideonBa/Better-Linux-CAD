@@ -11,6 +11,7 @@
 #include "blcad/gui/gui_document_browser.hpp"
 #include "blcad/gui/gui_step_import_workbench.hpp"
 #include "blcad/gui/gui_feature_edit.hpp"
+#include "gui_step_structured_import_fixture.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -115,6 +116,157 @@ std::size_t product_index(const geometry::StepImportGeometry& imported, double w
   return 0;
 }
 } // namespace
+
+TEST_CASE("Structured STEP GUI preparation matches shared commands and saves a new Project without "
+          "changing its registry",
+          "[gui][step-structured-import][step-import-workbench]") {
+  const bool registry_project = GENERATE(false, true);
+  const auto mode = GENERATE(StepImportMode::Reference, StepImportMode::EditableBody);
+  CAPTURE(registry_project, static_cast<int>(mode));
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  structured_test::write_supplier(directory.filePath("nested.step").toStdString());
+  GuiDocumentSession session;
+  create(session, registry_project);
+  REQUIRE(session.save_as(directory.filePath(filename(registry_project)).toStdString()));
+  const GuiStepImportWorkbench workbench;
+  auto registration =
+      checked(workbench.prepare_register(session, "Nested supplier", "nested.step", mode));
+  REQUIRE(workbench.apply(session, registration));
+  REQUIRE(session.dirty());
+  const auto original = snapshot(session);
+  const auto history = session.undo_label();
+  const auto original_path = session.file_path();
+  const auto original_file = bytes(QString::fromStdString(original_path.string()));
+  const auto asset = bytes(directory.filePath("nested.step"));
+  GuiStructuredStepImportRequest request{registration.source.id(), DocumentId("project.structured"),
+                                         "Imported supplier assembly"};
+  const auto preview = checked(workbench.prepare_structured_project(session, request));
+  const auto direct = checked(geometry::StepStructuredImportCommands{}.create_project(
+      registration.source, request.new_project, request.name, directory.path().toStdString()));
+  const auto imported = checked(
+      geometry::StepImportReader{}.read(registration.source, directory.path().toStdString()));
+  CHECK(checked(serialize_project_to_json(preview.candidate.project)) ==
+        checked(serialize_project_to_json(direct.project)));
+  REQUIRE(preview.candidate.project.part_document_count() == 1);
+  const auto foreign_part = std::find_if(imported.products.begin(), imported.products.end(),
+                                         [](const auto& product) { return !product.is_assembly; });
+  REQUIRE(foreign_part != imported.products.end());
+  CHECK(preview.candidate.project.part_documents().front().name() == foreign_part->name);
+  CHECK(preview.candidate.project.part_documents().front().is_reference_part() ==
+        (mode == StepImportMode::Reference));
+  structured_test::check_source_structure(preview.candidate.project, imported);
+  CHECK(checked(AssemblyLeafOccurrenceResolver{}.resolve(preview.candidate.project)).size() == 5);
+  CHECK(preview.preview_shapes.size() == 5);
+  CHECK(snapshot(session) == original);
+  CHECK(session.undo_label() == history);
+  CHECK(session.dirty());
+  const auto destination = directory.filePath("new.blcad.project.json");
+  REQUIRE(workbench.save_structured_project_copy(session, preview, destination.toStdString()));
+  CHECK(snapshot(session) == original);
+  CHECK(session.file_path() == original_path);
+  CHECK(session.undo_label() == history);
+  CHECK(session.dirty());
+  CHECK(bytes(QString::fromStdString(original_path.string())) == original_file);
+  GuiDocumentSession opened;
+  REQUIRE(opened.open_file(destination.toStdString()));
+  REQUIRE(opened.project());
+  CHECK(snapshot(opened) == checked(serialize_project_to_json(direct.project)));
+  CHECK(bytes(directory.filePath("nested.step")) == asset);
+}
+
+TEST_CASE("Structured STEP copy rejects forged candidates and protected or existing destinations "
+          "atomically",
+          "[gui][step-structured-import][step-import-workbench]") {
+  QTemporaryDir directory, elsewhere;
+  REQUIRE(directory.isValid());
+  REQUIRE(elsewhere.isValid());
+  structured_test::write_supplier(directory.filePath("nested.step").toStdString());
+  GuiDocumentSession session;
+  create(session, false);
+  REQUIRE(session.save_as(directory.filePath(filename(false)).toStdString()));
+  const GuiStepImportWorkbench workbench;
+  const auto registration = checked(workbench.prepare_register(
+      session, "Nested supplier", "nested.step", StepImportMode::Reference));
+  REQUIRE(workbench.apply(session, registration));
+  REQUIRE(session.save());
+  const auto original = snapshot(session);
+  const auto history = session.undo_label();
+  const auto asset = bytes(directory.filePath("nested.step"));
+  const auto preview = checked(workbench.prepare_structured_project(
+      session, {registration.source.id(), DocumentId("project.structured"), "Imported assembly"}));
+  auto forged = preview;
+  REQUIRE(forged.candidate.project.add_part_document(
+      checked(PartDocument::create(DocumentId("part.injected"), "Injected"))));
+  const auto output = directory.filePath("new.blcad.project.json");
+  CHECK_FALSE(workbench.save_structured_project_copy(session, forged, output.toStdString()));
+  CHECK_FALSE(QFile::exists(output));
+  CHECK_FALSE(workbench.save_structured_project_copy(session, preview, session.file_path()));
+  CHECK_FALSE(workbench.save_structured_project_copy(
+      session, preview, directory.filePath("nested.step").toStdString()));
+  std::error_code error;
+  const auto alias = directory.filePath("source-alias.blcad.project.json");
+  std::filesystem::create_hard_link(directory.filePath("nested.step").toStdString(),
+                                    alias.toStdString(), error);
+  REQUIRE_FALSE(error);
+  CHECK_FALSE(workbench.save_structured_project_copy(session, preview, alias.toStdString()));
+  write(output, "existing user project");
+  CHECK_FALSE(workbench.save_structured_project_copy(session, preview, output.toStdString()));
+  CHECK(bytes(output) == "existing user project");
+  CHECK_FALSE(workbench.save_structured_project_copy(
+      session, preview, elsewhere.filePath("new.blcad.project.json").toStdString()));
+  CHECK(QDir(directory.path())
+            .entryList({".blcad-structured-project-*"}, QDir::Files | QDir::Hidden)
+            .isEmpty());
+  CHECK(snapshot(session) == original);
+  CHECK(session.undo_label() == history);
+  CHECK_FALSE(session.dirty());
+  CHECK(bytes(directory.filePath("nested.step")) == asset);
+}
+
+TEST_CASE(
+    "Structured STEP copy validates session path intent and fresh source bytes before publication",
+    "[gui][step-structured-import][step-import-workbench]") {
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  structured_test::write_supplier(directory.filePath("nested.step").toStdString());
+  GuiDocumentSession session;
+  create(session, true);
+  REQUIRE(session.save_as(directory.filePath(filename(true)).toStdString()));
+  const GuiStepImportWorkbench workbench;
+  const auto registration = checked(workbench.prepare_register(
+      session, "Nested supplier", "nested.step", StepImportMode::EditableBody));
+  REQUIRE(workbench.apply(session, registration));
+  REQUIRE(session.save());
+  const GuiStructuredStepImportRequest request{
+      registration.source.id(), DocumentId("project.structured"), "Imported assembly"};
+  auto preview = checked(workbench.prepare_structured_project(session, request));
+  REQUIRE(session.commit_project_transaction("Registry edit", [](Project& project) {
+    return project.add_part_document(
+        checked(PartDocument::create(DocumentId("part.other"), "Other")));
+  }));
+  const auto edited = snapshot(session);
+  const auto history = session.undo_label();
+  const auto output = directory.filePath("new.blcad.project.json");
+  CHECK_FALSE(workbench.save_structured_project_copy(session, preview, output.toStdString()));
+  CHECK_FALSE(QFile::exists(output));
+  preview = checked(workbench.prepare_structured_project(session, request));
+  REQUIRE(session.save_as(directory.filePath("registry-renamed.blcad.project.json").toStdString()));
+  CHECK_FALSE(workbench.validate_structured_project(session, preview));
+  preview = checked(workbench.prepare_structured_project(session, request));
+  const auto changed =
+      bytes(directory.filePath("nested.step")) + QByteArray("\n/* supplier revision */\n");
+  write(directory.filePath("nested.step"), changed);
+  CHECK_FALSE(workbench.save_structured_project_copy(session, preview, output.toStdString()));
+  CHECK_FALSE(QFile::exists(output));
+  CHECK_FALSE(workbench.prepare_structured_project(session, request));
+  CHECK(snapshot(session) == edited);
+  CHECK(session.undo_label() == history);
+  CHECK(bytes(directory.filePath("nested.step")) == changed);
+  CHECK(QDir(directory.path())
+            .entryList({".blcad-structured-project-*"}, QDir::Files | QDir::Hidden)
+            .isEmpty());
+}
 
 TEST_CASE("Direct EditableBody source commands create standalone and Project imported base intent",
           "[gui][step-editable-parts][step-import-workbench]") {

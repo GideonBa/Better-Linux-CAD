@@ -137,6 +137,7 @@ struct ShellStepImportTools::Impl {
   std::optional<GuiViewportCameraBookmark> inspection_camera;
   std::optional<GuiStepImportTopologyPreview> topology;
   std::optional<GuiStepReferencePreview> reference;
+  std::optional<GuiStructuredStepImportPreview> structured;
   std::vector<std::pair<std::string, ImportedTopologyReference>> topology_targets;
   std::optional<std::uint32_t> previous_pick_mask;
   std::optional<std::vector<std::string>> previous_pick_scope;
@@ -173,6 +174,7 @@ struct ShellStepImportTools::Impl {
   void invalidate() {
     candidate.reset();
     reference.reset();
+    structured.reset();
     topology.reset();
     topology_targets.clear();
     window.viewport().clear_preview_selection_targets();
@@ -277,6 +279,71 @@ struct ShellStepImportTools::Impl {
     status->setText(state_text(value.state()));
     expected->setPlainText(text(value.source().sha256_digest()));
     observed->setPlainText(text(value.observed_sha256_digest().value_or("")));
+  }
+  void show_structured_project(const GuiStructuredStepImportPreview& value) {
+    const auto& project = value.candidate.project;
+    auto* definitions = new QTreeWidgetItem(geometry_products, {QStringLiteral("Definitions")});
+    for (const auto& part : project.part_documents()) {
+      new QTreeWidgetItem(definitions,
+                          {text(part.name()),
+                           part.is_reference_part() ? "Reference Part" : "Editable Part",
+                           QStringLiteral("%1 bodies").arg(part.bodies().size())});
+    }
+    const auto append = [&](auto&& self, QTreeWidgetItem* parent,
+                            const AssemblyDocument& assembly) -> void {
+      for (const auto& component : assembly.component_instances()) {
+        const auto* part = project.find_part_document(component.referenced_part_document());
+        auto* item = new QTreeWidgetItem(parent, {text(component.name()), "Part occurrence",
+                                                  part ? text(part->name()) : QString()});
+        const auto& pose = component.transform();
+        item->setToolTip(0,
+                         QStringLiteral("%1\nDirect XYZ: %2, %3, %4 mm\nRotation XYZ: %5, %6, %7°")
+                             .arg(text(component.name()))
+                             .arg(pose.translation_mm.x)
+                             .arg(pose.translation_mm.y)
+                             .arg(pose.translation_mm.z)
+                             .arg(pose.rotation_deg.x)
+                             .arg(pose.rotation_deg.y)
+                             .arg(pose.rotation_deg.z));
+      }
+      for (const auto& occurrence : assembly.subassembly_instances()) {
+        const auto* child =
+            project.find_assembly_document(occurrence.referenced_assembly_document());
+        auto* item = new QTreeWidgetItem(parent, {text(occurrence.name()), "Assembly occurrence",
+                                                  child ? text(child->name()) : QString()});
+        const auto& pose = occurrence.transform();
+        item->setToolTip(0,
+                         QStringLiteral("%1\nDirect XYZ: %2, %3, %4 mm\nRotation XYZ: %5, %6, %7°")
+                             .arg(text(occurrence.name()))
+                             .arg(pose.translation_mm.x)
+                             .arg(pose.translation_mm.y)
+                             .arg(pose.translation_mm.z)
+                             .arg(pose.rotation_deg.x)
+                             .arg(pose.rotation_deg.y)
+                             .arg(pose.rotation_deg.z));
+        if (child)
+          self(self, item, *child);
+      }
+    };
+    auto* hierarchy = new QTreeWidgetItem(
+        geometry_products, {text(project.name()), "New Project", text(project.assembly().name())});
+    append(append, hierarchy, project.assembly());
+    geometry_products->expandToDepth(2);
+    QStringList diagnostics;
+    for (const auto& diagnostic : value.candidate.diagnostics)
+      diagnostics.push_back(text(diagnostic));
+    geometry_diagnostics->setPlainText(diagnostics.join('\n'));
+    geometry_summary->setText(
+        QStringLiteral(
+            "New Project: %1 Part definitions, %2 Assembly definitions, %3 posed body occurrences. "
+            "Shared definitions, names and direct placements are preserved.")
+            .arg(project.part_document_count())
+            .arg(project.child_assembly_document_count() + 1)
+            .arg(value.preview_shapes.size()));
+    geometry_units->setText(QStringLiteral("Model lengths: mm · Mode: %1")
+                                .arg(value.source.mode() == StepImportMode::Reference
+                                         ? QStringLiteral("Reference")
+                                         : QStringLiteral("Editable Body")));
   }
   void show_geometry(const GuiStepImportGeometryPreview& value) {
     const auto& imported = value.geometry;
@@ -472,6 +539,8 @@ struct ShellStepImportTools::Impl {
     };
     if (inspection)
       append(inspection->source);
+    if (structured)
+      append(structured->source);
     if (reference)
       std::visit(
           [&](const auto& value) {
@@ -661,7 +730,9 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   ui.geometry_products->setHeaderLabels({"Product / Body", "Kind", "Dimensions / Definition"});
   ui.geometry_products->setEditTriggers(QAbstractItemView::NoEditTriggers);
   ui.geometry_products->setSelectionMode(QAbstractItemView::NoSelection);
+  ui.geometry_products->header()->setStretchLastSection(false);
   ui.geometry_products->header()->setSectionResizeMode(QHeaderView::Stretch);
+  ui.geometry_products->header()->setMinimumSectionSize(40);
   ui.geometry_products->setMinimumWidth(0);
   ui.geometry_products->setMinimumHeight(160);
   ui.geometry_products->setMaximumHeight(220);
@@ -740,15 +811,16 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   };
   ui.reference_operation = combo("reference_operation");
   ui.reference_operation->addItems({"Insert Selected Product", "Repeat Reference Part",
-                                    "Refresh Shared STEP Asset", "Convert to New Editable Part"});
-  reference_form->addRow("Part Change", ui.reference_operation);
+                                    "Refresh Shared STEP Asset", "Convert to New Editable Part",
+                                    "Import Structured Assembly as New Project"});
+  reference_form->addRow("Part / Project Change", ui.reference_operation);
   ui.reference_part = combo("reference_part");
   reference_form->addRow("Imported Part", ui.reference_part);
   ui.reference_assembly = combo("reference_assembly");
   reference_form->addRow("Target Assembly", ui.reference_assembly);
   ui.reference_name = new QLineEdit(QStringLiteral("Imported Part"), content);
   ui.reference_name->setObjectName("blcad.step_import.reference_name");
-  reference_form->addRow("New Part Name", ui.reference_name);
+  reference_form->addRow("New Part / Project Name", ui.reference_name);
   for (std::size_t i = 0; i < ui.reference_placement.size(); ++i) {
     const std::array<const char*, 6> ids{"reference_x",  "reference_y",  "reference_z",
                                          "reference_rx", "reference_ry", "reference_rz"};
@@ -786,21 +858,23 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   ui.watcher = new QFileSystemWatcher(this);
   const auto source_changed = [this] {
     auto& ui = *impl_;
-    if (!ui.active || (!ui.inspection && !ui.reference))
+    if (!ui.active || (!ui.inspection && !ui.reference && !ui.structured))
       return;
     if (!ui.current()) {
       cancel();
       return;
     }
-    auto current = ui.reference
-                       ? ui.workbench.validate_reference(ui.window.session(), *ui.reference)
+    auto current =
+        ui.structured
+            ? ui.workbench.validate_structured_project(ui.window.session(), *ui.structured)
+        : ui.reference ? ui.workbench.validate_reference(ui.window.session(), *ui.reference)
                        : ui.workbench.validate_inspection(ui.window.session(), *ui.inspection);
     if (!current) {
-      const bool reference_preview = ui.reference.has_value();
+      const bool imported_preview = ui.reference.has_value() || ui.structured.has_value();
       const auto selected =
           ui.inspection ? std::optional<StepImportSource>(ui.inspection->source) : std::nullopt;
       ui.invalidate();
-      if (reference_preview) {
+      if (imported_preview) {
         (void)ui.window.session().recompute();
         ui.window.refresh();
       }
@@ -871,8 +945,17 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
           [this, report] { report(prepare_topology()); });
   connect(reference_prepare, &QPushButton::clicked, this,
           [this, report] { report(prepare_reference()); });
-  for (auto* combo : {ui.reference_operation, ui.reference_part, ui.reference_assembly})
+  for (auto* combo : {ui.reference_part, ui.reference_assembly})
     connect(combo, &QComboBox::currentIndexChanged, this, [this] { impl_->edited(); });
+  connect(ui.reference_operation, &QComboBox::currentIndexChanged, this, [this] {
+    auto& ui = *impl_;
+    const bool structured = ui.reference_operation->currentIndex() == 4;
+    ui.reference_part->setEnabled(!structured);
+    ui.reference_assembly->setEnabled(!structured && ui.window.session().project());
+    for (auto* input : ui.reference_placement)
+      input->setEnabled(!structured);
+    ui.edited();
+  });
   connect(ui.reference_name, &QLineEdit::textChanged, this, [this] { impl_->edited(); });
   for (auto* input : ui.reference_placement)
     connect(input, &QLineEdit::textChanged, this, [this] { impl_->edited(); });
@@ -1151,6 +1234,32 @@ Result<std::size_t> ShellStepImportTools::prepare_reference() {
     cancel();
     return Result<std::size_t>::failure(error("Document changed. Reopen source management."));
   }
+  if (ui.reference_operation->currentIndex() == 4) {
+    GuiStructuredStepImportRequest request{
+        StepImportSourceId(ui.source->currentData().toString().toStdString()),
+        DocumentId("project.step.gui"), ui.reference_name->text().trimmed().toStdString()};
+    ui.invalidate();
+    auto result = ui.workbench.prepare_structured_project(ui.window.session(), std::move(request));
+    if (!result)
+      return Result<std::size_t>::failure(result.error());
+    ui.inspection_camera = ui.window.viewport().camera_bookmark();
+    auto shown = ui.window.viewport().set_feature_previews(
+        result.value().preview_shapes, ui.window.viewport().scene_semantic_ids());
+    if (!shown) {
+      ui.invalidate();
+      return shown;
+    }
+    ui.structured = std::move(result.value());
+    ui.show_structured_project(*ui.structured);
+    ui.summary->setText(QStringLiteral(
+        "Apply asks for a new Project file beside this document. "
+        "The current document and its history are preserved. Open the new Project explicitly."));
+    ui.watch_inspection();
+    ui.apply->setEnabled(true);
+    (void)ui.window.session().task().show_preview();
+    ui.window.viewport().fit_feature_preview();
+    return shown;
+  }
   GuiStepReferenceRequest request;
   request.operation =
       static_cast<GuiStepReferenceOperation>(ui.reference_operation->currentIndex());
@@ -1282,9 +1391,26 @@ Result<std::size_t> ShellStepImportTools::apply() {
     cancel();
     return Result<std::size_t>::failure(error("Document changed. Reopen source management."));
   }
-  if (!ui.reference && !ui.candidate && (!ui.topology || ui.topology->accepted_catalog))
+  if (!ui.structured && !ui.reference && !ui.candidate &&
+      (!ui.topology || ui.topology->accepted_catalog))
     return Result<std::size_t>::failure(error("Prepare the change first"));
   const auto result = [&]() -> Result<std::size_t> {
+    if (ui.structured) {
+      const auto destination = QFileDialog::getSaveFileName(
+          &ui.window, QStringLiteral("Save New Structured Project Copy"),
+          QString::fromStdString(
+              (ui.original_path.parent_path() / "imported-assembly.blcad.project.json").string()),
+          QStringLiteral("BLCAD Project (*.blcad.project.json)"), nullptr,
+          QFileDialog::DontConfirmOverwrite);
+      if (destination.isEmpty())
+        return Result<std::size_t>::failure(
+            error("Choose a new Project destination to apply the copy"));
+      if (!ui.current() || !ui.structured)
+        return Result<std::size_t>::failure(error(
+            "Structured Project preview changed while choosing its destination; prepare again"));
+      return ui.workbench.save_structured_project_copy(ui.window.session(), *ui.structured,
+                                                       destination.toStdString());
+    }
     if (ui.reference) {
       if (ui.window.session().part_document() &&
           ui.reference->request.operation != GuiStepReferenceOperation::Refresh) {
@@ -1346,6 +1472,16 @@ void ShellStepImportTools::refresh() {
   if (impl_->active && impl_->reference) {
     const auto current =
         impl_->workbench.validate_reference(impl_->window.session(), *impl_->reference);
+    if (!current) {
+      impl_->invalidate();
+      (void)impl_->window.session().recompute();
+      impl_->window.refresh();
+      impl_->summary->setText(text(current.error().message()));
+    }
+  }
+  if (impl_->active && impl_->structured) {
+    const auto current =
+        impl_->workbench.validate_structured_project(impl_->window.session(), *impl_->structured);
     if (!current) {
       impl_->invalidate();
       (void)impl_->window.session().recompute();

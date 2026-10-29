@@ -2508,3 +2508,80 @@ Delivery: [PR #133](https://github.com/GideonBa/Better-Linux-CAD/pull/133), veri
 commit `c4fc431`. Runtime fingerprints remain unchanged; this PR must merge before Block 142 starts.
 Final serialized documentation/GUI inventory passes **3 / 313** after PR references are added
 (`/tmp/blcad141-final-inventory.log`); all 970 runtime fingerprints remain unchanged.
+
+PR #133 merged as `525c98f`; main exactly matches tested head `2db9891` and all **970** runtime
+fingerprints. Fresh GitHub searches find no open issues or PRs before Block 142 begins.
+
+### Block 142 — Structured STEP assembly import (accepted 2026-10-29)
+
+Branch `feat/structured-step-assembly-import` starts after PR #133 is merged and main `525c98f`
+exactly matches tested head `2db9891`, tree `03aaa5c110de8710e6d2fdb5e1058c5953e9444c`, and all
+970 runtime fingerprints. Fresh GitHub searches find no open issues or PRs. Core, Geometry and GUI
+source owners work in one branch; all owners must freeze before any shared build/test starts.
+The always-synthetic root policy, initial-only candidate validation, exact placements, Part-owned
+catalogs and distinct protected Project-copy workflow are recorded in the STEP import sequence.
+Numbered completion remains through Block 141 until the acceptance gates below are complete.
+
+The first five-target build passes (`/tmp/blcad142-build-1.log`). A signed/unsigned comparison in a
+new Geometry assertion was corrected; the second build passes without that warning
+(`/tmp/blcad142-build-2.log`). The initial runtime inventory contains **978** files. Focused Core
+passes **7 / 1,651** (`/tmp/blcad142-core-focused.log`). No full/native gates have run yet.
+
+The time-limited malformed-source run terminates normally, with cycle and complete-depth checks
+working; its missing-definition fixture failed while writing an invalid null handle, before reaching
+the reader. It is being changed to write valid STEP and then replace one usage child field with `$`.
+The first GUI focused run exposes an overstrict Assembly-ambiguity policy: the existing structured
+writer intentionally emits one Assembly product per rooted occurrence. Its valid five Assembly
+products must remain distinct even when geometry is equal; the importer now needs deterministic
+metadata/context ordering, while leaf Part/Body recovery remains strict. Test oracles compare the
+actual STEP product definitions, not the original author's three Assembly definitions. No exporter
+semantics are changed for this correction. These initial failing runs are not accepted gates.
+
+The third five-target build passes (`/tmp/blcad142-build-3.log`) with canonical Assembly ordering
+and corrected actual-source GUI oracles. Full Core passes **596 / 22,501**
+(`/tmp/blcad142-core-full.log`). The malformed-source test now reaches the real reader; its missing
+mandatory child is rejected by strict entity validation before usage preflight. Its assertion now
+accepts that exact diagnostic or the explicit missing-product-definition diagnostic, while cycles
+still require the cycle diagnostic and source bytes remain unchanged. Production validation order
+is unchanged. This test-only correction is built under the 978-file freeze
+`3e1e6b619a3986d755e1483c666d3cf25d8e8139efcdccb33dad0ed7053f859d`.
+
+The malformed-source regression passes **2 / 74**. The next focused GUI run exposes only a test
+metadata assumption: the public exporter writes its actual product name
+`blcad:part-definition:supplier.plate`, rather than the authoring display name. Both GUI oracles now
+compare the exact actual Reader product name; production naming is unchanged. The fifth five-target
+build passes (`/tmp/blcad142-build-5.log`). Under the final **978-file** freeze
+`a39896f9dac3f7bb6ecbcdfcb8bf61a7d8007bea99ac042e4ed5b36c70c980c0`, focused Geometry passes
+**10 / 1,313**, and focused GUI passes **7 cases — 6 passed, 1 native-only skip / 1,590 assertions**
+(`/tmp/blcad142-geometry-focused-final.log`, `/tmp/blcad142-gui-focused-final.log`). Full Geometry
+and native Sources workflows then run against that freeze.
+
+Full Geometry passes **560 / 43,872** (`/tmp/blcad142-geometry-full.log`). Native 100% passes
+**11 / 5,238** and native 150% passes **1 / 1,414**, without skips
+(`/tmp/blcad142-native-100.log`, `/tmp/blcad142-native-150.log`). The native set includes both new
+structured import modes, existing Reference/Editable workflows, topology/source inspection, viewer
+lifecycle and current Shell coverage. Structured workflows prepare all five world-space Body
+occurrences, save and explicitly open the distinct Project, and reject source changes during the
+save dialog and while consuming original derived geometry. Original JSON/history/camera/selection
+and source bytes are checked across cancellation and publication failures. Captures in
+`/tmp/blcad142-native-{100,150}` were visually inspected for posed geometry, hierarchy, controls and
+stale-state clearing. All **507** Ninja dependency records are nonempty and valid
+(`/tmp/blcad142-ninja-deps.log`). Legacy CLI export passes with **19,170 bytes**
+(`/tmp/blcad142-cli-legacy.log`). These entries describe the successive gates; final acceptance
+follows below.
+
+```sh
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad142-native-100 QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[native-step-structured-import],[native-step-editable-parts],[native-step-reference-parts],[native-step-topology],[native-step-inspection],[integration][gui-feature-coverage],[native-viewer-lifecycle]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad142-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[native-step-structured-import]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests
+```
+
+Final acceptance: full GUI passes **647 cases — 614 passed, 33 expected native-only skips /
+85,200 assertions** (`/tmp/blcad142-gui-full.log`). The separate native startup reaches intentional
+timeout **124** without a crash (`/tmp/blcad142-startup.log`). After numbered documentation advances
+through Block 142 with **current Block 143 planned**, the final Shell inventory passes **3 / 313**
+(`/tmp/blcad142-final-inventory.log`). Runtime inputs remain exactly the frozen **978** files; all
+five builds, focused/full suites, native workflows, visual review, startup and CLI gates pass.
+Core and Geometry sources/binaries are unchanged by the final GUI-only name-oracle correction.
+The staged diff must be reviewed and delivered through one protected PR; Block 143 cannot start
+before that PR merges and main matches the tested tree and runtime fingerprints.

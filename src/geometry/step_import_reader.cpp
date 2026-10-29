@@ -25,15 +25,17 @@
 #include <StepBasic_ConversionBasedUnitAndLengthUnit.hxx>
 #include <StepBasic_LengthUnit.hxx>
 #include <StepBasic_MeasureWithUnit.hxx>
+#include <StepBasic_ProductDefinition.hxx>
 #include <StepBasic_SiUnitAndLengthUnit.hxx>
 #include <StepBasic_Unit.hxx>
-#include <StepData_StepModel.hxx>
 #include <StepData_GlobalFactors.hxx>
+#include <StepData_StepModel.hxx>
 #include <StepGeom_CartesianPoint.hxx>
 #include <StepGeom_CartesianTransformationOperator.hxx>
 #include <StepGeom_Direction.hxx>
 #include <StepGeom_GeomRepContextAndGlobUnitAssCtxAndGlobUncertaintyAssCtx.hxx>
 #include <StepGeom_GeometricRepresentationContextAndGlobalUnitAssignedContext.hxx>
+#include <StepRepr_AssemblyComponentUsage.hxx>
 #include <StepRepr_GlobalUnitAssignedContext.hxx>
 #include <StepShape_ShapeRepresentation.hxx>
 #include <TCollection_ExtendedString.hxx>
@@ -45,8 +47,8 @@
 #include <TopoDS.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <Transfer_TransientProcess.hxx>
-#include <UnitsMethods_LengthUnit.hxx>
 #include <UnitsMethods.hxx>
+#include <UnitsMethods_LengthUnit.hxx>
 #include <XCAFDoc_DocumentTool.hxx>
 #include <XCAFDoc_ShapeTool.hxx>
 #include <XSAlgo.hxx>
@@ -57,8 +59,9 @@
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
-#include <locale>
 #include <limits>
+#include <locale>
+#include <map>
 #include <mutex>
 #include <numeric>
 #include <sstream>
@@ -543,6 +546,62 @@ struct DraftGraph {
   }
 };
 
+// Reject malformed foreign usage graphs before CAF transfer can recursively
+// expand them. Pointer identity here belongs solely to this immutable STEP model.
+void inspect_assembly_usage_graph(const Handle(StepData_StepModel) & model) {
+  using Product = const StepBasic_ProductDefinition*;
+  std::map<Product, std::vector<Product>> children;
+  std::size_t usages = 0;
+  for (int index = 1; index <= model->NbEntities(); ++index) {
+    const auto usage = Handle(StepRepr_AssemblyComponentUsage)::DownCast(model->Value(index));
+    if (usage.IsNull())
+      continue;
+    const auto parent = usage->RelatingProductDefinition();
+    const auto child = usage->RelatedProductDefinition();
+    require(!parent.IsNull() && !child.IsNull() && model->Number(parent) > 0 &&
+                model->Number(child) > 0,
+            "STEP assembly usage refers to a missing product definition");
+    require(parent != child, "STEP assembly usage graph contains a self cycle");
+    require(++usages <= 100000, "STEP assembly usage graph exceeds the import limit");
+    children[parent.get()].push_back(child.get());
+    children.try_emplace(child.get());
+  }
+  std::map<Product, unsigned> state;
+  std::map<Product, std::size_t> depth;
+  struct Frame {
+    Product product;
+    std::size_t next{};
+  };
+  for (const auto& [product, descendants] : children) {
+    (void)descendants;
+    if (state[product] == 2)
+      continue;
+    std::vector<Frame> pending{{product, 0}};
+    state[product] = 1;
+    while (!pending.empty()) {
+      auto& frame = pending.back();
+      const auto& next = children.at(frame.product);
+      if (frame.next == next.size()) {
+        std::size_t longest = 1;
+        for (const auto child : next)
+          longest = std::max(longest, depth.at(child) + 1);
+        require(longest <= 512, "STEP assembly usage depth exceeds the import limit");
+        depth[frame.product] = longest;
+        state[frame.product] = 2;
+        pending.pop_back();
+        continue;
+      }
+      const auto child = next[frame.next++];
+      require(state[child] != 1, "STEP assembly usage graph contains a product cycle");
+      if (state[child] == 0) {
+        require(pending.size() < 512, "STEP assembly usage depth exceeds the import limit");
+        state[child] = 1;
+        pending.push_back({child, 0});
+      }
+    }
+  }
+}
+
 // Share rooted placement validation between headless reading and disposable presentation. No
 // tessellation, geometry copying, healing or body descriptor recomputation is needed for this walk.
 template <typename Visitor>
@@ -629,6 +688,7 @@ StepImportReader::read(const StepImportSource& source,
             "external STEP file references are unsupported; register a self-contained STEP asset");
     StepImportGeometry result{source, {}, {}, {}, {}};
     result.units = inspect_model(reader.ChangeReader().StepModel());
+    inspect_assembly_usage_graph(reader.ChangeReader().StepModel());
     Handle(TDocStd_Document) document = new TDocStd_Document("BinXCAF");
     XCAFDoc_DocumentTool::Set(document->Main());
     XCAFDoc_DocumentTool::SetLengthUnit(document, 1.0, UnitsMethods_LengthUnit_Millimeter);
