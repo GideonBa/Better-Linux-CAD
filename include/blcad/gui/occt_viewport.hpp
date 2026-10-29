@@ -99,6 +99,8 @@ public:
   set_sketch_interaction(GuiSketchPlaneView plane, GuiSketchInteractionScene scene,
                          GuiSketchInteractionConfig config = {});
   void clear_sketch_interaction();
+  // Resolve the clicked visible dimension independently of prior selection/cycling.
+  [[nodiscard]] bool select_sketch_dimension_at(GuiSketchScreenPoint point);
   void set_sketch_selection_enabled(bool enabled) noexcept;
   void set_sketch_additive_selection(bool enabled) noexcept {
     sketch_additive_selection_ = enabled;

@@ -1431,6 +1431,30 @@ offscreen GUI binaries after the focused proof, plus separate native startup. Ke
 builds and GUI runs serial. Actual follow-up results live in
 `docs/gui-interactive-path-sweep-loft-mvp9.md`.
 
+## Dimension label input follow-up — issues #107 and #108
+
+Build all five GUI-preset targets before testing. Keep source edits, builds, GUI suites and separate
+startup serial. Prepare the capture directories before invoking existing native capture helpers.
+
+```bash
+cmake --build --preset dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app blcad_export_step -j6
+mkdir -p /tmp/blcad-dimension-input-native /tmp/blcad-dimension-input-native-150
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-dimension-input-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[dimension-label-input],[sketch-hit-test],[sketch-dimension-workflow],[rapid-dimension],[sketch-constraints],[sketch-drag],[hermes-design-workflow],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-dimension-input-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[dimension-label-input]"
+```
+
+The new cases prepare geometry through authoring APIs, then select, double-click, type and delete
+through real Qt mouse/key events. Native fixtures require an OCCT viewer and bounded actual window/
+keyboard focus readiness. They cover length/radius/diameter/angle labels at both edges and center,
+geometry overlap, references, invalid-input correction, Escape, stacked and multiple selection,
+highlight pixels, retained formula parameters, a downstream circle extrusion, history and canonical
+document/catalog reopening with recomputed body volumes. The controller case varies zoom and uses
+an offset, rotated workplane. Inspect `dimension-selected-overlap.png`, then smoke-start `blcad`
+separately. The behavior contract and dated validation evidence live in
+`docs/gui-sketch-dimension-authoring-mvp8.md`; numbered implementation status remains in
+`docs/mvp-plan.md`.
+
 ## Cut outcome and curved-profile regression — issue #113
 
 Build all five targets, then keep source edits, builds, GUI suites and application startup serial.
@@ -1623,3 +1647,46 @@ and evidence boundaries live in `docs/gui-modeling-workspace-mvp9.md`; result-wi
 remains owned by `docs/gui-interactive-finishing-mvp9.md`. Full Core/Geometry/offscreen GUI,
 affected native feature families, required shell coverage and separate startup still follow the
 focused proof. Numbered implementation sequencing remains in `docs/mvp-plan.md`.
+
+## Combined remaining-PR integration — 2026-10-29
+
+Resolve #116/#118 on top of current main and include the #121 follow-up from the already-merged
+performance branch. Preserve both appended verification sections when merging this document.
+The viewport combines measured badge bounds/selection layers with accent/panel/text theme colors.
+Keep source edits, builds, GUI suites and separate startup serial; Core/Geometry may run alongside
+one correctness GUI suite. This integration does not rerun isolated timing profiles.
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests blcad_export_step -j6
+./build/dev-gui/blcad_core_tests
+./build/dev-gui/blcad_geometry_tests
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+mkdir -p /tmp/blcad-merge-native /tmp/blcad-merge-native-150
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-merge-native BLCAD_SPLASH_SCREENSHOT=/tmp/blcad-merge-native/splash.png QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[icons],[appearance],[startup-splash],[hermes-design-workflow],[rapid-dimension],[ribbon],[model-browser],[dimension-label-input],[sketch-hit-test],[sketch-dimension-workflow],[sketch-constraints],[sketch-drag],[coincident-closure],[complex-part-workflow],[cut-material-workflow],[shell-combined-part],[shell-combined-spatial-context],[shell-combined-finishing-context],[shell-combined-parameters],[shell-combined-assembly-context],[block137-step-import],[block136-measure],[gui][viewport],[native-viewer-lifecycle],[block136-profile-context],[block136-body-context],[block136-pattern-context],[block136-surface-context],[block136-feature-edit],[block136-assembly-context],[block136-construction],[integration][gui-feature-coverage]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[dimension-label-input]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-merge-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[dimension-label-input]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-merge-native-150 BLCAD_SPLASH_SCREENSHOT=/tmp/blcad-merge-native-150/splash.png QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[icons],[appearance],[startup-splash],[hermes-design-workflow],[dimension-label-input]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+All five targets build. Full Core **549 / 17,217**, Geometry **459 / 35,243**, offscreen GUI
+**569 passed / 20 native-only skips / 80,332 assertions**, and native **136 / 29,127** pass.
+These broad runs precede a native test-fixture-only adjustment: fit dimension windows onto the
+first available screen and require stable actual focus across two event turns before keyboard
+delivery, retaining the two-second deadline. The helper also checks the complete typed text.
+Initial scaled and ordinary runs exposed focus/input interference; no production input behavior
+was changed. After rebuilding, final focused dimension checks pass offscreen **7 / 1,618** and
+natively **7 / 1,739**; final 150% UI/dimension checks pass **16 / 3,209**, without skips.
+Separate startup reaches expected timeout 124. Final native logs have no High-severity,
+BadDrawable or BadWindow errors; the known Medium X11 visual warning remains.
+
+Logs: `/tmp/blcad-merge-{build,core,geometry,gui,native}.log`,
+`/tmp/blcad-merge-build-final.log`, `/tmp/blcad-merge-dim-{offscreen,native}-final.log`,
+`/tmp/blcad-merge-native-150-final.log` and `/tmp/blcad-merge-startup.log`.
+Both freezes cover **886** tracked source/test/asset/build-definition inputs. The broad freeze is
+`/tmp/blcad-merge-source-freeze.json`; the final focused/scaled/startup freeze is
+`/tmp/blcad-merge-final-source-freeze.json` (SHA-256
+`00fa1d248cc8b166f7c03a8bab605e10a850c0c94c5e907fb656582bdc4a2eff`).
+Only `tests/gui/gui_dimension_label_interaction_tests.cpp` differs between them. Documentation
+records the actual results afterward. Before delivery, require the final integration tree to match
+the tested branch plus these documentation updates, then verify the merged main tree and ancestry.

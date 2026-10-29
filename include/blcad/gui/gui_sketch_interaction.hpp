@@ -131,6 +131,9 @@ struct GuiSketchAnnotationPrimitive {
   // leaderless dimensions like angle); the overlay draws the dimension line and
   // arrowheads across these, projected each frame.
   std::vector<Point2> leader;
+  // Painted label rectangle in logical DIPs, relative to its projected anchor.
+  // The Qt viewport supplies font metrics; the interaction controller stays Qt-free.
+  std::optional<GuiSketchScreenRect> label_bounds_dip{};
 };
 
 struct GuiSketchInteractionScene {
@@ -207,6 +210,7 @@ struct GuiSketchHit {
   Point2 plane_point;
   double model_distance{0.0};
   double screen_distance_dip{0.0};
+  bool label_hit{false};
 };
 
 struct GuiSketchSnapResult {

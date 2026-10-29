@@ -213,6 +213,7 @@ private:
   bool label_publish_scheduled_{false};
   QLineEdit* dimension_editor_{nullptr};
   std::optional<SketchDimensionId> dimension_editor_id_;
+  bool suppress_dimension_edit_release_{false};
   // Inventor-style line chaining: end of the last committed segment; the next
   // segment starts here and the shared corner is coupled coincident.
   std::optional<Point2> chain_anchor_;

@@ -1339,14 +1339,22 @@ missing shell/persistence integration; these tickets do not claim that every rep
 | Sketch endpoint snaps | [#104](https://github.com/GideonBa/Better-Linux-CAD/issues/104) | Confirmed persistence gap for loop closure / restarted Line | P2 |
 | Coincident → closed region | [#105](https://github.com/GideonBa/Better-Linux-CAD/issues/105) | Exact Coincident equality groups implemented; cross-layer/native regression in `gui-sketch-regions-finish-mvp8.md` | P1 |
 | Dimension line layout | [#106](https://github.com/GideonBa/Better-Linux-CAD/issues/106) | Confirmed family-specific rendering gaps; DIN/ISO target recorded | P2 |
-| Dimension double-click editing | [#107](https://github.com/GideonBa/Better-Linux-CAD/issues/107) | Confirmed paint/pick mismatch; exact reported gesture pending | P1 |
-| Dimension deletion | [#108](https://github.com/GideonBa/Better-Linux-CAD/issues/108) | Existing backend; visible-selection/keyboard route needs reproduction | P1 |
+| Dimension double-click editing | [#107](https://github.com/GideonBa/Better-Linux-CAD/issues/107) | Implemented: shared badge rectangle and independent double-click resolution; native proof | P1 |
+| Dimension deletion | [#108](https://github.com/GideonBa/Better-Linux-CAD/issues/108) | Implemented: visible selection, multi-selection enablement and real Delete/Backspace proof | P1 |
 | Construction conversion | [#109](https://github.com/GideonBa/Better-Linux-CAD/issues/109) | Missing shell toggle and curved-flag compatibility persistence | P2 |
 | Sketch-line rotation axes | [#110](https://github.com/GideonBa/Better-Linux-CAD/issues/110) | Missing persistent sketch/entity axis source | P2 |
 | Body Rotate axis parity | [#111](https://github.com/GideonBa/Better-Linux-CAD/issues/111) | Shell omits existing derived-datum/semantic-edge support | P2 |
 | Sketch on planar result face | [#112](https://github.com/GideonBa/Better-Linux-CAD/issues/112) | Direct workflow and general associative support identity missing | P2 |
 | Cut feedback and workflow | [#113](https://github.com/GideonBa/Better-Linux-CAD/issues/113) | Implemented: distinct Cut outcomes, correctable diagnostics and exact curved extents; native regression verified | P1 |
-| Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | Implemented for review: cached previews/Surface validation, single-sampled witnesses and deep-rotor native profiling; residual costs and local target misses documented | P1 |
+| Complex-Part responsiveness | [#114](https://github.com/GideonBa/Better-Linux-CAD/issues/114) | Implemented: cached previews/Surface validation, single-sampled witnesses and deep-rotor native profiling; residual costs and local target misses documented | P1 |
+
+The 2026-10-28 dimension-input follow-up implements #107/#108 with shared painted/picked badge
+bounds, independent double-click resolution, visible selection and multi-dimension Delete/Backspace
+enablement. The unchanged editor/deletion transactions retain geometry, relations and backing
+parameters. Full GUI **557 passed / 20 native-only skips / 76,327 assertions**, native affected
+workflows **49 / 3,115**, and native 150% **7 / 1,606** passed. Exact contracts and evidence live in
+`docs/gui-sketch-dimension-authoring-mvp8.md`. This is an unnumbered usability fix; Block 138 remains
+planned and no entire implementation block is advanced.
 
 The independent Coincident probe commits the real GUI constraint intent, then checks Geometry:
 a 100×50 mm outline with a 0.001 mm initial gap retains a 3.85787585e-8 mm gap after an accepted
@@ -1445,5 +1453,18 @@ Fillet-removal invariance replace an unsupported exact aggregate-scaling oracle,
 volume tolerance tightened and production tolerances unchanged. The final **741** source/test/
 asset/build-definition fingerprints remain unchanged after native verification. Scope, raw data,
 budget review and residual performance limits are documented in the existing workspace/development
-docs. The implementation is ready for PR review; the issue remains open until review/merge.
+docs. This acceptance follow-up is included in the combined PR integration recorded below;
+the documented full-history costs and local target misses remain follow-up work.
 No numbered implementation block is advanced.
+
+PR integration (2026-10-29) resolves #116/#118 against current main and recovers the #121
+acceptance follow-up that had been merged into an already-merged performance branch. The native
+badge renderer retains both dimension interaction and dark theme colors. Full combined verification:
+Core **549 / 17,217**, Geometry **459 / 35,243**, offscreen GUI **569 passed / 20 native-only
+skips / 80,332 assertions**, native affected workflows and required shell coverage **136 / 29,127**.
+After a test-only focus/screen-fit adjustment, dimension input passes offscreen **7 / 1,618** and
+natively **7 / 1,739**; final 150% UI/dimension proof passes **16 / 3,209**, without skips.
+All five targets build and separate native startup reaches timeout 124. Existing contracts and
+`development-setup.md` record the exact boundaries; no timing profile was rerun and the known
+40-blade full Apply/Undo/Redo cost remains about **5–6 s**. Block 137 remains complete and
+Block 138 remains planned.

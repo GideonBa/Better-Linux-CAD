@@ -619,6 +619,8 @@ void ShellSketchTools::wire_viewport_callbacks() {
       return;
     }
     if (label_drag_) {
+      if (raw == label_drag_last_)
+        return;
       // Dimension label drag: move the badge with the raw pointer.
       label_drag_delta_.x += raw.x - label_drag_last_.x;
       label_drag_delta_.y += raw.y - label_drag_last_.y;
@@ -712,6 +714,13 @@ void ShellSketchTools::wire_viewport_callbacks() {
           }
           begin_drag(screen);
         } else if (label_drag_) {
+          if (label_drag_delta_ == Point2{} && raw == label_drag_last_) {
+            // A click only selects. Preserve the hit cycle for stacked labels
+            // and avoid rebuilding the scene/history for an unchanged badge.
+            label_drag_.reset();
+            viewport_.set_sketch_selection_enabled(true);
+            return;
+          }
           const Point2 offset{label_drag_initial_offset_.x + label_drag_delta_.x + raw.x - label_drag_last_.x,
                               label_drag_initial_offset_.y + label_drag_delta_.y + raw.y - label_drag_last_.y};
           const auto moved = GuiSketchDimensionController::set_label_offset(
@@ -913,10 +922,31 @@ void ShellSketchTools::refresh_enablement() {
     const auto* sketch = active ? session_.part_document()->find_sketch(*window_.active_sketch()) : nullptr;
     break_link_action_->setEnabled(sketch && session_.selection().size() == 1U && ids.size() == 1U && sketch->find_projected_line(ids.front()));
   }
-  if (delete_constraint_action_ != nullptr)
-    delete_constraint_action_->setEnabled(active && (selected_accepted_constraint().has_value() ||
-                                                     selected_dimension().has_value() ||
-                                                     selected_entity().has_value()));
+  if (delete_constraint_action_ != nullptr) {
+    bool annotation_selected = false;
+    if (active) {
+      const auto sketch = *window_.active_sketch();
+      const auto dimensions = session_.sketch_dimension_catalog(sketch);
+      const auto constraints = session_.sketch_constraint_catalog(sketch);
+      const std::string prefix = "sketch/" + sketch.value();
+      const std::string dimension_prefix = prefix + "/dimension/";
+      const std::string constraint_prefix = prefix + "/constraint/";
+      annotation_selected =
+          std::any_of(session_.selection().entries().begin(), session_.selection().entries().end(),
+                      [&](const auto& selection) {
+                        if (selection.kind != GuiSelectionKind::SketchEntity)
+                          return false;
+                        const std::string_view id = selection.semantic_id;
+                        return (dimensions && id.starts_with(dimension_prefix) &&
+                                dimensions.value().find(SketchDimensionId(
+                                    selection.semantic_id.substr(dimension_prefix.size())))) ||
+                               (constraints && id.starts_with(constraint_prefix) &&
+                                constraints.value().find(SketchConstraintId(
+                                    selection.semantic_id.substr(constraint_prefix.size()))));
+                      });
+    }
+    delete_constraint_action_->setEnabled(active && (annotation_selected || selected_entity()));
+  }
   if (edit_dimension_action_ != nullptr)
     edit_dimension_action_->setEnabled(active && selected_dimension().has_value());
   if (grid_action_ != nullptr)
@@ -1955,7 +1985,13 @@ bool ShellSketchTools::edit_selected_dimension_interactive() {
   if (!id || !window_.active_sketch()) return false;
   auto catalog = session_.sketch_dimension_catalog(*window_.active_sketch());
   const auto* dimension = catalog ? catalog.value().find(*id) : nullptr;
-  if (!dimension || !dimension->driving() || !dimension->parameter()) return false;
+  if (!dimension)
+    return false;
+  if (!dimension->driving() || !dimension->parameter()) {
+    window_.statusBar()->showMessage(
+        QStringLiteral("Reference dimensions are read-only and reflect the sketch geometry."));
+    return false;
+  }
   const auto* parameter = session_.part_document()->find_parameter(*dimension->parameter());
   if (!parameter) return false;
   auto annotations = GuiSketchDimensionController::accepted_annotations(session_, *window_.active_sketch());
@@ -2475,6 +2511,15 @@ void ShellSketchTools::synchronize_sketch_selection(const std::vector<GuiSelecti
 }
 
 bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
+  if ((watched == &viewport_ && event->type() == QEvent::MouseButtonPress) ||
+      event->type() == QEvent::WindowDeactivate)
+    suppress_dimension_edit_release_ = false;
+  if (watched == &viewport_ && event->type() == QEvent::MouseButtonRelease &&
+      static_cast<QMouseEvent*>(event)->button() == Qt::LeftButton &&
+      suppress_dimension_edit_release_) {
+    suppress_dimension_edit_release_ = false;
+    return true;
+  }
   if (rapid_dimension_active_ && (watched == &viewport_ || watched == &window_) &&
       event->type() == QEvent::KeyPress &&
       static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
@@ -2561,11 +2606,14 @@ bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
       }
     }
   } else if (watched == &viewport_ && event->type() == QEvent::MouseButtonDblClick &&
-             !tool_active()) {
-    // Double-click a dimension glyph to edit it (Inventor behavior). The
-    // preceding press already selected it via the viewport hit path.
+             !tool_active() && !rapid_dimension_active_ && !modify_tool_ && !operation_phase_) {
+    // Resolve the actual clicked badge, regardless of previous selection or
+    // the geometry/annotation stack traversed by the first click.
     const auto* mouse = static_cast<QMouseEvent*>(event);
-    if (mouse->button() == Qt::LeftButton && selected_dimension()) {
+    if (mouse->button() == Qt::LeftButton &&
+        viewport_.select_sketch_dimension_at({mouse->position().x(), mouse->position().y()})) {
+      cancel_label_drag();
+      suppress_dimension_edit_release_ = true;
       QTimer::singleShot(0, this, [this] { (void)edit_selected_dimension_interactive(); });
       return true;
     }

@@ -639,6 +639,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_raw_profile_transaction_tests.cpp
       tests/gui/gui_sketch_conic_workflow_tests.cpp
       tests/gui/gui_shell_dimension_workflow_tests.cpp
+      tests/gui/gui_dimension_label_interaction_tests.cpp
       tests/gui/gui_shell_feature_tools_tests.cpp
       tests/gui/gui_shell_finishing_tools_tests.cpp
       tests/gui/gui_shell_pattern_tools_tests.cpp

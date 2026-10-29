@@ -1,5 +1,6 @@
 #include "blcad/gui/occt_viewport.hpp"
 #include "blcad/gui/gui_appearance.hpp"
+#include "blcad/gui/gui_sketch_annotation_layout.hpp"
 
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/gui/gui_viewport_manipulator.hpp"
@@ -49,6 +50,7 @@ namespace {
 class SketchInteractionOverlay final : public QWidget {
 public:
   explicit SketchInteractionOverlay(QWidget* parent) : QWidget(parent) {
+    setObjectName(QStringLiteral("blcad.sketch.overlay"));
     setAttribute(Qt::WA_TransparentForMouseEvents);
     setAttribute(Qt::WA_TranslucentBackground);
     setFocusPolicy(Qt::NoFocus);
@@ -83,6 +85,16 @@ public:
     update();
   }
 
+  void set_selected_annotations(std::unordered_set<std::string> ids) {
+    selected_annotations_ = std::move(ids);
+    update();
+  }
+
+  void set_hovered_annotation(std::string id) {
+    hovered_annotation_ = std::move(id);
+    update();
+  }
+
   void set_operation_preview(std::vector<std::vector<GuiSketchScreenPoint>> curves) {
     operation_preview_ = std::move(curves);
     update();
@@ -98,6 +110,7 @@ public:
     QString label;
     bool dimension{true};
     std::vector<GuiSketchScreenPoint> leader; // dimension line extremities (screen)
+    std::string semantic_id;
   };
 
   void set_annotations(std::vector<AnnotationBadge> annotations) {
@@ -121,6 +134,8 @@ public:
     snap_point_.reset();
     box_.reset();
     selected_polylines_.clear();
+    selected_annotations_.clear();
+    hovered_annotation_.clear();
     update();
   }
 
@@ -244,23 +259,32 @@ protected:
       painter.drawLine(midpoint, QPointF(annotation.point.x, annotation.point.y));
     }
 
-    // Dimension values and constraint tokens.
-    for (const auto& annotation : annotations_) {
-      if (annotation.label.isEmpty())
-        continue;
-      painter.setFont(appearance::numeric_font(annotation.dimension ? 13 : 14));
-      const QFont font = painter.font();
-      const QFontMetricsF metrics(font);
-      const QRectF text_rect = metrics.boundingRect(annotation.label);
-      const QRectF badge(annotation.point.x - text_rect.width() * 0.5 - 4.0,
-                         annotation.point.y - text_rect.height() * 0.5 - 2.0,
-                         text_rect.width() + 8.0, text_rect.height() + 4.0);
-      painter.setPen(QPen(QColor::fromRgb(appearance::accent), 1.0));
-      painter.setBrush(QColor::fromRgb(appearance::panel));
-      painter.drawRect(badge);
-      painter.setPen(QColor::fromRgb(appearance::text));
-      painter.setBrush(Qt::NoBrush);
-      painter.drawText(badge, Qt::AlignCenter, annotation.label);
+    // Selected and hovered badges remain visible above overlapping labels.
+    for (int layer = 0; layer < 3; ++layer) {
+      for (const auto& annotation : annotations_) {
+        const bool selected = selected_annotations_.contains(annotation.semantic_id);
+        const bool hovered = hovered_annotation_ == annotation.semantic_id;
+        if ((selected ? 2 : hovered ? 1 : 0) != layer)
+          continue;
+        if (annotation.label.isEmpty())
+          continue;
+        const auto layout = sketch_annotation_layout(annotation.label, annotation.dimension);
+        painter.setFont(layout.font);
+        const QRectF badge = layout.bounds.translated(annotation.point.x, annotation.point.y);
+        painter.setPen(QPen(QColor::fromRgb(appearance::accent), 1.0));
+        painter.setBrush(QColor::fromRgb(appearance::panel));
+        if (selected || hovered) {
+          painter.setPen(QPen(palette().color(QPalette::Highlight), selected ? 2.0 : 1.5));
+          if (selected)
+            painter.setBrush(palette().color(QPalette::Highlight));
+        }
+        painter.drawRect(badge);
+        painter.setPen(QColor::fromRgb(appearance::text));
+        if (selected)
+          painter.setPen(palette().color(QPalette::HighlightedText));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawText(badge, Qt::AlignCenter, annotation.label);
+      }
     }
 
     if (box_) {
@@ -282,6 +306,8 @@ private:
   std::vector<std::vector<GuiSketchScreenPoint>> selected_polylines_;
   std::vector<std::vector<GuiSketchScreenPoint>> operation_preview_;
   std::vector<AnnotationBadge> annotations_;
+  std::unordered_set<std::string> selected_annotations_;
+  std::string hovered_annotation_;
   std::vector<GuiSketchScreenPoint> scene_points_;
   std::vector<GuiSketchScreenPoint> handles_;
   std::vector<GuiSketchScreenPoint> hover_polyline_;
@@ -935,6 +961,15 @@ OcctViewport::set_sketch_interaction(GuiSketchPlaneView plane,
   }();
   if (mapping.has_error())
     return Result<std::size_t>::failure(mapping.error());
+  for (auto& annotation : scene.annotations) {
+    if (annotation.label.empty())
+      continue;
+    const auto bounds = sketch_annotation_layout(QString::fromStdString(annotation.label),
+                                                 annotation.hit_kind == GuiSketchHitKind::Dimension)
+                            .bounds.adjusted(-1.0, -1.0, 1.0, 1.0);
+    annotation.label_bounds_dip =
+        GuiSketchScreenRect{{bounds.left(), bounds.top()}, {bounds.right(), bounds.bottom()}};
+  }
   auto controller = GuiSketchInteractionController::create(
       std::move(mapping.value()), std::move(scene), std::move(config));
   if (controller.has_error())
@@ -955,6 +990,21 @@ OcctViewport::set_sketch_interaction(GuiSketchPlaneView plane,
   rebuild_sketch_drag_handles();
   rebuild_sketch_preview_polyline();
   return Result<std::size_t>::success(primitive_count);
+}
+
+bool OcctViewport::select_sketch_dimension_at(GuiSketchScreenPoint point) {
+  if (!sketch_interaction_ || !sketch_selection_enabled_)
+    return false;
+  auto hits = sketch_interaction_->hits_at(point);
+  if (!hits || hits.value().empty() || hits.value().front().kind != GuiSketchHitKind::Dimension ||
+      !hits.value().front().label_hit)
+    return false;
+  sketch_box_active_ = false;
+  sketch_box_selection_.reset();
+  static_cast<SketchInteractionOverlay*>(sketch_overlay_)->set_box(std::nullopt);
+  sketch_selections_ = {{GuiSelectionKind::SketchEntity, hits.value().front().semantic_id}};
+  publish_sketch_selection();
+  return true;
 }
 
 void OcctViewport::clear_sketch_interaction() {
@@ -1767,7 +1817,8 @@ void OcctViewport::rebuild_sketch_annotations() {
           leader.push_back(leader_screen.value());
       }
       badges.push_back({screen.value(), QString::fromStdString(annotation.label),
-                        annotation.hit_kind == GuiSketchHitKind::Dimension, std::move(leader)});
+                        annotation.hit_kind == GuiSketchHitKind::Dimension, std::move(leader),
+                        annotation.semantic_id});
     }
   }
   overlay->set_annotations(std::move(badges));
@@ -1778,8 +1829,10 @@ void OcctViewport::rebuild_sketch_selection_highlight() {
   if (overlay == nullptr)
     return;
   std::vector<std::vector<GuiSketchScreenPoint>> polylines;
+  std::unordered_set<std::string> annotations;
   if (sketch_interaction_) {
     for (const auto& selection : sketch_selections_) {
+      annotations.insert(selection.semantic_id);
       const auto curve = std::find_if(
           sketch_interaction_->scene().curves.begin(), sketch_interaction_->scene().curves.end(),
           [&selection](const auto& item) { return item.semantic_id == selection.semantic_id; });
@@ -1791,6 +1844,7 @@ void OcctViewport::rebuild_sketch_selection_highlight() {
     }
   }
   overlay->set_selected(std::move(polylines));
+  overlay->set_selected_annotations(std::move(annotations));
 }
 
 void OcctViewport::rebuild_sketch_drag_handles() {
@@ -1850,6 +1904,9 @@ void OcctViewport::update_sketch_pointer(GuiSketchScreenPoint screen_point) {
                             : std::optional<GuiSketchHit>{hits.value().front()};
   auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_);
   if (overlay != nullptr) {
+    overlay->set_hovered_annotation(hovered_sketch_hit_ && hovered_sketch_hit_->label_hit
+                                        ? hovered_sketch_hit_->semantic_id
+                                        : std::string{});
     std::vector<GuiSketchScreenPoint> hover_polyline;
     std::optional<GuiSketchScreenPoint> hover_point;
     if (hovered_sketch_hit_) {
