@@ -50,9 +50,10 @@ public:
 
   // Dialog-free command surface (ribbon slots and tests call these).
   [[nodiscard]] bool begin_tool(GuiSketchCreateTool tool);
-  [[nodiscard]] bool add_pick(Point2 point,
-                              GuiSketchSnapKind kind = GuiSketchSnapKind::None,
-                              std::optional<SketchEntityId> tangent_reference = std::nullopt);
+  [[nodiscard]] bool
+  add_pick(Point2 point, GuiSketchSnapKind kind = GuiSketchSnapKind::None,
+           std::optional<SketchEntityId> tangent_reference = std::nullopt,
+           std::optional<GuiSketchCreatePointReference> endpoint_target = std::nullopt);
   [[nodiscard]] bool complete_tool();
   [[nodiscard]] bool finish_tool(); // Commit an active fitted spline; discard incomplete picks.
   void cancel_tool();
@@ -124,7 +125,6 @@ private:
   void end_trim_stroke() noexcept;
   void cancel_trim_stroke() noexcept;
   void after_pick();
-  void apply_chain_coincidence();
   void update_preview();
   void apply_numeric_buffer();
   void mirror_numeric_buffer();
@@ -214,11 +214,10 @@ private:
   QLineEdit* dimension_editor_{nullptr};
   std::optional<SketchDimensionId> dimension_editor_id_;
   bool suppress_dimension_edit_release_{false};
-  // Inventor-style line chaining: end of the last committed segment; the next
-  // segment starts here and the shared corner is coupled coincident.
-  std::optional<Point2> chain_anchor_;
   std::unordered_map<std::string, std::string> candidate_by_semantic_;
   std::string numeric_buffer_;
+  std::size_t create_session_{0};
+  std::size_t next_create_session_{0};
   bool preview_scheduled_{false};
   bool solve_scheduled_{false};
   bool synchronizing_selection_{false};

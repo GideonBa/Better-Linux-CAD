@@ -1750,3 +1750,47 @@ Exact logs: `/tmp/blcad-issue114-history-build-final.log`,
 guard are retained separately as `/tmp/blcad-issue114-history-prelegacy-{gui,native}.log`.
 The initial scaled mismatch is `/tmp/blcad-issue114-history-native-150.log`; it is superseded by
 the final scaled proof. No later numbered block is completed by this issue.
+
+
+## Issue #104 — persistent line endpoint snaps (2026-10-29)
+
+The existing creation transaction now publishes line geometry and automatic Coincident recipes
+atomically. Press-phase snap evidence carries canonical endpoint identity through deferred input;
+coordinate overlap never selects a relationship target. See `gui-sketch-basic-creation-mvp8.md`.
+Keep the following GUI suites and startup serial; captures are optional local artifacts.
+
+```bash
+cmake --build --preset dev-gui --target blcad_gui_tests blcad_app blcad_core_tests blcad_geometry_tests blcad_export_step -j6
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[endpoint-coincidence]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue104-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[endpoint-coincidence]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue104-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[endpoint-coincidence]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue104-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-sketch],[sketch-create],[sketch-create-basic],[sketch-create-conics],[spline-create-workflow],[sketch-mouse-operations],[coincident-closure],[native-viewer-lifecycle],[integration][gui-feature-coverage]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+All five build targets succeed. Final focused checks pass **6 / 313** offscreen and **6 / 331**
+natively at both scales, without native skips. Four added cases plus two strengthened existing loop
+cases guard exact and near closure, restart/overlap, twelve segments, persistence/drag/history,
+Polyline atomic recipes, stale/foreign/missing evidence and zero-length rejection, queued movement,
+cancellation and three presses across automatic Line rearming. The new tests first reproduced
+missing/nonautomatic closure constraints, a separate history entry and deferred-hover retargeting.
+Native fixtures publish manually seeded scenes before snapping, fit their windows to the screen and
+bring all inputs into view using bounded ordinary wheel zoom. They do not select endpoint targets
+by coordinate equality or send off-canvas events. Both saved-after-drag captures were inspected at
+100% and 150%.
+
+The final full offscreen GUI suite passes **598 cases — 578 passed, 20 expected native-only skips;
+81,018 assertions**. Native affected-sketch workflows and the required shell gate pass
+**82 / 3,609**, without skips.
+Separate native startup reaches expected timeout **124**. Final native/scaled/startup logs have no
+High-severity, BadDrawable or BadWindow errors. The pre-existing OCCT Medium visual-depth/stencil
+warning remains. All 886 fingerprints stay unchanged through the final checks.
+
+The final runtime input manifest has **886** files, SHA-256
+`14d5cc545522777065132b3497bf53a438ab5b7a55b32d4e7a34fa0b0979c520`, stored at
+`/tmp/blcad-issue104-source-freeze.json`. Core and Geometry inputs/binaries are unchanged from
+verified main `736f100` (its accepted full-suite results are **549 / 17,217** and **459 / 35,243**);
+this issue's full regression targets the changed GUI layer. No performance profile or later numbered
+block is claimed by this fix. Logs use `/tmp/blcad-issue104-{build-final,focused-final,native-final,
+native-150-final,gui-final,native-broad-final,startup-final}.log`.

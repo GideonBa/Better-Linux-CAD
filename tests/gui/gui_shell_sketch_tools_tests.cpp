@@ -8,6 +8,7 @@
 
 #include "blcad/core/sketch.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/sketch_constraint_authoring_json.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
@@ -16,12 +17,15 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <QApplication>
+#include <QDir>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QStatusBar>
+#include <QScreen>
 #include <QTemporaryDir>
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
+#include <QWheelEvent>
 
 #include <algorithm>
 #include <array>
@@ -42,6 +46,56 @@ void enter_sketch(ShellWindow& window) {
   REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
   REQUIRE(window.create_sketch_on_selection());
   REQUIRE(window.active_sketch().has_value());
+}
+
+void show_endpoint_window(ShellWindow& window) {
+  window.resize(1280, 800);
+  if (QApplication::platformName() == "xcb") {
+    auto* screen = QGuiApplication::screenAt(QPoint(0, 0));
+    REQUIRE(screen);
+    const auto available = screen->availableGeometry().adjusted(12, 12, -12, -12);
+    window.move(available.topLeft());
+    window.resize(std::min(1280, available.width()), std::min(800, available.height()));
+  }
+  window.show();
+  window.raise();
+  window.activateWindow();
+  QGuiApplication::sync();
+  qApp->processEvents();
+  if (QApplication::platformName() == "xcb")
+    REQUIRE(window.viewport().native_viewer_available());
+}
+
+GuiSketchScreenPoint visible_endpoint_screen(OcctViewport& viewport, Point2 point) {
+  INFO("Endpoint input at model " << point.x << ',' << point.y);
+  for (int attempt = 0; attempt < 12; ++attempt) {
+    auto screen = viewport.sketch_plane_to_screen(point);
+    REQUIRE(screen);
+    if (viewport.rect()
+            .adjusted(12, 12, -12, -12)
+            .contains(QPoint(screen.value().x, screen.value().y)))
+      return screen.value();
+    // Extending a chain can move past the current native fit. Exercise the
+    // ordinary wheel route and remap before clicking; never send off-canvas input.
+    const QPoint center = viewport.rect().center();
+    QWheelEvent wheel(QPointF(center), QPointF(viewport.mapToGlobal(center)), {}, {0, -120},
+                      Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+    QApplication::sendEvent(&viewport, &wheel);
+    QGuiApplication::sync();
+    qApp->processEvents();
+  }
+  FAIL("Endpoint input remains outside the visible viewport after bounded zoom");
+  return {};
+}
+
+void capture_endpoint_window(ShellWindow& window, const char* name) {
+  const auto directory = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
+  if (directory.isEmpty())
+    return;
+  REQUIRE(QDir().mkpath(directory));
+  QGuiApplication::sync();
+  qApp->processEvents();
+  REQUIRE(window.grab().save(directory + '/' + QString::fromLatin1(name) + ".png"));
 }
 
 void reenter_sketch(ShellWindow& window, const SketchId& sketch) {
@@ -277,6 +331,29 @@ void verify_pointer_drawn_line_region(double close_offset_dip) {
   const auto* raw = window.session().part_document()->find_sketch(sketch_id);
   REQUIRE(raw != nullptr);
   REQUIRE(raw->line_segments().size() == 4U);
+  const auto constraints = window.session().sketch_constraint_catalog(sketch_id);
+  REQUIRE(constraints);
+  CHECK(constraints.value().constraints().size() == 4U);
+  for (const auto& intent : constraints.value().constraints()) {
+    CHECK(intent.kind() == SketchSolverConstraintKind::Coincident);
+    CHECK(intent.source() == SketchConstraintIntentSource::Automatic);
+  }
+  const auto geometry_json =
+      serialize_part_document_to_json(*window.session().part_document()).value();
+  const auto constraint_json =
+      serialize_sketch_constraint_catalog_to_json(constraints.value()).value();
+  tools.cancel_tool();
+  REQUIRE(window.undo());
+  CHECK(window.session().part_document()->find_sketch(sketch_id)->line_segments().size() == 3U);
+  REQUIRE(window.redo());
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() ==
+        geometry_json);
+  CHECK(serialize_sketch_constraint_catalog_to_json(
+            window.session().sketch_constraint_catalog(sketch_id).value())
+            .value() == constraint_json);
+  if (!window.active_sketch())
+    reenter_sketch(window, sketch_id);
+  raw = window.session().part_document()->find_sketch(sketch_id);
   const auto analysis =
       geometry::SketchFinishService::analyze(*window.session().part_document(), *raw);
   REQUIRE(analysis);
@@ -340,12 +417,12 @@ TEST_CASE("Block 134 line tool commits an entity through the shell tool surface"
 }
 
 TEST_CASE("Line pointer clicks publish a selectable profile face when the loop closes exactly",
-          "[gui][shell-sketch][gui][line-region-regression]") {
+          "[gui][shell-sketch][gui][line-region-regression][endpoint-coincidence]") {
   verify_pointer_drawn_line_region(0.0);
 }
 
 TEST_CASE("Line pointer endpoint snap closes a visually closed loop",
-          "[gui][shell-sketch][gui][line-region-regression][snap]") {
+          "[gui][shell-sketch][gui][line-region-regression][snap][endpoint-coincidence]") {
   // Four DIPs is visibly on the endpoint marker and inside the ten-DIP snap
   // tolerance.  A curve-nearest candidate must not steal this closure.
   verify_pointer_drawn_line_region(4.0);
@@ -381,6 +458,328 @@ TEST_CASE("Finish Sketch leaves an open contour intact for later editing",
   CHECK_FALSE(window.feature_tools().begin_extrude());
   reenter_sketch(window, sketch_id);
   CHECK(window.viewport().sketch_interaction_active());
+}
+
+TEST_CASE("Restarted Line preserves the picked identity at overlapping endpoints through history "
+          "and drag",
+          "[gui][shell-sketch][endpoint-coincidence][endpoint-native-workflow]") {
+  ShellWindow window;
+  show_endpoint_window(window);
+  enter_sketch(window);
+  seed_two_lines(window, {50, 50}, {90, 50}, {90, 50}, {110, 75});
+  auto& tools = window.sketch_tools();
+  tools.publish_scene();
+  qApp->processEvents();
+  auto& viewport = window.viewport();
+  const auto sketch = *window.active_sketch();
+  const auto original = topology_of(window);
+  const auto chosen = original.find_entity("entity/line.h")->points()[1];
+  const auto unrelated = original.find_entity("entity/line.v")->points()[0];
+  REQUIRE(chosen != unrelated);
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Line));
+  const auto start = visible_endpoint_screen(viewport, {90, 50});
+  move_sketch_pointer(viewport, start);
+  REQUIRE(viewport.sketch_snap_result());
+  REQUIRE(viewport.sketch_snap_result()->kind == GuiSketchSnapKind::Endpoint);
+  REQUIRE(viewport.sketch_snap_result()->candidate_id == "line.h:end");
+  click_sketch_pointer(viewport, start);
+  click_sketch_pointer(viewport, visible_endpoint_screen(viewport, {70, 100}));
+  tools.cancel_tool();
+  const auto topology = topology_of(window);
+  REQUIRE(topology.entities().size() == 3);
+  const auto created =
+      std::find_if(topology.entities().begin(), topology.entities().end(), [](const auto& entity) {
+        return entity.id() != "entity/line.h" && entity.id() != "entity/line.v";
+      });
+  REQUIRE(created != topology.entities().end());
+  const auto new_start = created->points()[0];
+  const auto catalog = window.session().sketch_constraint_catalog(sketch).value();
+  REQUIRE(catalog.constraints().size() == 1);
+  CHECK(catalog.constraints().front().source() == SketchConstraintIntentSource::Automatic);
+  std::vector<std::string> targets;
+  for (const auto& target : catalog.constraints().front().targets())
+    targets.push_back(target.id());
+  CHECK(std::find(targets.begin(), targets.end(), chosen.value()) != targets.end());
+  CHECK(std::find(targets.begin(), targets.end(), new_start.value()) != targets.end());
+  CHECK(std::find(targets.begin(), targets.end(), unrelated.value()) == targets.end());
+  const auto before = serialize_part_document_to_json(*window.session().part_document()).value();
+  const auto relations = serialize_sketch_constraint_catalog_to_json(catalog).value();
+  REQUIRE(window.undo());
+  CHECK(window.session().part_document()->find_sketch(sketch)->line_segments().size() == 2);
+  CHECK(window.session().sketch_constraint_catalog(sketch).value().constraints().empty());
+  REQUIRE(window.redo());
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before);
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto path = directory.filePath("endpoint.blcad");
+  REQUIRE(window.save_to(path));
+  REQUIRE(window.open_path(path));
+  CHECK(serialize_sketch_constraint_catalog_to_json(
+            window.session().sketch_constraint_catalog(sketch).value())
+            .value() == relations);
+  if (!window.active_sketch())
+    reenter_sketch(window, sketch);
+  // Translate the chosen line through its unambiguous midpoint. The initial
+  // coincident location deliberately contains an unrelated endpoint as well.
+  (void)visible_endpoint_screen(viewport, {80, 40});
+  move_sketch_pointer(viewport, visible_endpoint_screen(viewport, {70, 50}));
+  press_sketch_pointer(viewport, visible_endpoint_screen(viewport, {70, 50}));
+  const auto moved = visible_endpoint_screen(viewport, {80, 40});
+  drag_sketch_pointer(viewport, moved);
+  release_sketch_pointer(viewport, moved);
+  const auto dragged = topology_of(window);
+  CHECK(dragged.find_point(chosen)->position() == dragged.find_point(new_start)->position());
+  CHECK_FALSE(near(dragged.find_point(chosen)->position(), {90, 50}));
+  CHECK(near(dragged.find_point(unrelated)->position(), {90, 50}));
+  capture_endpoint_window(window, "endpoint-overlap-after-drag");
+  REQUIRE(window.undo());
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == before);
+  REQUIRE(window.redo());
+  CHECK(window.session().sketch_constraint_catalog(sketch).value().constraints().size() == 1);
+}
+
+TEST_CASE(
+    "Queued creation picks retain press-time targets and cannot leak into a restarted command",
+    "[gui][shell-sketch][endpoint-coincidence][endpoint-input-snapshot]") {
+  ShellWindow window;
+  show_endpoint_window(window);
+  enter_sketch(window);
+  seed_two_lines(window, {50, 50}, {90, 50}, {120, 80}, {120, 110});
+  auto& tools = window.sketch_tools();
+  tools.publish_scene();
+  qApp->processEvents();
+  auto& viewport = window.viewport();
+  const auto sketch = *window.active_sketch();
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Line));
+  SECTION("Movement after press does not retarget the accepted endpoint") {
+    REQUIRE(tools.add_pick({70, 140}));
+    const auto clicked = visible_endpoint_screen(viewport, {90, 50});
+    const auto later = visible_endpoint_screen(viewport, {120, 80});
+    QMouseEvent press(QEvent::MouseButtonPress, QPointF(clicked.x, clicked.y),
+                      viewport.mapToGlobal(QPoint(clicked.x, clicked.y)), Qt::LeftButton,
+                      Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(&viewport, &press);
+    QMouseEvent move(QEvent::MouseMove, QPointF(later.x, later.y),
+                     viewport.mapToGlobal(QPoint(later.x, later.y)), Qt::NoButton, Qt::LeftButton,
+                     Qt::NoModifier);
+    QApplication::sendEvent(&viewport, &move);
+    qApp->processEvents();
+    release_sketch_pointer(viewport, clicked);
+    tools.cancel_tool();
+    const auto* raw = window.session().part_document()->find_sketch(sketch);
+    REQUIRE(raw->line_segments().size() == 3);
+    const auto created = std::find_if(
+        raw->line_segments().begin(), raw->line_segments().end(), [](const auto& line) {
+          return line.id() != SketchEntityId("line.h") && line.id() != SketchEntityId("line.v");
+        });
+    REQUIRE(created != raw->line_segments().end());
+    CHECK(near(created->end(), {90, 50}));
+    const auto chosen = topology_of(window).find_entity("entity/line.h")->points()[1];
+    const auto catalog = window.session().sketch_constraint_catalog(sketch).value();
+    REQUIRE(catalog.constraints().size() == 1);
+    CHECK(std::any_of(catalog.constraints().front().targets().begin(),
+                      catalog.constraints().front().targets().end(),
+                      [&](const auto& target) { return target.id() == chosen.value(); }));
+  }
+  SECTION("Cancellation invalidates a queued press before the same tool restarts") {
+    const auto clicked = visible_endpoint_screen(viewport, {90, 50});
+    QMouseEvent press(QEvent::MouseButtonPress, QPointF(clicked.x, clicked.y),
+                      viewport.mapToGlobal(QPoint(clicked.x, clicked.y)), Qt::LeftButton,
+                      Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(&viewport, &press);
+    tools.cancel_tool();
+    REQUIRE(tools.begin_tool(GuiSketchCreateTool::Line));
+    qApp->processEvents();
+    release_sketch_pointer(viewport, clicked);
+    REQUIRE(tools.add_pick({70, 140}));
+    CHECK(window.session().part_document()->find_sketch(sketch)->line_segments().size() == 2);
+    tools.cancel_tool();
+  }
+  SECTION("A burst of presses continues one line command across automatic rearming") {
+    const std::array<Point2, 3> points{{{60, 100}, {80, 100}, {100, 100}}};
+    for (const auto point : points)
+      (void)visible_endpoint_screen(viewport, point);
+    for (const auto point : points) {
+      const auto screen = visible_endpoint_screen(viewport, point);
+      const QPointF local(screen.x, screen.y);
+      const QPointF global(viewport.mapToGlobal(local.toPoint()));
+      QMouseEvent press(QEvent::MouseButtonPress, local, global, Qt::LeftButton, Qt::LeftButton,
+                        Qt::NoModifier);
+      QApplication::sendEvent(&viewport, &press);
+      QMouseEvent release(QEvent::MouseButtonRelease, local, global, Qt::LeftButton, Qt::NoButton,
+                          Qt::NoModifier);
+      QApplication::sendEvent(&viewport, &release);
+    }
+    qApp->processEvents();
+    tools.cancel_tool();
+    const auto* raw = window.session().part_document()->find_sketch(sketch);
+    REQUIRE(raw->line_segments().size() == 4);
+    const auto catalog = window.session().sketch_constraint_catalog(sketch).value();
+    REQUIRE(catalog.constraints().size() == 1);
+    CHECK(catalog.constraints().front().source() == SketchConstraintIntentSource::Automatic);
+    std::vector<LineSegment> created;
+    for (const auto& line : raw->line_segments())
+      if (line.id() != SketchEntityId("line.h") && line.id() != SketchEntityId("line.v"))
+        created.push_back(line);
+    REQUIRE(created.size() == 2);
+    CHECK(near(created[0].start(), points[0]));
+    CHECK(near(created[0].end(), points[1]));
+    CHECK(near(created[1].start(), points[1]));
+    CHECK(near(created[1].end(), points[2]));
+  }
+}
+
+TEST_CASE("Twelve-segment pointer loop keeps every automatic junction after reopening and drag",
+          "[gui][shell-sketch][endpoint-coincidence][endpoint-native-workflow]") {
+  ShellWindow window;
+  show_endpoint_window(window);
+  enter_sketch(window);
+  auto& tools = window.sketch_tools();
+  auto& viewport = window.viewport();
+  const auto sketch = *window.active_sketch();
+  const std::vector<Point2> picks{{50, 50},  {80, 50},   {110, 50},  {140, 50}, {140, 70},
+                                  {140, 90}, {140, 110}, {110, 110}, {80, 110}, {50, 110},
+                                  {50, 90},  {50, 70},   {50, 50}};
+  REQUIRE(tools.begin_tool(GuiSketchCreateTool::Line));
+  for (const auto point : picks)
+    click_sketch_pointer(viewport, visible_endpoint_screen(viewport, point));
+  tools.cancel_tool();
+  const auto catalog = window.session().sketch_constraint_catalog(sketch).value();
+  REQUIRE(catalog.constraints().size() == 12);
+  for (const auto& intent : catalog.constraints())
+    CHECK(intent.source() == SketchConstraintIntentSource::Automatic);
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto path = directory.filePath("long-chain.blcad");
+  REQUIRE(window.save_to(path));
+  REQUIRE(window.open_path(path));
+  CHECK(serialize_sketch_constraint_catalog_to_json(
+            window.session().sketch_constraint_catalog(sketch).value())
+            .value() == serialize_sketch_constraint_catalog_to_json(catalog).value());
+  if (!window.active_sketch())
+    reenter_sketch(window, sketch);
+  (void)visible_endpoint_screen(viewport, {40, 40});
+  press_sketch_pointer(viewport, visible_endpoint_screen(viewport, {50, 50}));
+  const auto destination = visible_endpoint_screen(viewport, {40, 40});
+  drag_sketch_pointer(viewport, destination);
+  release_sketch_pointer(viewport, destination);
+  auto analysis = geometry::SketchFinishService::analyze(
+      *window.session().part_document(), *window.session().part_document()->find_sketch(sketch));
+  REQUIRE(analysis);
+  CHECK(analysis.value().regions.size() == 1);
+  CHECK(analysis.value().diagnostics.empty());
+  capture_endpoint_window(window, "endpoint-twelve-segment-after-drag");
+  const auto after = serialize_part_document_to_json(*window.session().part_document()).value();
+  REQUIRE(window.undo());
+  REQUIRE(window.redo());
+  CHECK(serialize_part_document_to_json(*window.session().part_document()).value() == after);
+}
+
+TEST_CASE("Creation endpoint evidence rejects stale targets and commits a polyline atomically",
+          "[gui][sketch-create-basic][endpoint-coincidence][endpoint-evidence]") {
+  ShellWindow window;
+  enter_sketch(window);
+  seed_two_lines(window, {50, 50}, {90, 50}, {120, 80}, {120, 110});
+  auto& session = window.session();
+  const auto sketch = *window.active_sketch();
+  GuiSketchWorkbench workbench;
+  const auto plane = workbench.plane_view(session, sketch).value();
+  const auto topology = topology_of(window);
+  const auto target = topology.find_entity("entity/line.h")->points()[1];
+  auto controller =
+      GuiSketchCreateController::begin(GuiSketchCreateTool::Line, sketch, plane).value();
+  bool committed_polyline = false;
+  SECTION("A point from a different Sketch is not a matching identity") {
+    REQUIRE_FALSE(
+        controller.add_pick({{90, 50},
+                             GuiSketchSnapKind::Endpoint,
+                             GuiSketchCreatePointReference{SketchId("foreign.sketch"), target}}));
+    CHECK(controller.picks().empty());
+  }
+  SECTION("A missing target never falls back to another point at the same position") {
+    REQUIRE(controller.add_pick(
+        {{90, 50},
+         GuiSketchSnapKind::Endpoint,
+         GuiSketchCreatePointReference{sketch, SketchPointId("entity/removed/end")}}));
+    REQUIRE(controller.add_pick({{70, 100}, GuiSketchSnapKind::None}));
+    const auto before = serialize_part_document_to_json(*session.part_document()).value();
+    const std::string history(session.undo_label());
+    REQUIRE_FALSE(controller.commit(session, workbench));
+    CHECK(serialize_part_document_to_json(*session.part_document()).value() == before);
+    CHECK(session.undo_label() == history);
+  }
+  SECTION("Moved source evidence cannot move the picked source back on commit") {
+    REQUIRE(controller.add_pick(
+        {{90, 50}, GuiSketchSnapKind::Endpoint, GuiSketchCreatePointReference{sketch, target}}));
+    REQUIRE(controller.add_pick({{70, 100}, GuiSketchSnapKind::None}));
+    REQUIRE(session.commit_part_transaction("Move picked source", [&](PartDocument& part) {
+      const auto* source = part.find_sketch(sketch);
+      auto replacement = Sketch::create(sketch, source->name(), DatumPlaneId("datum.xy")).value();
+      for (const auto& line : source->line_segments()) {
+        const auto updated = line.id() == SketchEntityId("line.h")
+                                 ? LineSegment::create(line.id(), line.start(), {95, 50}).value()
+                                 : line;
+        auto added = replacement.add_entity(updated);
+        if (!added)
+          return added;
+      }
+      return part.update_sketch(std::move(replacement));
+    }));
+    const auto before = serialize_part_document_to_json(*session.part_document()).value();
+    const std::string history(session.undo_label());
+    REQUIRE_FALSE(controller.commit(session, workbench));
+    CHECK(serialize_part_document_to_json(*session.part_document()).value() == before);
+    CHECK(session.undo_label() == history);
+  }
+  SECTION("A repeated endpoint creates neither a zero-length line nor a relation") {
+    REQUIRE(controller.add_pick(
+        {{90, 50}, GuiSketchSnapKind::Endpoint, GuiSketchCreatePointReference{sketch, target}}));
+    REQUIRE(controller.add_pick({{90, 50}, GuiSketchSnapKind::None}));
+    const auto before = serialize_part_document_to_json(*session.part_document()).value();
+    const std::string history(session.undo_label());
+    REQUIRE_FALSE(controller.commit(session, workbench));
+    CHECK(serialize_part_document_to_json(*session.part_document()).value() == before);
+    CHECK(session.undo_label() == history);
+  }
+  SECTION("Polyline internal and accepted external junctions share one transaction") {
+    auto polyline =
+        GuiSketchCreateController::begin(GuiSketchCreateTool::Polyline, sketch, plane).value();
+    const auto start = topology.find_entity("entity/line.h")->points()[0];
+    REQUIRE(polyline.add_pick(
+        {{90, 50}, GuiSketchSnapKind::Endpoint, GuiSketchCreatePointReference{sketch, target}}));
+    REQUIRE(polyline.add_pick({{70, 100}, GuiSketchSnapKind::None}));
+    REQUIRE(polyline.add_pick(
+        {{50, 50}, GuiSketchSnapKind::Endpoint, GuiSketchCreatePointReference{sketch, start}}));
+    REQUIRE(polyline.commit(session, workbench));
+    committed_polyline = true;
+    const auto catalog = session.sketch_constraint_catalog(sketch).value();
+    REQUIRE(catalog.constraints().size() == 3);
+    std::vector<std::pair<std::string, std::string>> pairs;
+    for (const auto& intent : catalog.constraints()) {
+      REQUIRE(intent.targets().size() == 2);
+      CHECK(intent.source() == SketchConstraintIntentSource::Automatic);
+      auto first = intent.targets()[0].id(), second = intent.targets()[1].id();
+      REQUIRE(first != second);
+      if (second < first)
+        std::swap(first, second);
+      CHECK(std::find(pairs.begin(), pairs.end(), std::pair{first, second}) == pairs.end());
+      pairs.emplace_back(first, second);
+    }
+    const auto geometry = serialize_part_document_to_json(*session.part_document()).value();
+    const auto relations = serialize_sketch_constraint_catalog_to_json(catalog).value();
+    REQUIRE(session.undo());
+    CHECK(session.part_document()->find_sketch(sketch)->line_segments().size() == 2);
+    CHECK(session.sketch_constraint_catalog(sketch).value().constraints().empty());
+    REQUIRE(session.redo());
+    CHECK(serialize_part_document_to_json(*session.part_document()).value() == geometry);
+    CHECK(serialize_sketch_constraint_catalog_to_json(
+              session.sketch_constraint_catalog(sketch).value())
+              .value() == relations);
+  }
+  CHECK(session.part_document()->find_sketch(sketch)->line_segments().size() ==
+        (committed_polyline ? 4 : 2));
+  CHECK(session.sketch_constraint_catalog(sketch).value().constraints().size() ==
+        (committed_polyline ? 3 : 0));
 }
 
 TEST_CASE("Block 134 constraints apply and remove end-to-end from the tool surface",

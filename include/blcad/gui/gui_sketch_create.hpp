@@ -46,9 +46,20 @@ struct GuiSketchCreateOptions {
   friend bool operator==(const GuiSketchCreateOptions&, const GuiSketchCreateOptions&) = default;
 };
 
+struct GuiSketchCreatePointReference {
+  SketchId sketch;
+  SketchPointId point;
+
+  friend bool operator==(const GuiSketchCreatePointReference&,
+                         const GuiSketchCreatePointReference&) = default;
+};
+
 struct GuiSketchCreatePick {
   Point2 point;
   GuiSketchSnapKind snap{GuiSketchSnapKind::None};
+  // Canonical endpoint identity chosen by snapping, never inferred from a
+  // coincident coordinate or an OCCT traversal index. Transient pick evidence.
+  std::optional<GuiSketchCreatePointReference> endpoint_target{};
 
   friend bool operator==(const GuiSketchCreatePick&, const GuiSketchCreatePick&) = default;
 };

@@ -282,6 +282,29 @@ resolve_point_role(const SketchTopology& topology, const SketchTopologyEntity& e
   return std::nullopt;
 }
 
+// The snap candidate identifies a curve and endpoint role. Resolve that exact
+// identity; coincident coordinates can belong to several unrelated endpoints.
+std::optional<GuiSketchCreatePointReference> endpoint_snap_reference(const SketchTopology& topology,
+                                                                     std::string_view candidate) {
+  const auto separator = candidate.rfind(':');
+  if (separator == std::string_view::npos)
+    return std::nullopt;
+  const auto* entity =
+      topology.find_entity("entity/" + std::string(candidate.substr(0, separator)));
+  if (!entity)
+    return std::nullopt;
+  const auto role = candidate.substr(separator + 1);
+  if (entity->kind() == SketchTopologyEntityKind::Point && role == "point" &&
+      !entity->points().empty())
+    return GuiSketchCreatePointReference{topology.sketch(), entity->points().front()};
+  if (role != "start" && role != "end")
+    return std::nullopt;
+  auto point = resolve_point_role(topology, *entity, candidate);
+  if (!point)
+    return std::nullopt;
+  return GuiSketchCreatePointReference{topology.sketch(), *point};
+}
+
 [[nodiscard]] SketchConstraintId next_constraint_id(const SketchConstraintCatalog& catalog,
                                                     SketchSolverConstraintKind kind) {
   const std::string base = "constraint.gui." + std::string(to_string(kind)) + ".";
@@ -675,8 +698,35 @@ void ShellSketchTools::wire_viewport_callbacks() {
           operation_phase_(phase, snap.snapped_point, hit);
           return;
         }
-        if (tool_active())
-          return; // create tools capture picks via the viewport event filter
+        if (tool_active()) {
+          if (phase == GuiSketchPointerPhase::Press) {
+            const auto session = create_session_;
+            const auto sketch = create_controller_->sketch();
+            // The viewport has resolved this press. Copy its evidence now;
+            // a later hover must not retarget a deferred creation pick.
+            QTimer::singleShot(0, this, [this, snapshot = snap, session, sketch] {
+              if (!tool_active() || create_session_ != session ||
+                  create_controller_->sketch() != sketch)
+                return;
+              const auto pick = create_pointer_pick(*create_controller_, viewport_, snapshot);
+              std::optional<GuiSketchCreatePointReference> endpoint;
+              const auto tool = create_controller_->tool();
+              if (snapshot.kind == GuiSketchSnapKind::Endpoint &&
+                  (tool == GuiSketchCreateTool::Line || tool == GuiSketchCreateTool::Polyline ||
+                   tool == GuiSketchCreateTool::ConstructionLine ||
+                   tool == GuiSketchCreateTool::Centerline)) {
+                auto topology = active_topology();
+                if (!topology) {
+                  report(topology.error());
+                  return;
+                }
+                endpoint = endpoint_snap_reference(topology.value(), snapshot.candidate_id);
+              }
+              (void)add_pick(pick.point, pick.snap, std::nullopt, std::move(endpoint));
+            });
+          }
+          return;
+        }
         if (modify_tool_) {
           // Trim supports Inventor-style paint trimming while the left button
           // is held. Extend and Split intentionally stay single-press tools.
@@ -1089,6 +1139,7 @@ bool ShellSketchTools::begin_tool(GuiSketchCreateTool tool) {
     return false;
   }
   create_controller_.emplace(std::move(controller.value()));
+  create_session_ = ++next_create_session_;
   numeric_buffer_.clear();
   viewport_.set_sketch_selection_enabled(false);
   show_workspace_status();
@@ -1096,26 +1147,29 @@ bool ShellSketchTools::begin_tool(GuiSketchCreateTool tool) {
 }
 
 bool ShellSketchTools::add_pick(Point2 point, GuiSketchSnapKind kind,
-                                std::optional<SketchEntityId> tangent_reference) {
+                                std::optional<SketchEntityId> tangent_reference,
+                                std::optional<GuiSketchCreatePointReference> endpoint_target) {
   if (!tool_active())
     return false;
   const bool tangent = create_controller_->tool() == GuiSketchCreateTool::TangentArc ||
                        create_controller_->tool() == GuiSketchCreateTool::TangentCircle;
   auto added = [&]() -> Result<std::size_t> {
-    if (!tangent || !create_controller_->picks().empty()) return create_controller_->add_pick({point, kind});
+    if (!tangent || !create_controller_->picks().empty())
+      return create_controller_->add_pick({point, kind, endpoint_target});
     if (!tangent_reference) {
       auto screen = viewport_.sketch_plane_to_screen(point);
       auto topology = active_topology();
       if (screen && topology) {
         auto hits = viewport_.sketch_curve_hits_along(screen.value(), screen.value());
-        if (hits) for (const auto& hit : hits.value()) {
-          auto target = selection_target(topology.value(), hit.semantic_id);
-          if (target && target->kind() == SketchConstraintIntentTargetKind::Entity &&
-              target->id().starts_with("entity/")) {
-            tangent_reference = SketchEntityId(target->id().substr(7));
-            break;
+        if (hits)
+          for (const auto& hit : hits.value()) {
+            auto target = selection_target(topology.value(), hit.semantic_id);
+            if (target && target->kind() == SketchConstraintIntentTargetKind::Entity &&
+                target->id().starts_with("entity/")) {
+              tangent_reference = SketchEntityId(target->id().substr(7));
+              break;
+            }
           }
-        }
       }
     }
     if (!tangent_reference)
@@ -1143,15 +1197,23 @@ void ShellSketchTools::after_pick() {
 bool ShellSketchTools::complete_tool() {
   if (!create_controller_)
     return false;
+  const auto input_session = create_session_;
   const bool chained_line = create_controller_->tool() == GuiSketchCreateTool::Line;
   // The Point tool re-arms after each placement so repeated clicks drop more
   // points (Inventor-style), until Escape. Without this the tool deactivated
   // after one point and further clicks fell through to the drag layer.
   const bool repeatable_point = create_controller_->tool() == GuiSketchCreateTool::Point;
-  std::optional<Point2> next_anchor;
-  if (chained_line && !create_controller_->picks().empty())
-    next_anchor = create_controller_->picks().back().point;
-  const bool couple_previous = chained_line && chain_anchor_.has_value();
+  std::optional<SketchEntityId> created_line;
+  if (chained_line) {
+    auto expansion = create_controller_->expansion(*session_.part_document());
+    if (!expansion || expansion.value().lines.empty()) {
+      if (!expansion)
+        report(expansion.error());
+      cancel_tool();
+      return false;
+    }
+    created_line = expansion.value().lines.back().id();
+  }
   if (workspace_.stage() == GuiSketchInteractionStage::CollectingPicks)
     (void)workspace_.begin_numeric_input(session_);
   if (workspace_.stage() == GuiSketchInteractionStage::NumericInput)
@@ -1163,23 +1225,38 @@ bool ShellSketchTools::complete_tool() {
     return false;
   }
   (void)workspace_.commit_command(session_);
+  std::optional<GuiSketchCreatePick> next_anchor;
+  if (created_line) {
+    auto topology = active_topology();
+    if (topology) {
+      const auto* line = topology.value().find_entity("entity/" + created_line->value());
+      if (line && line->points().size() == 2U) {
+        const auto* end = topology.value().find_point(line->points()[1]);
+        if (end)
+          next_anchor = GuiSketchCreatePick{
+              end->position(), GuiSketchSnapKind::Endpoint,
+              GuiSketchCreatePointReference{topology.value().sketch(), end->id()}};
+      }
+    }
+  }
   create_controller_.reset();
+  create_session_ = 0;
   numeric_buffer_.clear();
   viewport_.set_sketch_preview_polyline({}, false);
   viewport_.set_sketch_inference_anchor(std::nullopt);
   viewport_.set_sketch_selection_enabled(true);
-  if (couple_previous)
-    apply_chain_coincidence();
   publish_scene();
   arm_drag_controller();
   window_.refresh();
   if (chained_line && next_anchor && begin_tool(GuiSketchCreateTool::Line)) {
-    // Inventor-style chaining: the next segment starts at the committed end;
-    // the shared corner is coupled coincident on the next commit.
-    chain_anchor_ = next_anchor;
-    (void)add_pick(*next_anchor, GuiSketchSnapKind::Endpoint);
+    create_session_ = input_session;
+    // The next segment carries the committed endpoint's canonical identity;
+    // its geometry and Coincident intent will share the next transaction.
+    (void)add_pick(next_anchor->point, next_anchor->snap, std::nullopt,
+                   next_anchor->endpoint_target);
   } else if (repeatable_point) {
-    (void)begin_tool(GuiSketchCreateTool::Point); // stay armed for more points
+    if (begin_tool(GuiSketchCreateTool::Point))
+      create_session_ = input_session; // stay armed for the same pointer sequence
   }
   return true;
 }
@@ -1201,6 +1278,7 @@ bool ShellSketchTools::finish_tool() {
 }
 
 void ShellSketchTools::cancel_tool() {
+  create_session_ = 0;
   cancel_operation_preview();
   if (rapid_dimension_active_) {
     rapid_dimension_active_ = false;
@@ -1212,7 +1290,6 @@ void ShellSketchTools::cancel_tool() {
     refresh_enablement();
   }
   cancel_label_drag();
-  chain_anchor_.reset();
   modify_tool_.reset(); // switching/cancelling any tool ends a modal modify tool
   cancel_trim_stroke();
   viewport_.set_sketch_selection_enabled(true);
@@ -1224,59 +1301,6 @@ void ShellSketchTools::cancel_tool() {
   viewport_.set_sketch_inference_anchor(std::nullopt);
   while (collecting_stage(workspace_.stage()) && workspace_.escape(session_)) {
   }
-}
-
-void ShellSketchTools::apply_chain_coincidence() {
-  if (!chain_anchor_)
-    return;
-  auto topology = active_topology();
-  if (topology.has_error())
-    return;
-  // Find the two DISTINCT line endpoints sitting exactly on the chain anchor.
-  // (Positional lookup — entity ordering is not reliable: profiles and other
-  // entities interleave with the chained lines.)
-  std::vector<SketchPointId> corner_points;
-  for (const auto& entity : topology.value().entities()) {
-    if (entity.kind() != SketchTopologyEntityKind::Line || entity.points().size() < 2U)
-      continue;
-    for (const auto& point_id : entity.points()) {
-      const auto* point = topology.value().find_point(point_id);
-      if (point == nullptr)
-        continue;
-      if (std::hypot(point->position().x - chain_anchor_->x,
-                     point->position().y - chain_anchor_->y) > 1.0e-9)
-        continue;
-      if (std::find(corner_points.begin(), corner_points.end(), point_id) == corner_points.end())
-        corner_points.push_back(point_id);
-    }
-  }
-  if (corner_points.size() < 2U)
-    return;
-  auto first = SketchConstraintIntentTarget::point(corner_points[corner_points.size() - 2U]);
-  auto second = SketchConstraintIntentTarget::point(corner_points.back());
-  if (first.has_error() || second.has_error())
-    return;
-  auto catalog = session_.sketch_constraint_catalog(topology.value().sketch());
-  if (catalog.has_error())
-    return;
-  auto intent = SketchConstraintIntent::create(
-      next_constraint_id(catalog.value(), SketchSolverConstraintKind::Coincident),
-      SketchSolverConstraintKind::Coincident, {first.value(), second.value()});
-  if (intent.has_error())
-    return;
-  auto controller = GuiSketchConstraintController::create(session_, topology.value().sketch(),
-                                                          std::move(intent.value()));
-  if (controller.has_error()) {
-    report(controller.error());
-    return;
-  }
-  // Redundant preview (corner already constrained) is fine and stays silent;
-  // real rejections surface in the diagnostics.
-  if (!controller.value().preview().authoring.accepted)
-    return;
-  auto committed = controller.value().commit(session_);
-  if (committed.has_error())
-    report(committed.error());
 }
 
 void ShellSketchTools::update_preview() {
@@ -2572,19 +2596,6 @@ bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
         (void)finish_tool();
         return true;
       }
-      if (mouse->button() == Qt::LeftButton) {
-        // Deferred so the pick uses the snap result computed by the viewport's
-        // own press handling (the filter runs first) — sequencing, not polling.
-        QTimer::singleShot(0, this, [this] {
-          if (!tool_active())
-            return;
-          const auto& snap = viewport_.sketch_snap_result();
-          if (snap) {
-            const auto pick = create_pointer_pick(*create_controller_, viewport_, *snap);
-            (void)add_pick(pick.point, pick.snap);
-          }
-        });
-      }
     } else if (event->type() == QEvent::MouseButtonDblClick) {
       const auto* mouse = static_cast<QMouseEvent*>(event);
       if (mouse->button() == Qt::LeftButton &&
@@ -2636,6 +2647,7 @@ bool ShellSketchTools::eventFilter(QObject* watched, QEvent* event) {
           return true;
         }
         if (!create_controller_->picks().empty()) {
+          create_session_ = ++next_create_session_;
           (void)create_controller_->pop_pick();
           update_preview();
           return true;
