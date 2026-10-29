@@ -3,8 +3,10 @@
 #include "blcad/gui/gui_icons.hpp"
 
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/reference_part_geometry.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -79,6 +81,7 @@ struct ShellReferenceRepairTools::Impl {
   std::vector<Pending> pending;
   std::optional<PartDocument> prepared;
   std::optional<geometry::ShapeCache> selection_cache;
+  std::unique_ptr<geometry::StepImportTopologyContext> selection_context;
   std::size_t revision{};
   bool active{};
   bool previewed{};
@@ -94,6 +97,14 @@ struct ShellReferenceRepairTools::Impl {
     return prepared ? *prepared : *window.session().part_document();
   }
   Result<std::size_t> prepare_selection_cache() {
+    auto context = make_step_import_context(window.session());
+    if (!context)
+      return Result<std::size_t>::failure(context.error());
+    selection_context = std::move(context.value());
+    auto observed =
+        geometry::observe_imported_part_sources(selection_part(), selection_context.get());
+    if (!observed)
+      return observed;
     if (const auto* cache = window.session().part_shape_cache()) {
       selection_cache = *cache;
       return Result<std::size_t>::success(1);
@@ -104,7 +115,16 @@ struct ShellReferenceRepairTools::Impl {
     // These successful producer results are only provisional repair input. The
     // session never receives this partial cache or labels it fresh Geometry.
     const auto& part = selection_part();
-    geometry::GeometryRecomputeExecutor executor;
+    geometry::GeometryRecomputeExecutor executor{selection_context.get()};
+    for (const auto& base : part.imported_body_features()) {
+      if (!selection_context)
+        return Result<std::size_t>::failure(
+            error("Imported repair inputs require a saved source root"));
+      auto seeded = geometry::ReferencePartGeometry{}.seed_imported_body_feature(
+          part, base, *selection_context, cache.value());
+      if (!seeded)
+        return seeded;
+    }
     auto order = part.dependency_graph().topological_order();
     if (!order)
       return Result<std::size_t>::failure(order.error());
@@ -120,6 +140,11 @@ struct ShellReferenceRepairTools::Impl {
         cache.value() = std::move(provisional);
     }
     selection_cache = std::move(cache.value());
+    if (selection_context) {
+      auto source_fresh = selection_context->validate_sources();
+      if (!source_fresh)
+        return source_fresh;
+    }
     return Result<std::size_t>::success(selection_cache->feature_shape_count());
   }
   static bool same_reference(const Reference& a, const Reference& b) {
@@ -185,7 +210,8 @@ struct ShellReferenceRepairTools::Impl {
                          {},
                          plane.reference().identity(),
                          text(plane.name()) + QStringLiteral(" / Result face"),
-                         status(geometry::ResultFaceSupportGeometry::resolve(part, plane, cache))});
+                         status(geometry::ResultFaceSupportGeometry::resolve(
+                             part, plane, cache, selection_context.get()))});
     for (const auto& sketch : part.sketches()) {
       for (const auto& point : sketch.projected_points())
         entries.push_back(
@@ -277,8 +303,8 @@ struct ShellReferenceRepairTools::Impl {
     if (entry.kind == Kind::ResultPlane) {
       const auto* plane = part.find_result_face_workplane(DatumPlaneId(entry.owner));
       for (const auto& body : part.bodies()) {
-        auto faces = geometry::ResultFaceSupportGeometry::selectable_faces(part, *selection_cache,
-                                                                           body.id());
+        auto faces = geometry::ResultFaceSupportGeometry::selectable_faces(
+            part, *selection_cache, body.id(), selection_context.get());
         if (!faces)
           continue;
         for (const auto& face : faces.value()) {
@@ -295,7 +321,8 @@ struct ShellReferenceRepairTools::Impl {
       }
     }
     auto sources =
-        geometry::ViewportSceneBuilder{}.build_construction_sources(part, *selection_cache);
+        geometry::ViewportSceneBuilder{selection_context.get()}.build_construction_sources(
+            part, *selection_cache);
     if (sources)
       for (const auto& source : sources.value())
         std::visit(
@@ -564,10 +591,15 @@ Result<std::size_t> ShellReferenceRepairTools::preview() {
   auto cache = geometry::ShapeCache::create(ShapeCacheId("reference.repair.preview"));
   if (!cache)
     return Result<std::size_t>::failure(cache.error());
-  auto computed = geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
+  auto import_context = make_step_import_context(ui.window.session());
+  if (!import_context)
+    return Result<std::size_t>::failure(import_context.error());
+  auto* context = import_context.value().get();
+  auto computed =
+      geometry::GeometryRecomputeExecutor{context}.execute_document(candidate, cache.value());
   if (!computed)
     return Result<std::size_t>::failure(computed.error());
-  auto scene = geometry::ViewportSceneBuilder{}.build_part(candidate, cache.value());
+  auto scene = geometry::ViewportSceneBuilder{context}.build_part(candidate, cache.value());
   if (!scene)
     return Result<std::size_t>::failure(scene.error());
   std::vector<geometry::GeometryShape> shapes;
@@ -595,6 +627,11 @@ Result<std::size_t> ShellReferenceRepairTools::preview() {
     }
   if (shapes.empty())
     return Result<std::size_t>::failure(error("Repair has no displayable geometry"));
+  if (context) {
+    auto source_fresh = context->validate_sources();
+    if (!source_fresh)
+      return Result<std::size_t>::failure(source_fresh.error());
+  }
   auto shown = ui.window.viewport().set_feature_previews(std::move(shapes), std::move(replaced));
   if (!shown)
     return shown;
@@ -649,6 +686,7 @@ void ShellReferenceRepairTools::cancel() {
   ui.pending.clear();
   ui.prepared.reset();
   ui.selection_cache.reset();
+  ui.selection_context.reset();
   ui.show_pending();
   ui.window.refresh();
 }

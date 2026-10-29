@@ -6,6 +6,7 @@
 
 #include <BRep_Builder.hxx>
 #include <Standard_Failure.hxx>
+#include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
 
 #include <algorithm>
@@ -20,10 +21,9 @@ Error invalid(const PartDocument& document, std::string message) {
 }
 } // namespace
 
-Result<CachedReferencePartResult>
-ReferencePartGeometry::resolve_definition(const PartDocument& document,
-                                          const ImportedPartDefinition& definition,
-                                          StepImportTopologyContext& context) const {
+Result<CachedReferencePartResult> ReferencePartGeometry::resolve_definition(
+    const PartDocument& document, const ImportedPartDefinition& definition,
+    StepImportTopologyContext& context, std::optional<FeatureId> producer) const {
   const auto* source = document.find_step_import_source(definition.source());
   const auto* catalog = document.find_imported_topology_catalog(definition.catalog());
   if (source == nullptr || catalog == nullptr || catalog->source() != source->id() ||
@@ -59,7 +59,38 @@ ReferencePartGeometry::resolve_definition(const PartDocument& document,
           resolved.value().descriptor->body_kind != output.kind)
         return Result<CachedReferencePartResult>::failure(invalid(
             document, "recovered imported body kind differs from persistent output intent"));
-      result.bodies.push_back({output, resolved.value().shape});
+      GeometryShape body_shape = resolved.value().shape;
+      if (producer) {
+        auto backing = std::make_shared<GeometryShape::Impl>(*body_shape.impl_);
+        for (const auto& entry : catalog->entries()) {
+          if (entry.parent_body != output.imported_body ||
+              entry.descriptor.kind != ImportedTopologyKind::Face)
+            continue;
+          const auto* current = recovery.value()->find(entry.id);
+          if (!current || current->status != ImportedTopologyRecoveryStatus::Resolved ||
+              !current->descriptor || current->descriptor->geometry != ImportedGeometryClass::Plane)
+            continue;
+          auto analytic = imported_topology_analytic_descriptor(*current->descriptor);
+          if (!analytic)
+            return Result<CachedReferencePartResult>::failure(analytic.error());
+          const auto& plane = std::get<AssemblyPlanarTargetDescriptor>(analytic.value());
+          auto reference = ImportedTopologyReference::create(catalog->id(), entry.id,
+                                                             ImportedTopologyCapability::Face);
+          if (!reference)
+            return Result<CachedReferencePartResult>::failure(reference.error());
+          auto role = make_imported_face_origin_role(reference.value());
+          if (!role)
+            return Result<CachedReferencePartResult>::failure(role.error());
+          detail::append_lineage(backing->face_lineage,
+                                 {{*producer, role.value()},
+                                  TopoDS::Face(current->shape.impl_->shape),
+                                  plane.origin,
+                                  plane.x_axis},
+                                 backing->shape);
+        }
+        body_shape = GeometryShape(std::move(backing));
+      }
+      result.bodies.push_back({output, std::move(body_shape)});
     }
     if (result.bodies.size() == 1) {
       result.shape = result.bodies.front().shape;
@@ -69,7 +100,11 @@ ReferencePartGeometry::resolve_definition(const PartDocument& document,
       builder.MakeCompound(compound);
       for (const auto& body : result.bodies)
         builder.Add(compound, body.shape.impl_->shape);
-      result.shape = GeometryShape(std::make_shared<GeometryShape::Impl>(compound));
+      auto backing = std::make_shared<GeometryShape::Impl>(compound);
+      for (const auto& body : result.bodies)
+        for (const auto& entry : body.shape.impl_->face_lineage)
+          detail::append_lineage(backing->face_lineage, entry, backing->shape);
+      result.shape = GeometryShape(std::move(backing));
     }
     auto fresh = context.validate_sources();
     if (!fresh)
@@ -131,7 +166,7 @@ ReferencePartGeometry::resolve_imported_body_feature(const PartDocument& documen
   if (source == nullptr || source->mode() != StepImportMode::EditableBody)
     return Result<CachedReferencePartResult>::failure(
         invalid(document, "imported body feature source must retain explicit EditableBody mode"));
-  return resolve_definition(document, feature.definition(), context);
+  return resolve_definition(document, feature.definition(), context, feature.id());
 }
 
 Result<std::size_t> ReferencePartGeometry::seed_imported_body_feature(
@@ -146,6 +181,9 @@ Result<std::size_t> ReferencePartGeometry::seed_imported_body_feature(
   auto stored = candidate.store_feature_shape(feature.id(), resolved.value().shape);
   if (!stored)
     return stored;
+  auto base = candidate.store_imported_body_result(feature.id(), resolved.value());
+  if (!base)
+    return base;
   for (const auto& body : resolved.value().bodies) {
     auto result = candidate.store_body_shape(body.output.body, feature.id(), body.shape);
     if (!result)

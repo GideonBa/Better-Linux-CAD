@@ -71,3 +71,11 @@ results, kind-incompatible topology, no-visible-Body rejection, and empty-path r
 Blocks 48–94 are implemented. Block 94 acceptance is canonical in
 `docs/part-construction-mvp6-acceptance.md`; Block 95 Qt application shell, GUI document session, and
 command architecture is the current next technical step.
+
+## Editable STEP bases — Block 141 integration
+
+Part export includes the latest modeled result of each imported output Body, preserving ordinary
+visibility and multi-body rules. The GUI passes the saved document's source context into the
+document-aware exporter. Actual STEP sources and their aliases remain protected destinations;
+changed or unavailable assets fail before publishing output. Export never replaces the immutable
+base cache with a downstream result. Numbered acceptance is recorded in `docs/mvp-plan.md`.

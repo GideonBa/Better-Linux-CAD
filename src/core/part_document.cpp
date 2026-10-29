@@ -61,6 +61,10 @@ template <typename FeatureT>
 
 [[nodiscard]] bool record_produces_body(const PartDocument& part, const std::string& node,
                                         const BodyId& body) {
+  if (const auto* imported = part.find_imported_body_feature(FeatureId(node)))
+    return std::any_of(imported->definition().outputs().begin(),
+                       imported->definition().outputs().end(),
+                       [&](const auto& output) { return output.body == body; });
   const auto matches = [&](const auto& records) {
     return std::any_of(records.begin(), records.end(), [&](const auto& record) {
       return record_feature_id(record).value() == node && record_result_body(record) == body;
@@ -106,7 +110,25 @@ validate_result_face_source(const PartDocument& document, const ResultFaceWorkpl
   if (!producer && !may_retain(reference.producer().value()))
     return fail("producer must exist and produce the referenced Body");
   for (const auto& origin : reference.origins()) {
+    if (const auto* imported = document.find_imported_body_feature(origin.feature)) {
+      auto imported_face = parse_imported_face_origin_role(origin.role);
+      if (!imported_face || imported_face.value().catalog() != imported->definition().catalog())
+        return fail("imported face origin must identify a canonical Face in its base catalog");
+      const auto* catalog =
+          document.find_imported_topology_catalog(imported_face.value().catalog());
+      const auto* entry = catalog ? catalog->find(imported_face.value().entry()) : nullptr;
+      if (!entry || entry->descriptor.kind != ImportedTopologyKind::Face ||
+          entry->descriptor.geometry != ImportedGeometryClass::Plane ||
+          std::none_of(imported->definition().outputs().begin(),
+                       imported->definition().outputs().end(), [&](const auto& output) {
+                         return entry->parent_body == output.imported_body &&
+                                (origin.feature != reference.producer() ||
+                                 output.body == reference.body());
+                       }))
+        return fail("imported planar face origin must belong to a selected output Body");
+    }
     const bool exists =
+        document.find_imported_body_feature(origin.feature) ||
         document.find_feature(origin.feature) || document.find_revolve_feature(origin.feature) ||
         document.find_sweep_feature(origin.feature) || document.find_loft_feature(origin.feature) ||
         document.find_surface_feature(origin.feature) ||
@@ -847,9 +869,10 @@ add_constraint_reference_dependency(DependencyGraph& graph, const Sketch& sketch
   return Result<std::size_t>::success(0);
 }
 
-[[nodiscard]] Result<std::size_t> add_projected_reference_dependencies(DependencyGraph& graph,
-                                                                       const Sketch& sketch,
-                                                                       bool allow_missing_sources) {
+template <typename AddNode>
+[[nodiscard]] Result<std::size_t>
+add_projected_reference_dependencies(DependencyGraph& graph, const Sketch& sketch,
+                                     bool allow_missing_sources, AddNode add_node) {
   for (const auto& point : sketch.projected_points()) {
     auto dependency =
         add_projected_point_dependency(graph, point, sketch.id().value(), allow_missing_sources);
@@ -864,7 +887,7 @@ add_constraint_reference_dependency(DependencyGraph& graph, const Sketch& sketch
   }
   for (const auto& line : sketch.reference_generated_lines()) {
     const std::string line_node = reference_generated_line_node_id(sketch, line);
-    auto node = graph.add_node(line_node);
+    auto node = add_node(line_node);
     if (node.has_error())
       return node;
     const SketchConstraint* start = sketch.find_constraint(line.start_constraint());
@@ -983,7 +1006,7 @@ Result<std::size_t> PartDocument::add_parameter(Parameter parameter) {
     return Result<std::size_t>::failure(Error::validation(
         parameter.id().value(), "parameter name must be unique within part document"));
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(parameter.id().value());
+  auto added_node = add_authored_graph_node(graph, parameter.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   auto invalidation_state = invalidation_state_;
@@ -1019,7 +1042,7 @@ Result<std::size_t> PartDocument::add_expression_parameter(ParameterId id, std::
     return Result<std::size_t>::failure(parameter.error());
 
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(id.value());
+  auto added_node = add_authored_graph_node(graph, id.value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   for (const ParameterId& referenced : evaluation.value().referenced_parameters) {
@@ -1070,7 +1093,7 @@ Result<std::size_t> PartDocument::add_datum_axis(DatumAxis datum_axis) {
         datum_axis.id().value(),
         "construction-line-derived datum axis source line must exist in part document"));
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(datum_axis.id().value());
+  auto added_node = add_authored_graph_node(graph, datum_axis.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   auto parameter_dependencies = add_parameter_dependencies(
@@ -1110,7 +1133,7 @@ Result<std::size_t> PartDocument::add_construction_point(ConstructionPoint point
       return Result<std::size_t>::failure(valid_relation.error());
   }
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(point.id().value());
+  auto added_node = add_authored_graph_node(graph, point.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   auto parameter_dependencies =
@@ -1163,7 +1186,7 @@ Result<std::size_t> PartDocument::add_construction_line(ConstructionLine line) {
       return Result<std::size_t>::failure(valid_relation.error());
   }
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(line.id().value());
+  auto added_node = add_authored_graph_node(graph, line.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   auto parameter_dependencies =
@@ -1220,7 +1243,7 @@ Result<std::size_t> PartDocument::add_construction_plane(ConstructionPlane plane
       return Result<std::size_t>::failure(valid_relation.error());
   }
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(plane.id().value());
+  auto added_node = add_authored_graph_node(graph, plane.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   auto parameter_dependencies =
@@ -1267,7 +1290,7 @@ Result<std::size_t> PartDocument::add_derived_workplane_impl(DerivedWorkplane wo
         workplane.id().value(),
         "only top, bottom, right, left, front, and back semantic faces are supported"));
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(workplane.id().value());
+  auto added_node = add_authored_graph_node(graph, workplane.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   if (source_feature) {
@@ -1307,7 +1330,7 @@ Result<std::size_t> PartDocument::add_result_face_workplane_impl(
   if (!valid)
     return valid;
   auto graph = dependency_graph_;
-  auto node = graph.add_node(workplane.id().value());
+  auto node = add_authored_graph_node(graph, workplane.id().value());
   if (!node)
     return Result<std::size_t>::failure(node.error());
   const auto& reference = workplane.reference();
@@ -1485,7 +1508,7 @@ Result<std::size_t> PartDocument::add_sketch_impl(Sketch sketch, const Sketch* r
                                 "a length parameter in part document"));
   }
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(sketch.id().value());
+  auto added_node = add_authored_graph_node(graph, sketch.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   if (has_derived_workplane_id(sketch.workplane()) ||
@@ -1496,8 +1519,9 @@ Result<std::size_t> PartDocument::add_sketch_impl(Sketch sketch, const Sketch* r
     if (workplane_dependency.has_error())
       return Result<std::size_t>::failure(workplane_dependency.error());
   }
-  auto projected_reference_dependencies =
-      add_projected_reference_dependencies(graph, sketch, retained != nullptr);
+  auto projected_reference_dependencies = add_projected_reference_dependencies(
+      graph, sketch, retained != nullptr,
+      [&](std::string node) { return add_authored_graph_node(graph, std::move(node)); });
   if (projected_reference_dependencies.has_error())
     return Result<std::size_t>::failure(projected_reference_dependencies.error());
   auto dimension_dependencies = add_driving_dimension_dependencies(graph, sketch);
@@ -1697,7 +1721,7 @@ Result<std::size_t> PartDocument::add_sketch_3d(Sketch3D sketch) {
     }
 
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(sketch.id().value());
+  auto added_node = add_authored_graph_node(graph, sketch.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   for (const ParameterId& parameter_id : sketch.parameter_dependencies()) {
@@ -1782,7 +1806,7 @@ Result<std::size_t> PartDocument::add_path_curve(PathCurve path_curve) {
     return valid;
 
   auto graph = dependency_graph_;
-  auto node = graph.add_node(path_curve.id().value());
+  auto node = add_authored_graph_node(graph, path_curve.id().value());
   if (node.has_error())
     return Result<std::size_t>::failure(node.error());
   for (const auto& segment : path_curve.segments()) {
@@ -1856,9 +1880,22 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
   if (valid_extrude_intent.has_error())
     return Result<std::size_t>::failure(valid_extrude_intent.error());
   if (feature.type() == FeatureType::SubtractiveExtrude &&
-      !has_feature_id(feature.target_feature()))
-    return Result<std::size_t>::failure(Error::validation(
-        feature.id().value(), "subtractive extrude target feature must exist in part document"));
+      !has_feature_id(feature.target_feature())) {
+    const auto* imported = find_imported_body_feature(feature.target_feature());
+    if (!imported)
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "subtractive extrude target feature must exist in part document"));
+    const auto& context = feature.body_result_context();
+    if (!context || !context->target_body() ||
+        std::none_of(imported->definition().outputs().begin(),
+                     imported->definition().outputs().end(), [&](const auto& output) {
+                       return output.body == *context->target_body() &&
+                              output.kind == BodyKind::Solid;
+                     }))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(),
+          "imported subtraction requires an explicit selected Solid output Body"));
+  }
   if (feature.body_result_context().has_value()) {
     const auto& context = feature.body_result_context().value();
     if (context.target_body().has_value() && !has_body_id(context.target_body().value()))
@@ -1869,7 +1906,7 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
           feature.id().value(), "feature produced body must exist in part document"));
   }
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(feature.id().value());
+  auto added_node = add_authored_graph_node(graph, feature.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   auto sketch_dependency =
@@ -1948,7 +1985,7 @@ Result<std::size_t> PartDocument::add_revolve_feature(RevolveFeature feature) {
         feature.id().value(), "revolve produced body must exist in part document"));
 
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(feature.id().value());
+  auto added_node = add_authored_graph_node(graph, feature.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   for (const std::string& source :
@@ -2059,7 +2096,7 @@ Result<std::size_t> PartDocument::add_sweep_feature(SweepFeature feature) {
   }
 
   auto graph = dependency_graph_;
-  auto node = graph.add_node(feature.id().value());
+  auto node = add_authored_graph_node(graph, feature.id().value());
   if (node.has_error())
     return Result<std::size_t>::failure(node.error());
   for (const std::string& source : {feature.profile().source_node_id(), feature.path().value()}) {
@@ -2204,7 +2241,7 @@ Result<std::size_t> PartDocument::add_loft_feature(LoftFeature feature) {
   }
 
   auto graph = dependency_graph_;
-  auto node = graph.add_node(feature.id().value());
+  auto node = add_authored_graph_node(graph, feature.id().value());
   if (node.has_error())
     return Result<std::size_t>::failure(node.error());
   for (const auto& section : feature.sections()) {
@@ -2372,7 +2409,7 @@ Result<std::size_t> PartDocument::add_surface_feature(SurfaceFeature feature) {
         Error::dependency(id.value(), "surface feature result Body already has a producer"));
 
   auto graph = dependency_graph_;
-  auto node = graph.add_node(id.value());
+  auto node = add_authored_graph_node(graph, id.value());
   if (node.has_error()) return Result<std::size_t>::failure(node.error());
   for (const auto& input : surface_feature_input_nodes(feature)) {
     if (input == result_node)
@@ -2466,7 +2503,7 @@ Result<std::size_t> PartDocument::add_linear_pattern_feature(LinearPatternFeatur
   const bool modifies_in_place = context.target_body().has_value() &&
                                  *context.target_body() == context.effective_produced_body();
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(feature.id().value());
+  auto added_node = add_authored_graph_node(graph, feature.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   for (const auto& source : feature.sources()) {
@@ -2555,7 +2592,7 @@ Result<std::size_t> PartDocument::add_circular_pattern_feature(CircularPatternFe
   const bool modifies_in_place = context.target_body().has_value() &&
                                  *context.target_body() == context.effective_produced_body();
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(feature.id().value());
+  auto added_node = add_authored_graph_node(graph, feature.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   for (const auto& source : feature.sources()) {
@@ -2637,7 +2674,7 @@ Result<std::size_t> PartDocument::add_mirror_feature(MirrorFeature feature) {
   const bool modifies_in_place = context.target_body().has_value() &&
                                  *context.target_body() == context.effective_produced_body();
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(feature.id().value());
+  auto added_node = add_authored_graph_node(graph, feature.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   for (const auto& source : feature.sources()) {
@@ -2696,10 +2733,17 @@ PartDocument::add_edge_treatment_dependencies(const FeatureId& id, const BodyId&
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(id.value());
+  auto added_node = add_authored_graph_node(graph, id.value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   for (const auto& edge : edges) {
+    if (const auto* result = std::get_if<ResultEdgeReference>(&edge.source()))
+      if (const auto* imported = find_imported_body_feature(result->source_feature());
+          imported && std::none_of(imported->definition().outputs().begin(),
+                                   imported->definition().outputs().end(),
+                                   [&](const auto& output) { return output.body == target_body; }))
+        return Result<std::size_t>::failure(Error::validation(
+            id.value(), "imported result edge must target an output Body of its producing base"));
     auto dependency = add_dependency_if_missing(graph, edge.source_node_id(), id.value());
     if (dependency.has_error())
       return Result<std::size_t>::failure(dependency.error());
@@ -2804,7 +2848,7 @@ Result<std::size_t> PartDocument::add_shell_dependencies(const ShellFeature& fea
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(feature.id().value());
+  auto added_node = add_authored_graph_node(graph, feature.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   for (const FaceReference& face : feature.removed_faces()) {
@@ -2869,7 +2913,7 @@ Result<std::size_t> PartDocument::add_draft_dependencies(const DraftFeature& fea
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(feature.id().value());
+  auto added_node = add_authored_graph_node(graph, feature.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   for (const FaceReference& face : feature.faces()) {
@@ -2959,7 +3003,7 @@ Result<std::size_t> PartDocument::add_body_boolean_feature(BodyBooleanFeature fe
         feature.id().value(), "body boolean result body must exist in part document"));
 
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(feature.id().value());
+  auto added_node = add_authored_graph_node(graph, feature.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
 
@@ -3019,7 +3063,7 @@ Result<std::size_t> PartDocument::add_sketch_ownership(SketchOwnership ownership
 
   auto graph = dependency_graph_;
   const std::string node_id = sketch_ownership_node_id(ownership.sketch());
-  auto added_node = graph.add_node(node_id);
+  auto added_node = add_authored_graph_node(graph, node_id);
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   auto sketch_dependency = add_dependency_if_missing(graph, ownership.sketch().value(), node_id);
@@ -3118,7 +3162,7 @@ Result<std::size_t> PartDocument::add_body_transform(BodyTransform transform) {
   }
 
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(transform.id().value());
+  auto added_node = add_authored_graph_node(graph, transform.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   const std::string result_node = body_dependency_node_id(transform.body());
@@ -3171,7 +3215,7 @@ Result<std::size_t> PartDocument::add_body(Body body) {
   }
   auto graph = dependency_graph_;
   const std::string node_id = body_dependency_node_id(body.id());
-  auto added_node = graph.add_node(node_id);
+  auto added_node = add_authored_graph_node(graph, node_id);
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   auto invalidation_state = invalidation_state_;
@@ -3355,7 +3399,7 @@ Result<std::size_t> PartDocument::add_reference_status(ReferenceStatusRecord sta
       return Result<std::size_t>::failure(valid_target.error());
   }
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(status.id().value());
+  auto added_node = add_authored_graph_node(graph, status.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   if (find_feature(status.target().source_feature()) != nullptr) {
@@ -3384,7 +3428,7 @@ Result<std::size_t> PartDocument::add_reference_remap(ReferenceRemapRecord remap
   if (valid_replacement.has_error())
     return Result<std::size_t>::failure(valid_replacement.error());
   auto graph = dependency_graph_;
-  auto added_node = graph.add_node(remap.id().value());
+  auto added_node = add_authored_graph_node(graph, remap.id().value());
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   auto replacement_dependency = add_dependency_if_missing(
@@ -3419,7 +3463,7 @@ PartDocument::add_sketch_origin_override(SketchOriginOverrideRecord origin_overr
                           "sketch origin override sketch must exist in part document"));
   auto graph = dependency_graph_;
   const std::string node_id = origin_override.sketch().value() + ".origin_override";
-  auto added_node = graph.add_node(node_id);
+  auto added_node = add_authored_graph_node(graph, node_id);
   if (added_node.has_error())
     return Result<std::size_t>::failure(added_node.error());
   auto dependency = add_dependency_if_missing(graph, origin_override.sketch().value(), node_id);
@@ -4094,6 +4138,33 @@ bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
          has_mirror_feature_id(id) || has_fillet_feature_id(id) || has_chamfer_feature_id(id) ||
          has_shell_feature_id(id) || has_draft_feature_id(id) || has_body_boolean_feature_id(id);
 }
+
+bool PartDocument::has_authored_node_identity(std::string_view node) const {
+  const auto contains = [&](const auto& records) {
+    return std::any_of(records.begin(), records.end(), [&](const auto& record) {
+      if constexpr (requires { record.id(); })
+        return record.id().value() == node;
+      else
+        return surface_feature_id(record).value() == node;
+    });
+  };
+  if (contains(parameters_) || contains(datum_axes_) || contains(construction_points_) ||
+      contains(construction_lines_) || contains(construction_planes_) ||
+      contains(derived_workplanes_) || contains(result_face_workplanes_) || contains(sketches_) ||
+      contains(sketches_3d_) || contains(path_curves_) || contains(imported_body_features_) ||
+      contains(features_) || contains(revolve_features_) || contains(sweep_features_) ||
+      contains(loft_features_) || contains(surface_features_) ||
+      contains(linear_pattern_features_) || contains(circular_pattern_features_) ||
+      contains(mirror_features_) || contains(fillet_features_) || contains(chamfer_features_) ||
+      contains(shell_features_) || contains(draft_features_) || contains(body_boolean_features_) ||
+      contains(body_transforms_) || contains(reference_statuses_) || contains(reference_remaps_))
+    return true;
+  for (const auto& sketch : sketches_)
+    for (const auto& line : sketch.reference_generated_lines())
+      if (reference_generated_line_node_id(sketch, line) == node)
+        return true;
+  return false;
+}
 bool PartDocument::has_body_id(const BodyId& id) const noexcept {
   return find_body(id) != nullptr;
 }
@@ -4228,9 +4299,8 @@ PartDocument::update_feature_record(std::vector<FeatureT> PartDocument::*member,
 // Block 129 generic feature remove: delete a record only when nothing downstream
 // depends on its result body or its intent (mirrors remove_surface_feature).
 template <typename FeatureT>
-Result<std::size_t>
-PartDocument::remove_feature_record(std::vector<FeatureT> PartDocument::*member,
-                                    const FeatureId& id) {
+Result<std::size_t> PartDocument::remove_feature_record(std::vector<FeatureT> PartDocument::*member,
+                                                        const FeatureId& id) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
   std::vector<FeatureT>& records = this->*member;
@@ -4245,13 +4315,29 @@ PartDocument::remove_feature_record(std::vector<FeatureT> PartDocument::*member,
     return Result<std::size_t>::failure(
         Error::dependency(id.value(), "feature with a dependent result cannot be removed"));
   const auto feature_dependents = dependency_graph_.direct_dependents(id.value());
-  if (std::any_of(feature_dependents.begin(), feature_dependents.end(),
-                  [&result_node](const std::string& dependent) { return dependent != result_node; }))
+  if (std::any_of(
+          feature_dependents.begin(), feature_dependents.end(),
+          [&result_node](const std::string& dependent) { return dependent != result_node; }))
     return Result<std::size_t>::failure(
         Error::dependency(id.value(), "feature with dependent intent cannot be removed"));
   auto graph = dependency_graph_;
+  std::string previous_body_producer;
+  const BodyId result_body = record_result_body(*found);
+  auto order = dependency_graph_.topological_order();
+  if (!order)
+    return Result<std::size_t>::failure(order.error());
+  for (const auto& source : order.value())
+    if (dependency_graph_.has_dependency(source, id.value()) &&
+        record_produces_body(*this, source, result_body))
+      previous_body_producer = source;
   auto removed = graph.remove_node(id.value());
-  if (removed.has_error()) return Result<std::size_t>::failure(removed.error());
+  if (removed.has_error())
+    return Result<std::size_t>::failure(removed.error());
+  if (!previous_body_producer.empty()) {
+    auto restored = add_dependency_if_missing(graph, previous_body_producer, result_node);
+    if (!restored)
+      return restored;
+  }
   auto invalidation = invalidation_state_;
   invalidation.untrack_node(id.value());
   dependency_graph_ = std::move(graph);
@@ -4269,6 +4355,8 @@ Result<std::size_t> PartDocument::update_feature(Feature feature) {
 Result<std::size_t> PartDocument::remove_feature(FeatureId id) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
+  if (find_imported_body_feature(id))
+    return remove_imported_body_feature(std::move(id));
   return remove_feature_record(&PartDocument::features_, id);
 }
 Result<std::size_t> PartDocument::update_revolve_feature(RevolveFeature feature) {

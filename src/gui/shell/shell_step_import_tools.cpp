@@ -719,12 +719,12 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   ui.topology_reference->setPlaceholderText(
       QStringLiteral("Select a resolved imported face, edge or vertex."));
   content_layout->addWidget(ui.topology_reference);
-  content_layout->addWidget(new QLabel(QStringLiteral("Reference Parts"), content));
+  content_layout->addWidget(new QLabel(QStringLiteral("Imported Parts"), content));
   auto* reference_hint = new QLabel(
       QStringLiteral(
-          "Insert a saved Reference product as an immutable Part. Repeated occurrences share its "
-          "definition. Refresh reports every affected asset binding; conversion creates a new "
-          "Editable Part."),
+          "Insert a saved product using its explicit Reference or Editable Body source mode. "
+          "Editable imports support later Part features. Refresh validates all downstream features "
+          "and reports affected bindings; Reference conversion creates a new Editable Part."),
       content);
   reference_hint->setWordWrap(true);
   reference_hint->setMinimumWidth(0);
@@ -743,7 +743,7 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
                                     "Refresh Shared STEP Asset", "Convert to New Editable Part"});
   reference_form->addRow("Part Change", ui.reference_operation);
   ui.reference_part = combo("reference_part");
-  reference_form->addRow("Reference Part", ui.reference_part);
+  reference_form->addRow("Imported Part", ui.reference_part);
   ui.reference_assembly = combo("reference_assembly");
   reference_form->addRow("Target Assembly", ui.reference_assembly);
   ui.reference_name = new QLineEdit(QStringLiteral("Imported Part"), content);
@@ -760,7 +760,7 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   }
   content_layout->addLayout(reference_form);
   auto* reference_prepare =
-      make_gui_button(QStringLiteral("Prepare Reference Part Change"), content);
+      make_gui_button(QStringLiteral("Prepare Imported Part Change"), content);
   reference_prepare->setObjectName("blcad.step_import.reference_prepare");
   content_layout->addWidget(reference_prepare);
   content_layout->addStretch();
@@ -944,14 +944,14 @@ Result<std::size_t> ShellStepImportTools::begin() {
   ui.reference_assembly->clear();
   if (const auto* project = ui.window.session().project()) {
     for (const auto& part : project->part_documents())
-      if (part.is_reference_part())
+      if (part.is_reference_part() || !part.imported_body_features().empty())
         ui.reference_part->addItem(text(part.name()), text(part.id().value()));
     ui.reference_assembly->addItem(text(project->assembly().name()),
                                    text(project->assembly().id().value()));
     for (const auto& assembly : project->child_assembly_documents())
       ui.reference_assembly->addItem(text(assembly.name()), text(assembly.id().value()));
   } else if (const auto* part = ui.window.session().part_document();
-             part && part->is_reference_part()) {
+             part && (part->is_reference_part() || !part->imported_body_features().empty())) {
     ui.reference_part->addItem(text(part->name()), text(part->id().value()));
   }
   ui.reference_assembly->setEnabled(ui.window.session().project());
@@ -1156,6 +1156,7 @@ Result<std::size_t> ShellStepImportTools::prepare_reference() {
       static_cast<GuiStepReferenceOperation>(ui.reference_operation->currentIndex());
   request.catalog =
       ImportedTopologyCatalogId(ui.topology_catalog->currentData().toString().toStdString());
+  request.refresh_source = StepImportSourceId(ui.source->currentData().toString().toStdString());
   request.reference_part = DocumentId(ui.reference_part->currentData().toString().toStdString());
   request.target_assembly =
       DocumentId(ui.reference_assembly->currentData().toString().toStdString());
@@ -1228,7 +1229,7 @@ Result<std::size_t> ShellStepImportTools::prepare_reference() {
           .arg(ui.reference->preview_shapes.size()));
   ui.summary->setText(
       session.project()
-          ? QStringLiteral("Apply commits this Reference Part change in one history step.")
+          ? QStringLiteral("Apply commits this imported Part change in one history step.")
       : ui.reference->request.operation == GuiStepReferenceOperation::Refresh
           ? QStringLiteral("Apply accepts the validated source refresh in one history step.")
           : QStringLiteral("Apply asks for a new Part file beside this document. The current "

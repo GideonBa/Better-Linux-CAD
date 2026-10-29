@@ -2,6 +2,7 @@
 
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -46,8 +47,10 @@ inline Result<std::size_t> provision_new_feature_parameters(PartDocument& part,
   return Result<std::size_t>::success(pending.size());
 }
 inline Result<geometry::ShapeCache>
-recompute_preview_geometry(const GuiDocumentSession& session, const PartDocument& candidate,
-                           const std::vector<std::string>& changed_features) {
+recompute_preview_geometry_with_context(const GuiDocumentSession& session,
+                                        const PartDocument& candidate,
+                                        const std::vector<std::string>& changed_features,
+                                        geometry::StepImportTopologyContext* context) {
   const auto* committed = session.part_document();
   const auto* existing = session.part_shape_cache();
   const auto backings_match = [](const PartDocument& part, const geometry::ShapeCache& cache) {
@@ -61,6 +64,7 @@ recompute_preview_geometry(const GuiDocumentSession& session, const PartDocument
           producers.insert(record.id().value());
       }
     };
+    collect(part.imported_body_features());
     collect(part.features());
     collect(part.revolve_features());
     collect(part.sweep_features());
@@ -93,7 +97,7 @@ recompute_preview_geometry(const GuiDocumentSession& session, const PartDocument
     return cache;
   if (!reuse) {
     auto recomputed =
-        geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
+        geometry::GeometryRecomputeExecutor{context}.execute_document(candidate, cache.value());
     if (!recomputed)
       return Result<geometry::ShapeCache>::failure(recomputed.error());
     return cache;
@@ -114,11 +118,18 @@ recompute_preview_geometry(const GuiDocumentSession& session, const PartDocument
   auto plan = RecomputePlan::from_graph_and_changed_nodes(candidate.dependency_graph(), roots);
   if (!plan)
     return Result<geometry::ShapeCache>::failure(plan.error());
-  auto recomputed =
-      geometry::GeometryRecomputeExecutor{}.execute_plan(candidate, plan.value(), cache.value());
+  auto recomputed = geometry::GeometryRecomputeExecutor{context}.execute_plan(
+      candidate, plan.value(), cache.value());
   if (!recomputed)
     return Result<geometry::ShapeCache>::failure(recomputed.error());
   return cache;
+}
+inline Result<geometry::ShapeCache>
+recompute_preview_geometry(const GuiDocumentSession& session, const PartDocument& candidate,
+                           const std::vector<std::string>& changed_features) {
+  return query_with_step_import_context(session, [&](auto* context) {
+    return recompute_preview_geometry_with_context(session, candidate, changed_features, context);
+  });
 }
 inline Result<geometry::GeometryShape> preview_feature_body(const GuiDocumentSession& session,
                                                             const PartDocument& candidate,

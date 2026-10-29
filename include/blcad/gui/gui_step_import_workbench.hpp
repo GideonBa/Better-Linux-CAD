@@ -58,6 +58,7 @@ struct GuiStepReferenceRequest {
   ComponentInstanceId instance;
   RigidTransform transform{identity_rigid_transform()};
   FeatureId base_feature{"feature.imported.base"};
+  StepImportSourceId refresh_source;
 };
 struct GuiStepReferencePreview {
   GuiStepReferenceRequest request;

@@ -365,7 +365,8 @@ TEST_CASE(
   p.mark_all_clean();
   REQUIRE(p.refresh_step_import_source(source(), std::string(64, '3')));
   CHECK(p.imported_topology_catalogs() == std::vector{catalog()});
-  CHECK(p.invalidation_state().find(catalog().node_id())->status == InvalidationStatus::Changed);
+  CHECK(p.invalidation_state().find(source().node_id())->status == InvalidationStatus::Changed);
+  CHECK(p.invalidation_state().find(catalog().node_id())->status == InvalidationStatus::Dirty);
   CHECK(p.invalidation_state().find("revolve")->status == InvalidationStatus::Dirty);
   CHECK_FALSE(p.refresh_step_import_source(source(), std::string(64, '4')));
   const auto after = json(p);

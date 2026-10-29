@@ -9,6 +9,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct ResultFaceSelectionTarget {
   std::string semantic_id;
   std::string label;
@@ -33,9 +35,11 @@ public:
   [[nodiscard]] static GeometryShape scope_copy(const GeometryShape& shape, FeatureId producer,
                                                 std::string instance);
   [[nodiscard]] static Result<std::vector<ResultFaceSelectionTarget>>
-  selectable_faces(const PartDocument& document, const ShapeCache& cache, const BodyId& body);
+  selectable_faces(const PartDocument& document, const ShapeCache& cache, const BodyId& body,
+                   StepImportTopologyContext* import_context = nullptr);
   [[nodiscard]] static Result<ResolvedWorkplane>
-  resolve(const PartDocument& document, const ResultFaceWorkplane& plane, const ShapeCache& cache);
+  resolve(const PartDocument& document, const ResultFaceWorkplane& plane, const ShapeCache& cache,
+          StepImportTopologyContext* import_context = nullptr);
 };
 
 } // namespace blcad::geometry

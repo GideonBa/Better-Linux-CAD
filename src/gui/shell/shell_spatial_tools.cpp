@@ -3,6 +3,7 @@
 
 #include "blcad/gui/gui_modeling_workspace.hpp"
 #include "blcad/gui/occt_viewport.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <QAction>
@@ -584,10 +585,12 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
       if (!guide.isEmpty())
         sweep.set_guide(PathCurveId(guide.toStdString()));
       GuiFeatureManipulatorFrame frame;
-      auto segments = geometry::GeometryRecomputeExecutor{}.resolve_path_segments(
-          *session_.part_document(),
-          PathCurveId(spatial_path_->currentData().toString().toStdString()),
-          *session_.part_shape_cache());
+      auto segments = query_with_step_import_context(session_, [&](auto* context) {
+        return geometry::GeometryRecomputeExecutor{context}.resolve_path_segments(
+            *session_.part_document(),
+            PathCurveId(spatial_path_->currentData().toString().toStdString()),
+            *session_.part_shape_cache());
+      });
       if (segments && !segments.value().empty()) {
         const auto& first = segments.value().front();
         frame.origin = first.start;

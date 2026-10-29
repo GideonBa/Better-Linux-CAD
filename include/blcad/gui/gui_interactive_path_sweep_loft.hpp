@@ -176,15 +176,16 @@ public:
       return Result<geometry::GeometryShape>::failure(added.error());
     if (mode_ == GuiPathSweepMode::Sweep)
       return detail::preview_feature_body(session, candidate, feature_, result_body_);
-    auto cache = geometry::ShapeCache::create(ShapeCacheId(path_id_.value() + ".preview"));
-    if (!cache)
-      return Result<geometry::GeometryShape>::failure(cache.error());
-    auto recomputed =
-        geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
-    if (!recomputed)
-      return Result<geometry::GeometryShape>::failure(recomputed.error());
-    return geometry::GeometryRecomputeExecutor{}.preview_path_curve(candidate, path_id_,
-                                                                    cache.value());
+    return query_with_step_import_context(session, [&](auto* context) {
+      auto cache = geometry::ShapeCache::create(ShapeCacheId(path_id_.value() + ".preview"));
+      if (!cache)
+        return Result<geometry::GeometryShape>::failure(cache.error());
+      const geometry::GeometryRecomputeExecutor executor{context};
+      auto recomputed = executor.execute_document(candidate, cache.value());
+      if (!recomputed)
+        return Result<geometry::GeometryShape>::failure(recomputed.error());
+      return executor.preview_path_curve(candidate, path_id_, cache.value());
+    });
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {

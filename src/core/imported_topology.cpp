@@ -305,6 +305,21 @@ Result<std::size_t> validate_imported_topology_reference(const PartDocument& par
                      [&](const auto& output) { return owner == output.imported_body; }))
       return Result<std::size_t>::failure(
           invalid("imported reference must belong to a selected Reference Part Body"));
+  } else {
+    const auto owner = entry->descriptor.kind == ImportedTopologyKind::Body
+                           ? std::optional(entry->id)
+                           : entry->parent_body;
+    bool bound = false, selected = false;
+    for (const auto& base : part.imported_body_features())
+      if (base.definition().catalog() == ref.catalog()) {
+        bound = true;
+        selected |=
+            std::any_of(base.definition().outputs().begin(), base.definition().outputs().end(),
+                        [&](const auto& output) { return owner == output.imported_body; });
+      }
+    if (bound && !selected)
+      return Result<std::size_t>::failure(
+          invalid("imported reference must belong to a selected EditableBody output"));
   }
   const auto capabilities = imported_topology_capabilities(entry->descriptor);
   if (std::find(capabilities.begin(), capabilities.end(), ref.capability()) == capabilities.end())
@@ -357,6 +372,25 @@ const ImportedTopologyCatalog*
 Project::find_imported_topology_catalog(ImportedTopologyCatalogId id) const noexcept {
   return find_catalog(*this, std::move(id));
 }
+Result<std::size_t> PartDocument::add_step_import_source(StepImportSource source) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
+  if (dependency_graph_.has_node(source.node_id()))
+    return Result<std::size_t>::failure(invalid("STEP source dependency identity must be unique"));
+  auto candidate = *this;
+  const auto node = source.node_id();
+  auto added = candidate.step_import_sources_.add(std::move(source));
+  if (!added)
+    return added;
+  auto tracked = candidate.dependency_graph_.add_node(node);
+  if (!tracked)
+    return tracked;
+  auto synced = candidate.invalidation_state_.sync_from_graph(candidate.dependency_graph_);
+  if (!synced)
+    return synced;
+  *this = std::move(candidate);
+  return added;
+}
 Result<std::size_t> PartDocument::add_imported_topology_catalog(ImportedTopologyCatalog catalog) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
@@ -368,6 +402,10 @@ Result<std::size_t> PartDocument::add_imported_topology_catalog(ImportedTopology
   auto added = candidate.dependency_graph_.add_node(catalog.node_id());
   if (!added)
     return added;
+  auto edge = candidate.dependency_graph_.add_dependency(
+      find_step_import_source(catalog.source())->node_id(), catalog.node_id());
+  if (!edge)
+    return edge;
   auto synced = candidate.invalidation_state_.sync_from_graph(candidate.dependency_graph_);
   if (!synced)
     return synced;
@@ -409,17 +447,28 @@ Result<std::size_t> Project::remove_imported_topology_catalog(ImportedTopologyCa
 Result<std::size_t> PartDocument::remove_step_import_source(StepImportSourceId id) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
-  return source_in_use(*this, id) ? Result<std::size_t>::failure(invalid(
-                                        "STEP source is owned by an imported topology catalog"))
-                                  : step_import_sources_.remove(std::move(id));
+  const auto* source = find_step_import_source(id);
+  if (!source)
+    return Result<std::size_t>::failure(invalid("STEP source does not exist"));
+  return remove_step_import_source(*source);
 }
 Result<std::size_t> PartDocument::remove_step_import_source(const StepImportSource& expected) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
-  return source_in_use(*this, expected.id())
-             ? Result<std::size_t>::failure(
-                   invalid("STEP source is owned by an imported topology catalog"))
-             : step_import_sources_.remove(expected);
+  if (source_in_use(*this, expected.id()) ||
+      !dependency_graph_.direct_dependents(expected.node_id()).empty())
+    return Result<std::size_t>::failure(
+        invalid("STEP source is owned by imported topology or downstream intent"));
+  auto candidate = *this;
+  auto removed = candidate.step_import_sources_.remove(expected);
+  if (!removed)
+    return removed;
+  auto untracked = candidate.dependency_graph_.remove_node(expected.node_id());
+  if (!untracked)
+    return untracked;
+  candidate.invalidation_state_.untrack_node(expected.node_id());
+  *this = std::move(candidate);
+  return removed;
 }
 Result<std::size_t> Project::remove_step_import_source(StepImportSourceId id) {
   return source_in_use(*this, id) ? Result<std::size_t>::failure(invalid(
@@ -440,13 +489,10 @@ Result<std::size_t> PartDocument::refresh_step_import_source(const StepImportSou
   auto changed = candidate.step_import_sources_.refresh(expected, std::move(hash));
   if (!changed || changed.value() == 0)
     return changed;
-  for (const auto& catalog : candidate.imported_topology_catalogs_)
-    if (catalog.source() == expected.id()) {
-      auto invalidated = candidate.invalidation_state_.mark_changed(candidate.dependency_graph_,
-                                                                    catalog.node_id());
-      if (!invalidated)
-        return Result<std::size_t>::failure(invalidated.error());
-    }
+  auto invalidated =
+      candidate.invalidation_state_.mark_changed(candidate.dependency_graph_, expected.node_id());
+  if (!invalidated)
+    return Result<std::size_t>::failure(invalidated.error());
   *this = std::move(candidate);
   return changed;
 }

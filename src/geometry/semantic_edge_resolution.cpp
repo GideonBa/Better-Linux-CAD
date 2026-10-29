@@ -1,6 +1,7 @@
 #include "semantic_edge_resolution.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
+#include "imported_body_placement.hpp"
 
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "blcad/geometry/shape_cache.hpp"
@@ -224,7 +225,11 @@ Result<TopoDS_Edge> resolve_semantic_edge(const PartDocument& document, const Sh
       return Result<TopoDS_Edge>::failure(current.error());
     if (!current.value().descriptor)
       return Result<TopoDS_Edge>::failure(edge_error(id, "imported edge is not resolved"));
-    auto match = StepImportTopology{}.match_subshape(*current.value().descriptor, target);
+    auto descriptor =
+        detail::imported_descriptor_on_body(document, cache, *imported, current.value(), id);
+    if (!descriptor)
+      return Result<TopoDS_Edge>::failure(descriptor.error());
+    auto match = StepImportTopology{}.match_subshape(descriptor.value(), target);
     if (!match)
       return Result<TopoDS_Edge>::failure(match.error());
     if (match.value().status != ImportedTopologyRecoveryStatus::Resolved)

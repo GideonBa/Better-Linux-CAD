@@ -34,6 +34,13 @@ struct CachedReferencePartResult {
   GeometryShape shape;
 };
 
+// Immutable imported-base outputs retained independently of each Body's latest
+// downstream result. A multi-body feature shape alone cannot identify one input.
+struct CachedImportedBodyFeatureResult {
+  FeatureId feature_id;
+  CachedReferencePartResult imported;
+};
+
 struct CachedFeatureShape {
   FeatureId feature_id;
   GeometryShape shape;
@@ -75,6 +82,20 @@ public:
   // catalog baseline or body mapping cannot be presented as this document.
   [[nodiscard]] Result<const CachedReferencePartResult*>
   validated_reference_result(const PartDocument& document) const;
+  [[nodiscard]] Result<std::size_t> store_imported_body_result(FeatureId feature_id,
+                                                               CachedReferencePartResult result);
+  [[nodiscard]] const CachedImportedBodyFeatureResult*
+  find_imported_body_result(const FeatureId& feature_id) const noexcept;
+  [[nodiscard]] const GeometryShape* find_imported_body_shape(const FeatureId& feature_id,
+                                                              const BodyId& body_id) const noexcept;
+  [[nodiscard]] Result<const CachedImportedBodyFeatureResult*>
+  validated_imported_body_result(const PartDocument& document,
+                                 const ImportedBodyFeature& feature) const;
+  [[nodiscard]] Result<std::size_t>
+  validate_imported_body_owners(const PartDocument& document) const;
+  // Remove only orphaned, untouched base outputs in a disposable recompute cache.
+  // Deleted modifier results or reused authorities require an explicit clean rebuild.
+  [[nodiscard]] Result<std::size_t> reconcile_imported_body_owners(const PartDocument& document);
   [[nodiscard]] Result<std::size_t>
   store_body_transform_state(BodyTransformId transform_id, BodyId body_id,
                              GeometryAffineTransform cumulative_transform);
@@ -119,6 +140,7 @@ private:
   std::vector<CachedBodyTransformState> body_transform_states_;
   std::vector<CachedReferenceTransform> reference_transforms_;
   std::optional<CachedReferencePartResult> reference_result_;
+  std::vector<CachedImportedBodyFeatureResult> imported_body_results_;
   bool has_final_shape_ = false;
   FeatureId final_feature_id_;
   GeometryShape final_shape_;

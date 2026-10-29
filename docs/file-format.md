@@ -1101,12 +1101,48 @@ including the result-face workplane replay path. Project JSON embeds this same P
 shared definition is duplicated per occurrence. Import source/catalog identities remain scoped to
 their Part owner, so separate definitions may retain the same source identity without conflation.
 
-## Remaining STEP import persistence — Blocks 141–143
+## EditableBody history and imported face provenance — Block 141 implementation
+
+Direct EditableBody creation uses the same strict `imported_body_features` payload introduced for
+conversion in Block 140. It creates a normal editable Part with the three BLCAD origin datums and
+explicit ordered Solid/Surface output BodyIds. A base has no editable modeling parameters; source
+acceptance changes only through explicit refresh. Later operations remain ordinary BLCAD features.
+The numbered acceptance status remains owned by `docs/mvp-plan.md`.
+
+Within one Part, a catalog Body may be mapped by only one imported base output. Disjoint selections
+of one catalog may supply separate bases; unselected catalog Bodies cannot become semantic inputs
+of a bound EditableBody definition. Source, catalog, base and output Body dependency identities
+cannot alias later authored graph nodes. Derived source-to-catalog-to-base-to-Body dependencies are
+rebuilt from existing JSON fields; the source node `step-import-source:<id>` and cache evidence are
+not additional persistent payloads. Explicit refresh invalidates affected descendants. The final
+Body producer changes normally as downstream operations are added or edited; removing a terminal
+modifier restores its actual predecessor. Removing an imported base fails while its feature or
+outputs have consumers and otherwise follows normal feature removal, retaining Body declarations
+and independently owned source/catalog metadata. A retained Body declaration does not authorize
+reusing geometry from a removed base or modifier; derived-cache reconciliation must remove or
+reject that orphaned result independently of persistence.
+
+An imported planar face can contribute to an existing `ResultFaceReference`. Its origin names the
+real ImportedBodyFeature and uses `imported-face/` followed by the canonical Face-capability target:
+
+```json
+{"feature":"feature.imported.base","role":"imported-face/imported:catalog_supplier:face_1:face"}
+```
+
+The origin must name an actual selected planar Face in that base's owned catalog; its output Body
+must match the support and its base must precede the producer. Wrong capability, foreign ownership,
+unselected Bodies and malformed/noncanonical spelling fail before replay. No generated `.top` role,
+foreign face ordinal or resolved world-space frame is invented. Existing support/workplane/Sketch
+fields and `feature_order` carry this intent, so no new root JSON field is needed. Pattern/Mirror
+and current-result edge producer validation recognize a real imported base through the same typed
+Body authority. The immutable base cache, transformed recovery witnesses and current topology
+handles remain runtime-only.
+
+## Remaining STEP import persistence — Blocks 142–143
 
 Planned persistent import intent includes:
 
 ```text
-full EditableBody authoring and incremental recompute integration
 structured foreign assembly definition/occurrence import
 ```
 

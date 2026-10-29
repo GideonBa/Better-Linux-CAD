@@ -1,5 +1,6 @@
 #include "blcad/geometry/result_face_support.hpp"
 #include "blcad/geometry/finishing_selection.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "geometry_shape_internal.hpp"
 
 #include <BRepAdaptor_Surface.hxx>
@@ -128,12 +129,28 @@ GeometryShape ResultFaceSupportGeometry::scope_copy(const GeometryShape& shape, 
   return GeometryShape(std::move(backing));
 }
 
-Result<ResolvedWorkplane> ResultFaceSupportGeometry::resolve(const PartDocument& document,
-                                                             const ResultFaceWorkplane& plane,
-                                                             const ShapeCache& cache) {
+Result<ResolvedWorkplane>
+ResultFaceSupportGeometry::resolve(const PartDocument& document, const ResultFaceWorkplane& plane,
+                                   const ShapeCache& cache,
+                                   StepImportTopologyContext* import_context) {
   auto valid = validate_result_face_workplane_reference(document, plane);
   if (!valid)
     return Result<ResolvedWorkplane>::failure(valid.error());
+  for (const auto& base : document.imported_body_features()) {
+    const bool owns_body =
+        std::any_of(base.definition().outputs().begin(), base.definition().outputs().end(),
+                    [&](const auto& output) { return output.body == plane.reference().body(); });
+    if (!owns_body)
+      continue;
+    auto owned = cache.validated_imported_body_result(document, base);
+    if (!owned)
+      return Result<ResolvedWorkplane>::failure(owned.error());
+  }
+  if (import_context) {
+    auto observed = observe_imported_part_sources(document, import_context);
+    if (!observed)
+      return Result<ResolvedWorkplane>::failure(observed.error());
+  }
   const auto* shape = cache.find_feature_shape(plane.reference().producer());
   const auto fail = [&](std::string message) {
     return Result<ResolvedWorkplane>::failure(
@@ -161,15 +178,16 @@ Result<ResolvedWorkplane> ResultFaceSupportGeometry::resolve(const PartDocument&
 
 Result<std::vector<ResultFaceSelectionTarget>>
 ResultFaceSupportGeometry::selectable_faces(const PartDocument& document, const ShapeCache& cache,
-                                            const BodyId& body) {
+                                            const BodyId& body,
+                                            StepImportTopologyContext* import_context) {
   const auto* model_body = document.find_body(body);
   const auto* result = cache.find_body_result(body);
   if (!model_body || model_body->kind() != BodyKind::Solid ||
       model_body->visibility() != BodyVisibility::Visible || !result || result->shape.empty())
     return Result<std::vector<ResultFaceSelectionTarget>>::failure(Error::validation(
         body.value(), "Face-supported sketches require a visible recomputed solid Body"));
-  auto aliases = FinishingSelectionBuilder::build(document, cache, body,
-                                                  PartFeatureInputRole::ShellRemovalFace);
+  auto aliases = FinishingSelectionBuilder::build(
+      document, cache, body, PartFeatureInputRole::ShellRemovalFace, import_context);
   std::vector<ResultFaceSelectionTarget> targets;
   for (TopExp_Explorer it(result->shape.impl_->shape, TopAbs_FACE); it.More(); it.Next()) {
     const auto face = TopoDS::Face(it.Current());
@@ -185,7 +203,7 @@ ResultFaceSupportGeometry::selectable_faces(const PartDocument& document, const 
       continue;
     auto plane =
         ResultFaceWorkplane::create(DatumPlaneId("selection.face"), "Face", reference.value());
-    if (!plane || !resolve(document, plane.value(), cache))
+    if (!plane || !resolve(document, plane.value(), cache, import_context))
       continue;
     std::string semantic = "support/" + reference.value().identity();
     if (aliases)

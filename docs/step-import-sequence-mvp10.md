@@ -1,7 +1,7 @@
 # STEP Import Sequence MVP-10
 
-Status: Blocks 137–140 complete; Blocks 141–143 planned. Block 141 starts only after the
-Block-140 PR is merged and main is verified. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
+Status: Blocks 137–141 complete; Blocks 142–143 planned. Block 141 is accepted on 2026-10-29;
+its PR must merge and main be verified before Block 142 starts. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
 `docs/gui-shell-reset-sequence-mvp9r.md`); `docs/mvp-plan.md` is the status authority. An earlier
 revision numbered these blocks 132–138, before MVP-9R took that range; only the numbering moved,
 never the content or the ordering.
@@ -601,14 +601,17 @@ dependency audit and visual evidence live in `docs/development-setup.md`.
 The final serialized documentation/GUI inventory passes **3 / 313** at this accepted boundary.
 Delivery: [PR #132](https://github.com/GideonBa/Better-Linux-CAD/pull/132), verified implementation
 commit `16fd35e`.
+PR #132 merged as `f426480`; main exactly matches tested head `ba79e27` and all **961** runtime
+fingerprints. Fresh GitHub searches find no open issues or PRs at the serialized Block-141 boundary.
 
 ## Block 141 — EditableBody ImportedBodyFeature and downstream modeling
 
 Primary boundary: imported geometry as a Part feature-result authority.
 
-Status: planned. Start only after the Block-140 PR is merged and main is verified. Block 140
-supplies the real minimal `ImportedBodyFeature` intent/cache needed for conversion; that
-foundation does not complete this block.
+Status: complete on 2026-10-29 on `feat/step-editable-body-modeling`, from verified main `f426480`
+after PR #132. Direct creation, full downstream/incremental integration and focused/full/native/visual
+acceptance are complete; the Block-141 PR must merge before Block 142 starts. Detailed gates live in
+`docs/development-setup.md`; numbered completion belongs to `docs/mvp-plan.md`.
 
 Extend the foundation with direct EditableBody import creation referencing one `StepImportSource`
 and its imported body definitions, and full downstream/incremental Part integration. Its ordered
@@ -629,6 +632,26 @@ Freeze:
 Prove representative downstream edits: an additive feature, a subtractive feature, a hole, a
 fillet/chamfer or body boolean, JSON roundtrip, recompute, and re-export.
 
+Implementation contract: direct import uses the explicit `EditableBody` source mode and creates a
+new Part definition with ordered `Solid`/`Surface` outputs. The derived dependency chain is source →
+catalog → imported base → output Bodies/downstream features. The base cache retains each original
+output separately from the latest modeled Body result; downstream parameter changes replay the
+necessary consumers without replacing this verified base. Reusing a cache after base deletion
+must remove unambiguously orphaned base results or reject the stale cache atomically; deleted
+modifier results cannot become geometry authority for a now-unbound Body. Refresh validates the entire modeled
+history and all explicit same-asset bindings before accepting changed source bytes.
+
+Imported planar faces can support Sketches through producer-owned `imported-face/` roles. Typed
+imported edges remain selectable after supported Body placement transforms. These references must
+resolve uniquely against the actual current Body. Lost topology never receives a substitute by
+index. Open/Undo/Redo retain valid persisted intent with failed derived state for a verified lost
+imported subentity; authoring and refresh still reject an invalid candidate atomically.
+
+The existing source task dispatches insertion by the explicitly stored source mode. Standalone
+insertion writes a distinct Editable document in the same asset root. Previews, downstream feature
+commands, repair queries and Part export share the saved document's source context. The imported
+base itself has no editable feature parameters; guarded deletion preserves live consumers.
+
 This block is history-based modeling after an immutable base feature. It does not implement feature
 recognition or direct modeling/push-pull.
 
@@ -638,7 +661,14 @@ Focused tags:
 [core][imported-body-feature]
 [geometry][imported-body-recompute]
 [geometry][imported-body-downstream-feature]
+[geometry][step-editable-commands]
+[gui][imported-body-preview]
+[gui][step-editable-parts]
+[native-step-editable-parts]
 ```
+
+Delivery: [PR #133](https://github.com/GideonBa/Better-Linux-CAD/pull/133), verified implementation
+commit `c4fc431`. Runtime fingerprints remain unchanged; this PR must merge before Block 142 starts.
 
 ## Block 142 — Structured STEP assembly import
 

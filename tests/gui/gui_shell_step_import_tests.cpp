@@ -8,6 +8,8 @@
 #include "blcad/geometry/body_transform_adapter.hpp"
 #include "blcad/geometry/circular_cut_adapter.hpp"
 #include "blcad/geometry/step_exporter.hpp"
+#include "blcad/geometry/result_face_support.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
@@ -16,6 +18,7 @@
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <QAction>
+#include <QAbstractItemModel>
 #include <QApplication>
 #include <QComboBox>
 #include <QCheckBox>
@@ -33,6 +36,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPlainTextEdit>
@@ -192,13 +196,19 @@ public:
     key(control, Qt::Key_Tab);
   }
   void choose(QComboBox& combo, int index) {
+    INFO(combo.objectName().toStdString());
+    INFO("Requested combo row: " << index);
     REQUIRE(index >= 0);
     REQUIRE(index < combo.count());
+    REQUIRE(combo.model());
+    const auto requested = combo.model()->index(index, combo.modelColumn(), combo.rootModelIndex());
+    REQUIRE(requested.isValid());
+    REQUIRE(requested.flags().testFlag(Qt::ItemIsEnabled));
     reveal(combo);
     REQUIRE(combo.isEnabled());
     combo.setFocus();
     key(combo, Qt::Key_Home);
-    for (int i = 0; i < index; ++i)
+    for (int i = 0; i < combo.count() && combo.currentIndex() != index; ++i)
       key(combo, Qt::Key_Down);
     REQUIRE(combo.currentIndex() == index);
   }
@@ -353,6 +363,32 @@ public:
     click(widget<QPushButton>("blcad.feature.apply"));
     REQUIRE(window.session().part_document()->bodies().size() == 1);
     REQUIRE(window.session().part_shape_cache()->body_shape_count() == 1);
+  }
+  void rectangle_in_active(Point2 first, Point2 second) {
+    REQUIRE(window.active_sketch());
+    for (auto* button : window.ribbon().findChildren<QToolButton*>())
+      if (auto* action = button->defaultAction();
+          action && action->text() == "Snap" && action->isChecked())
+        click(*button);
+    command("sketch.create.corner_rectangle");
+    const auto coordinates = [&](Point2 point) {
+      const auto entry =
+          QString::number(point.x, 'g', 17) + ";" + QString::number(point.y, 'g', 17);
+      for (const auto character : entry)
+        key(window, character.unicode(), QString(character));
+      key(window, Qt::Key_Return);
+    };
+    coordinates(first);
+    const auto hover =
+        checked(window.viewport().sketch_plane_to_screen({first.x + 20, first.y + 20}));
+    QMouseEvent move(QEvent::MouseMove, {hover.x, hover.y},
+                     window.viewport().mapToGlobal(QPoint(qRound(hover.x), qRound(hover.y))),
+                     Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(&window.viewport(), &move);
+    flush();
+    coordinates({second.x - first.x, second.y - first.y});
+    command("finish_sketch");
+    REQUIRE_FALSE(window.active_sketch());
   }
   std::string snapshot() {
     return window.session().project()
@@ -1553,6 +1589,235 @@ TEST_CASE(
   CHECK(ui.window.session().part_shape_cache()->body_shape_count() == 1);
   CHECK_FALSE(ui.window.session().part_shape_cache()->reference_result());
   ui.roundtrip(editable_path);
+}
+
+TEST_CASE("Native direct EditableBody imports support face sketches, modeling, refresh and "
+          "protected STEP export",
+          "[gui][integration][block141-editable-parts][native-step-editable-parts]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native OCCT imported-base picking and Part authoring");
+  SourceUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto asset = directory.filePath("editable.step");
+  auto supplier = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(
+      checked(Quantity::length_mm(20)), checked(Quantity::length_mm(10)),
+      checked(Quantity::length_mm(5))));
+  REQUIRE(geometry::StepExporter{}.write_step(supplier, asset.toStdString()));
+  const auto supplier_bytes = bytes(asset);
+  ui.dialog<QInputDialog>([&] { ui.command("new_part"); },
+                          [&](QInputDialog& dialog) {
+                            dialog.setTextValue("Editable supplier registry");
+                            dialog.accept();
+                          });
+  const auto registry = directory.filePath("registry.blcad.json");
+  ui.file("save_as", registry);
+  ui.begin();
+  ui.draft("Editable supplier", "editable.step", StepImportMode::EditableBody);
+  ui.preview();
+  ui.apply();
+  const auto source_id = QString::fromStdString(ui.sources().front().id().value());
+  ui.begin();
+  ui.source(source_id);
+  ui.button("inspect_geometry");
+  ui.button("topology_prepare");
+  ui.apply();
+  ui.command("save");
+  const auto registry_json = ui.snapshot();
+  ui.begin();
+  ui.source(source_id);
+  ui.text(ui.field<QLineEdit>("reference_name"), "Editable imported plate");
+  ui.button("reference_prepare");
+  REQUIRE(ui.field<QPushButton>("apply").isEnabled());
+  CHECK(ui.snapshot() == registry_json);
+  ui.capture("step-editable-direct-preview");
+  const auto document = directory.filePath("editable.blcad.json");
+  ui.dialog<QFileDialog>([&] { ui.apply(); },
+                         [&](QFileDialog& dialog) {
+                           dialog.selectFile(document);
+                           QMetaObject::invokeMethod(&dialog, "accept", Qt::DirectConnection);
+                         });
+  CHECK(ui.snapshot() == registry_json);
+  ui.file("open", document);
+  REQUIRE_FALSE(ui.window.session().part_document()->is_reference_part());
+  REQUIRE(ui.window.session().part_document()->imported_body_features().size() == 1);
+  const auto base_intent = ui.window.session().part_document()->imported_body_features().front();
+  const auto base = base_intent.id();
+  const auto body = ui.window.session()
+                        .part_document()
+                        ->imported_body_features()
+                        .front()
+                        .definition()
+                        .outputs()
+                        .front()
+                        .body;
+  const auto imported_intent =
+      checked(serialize_part_document_to_json(*ui.window.session().part_document()));
+  const auto body_volume = [&] {
+    const auto* shape = ui.window.session().part_shape_cache()->find_body_shape(body);
+    REQUIRE(shape);
+    return geometry::RectangleExtrusionAdapter{}.summarize(*shape).volume_mm3;
+  };
+  CHECK(body_volume() == Approx(1000).margin(1e-5));
+  // Select the real imported top face with the mouse, then create an ordinary
+  // face-supported Sketch carrying the true imported feature's provenance.
+  ui.choose(ui.widget<QComboBox>("blcad.selection.filter"), 3);
+  ui.command("view_top");
+  geometry::StepImportTopologyContext face_context(directory.path().toStdString());
+  const auto faces = checked(geometry::ResultFaceSupportGeometry::selectable_faces(
+      *ui.window.session().part_document(), *ui.window.session().part_shape_cache(), body,
+      &face_context));
+  const auto top = std::find_if(faces.begin(), faces.end(), [](const auto& target) {
+    return std::abs(target.anchor.z - 5) < 1e-7;
+  });
+  REQUIRE(top != faces.end());
+  const auto screen = checked(ui.window.viewport().model_to_screen(top->anchor));
+  REQUIRE(screen.x > 0);
+  REQUIRE(screen.x < ui.window.viewport().width());
+  REQUIRE(screen.y > 0);
+  REQUIRE(screen.y < ui.window.viewport().height());
+  QCursor::setPos(ui.window.viewport().mapToGlobal(QPoint(qRound(screen.x), qRound(screen.y))));
+  QMouseEvent face_move(
+      QEvent::MouseMove, {screen.x, screen.y},
+      ui.window.viewport().mapToGlobal(QPoint(qRound(screen.x), qRound(screen.y))), Qt::NoButton,
+      Qt::NoButton, Qt::NoModifier);
+  QApplication::sendEvent(&ui.window.viewport(), &face_move);
+  ui.click_at(ui.window.viewport(), {screen.x, screen.y});
+  REQUIRE(ui.window.session().selection().size() == 1);
+  CHECK(ui.window.session().selection().entries().front().kind == GuiSelectionKind::Face);
+  ui.command("create_sketch");
+  REQUIRE(ui.window.active_sketch());
+  REQUIRE(ui.window.session().part_document()->result_face_workplanes().size() == 1);
+  const auto& support = ui.window.session().part_document()->result_face_workplanes().front();
+  CHECK(support.reference().producer() == base);
+  REQUIRE_FALSE(support.reference().origins().empty());
+  CHECK(support.reference().origins().front().feature == base);
+  CHECK(support.reference().origins().front().role.starts_with("imported-face/"));
+  ui.rectangle_in_active({-2, -2}, {2, 2});
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 1);
+  ui.text(ui.widget<QLineEdit>("blcad.manipulator_numeric_hud"), "3 mm");
+  ui.key(ui.widget<QLineEdit>("blcad.manipulator_numeric_hud"), Qt::Key_Return);
+  const auto boss_parameter =
+      ui.window.feature_tools().coordinator().extrude().distance_parameter_id();
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.capture("step-editable-imported-face-boss");
+  ui.click(ui.widget<QPushButton>("blcad.feature.apply"));
+  CHECK(body_volume() == Approx(1048).margin(1e-5));
+  const auto boss_json = ui.snapshot();
+  ui.command("undo");
+  CHECK(body_volume() == Approx(1000).margin(1e-5));
+  ui.command("redo");
+  CHECK(ui.snapshot() == boss_json);
+  ui.choose(ui.widget<QComboBox>("blcad.selection.filter"), 0);
+  ui.tree("datum.xy");
+  ui.command("create_sketch");
+  ui.rectangle_in_active({5, -2}, {7, 2});
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  auto& extent = ui.widget<QComboBox>("blcad.extrude.extent");
+  ui.choose(extent, extent.findData(static_cast<int>(ExtrudeExtentMode::ThroughAll)));
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.click(ui.widget<QPushButton>("blcad.feature.apply"));
+  CHECK(body_volume() == Approx(1008).margin(1e-5));
+  ui.tree(body.value());
+  ui.command("hole");
+  ui.text(ui.widget<QLineEdit>("blcad.hole.diameter"), "2");
+  ui.text(ui.widget<QLineEdit>("blcad.hole.center_x"), "-5");
+  ui.text(ui.widget<QLineEdit>("blcad.hole.center_y"), "0");
+  ui.click(ui.widget<QPushButton>("blcad.hole.preview"));
+  REQUIRE(ui.widget<QPushButton>("blcad.hole.apply").isEnabled());
+  ui.click(ui.widget<QPushButton>("blcad.hole.apply"));
+  const auto drilled = body_volume();
+  CHECK(drilled == Approx(1008 - 5 * std::acos(-1.0)).margin(1e-5));
+  ui.command("fillet");
+  auto& edges = ui.window.feature_tools().finishing_target_editor();
+  REQUIRE(edges.count() > 0);
+  REQUIRE(edges.item(0)->text().contains("Imported edge"));
+  ui.reveal(edges);
+  edges.scrollToItem(edges.item(0));
+  ui.flush();
+  ui.click_at(*edges.viewport(), edges.visualItemRect(edges.item(0)).center());
+  ui.text(ui.widget<QLineEdit>("blcad.manipulator_numeric_hud"), "0.3 mm");
+  ui.key(ui.widget<QLineEdit>("blcad.manipulator_numeric_hud"), Qt::Key_Return);
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.capture("step-editable-downstream-fillet");
+  ui.click(ui.widget<QPushButton>("blcad.feature.apply"));
+  REQUIRE(ui.window.session().part_document()->fillet_features().size() == 1);
+  CHECK(ui.window.session()
+            .part_document()
+            ->fillet_features()
+            .front()
+            .edges()
+            .front()
+            .source_kind() == PartFeatureInputSourceKind::ImportedTopology);
+  const auto rounded = body_volume();
+  CHECK(rounded < drilled);
+  ui.command("parameters");
+  auto& parameters = ui.widget<QComboBox>("blcad.parameters.parameter");
+  ui.choose(parameters, parameters.findData(QString::fromStdString(boss_parameter.value())));
+  ui.text(ui.widget<QLineEdit>("blcad.parameters.input"), "4");
+  ui.click(ui.widget<QPushButton>("blcad.parameters.stage"));
+  ui.click(ui.widget<QPushButton>("blcad.parameters.preview"));
+  {
+    INFO(ui.widget<QLabel>("blcad.parameters.summary").text().toStdString());
+    REQUIRE(ui.widget<QPushButton>("blcad.parameters.apply").isEnabled());
+  }
+  ui.click(ui.widget<QPushButton>("blcad.parameters.apply"));
+  CHECK(body_volume() == Approx(rounded + 16).margin(1e-5));
+  CHECK(ui.window.session().part_document()->imported_body_features().front().id() == base);
+  CHECK(ui.window.session().part_document()->imported_body_features().front() == base_intent);
+  const auto* base_shape =
+      ui.window.session().part_shape_cache()->find_imported_body_shape(base, body);
+  REQUIRE(base_shape);
+  CHECK(geometry::RectangleExtrusionAdapter{}.summarize(*base_shape).volume_mm3 == Approx(1000));
+  const auto modeled = ui.snapshot();
+  ui.command("undo");
+  CHECK(body_volume() == Approx(rounded).margin(1e-5));
+  ui.command("redo");
+  CHECK(ui.snapshot() == modeled);
+  ui.roundtrip(document);
+  const auto modeled_volume = body_volume();
+  const auto exported = directory.filePath("modeled.step");
+  ui.file("export_part_step", exported);
+  CHECK(bytes(exported).contains("ISO-10303-21"));
+  CHECK(ui.snapshot() == modeled);
+  CHECK(bytes(asset) == supplier_bytes);
+  // Explicit refresh previews the complete modeled result, accepts only its
+  // inspected bytes and preserves authored base/consumer identities.
+  auto revised = supplier_bytes;
+  revised.insert(revised.indexOf("ENDSEC;"), "/* Editable supplier revision B */\n");
+  write(asset, revised);
+  ui.begin();
+  ui.choose(ui.field<QComboBox>("reference_operation"), 2);
+  ui.button("reference_prepare");
+  REQUIRE(ui.field<QPushButton>("apply").isEnabled());
+  CHECK(ui.snapshot() == modeled);
+  ui.capture("step-editable-modeled-refresh");
+  ui.apply();
+  CHECK(body_volume() == Approx(modeled_volume).margin(1e-5));
+  const auto refreshed = ui.snapshot();
+  ui.command("undo");
+  CHECK(ui.snapshot() == modeled);
+  ui.command("redo");
+  CHECK(ui.snapshot() == refreshed);
+  ui.roundtrip(document);
+  // A changed top face breaks the real face-supported sketch; accepting the
+  // new digest alone cannot publish a partially recomputed document.
+  supplier = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(
+      checked(Quantity::length_mm(20)), checked(Quantity::length_mm(10)),
+      checked(Quantity::length_mm(8))));
+  REQUIRE(geometry::StepExporter{}.write_step(supplier, asset.toStdString()));
+  const auto incompatible_bytes = bytes(asset);
+  ui.begin();
+  ui.choose(ui.field<QComboBox>("reference_operation"), 2);
+  ui.button("reference_prepare");
+  CHECK_FALSE(ui.field<QPushButton>("apply").isEnabled());
+  CHECK(ui.snapshot() == refreshed);
+  CHECK(bytes(asset) == incompatible_bytes);
+  ui.capture("step-editable-downstream-refresh-rejected");
+  ui.button("cancel");
+  CHECK(imported_intent != refreshed);
 }
 
 TEST_CASE(

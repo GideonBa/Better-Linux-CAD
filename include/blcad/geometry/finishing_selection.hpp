@@ -8,6 +8,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct FinishingSelectionTarget {
   std::string semantic_id;
   std::string label;
@@ -22,7 +24,7 @@ class FinishingSelectionBuilder {
 public:
   [[nodiscard]] static Result<std::vector<FinishingSelectionTarget>>
   build(const PartDocument& document, const ShapeCache& cache, const BodyId& body,
-        PartFeatureInputRole role);
+        PartFeatureInputRole role, StepImportTopologyContext* import_context = nullptr);
 };
 
 } // namespace blcad::geometry

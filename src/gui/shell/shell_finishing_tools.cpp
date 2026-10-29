@@ -2,6 +2,7 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 
 #include "blcad/gui/occt_viewport.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <QAction>
@@ -20,6 +21,14 @@
 
 namespace blcad::gui {
 namespace {
+Result<std::vector<geometry::FinishingSelectionTarget>>
+finishing_targets(const GuiDocumentSession& session, const BodyId& body,
+                  PartFeatureInputRole role) {
+  return query_with_step_import_context(session, [&](auto* context) {
+    return geometry::FinishingSelectionBuilder::build(
+        *session.part_document(), *session.part_shape_cache(), body, role, context);
+  });
+}
 PartFeatureInputRole selection_role(ShellFeatureTools::Command command) {
   using C = ShellFeatureTools::Command;
   if (command == C::Fillet)
@@ -122,9 +131,7 @@ ShellFeatureTools::finishing_context(Command command) const {
     return std::nullopt;
   std::optional<FinishingContext> context;
   for (const auto& body : session_.part_document()->bodies()) {
-    auto targets = geometry::FinishingSelectionBuilder::build(*session_.part_document(),
-                                                              *session_.part_shape_cache(),
-                                                              body.id(), selection_role(command));
+    auto targets = finishing_targets(session_, body.id(), selection_role(command));
     if (targets)
       for (const auto& target : targets.value())
         if (target.semantic_id == selected.semantic_id) {
@@ -140,9 +147,7 @@ bool ShellFeatureTools::finishing_context_available(const FinishingContext& cont
   if (!finishing_action(context.command) || !session_.part_document() ||
       !session_.part_shape_cache())
     return false;
-  auto targets = geometry::FinishingSelectionBuilder::build(
-      *session_.part_document(), *session_.part_shape_cache(), context.body,
-      selection_role(context.command));
+  auto targets = finishing_targets(session_, context.body, selection_role(context.command));
   return targets &&
          std::count_if(targets.value().begin(), targets.value().end(), [&](const auto& target) {
            return target.semantic_id == context.semantic_id;
@@ -318,8 +323,7 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
         axis_block(draft_axis_), plane_block(draft_plane_);
     finishing_body_->clear();
     for (const auto& body : part.bodies()) {
-      auto targets = geometry::FinishingSelectionBuilder::build(part, *session_.part_shape_cache(),
-                                                                body.id(), selection_role(command));
+      auto targets = finishing_targets(session_, body.id(), selection_role(command));
       if (targets && !targets.value().empty())
         finishing_body_->addItem(QString::fromStdString(body.name()),
                                  QString::fromStdString(body.id().value()));
@@ -411,8 +415,8 @@ void ShellFeatureTools::reload_finishing_targets() {
     const QSignalBlocker block(finishing_targets_list_);
     finishing_targets_list_->clear();
     if (part && cache) {
-      auto targets = geometry::FinishingSelectionBuilder::build(
-          *part, *cache, BodyId(finishing_body_->currentData().toString().toStdString()),
+      auto targets = finishing_targets(
+          session_, BodyId(finishing_body_->currentData().toString().toStdString()),
           selection_role(command_));
       if (targets)
         finishing_targets_ = std::move(targets.value());
@@ -575,17 +579,19 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::finishing_selection_
   if (const auto mask = idle_finishing_selection_mask()) {
     const bool edges = mask == selection_kind_bit(GuiSelectionKind::Edge);
     for (const auto& body : session_.part_document()->bodies()) {
-      auto targets = geometry::FinishingSelectionBuilder::build(
-          *session_.part_document(), *session_.part_shape_cache(), body.id(),
-          edges ? PartFeatureInputRole::FilletEdge : PartFeatureInputRole::ShellRemovalFace);
+      auto targets = finishing_targets(session_, body.id(),
+                                       edges ? PartFeatureInputRole::FilletEdge
+                                             : PartFeatureInputRole::ShellRemovalFace);
       if (targets)
         for (const auto& target : targets.value())
           items.push_back(
               {edges ? geometry::ViewportSceneKind::Edge : geometry::ViewportSceneKind::Face,
                target.semantic_id, target.shape, SketchLineRole::Geometry, body.id().value()});
       if (!edges) {
-        auto supports = geometry::ResultFaceSupportGeometry::selectable_faces(
-            *session_.part_document(), *session_.part_shape_cache(), body.id());
+        auto supports = query_with_step_import_context(session_, [&](auto* context) {
+          return geometry::ResultFaceSupportGeometry::selectable_faces(
+              *session_.part_document(), *session_.part_shape_cache(), body.id(), context);
+        });
         if (supports)
           for (const auto& target : supports.value()) {
             if (std::any_of(items.begin(), items.end(), [&](const auto& item) {

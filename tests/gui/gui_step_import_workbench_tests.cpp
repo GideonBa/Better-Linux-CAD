@@ -3,11 +3,14 @@
 #include "blcad/geometry/step_exporter.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/reference_part_geometry.hpp"
+#include "blcad/geometry/result_face_support.hpp"
+#include "blcad/geometry/step_editable_commands.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/gui/gui_analysis_export_workbench.hpp"
 #include "blcad/gui/gui_assembly_workbench.hpp"
 #include "blcad/gui/gui_document_browser.hpp"
 #include "blcad/gui/gui_step_import_workbench.hpp"
+#include "blcad/gui/gui_feature_edit.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -112,6 +115,235 @@ std::size_t product_index(const geometry::StepImportGeometry& imported, double w
   return 0;
 }
 } // namespace
+
+TEST_CASE("Direct EditableBody source commands create standalone and Project imported base intent",
+          "[gui][step-editable-parts][step-import-workbench]") {
+  const bool project = GENERATE(false, true);
+  GuiDocumentSession session;
+  create(session, project);
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto document = directory.filePath(filename(project));
+  const auto asset = directory.filePath("editable.step");
+  write_geometry(asset);
+  const auto source_bytes = bytes(asset);
+  REQUIRE(session.save_as(document.toStdString()));
+  const GuiStepImportWorkbench workbench;
+  const auto source = checked(workbench.prepare_register(
+      session, "Editable supplier", "editable.step", StepImportMode::EditableBody));
+  REQUIRE(workbench.apply(session, source));
+  const auto topology = checked(workbench.prepare_topology(session, source.source.id(), 0));
+  REQUIRE(workbench.apply_topology(session, topology));
+  const auto before = snapshot(session);
+  GuiStepReferenceRequest request;
+  request.catalog = topology.catalog.id();
+  request.new_part = DocumentId("editable.direct");
+  request.name = "Direct editable";
+  if (project) {
+    request.target_assembly = session.project()->assembly().id();
+    request.instance = ComponentInstanceId("editable.instance");
+  }
+  const auto prepared = checked(workbench.prepare_reference(session, request));
+  CHECK(snapshot(session) == before);
+  REQUIRE(prepared.preview_shapes.size() == 1);
+  CHECK(
+      geometry::RectangleExtrusionAdapter{}.summarize(prepared.preview_shapes.front()).volume_mm3 ==
+      Catch::Approx(1000).margin(1e-5));
+  if (project) {
+    REQUIRE(workbench.apply_reference(session, prepared));
+    REQUIRE(session.project()->part_document_count() == 1);
+    const auto* part = session.project()->find_part_document(request.new_part);
+    REQUIRE(part);
+    CHECK_FALSE(part->is_reference_part());
+    REQUIRE(part->imported_body_features().size() == 1);
+    CHECK(part->imported_body_features().front().id() == request.base_feature);
+    CHECK(session.project()->assembly().component_instances().front().referenced_part_document() ==
+          request.new_part);
+    const auto accepted = snapshot(session);
+    REQUIRE(session.undo());
+    CHECK(snapshot(session) == before);
+    REQUIRE(session.redo());
+    CHECK(snapshot(session) == accepted);
+  } else {
+    const auto destination = directory.filePath("direct.blcad.json");
+    REQUIRE(workbench.save_editable_copy(session, prepared, destination.toStdString()));
+    CHECK(snapshot(session) == before);
+    GuiDocumentSession editable;
+    REQUIRE(editable.open_file(destination.toStdString()));
+    REQUIRE(editable.part_document());
+    CHECK_FALSE(editable.part_document()->is_reference_part());
+    REQUIRE(editable.part_document()->imported_body_features().size() == 1);
+    CHECK(editable.part_shape_cache()->feature_shape_count() == 1);
+    CHECK(editable.part_shape_cache()->body_shape_count() == 1);
+    GuiFeatureEditController editor;
+    const auto rejected = editor.begin(editable, request.base_feature);
+    REQUIRE_FALSE(rejected);
+    CHECK(rejected.error().message().find("immutable") != std::string::npos);
+    CHECK_FALSE(workbench.save_editable_copy(session, prepared, destination.toStdString()));
+  }
+  CHECK(bytes(asset) == source_bytes);
+}
+
+TEST_CASE(
+    "Editable refresh binds candidate intent and source evidence and preserves atomic history",
+    "[gui][step-editable-parts][step-import-workbench]") {
+  GuiDocumentSession registered;
+  create(registered, false);
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto asset = directory.filePath("editable.step");
+  write_geometry(asset);
+  REQUIRE(registered.save_as(directory.filePath("registered.blcad.json").toStdString()));
+  const GuiStepImportWorkbench workbench;
+  const auto source = checked(workbench.prepare_register(registered, "Editable", "editable.step",
+                                                         StepImportMode::EditableBody));
+  REQUIRE(workbench.apply(registered, source));
+  const auto topology = checked(workbench.prepare_topology(registered, source.source.id(), 0));
+  REQUIRE(workbench.apply_topology(registered, topology));
+  GuiStepReferenceRequest insert;
+  insert.catalog = topology.catalog.id();
+  insert.new_part = DocumentId("editable.actual");
+  insert.name = "Editable actual";
+  const auto preview = checked(workbench.prepare_reference(registered, insert));
+  const auto file = directory.filePath("editable.blcad.json");
+  REQUIRE(workbench.save_editable_copy(registered, preview, file.toStdString()));
+  GuiDocumentSession session;
+  REQUIRE(session.open_file(file.toStdString()));
+  const auto before = snapshot(session);
+  const auto history = std::string(session.undo_label());
+  GuiStepReferenceRequest refresh;
+  refresh.operation = GuiStepReferenceOperation::Refresh;
+  refresh.refresh_source = source.source.id();
+  auto candidate = checked(workbench.prepare_reference(session, refresh));
+  auto forged = candidate;
+  auto& forged_part = std::get<geometry::StepReferencePartCandidate>(forged.candidate).part;
+  REQUIRE(forged_part.add_parameter(checked(
+      Parameter::create_length(ParameterId("forged"), "Forged", checked(Quantity::length_mm(1))))));
+  CHECK_FALSE(workbench.apply_reference(session, forged));
+  CHECK(snapshot(session) == before);
+  auto revised = bytes(asset);
+  revised.insert(revised.indexOf("ENDSEC;"), "/* accepted revision B */\n");
+  write(asset, revised);
+  CHECK_FALSE(workbench.apply_reference(session, candidate));
+  CHECK(snapshot(session) == before);
+  CHECK(session.undo_label() == history);
+  CHECK_FALSE(session.dirty());
+  candidate = checked(workbench.prepare_reference(session, refresh));
+  REQUIRE(workbench.apply_reference(session, candidate));
+  const auto accepted = snapshot(session);
+  CHECK(accepted != before);
+  CHECK(session.part_document()->imported_body_features().front().id() == insert.base_feature);
+  CHECK(session.part_shape_cache()->feature_shape_count() == 1);
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == before);
+  CHECK(session.recompute_status() == GuiRecomputeStatus::Failed);
+  REQUIRE(session.redo());
+  CHECK(snapshot(session) == accepted);
+  REQUIRE(session.save());
+  REQUIRE(session.open_file(file.toStdString()));
+  CHECK(snapshot(session) == accepted);
+  CHECK(bytes(asset) == revised);
+}
+
+TEST_CASE(
+    "Current-digest imported face loss retains Part intent and history but rejects malformed roles",
+    "[gui][step-editable-parts][step-import-workbench]") {
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto root = std::filesystem::path(directory.path().toStdString());
+  const auto asset = directory.filePath("supplier.step");
+  write_geometry(asset);
+  const auto inspected = checked(inspect_step_import_asset(root, "supplier.step"));
+  auto source = checked(
+      StepImportSource::create(StepImportSourceId("supplier"), "Supplier", "supplier.step",
+                               *inspected.observed_sha256_digest(), StepImportMode::EditableBody));
+  const auto imported = checked(geometry::StepImportReader{}.read(source, root));
+  const auto catalog = checked(geometry::StepImportTopology{}.create_catalog(
+      ImportedTopologyCatalogId("catalog.supplier"), imported, 0));
+  auto part = checked(geometry::StepEditableCommands{}.create_definition(
+      source, catalog, DocumentId("part.recovery"), "Imported face recovery",
+      FeatureId("import.base"), root));
+  const auto body = part.bodies().front().id();
+  auto cache = checked(geometry::ShapeCache::create(ShapeCacheId("recovery.fixture")));
+  geometry::StepImportTopologyContext context(root);
+  REQUIRE(geometry::GeometryRecomputeExecutor{&context}.execute_document(part, cache));
+  const auto targets =
+      checked(geometry::ResultFaceSupportGeometry::selectable_faces(part, cache, body, &context));
+  const auto top = std::find_if(targets.begin(), targets.end(), [](const auto& target) {
+    return std::abs(target.anchor.z - 5) < 1e-8;
+  });
+  REQUIRE(top != targets.end());
+  const auto plane = checked(ResultFaceWorkplane::create(DatumPlaneId("support.imported.top"),
+                                                         "Imported top", top->reference));
+  for (const auto& [id, value] :
+       std::vector<std::pair<std::string, double>>{{"width", 4}, {"height", 4}, {"depth", 3}})
+    REQUIRE(part.add_parameter(checked(
+        Parameter::create_length(ParameterId(id), id, checked(Quantity::length_mm(value))))));
+  auto sketch = checked(Sketch::create(SketchId("boss.sketch"), "Boss", plane.id()));
+  REQUIRE(sketch.add_profile(checked(RectangleProfile::create(
+      ProfileId("boss.profile"), ParameterId("width"), ParameterId("height")))));
+  REQUIRE(part.add_face_supported_sketch(plane, sketch));
+  auto boss = checked(Feature::create_additive_extrude(FeatureId("boss"), "Boss", sketch.id(),
+                                                       ParameterId("depth")));
+  boss = checked(boss.with_body_result_context(checked(
+      FeatureBodyResultContext::create(FeatureBodyOperationMode::Join, body, std::nullopt))));
+  REQUIRE(part.add_feature(boss));
+  const auto document = directory.filePath("recovery.blcad.json");
+  REQUIRE(write_part_document_json_file(part, document.toStdString()));
+  GuiDocumentSession session;
+  REQUIRE(session.open_file(document.toStdString()));
+  REQUIRE(session.part_shape_cache());
+  auto revised = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(
+      checked(Quantity::length_mm(20)), checked(Quantity::length_mm(10)),
+      checked(Quantity::length_mm(8))));
+  REQUIRE(geometry::StepExporter{}.write_step(revised, asset.toStdString()));
+  const auto report = checked(inspect_step_import_source(source, root));
+  REQUIRE(refresh_step_import_source(part, root, report));
+  const auto intended = checked(serialize_part_document_to_json(part));
+  REQUIRE(write_part_document_json_file(part, document.toStdString()));
+  geometry::StepImportTopologyContext recovery_context(root);
+  const auto recovery = checked(recovery_context.recover(part, catalog.id()));
+  const auto body_entry =
+      part.imported_body_features().front().definition().outputs().front().imported_body;
+  REQUIRE(recovery->find(body_entry));
+  CHECK(recovery->find(body_entry)->status == ImportedTopologyRecoveryStatus::Resolved);
+  const auto face = checked(parse_imported_face_origin_role(top->reference.origins().front().role));
+  REQUIRE(recovery->find(face.entry()));
+  CHECK(recovery->find(face.entry())->status == ImportedTopologyRecoveryStatus::Lost);
+  REQUIRE(session.open_file(document.toStdString()));
+  CHECK(snapshot(session) == intended);
+  CHECK(session.recompute_status() == GuiRecomputeStatus::Failed);
+  CHECK_FALSE(session.part_shape_cache());
+  CHECK_FALSE(session.reference_repair_mode());
+  CHECK_FALSE(session.dirty());
+  REQUIRE_FALSE(session.diagnostics().empty());
+  // An explicit headless recovery transaction removes the dependent authored
+  // workflow, preserving the exact imported source/catalog/base/output intent.
+  const auto repaired = checked(PartDocument::create_editable_import(
+      part.id(), part.name(), part.step_import_sources().front(), catalog,
+      part.imported_body_features().front()));
+  REQUIRE(session.commit_part_transaction("Remove lost face workflow", [&](PartDocument& target) {
+    target = repaired;
+    return Result<std::size_t>::success(1);
+  }));
+  const auto recovered = snapshot(session);
+  CHECK(session.recompute_status() == GuiRecomputeStatus::Fresh);
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == intended);
+  CHECK(session.recompute_status() == GuiRecomputeStatus::Failed);
+  CHECK_FALSE(session.part_shape_cache());
+  REQUIRE(session.redo());
+  CHECK(snapshot(session) == recovered);
+  CHECK(session.recompute_status() == GuiRecomputeStatus::Fresh);
+  auto malformed = nlohmann::json::parse(intended);
+  malformed["result_face_workplanes"][0]["reference"]["origins"][0]["role"] =
+      "imported-face/malformed";
+  const auto invalid_file = directory.filePath("malformed.blcad.json");
+  const auto invalid_json = malformed.dump();
+  write(invalid_file, QByteArray::fromStdString(invalid_json));
+  CHECK_FALSE(session.open_file(invalid_file.toStdString(), true));
+  CHECK(snapshot(session) == recovered);
+}
 
 TEST_CASE(
     "STEP geometry inspection provides posed bodies units and diagnostics without model intent",

@@ -698,6 +698,16 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
           return validate_imported_topology_reference(document, source);
         else if constexpr (std::is_same_v<T, ResultEdgeReference>) {
           const auto& id = source.source_feature();
+          if (const auto* imported = document.find_imported_body_feature(id)) {
+            const auto& outputs = imported->definition().outputs();
+            if (std::all_of(outputs.begin(), outputs.end(), [&](const auto& output) {
+                  const auto* body = document.find_body(output.body);
+                  return body && body->kind() == output.kind;
+                }))
+              return Result<std::size_t>::success(1U);
+            return Result<std::size_t>::failure(validation_error(
+                id.value(), "imported result edge output Body must belong to its base"));
+          }
           if (document.find_feature(id) || document.find_revolve_feature(id) ||
               document.find_sweep_feature(id) || document.find_loft_feature(id) ||
               document.find_surface_feature(id) || document.find_linear_pattern_feature(id) ||

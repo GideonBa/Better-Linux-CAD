@@ -43,6 +43,9 @@ public:
     const auto* part = session.part_document();
     if (part == nullptr)
       return fail("feature edit requires an active Part document");
+    if (part->find_imported_body_feature(feature))
+      return fail(
+          "Imported Body base is immutable; use STEP Sources to explicitly refresh its source");
     if (part->find_feature(feature) != nullptr) kind_ = GuiFeatureEditKind::Extrude;
     else if (part->find_revolve_feature(feature) != nullptr) kind_ = GuiFeatureEditKind::Revolve;
     else if (part->find_sweep_feature(feature) != nullptr) kind_ = GuiFeatureEditKind::Sweep;

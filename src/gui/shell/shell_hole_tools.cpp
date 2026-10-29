@@ -2,6 +2,7 @@
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -46,12 +47,16 @@ Result<double> number(const QLineEdit& field) {
     return Result<double>::failure(error("Enter finite numbers without units (decimal point)."));
   return Result<double>::success(value);
 }
-// The retained SubtractiveExtrude contract requires a Feature from the Extrude
-// collection even when a Body context supplies the actual target geometry.
+// A subtractive feature retains its real producer identity and explicit Body
+// target. Imported outputs never receive a synthetic Extrude feature.
 std::optional<FeatureId> target_feature(const PartDocument& part, const BodyId& body) {
   for (auto it = part.features().rbegin(); it != part.features().rend(); ++it)
     if (it->body_result_context() && it->body_result_context()->effective_produced_body() == body)
       return it->id();
+  for (const auto& feature : part.imported_body_features())
+    for (const auto& output : feature.definition().outputs())
+      if (output.body == body && output.kind == BodyKind::Solid)
+        return feature.id();
   return std::nullopt;
 }
 bool target_available(const GuiDocumentSession& session, const Body& body) {
@@ -202,7 +207,7 @@ struct ShellHoleTools::Impl {
     const auto* body = part.find_body(body_id);
     if (!body || !target_available(window.session(), *body) || plane->currentIndex() < 0)
       return Result<Candidate>::failure(
-          error("Select a valid visible solid target body with extrude history and a workplane."));
+          error("Select a valid visible solid target body with a feature producer and workplane."));
     const auto feature = target_feature(part, body_id);
     const auto title = name->text().trimmed().toStdString();
     if (title.empty())
@@ -482,12 +487,20 @@ Result<std::size_t> ShellHoleTools::preview() {
   // Validate the complete presentation, then shade the candidate Body results.
   // Keep supporting planes and sketches in their normal wire presentation so
   // an unchanged face workplane cannot fill the visible hole openings.
-  const geometry::ViewportSceneBuilder builder;
+  auto context = make_step_import_context(candidate);
+  if (!context)
+    return Result<std::size_t>::failure(context.error());
+  const geometry::ViewportSceneBuilder builder{context.value().get()};
   auto scene = builder.build_part(*candidate.part_document(), *candidate.part_shape_cache());
   auto old_scene = builder.build_part(*ui.window.session().part_document(),
                                       *ui.window.session().part_shape_cache());
   if (!scene || !old_scene)
     return Result<std::size_t>::failure(!scene ? scene.error() : old_scene.error());
+  if (context.value()) {
+    auto fresh = context.value()->validate_sources();
+    if (!fresh)
+      return fresh;
+  }
   for (const auto& item : old_scene.value())
     if (item.kind == geometry::ViewportSceneKind::SolidBody ||
         item.kind == geometry::ViewportSceneKind::SurfaceBody)
