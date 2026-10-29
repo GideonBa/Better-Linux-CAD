@@ -1,3 +1,4 @@
+#include "blcad/gui/gui_sketch_dimension_layout.hpp"
 #include "blcad/gui/gui_sketch_interaction.hpp"
 
 #include "blcad/geometry/reference_driven_sketch_helper.hpp"
@@ -1092,6 +1093,14 @@ GuiSketchInteractionController::hits_at(GuiSketchScreenPoint screen_point) const
     auto screen = mapping_.plane_to_screen(annotation.point);
     if (screen.has_error())
       return Result<std::vector<GuiSketchHit>>::failure(screen.error());
+    std::optional<GuiDimensionScreenLayout> dimension_layout;
+    if (annotation.hit_kind == GuiSketchHitKind::Dimension) {
+      auto placed = resolve_dimension_screen_layout(annotation, mapping_);
+      if (!placed)
+        return Result<std::vector<GuiSketchHit>>::failure(placed.error());
+      screen.value() = placed.value().label_anchor;
+      dimension_layout = std::move(placed.value());
+    }
     const double screen_delta = screen_distance(screen_point, screen.value());
     bool label_hit = false;
     if (annotation.label_bounds_dip) {
@@ -1109,25 +1118,14 @@ GuiSketchInteractionController::hits_at(GuiSketchScreenPoint screen_point) const
                       label_hit});
       continue;
     }
-    // Match the currently painted dimension line and midpoint-to-label extension.
-    // A leader does not outrank real geometry; the opaque value rectangle does.
-    if (annotation.hit_kind == GuiSketchHitKind::Dimension && annotation.leader.size() >= 2U) {
-      const Point2 a = annotation.leader.front();
-      const Point2 b = annotation.leader.back();
-      const Point2 midpoint{(a.x + b.x) * 0.5, (a.y + b.y) * 0.5};
-      const std::vector<Point2> plane_points{a, b, midpoint, annotation.point};
-      std::vector<GuiSketchScreenPoint> screen_points;
-      for (const auto point : plane_points) {
-        auto projected = mapping_.plane_to_screen(point);
-        if (!projected)
-          return Result<std::vector<GuiSketchHit>>::failure(projected.error());
-        screen_points.push_back(projected.value());
-      }
-      const auto nearest = nearest_on_screen_polyline(screen_point, screen_points, plane_points);
-      if (nearest.distance <= config_.curve_hit_tolerance_dip)
+    // Shared projected geometry includes extension strokes, actual angle/length
+    // arcs and arrow polygons. No unpainted chord or synthetic diagonal is hit.
+    if (annotation.hit_kind == GuiSketchHitKind::Dimension) {
+      if (const auto hit = hit_dimension_screen_layout(*dimension_layout, screen_point,
+                                                       config_.curve_hit_tolerance_dip))
         hits.push_back({annotation.hit_kind, annotation.semantic_id, annotation.candidate_id,
-                        nearest.plane_point, distance(raw.value(), nearest.plane_point),
-                        nearest.distance});
+                        hit->plane_point, distance(raw.value(), hit->plane_point),
+                        hit->distance_dip});
     }
   }
 
@@ -1417,6 +1415,12 @@ GuiSketchInteractionController::box_select(GuiSketchScreenRect rectangle,
     auto screen = mapping_.plane_to_screen(annotation.point);
     if (screen.has_error())
       return Result<std::vector<GuiSelection>>::failure(screen.error());
+    if (annotation.hit_kind == GuiSketchHitKind::Dimension) {
+      auto placed = resolve_dimension_screen_layout(annotation, mapping_);
+      if (!placed)
+        return Result<std::vector<GuiSelection>>::failure(placed.error());
+      screen.value() = placed.value().label_anchor;
+    }
     if (rectangle.contains(screen.value()))
       selected_ids.insert(annotation.semantic_id);
   }

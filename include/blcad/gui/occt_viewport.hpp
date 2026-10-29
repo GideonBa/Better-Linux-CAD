@@ -4,6 +4,7 @@
 #include "blcad/core/spatial.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/gui_sketch_interaction.hpp"
+#include "blcad/gui/gui_sketch_dimension_layout.hpp"
 #include "blcad/gui/gui_types.hpp"
 
 #include <QPoint>
@@ -99,6 +100,8 @@ public:
   set_sketch_interaction(GuiSketchPlaneView plane, GuiSketchInteractionScene scene,
                          GuiSketchInteractionConfig config = {});
   void clear_sketch_interaction();
+  [[nodiscard]] Result<GuiDimensionScreenLayout>
+  sketch_dimension_screen_layout(const GuiSketchAnnotationPrimitive& annotation) const;
   // Resolve the clicked visible dimension independently of prior selection/cycling.
   [[nodiscard]] bool select_sketch_dimension_at(GuiSketchScreenPoint point);
   void set_sketch_selection_enabled(bool enabled) noexcept;

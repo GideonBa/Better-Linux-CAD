@@ -1507,6 +1507,34 @@ verification commands/logs are synchronized in `docs/development-setup.md`. Deli
 [PR #128](https://github.com/GideonBa/Better-Linux-CAD/pull/128), with verified implementation
 commit `76b68ed`. The remaining issue queue is **#106**; start it only after this PR is merged.
 Imported supports remain outside this issue and no numbered implementation block is advanced.
+PR #128 merged as `c9d203b`; the delivered main tree exactly matches head `de270a9`, all runtime
+fingerprints match, issue #112 is closed with its seven acceptance checks complete and no PR remains.
+
+**Verified for delivery: #106**, branch `fix/sketch-dimension-presentation`, from main
+`c9d203b`. Dimensions now separate true measured references, placed measure/extension lines,
+angle/arc-length arcs, leaders, origin marks and terminators. A shared projected layout supplies
+painted strokes, triangles, caption bounds, picking and inline-editor placement. Horizontal/vertical
+spans show the correct projection; radius stays on the actual partial arc. View-sized metrics and
+transient reflow preserve attachment during label movement, zoom and oblique-plane editing.
+Dimension meaning, parameter bindings and persisted offsets remain unchanged.
+
+All five targets build. Complete Core **557 / 17,711**, Geometry **479 / 36,084** and GUI
+**620 cases — 594 passed, 26 expected native-only skips / 81,956 assertions** pass. Deterministic
+layout/required inventory passes **10 / 572**. Native layout and existing dimension input pass
+**8 / 2,074** at both 100% and 150%, including pairwise-disjoint initial caption rectangles,
+actual mouse/key input, exact history and reopen. Affected native Sketch/desktop/lifecycle/coverage
+passes **52 / 1,840** without skips; separate startup reaches intentional **124**. The final
+**900** runtime fingerprints remain unchanged. The native scale proof precedes only a mechanical
+Shell-test filename/coverage-registration correction; its test content and production sources
+are unchanged, and the rebuilt final broad/full gates pass. Exact commands and evidence live in
+`docs/development-setup.md`.
+
+Selected editor conventions and the official DIN EN ISO 129-1:2022-02 metadata/public ISO preview
+review are documented in `docs/gui-sketch-dimension-authoring-mvp8.md`. Full DIN/ISO conformity
+requires a separate review of the complete applicable text and is not claimed here. Manual label
+placement retains existing overlap cycling; no automatic caption-collision solver is introduced.
+Merge the single issue PR and verify main before starting Block 138. No numbered implementation
+block is advanced by this fix.
 
 After all open issues are complete and merged, execute **Blocks 138 → 139 → 140 → 141 → 142 →
 143**, each with the architecture boundaries, GUI access and acceptance gates in

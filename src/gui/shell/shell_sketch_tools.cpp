@@ -2077,8 +2077,10 @@ bool ShellSketchTools::edit_selected_dimension_interactive() {
   if (!annotations) return false;
   for (const auto& annotation : annotations.value()) {
     if (annotation.candidate_id != id->value()) continue;
-    auto screen = viewport_.sketch_plane_to_screen(annotation.point);
-    if (!screen) return false;
+    auto layout = viewport_.sketch_dimension_screen_layout(annotation);
+    if (!layout)
+      return false;
+    const auto screen = layout.value().label_anchor;
     cancel_label_drag();
     dimension_editor_id_ = *id;
     const bool circle_radius =
@@ -2096,10 +2098,10 @@ bool ShellSketchTools::edit_selected_dimension_interactive() {
     dimension_editor_->setToolTip({});
     const int width = std::min(220, viewport_.width());
     dimension_editor_->setFixedWidth(width);
-    dimension_editor_->move(std::clamp(static_cast<int>(screen.value().x) - width / 2, 0,
-                                      std::max(0, viewport_.width() - width)),
-                            std::clamp(static_cast<int>(screen.value().y) - 15, 0,
-                                      std::max(0, viewport_.height() - 30)));
+    dimension_editor_->move(
+        std::clamp(static_cast<int>(screen.x) - width / 2, 0,
+                   std::max(0, viewport_.width() - width)),
+        std::clamp(static_cast<int>(screen.y) - 15, 0, std::max(0, viewport_.height() - 30)));
     dimension_editor_->show();
     dimension_editor_->raise();
     dimension_editor_->setFocus();
@@ -2276,9 +2278,7 @@ void ShellSketchTools::update_rapid_dimension(Point2 pointer,
   rapid_candidate_ = inferred ? std::move(inferred.value()) : std::nullopt;
   if (rapid_candidate_) {
     const auto& glyph = rapid_candidate_->glyph;
-    viewport_.set_sketch_dimension_preview(GuiSketchAnnotationPrimitive{
-        glyph.semantic_id, glyph.candidate_id, glyph.anchor, GuiSketchHitKind::Dimension,
-        GuiSketchDimensionController::annotation_label(glyph), glyph.leader});
+    viewport_.set_sketch_dimension_preview(GuiSketchDimensionController::annotation_for(glyph));
     window_.statusBar()->showMessage(
         QStringLiteral(
             "Rapid Dimension: %1 — %2. Click empty space to place; D switches radius/diameter.")
