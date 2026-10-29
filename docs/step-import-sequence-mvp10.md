@@ -599,6 +599,8 @@ fixture now uses an existing explicit Frame and proves atomic missing/Plane-only
 Exact commands, full result counts, freshness/immutability regressions, export failure atomicity,
 dependency audit and visual evidence live in `docs/development-setup.md`.
 The final serialized documentation/GUI inventory passes **3 / 313** at this accepted boundary.
+Delivery: [PR #132](https://github.com/GideonBa/Better-Linux-CAD/pull/132), verified implementation
+commit `16fd35e`.
 
 ## Block 141 — EditableBody ImportedBodyFeature and downstream modeling
 

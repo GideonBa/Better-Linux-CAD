@@ -1624,6 +1624,8 @@ GUI Assembly fixture differs from the native-gate inventory. Exact commands, sou
 failure-atomicity regressions, inventory comparison and acceptance evidence live in
 `docs/development-setup.md` and `docs/step-import-sequence-mvp10.md`.
 The final serialized documentation/GUI inventory passes **3 / 313** after advancing this boundary.
+Delivery: [PR #132](https://github.com/GideonBa/Better-Linux-CAD/pull/132), verified implementation
+commit `16fd35e`.
 
 ## Next numbered technical step — Block 141 (planned)
 

@@ -2368,3 +2368,5 @@ are nonempty (`/tmp/blcad140-ninja-deps-final.log`). Only Markdown may change du
 After updating numbered completion through Block 140, the serialized documentation/GUI coverage
 inventory passes **3 / 313** with Shell acceptance required
 (`/tmp/blcad140-final-inventory.log`). The runtime freeze remains unchanged.
+Delivery: [PR #132](https://github.com/GideonBa/Better-Linux-CAD/pull/132), verified implementation
+commit `16fd35e`.
