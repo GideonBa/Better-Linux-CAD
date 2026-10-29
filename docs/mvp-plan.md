@@ -1565,6 +1565,8 @@ rotor profile passes **1 / 64**, with five warm reader samples at **169.8 ms med
 observed maximum**, without a portable budget claim. All **904** runtime fingerprints remain
 unchanged. Exact commands, red-before-fix regressions, captures and raw timing observations live in
 `docs/development-setup.md` and `docs/benchmarks/block138-step-inspection.json`.
+Delivery: [PR #130](https://github.com/GideonBa/Better-Linux-CAD/pull/130), verified implementation
+commit `4a7fdd6`. Merge this single PR and verify main before starting Block 139.
 
 ## Next numbered technical step — Block 139 (planned)
 
