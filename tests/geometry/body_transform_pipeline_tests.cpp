@@ -335,3 +335,99 @@ TEST_CASE("Body rotation edge collection matches cache-aware moved semantic geom
   CHECK(shape_bounds.minimum.y == Catch::Approx(expected.start.y).margin(1e-7));
   CHECK(shape_bounds.minimum.z == Catch::Approx(expected.start.z).margin(1e-7));
 }
+
+TEST_CASE("Sketch-line axes apply the owned Sketch workplane transform exactly once",
+          "[geometry][body-transform][sketch-line-axis]") {
+  auto document = box_document();
+  auto sketch = *document.find_sketch(SketchId("sketch.base"));
+  REQUIRE(sketch.add_entity(
+      LineSegment::create(SketchEntityId("axis"), {20, 0}, {30, 10}, SketchLineRole::Centerline)
+          .value()));
+  REQUIRE(document.update_sketch(sketch));
+  REQUIRE(document.add_body_transform(translation("move.axis", {15, 8, 3})));
+  auto transformed = cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, transformed));
+  const auto source = SketchLineReference::create(sketch.id(), SketchEntityId("axis")).value();
+  const auto reference =
+      AxisReference::create_sketch_line(PartFeatureInputRole::RevolveAxis, source).value();
+  const auto resolved =
+      GeometryRecomputeExecutor{}.resolve_feature_axis(document, reference, transformed);
+  REQUIRE(resolved);
+  CHECK(resolved.value().first == Point3{35, 8, 3});
+  CHECK(resolved.value().second.x == Catch::Approx(std::sqrt(.5)));
+  CHECK(resolved.value().second.y == Catch::Approx(std::sqrt(.5)));
+  const auto axis = BodyTransformRotationAxis::create_sketch_line(source).value();
+  const auto body_axis = BodyRotationAxisResolver{}.resolve(document, axis, transformed);
+  REQUIRE(body_axis);
+  CHECK(body_axis.value() == resolved.value());
+  auto oracle = document;
+  REQUIRE(oracle.add_body_transform(
+      BodyTransform::create_rotate(BodyTransformId("rotate.axis"), BodyId("body.base"),
+                                   BodyTransformCoordinateSpace::World, std::nullopt,
+                                   BodyTransformRotationAxis::create_explicit(
+                                       resolved.value().first, resolved.value().second)
+                                       .value(),
+                                   90, false, false)
+          .value()));
+  REQUIRE(document.add_body_transform(
+      BodyTransform::create_rotate(BodyTransformId("rotate.axis"), BodyId("body.base"),
+                                   BodyTransformCoordinateSpace::World, std::nullopt, axis, 90,
+                                   false, false)
+          .value()));
+  auto actual_cache = cache(), expected_cache = cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, actual_cache));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(oracle, expected_cache));
+  const auto actual = bounds(actual_cache), expected = bounds(expected_cache);
+  for (const auto& pair : {std::pair{actual.minimum.x, expected.minimum.x},
+                           {actual.minimum.y, expected.minimum.y},
+                           {actual.minimum.z, expected.minimum.z},
+                           {actual.maximum.x, expected.maximum.x},
+                           {actual.maximum.y, expected.maximum.y},
+                           {actual.maximum.z, expected.maximum.z}})
+    CHECK(pair.first == Catch::Approx(pair.second).margin(1e-7));
+}
+
+TEST_CASE(
+    "Sketch-line axis resolution follows edited oblique construction workplanes and endpoints",
+    "[geometry][body-transform][sketch-line-axis]") {
+  auto document = PartDocument::create(DocumentId("axis.plane"), "Axis plane").value();
+  const auto u = std::sqrt(.5);
+  const auto plane = [&](Point3 origin) {
+    return ConstructionPlane::create_explicit(ConstructionPlaneId("plane.axis"), "Axis plane",
+                                              origin, {u, u, 0}, {0, 0, 1}, {u, -u, 0})
+        .value();
+  };
+  REQUIRE(document.add_construction_plane(plane({100, 20, 30})));
+  auto sketch = Sketch::create(SketchId("sketch.axis"), "Axis", DatumPlaneId("plane.axis")).value();
+  REQUIRE(
+      sketch.add_entity(LineSegment::create(SketchEntityId("line"), {20, 0}, {30, 10}).value()));
+  REQUIRE(document.add_sketch(sketch));
+  auto source = SketchLineReference::create(sketch.id(), SketchEntityId("line")).value();
+  auto empty = cache();
+  auto first = GeometryRecomputeExecutor{}.resolve_feature_axis(
+      document,
+      AxisReference::create_sketch_line(PartFeatureInputRole::RevolveAxis, source).value(), empty);
+  REQUIRE(first);
+  CHECK(first.value().first.x == Catch::Approx(100 + 20 * u));
+  CHECK(first.value().first.y == Catch::Approx(20 + 20 * u));
+  CHECK(first.value().first.z == Catch::Approx(30));
+  CHECK(first.value().second.z == Catch::Approx(u));
+  REQUIRE(document.update_construction_plane(plane({100, 20, 45})));
+  auto replacement = Sketch::create(sketch.id(), sketch.name(), sketch.workplane()).value();
+  REQUIRE(replacement.add_entity(
+      LineSegment::create(SketchEntityId("line"), {25, 2}, {40, 2}, SketchLineRole::Construction)
+          .value()));
+  REQUIRE(document.update_sketch(replacement));
+  auto changed = BodyRotationAxisResolver{}.resolve(
+      document, BodyTransformRotationAxis::create_sketch_line(source).value(), empty);
+  REQUIRE(changed);
+  CHECK(changed.value().first.z == Catch::Approx(47));
+  CHECK(changed.value().second.x == Catch::Approx(u));
+  CHECK(changed.value().second.z == Catch::Approx(0).margin(1e-8));
+  auto removed = Sketch::create(sketch.id(), sketch.name(), sketch.workplane()).value();
+  REQUIRE(document.update_sketch(removed));
+  auto missing = BodyRotationAxisResolver{}.resolve(
+      document, BodyTransformRotationAxis::create_sketch_line(source).value(), empty);
+  REQUIRE_FALSE(missing);
+  CHECK(missing.error().message().find("repair") != std::string::npos);
+}

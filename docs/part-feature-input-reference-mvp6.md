@@ -57,7 +57,7 @@ not conflated with the requested Geometry projection.
 ```text
 ProfileRegionReference  SketchId + ProfileId
 AxisReference           DatumAxisId | ConstructionLineId |
-                        SemanticAxisReference | SemanticEdgeReference
+                        SemanticAxisReference | SemanticEdgeReference | SketchLineReference
 PlaneReference          DatumPlaneId | ConstructionPlaneId | SemanticFaceReference
 FaceReference           SemanticFaceReference | SemanticCylindricalFaceReference
 EdgeReference           SemanticEdgeReference | SemanticCircularEdgeReference
@@ -96,3 +96,16 @@ The proof covers stable spellings, the role/capability matrix, all six reference
 Block-35 face/edge identity reuse, dependency node identity, fail-closed construction, and
 document validation. Block 59 now embeds `FaceReference` values with the `ExtrudeLimitFace` role
 in ToFace/Between intent; its canonical contract is `docs/part-extrude-extent-intent-mvp6.md`.
+
+
+## Sketch-line axis input — Issue #110
+
+`SketchLineReference` stores one nonempty `(SketchId, SketchEntityId)` pair. Its length-delimited
+display/selection identity is collision-free even when ids contain separators; it does not encode
+coordinates. `AxisReference::create_sketch_line` currently accepts only `RevolveAxis` and exposes
+`Axis` capability and source kind `sketch_line`. Pattern/Draft are not extended by this issue.
+Validation requires exactly one editable `LineSegment` in that Sketch, independently of its normal,
+construction or centerline role. The source node is the Sketch, whose own plane/parameter
+dependencies feed downstream recompute. Body Rotate stores the same reference through its separate
+`BodyTransformRotationAxisKind::SketchLine` variant. Missing, unsupported or ambiguous sources fail
+with the exact source identity and an instruction to repair it, never with positional retargeting.

@@ -1375,6 +1375,18 @@ Result<std::size_t> PartDocument::add_sketch_impl(Sketch sketch, const Sketch* r
 }
 
 Result<std::size_t> PartDocument::validate_reference_sources() const {
+  for (const auto& feature : revolve_features_)
+    if (const auto* line = std::get_if<SketchLineReference>(&feature.axis().source())) {
+      auto valid = validate_sketch_line_reference(*this, *line);
+      if (!valid)
+        return valid;
+    }
+  for (const auto& transform : body_transforms_)
+    if (transform.rotation_axis() && transform.rotation_axis()->sketch_line()) {
+      auto valid = validate_sketch_line_reference(*this, *transform.rotation_axis()->sketch_line());
+      if (!valid)
+        return valid;
+    }
   for (const auto& plane : derived_workplanes_) {
     const auto* source = find_feature(plane.face_reference().source_feature());
     if (!source || source->type() != FeatureType::AdditiveExtrude)
@@ -2863,6 +2875,11 @@ Result<std::size_t> PartDocument::add_body_transform(BodyTransform transform) {
         return Result<std::size_t>::failure(Error::validation(
             transform.id().value(), "rotation construction line must exist in part document"));
       axis_dependency = axis.construction_line().value();
+    } else if (axis.kind() == BodyTransformRotationAxisKind::SketchLine) {
+      auto valid = validate_sketch_line_reference(*this, *axis.sketch_line());
+      if (!valid)
+        return Result<std::size_t>::failure(valid.error());
+      axis_dependency = axis.sketch_line()->sketch().value();
     } else if (axis.kind() == BodyTransformRotationAxisKind::SemanticEdge) {
       auto valid =
           validate_generated_edge_reference(*this, *axis.semantic_edge(), transform.id().value());

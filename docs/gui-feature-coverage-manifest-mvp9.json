@@ -454,7 +454,7 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/gui-interactive-extrude-revolve-mvp9.md",
-        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; all seven Extrude extents with role-based native selection/highlighting of bounded semantic source planes, four Body operations, reversed direction, a local second distance and taper; single-open-line Thin Extrude with three wall modes and atomic new thickness inputs; open-PathCurve Extrude with inherited orientation and no scalar inputs; Full/directed/Symmetric Revolve with typed compatible axes and operation-paired Cut intent; dedicated through-all single/bolt-circle cuts with typed inputs, bindings and complete atomic Preview/Apply.",
+        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; all seven Extrude extents with role-based native selection/highlighting of bounded semantic source planes, four Body operations, reversed direction, a local second distance and taper; single-open-line Thin Extrude with three wall modes and atomic new thickness inputs; open-PathCurve Extrude with inherited orientation and no scalar inputs; Full/directed/Symmetric Revolve with typed compatible axes and operation-paired Cut intent; dedicated through-all single/bolt-circle cuts with typed inputs, bindings and complete atomic Preview/Apply. Rotation supports persistent editable Sketch-line identities in normal, construction and centerline roles through the existing axis selector, with current transformed workplanes and associative endpoint/plane updates.",
         "gaps": [],
         "proofs": [
           {
@@ -515,6 +515,14 @@
           },
           {
             "filter": "[shell-combined-extrude-limit-picking]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[sketch-line-axis-revolve]",
+            "source": "tests/gui/gui_shell_revolve_tests.cpp"
+          },
+          {
+            "filter": "[sketch-line-axis-native]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
@@ -593,7 +601,7 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/gui-interactive-pattern-body-mvp9.md",
-        "scope": "Target/tool Boolean operations and multiple Body Translate/Rotate/UniformScale with numeric/drag preview. Rotation offers resolvable explicit/derived datum, construction-line and supported semantic-edge axes with typed identity, cache-aware viewport collection and shared execution resolution.",
+        "scope": "Target/tool Boolean operations and multiple Body Translate/Rotate/UniformScale with numeric/drag preview. Rotation offers resolvable explicit/derived datum, construction-line and supported semantic-edge axes with typed identity, cache-aware viewport collection and shared execution resolution. Rotation supports persistent editable Sketch-line identities in normal, construction and centerline roles through the existing axis selector, with current transformed workplanes and associative endpoint/plane updates.",
         "gaps": [],
         "proofs": [
           {
@@ -618,6 +626,14 @@
           },
           {
             "filter": "[body-axis-native]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[gui][shell-body][sketch-line-axis]",
+            "source": "tests/gui/gui_shell_body_tools_tests.cpp"
+          },
+          {
+            "filter": "[sketch-line-axis-native]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],

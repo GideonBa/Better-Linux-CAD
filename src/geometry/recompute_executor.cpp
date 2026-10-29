@@ -4,6 +4,7 @@
 
 #include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/body_rotation_axis_resolver.hpp"
+#include "blcad/geometry/sketch_line_axis_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/dimension_driven_profile_resolver.hpp"
 #include "blcad/geometry/profile_region_classifier.hpp"
@@ -643,6 +644,9 @@ store_pattern_result(const PartDocument& document, const PatternFeature& feature
 [[nodiscard]] Result<std::pair<Point3, Vector3>>
 resolve_axis_reference(const PartDocument& document, const AxisReference& reference,
                        const ShapeCache& shape_cache, const WorkplaneResolver& workplane_resolver) {
+  // The Sketch resolver already applies the current owned workplane transform.
+  if (const auto* line = std::get_if<SketchLineReference>(&reference.source()))
+    return SketchLineAxisResolver{}.resolve(document, *line, shape_cache);
   Result<std::pair<Point3, Vector3>> resolved = Result<std::pair<Point3, Vector3>>::failure(
       geometry_error(reference.source_node_id(), "unsupported axis source"));
   if (const auto* datum = std::get_if<DatumAxisId>(&reference.source())) {
@@ -2086,12 +2090,36 @@ validate_extrude_construction_profile(const PartDocument& document, const Featur
 } // namespace
 
 Result<std::pair<Point3, Vector3>>
+SketchLineAxisResolver::resolve(const PartDocument& document, const SketchLineReference& reference,
+                                const ShapeCache& cache) const {
+  auto valid = validate_sketch_line_reference(document, reference);
+  if (!valid)
+    return Result<std::pair<Point3, Vector3>>::failure(valid.error());
+  const auto& sketch = *document.find_sketch(reference.sketch());
+  const auto& line = *sketch.find_line_segment(reference.entity());
+  const WorkplaneResolver resolver;
+  auto plane = resolver.resolve_for_sketch(document, sketch, cache);
+  if (!plane)
+    return Result<std::pair<Point3, Vector3>>::failure(plane.error());
+  const auto origin = resolver.evaluate_point(plane.value(), line.start());
+  const auto end = resolver.evaluate_point(plane.value(), line.end());
+  const Vector3 direction{end.x - origin.x, end.y - origin.y, end.z - origin.z};
+  const double magnitude = length(direction);
+  if (!std::isfinite(magnitude) || magnitude <= k_tolerance)
+    return Result<std::pair<Point3, Vector3>>::failure(geometry_error(
+        reference.identity(), "Sketch-line axis is degenerate; repair its endpoints"));
+  return Result<std::pair<Point3, Vector3>>::success({origin, normalized(direction)});
+}
+
+Result<std::pair<Point3, Vector3>>
 BodyRotationAxisResolver::resolve(const PartDocument& document,
                                   const BodyTransformRotationAxis& axis,
                                   const ShapeCache& cache) const {
   const auto fail = [](const std::string& id, const std::string& message) {
     return Result<std::pair<Point3, Vector3>>::failure(Error::validation(id, message));
   };
+  if (axis.kind() == BodyTransformRotationAxisKind::SketchLine && axis.sketch_line())
+    return SketchLineAxisResolver{}.resolve(document, *axis.sketch_line(), cache);
   Point3 origin;
   Vector3 direction;
   if (axis.kind() == BodyTransformRotationAxisKind::DatumAxis) {

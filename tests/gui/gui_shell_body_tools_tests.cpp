@@ -694,3 +694,33 @@ TEST_CASE(
     CHECK(stored.construction_line() == ConstructionLineId("rotation.line"));
   history_and_save(window, before);
 }
+
+TEST_CASE("Body Rotate offers ordinary construction and centerline Sketch axes",
+          "[gui][shell-body][sketch-line-axis]") {
+  ShellWindow window;
+  bodies(window, false);
+  REQUIRE(window.session().commit_part_transaction(
+      "Sketch axis sources", [](PartDocument& part) -> Result<std::size_t> {
+        auto sketch =
+            Sketch::create(SketchId("sketch.axis"), "Axis sources", DatumPlaneId("datum.xy"));
+        if (!sketch)
+          return Result<std::size_t>::failure(sketch.error());
+        for (const auto& [id, role] : {std::pair{"normal", SketchLineRole::Geometry},
+                                       {"construction", SketchLineRole::Construction},
+                                       {"centerline", SketchLineRole::Centerline}}) {
+          auto line = LineSegment::create(SketchEntityId(id), {20, 0}, {30, 10}, role);
+          if (!line)
+            return Result<std::size_t>::failure(line.error());
+          auto added = sketch.value().add_entity(line.value());
+          if (!added)
+            return added;
+        }
+        return part.add_sketch(sketch.value());
+      }));
+  REQUIRE(window.feature_tools().begin_body_operation(Command::BodyRotate));
+  const auto& choices = window.feature_tools().body_axis_editor();
+  for (const std::string id : {"normal", "construction", "centerline"}) {
+    const auto identity = "sketch-line/11:sketch.axis/" + std::to_string(id.size()) + ":" + id;
+    CHECK(choices.findData(QString::fromStdString(identity)) >= 0);
+  }
+}

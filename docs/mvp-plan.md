@@ -1342,7 +1342,7 @@ missing shell/persistence integration; these tickets do not claim that every rep
 | Dimension double-click editing | [#107](https://github.com/GideonBa/Better-Linux-CAD/issues/107) | Implemented: shared badge rectangle and independent double-click resolution; native proof | P1 |
 | Dimension deletion | [#108](https://github.com/GideonBa/Better-Linux-CAD/issues/108) | Implemented: visible selection, multi-selection enablement and real Delete/Backspace proof | P1 |
 | Construction conversion | [#109](https://github.com/GideonBa/Better-Linux-CAD/issues/109) | Implemented: reversible typed curve/group conversion, lossless curved roles, region exclusion and native modeling/history/persistence proof | P2 |
-| Sketch-line rotation axes | [#110](https://github.com/GideonBa/Better-Linux-CAD/issues/110) | Missing persistent sketch/entity axis source | P2 |
+| Sketch-line rotation axes | [#110](https://github.com/GideonBa/Better-Linux-CAD/issues/110) | Implemented: scoped Sketch-line persistence, current transformed-plane resolution, associative source edits and native modeling/history/persistence proof | P2 |
 | Body Rotate axis parity | [#111](https://github.com/GideonBa/Better-Linux-CAD/issues/111) | Implemented: typed derived datum and supported semantic-edge choices, shared resolver and native upstream/history/persistence proof | P2 |
 | Sketch on planar result face | [#112](https://github.com/GideonBa/Better-Linux-CAD/issues/112) | Direct workflow and general associative support identity missing | P2 |
 | Cut feedback and workflow | [#113](https://github.com/GideonBa/Better-Linux-CAD/issues/113) | Implemented: distinct Cut outcomes, correctable diagnostics and exact curved extents; native regression verified | P1 |
@@ -1463,9 +1463,26 @@ Undo/Redo, canonical reopen, full recompute and STEP. Full Geometry **463 / 35,4
 **606 cases: 584 passed, 22 expected native-only skips / 81,444** pass. Native workflow **1 / 320**
 at each scale, affected native/required shell gate **34 / 7,497**, and separate startup **124** pass;
 all 890 final runtime fingerprints remain unchanged. Exact contracts and logs are recorded in
-`docs/development-setup.md`. Its single PR is the delivery boundary; the next issue **#110** starts
-only after merge and exact-tree verification on main. New Sketch-line persistence is that separate
-issue; this fix advances no numbered block. Remaining issue order: **#110 → #112 → #106**.
+`docs/development-setup.md`. Delivered by [PR #126](https://github.com/GideonBa/Better-Linux-CAD/pull/126),
+merge `c73226b`; issue #111 is closed and main exactly matches tested commit `bbc69c4`.
+Sketch-line persistence is tracked in #110; this fix advances no numbered block. Remaining issue
+order at delivery: **#110 → #112 → #106**.
+
+**Implementation and acceptance complete: #110**, branch `feat/persistent-sketch-line-axes`,
+from verified main `c73226b`. Revolve and Body Rotate persist exact `(SketchId, SketchEntityId)`
+references for editable normal/construction/centerline segments. Current endpoints map through the
+cache-aware workplane exactly once, including owned poses. Sketch dependencies propagate source
+edits; strict new JSON and membership checks reject malformed/missing/renamed/duplicate sources
+without coordinate retargeting. Accessible existing selectors retain typed identity; Revolve keeps
+its plane/non-crossing guards. Full Core **557 / 17,711**, Geometry **466 / 35,655** and full GUI
+**609 cases: 586 passed, 23 expected native-only skips / 81,564** pass. Native normal/construction/
+centerline generator paths pass **1 / 851** at each of 100% and 150%, authoring a 180° oblique
+Revolve, 90° Body Rotate, retained endpoint drag, downstream two-instance pattern, exact history,
+full recompute, canonical reopen and STEP. Final affected native/required shell gate **45 / 7,735**
+and separate startup **124** pass, with all 892 runtime fingerprints unchanged. Existing contract
+and evidence files are synchronized; see `docs/development-setup.md`. Its single PR is the delivery
+boundary; issue #112 starts only after merge and exact-tree verification on main. Remaining issue
+order: **#112 → #106**. Blocks 138–143 remain planned.
 
 After all open issues are complete and merged, execute **Blocks 138 → 139 → 140 → 141 → 142 →
 143**, each with the architecture boundaries, GUI access and acceptance gates in

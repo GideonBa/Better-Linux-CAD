@@ -4,6 +4,7 @@
 #include "blcad/core/generated_topology_reference.hpp"
 #include "blcad/core/id.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/core/sketch_line_reference.hpp"
 
 #include <array>
 #include <cstddef>
@@ -39,6 +40,7 @@ enum class PartFeatureInputRole {
 
 enum class PartFeatureInputSourceKind {
   SketchProfileRegion,
+  SketchLine,
   DatumAxis,
   ConstructionLine,
   SemanticAxis,
@@ -78,11 +80,13 @@ private:
   PartFeatureInputRole role_;
 };
 
-using AxisReferenceSource =
-    std::variant<DatumAxisId, ConstructionLineId, SemanticAxisReference, SemanticEdgeReference>;
+using AxisReferenceSource = std::variant<DatumAxisId, ConstructionLineId, SemanticAxisReference,
+                                         SemanticEdgeReference, SketchLineReference>;
 
 class AxisReference {
 public:
+  [[nodiscard]] static Result<AxisReference> create_sketch_line(PartFeatureInputRole role,
+                                                                SketchLineReference line);
   [[nodiscard]] static Result<AxisReference> create_datum_axis(PartFeatureInputRole role,
                                                                DatumAxisId axis);
   [[nodiscard]] static Result<AxisReference>

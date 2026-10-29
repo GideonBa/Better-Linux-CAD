@@ -301,3 +301,15 @@ persistent state during preview, typed persistence, exact Undo/Redo and reopenin
 five representations, invalid references and cache-aware moved-source edge presentations.
 `[body-axis-native]` covers native ribbon/chooser/viewport collection, cancellation, downstream
 rotation after an upstream depth edit, exact local history, canonical reopening and STEP export.
+
+
+## Sketch-line axes — Issue #110
+
+The Rotation Axis chooser also offers editable normal/construction/centerline Sketch lines with
+Sketch name, entity id and role. The chooser stores the exact `(SketchId, SketchEntityId)` source.
+These sources are selected in that list; the model-pick button retains the existing Datum/Edge
+collection scope. Geometry resolves the current transformed Sketch plane and endpoints through
+`SketchLineAxisResolver`, shared with Revolve, and the Body Rotate manipulator refreshes from that
+authority. Source edits invalidate the transform through the Sketch dependency. Missing/invalid
+line sources fail with repair diagnostics, without copying coordinates or retargeting another line.
+See `gui-interactive-extrude-revolve-mvp9.md` for the common authoring and native workflow proof.

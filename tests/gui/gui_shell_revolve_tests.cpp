@@ -354,3 +354,45 @@ TEST_CASE("Revolve supports offset construction axes and mixed-feature global id
   window.feature_tools().cancel();
   CHECK(snapshot(window) == after);
 }
+
+TEST_CASE("Revolve offers all editable Sketch line roles through its in-plane selector",
+          "[gui][block136-revolve][sketch-line-axis-revolve]") {
+  for (const auto role :
+       {SketchLineRole::Geometry, SketchLineRole::Construction, SketchLineRole::Centerline}) {
+    ShellWindow window;
+    seed(window, "datum.xy", {20, 16}, 4);
+    window.feature_tools().cancel();
+    REQUIRE(window.session().commit_part_transaction(
+        "Oblique Sketch axis", [&](PartDocument& part) -> Result<std::size_t> {
+          auto source =
+              Sketch::create(SketchId("sketch.axis"), "Oblique", DatumPlaneId("datum.xy"));
+          if (!source)
+            return Result<std::size_t>::failure(source.error());
+          auto added = source.value().add_entity(
+              LineSegment::create(SketchEntityId("line"), {20, 0}, {30, 10}, role).value());
+          if (!added)
+            return added;
+          return part.add_sketch(source.value());
+        }));
+    REQUIRE(
+        window.feature_tools().select_profile(SketchId("sketch.tool"), ProfileId("profile.tool")));
+    REQUIRE(window.feature_tools().begin_revolve());
+    auto source =
+        SketchLineReference::create(SketchId("sketch.axis"), SketchEntityId("line")).value();
+    axis(window, QString::fromStdString(source.identity()));
+    choose(window, "blcad.revolve.extent", 0);
+    applicable(window);
+    const auto body = window.feature_tools().coordinator().revolve().result_body_id();
+    const auto before = snapshot(window);
+    REQUIRE(window.feature_tools().apply());
+    CHECK(std::get<SketchLineReference>(
+              window.session().part_document()->revolve_features().back().axis().source()) ==
+          source);
+    CHECK(volume(window, body) > 100);
+    const auto after = snapshot(window);
+    REQUIRE(window.undo());
+    CHECK(snapshot(window) == before);
+    REQUIRE(window.redo());
+    CHECK(snapshot(window) == after);
+  }
+}

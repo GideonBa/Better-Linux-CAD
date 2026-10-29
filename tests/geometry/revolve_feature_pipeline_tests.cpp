@@ -5,6 +5,7 @@
 
 #include <cmath>
 #include <optional>
+#include <numbers>
 
 using namespace blcad;
 using namespace blcad::geometry;
@@ -423,4 +424,55 @@ TEST_CASE("Downstream Boolean simplification preserves earlier cached rotational
   CHECK(volume(base_copy) == Catch::Approx(86400).margin(1e-5));
   CHECK(volume(first_copy) == Catch::Approx(86400 - 384 * std::acos(-1.0)).margin(1e-5));
   CHECK(body_volume(cache, "body") == Catch::Approx(86400 - 1536 * std::acos(-1.0)).margin(1e-5));
+}
+
+TEST_CASE("Revolve Sketch-line axes follow endpoint edits and retain geometric validity guards",
+          "[geometry][revolve-feature][sketch-line-axis-revolve]") {
+  for (const auto role :
+       {SketchLineRole::Geometry, SketchLineRole::Construction, SketchLineRole::Centerline}) {
+    auto document = new_body_revolve(RevolveAngleExtent::full());
+    auto sketch = Sketch::create(SketchId("sketch.axis"), "Axis", DatumPlaneId("datum.xy")).value();
+    REQUIRE(sketch.add_entity(
+        LineSegment::create(SketchEntityId("line"), {20, -20}, {30, -10}, role).value()));
+    REQUIRE(document.add_sketch(sketch));
+    auto source = SketchLineReference::create(sketch.id(), SketchEntityId("line")).value();
+    const auto previous = document.revolve_features().front();
+    auto changed =
+        RevolveFeature::create_revolve(
+            previous.id(), previous.name(), previous.profile(),
+            AxisReference::create_sketch_line(PartFeatureInputRole::RevolveAxis, source).value(),
+            previous.extent(), previous.body_result_context())
+            .value();
+    REQUIRE(document.update_revolve_feature(changed));
+    auto actual = shape_cache();
+    REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, actual));
+    CHECK(body_volume(actual, "body.revolve") ==
+          Catch::Approx(2 * std::numbers::pi * 200 * 25 / std::sqrt(2.)).margin(1e-5));
+    document.mark_all_clean();
+    auto replacement = Sketch::create(sketch.id(), sketch.name(), sketch.workplane()).value();
+    REQUIRE(replacement.add_entity(
+        LineSegment::create(SketchEntityId("line"), {20, -25}, {30, -15}, role).value()));
+    REQUIRE(document.update_sketch(replacement));
+    auto plan = document.create_recompute_plan();
+    REQUIRE(plan);
+    REQUIRE(GeometryRecomputeExecutor{}.execute_plan(document, plan.value(), actual));
+    auto full = shape_cache();
+    REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, full));
+    CHECK(body_volume(actual, "body.revolve") ==
+          Catch::Approx(body_volume(full, "body.revolve")).margin(1e-5));
+    CHECK(body_volume(actual, "body.revolve") ==
+          Catch::Approx(2 * std::numbers::pi * 200 * 30 / std::sqrt(2.)).margin(1e-5));
+    auto crossing = Sketch::create(sketch.id(), sketch.name(), sketch.workplane()).value();
+    REQUIRE(crossing.add_entity(
+        LineSegment::create(SketchEntityId("line"), {0, 0}, {30, 0}, role).value()));
+    REQUIRE(document.update_sketch(crossing));
+    auto invalid = shape_cache();
+    CHECK_FALSE(GeometryRecomputeExecutor{}.execute_document(document, invalid));
+    REQUIRE(document.add_datum_plane(DatumPlane::xz().value()));
+    auto outside = Sketch::create(sketch.id(), sketch.name(), DatumPlaneId("datum.xz")).value();
+    REQUIRE(outside.add_entity(
+        LineSegment::create(SketchEntityId("line"), {20, 0}, {30, 10}, role).value()));
+    REQUIRE(document.update_sketch(outside));
+    CHECK_FALSE(GeometryRecomputeExecutor{}.execute_document(document, invalid));
+  }
 }

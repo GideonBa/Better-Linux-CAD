@@ -604,12 +604,13 @@ public:
     REQUIRE_FALSE(window.session().task().active());
     return window.session().part_document()->bodies().back().id();
   }
-  SketchId open_line(const std::string& plane, Point2 first, Point2 second) {
+  SketchId open_line(const std::string& plane, Point2 first, Point2 second,
+                     const QString& tool = "sketch.create.line") {
     tree(plane);
     command("create_sketch");
     REQUIRE(window.active_sketch());
     const auto id = *window.active_sketch();
-    command("sketch.create.line");
+    command(tool);
     const auto coordinates = [&](Point2 point) {
       const auto entry = QString::number(point.x) + ";" + QString::number(point.y);
       for (const auto character : entry)
@@ -624,7 +625,8 @@ public:
     REQUIRE(sketch);
     REQUIRE(sketch->line_segments().size() == 1);
     REQUIRE(sketch->profile_count() == 0);
-    REQUIRE(action("extrude").isEnabled());
+    if (tool == "sketch.create.line")
+      REQUIRE(action("extrude").isEnabled());
     CHECK_FALSE(action("revolve").isEnabled());
     return id;
   }
@@ -5630,5 +5632,151 @@ TEST_CASE("Native Body Rotate selects derived and semantic axes and follows upst
   ui.file("export_part_step", directory.filePath("rotation.step"));
   CHECK(ui.bytes(directory.filePath("rotation.step")).startsWith("ISO-10303-21;"));
   CHECK(ui.snapshot() == after_edit);
+  ui.idle();
+}
+
+TEST_CASE(
+    "Native Sketch-line axes remain associative through Revolve rotation editing and modeling",
+    "[gui][integration][shell-combined-workflow][sketch-line-axis-native]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native Qt/OCCT Sketch drag and visible axis selectors");
+  const auto tool =
+      GENERATE("sketch.create.line", "sketch.create.construction_line", "sketch.create.centerline");
+  CAPTURE(tool);
+  WorkflowUi ui;
+  ui.fit_first_screen();
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Associative oblique Sketch axis");
+  const auto axis_sketch = ui.open_line("datum.xy", {20, 0}, {30, 10}, tool);
+  const auto entity =
+      ui.window.session().part_document()->find_sketch(axis_sketch)->line_segments().front().id();
+  const auto source = checked(SketchLineReference::create(axis_sketch, entity));
+  const auto role = ui.window.session()
+                        .part_document()
+                        ->find_sketch(axis_sketch)
+                        ->find_line_segment(entity)
+                        ->role();
+  CHECK(role == (std::string_view(tool) == "sketch.create.centerline" ? SketchLineRole::Centerline
+                 : std::string_view(tool) == "sketch.create.construction_line"
+                     ? SketchLineRole::Construction
+                     : SketchLineRole::Geometry));
+  ui.rectangle("datum.xy", {20, 16}, {24, 20});
+  const auto before_revolve = ui.snapshot();
+  ui.command("revolve");
+  ui.data(ui.widget<QComboBox>("blcad.revolve.axis"), QString::fromStdString(source.identity()));
+  ui.scalar("180 deg");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == before_revolve);
+  ui.capture("sketch-line-axis-revolve-preview");
+  ui.button("blcad.feature.apply");
+  const auto body = ui.window.session()
+                        .part_document()
+                        ->revolve_features()
+                        .back()
+                        .body_result_context()
+                        .effective_produced_body();
+  CHECK(std::get<SketchLineReference>(
+            ui.window.session().part_document()->revolve_features().back().axis().source()) ==
+        source);
+  const auto exact_history = [&](const std::string& before, const std::string& after) {
+    ui.command("undo");
+    CHECK(ui.snapshot() == before);
+    ui.command("redo");
+    CHECK(ui.snapshot() == after);
+  };
+  const auto expected_volume = [&] {
+    const auto& line =
+        *ui.window.session().part_document()->find_sketch(axis_sketch)->find_line_segment(entity);
+    const double dx = line.end().x - line.start().x, dy = line.end().y - line.start().y;
+    return std::numbers::pi * 16 *
+           std::abs(dx * (18 - line.start().y) - dy * (22 - line.start().x)) / std::hypot(dx, dy);
+  };
+  CHECK(ui.summary(body).volume_mm3 == Approx(expected_volume()).margin(1e-5));
+  exact_history(before_revolve, ui.snapshot());
+  const auto before_rotate = ui.snapshot();
+  ui.command("body_rotate");
+  ui.list_data(ui.widget<QListWidget>("blcad.body.sources"), QString::fromStdString(body.value()));
+  ui.data(ui.widget<QComboBox>("blcad.body.axis"), QString::fromStdString(source.identity()));
+  ui.scalar("90 deg");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == before_rotate);
+  ui.button("blcad.feature.apply");
+  CHECK(ui.window.session()
+            .part_document()
+            ->body_transforms()
+            .back()
+            .rotation_axis()
+            ->sketch_line() == source);
+  CHECK(ui.summary(body).volume_mm3 == Approx(expected_volume()).margin(1e-5));
+  exact_history(before_rotate, ui.snapshot());
+  const auto old_volume = ui.summary(body).volume_mm3;
+  ui.tree(axis_sketch.value(), true);
+  ui.window.viewport().fit_all();
+  ui.flush();
+  const auto old_endpoint = ui.window.session()
+                                .part_document()
+                                ->find_sketch(axis_sketch)
+                                ->find_line_segment(entity)
+                                ->end();
+  const auto start = checked(ui.window.viewport().sketch_plane_to_screen(old_endpoint));
+  const auto end = checked(ui.window.viewport().sketch_plane_to_screen({36, 4}));
+  REQUIRE(ui.window.viewport().rect().contains(QPoint(start.x, start.y)));
+  REQUIRE(ui.window.viewport().rect().contains(QPoint(end.x, end.y)));
+  REQUIRE(std::hypot(end.x - start.x, end.y - start.y) > QApplication::startDragDistance());
+  const auto before_edit = ui.snapshot();
+  ui.mouse(ui.window.viewport(), {start.x, start.y}, QEvent::MouseButtonPress);
+  ui.flush();
+  ui.mouse(ui.window.viewport(), {end.x, end.y}, QEvent::MouseMove);
+  ui.flush();
+  ui.mouse(ui.window.viewport(), {end.x, end.y}, QEvent::MouseButtonRelease);
+  ui.flush();
+  const auto& edited =
+      *ui.window.session().part_document()->find_sketch(axis_sketch)->find_line_segment(entity);
+  CHECK(edited.role() == role);
+  CHECK(std::hypot(edited.end().x - old_endpoint.x, edited.end().y - old_endpoint.y) > 2);
+  const auto after_edit = ui.snapshot();
+  REQUIRE(after_edit != before_edit);
+  exact_history(before_edit, after_edit);
+  ui.capture("sketch-line-axis-edited");
+  ui.command("finish_sketch");
+  CHECK(std::abs(ui.summary(body).volume_mm3 - old_volume) > 1);
+  CHECK(ui.summary(body).volume_mm3 == Approx(expected_volume()).margin(1e-5));
+  const auto before_pattern = ui.snapshot();
+  ui.command("linear_pattern");
+  ui.list_data(ui.widget<QListWidget>("blcad.pattern.sources"),
+               QString::fromStdString(body.value()));
+  ui.number(ui.widget<QSpinBox>("blcad.pattern.count"), "2");
+  ui.scalar("100 mm");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.feature.apply");
+  const auto result = ui.window.session()
+                          .part_document()
+                          ->linear_pattern_features()
+                          .back()
+                          .body_result_context()
+                          .effective_produced_body();
+  CHECK(ui.summary(result).solid_count == 2);
+  CHECK(ui.summary(result).volume_mm3 == Approx(2 * expected_volume()).margin(1e-5));
+  const auto after_pattern = ui.snapshot();
+  exact_history(before_pattern, after_pattern);
+  auto full = checked(geometry::ShapeCache::create(ShapeCacheId("sketch.axis.full")));
+  checked(geometry::GeometryRecomputeExecutor{}.execute_document(
+      *ui.window.session().part_document(), full));
+  REQUIRE(full.find_body_shape(result));
+  CHECK(geometry::RectangleExtrusionAdapter{}.summarize(*full.find_body_shape(result)).volume_mm3 ==
+        Approx(ui.summary(result).volume_mm3).margin(1e-5));
+  ui.roundtrip(directory.filePath("sketch-axis.blcad.json"));
+  CHECK(ui.snapshot() == after_pattern);
+  CHECK(ui.window.session()
+            .part_document()
+            ->body_transforms()
+            .back()
+            .rotation_axis()
+            ->sketch_line() == source);
+  ui.capture("sketch-line-axis-modeled");
+  ui.file("export_part_step", directory.filePath("sketch-axis.step"));
+  CHECK(ui.bytes(directory.filePath("sketch-axis.step")).startsWith("ISO-10303-21;"));
+  CHECK(ui.snapshot() == after_pattern);
   ui.idle();
 }

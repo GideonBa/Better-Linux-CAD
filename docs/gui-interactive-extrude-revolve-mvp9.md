@@ -344,3 +344,27 @@ Bounded here and not introduced implicitly by this block:
 
 Block 125 adds interactive Fillet, Chamfer, Shell, and Draft over the same manipulator layer and the
 supported-topology picking boundary.
+
+
+## Sketch-line axis selectors — Issue #110
+
+Revolve and Body Rotate offer eligible editable Sketch lines in their existing Rotation Axis
+chooser, labelled with Sketch name, entity id and Geometry/Construction/Centerline role. Each item
+carries the scoped persistent pair, independently of its position in the chooser. This accessible
+selector is the Sketch-line collection route; existing model picking for datum/construction and
+semantic-edge sources keeps its bounded scope. No extra Sketch ownership or detached coordinate
+snapshot is inferred.
+
+Revolve offers only axes currently in the profile plane; its Geometry preview/Apply still reject
+profiles crossing the axis and all existing invalid combinations. Body Rotate accepts arbitrary
+spatial Sketch planes. Both commands use the Geometry Sketch-line resolver, which reads current
+endpoints and the cache-aware workplane exactly once. Revolve refreshes its manipulator frame from
+the resolver during candidate configuration. Changing source endpoints or the plane after Apply
+recomputes downstream features through the source Sketch dependency.
+
+`[sketch-line-axis]` and `[sketch-line-axis-revolve]` cover Core identity/JSON/dependencies, posed and
+edited Geometry, profile guards and the two GUI selectors. `[sketch-line-axis-native]` authors all
+three line roles through native ribbon/numeric input, creates a partial oblique Revolve and 90°
+Body Rotate, edits the original endpoint through a viewport drag, then creates a downstream linear
+pattern and checks exact history, full recompute, canonical reopening and STEP. Acceptance results
+are recorded in `development-setup.md`; tag existence alone is not native interaction proof.
