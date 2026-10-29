@@ -68,10 +68,11 @@ Result<bool> ShapeCache::remove_feature_shape(FeatureId feature_id) {
                                        return cached_shape.feature_id == feature_id;
                                      });
 
+  std::erase_if(imported_body_results_,
+                [&](const auto& imported) { return imported.feature_id == feature_id; });
   if (existing == feature_shapes_.end()) {
     return Result<bool>::success(false);
   }
-
   feature_shapes_.erase(existing);
 
   if (has_final_shape_ && final_feature_id_ == feature_id) {
@@ -186,6 +187,152 @@ ShapeCache::validated_reference_result(const PartDocument& document) const {
   return Result<const CachedReferencePartResult*>::success(&result);
 }
 
+Result<std::size_t> ShapeCache::store_imported_body_result(FeatureId feature_id,
+                                                           CachedReferencePartResult result) {
+  const auto invalid = [](std::string message) {
+    return Result<std::size_t>::failure(Error::validation(kShapeCacheObjectId, std::move(message)));
+  };
+  if (feature_id.empty() || reference_result_ || result.part_document.empty() ||
+      result.shape.empty() || result.bodies.empty() ||
+      result.bodies.size() != result.definition.outputs().size() ||
+      result.source.mode() != StepImportMode::EditableBody ||
+      result.source.id() != result.definition.source() ||
+      result.catalog.id() != result.definition.catalog() ||
+      result.catalog.source() != result.source.id())
+    return invalid("imported base cache requires complete editable feature/source/output intent");
+  std::set<std::string> bodies;
+  std::set<std::string> entries;
+  for (std::size_t index = 0; index < result.bodies.size(); ++index) {
+    const auto& body = result.bodies[index];
+    const auto* entry = result.catalog.find(body.output.imported_body);
+    if (body.output != result.definition.outputs()[index] || body.shape.empty() ||
+        !bodies.insert(body.output.body.value()).second ||
+        !entries.insert(body.output.imported_body.value()).second || entry == nullptr ||
+        entry->descriptor.kind != ImportedTopologyKind::Body ||
+        entry->descriptor.body_kind != body.output.kind)
+      return invalid("imported base cache must retain each ordered catalog Body separately");
+  }
+  const auto found =
+      std::find_if(imported_body_results_.begin(), imported_body_results_.end(),
+                   [&](const auto& value) { return value.feature_id == feature_id; });
+  if (found != imported_body_results_.end()) {
+    found->imported = std::move(result);
+    return Result<std::size_t>::success(
+        static_cast<std::size_t>(std::distance(imported_body_results_.begin(), found)));
+  }
+  imported_body_results_.push_back({std::move(feature_id), std::move(result)});
+  return Result<std::size_t>::success(imported_body_results_.size() - 1);
+}
+
+const CachedImportedBodyFeatureResult*
+ShapeCache::find_imported_body_result(const FeatureId& feature_id) const noexcept {
+  const auto found =
+      std::find_if(imported_body_results_.begin(), imported_body_results_.end(),
+                   [&](const auto& value) { return value.feature_id == feature_id; });
+  return found == imported_body_results_.end() ? nullptr : &*found;
+}
+
+const GeometryShape* ShapeCache::find_imported_body_shape(const FeatureId& feature_id,
+                                                          const BodyId& body_id) const noexcept {
+  const auto* result = find_imported_body_result(feature_id);
+  if (!result)
+    return nullptr;
+  const auto found = std::find_if(result->imported.bodies.begin(), result->imported.bodies.end(),
+                                  [&](const auto& body) { return body.output.body == body_id; });
+  return found == result->imported.bodies.end() ? nullptr : &found->shape;
+}
+
+Result<const CachedImportedBodyFeatureResult*>
+ShapeCache::validated_imported_body_result(const PartDocument& document,
+                                           const ImportedBodyFeature& feature) const {
+  const auto invalid = [&document](std::string message) {
+    return Result<const CachedImportedBodyFeatureResult*>::failure(
+        Error::geometry(document.id().value(), std::move(message)));
+  };
+  const auto* cached = find_imported_body_result(feature.id());
+  const auto& features = document.imported_body_features();
+  const auto owned = std::find(features.begin(), features.end(), feature);
+  if (document.is_reference_part() || cached == nullptr || owned == features.end())
+    return invalid("incremental imported base requires its owned computed feature result");
+  const auto& imported = cached->imported;
+  const auto* source = document.find_step_import_source(feature.definition().source());
+  const auto* catalog = document.find_imported_topology_catalog(feature.definition().catalog());
+  if (imported.part_document != document.id() || imported.definition != feature.definition() ||
+      source == nullptr || imported.source != *source || catalog == nullptr ||
+      imported.catalog != *catalog || !find_feature_shape(feature.id()))
+    return invalid("imported base cache owner or source/catalog/output intent is stale");
+  for (const auto& body : imported.bodies) {
+    const auto* declared = document.find_body(body.output.body);
+    if (declared == nullptr || declared->kind() != body.output.kind)
+      return invalid("imported base output must retain its declared Body kind");
+  }
+  return Result<const CachedImportedBodyFeatureResult*>::success(cached);
+}
+
+Result<std::size_t> ShapeCache::validate_imported_body_owners(const PartDocument& document) const {
+  for (const auto& cached : imported_body_results_) {
+    const auto* current = document.find_imported_body_feature(cached.feature_id);
+    if (cached.imported.part_document != document.id() || current == nullptr)
+      return Result<std::size_t>::failure(Error::geometry(
+          document.id().value(), "cached imported base no longer belongs to the current Part"));
+    const auto* catalog = document.find_imported_topology_catalog(current->definition().catalog());
+    if (current->definition() != cached.imported.definition || catalog == nullptr ||
+        *catalog != cached.imported.catalog)
+      return Result<std::size_t>::failure(Error::geometry(
+          cached.feature_id.value(),
+          "cached imported base identity has different immutable catalog/output intent"));
+  }
+  return Result<std::size_t>::success(imported_body_results_.size());
+}
+
+Result<std::size_t> ShapeCache::reconcile_imported_body_owners(const PartDocument& document) {
+  std::vector<FeatureId> removed;
+  std::vector<BodyId> removed_bodies;
+  for (const auto& cached : imported_body_results_) {
+    if (cached.imported.part_document != document.id())
+      return Result<std::size_t>::failure(
+          Error::geometry(document.id().value(), "imported base cache belongs to another Part"));
+    if (const auto* current = document.find_imported_body_feature(cached.feature_id)) {
+      const auto* catalog =
+          document.find_imported_topology_catalog(current->definition().catalog());
+      if (current->definition() != cached.imported.definition || catalog == nullptr ||
+          *catalog != cached.imported.catalog)
+        return Result<std::size_t>::failure(Error::geometry(
+            cached.feature_id.value(),
+            "cached imported base identity has different immutable catalog/output intent"));
+      continue;
+    }
+    if (document.dependency_graph().has_node(cached.feature_id.value()))
+      return Result<std::size_t>::failure(Error::geometry(
+          cached.feature_id.value(), "removed imported base identity has another authority"));
+    for (const auto& output : cached.imported.definition.outputs()) {
+      const auto* body = find_body_result(output.body);
+      if (!body)
+        continue;
+      if (body->source_feature_id == cached.feature_id)
+        removed_bodies.push_back(output.body);
+      else if (!document.dependency_graph().has_dependency(body->source_feature_id.value(),
+                                                           "body:" + output.body.value()))
+        return Result<std::size_t>::failure(Error::geometry(
+            output.body.value(),
+            "removed imported base retains a deleted modifier result; rebuild from a clean cache"));
+    }
+    removed.push_back(cached.feature_id);
+  }
+  // Validate the whole removal set before changing even this disposable cache.
+  for (const auto& body : removed_bodies) {
+    auto removed_body = remove_body_shape(body);
+    if (!removed_body)
+      return Result<std::size_t>::failure(removed_body.error());
+  }
+  for (const auto& feature : removed) {
+    auto removed_feature = remove_feature_shape(feature);
+    if (!removed_feature)
+      return Result<std::size_t>::failure(removed_feature.error());
+  }
+  return Result<std::size_t>::success(removed.size());
+}
+
 Result<std::size_t>
 ShapeCache::store_body_transform_state(BodyTransformId transform_id, BodyId body_id,
                                        GeometryAffineTransform cumulative_transform) {
@@ -247,6 +394,7 @@ void ShapeCache::clear() noexcept {
   body_transform_states_.clear();
   reference_transforms_.clear();
   reference_result_.reset();
+  imported_body_results_.clear();
   clear_final_shape();
 }
 

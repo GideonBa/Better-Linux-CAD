@@ -3,6 +3,8 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/geometry/reference_part_geometry.hpp"
+#include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/step_editable_commands.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include <QFile>
 #include <algorithm>
@@ -534,6 +536,7 @@ GuiStepImportWorkbench::prepare_reference(const GuiDocumentSession& session,
     return Result<GuiStepReferencePreview>::failure(!path ? path.error() : json.error());
   const auto root = path.value().parent_path();
   const geometry::StepReferenceCommands commands;
+  const geometry::StepEditableCommands editable;
   auto candidate = [&]() -> Result<std::variant<geometry::StepReferencePartCandidate,
                                                 geometry::StepReferenceProjectCandidate>> {
     using Value =
@@ -541,15 +544,23 @@ GuiStepImportWorkbench::prepare_reference(const GuiDocumentSession& session,
     if (const auto* project = session.project()) {
       const auto result = [&]() -> Result<geometry::StepReferenceProjectCandidate> {
         switch (request.operation) {
-        case GuiStepReferenceOperation::Insert:
+        case GuiStepReferenceOperation::Insert: {
+          const auto* catalog = project->find_imported_topology_catalog(request.catalog);
+          const auto* source =
+              catalog ? project->find_step_import_source(catalog->source()) : nullptr;
+          if (source && source->mode() == StepImportMode::EditableBody)
+            return editable.insert(*project, request.catalog, request.new_part, request.name,
+                                   request.base_feature, request.target_assembly, request.instance,
+                                   request.transform, root);
           return commands.insert(*project, request.catalog, request.new_part, request.name,
                                  request.target_assembly, request.instance, request.transform,
                                  root);
+        }
         case GuiStepReferenceOperation::Repeat:
           return commands.repeat(*project, request.reference_part, request.target_assembly,
                                  request.instance, request.transform, root);
         case GuiStepReferenceOperation::Refresh:
-          return commands.refresh(*project, request.reference_part, root);
+          return editable.refresh(*project, request.reference_part, request.refresh_source, root);
         case GuiStepReferenceOperation::Convert:
           return commands.convert(*project, request.reference_part, request.new_part, request.name,
                                   request.base_feature, root);
@@ -568,18 +579,24 @@ GuiStepImportWorkbench::prepare_reference(const GuiDocumentSession& session,
         const auto* source = catalog ? part.find_step_import_source(catalog->source()) : nullptr;
         if (!source)
           return Result<geometry::StepReferencePartCandidate>::failure(
-              invalid("Choose a saved Reference topology catalog"));
-        auto created =
-            commands.create_definition(*source, *catalog, request.new_part, request.name, root);
+              invalid("Choose a saved imported product topology catalog"));
+        auto created = source->mode() == StepImportMode::EditableBody
+                           ? editable.create_definition(*source, *catalog, request.new_part,
+                                                        request.name, request.base_feature, root)
+                           : commands.create_definition(*source, *catalog, request.new_part,
+                                                        request.name, root);
         if (!created)
           return Result<geometry::StepReferencePartCandidate>::failure(created.error());
         return Result<geometry::StepReferencePartCandidate>::success(
             {std::move(created.value()),
              {},
-             {"Create a new immutable Reference Part file. The current Part is preserved."}});
+             {source->mode() == StepImportMode::EditableBody
+                  ? "Create a new Editable Part with an Imported Body base. The current Part is "
+                    "preserved."
+                  : "Create a new immutable Reference Part file. The current Part is preserved."}});
       }
       case GuiStepReferenceOperation::Refresh:
-        return commands.refresh(part, root);
+        return editable.refresh(part, request.refresh_source, root);
       case GuiStepReferenceOperation::Convert:
         return commands.convert(part, request.new_part, request.name, request.base_feature, root);
       case GuiStepReferenceOperation::Repeat:
@@ -614,13 +631,15 @@ GuiStepImportWorkbench::prepare_reference(const GuiDocumentSession& session,
     for (const auto& body : resolved.value().bodies)
       shapes.push_back(body.shape);
   } else {
-    for (const auto& feature : selected->imported_body_features()) {
-      auto resolved = adapter.resolve_imported_body_feature(*selected, feature, context);
-      if (!resolved)
-        return Result<GuiStepReferencePreview>::failure(resolved.error());
-      for (const auto& body : resolved.value().bodies)
-        shapes.push_back(body.shape);
-    }
+    auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.step_import.preview"));
+    if (!cache)
+      return Result<GuiStepReferencePreview>::failure(cache.error());
+    auto result =
+        geometry::GeometryRecomputeExecutor{&context}.execute_document(*selected, cache.value());
+    if (!result)
+      return Result<GuiStepReferencePreview>::failure(result.error());
+    for (const auto& body : cache.value().body_shapes())
+      shapes.push_back(body.shape);
   }
   auto valid = context.validate_sources();
   if (!valid)
@@ -665,7 +684,7 @@ GuiStepImportWorkbench::validate_reference(const GuiDocumentSession& session,
   auto actual = reference_candidate_json(preview);
   if (!expected || !actual || expected.value() != actual.value())
     return Result<std::size_t>::failure(
-        invalid("Reference Part candidate or source changed; prepare again"));
+        invalid("Imported Part candidate or source changed; prepare again"));
   return Result<std::size_t>::success(preview.preview_shapes.size());
 }
 Result<std::size_t>
@@ -684,11 +703,11 @@ GuiStepImportWorkbench::apply_reference(GuiDocumentSession& session,
   if (candidate_json && candidate_json.value() == preview.document_json)
     return Result<std::size_t>::success(0);
   const auto label = preview.request.operation == GuiStepReferenceOperation::Insert
-                         ? "Insert STEP Reference Part"
+                         ? "Insert STEP Part"
                      : preview.request.operation == GuiStepReferenceOperation::Repeat
                          ? "Insert Reference Part occurrence"
                      : preview.request.operation == GuiStepReferenceOperation::Refresh
-                         ? "Refresh STEP Reference Parts"
+                         ? "Refresh STEP Imported Parts"
                          : "Convert Reference to new Editable Part";
   if (const auto* project =
           std::get_if<geometry::StepReferenceProjectCandidate>(&fresh.value().candidate))

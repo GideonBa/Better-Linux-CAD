@@ -3,6 +3,7 @@
 #include "blcad/core/step_import_freshness.hpp"
 #include "blcad/geometry/assembly_import_validation.hpp"
 #include "blcad/geometry/reference_part_geometry.hpp"
+#include "blcad/geometry/step_editable_commands.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include <algorithm>
 
@@ -10,15 +11,6 @@ namespace blcad::geometry {
 namespace {
 Error invalid(std::string message) {
   return Error::validation("step.reference", std::move(message));
-}
-bool same_asset(const StepImportSource& a, const StepImportSource& b,
-                const std::filesystem::path& root) {
-  if (a.project_relative_asset_path() == b.project_relative_asset_path())
-    return true;
-  std::error_code error;
-  return std::filesystem::equivalent(root / a.project_relative_asset_path(),
-                                     root / b.project_relative_asset_path(), error) &&
-         !error;
 }
 Result<std::size_t> validate_part(const PartDocument& part, const std::filesystem::path& root) {
   StepImportTopologyContext context(root);
@@ -60,33 +52,6 @@ Result<std::size_t> append_occurrence(Project& project, DocumentId part, Documen
   if (!instance)
     return Result<std::size_t>::failure(instance.error());
   return target->add_component_instance(std::move(instance.value()));
-}
-template <class Owner>
-Result<std::size_t>
-refresh_owner(Owner& owner, const StepImportSource& selected, const std::filesystem::path& root,
-              std::vector<DocumentId>& affected, std::vector<std::string>& diagnostics) {
-  // Copy the registry: updating a digest invalidates pointers into the owner.
-  const auto sources = owner.step_import_sources();
-  std::size_t count{};
-  for (const auto& source : sources) {
-    if (!same_asset(source, selected, root))
-      continue;
-    auto report = inspect_step_import_source(source, root);
-    if (!report)
-      return Result<std::size_t>::failure(report.error());
-    if (!report.value().observed_sha256_digest())
-      return Result<std::size_t>::failure(invalid(report.value().diagnostic()));
-    auto refreshed = refresh_step_import_source(owner, root, report.value());
-    if (!refreshed)
-      return refreshed;
-    diagnostics.push_back(owner.id().value() + "/" + source.id().value() + ": " +
-                          source.project_relative_asset_path() + " → " +
-                          *report.value().observed_sha256_digest());
-    ++count;
-  }
-  if (count)
-    affected.push_back(owner.id());
-  return Result<std::size_t>::success(count);
 }
 } // namespace
 
@@ -205,20 +170,7 @@ StepReferenceCommands::refresh(const Project& original, DocumentId part_id,
   if (!source)
     return Result<StepReferenceProjectCandidate>::failure(
         invalid("Choose a Reference Part to refresh"));
-  StepReferenceProjectCandidate result{original, part_id, {}, {}};
-  auto changed =
-      refresh_owner(result.project, *source, root, result.affected_owners, result.diagnostics);
-  if (!changed)
-    return Result<StepReferenceProjectCandidate>::failure(changed.error());
-  for (auto& owned : result.project.part_documents()) {
-    changed = refresh_owner(owned, *source, root, result.affected_owners, result.diagnostics);
-    if (!changed)
-      return Result<StepReferenceProjectCandidate>::failure(changed.error());
-  }
-  auto valid = validate_project(result.project, root);
-  if (!valid)
-    return Result<StepReferenceProjectCandidate>::failure(valid.error());
-  return Result<StepReferenceProjectCandidate>::success(std::move(result));
+  return StepEditableCommands{}.refresh(original, part_id, source->id(), root);
 }
 Result<StepReferencePartCandidate>
 StepReferenceCommands::refresh(const PartDocument& original,
@@ -227,15 +179,7 @@ StepReferenceCommands::refresh(const PartDocument& original,
   const auto* source = binding ? original.find_step_import_source(binding->source()) : nullptr;
   if (!source)
     return Result<StepReferencePartCandidate>::failure(invalid("Open a Reference Part to refresh"));
-  StepReferencePartCandidate result{original, {}, {}};
-  auto changed =
-      refresh_owner(result.part, *source, root, result.affected_owners, result.diagnostics);
-  if (!changed)
-    return Result<StepReferencePartCandidate>::failure(changed.error());
-  auto valid = validate_part(result.part, root);
-  if (!valid)
-    return Result<StepReferencePartCandidate>::failure(valid.error());
-  return Result<StepReferencePartCandidate>::success(std::move(result));
+  return StepEditableCommands{}.refresh(original, source->id(), root);
 }
 Result<StepReferencePartCandidate>
 StepReferenceCommands::convert(const PartDocument& original, DocumentId id, std::string name,

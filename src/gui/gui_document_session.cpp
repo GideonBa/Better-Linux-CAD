@@ -9,6 +9,7 @@
 #include "blcad/core/sketch_dimension_catalog_system.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/reference_part_geometry.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 #include "blcad/geometry/assembly_import_validation.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/gui/gui_step_import_workbench.hpp"
@@ -57,6 +58,139 @@ std::optional<Error> imported_result_failure(const PartDocument& part,
 bool same_error(const Error& first, const std::optional<Error>& second) {
   return second && first.category() == second->category() &&
          first.object_id() == second->object_id() && first.message() == second->message();
+}
+bool imported_part_consumer_failure(const PartDocument& part, const std::filesystem::path& root,
+                                    const Error& failure) {
+  if (part.imported_body_features().empty() || root.empty())
+    return false;
+  std::vector<ImportedTopologyReference> references;
+  bool malformed{};
+  const auto append = [&](Result<ImportedTopologyReference> reference) {
+    if (!reference || !validate_imported_topology_reference(part, reference.value())) {
+      malformed = true;
+      return;
+    }
+    references.push_back(std::move(reference.value()));
+  };
+  // Inspect canonical Core serialization only after strict Core loading. This
+  // covers the typed imported inputs of every feature family without treating
+  // arbitrary diagnostic strings or unrelated Geometry errors as recovery.
+  auto serialized = serialize_part_document_to_json(part);
+  if (!serialized)
+    return false;
+  const auto intent = nlohmann::json::parse(serialized.value(), nullptr, false);
+  const auto visit = [&](auto&& self, const nlohmann::json& value) -> void {
+    if (value.is_object()) {
+      if (value.value("source_kind", std::string{}) == "imported_topology") {
+        const auto found = value.find("reference");
+        if (found == value.end() || !found->is_object() || found->size() != 3 ||
+            !found->contains("catalog") || !found->at("catalog").is_string() ||
+            !found->contains("entry") || !found->at("entry").is_string() ||
+            !found->contains("capability") || !found->at("capability").is_string()) {
+          malformed = true;
+          return;
+        }
+        bool known{};
+        for (const auto capability :
+             {ImportedTopologyCapability::Body, ImportedTopologyCapability::Face,
+              ImportedTopologyCapability::Edge, ImportedTopologyCapability::Plane,
+              ImportedTopologyCapability::Cylinder, ImportedTopologyCapability::Axis,
+              ImportedTopologyCapability::Line, ImportedTopologyCapability::Circle,
+              ImportedTopologyCapability::Point}) {
+          if (found->at("capability") != to_string(capability))
+            continue;
+          known = true;
+          append(ImportedTopologyReference::create(
+              ImportedTopologyCatalogId(found->at("catalog").get<std::string>()),
+              ImportedTopologyId(found->at("entry").get<std::string>()), capability));
+          break;
+        }
+        if (!known)
+          malformed = true;
+      }
+      for (const auto& child : value)
+        self(self, child);
+    } else if (value.is_array())
+      for (const auto& child : value)
+        self(self, child);
+  };
+  visit(visit, intent);
+  for (const auto& plane : part.result_face_workplanes()) {
+    if (!validate_result_face_workplane_reference(part, plane))
+      return false;
+    for (const auto& origin : plane.reference().origins())
+      if (origin.role.starts_with("imported-face/"))
+        append(parse_imported_face_origin_role(origin.role));
+  }
+  if (malformed || references.empty())
+    return false;
+  geometry::StepImportTopologyContext context(root);
+  const auto lost = [&](const ImportedTopologyReference& reference) {
+    auto recovery = context.recover(part, reference.catalog());
+    if (!recovery)
+      return false;
+    const auto* entry = recovery.value()->find(reference.entry());
+    return entry && (entry->status == ImportedTopologyRecoveryStatus::Lost ||
+                     entry->status == ImportedTopologyRecoveryStatus::Ambiguous);
+  };
+  for (const auto& reference : references) {
+    if (!lost(reference))
+      continue;
+    auto resolved = context.resolve(part, reference);
+    if (!resolved && same_error(failure, resolved.error()))
+      return true;
+  }
+  // A face-supported Sketch reports its workplane identity, rather than the
+  // imported entry's identity. Reproduce that exact error from verified base
+  // outputs, and require a genuinely Lost/Ambiguous owned imported face origin.
+  auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.imported.recovery"));
+  if (!cache)
+    return false;
+  for (const auto& feature : part.imported_body_features())
+    if (!geometry::ReferencePartGeometry{}.seed_imported_body_feature(part, feature, context,
+                                                                      cache.value()))
+      return false;
+  for (const auto& plane : part.result_face_workplanes()) {
+    bool missing{};
+    for (const auto& origin : plane.reference().origins()) {
+      if (!origin.role.starts_with("imported-face/"))
+        continue;
+      auto reference = parse_imported_face_origin_role(origin.role);
+      missing = missing || (reference && lost(reference.value()));
+    }
+    if (!missing)
+      continue;
+    auto prefix_cache = cache.value();
+    if (!part.find_imported_body_feature(plane.reference().producer())) {
+      // A transformed or otherwise modeled producer still has genuine Core
+      // ancestry. Replay only that ancestry, excluding the failed consumer.
+      auto graph = part.dependency_graph();
+      std::unordered_set<std::string> ancestors{plane.reference().producer().value()};
+      bool changed = true;
+      while (changed) {
+        changed = false;
+        for (const auto& [source, dependent] : graph.dependencies())
+          if (ancestors.contains(dependent))
+            changed = ancestors.insert(source).second || changed;
+      }
+      const auto nodes = graph.nodes();
+      bool valid = true;
+      for (const auto& node : nodes)
+        if (!ancestors.contains(node) && !graph.remove_node(node))
+          valid = false;
+      if (!valid)
+        continue;
+      auto plan = RecomputePlan::from_graph_and_changed_nodes(graph, graph.nodes());
+      if (!plan || !geometry::GeometryRecomputeExecutor{&context}.execute_plan(part, plan.value(),
+                                                                               prefix_cache))
+        continue;
+    }
+    auto expected =
+        geometry::ResultFaceSupportGeometry::resolve(part, plane, prefix_cache, &context);
+    if (!expected && same_error(failure, expected.error()))
+      return true;
+  }
+  return false;
 }
 bool imported_endpoint_recovery_failure(const Project& project, const std::filesystem::path& root,
                                         const Error& failure) {
@@ -731,7 +865,9 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
     if (result.has_error()) {
       import_failure = imported_result_failure(*part, asset_root);
       if (!same_error(result.error(), import_failure))
-        import_failure.reset();
+        import_failure = imported_part_consumer_failure(*part, asset_root, result.error())
+                             ? std::optional<Error>(result.error())
+                             : std::nullopt;
       if (!import_failure && mode != GuiDocumentOpenMode::ReferenceRepair) {
         record_error(result.error());
         return result;
@@ -1340,7 +1476,10 @@ GuiDocumentSession::recompute_project(Project& active_project,
       return Result<std::vector<ProjectPartCache>>::failure(cache.error());
     const auto result = recompute_part(part, cache.value(), root);
     if (result.has_error()) {
-      const auto failure = import_failure ? imported_result_failure(part, root) : std::nullopt;
+      auto failure = import_failure ? imported_result_failure(part, root) : std::nullopt;
+      if (import_failure && !same_error(result.error(), failure) &&
+          imported_part_consumer_failure(part, root, result.error()))
+        failure = result.error();
       if (same_error(result.error(), failure)) {
         if (!*import_failure)
           *import_failure = failure;
@@ -1411,7 +1550,9 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
     if (!computed) {
       import_failure = imported_result_failure(*part, asset_root);
       if (!same_error(computed.error(), import_failure))
-        import_failure.reset();
+        import_failure = imported_part_consumer_failure(*part, asset_root, computed.error())
+                             ? std::optional<Error>(computed.error())
+                             : std::nullopt;
       if (!import_failure && !entry.allow_failed_recompute) {
         record_error(computed.error());
         return computed;
@@ -1604,7 +1745,6 @@ GuiDocumentSession::recompute_part_candidate(PartDocument& document,
   if (!current || history_.empty() || reference_repair_mode_ ||
       recompute_status_ != GuiRecomputeStatus::Fresh || !part_shape_cache_ ||
       current->id() != document.id() || current->bodies().empty() || document.bodies().empty() ||
-      !current->step_import_sources().empty() || !document.step_import_sources().empty() ||
       has_legacy_aggregate(*current) || has_legacy_aggregate(document))
     return full();
   const auto baseline = serialize_current();

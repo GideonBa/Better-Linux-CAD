@@ -898,10 +898,15 @@ std::optional<DatumPlaneId> ShellWindow::selected_datum_plane() const {
     if (!selected_semantic_id_.starts_with(prefix))
       continue;
     const DatumPlaneId id(selected_semantic_id_.substr(prefix.size()));
-    if (session_.part_shape_cache()
-            ? static_cast<bool>(
-                  geometry::WorkplaneResolver{}.resolve(*part, id, *session_.part_shape_cache()))
-            : static_cast<bool>(geometry::WorkplaneResolver{}.resolve(*part, id)))
+    auto resolved = query_with_step_import_context(session_, [&](auto* context) {
+      auto observed = geometry::observe_imported_part_sources(*part, context);
+      if (!observed)
+        return Result<geometry::ResolvedWorkplane>::failure(observed.error());
+      return session_.part_shape_cache()
+                 ? geometry::WorkplaneResolver{}.resolve(*part, id, *session_.part_shape_cache())
+                 : geometry::WorkplaneResolver{}.resolve(*part, id);
+    });
+    if (resolved)
       return id;
   }
   return std::nullopt;
@@ -912,10 +917,14 @@ std::optional<ResultFaceReference> ShellWindow::selected_result_face() const {
   const auto* cache = session_.part_shape_cache();
   if (!part || !cache || !session_.derived_results_fresh() ||
       (!selected_semantic_id_.starts_with("finishing/face/") &&
+       !selected_semantic_id_.starts_with("finishing/imported:") &&
        !selected_semantic_id_.starts_with("support/result-face/")))
     return std::nullopt;
   for (const auto& body : part->bodies()) {
-    auto targets = geometry::ResultFaceSupportGeometry::selectable_faces(*part, *cache, body.id());
+    auto targets = query_with_step_import_context(session_, [&](auto* context) {
+      return geometry::ResultFaceSupportGeometry::selectable_faces(*part, *cache, body.id(),
+                                                                   context);
+    });
     if (targets)
       for (const auto& target : targets.value())
         if (target.semantic_id == selected_semantic_id_)

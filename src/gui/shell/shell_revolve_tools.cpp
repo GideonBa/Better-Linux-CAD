@@ -1,6 +1,7 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 
 #include "blcad/gui/occt_viewport.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <QComboBox>
@@ -23,12 +24,16 @@ ShellFeatureTools::revolve_axis_choices(const GuiSketchPlaneView& plane) const {
   const auto* cache = session_.part_shape_cache();
   if (!part || !cache)
     return choices;
+  auto import_context = make_step_import_context(session_);
+  if (!import_context)
+    return choices;
+  auto* context = import_context.value().get();
   const auto append = [&](Result<AxisReference> reference, std::string label,
                           std::string identity) {
     if (!reference)
       return;
-    auto axis = geometry::GeometryRecomputeExecutor{}.resolve_feature_axis(*part, reference.value(),
-                                                                           *cache);
+    auto axis = geometry::GeometryRecomputeExecutor{context}.resolve_feature_axis(
+        *part, reference.value(), *cache);
     if (!axis)
       return;
     const auto [origin, direction] = axis.value();
@@ -72,7 +77,27 @@ ShellFeatureTools::revolve_axis_choices(const GuiSketchPlaneView& plane) const {
                                                    semantic.value()),
                feature.name() + " / Axis", "feature-axis/" + feature.id().value());
     }
-  auto sources = geometry::ViewportSceneBuilder{}.build_construction_sources(*part, *cache);
+  for (const auto& catalog : part->imported_topology_catalogs())
+    for (const auto& entry : catalog.entries()) {
+      const auto capabilities = imported_topology_capabilities(entry.descriptor);
+      const auto has = [&](ImportedTopologyCapability capability) {
+        return std::find(capabilities.begin(), capabilities.end(), capability) !=
+               capabilities.end();
+      };
+      if (!has(ImportedTopologyCapability::Axis) && !has(ImportedTopologyCapability::Line))
+        continue;
+      auto reference = ImportedTopologyReference::create(catalog.id(), entry.id,
+                                                         has(ImportedTopologyCapability::Axis)
+                                                             ? ImportedTopologyCapability::Axis
+                                                             : ImportedTopologyCapability::Line);
+      if (!reference || !validate_imported_topology_reference(*part, reference.value()))
+        continue;
+      auto spelling = make_imported_topology_target_spelling(reference.value());
+      if (spelling)
+        append(AxisReference::create_imported(PartFeatureInputRole::RevolveAxis, reference.value()),
+               "Imported axis / " + entry.id.value(), "imported-axis/" + spelling.value());
+    }
+  auto sources = geometry::ViewportSceneBuilder{context}.build_construction_sources(*part, *cache);
   if (sources)
     for (const auto& source : sources.value())
       if (const auto* edge = std::get_if<SemanticEdgeReference>(&source.reference)) {
@@ -82,6 +107,8 @@ ShellFeatureTools::revolve_axis_choices(const GuiSketchPlaneView& plane) const {
                feature->name() + " / " + std::string(to_string(edge->edge())),
                source.item.semantic_id);
       }
+  if (context && !context->validate_sources())
+    return {};
   return choices;
 }
 
@@ -215,8 +242,10 @@ Result<std::size_t> ShellFeatureTools::configure_revolve_candidate() {
           ? std::nullopt
           : std::optional<BodyId>{BodyId(revolve_target_->currentData().toString().toStdString())});
   auto frame = axis.frame;
-  auto resolved = geometry::GeometryRecomputeExecutor{}.resolve_feature_axis(
-      *session_.part_document(), axis.reference, *session_.part_shape_cache());
+  auto resolved = query_with_step_import_context(session_, [&](auto* context) {
+    return geometry::GeometryRecomputeExecutor{context}.resolve_feature_axis(
+        *session_.part_document(), axis.reference, *session_.part_shape_cache());
+  });
   if (!resolved)
     return Result<std::size_t>::failure(resolved.error());
   frame.origin = resolved.value().first;

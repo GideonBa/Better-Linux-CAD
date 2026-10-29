@@ -206,3 +206,14 @@ Finishing previews participate in the shared candidate-cache contract in
 `docs/gui-modeling-workspace-mvp9.md`. The representative rotor profile and actual shell workflow
 exercise curved current-result edges and radius recovery without weakening the existing reference
 or geometry validation rules.
+
+## Editable imported topology — Block 141 integration
+
+Finishing target discovery verifies the saved document's STEP source context and resolves imported
+edge/face references against the current Body. The immutable imported base remains the producer
+for its own ordered outputs; modeled results retain normal feature-result authority. Supported Body
+transforms carry the imported geometric witnesses to the actual placed Body before matching.
+Ambiguous, lost or stale inputs are omitted from picking and reject candidate recompute. Preview,
+Apply, feature editing and reference repair use the same source context and preserve atomic history.
+Imported solid faces are not offered as Surface inputs unless that command's existing typed input
+family can represent them. Numbered acceptance remains in `docs/mvp-plan.md`.

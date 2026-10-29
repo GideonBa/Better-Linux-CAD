@@ -50,6 +50,13 @@ public:
                                                              StepImportSource source,
                                                              ImportedTopologyCatalog catalog,
                                                              ImportedPartDefinition definition);
+  // Creates an editable Part with one immutable imported base and the three
+  // BLCAD origin planes. The feature's ordered output mapping is retained;
+  // Bodies themselves keep their canonical BodyId collection order.
+  [[nodiscard]] static Result<PartDocument> create_editable_import(DocumentId id, std::string name,
+                                                                   StepImportSource source,
+                                                                   ImportedTopologyCatalog catalog,
+                                                                   ImportedBodyFeature feature);
   [[nodiscard]] PartDocumentMode mode() const noexcept {
     return reference_part_definition_ ? PartDocumentMode::Reference : PartDocumentMode::Editable;
   }
@@ -62,7 +69,11 @@ public:
   [[nodiscard]] const std::vector<ImportedBodyFeature>& imported_body_features() const noexcept {
     return imported_body_features_;
   }
+  [[nodiscard]] const ImportedBodyFeature* find_imported_body_feature(FeatureId id) const noexcept;
   [[nodiscard]] Result<std::size_t> add_imported_body_feature(ImportedBodyFeature feature);
+  // The base has no authored parameter/update path. Removal retains declared
+  // Bodies and source/catalog metadata and rejects every downstream consumer.
+  [[nodiscard]] Result<std::size_t> remove_imported_body_feature(FeatureId id);
   [[nodiscard]] Result<PartDocument>
   convert_reference_to_editable(DocumentId new_id, std::string new_name, FeatureId base_feature_id,
                                 std::vector<BodyId> new_body_ids) const;
@@ -191,11 +202,7 @@ public:
   find_step_import_source(StepImportSourceId id) const noexcept {
     return step_import_sources_.find(std::move(id));
   }
-  [[nodiscard]] Result<std::size_t> add_step_import_source(StepImportSource source) {
-    if (is_reference_part())
-      return Result<std::size_t>::failure(reference_part_edit_error());
-    return step_import_sources_.add(std::move(source));
-  }
+  [[nodiscard]] Result<std::size_t> add_step_import_source(StepImportSource source);
   [[nodiscard]] Result<std::size_t> remove_step_import_source(StepImportSourceId id);
   [[nodiscard]] Result<std::size_t> remove_step_import_source(const StepImportSource& expected);
   [[nodiscard]] Result<std::size_t> refresh_step_import_source(const StepImportSource& expected,
@@ -369,6 +376,10 @@ private:
   [[nodiscard]] bool has_reference_status_id(const ReferenceStatusId& id) const noexcept;
   [[nodiscard]] bool has_reference_remap_id(const ReferenceRemapId& id) const noexcept;
   [[nodiscard]] bool has_sketch_origin_override_id(const SketchId& id) const noexcept;
+  [[nodiscard]] bool is_imported_authority_node(std::string_view node) const noexcept;
+  [[nodiscard]] bool has_authored_node_identity(std::string_view node) const;
+  [[nodiscard]] Result<std::size_t> add_authored_graph_node(DependencyGraph& graph,
+                                                            std::string node) const;
   [[nodiscard]] Result<std::size_t>
   add_edge_treatment_dependencies(const FeatureId& id, const BodyId& target_body,
                                   const std::vector<EdgeReference>& edges,

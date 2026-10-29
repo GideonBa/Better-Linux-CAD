@@ -499,8 +499,8 @@ Blocks 132 (QOpenGLWidget viewport), 133 (`ShellWindow` + `ShellRibbon`, origin 
 implemented; Block 136 restores full bounded feature coverage and is accepted with full offscreen,
 native Qt/OCCT and closure checks. Block 137 adds verified STEP source intent, freshness and shell
 management. Block 138 adds the verified STEP/XDE reader and read-only geometry inspection.
-All Blocks through 140 are complete; Block 141 (EditableBody downstream modeling) is planned after
-the Block-140 PR is merged and main is verified.
+All Blocks through 140 are complete; Block 141 (EditableBody downstream modeling) is in progress
+after PR #132 is merged and main is verified.
 Source contracts and acceptance evidence live in `docs/step-import-sequence-mvp10.md`; the completed shell milestone
 lives in `docs/gui-shell-acceptance-mvp9r.md`. Dated proof sections below retain their original
 incremental status.
@@ -2370,3 +2370,136 @@ inventory passes **3 / 313** with Shell acceptance required
 (`/tmp/blcad140-final-inventory.log`). The runtime freeze remains unchanged.
 Delivery: [PR #132](https://github.com/GideonBa/Better-Linux-CAD/pull/132), verified implementation
 commit `16fd35e`.
+PR #132 merged as `f426480`; main exactly matches tested head `ba79e27` and all **961** runtime
+fingerprints, with no open issues or PRs before Block 141 starts.
+
+### Block 141 — EditableBody downstream modeling (accepted 2026-10-29)
+
+Branch `feat/step-editable-body-modeling` starts from verified main `f426480` after PR #132 is
+merged. The new Core factory, source-to-base dependency graph, immutable per-output base cache,
+incremental downstream replay, shared direct-import/refresh commands and matching GUI authoring
+are implemented. Sources were frozen before each common build/test window. Full acceptance is
+complete as recorded below; numbered completion advances through Block 141 only.
+
+
+Block-141 acceptance commands (results are recorded below only after execution):
+
+```bash
+cmake --build build/dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app blcad_export_step -j 8
+./build/dev-gui/blcad_core_tests "[imported-body-feature]"
+./build/dev-gui/blcad_geometry_tests "[imported-body-recompute],[imported-body-downstream-feature],[step-editable-commands]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[imported-body-feature],[step-editable-parts],[block141-editable-parts],[step-reference-parts],[block140-reference-parts],[integration][gui-feature-coverage]"
+./build/dev-gui/blcad_core_tests
+./build/dev-gui/blcad_geometry_tests
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad141-native-100 QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[native-step-editable-parts],[native-step-reference-parts],[native-step-topology],[native-step-inspection],[block136-feature-edit],[block136-surface-context],[shell-combined-revolve-controls],[native-shell-surface],[native-construction-picking],[shell-combined-workplane-edit],[shell-repair-open-input],[integration][gui-feature-coverage],[native-viewer-lifecycle]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad141-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[native-step-editable-parts]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+./build/dev-gui/blcad_export_step examples/reference_plate.blcad.json /tmp/blcad141-cli-legacy.step
+```
+
+The first common build was stopped before tests after independent review found that reusing an old
+Geometry cache after imported-base deletion could retain removed geometry. A narrow cache ownership correction and full/empty-plan regressions were added before the next
+frozen build. Pristine removed bases reconcile on a working copy; deleted modifier chains and
+foreign/reused ownership fail atomically, including direct feature entrypoints. This interrupted
+build is not recorded as a passing gate. The corrected build freezes **970** runtime inputs;
+manifest SHA-256 `b4e445ff1a40202e7b623460eed89263def50f04457b5d17b31d29961e92d288`.
+The next build caught a `string_view`/`string` helper mismatch, which was corrected before tests.
+Final review also added a reused-base-id/output-remapping regression: old immutable definition or
+catalog evidence cannot be reused for a different base; digest-only refresh remains supported.
+
+The first focused Core run found two test assumptions (10/12 cases passed): dependency-ready JSON
+replay preserves the complete semantic edge set rather than vector insertion order, and the
+state-driven planner executes `Dirty` descendants rather than the already accepted `Changed`
+source. The corrected assertions retain exact sorted edge equality, ordering, every downstream
+feature and both output Bodies, and also verify the explicit changed-root planner. Production code
+was unchanged by this test correction. Final gates below must use the corrected freeze.
+
+Corrected frozen Core gates pass: focused **12 cases / 1,544 assertions**
+(`/tmp/blcad141-core-focused-final.log`), full **589 / 20,850**
+(`/tmp/blcad141-core-full.log`). Runtime fingerprints remain unchanged. Geometry/GUI/native gates
+are still pending; this evidence alone does not advance numbered completion.
+
+The new native test required explicit `QPoint` overload selection when compiling against Qt 6.
+The first focused Geometry run passed 15/17 cases; its two failures used `RectangleProfile` through
+an older SubtractiveExtrude path that accepts closed profiles instead. The fixture now uses the
+actual four-line `ClosedProfile` at (13,13)–(17,17), with four directed driving dimensions bound to
+the original width/height parameters. The real imported-base SubtractiveExtrude, 160 mm³ cut,
+incremental dependencies and all later volume/JSON/re-export assertions are retained. No production
+geometry behavior changed for this fixture correction.
+
+The corrected frozen Geometry focused gate passes **17 / 921**
+(`/tmp/blcad141-geometry-focused-final.log`), including full/empty-plan deletion and reused-id
+regressions, immutable multi-output base retention, actual imported face-supported Sketches,
+placed imported-edge Fillet, downstream Add/Cut/Hole, JSON and physical re-export. Full Core repeats
+successfully under the current freeze: **589 / 20,850** (`/tmp/blcad141-core-full-final.log`).
+
+All five targets build successfully (`/tmp/blcad141-build-6.log`); the dependency audit contains
+**502 nonempty records** (`/tmp/blcad141-ninja-deps.log`). Full Geometry passes **550 / 42,559**
+(`/tmp/blcad141-geometry-full.log`). Focused offscreen GUI passes **14 cases: 11 passed, 3
+native-only skips / 849 assertions** (`/tmp/blcad141-gui-focused.log`). The 970-file freeze remains
+unchanged. Native workflows and the complete GUI suite still gate acceptance.
+
+The first native 100% run finished **29 cases: 27 passed, 2 failed / 17,364 assertions**
+(`/tmp/blcad141-native-100.log`). The Editable workflow reached the real face-supported boss, Cut,
+Hole and imported-edge Fillet, then exposed a missing saved STEP context when the Parameters tool
+built candidate/original preview scenes. That product path is being corrected before native rerun.
+The other failure is an existing Workplane test's actual cursor-position guard (requested 3208,304,
+observed 2017,356); it requires an isolated native recheck with the same pointer assertions retained.
+Neither failure is counted as acceptance.
+
+The Parameters product correction changes only `shell_parameter_tools.cpp`; its candidate and
+original scenes now share the saved-root context and validate observed sources before publishing
+preview. Native diagnostics also include the task summary before the Apply assertion. The five-target
+incremental build passes (`/tmp/blcad141-build-7.log`, two GUI translation units plus GUI/app links);
+Core/Geometry sources and test binaries remain unchanged from their successful complete gates.
+The updated 970-input freeze is held for subsequent GUI/native acceptance.
+
+Native targeted rerun (`/tmp/blcad141-native-fix.log`) confirms the unchanged Workplane pointer
+workflow passes and the Parameters correction reaches successful Apply, physical +16 mm³ change,
+history, Save/Open and export. The remaining failure is the test's combo helper assuming each Down
+key advances one numeric row: standalone Repeat is correctly disabled, so selecting Refresh skips
+that row. The helper is corrected to stop at the requested actual enabled index using bounded real
+key events; production command availability remains unchanged. The focused rerun itself is not a
+passing gate (1/2 cases passed).
+
+The bounded real-key combo helper fix builds successfully (`/tmp/blcad141-build-8.log`, native test
+translation unit and GUI test link only). The current source/test/coverage freeze remains **970**
+files, SHA-256 `b4e445ff1a40202e7b623460eed89263def50f04457b5d17b31d29961e92d288`.
+No further source edits occur during subsequent native/full GUI gates.
+
+Final native 100% matrix passes **29 / 17,979**, no skips
+(`/tmp/blcad141-native-100-final.log`). It includes new direct Editable import, actual imported top-face
+mouse selection, face-supported boss, Cut/Hole/imported-edge Fillet, physical parameter edit with
+unchanged 1,000 mm³ base, Undo/Redo/Open/export, full modeled refresh and incompatible-face rollback.
+Existing source/topology/Reference, feature edit, Revolve, Surface drag, construction picking,
+Workplane edit and no-cache repair paths also pass; the prior pointer failure does not recur.
+Captures in `/tmp/blcad141-native-100-final` were inspected for preview/refresh state and control
+accessibility. This proves existing Revolve context regression, not a new native imported-axis pick.
+
+Native 150% passes **1 / 554**, no skips (`/tmp/blcad141-native-150-final.log`). Its captures in
+`/tmp/blcad141-native-150-final` show the complete modeled refresh result and accessible fixed
+Prepare/Apply/Close controls within the existing scrolled source task. The complete GUI suite is
+running on the unchanged freeze; numbered acceptance still waits for it and the final startup/
+legacy-export/inventory checks.
+
+Full offscreen GUI passes **643 cases: 611 passed, 32 expected native-only skips / 83,923 assertions**
+(`/tmp/blcad141-gui-full.log`). Separate native startup reaches intentional **124**
+(`/tmp/blcad141-startup-final.log`). Historical bodyless Part CLI export passes and writes **19,170
+bytes** (`/tmp/blcad141-cli-legacy-final.log`); the initially omitted input argument was a command
+invocation error and was corrected in the repeatable command above. Final Ninja audit retains
+**502 nonempty** records (`/tmp/blcad141-ninja-deps-final.log`). All **970** runtime fingerprints
+remain unchanged under `b4e445ff1a40202e7b623460eed89263def50f04457b5d17b31d29961e92d288`.
+Numbered completion advances through Block 141; Blocks 142–143 remain planned and cannot start
+until this block's PR is merged and main verified. Final serialized inventory/focused evidence and
+PR delivery are recorded next.
+
+The final documentation audit initially rejected `current_block: 141` after completion advanced to
+141: the existing contract requires the next numbered block. The plan now records **current 142,
+planned**, explicitly blocked from starting until Block 141 merges; no Block-142 implementation or
+acceptance is claimed. The inventory rule is unchanged.
+
+Final focused GUI plus serialized Shell/documentation inventory passes **14 cases: 11 passed,
+3 expected native-only skips / 849 assertions** (`/tmp/blcad141-gui-focused-final.log`) after the
+numbered boundary is updated. Runtime freeze is unchanged; only Markdown changed after the
+successful full/native gates. Block 141 is ready for one reviewed commit/PR and protected merge.

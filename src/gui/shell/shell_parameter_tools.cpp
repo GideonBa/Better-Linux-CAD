@@ -1,6 +1,7 @@
 #include "blcad/gui/shell/shell_parameter_tools.hpp"
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -442,7 +443,11 @@ Result<std::size_t> ShellParameterTools::preview() {
   const auto result = ui.commit(candidate);
   if (!result)
     return result;
-  const geometry::ViewportSceneBuilder builder;
+  auto import_context = make_step_import_context(candidate);
+  if (!import_context)
+    return Result<std::size_t>::failure(import_context.error());
+  auto* context = import_context.value().get();
+  const geometry::ViewportSceneBuilder builder{context};
   auto scene = builder.build_part(*candidate.part_document(), *candidate.part_shape_cache());
   auto original = builder.build_part(*ui.window.session().part_document(),
                                      *ui.window.session().part_shape_cache());
@@ -461,6 +466,11 @@ Result<std::size_t> ShellParameterTools::preview() {
         item.kind != geometry::ViewportSceneKind::Edge &&
         item.kind != geometry::ViewportSceneKind::Vertex)
       shapes.push_back(std::move(item.shape));
+  if (context) {
+    auto fresh = context->validate_sources();
+    if (!fresh)
+      return fresh;
+  }
   if (!shapes.empty() || !replaced.empty()) {
     const auto shown =
         ui.window.viewport().set_feature_previews(std::move(shapes), std::move(replaced));

@@ -1,6 +1,7 @@
 #include "blcad/geometry/step_import_topology.hpp"
 
 #include "blcad/core/step_import_freshness.hpp"
+#include "blcad/geometry/body_transform_adapter.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 
 #include "geometry_shape_internal.hpp"
@@ -9,6 +10,7 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_Transform.hxx>
 #include <BRepGProp.hxx>
 #include <BRep_Tool.hxx>
 #include <Bnd_Box.hxx>
@@ -26,6 +28,7 @@
 #include <gp_Cylinder.hxx>
 #include <gp_Lin.hxx>
 #include <gp_Pln.hxx>
+#include <gp_Trsf.hxx>
 
 #include <algorithm>
 #include <array>
@@ -623,6 +626,46 @@ StepImportTopology::resolve(const ImportedTopologyRecovery& recovery,
     return Result<ImportedTopologyResolution>::failure(
         invalid("import topology does not support the requested analytic capability"));
   return Result<ImportedTopologyResolution>::success(*entry);
+}
+
+Result<ImportedTopologyDescriptor>
+StepImportTopology::placed_descriptor(const GeometryShape& current,
+                                      const GeometryAffineTransform& placement) const {
+  try {
+    require(!current.empty(), "import topology placed witness requires current source geometry");
+    const auto& m = placement.matrix;
+    require(std::all_of(m.begin(), m.end(), [](double value) { return std::isfinite(value); }),
+            "import topology Body placement must be finite");
+    require(m[12] == 0 && m[13] == 0 && m[14] == 0 && m[15] == 1,
+            "import topology Body placement must be affine");
+    gp_Trsf transform;
+    transform.SetValues(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10], m[11]);
+    require(!transform.IsNegative() && std::isfinite(transform.ScaleFactor()) &&
+                transform.ScaleFactor() > 0,
+            "import topology Body placement requires a positive rigid/uniform scale");
+    // SetValues accepts a gp_Trsf and may orthogonalize its input. Verify that no
+    // unsupported affine/shear component was silently discarded.
+    for (int row = 1; row <= 3; ++row)
+      for (int column = 1; column <= 4; ++column) {
+        const double expected = m[static_cast<std::size_t>((row - 1) * 4 + column - 1)];
+        require(std::abs(transform.Value(row, column) - expected) <=
+                    1e-10 * std::max(1.0, std::abs(expected)),
+                "import topology Body placement cannot contain nonuniform scale or shear");
+      }
+    const auto posed = BRepBuilderAPI_Transform(current.impl_->shape, transform, true).Shape();
+    if (posed.ShapeType() == TopAbs_FACE)
+      return Result<ImportedTopologyDescriptor>::success(face_descriptor(TopoDS::Face(posed)));
+    if (posed.ShapeType() == TopAbs_EDGE)
+      return Result<ImportedTopologyDescriptor>::success(edge_descriptor(TopoDS::Edge(posed)));
+    if (posed.ShapeType() == TopAbs_VERTEX)
+      return Result<ImportedTopologyDescriptor>::success(vertex_descriptor(TopoDS::Vertex(posed)));
+    return Result<ImportedTopologyDescriptor>::failure(
+        invalid("import topology placed witness requires Face, Edge or Vertex"));
+  } catch (const Standard_Failure& failure) {
+    return Result<ImportedTopologyDescriptor>::failure(invalid(standard_failure_message(failure)));
+  } catch (const std::exception& failure) {
+    return Result<ImportedTopologyDescriptor>::failure(invalid(failure.what()));
+  }
 }
 
 Result<ImportedTopologyResolution>

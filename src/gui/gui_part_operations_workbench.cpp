@@ -1,6 +1,7 @@
 #include "blcad/gui/gui_part_operations_workbench.hpp"
 
 #include "blcad/geometry/step_exporter.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 
 #include <utility>
 
@@ -85,8 +86,11 @@ Result<std::size_t> GuiPartOperationsWorkbench::export_visible_bodies_step(
     const GuiDocumentSession& session, const std::filesystem::path& path) const {
   if (!session.part_document() || !session.part_shape_cache() || !session.derived_results_fresh())
     return Result<std::size_t>::failure(Error::export_error("gui.step_export", "STEP export requires fresh recomputed Part Body results"));
-  auto result = geometry::StepExporter{}.write_part_step(*session.part_document(),
-                                                         *session.part_shape_cache(), path.string());
+  auto context = make_step_import_context(session);
+  if (!context)
+    return Result<std::size_t>::failure(context.error());
+  auto result = geometry::StepExporter{context.value().get()}.write_part_step(
+      *session.part_document(), *session.part_shape_cache(), path.string());
   return result.has_error() ? Result<std::size_t>::failure(result.error())
                             : Result<std::size_t>::success(result.value().written_bytes);
 }

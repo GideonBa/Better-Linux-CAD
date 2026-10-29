@@ -1,7 +1,9 @@
 #include "blcad/geometry/finishing_selection.hpp"
 
 #include "blcad/core/part_document.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "geometry_shape_internal.hpp"
+#include "imported_body_placement.hpp"
 #include "semantic_edge_resolution.hpp"
 #include "semantic_face_resolution.hpp"
 
@@ -20,7 +22,8 @@
 namespace blcad::geometry {
 Result<std::vector<FinishingSelectionTarget>>
 FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache& cache,
-                                 const BodyId& body, PartFeatureInputRole role) {
+                                 const BodyId& body, PartFeatureInputRole role,
+                                 StepImportTopologyContext* import_context) {
   const bool edge =
       role == PartFeatureInputRole::FilletEdge || role == PartFeatureInputRole::ChamferEdge;
   if (!edge && role != PartFeatureInputRole::ShellRemovalFace &&
@@ -34,6 +37,16 @@ FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache&
     return Result<std::vector<FinishingSelectionTarget>>::failure(
         Error::validation(body.value(), "finishing requires a visible, recomputed solid Body"));
   const auto& target = result->shape.impl_->shape;
+  if (!document.imported_body_features().empty()) {
+    auto observed = observe_imported_part_sources(document, import_context);
+    if (!observed)
+      return Result<std::vector<FinishingSelectionTarget>>::failure(observed.error());
+    for (const auto& base : document.imported_body_features()) {
+      auto owned = cache.validated_imported_body_result(document, base);
+      if (!owned)
+        return Result<std::vector<FinishingSelectionTarget>>::failure(owned.error());
+    }
+  }
   std::vector<FinishingSelectionTarget> targets;
   std::vector<TopoDS_Shape> represented_edges;
   const auto append = [&](auto reference, const TopoDS_Shape& shape, const std::string& label,
@@ -50,6 +63,48 @@ FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache&
                        GeometryShape(std::make_shared<GeometryShape::Impl>(shape)),
                        {(xmin + xmax) / 2, (ymin + ymax) / 2, (zmin + zmax) / 2}});
   };
+  for (const auto& base : document.imported_body_features()) {
+    const auto& definition = base.definition();
+    const auto output = std::find_if(definition.outputs().begin(), definition.outputs().end(),
+                                     [&](const auto& value) { return value.body == body; });
+    if (output == definition.outputs().end())
+      continue;
+    const auto* catalog = document.find_imported_topology_catalog(definition.catalog());
+    for (const auto& entry : catalog->entries()) {
+      if (entry.parent_body != output->imported_body ||
+          entry.descriptor.kind != (edge ? ImportedTopologyKind::Edge : ImportedTopologyKind::Face))
+        continue;
+      auto identity = ImportedTopologyReference::create(catalog->id(), entry.id,
+                                                        edge ? ImportedTopologyCapability::Edge
+                                                             : ImportedTopologyCapability::Face);
+      if (!identity)
+        continue;
+      auto current = import_context->resolve(document, identity.value());
+      if (!current)
+        continue;
+      auto descriptor = detail::imported_descriptor_on_body(
+          document, cache, identity.value(), current.value(), result->source_feature_id, true);
+      if (!descriptor)
+        return Result<std::vector<FinishingSelectionTarget>>::failure(descriptor.error());
+      auto match = StepImportTopology{}.match_subshape(descriptor.value(), target);
+      if (!match || match.value().status != ImportedTopologyRecoveryStatus::Resolved)
+        continue;
+      const auto spelling = make_imported_topology_target_spelling(identity.value());
+      if (!spelling)
+        continue;
+      if (edge) {
+        auto reference = EdgeReference::create_imported(role, identity.value());
+        if (reference)
+          append(reference.value(), match.value().shape.impl_->shape,
+                 base.name() + " / Imported edge", spelling.value());
+      } else {
+        auto reference = FaceReference::create_imported(role, identity.value());
+        if (reference)
+          append(reference.value(), match.value().shape.impl_->shape,
+                 base.name() + " / Imported face", spelling.value());
+      }
+    }
+  }
   for (const auto& source : document.features()) {
     if (!source.body_result_context() ||
         source.body_result_context()->effective_produced_body() != body)
@@ -136,6 +191,11 @@ FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache&
         // A degenerate or infinite edge cannot supply a persistent witness.
       }
     }
+  }
+  if (import_context) {
+    auto fresh = import_context->validate_sources();
+    if (!fresh)
+      return Result<std::vector<FinishingSelectionTarget>>::failure(fresh.error());
   }
   return Result<std::vector<FinishingSelectionTarget>>::success(std::move(targets));
 }

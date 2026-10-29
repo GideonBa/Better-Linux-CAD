@@ -368,3 +368,15 @@ three line roles through native ribbon/numeric input, creates a partial oblique 
 Body Rotate, edits the original endpoint through a viewport drag, then creates a downstream linear
 pattern and checks exact history, full recompute, canonical reopening and STEP. Acceptance results
 are recorded in `development-setup.md`; tag existence alone is not native interaction proof.
+
+## Editable imported Bodies — Block 141 integration
+
+A real `ImportedBodyFeature` output participates in the existing target-Body operation path. Additive
+and subtractive previews use the saved document's verified STEP source context and a disposable
+cache; Apply validates and commits one transaction. Parameter edits reuse the immutable imported
+base while recomputing downstream consumers. Imported planar faces may provide producer-owned
+Sketch workplanes; imported axes/lines are explicit Revolve axis choices when their typed capability
+and existing profile-plane constraints are satisfied. Changed source bytes reject preview and Apply.
+
+No new UI layout or independent feature authority is introduced. Numbered acceptance belongs to
+`docs/mvp-plan.md`; native workflow proof uses `[native-step-editable-parts]`.

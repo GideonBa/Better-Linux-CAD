@@ -1,4 +1,5 @@
 #include "blcad/gui/gui_sketch_workbench.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 
 #include <utility>
 
@@ -167,10 +168,15 @@ Result<GuiSketchPlaneView> GuiSketchWorkbench::plane_view(const GuiDocumentSessi
   const auto* target = part ? part->find_sketch(std::move(sketch)) : nullptr;
   if (!target)
     return Result<GuiSketchPlaneView>::failure(Error::validation("gui.sketch_workbench", "sketch must exist"));
-  geometry::WorkplaneResolver resolver;
-  auto plane = session.part_shape_cache()
-                   ? resolver.resolve_for_sketch(*part, *target, *session.part_shape_cache())
-                   : resolver.resolve_for_sketch(*part, *target);
+  auto plane = query_with_step_import_context(session, [&](auto* context) {
+    auto observed = geometry::observe_imported_part_sources(*part, context);
+    if (!observed)
+      return Result<geometry::ResolvedWorkplane>::failure(observed.error());
+    geometry::WorkplaneResolver resolver;
+    return session.part_shape_cache()
+               ? resolver.resolve_for_sketch(*part, *target, *session.part_shape_cache())
+               : resolver.resolve_for_sketch(*part, *target);
+  });
   if (plane.has_error()) return Result<GuiSketchPlaneView>::failure(plane.error());
   return Result<GuiSketchPlaneView>::success({plane.value().id, plane.value().origin,
                                               plane.value().x_axis, plane.value().y_axis,

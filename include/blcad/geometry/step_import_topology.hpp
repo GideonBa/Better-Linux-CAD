@@ -7,6 +7,8 @@ class TopoDS_Shape;
 
 namespace blcad::geometry {
 
+struct GeometryAffineTransform;
+
 // Derived current-source evidence. Runtime product/body indices only locate the recovered
 // definition for inspection/occurrence presentation; neither index is persistent identity.
 struct ImportedTopologyResolution {
@@ -53,6 +55,10 @@ public:
   // Match the same complete current witness on the actual downstream target body.
   [[nodiscard]] Result<ImportedTopologyResolution>
   match_subshape(const ImportedTopologyDescriptor& current, const TopoDS_Shape& target) const;
+  // Recompute the full normalized witness after an explicit authored Body placement.
+  // This never assigns identity by proximity or a primitive-only approximation.
+  [[nodiscard]] Result<ImportedTopologyDescriptor>
+  placed_descriptor(const GeometryShape& current, const GeometryAffineTransform& placement) const;
 };
 
 } // namespace blcad::geometry

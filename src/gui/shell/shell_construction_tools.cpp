@@ -4,6 +4,7 @@
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -262,8 +263,10 @@ void ShellConstructionTools::fill_references() {
     if (parameter.type() == ParameterType::Length)
       add(parameter_, parameter);
   selection_targets_.clear();
-  auto targets = geometry::ViewportSceneBuilder{}.build_construction_sources(
-      part, *window_.session().part_shape_cache());
+  auto targets = query_with_step_import_context(window_.session(), [&](auto* context) {
+    return geometry::ViewportSceneBuilder{context}.build_construction_sources(
+        part, *window_.session().part_shape_cache());
+  });
   if (!targets) {
     window_.report_error(targets.error());
     return;
@@ -814,19 +817,24 @@ Result<std::size_t> ShellConstructionTools::preview() {
   auto added = populate(candidate);
   if (!added)
     return added;
+  auto import_context = make_step_import_context(window_.session());
+  if (!import_context)
+    return Result<std::size_t>::failure(import_context.error());
+  auto* context = import_context.value().get();
   std::optional<geometry::ShapeCache> preview_cache;
   if (editing_) {
     auto cache = geometry::ShapeCache::create(ShapeCacheId("construction.edit.preview"));
     if (!cache)
       return Result<std::size_t>::failure(cache.error());
     auto executed =
-        geometry::GeometryRecomputeExecutor{}.execute_document(candidate, cache.value());
+        geometry::GeometryRecomputeExecutor{context}.execute_document(candidate, cache.value());
     if (!executed)
       return Result<std::size_t>::failure(executed.error());
     preview_cache = std::move(cache.value());
   }
-  auto scene = geometry::ViewportSceneBuilder{}.build_part(
-      candidate, preview_cache ? *preview_cache : *window_.session().part_shape_cache());
+  const geometry::ViewportSceneBuilder builder{context};
+  auto scene = builder.build_part(candidate, preview_cache ? *preview_cache
+                                                           : *window_.session().part_shape_cache());
   if (!scene)
     return Result<std::size_t>::failure(scene.error());
   const auto kind = static_cast<Kind>(kind_->currentIndex());
@@ -861,13 +869,18 @@ Result<std::size_t> ShellConstructionTools::preview() {
   if (shapes.empty() || (!editing_ && shapes.size() != 1))
     return Result<std::size_t>::failure(error("Could not display construction geometry"));
   if (editing_) {
-    auto original = geometry::ViewportSceneBuilder{}.build_part(
-        *window_.session().part_document(), *window_.session().part_shape_cache());
+    auto original = builder.build_part(*window_.session().part_document(),
+                                       *window_.session().part_shape_cache());
     if (!original)
       return Result<std::size_t>::failure(original.error());
     for (const auto& item : original.value())
       if (included(item))
         replaced.push_back(item.semantic_id);
+  }
+  if (context) {
+    auto source_fresh = context->validate_sources();
+    if (!source_fresh)
+      return Result<std::size_t>::failure(source_fresh.error());
   }
   auto shown = window_.viewport().set_feature_previews(std::move(shapes), std::move(replaced));
   if (!shown)

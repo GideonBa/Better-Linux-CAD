@@ -106,6 +106,14 @@ nor preview changes live intent, dirty state, history, caches or files. **Anwend
 rechecks it and commits all operations in one Part transaction/Undo entry. Existing GUI constraint
 and dimension sidecars are retained by that transaction; persistence uses the existing schema.
 
+Editable STEP Parts follow the same batch contract (Block 141 integration). Candidate and committed
+preview scenes share the saved document's verified STEP source context; sources are checked again
+before preview publication. Downstream parameter edits retain the immutable imported base and
+recompute its consumers. Changed or unavailable source bytes reject the candidate without publishing
+intent, geometry or history. Native `[native-step-editable-parts]` proves the modeled Body changes
+while the original imported base volume remains unchanged. Numbered completion belongs to
+`docs/mvp-plan.md`.
+
 Escape from child controls, dock close, Cancel, Undo/Redo, Save, changed presentation revision,
 foreign task, document replacement or entering another context discard the entire local task and
 preview. A foreign task is never cancelled by cleanup. Save writes only committed intent. The task

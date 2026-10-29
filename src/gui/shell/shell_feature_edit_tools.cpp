@@ -3,6 +3,7 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 #include <QCheckBox>
@@ -764,6 +765,10 @@ struct ShellFeatureEditTools::Impl {
       return Result<std::size_t>::success(0);
     if (!fresh())
       return reject(error("Feature or document changed. Restart editing."));
+    auto import_context = make_step_import_context(session);
+    if (!import_context)
+      return reject(import_context.error());
+    auto* context = import_context.value().get();
     auto decoded = decode();
     if (!decoded)
       return reject(decoded.error());
@@ -777,15 +782,15 @@ struct ShellFeatureEditTools::Impl {
     auto cache = geometry::ShapeCache::create(ShapeCacheId("feature.edit.preview"));
     if (!cache)
       return reject(cache.error());
-    auto executed =
-        geometry::GeometryRecomputeExecutor{}.execute_document(candidate.value(), cache.value());
+    auto executed = geometry::GeometryRecomputeExecutor{context}.execute_document(candidate.value(),
+                                                                                  cache.value());
     if (!executed)
       return reject(executed.error());
-    auto scene = geometry::ViewportSceneBuilder{}.build_part(candidate.value(), cache.value());
+    const geometry::ViewportSceneBuilder builder{context};
+    auto scene = builder.build_part(candidate.value(), cache.value());
     if (!scene)
       return reject(scene.error());
-    auto original = geometry::ViewportSceneBuilder{}.build_part(*session.part_document(),
-                                                                *session.part_shape_cache());
+    auto original = builder.build_part(*session.part_document(), *session.part_shape_cache());
     if (!original)
       return reject(original.error());
     std::vector<geometry::GeometryShape> shapes;
@@ -796,6 +801,11 @@ struct ShellFeatureEditTools::Impl {
     for (const auto& item : original.value())
       if (body_item(item))
         replaced.push_back(item.semantic_id);
+    if (context) {
+      auto source_fresh = context->validate_sources();
+      if (!source_fresh)
+        return reject(source_fresh.error());
+    }
     if (!shapes.empty() || !replaced.empty()) {
       auto published = viewport.set_feature_previews(std::move(shapes), std::move(replaced));
       if (!published)

@@ -33,6 +33,9 @@ public:
   [[nodiscard]] StepImportMode mode() const noexcept {
     return mode_;
   }
+  [[nodiscard]] std::string node_id() const {
+    return "step-import-source:" + id_.value();
+  }
   [[nodiscard]] Result<StepImportSource> with_sha256_digest(std::string digest) const;
   friend bool operator==(const StepImportSource&, const StepImportSource&) = default;
 

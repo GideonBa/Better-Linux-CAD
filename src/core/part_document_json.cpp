@@ -4835,7 +4835,9 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
           return Result<PartDocument>::failure(
               json_error("additive extrude length parameter must exist in part document"));
         if (feature.value().type() == FeatureType::SubtractiveExtrude &&
-            document.value().find_feature(feature.value().target_feature()) == nullptr)
+            document.value().find_feature(feature.value().target_feature()) == nullptr &&
+            document.value().find_imported_body_feature(feature.value().target_feature()) ==
+                nullptr)
           continue;
         if (feature.value().direction() == ExtrudeDirection::Path &&
             document.value().find_path_curve(*feature.value().path_curve()) == nullptr)
@@ -4999,7 +5001,8 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       pending_mirrors.emplace_back(std::move(feature.value()));
     }
     const auto feature_exists = [&document](const FeatureId& id) {
-      return document.value().find_feature(id) != nullptr ||
+      return document.value().find_imported_body_feature(id) != nullptr ||
+             document.value().find_feature(id) != nullptr ||
              document.value().find_revolve_feature(id) != nullptr ||
              document.value().find_sweep_feature(id) != nullptr ||
              document.value().find_loft_feature(id) != nullptr ||

@@ -25,6 +25,27 @@ std::string_view to_string(PartDocumentMode mode) noexcept {
   return "unknown";
 }
 
+Result<std::string> make_imported_face_origin_role(const ImportedTopologyReference& reference) {
+  if (reference.capability() != ImportedTopologyCapability::Face)
+    return Result<std::string>::failure(invalid("imported face origin requires Face capability"));
+  auto spelling = make_imported_topology_target_spelling(reference);
+  return spelling ? Result<std::string>::success("imported-face/" + spelling.value())
+                  : Result<std::string>::failure(spelling.error());
+}
+
+Result<ImportedTopologyReference> parse_imported_face_origin_role(std::string_view role) {
+  constexpr std::string_view prefix = "imported-face/";
+  if (!role.starts_with(prefix))
+    return Result<ImportedTopologyReference>::failure(invalid("invalid imported face origin role"));
+  auto reference = parse_imported_topology_target_spelling(role.substr(prefix.size()));
+  if (!reference)
+    return reference;
+  if (reference.value().capability() != ImportedTopologyCapability::Face)
+    return Result<ImportedTopologyReference>::failure(
+        invalid("imported face origin requires Face capability"));
+  return reference;
+}
+
 ImportedPartDefinition::ImportedPartDefinition(StepImportSourceId source,
                                                ImportedTopologyCatalogId catalog,
                                                std::vector<ImportedBodyOutput> outputs)
@@ -64,6 +85,34 @@ Result<ImportedBodyFeature> ImportedBodyFeature::create(FeatureId id, std::strin
 Error PartDocument::reference_part_edit_error() const {
   return Error::validation(
       id_.value(), "Reference Part is read-only; convert to a new EditableBody Part to edit");
+}
+
+bool PartDocument::is_imported_authority_node(std::string_view node) const noexcept {
+  const auto matches = [&](std::string_view prefix, std::string_view id) {
+    return node.starts_with(prefix) && node.substr(prefix.size()) == id;
+  };
+  for (const auto& source : step_import_sources())
+    if (matches("step-import-source:", source.id().value()))
+      return true;
+  for (const auto& catalog : imported_topology_catalogs_)
+    if (matches("imported-catalog:", catalog.id().value()))
+      return true;
+  for (const auto& base : imported_body_features_) {
+    if (node == base.id().value())
+      return true;
+    for (const auto& output : base.definition().outputs())
+      if (matches("body:", output.body.value()))
+        return true;
+  }
+  return false;
+}
+
+Result<std::size_t> PartDocument::add_authored_graph_node(DependencyGraph& graph,
+                                                          std::string node) const {
+  if (is_imported_authority_node(node))
+    return Result<std::size_t>::failure(Error::validation(
+        node, "authored identity must not alias imported source or result authority"));
+  return graph.add_node(std::move(node));
 }
 
 Result<std::size_t>
@@ -181,10 +230,21 @@ Result<std::size_t> PartDocument::add_imported_body_feature(ImportedBodyFeature 
         invalid("imported base feature requires an EditableBody source"));
   if (has_any_feature_id(feature.id()) || dependency_graph_.has_node(feature.id().value()))
     return Result<std::size_t>::failure(invalid("imported base feature id must be unique"));
-  for (const auto& output : feature.definition().outputs())
+  for (const auto& output : feature.definition().outputs()) {
+    if (has_authored_node_identity(body_node(output.body)))
+      return Result<std::size_t>::failure(
+          invalid("imported output Body identity must not alias authored intent"));
+    for (const auto& base : imported_body_features_)
+      if (base.definition().catalog() == feature.definition().catalog() &&
+          std::any_of(
+              base.definition().outputs().begin(), base.definition().outputs().end(),
+              [&](const auto& prior) { return prior.imported_body == output.imported_body; }))
+        return Result<std::size_t>::failure(
+            invalid("an imported catalog Body must have exactly one output mapping per Part"));
     for (const auto& [producer, dependent] : dependency_graph_.dependencies())
       if (dependent == body_node(output.body))
         return Result<std::size_t>::failure(invalid("imported output Body already has a producer"));
+  }
   auto candidate = *this;
   auto added = candidate.dependency_graph_.add_node(feature.id().value());
   if (!added)
@@ -210,6 +270,76 @@ Result<std::size_t> PartDocument::add_imported_body_feature(ImportedBodyFeature 
   const auto index = candidate.imported_body_features_.size() - 1;
   *this = std::move(candidate);
   return Result<std::size_t>::success(index);
+}
+
+const ImportedBodyFeature* PartDocument::find_imported_body_feature(FeatureId id) const noexcept {
+  const auto found = std::find_if(imported_body_features_.begin(), imported_body_features_.end(),
+                                  [&](const auto& feature) { return feature.id() == id; });
+  return found == imported_body_features_.end() ? nullptr : &*found;
+}
+
+Result<std::size_t> PartDocument::remove_imported_body_feature(FeatureId id) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
+  const auto* feature = find_imported_body_feature(id);
+  if (!feature)
+    return Result<std::size_t>::failure(invalid("imported base feature to remove must exist"));
+  std::set<std::string> outputs;
+  for (const auto& output : feature->definition().outputs()) {
+    const auto node = body_node(output.body);
+    outputs.insert(node);
+    if (!dependency_graph_.direct_dependents(node).empty())
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "imported base with a dependent output cannot be removed"));
+  }
+  for (const auto& dependent : dependency_graph_.direct_dependents(id.value()))
+    if (!outputs.contains(dependent))
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "imported base with dependent intent cannot be removed"));
+  auto candidate = *this;
+  auto removed = candidate.dependency_graph_.remove_node(id.value());
+  if (!removed)
+    return removed;
+  candidate.invalidation_state_.untrack_node(id.value());
+  std::erase_if(candidate.imported_body_features_,
+                [&](const auto& value) { return value.id() == id; });
+  *this = std::move(candidate);
+  return Result<std::size_t>::success(1);
+}
+
+Result<PartDocument> PartDocument::create_editable_import(DocumentId id, std::string name,
+                                                          StepImportSource source,
+                                                          ImportedTopologyCatalog catalog,
+                                                          ImportedBodyFeature feature) {
+  if (source.mode() != StepImportMode::EditableBody)
+    return Result<PartDocument>::failure(
+        invalid("editable import requires an EditableBody source"));
+  auto document = create(std::move(id), std::move(name));
+  if (!document)
+    return document;
+  for (const auto& plane : {DatumPlane::xy(), DatumPlane::xz(), DatumPlane::yz()}) {
+    if (!plane)
+      return Result<PartDocument>::failure(plane.error());
+    auto added = document.value().add_datum_plane(plane.value());
+    if (!added)
+      return Result<PartDocument>::failure(added.error());
+  }
+  auto added = document.value().add_step_import_source(std::move(source));
+  if (!added)
+    return Result<PartDocument>::failure(added.error());
+  added = document.value().add_imported_topology_catalog(std::move(catalog));
+  if (!added)
+    return Result<PartDocument>::failure(added.error());
+  for (const auto& output : feature.definition().outputs()) {
+    auto body = Body::create(output.body, output.body.value(), output.kind);
+    if (!body)
+      return Result<PartDocument>::failure(body.error());
+    added = document.value().add_body(std::move(body.value()));
+    if (!added)
+      return Result<PartDocument>::failure(added.error());
+  }
+  added = document.value().add_imported_body_feature(std::move(feature));
+  return added ? document : Result<PartDocument>::failure(added.error());
 }
 
 Result<PartDocument>

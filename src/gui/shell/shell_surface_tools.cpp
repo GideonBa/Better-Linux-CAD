@@ -2,6 +2,7 @@
 #include "blcad/gui/gui_icons.hpp"
 
 #include "blcad/gui/occt_viewport.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <QAction>
@@ -171,6 +172,12 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
   const auto* cache = session_.part_shape_cache();
   if (!part || !cache)
     return choices;
+  auto import_context = make_step_import_context(session_);
+  if (!import_context)
+    return choices;
+  auto* context = import_context.value().get();
+  if (!geometry::observe_imported_part_sources(*part, context))
+    return choices;
   for (const auto& path : part->path_curves()) {
     auto boundary = BoundaryCurveReference::create_path_curve(path.id());
     if (boundary)
@@ -205,7 +212,8 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
     if (body.kind() != BodyKind::Solid)
       continue;
     for (auto role : {PartFeatureInputRole::FilletEdge, PartFeatureInputRole::ShellRemovalFace}) {
-      auto resolved = geometry::FinishingSelectionBuilder::build(*part, *cache, body.id(), role);
+      auto resolved =
+          geometry::FinishingSelectionBuilder::build(*part, *cache, body.id(), role, context);
       if (!resolved)
         continue;
       for (const auto& target : resolved.value()) {
@@ -236,6 +244,8 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
       }
     }
   }
+  if (context && !context->validate_sources())
+    return {};
   return choices;
 }
 
@@ -358,8 +368,10 @@ Result<std::size_t> ShellFeatureTools::begin_surface(Command command) {
       if (command == Command::TrimSurface)
         eligible = path && path->closure() == PathClosure::Closed;
       if (command == Command::ExtendSurface) {
-        auto segments = geometry::GeometryRecomputeExecutor{}.resolve_path_segments(
-            *part, id, *session_.part_shape_cache());
+        auto segments = query_with_step_import_context(session_, [&](auto* context) {
+          return geometry::GeometryRecomputeExecutor{context}.resolve_path_segments(
+              *part, id, *session_.part_shape_cache());
+        });
         eligible = segments && segments.value().size() == 1 &&
                    segments.value().front().kind == geometry::SweepPathSegmentKind::Line;
       }
@@ -511,9 +523,11 @@ Result<std::size_t> ShellFeatureTools::rebuild_surface_controller() {
                                       *source->boundary, surface_parameter_, surface_result_,
                                       body.value(), parameters);
       if (begun) {
-        auto frame = geometry::GeometryRecomputeExecutor{}.surface_extension_frame(
-            *session_.part_document(), *target->surface, *source->boundary,
-            *session_.part_shape_cache());
+        auto frame = query_with_step_import_context(session_, [&](auto* context) {
+          return geometry::GeometryRecomputeExecutor{context}.surface_extension_frame(
+              *session_.part_document(), *target->surface, *source->boundary,
+              *session_.part_shape_cache());
+        });
         if (!frame)
           return Result<std::size_t>::failure(frame.error());
         GuiFeatureManipulatorFrame manipulator;
@@ -610,6 +624,12 @@ void ShellFeatureTools::refresh_surface_enablement(bool idle_part) {
   // Use source contracts for enablement; geometric suitability is checked by preview.
   bool curves = false, surfaces = false, shell = false;
   std::size_t surface_count = 0;
+  auto import_context = make_step_import_context(session_);
+  if (!import_context)
+    idle_part = false;
+  if (idle_part && !geometry::observe_imported_part_sources(*session_.part_document(),
+                                                            import_context.value().get()))
+    idle_part = false;
   if (idle_part) {
     const auto* part = session_.part_document();
     const auto* cache = session_.part_shape_cache();
@@ -622,15 +642,30 @@ void ShellFeatureTools::refresh_surface_enablement(bool idle_part) {
             ++surface_count;
           else if (body.kind() == BodyKind::Solid) {
             auto faces = geometry::FinishingSelectionBuilder::build(
-                *part, *cache, body.id(), PartFeatureInputRole::ShellRemovalFace);
+                *part, *cache, body.id(), PartFeatureInputRole::ShellRemovalFace,
+                import_context.value().get());
             if (faces)
-              surface_count += faces.value().size();
+              surface_count +=
+                  std::count_if(faces.value().begin(), faces.value().end(), [](const auto& target) {
+                    const auto* face = std::get_if<FaceReference>(&target.reference);
+                    return face && std::holds_alternative<SemanticFaceReference>(face->source());
+                  });
             auto edges = geometry::FinishingSelectionBuilder::build(
-                *part, *cache, body.id(), PartFeatureInputRole::FilletEdge);
-            curves |= edges && !edges.value().empty();
+                *part, *cache, body.id(), PartFeatureInputRole::FilletEdge,
+                import_context.value().get());
+            curves |=
+                edges &&
+                std::any_of(edges.value().begin(), edges.value().end(), [](const auto& target) {
+                  const auto* edge = std::get_if<EdgeReference>(&target.reference);
+                  return edge && std::holds_alternative<SemanticEdgeReference>(edge->source());
+                });
           }
         }
     surfaces = surface_count > 0;
+  }
+  if (import_context && import_context.value() && !import_context.value()->validate_sources()) {
+    idle_part = false;
+    curves = surfaces = shell = false;
   }
   for (const auto& [command, action] : surface_actions_)
     action->setEnabled(

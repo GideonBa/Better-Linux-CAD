@@ -30,7 +30,8 @@ public:
 private:
   [[nodiscard]] Result<CachedReferencePartResult>
   resolve_definition(const PartDocument& document, const ImportedPartDefinition& definition,
-                     StepImportTopologyContext& context) const;
+                     StepImportTopologyContext& context,
+                     std::optional<FeatureId> producer = std::nullopt) const;
 };
 
 } // namespace blcad::geometry

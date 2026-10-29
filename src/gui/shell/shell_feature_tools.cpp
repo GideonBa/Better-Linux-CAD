@@ -7,6 +7,7 @@
 #include "blcad/core/parameter.hpp"
 #include "blcad/core/quantity.hpp"
 #include "blcad/gui/gui_interactive_profile_materialization.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/occt_viewport.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -1080,8 +1081,10 @@ void ShellFeatureTools::refresh_enablement() {
                           : command == Command::Chamfer ? PartFeatureInputRole::ChamferEdge
                           : command == Command::Shell   ? PartFeatureInputRole::ShellRemovalFace
                                                         : PartFeatureInputRole::DraftFace;
-        auto targets = geometry::FinishingSelectionBuilder::build(
-            *session_.part_document(), *session_.part_shape_cache(), body.id(), role);
+        auto targets = query_with_step_import_context(session_, [&](auto* context) {
+          return geometry::FinishingSelectionBuilder::build(
+              *session_.part_document(), *session_.part_shape_cache(), body.id(), role, context);
+        });
         if (targets && !targets.value().empty()) {
           available = true;
           break;

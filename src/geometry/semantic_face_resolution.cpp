@@ -1,4 +1,5 @@
 #include "semantic_face_resolution.hpp"
+#include "imported_body_placement.hpp"
 
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "blcad/geometry/shape_cache.hpp"
@@ -240,7 +241,11 @@ Result<TopoDS_Face> resolve_semantic_face(const PartDocument& document, const Sh
       return Result<TopoDS_Face>::failure(current.error());
     if (!current.value().descriptor)
       return Result<TopoDS_Face>::failure(face_error(id, "imported face is not resolved"));
-    auto match = StepImportTopology{}.match_subshape(*current.value().descriptor, target);
+    auto descriptor =
+        detail::imported_descriptor_on_body(document, cache, *imported, current.value(), id);
+    if (!descriptor)
+      return Result<TopoDS_Face>::failure(descriptor.error());
+    auto match = StepImportTopology{}.match_subshape(descriptor.value(), target);
     if (!match)
       return Result<TopoDS_Face>::failure(match.error());
     if (match.value().status != ImportedTopologyRecoveryStatus::Resolved)

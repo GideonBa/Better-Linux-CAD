@@ -2,6 +2,7 @@
 
 #include "blcad/core/body.hpp"
 #include "blcad/core/id.hpp"
+#include "blcad/core/imported_topology.hpp"
 #include "blcad/core/result.hpp"
 
 #include <string>
@@ -12,6 +13,13 @@ namespace blcad {
 
 enum class PartDocumentMode { Editable, Reference };
 [[nodiscard]] std::string_view to_string(PartDocumentMode mode) noexcept;
+
+// Result-face provenance names a stable catalog Face, never a transient face
+// ordinal or an invented generated-feature role.
+[[nodiscard]] Result<std::string>
+make_imported_face_origin_role(const ImportedTopologyReference& reference);
+[[nodiscard]] Result<ImportedTopologyReference>
+parse_imported_face_origin_role(std::string_view role);
 
 // Persistent BLCAD output identities, independent of transient STEP/XDE order.
 struct ImportedBodyOutput {
@@ -47,8 +55,9 @@ private:
   std::vector<ImportedBodyOutput> outputs_;
 };
 
-// The immutable base intent used when a Reference Part is explicitly converted
-// to a new editable document. Downstream authoring is a separate operation.
+// Immutable imported base intent, created directly or by converting a Reference
+// Part. Parameters belong to downstream authored features; an explicit accepted
+// source refresh retains this feature's identity and ordered Body mapping.
 class ImportedBodyFeature {
 public:
   [[nodiscard]] static Result<ImportedBodyFeature> create(FeatureId id, std::string name,

@@ -2,6 +2,7 @@
 #include "blcad/core/sketch_contour.hpp"
 #include "blcad/core/sketch_profile_roles.hpp"
 #include "blcad/geometry/result_face_support.hpp"
+#include "imported_body_placement.hpp"
 
 #include "blcad/geometry/body_rotation_axis_resolver.hpp"
 #include "blcad/geometry/construction_line_resolver.hpp"
@@ -31,12 +32,22 @@ constexpr double k_tolerance = 1.0e-9;
 constexpr double k_pi = 3.14159265358979323846;
 
 const ImportedBodyFeature* imported_body_feature(const PartDocument& document,
-                                                 const std::string& id) {
+                                                 std::string_view id) {
   const auto& features = document.imported_body_features();
   const auto found = std::find_if(features.begin(), features.end(), [&id](const auto& feature) {
     return feature.id().value() == id;
   });
   return found == features.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] Result<std::size_t> validate_feature_imports(const PartDocument& document,
+                                                           const ShapeCache& cache,
+                                                           const std::string& consumer,
+                                                           StepImportTopologyContext* context) {
+  auto owners = cache.validate_imported_body_owners(document);
+  if (!owners)
+    return owners;
+  return detail::validate_imported_feature_inputs(document, cache, consumer, context);
 }
 
 struct LocalCompositeProfileVertices {
@@ -81,25 +92,38 @@ struct TransformInput {
   GeometryAffineTransform cumulative_transform;
 };
 
+[[nodiscard]] bool feature_produces_body(const PartDocument& document, std::string_view producer,
+                                         const BodyId& body);
+
+[[nodiscard]] const GeometryShape* cached_producer_body_shape(const PartDocument& document,
+                                                              const ShapeCache& cache,
+                                                              const std::string& producer,
+                                                              const BodyId& body) {
+  if (imported_body_feature(document, producer))
+    return cache.find_imported_body_shape(FeatureId(producer), body);
+  return cache.find_feature_shape(FeatureId(producer));
+}
+
 [[nodiscard]] Result<TransformInput> resolve_transform_input(const PartDocument& document,
                                                              const ShapeCache& shape_cache,
                                                              const BodyTransform& transform) {
   for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
     if (dependent != transform.id().value())
       continue;
-    const GeometryShape* shape = shape_cache.find_feature_shape(FeatureId(producer));
+    if (!feature_produces_body(document, producer, transform.body()))
+      continue;
+    const GeometryShape* shape =
+        cached_producer_body_shape(document, shape_cache, producer, transform.body());
     if (shape == nullptr)
       continue;
-    const BodyTransform* previous = document.find_body_transform(BodyTransformId(producer));
-    if (previous == nullptr)
-      return Result<TransformInput>::success(
-          TransformInput{*shape, std::nullopt, GeometryAffineTransform::identity()});
-    const CachedBodyTransformState* state = shape_cache.find_body_transform_state(previous->id());
-    if (state == nullptr)
-      return Result<TransformInput>::failure(geometry_error(
-          transform.id().value(), "previous body transform state must exist in shape cache"));
+    auto previous = detail::body_transform_before(document, shape_cache, transform.body(),
+                                                  transform.id().value());
+    if (!previous)
+      return Result<TransformInput>::failure(previous.error());
+    const auto* state = previous.value();
     return Result<TransformInput>::success(
-        TransformInput{*shape, previous->id(), state->cumulative_transform});
+        TransformInput{*shape, state ? std::optional(state->transform_id) : std::nullopt,
+                       state ? state->cumulative_transform : GeometryAffineTransform::identity()});
   }
   return Result<TransformInput>::failure(geometry_error(
       transform.id().value(), "body transform input shape must exist in dependency order"));
@@ -194,7 +218,8 @@ resolve_rotation_axis(const PartDocument& document, const BodyTransform& transfo
   for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
     if (dependent != body_node)
       continue;
-    if (const GeometryShape* shape = shape_cache.find_feature_shape(FeatureId(producer)))
+    if (const GeometryShape* shape =
+            cached_producer_body_shape(document, shape_cache, producer, body_id))
       return Result<GeometryShape>::success(*shape);
   }
 
@@ -209,7 +234,10 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
     for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
       if (dependent != feature.id().value() || producer.starts_with("body:"))
         continue;
-      if (const GeometryShape* shape = shape_cache.find_feature_shape(FeatureId(producer)))
+      if (!feature_produces_body(document, producer, feature.target_body()))
+        continue;
+      if (const GeometryShape* shape =
+              cached_producer_body_shape(document, shape_cache, producer, feature.target_body()))
         return Result<GeometryShape>::success(*shape);
     }
   }
@@ -257,6 +285,23 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
 
   shape_cache.clear_final_shape();
   return body_result;
+}
+
+[[nodiscard]] Result<std::size_t>
+store_verified_feature_result(const PartDocument& document, const Feature& feature,
+                              GeometryShape shape, ShapeCache& cache,
+                              StepImportTopologyContext* context) {
+  if (context == nullptr)
+    return store_feature_result(document, feature, std::move(shape), cache);
+  ShapeCache candidate = cache;
+  auto stored = store_feature_result(document, feature, std::move(shape), candidate);
+  if (!stored)
+    return stored;
+  auto fresh = context->validate_sources();
+  if (!fresh)
+    return fresh;
+  cache = std::move(candidate);
+  return stored;
 }
 
 [[nodiscard]] Result<std::size_t> store_revolve_result(const PartDocument& document,
@@ -357,6 +402,9 @@ resolve_boolean_target_input(const PartDocument& document, const ShapeCache& sha
 
 [[nodiscard]] bool feature_produces_body(const PartDocument& document, std::string_view producer,
                                          const BodyId& body) {
+  if (const auto* imported = imported_body_feature(document, producer))
+    return std::ranges::any_of(imported->definition().outputs(),
+                               [&](const auto& output) { return output.body == body; });
   if (const Feature* feature = document.find_feature(FeatureId(std::string(producer)));
       feature != nullptr && feature->body_result_context().has_value())
     return feature->body_result_context()->effective_produced_body() == body;
@@ -413,8 +461,9 @@ resolve_in_place_body_target(const PartDocument& document, const FeatureId& feat
         });
     if (!is_dependency)
       continue;
-    if (const GeometryShape* candidate = shape_cache.find_feature_shape(FeatureId(producer));
-        candidate != nullptr)
+    const GeometryShape* candidate =
+        cached_producer_body_shape(document, shape_cache, producer, target_body);
+    if (candidate != nullptr)
       target = candidate;
   }
 
@@ -528,7 +577,8 @@ template <typename PatternFeature>
     if (dependent != feature.id().value() || producer.starts_with("body:") ||
         !feature_produces_body(document, producer, body))
       continue;
-    if (const GeometryShape* shape = shape_cache.find_feature_shape(FeatureId(producer)))
+    if (const GeometryShape* shape =
+            cached_producer_body_shape(document, shape_cache, producer, body))
       return Result<const GeometryShape*>::success(shape);
   }
   const GeometryShape* shape = shape_cache.find_body_shape(body);
@@ -592,7 +642,8 @@ resolve_mirror_sources(const MirrorFeature& feature, const ShapeCache& shape_cac
 
 [[nodiscard]] Result<ResolvedWorkplane>
 resolve_imported_plane(const PartDocument& document, const ImportedTopologyReference& reference,
-                       StepImportTopologyContext* import_context) {
+                       StepImportTopologyContext* import_context, const ShapeCache& cache,
+                       const FeatureId& consumer) {
   if (import_context == nullptr)
     return Result<ResolvedWorkplane>::failure(geometry_error(
         reference.source_node_id(), "imported plane requires an explicit verified source context"));
@@ -602,7 +653,11 @@ resolve_imported_plane(const PartDocument& document, const ImportedTopologyRefer
   if (!current.value().descriptor)
     return Result<ResolvedWorkplane>::failure(
         geometry_error(reference.source_node_id(), "imported plane is not resolved"));
-  auto analytic = imported_topology_analytic_descriptor(*current.value().descriptor);
+  auto descriptor =
+      detail::imported_descriptor_on_body(document, cache, reference, current.value(), consumer);
+  if (!descriptor)
+    return Result<ResolvedWorkplane>::failure(descriptor.error());
+  auto analytic = imported_topology_analytic_descriptor(descriptor.value());
   if (!analytic)
     return Result<ResolvedWorkplane>::failure(analytic.error());
   const auto* frame = std::get_if<AssemblyPlanarTargetDescriptor>(&analytic.value());
@@ -616,7 +671,7 @@ resolve_imported_plane(const PartDocument& document, const ImportedTopologyRefer
 [[nodiscard]] Result<std::pair<Point3, Vector3>>
 resolve_mirror_plane(const PartDocument& document, const PlaneReference& reference,
                      const ShapeCache& shape_cache, const WorkplaneResolver& resolver,
-                     StepImportTopologyContext* import_context) {
+                     StepImportTopologyContext* import_context, const FeatureId& consumer) {
   Result<ResolvedWorkplane> plane = Result<ResolvedWorkplane>::failure(
       geometry_error(reference.source_node_id(), "unsupported mirror plane source"));
   if (const auto* datum = std::get_if<DatumPlaneId>(&reference.source())) {
@@ -624,7 +679,7 @@ resolve_mirror_plane(const PartDocument& document, const PlaneReference& referen
   } else if (const auto* construction = std::get_if<ConstructionPlaneId>(&reference.source())) {
     plane = resolver.resolve(document, DatumPlaneId(construction->value()));
   } else if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
-    plane = resolve_imported_plane(document, *imported, import_context);
+    plane = resolve_imported_plane(document, *imported, import_context, shape_cache, consumer);
   } else {
     plane = resolver.resolve_generated_face(document,
                                             std::get<SemanticFaceReference>(reference.source()));
@@ -695,7 +750,8 @@ store_pattern_result(const PartDocument& document, const PatternFeature& feature
 [[nodiscard]] Result<std::pair<Point3, Vector3>>
 resolve_axis_reference(const PartDocument& document, const AxisReference& reference,
                        const ShapeCache& shape_cache, const WorkplaneResolver& workplane_resolver,
-                       StepImportTopologyContext* import_context) {
+                       StepImportTopologyContext* import_context,
+                       const FeatureId& consumer = FeatureId{}) {
   // The Sketch resolver already applies the current owned workplane transform.
   if (const auto* line = std::get_if<SketchLineReference>(&reference.source()))
     return SketchLineAxisResolver{}.resolve(document, *line, shape_cache);
@@ -712,7 +768,11 @@ resolve_axis_reference(const PartDocument& document, const AxisReference& refere
     if (!current.value().descriptor)
       return Result<std::pair<Point3, Vector3>>::failure(
           geometry_error(reference.source_node_id(), "imported axis is not resolved"));
-    const auto& descriptor = *current.value().descriptor;
+    auto placed = detail::imported_descriptor_on_body(document, shape_cache, *imported,
+                                                      current.value(), consumer);
+    if (!placed)
+      return Result<std::pair<Point3, Vector3>>::failure(placed.error());
+    const auto& descriptor = placed.value();
     if (descriptor.geometry != ImportedGeometryClass::Line &&
         descriptor.geometry != ImportedGeometryClass::Circle &&
         descriptor.geometry != ImportedGeometryClass::Cylinder)
@@ -847,12 +907,11 @@ struct ResolvedExtrudeSpan {
   return Result<const GeometryShape*>::success(nullptr);
 }
 
-[[nodiscard]] Result<ResolvedWorkplane>
-resolve_limit_face_workplane(const PartDocument& document, const FaceReference& reference,
-                             const WorkplaneResolver& resolver,
-                             StepImportTopologyContext* import_context) {
+[[nodiscard]] Result<ResolvedWorkplane> resolve_limit_face_workplane(
+    const PartDocument& document, const FaceReference& reference, const WorkplaneResolver& resolver,
+    StepImportTopologyContext* import_context, const ShapeCache& cache, const FeatureId& consumer) {
   if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source()))
-    return resolve_imported_plane(document, *imported, import_context);
+    return resolve_imported_plane(document, *imported, import_context, cache, consumer);
   if (reference.source_kind() != PartFeatureInputSourceKind::SemanticPlanarFace)
     return Result<ResolvedWorkplane>::failure(geometry_error(
         reference.source_node_id(), "extrude limit Geometry currently requires a planar face"));
@@ -860,10 +919,12 @@ resolve_limit_face_workplane(const PartDocument& document, const FaceReference& 
                                          std::get<SemanticFaceReference>(reference.source()));
 }
 
-[[nodiscard]] Result<ResolvedExtrudeSpan> resolve_extrude_span(
-    const PartDocument& document, const Feature& feature, const ResolvedWorkplane& sketch_workplane,
-    Vector3 direction, const GeometryShape* target, const ClosedProfileAdapter& adapter,
-    const WorkplaneResolver& workplane_resolver, StepImportTopologyContext* import_context) {
+[[nodiscard]] Result<ResolvedExtrudeSpan>
+resolve_extrude_span(const PartDocument& document, const Feature& feature,
+                     const ResolvedWorkplane& sketch_workplane, Vector3 direction,
+                     const GeometryShape* target, const ClosedProfileAdapter& adapter,
+                     const WorkplaneResolver& workplane_resolver,
+                     StepImportTopologyContext* import_context, const ShapeCache& cache) {
   constexpr double kThroughAllMargin = 1.0;
   const auto& extent = feature.extrude_intent().extent();
   const auto distance = [&document, &feature](const std::optional<ParameterId>& id,
@@ -920,7 +981,7 @@ resolve_limit_face_workplane(const PartDocument& document, const FaceReference& 
   }
   case ExtrudeExtentMode::ToFace: {
     auto limit = resolve_limit_face_workplane(document, *extent.first_face(), workplane_resolver,
-                                              import_context);
+                                              import_context, cache, feature.id());
     if (limit.has_error())
       return Result<ResolvedExtrudeSpan>::failure(limit.error());
     const double alignment =
@@ -937,9 +998,9 @@ resolve_limit_face_workplane(const PartDocument& document, const FaceReference& 
   }
   case ExtrudeExtentMode::Between: {
     auto first = resolve_limit_face_workplane(document, *extent.first_face(), workplane_resolver,
-                                              import_context);
+                                              import_context, cache, feature.id());
     auto second = resolve_limit_face_workplane(document, *extent.second_face(), workplane_resolver,
-                                               import_context);
+                                               import_context, cache, feature.id());
     if (first.has_error())
       return Result<ResolvedExtrudeSpan>::failure(first.error());
     if (second.has_error())
@@ -2533,7 +2594,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_richer_extrude(
   ResolvedWorkplane span_workplane = workplane.value();
   span_workplane.origin = profile_center;
   auto span = resolve_extrude_span(document, feature, span_workplane, direction, target.value(),
-                                   closed_profile_adapter_, workplane_resolver_, import_context_);
+                                   closed_profile_adapter_, workplane_resolver_, import_context_,
+                                   shape_cache);
   if (span.has_error())
     return Result<std::size_t>::failure(span.error());
 
@@ -2599,6 +2661,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_richer_extrude(
 Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocument& document,
                                                                FeatureId feature_id,
                                                                ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty())
     return Result<std::size_t>::failure(
         validation_error("revolve", "feature id must not be empty"));
@@ -2616,7 +2683,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
   if (workplane.has_error())
     return Result<std::size_t>::failure(workplane.error());
   auto axis = resolve_axis_reference(document, feature->axis(), working_cache, workplane_resolver_,
-                                     import_context_);
+                                     import_context_, feature->id());
   if (axis.has_error())
     return Result<std::size_t>::failure(axis.error());
   const ResolvedRevolveAngles angles = resolve_revolve_angles(feature->extent());
@@ -2730,6 +2797,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
 Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument& document,
                                                              FeatureId feature_id,
                                                              ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty())
     return Result<std::size_t>::failure(validation_error("sweep", "feature id must not be empty"));
   const SweepFeature* feature = document.find_sweep_feature(feature_id);
@@ -2890,6 +2962,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
 Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& document,
                                                             FeatureId feature_id,
                                                             ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty())
     return Result<std::size_t>::failure(validation_error("loft", "feature id must not be empty"));
   const LoftFeature* feature = document.find_loft_feature(feature_id);
@@ -3061,6 +3138,11 @@ Result<SurfaceExtensionFrame> GeometryRecomputeExecutor::surface_extension_frame
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty())
     return Result<std::size_t>::failure(
         validation_error("surface_feature", "feature id must not be empty"));
@@ -3161,6 +3243,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty())
     return Result<std::size_t>::failure(
         validation_error("linear_pattern", "feature id must not be empty"));
@@ -3186,7 +3273,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
   if (sources.has_error())
     return Result<std::size_t>::failure(sources.error());
   auto direction = resolve_axis_reference(document, feature->direction(), working_cache,
-                                          workplane_resolver_, import_context_);
+                                          workplane_resolver_, import_context_, feature->id());
   if (direction.has_error())
     return Result<std::size_t>::failure(direction.error());
   Vector3 signed_direction = normalized(direction.value().second);
@@ -3261,6 +3348,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_circular_pattern(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty())
     return Result<std::size_t>::failure(
         validation_error("circular_pattern", "feature id must not be empty"));
@@ -3285,7 +3377,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_circular_pattern(
   if (sources.has_error())
     return Result<std::size_t>::failure(sources.error());
   auto axis = resolve_axis_reference(document, feature->axis(), working_cache, workplane_resolver_,
-                                     import_context_);
+                                     import_context_, feature->id());
   if (axis.has_error())
     return Result<std::size_t>::failure(axis.error());
   auto instances = circular_pattern_adapter_.generate_instances(
@@ -3355,6 +3447,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_circular_pattern(
 Result<std::size_t> GeometryRecomputeExecutor::execute_mirror(const PartDocument& document,
                                                               FeatureId feature_id,
                                                               ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty())
     return Result<std::size_t>::failure(validation_error("mirror", "feature id must not be empty"));
   const MirrorFeature* feature = document.find_mirror_feature(feature_id);
@@ -3370,7 +3467,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_mirror(const PartDocument
   if (sources.has_error())
     return Result<std::size_t>::failure(sources.error());
   auto plane = resolve_mirror_plane(document, feature->mirror_plane(), working_cache,
-                                    workplane_resolver_, import_context_);
+                                    workplane_resolver_, import_context_, feature->id());
   if (plane.has_error())
     return Result<std::size_t>::failure(plane.error());
   auto reflected = mirror_adapter_.reflect_sources(feature->id(), sources.value(),
@@ -3417,6 +3514,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_mirror(const PartDocument
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty()) {
     return Result<std::size_t>::failure(
         validation_error("feature", "feature id must not be empty"));
@@ -3500,7 +3602,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     if (shape.has_error())
       return Result<std::size_t>::failure(shape.error());
 
-    return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
+    return store_verified_feature_result(document, *feature, std::move(shape.value()), shape_cache,
+                                         import_context_);
   }
 
   const ClosedProfile* closed = extrude_closed_profile(*sketch, *feature);
@@ -3542,7 +3645,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
           body_boolean_adapter_);
       if (!shape)
         return Result<std::size_t>::failure(shape.error());
-      return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
+      return store_verified_feature_result(document, *feature, std::move(shape.value()),
+                                           shape_cache, import_context_);
     }
 
     if (composite != nullptr) {
@@ -3556,7 +3660,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
       if (shape.has_error())
         return Result<std::size_t>::failure(shape.error());
 
-      return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
+      return store_verified_feature_result(document, *feature, std::move(shape.value()),
+                                           shape_cache, import_context_);
     }
 
     if (circle != nullptr) {
@@ -3584,7 +3689,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
                                                                              thickness->value());
       if (shape.has_error())
         return Result<std::size_t>::failure(shape.error());
-      return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
+      return store_verified_feature_result(document, *feature, std::move(shape.value()),
+                                           shape_cache, import_context_);
     }
 
     std::vector<ContainedProfileHole> holes;
@@ -3619,7 +3725,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     if (shape.has_error())
       return Result<std::size_t>::failure(shape.error());
 
-    return store_feature_result(document, *feature, std::move(shape.value()), shape_cache);
+    return store_verified_feature_result(document, *feature, std::move(shape.value()), shape_cache,
+                                         import_context_);
   }
 
   return Result<std::size_t>::failure(validation_error(
@@ -3630,6 +3737,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty()) {
     return Result<std::size_t>::failure(
         validation_error("feature", "feature id must not be empty"));
@@ -3703,7 +3815,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
         body_boolean_adapter_.validate_subtraction_result(feature->id(), *target, result);
     if (!validation)
       return Result<std::size_t>::failure(validation.error());
-    return store_feature_result(document, *feature, std::move(result), shape_cache);
+    return store_verified_feature_result(document, *feature, std::move(result), shape_cache,
+                                         import_context_);
   };
 
   if (has_exactly_one_circle_profile(*sketch)) {
@@ -3833,6 +3946,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
 Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument& document,
                                                               FeatureId feature_id,
                                                               ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty())
     return Result<std::size_t>::failure(validation_error("fillet", "feature id must not be empty"));
   const FilletFeature* feature = document.find_fillet_feature(feature_id);
@@ -3867,6 +3985,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument
 Result<std::size_t> GeometryRecomputeExecutor::execute_chamfer(const PartDocument& document,
                                                                FeatureId feature_id,
                                                                ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty())
     return Result<std::size_t>::failure(
         validation_error("chamfer", "feature id must not be empty"));
@@ -3918,6 +4041,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_chamfer(const PartDocumen
 Result<std::size_t> GeometryRecomputeExecutor::execute_shell(const PartDocument& document,
                                                              FeatureId feature_id,
                                                              ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty())
     return Result<std::size_t>::failure(validation_error("shell", "feature id must not be empty"));
   const ShellFeature* feature = document.find_shell_feature(feature_id);
@@ -3953,6 +4081,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_shell(const PartDocument&
 Result<std::size_t> GeometryRecomputeExecutor::execute_draft(const PartDocument& document,
                                                              FeatureId feature_id,
                                                              ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty())
     return Result<std::size_t>::failure(validation_error("draft", "feature id must not be empty"));
   const DraftFeature* feature = document.find_draft_feature(feature_id);
@@ -3974,11 +4107,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_draft(const PartDocument&
   if (target.has_error())
     return Result<std::size_t>::failure(target.error());
   auto direction = resolve_axis_reference(document, feature->pull_direction(), working_cache,
-                                          workplane_resolver_, import_context_);
+                                          workplane_resolver_, import_context_, feature->id());
   if (direction.has_error())
     return Result<std::size_t>::failure(direction.error());
   auto plane = resolve_mirror_plane(document, feature->neutral_plane(), working_cache,
-                                    workplane_resolver_, import_context_);
+                                    workplane_resolver_, import_context_, feature->id());
   if (plane.has_error())
     return Result<std::size_t>::failure(plane.error());
   auto result = draft_adapter_.apply(
@@ -3998,6 +4131,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_draft(const PartDocument&
 Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(const PartDocument& document,
                                                                     FeatureId feature_id,
                                                                     ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (feature_id.empty()) {
     return Result<std::size_t>::failure(
         validation_error("body_boolean", "feature id must not be empty"));
@@ -4051,6 +4189,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(const PartDo
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_body_transform(
     const PartDocument& document, BodyTransformId transform_id, ShapeCache& shape_cache) const {
+  auto imported_inputs =
+      validate_feature_imports(document, shape_cache, transform_id.value(), import_context_);
+  if (!imported_inputs)
+    return imported_inputs;
+
   if (transform_id.empty())
     return Result<std::size_t>::failure(
         validation_error("body_transform", "transform id must not be empty"));
@@ -4214,13 +4357,22 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
         ReferencePartGeometry{}.resolve_imported_body_feature(document, feature, *import_context_);
     if (!verified)
       return Result<GeometryRecomputeSummary>::failure(verified.error());
+    if (!plan.contains(feature.id().value())) {
+      auto cached = shape_cache.validated_imported_body_result(document, feature);
+      if (!cached)
+        return Result<GeometryRecomputeSummary>::failure(cached.error());
+    }
   }
   ShapeCache working_cache = shape_cache;
   if (working_cache.reference_result() != nullptr)
     working_cache.clear();
+  auto reconciled = working_cache.reconcile_imported_body_owners(document);
+  if (!reconciled)
+    return Result<GeometryRecomputeSummary>::failure(reconciled.error());
   const bool transactional_cache =
       !document.bodies().empty() || !document.imported_topology_catalogs().empty() ||
-      import_context_ != nullptr || shape_cache.reference_result() != nullptr;
+      import_context_ != nullptr || shape_cache.reference_result() != nullptr ||
+      reconciled.value() > 0;
   ShapeCache& execution_cache = transactional_cache ? working_cache : shape_cache;
   GeometryRecomputeSummary summary;
   for (const RecomputeStep& step : plan.steps()) {
@@ -4331,9 +4483,13 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
   ShapeCache working_cache = shape_cache;
   if (working_cache.reference_result() != nullptr)
     working_cache.clear();
+  auto reconciled = working_cache.reconcile_imported_body_owners(document);
+  if (!reconciled)
+    return Result<GeometryRecomputeSummary>::failure(reconciled.error());
   const bool transactional_cache =
       !document.bodies().empty() || !document.imported_topology_catalogs().empty() ||
-      import_context_ != nullptr || shape_cache.reference_result() != nullptr;
+      import_context_ != nullptr || shape_cache.reference_result() != nullptr ||
+      reconciled.value() > 0;
   ShapeCache& execution_cache = transactional_cache ? working_cache : shape_cache;
   GeometryRecomputeSummary summary;
   std::vector<std::string> executable_ids;
