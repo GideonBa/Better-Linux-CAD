@@ -1690,6 +1690,9 @@ Reviewed captures show the hierarchy and posed preview at both scales. Legacy CL
 Separate native startup reaches intentional **124**; final Shell inventory passes **3 / 313**.
 Exact commands and final inventory/startup evidence live in `docs/development-setup.md`.
 
+Delivery: [PR #134](https://github.com/GideonBa/Better-Linux-CAD/pull/134), verified implementation
+commit `dbe6560`. Runtime fingerprints remain unchanged; this PR must merge before Block 143 starts.
+
 ## Current numbered technical step — Block 143 (planned)
 
 Block 142 implementation and acceptance are complete; its PR must merge and main be verified

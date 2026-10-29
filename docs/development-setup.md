@@ -2585,3 +2585,6 @@ five builds, focused/full suites, native workflows, visual review, startup and C
 Core and Geometry sources/binaries are unchanged by the final GUI-only name-oracle correction.
 The staged diff must be reviewed and delivered through one protected PR; Block 143 cannot start
 before that PR merges and main matches the tested tree and runtime fingerprints.
+
+Delivery: [PR #134](https://github.com/GideonBa/Better-Linux-CAD/pull/134), verified implementation
+commit `dbe6560`. Runtime fingerprints remain unchanged; this PR must merge before Block 143 starts.

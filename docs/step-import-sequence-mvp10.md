@@ -738,6 +738,9 @@ Legacy CLI writes **19,170 bytes**. All gates use the final **978-file** runtime
 `a39896f9dac3f7bb6ecbcdfcb8bf61a7d8007bea99ac042e4ed5b36c70c980c0`; exact commands and final
 startup/inventory evidence are in `docs/development-setup.md`.
 
+Delivery: [PR #134](https://github.com/GideonBa/Better-Linux-CAD/pull/134), verified implementation
+commit `dbe6560`. Runtime fingerprints remain unchanged; this PR must merge before Block 143 starts.
+
 ## Block 143 — Integrated STEP import acceptance and application workflows
 
 Primary boundary: end-to-end import proof and application commands.
