@@ -105,6 +105,39 @@ Result<GuiStepImportPreview> prepare_existing(const GuiDocumentSession& session,
   return Result<GuiStepImportPreview>::success(
       {operation, std::move(candidate), std::move(report.value()), path.value(), json.value()});
 }
+
+Result<GuiStepImportGeometryPreview>
+inspect_geometry_source(const GuiDocumentSession& session, StepImportSource item, bool registered) {
+  auto path = document_path(session);
+  if (!path)
+    return Result<GuiStepImportGeometryPreview>::failure(path.error());
+  auto json = snapshot(session);
+  if (!json)
+    return Result<GuiStepImportGeometryPreview>::failure(json.error());
+  auto report = inspect_step_import_source(item, path.value().parent_path());
+  if (!report)
+    return Result<GuiStepImportGeometryPreview>::failure(report.error());
+  if (report.value().state() != StepImportFreshness::Available)
+    return Result<GuiStepImportGeometryPreview>::failure(invalid(report.value().diagnostic()));
+  const geometry::StepImportReader reader;
+  auto imported = reader.read(item, path.value().parent_path());
+  if (!imported)
+    return Result<GuiStepImportGeometryPreview>::failure(imported.error());
+  auto shapes = reader.preview_shapes(imported.value());
+  if (!shapes)
+    return Result<GuiStepImportGeometryPreview>::failure(shapes.error());
+  GuiStepImportGeometryPreview result{std::move(item),
+                                      std::move(report.value()),
+                                      path.value(),
+                                      json.value(),
+                                      registered,
+                                      std::move(imported.value()),
+                                      std::move(shapes.value())};
+  auto valid = GuiStepImportWorkbench{}.validate_inspection(session, result);
+  if (!valid)
+    return Result<GuiStepImportGeometryPreview>::failure(valid.error());
+  return Result<GuiStepImportGeometryPreview>::success(std::move(result));
+}
 } // namespace
 
 Result<GuiStepImportPreview>
@@ -192,6 +225,46 @@ GuiStepImportWorkbench::inspect_sources(const GuiDocumentSession& session) const
     reports.push_back({owner, std::move(report.value()), embedded_part});
   }
   return Result<std::vector<GuiStepImportSourceStatus>>::success(std::move(reports));
+}
+Result<GuiStepImportGeometryPreview>
+GuiStepImportWorkbench::inspect_geometry(const GuiDocumentSession& session,
+                                         StepImportSourceId id) const {
+  const auto* current = source(session, std::move(id));
+  if (!current)
+    return Result<GuiStepImportGeometryPreview>::failure(invalid("STEP source does not exist"));
+  return inspect_geometry_source(session, *current, true);
+}
+Result<GuiStepImportGeometryPreview>
+GuiStepImportWorkbench::inspect_geometry(const GuiDocumentSession& session, std::string name,
+                                         std::string relative_path, StepImportMode mode) const {
+  auto draft = prepare_register(session, std::move(name), std::move(relative_path), mode);
+  if (!draft)
+    return Result<GuiStepImportGeometryPreview>::failure(draft.error());
+  return inspect_geometry_source(session, draft.value().source, false);
+}
+Result<std::size_t>
+GuiStepImportWorkbench::validate_inspection(const GuiDocumentSession& session,
+                                            const GuiStepImportGeometryPreview& preview) const {
+  const auto path = document_path(session);
+  const auto json = snapshot(session);
+  if (!path || !json || path.value() != preview.document_path ||
+      json.value() != preview.document_json ||
+      preview.report.root_directory() != path.value().parent_path() ||
+      preview.report.source() != preview.source || preview.geometry.source != preview.source ||
+      preview.report.state() != StepImportFreshness::Available)
+    return Result<std::size_t>::failure(
+        invalid("Document or STEP inspection changed; inspect again"));
+  if (preview.registered_source) {
+    const auto* accepted = source(session, preview.source.id());
+    if (!accepted || *accepted != preview.source)
+      return Result<std::size_t>::failure(invalid("STEP source intent changed; inspect again"));
+  }
+  const auto report = inspect_step_import_source(preview.source, path.value().parent_path());
+  if (!report || report.value().state() != StepImportFreshness::Available ||
+      report.value().observed_sha256_digest() != preview.report.observed_sha256_digest())
+    return Result<std::size_t>::failure(
+        invalid("STEP source changed or became unavailable; inspect again"));
+  return Result<std::size_t>::success(preview.preview_shapes.size());
 }
 Result<std::size_t> GuiStepImportWorkbench::apply(GuiDocumentSession& session,
                                                   const GuiStepImportPreview& preview) const {

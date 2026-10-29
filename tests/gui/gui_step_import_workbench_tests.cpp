@@ -1,5 +1,6 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
+#include "blcad/geometry/step_exporter.hpp"
 #include "blcad/gui/gui_analysis_export_workbench.hpp"
 #include "blcad/gui/gui_assembly_workbench.hpp"
 #include "blcad/gui/gui_document_browser.hpp"
@@ -8,6 +9,7 @@
 #include <QDir>
 #include <QFile>
 #include <QTemporaryDir>
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
@@ -52,7 +54,132 @@ StepImportSource register_source(GuiDocumentSession& session, const QTemporaryDi
   REQUIRE(workbench.apply(session, preview));
   return preview.source;
 }
+void write_geometry(const QString& path, double width = 20) {
+  auto shape = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(
+      checked(Quantity::length_mm(width)), checked(Quantity::length_mm(10)),
+      checked(Quantity::length_mm(5))));
+  REQUIRE(geometry::StepExporter{}.write_step(shape, path.toStdString()));
+}
 } // namespace
+
+TEST_CASE(
+    "STEP geometry inspection provides posed bodies units and diagnostics without model intent",
+    "[gui][step-import-workbench][step-import-inspection]") {
+  const bool project = GENERATE(false, true);
+  const auto mode = GENERATE(StepImportMode::Reference, StepImportMode::EditableBody);
+  GuiDocumentSession session;
+  create(session, project);
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const GuiStepImportWorkbench workbench;
+  write_geometry(directory.filePath("source.step"));
+  CHECK_FALSE(workbench.inspect_geometry(session, "Supplier", "source.step", mode));
+  REQUIRE(session.save_as(directory.filePath(filename(project)).toStdString()));
+  const auto before = snapshot(session);
+  const auto asset = bytes(directory.filePath("source.step"));
+  const auto undo = session.can_undo();
+  const auto redo = session.can_redo();
+  const auto preview =
+      checked(workbench.inspect_geometry(session, "Supplier", "source.step", mode));
+  CHECK_FALSE(preview.registered_source);
+  CHECK(preview.source.mode() == mode);
+  CHECK(preview.report.state() == StepImportFreshness::Available);
+  REQUIRE(preview.geometry.units.size() == 1);
+  CHECK(preview.geometry.units.front().length_to_mm == Catch::Approx(1));
+  REQUIRE_FALSE(preview.geometry.products.empty());
+  CHECK(preview.geometry.products.front().source_kind == geometry::StepImportedShapeKind::Solid);
+  CHECK(preview.geometry.body_count() == 1);
+  REQUIRE(preview.preview_shapes.size() == 1);
+  REQUIRE_FALSE(preview.geometry.diagnostics.empty());
+  CHECK(
+      geometry::RectangleExtrusionAdapter{}.summarize(preview.preview_shapes.front()).volume_mm3 ==
+      Catch::Approx(1000).margin(1e-5));
+  REQUIRE_FALSE(preview.geometry.products.front().bodies.empty());
+  const auto& body = preview.geometry.products.front().bodies.front();
+  CHECK(body.kind == BodyKind::Solid);
+  CHECK(body.volume_mm3 == Catch::Approx(1000).margin(1e-5));
+  CHECK(body.bounds_mm[3] - body.bounds_mm[0] == Catch::Approx(20).margin(1e-5));
+  CHECK(body.bounds_mm[4] - body.bounds_mm[1] == Catch::Approx(10).margin(1e-5));
+  CHECK(body.bounds_mm[5] - body.bounds_mm[2] == Catch::Approx(5).margin(1e-5));
+  CHECK(checked(workbench.validate_inspection(session, preview)) == 1);
+  CHECK(snapshot(session) == before);
+  CHECK_FALSE(session.dirty());
+  CHECK(session.can_undo() == undo);
+  CHECK(session.can_redo() == redo);
+  CHECK(bytes(directory.filePath("source.step")) == asset);
+  REQUIRE(session.save());
+  CHECK(workbench.validate_inspection(session, preview));
+  REQUIRE(session.save_as(directory.filePath("renamed.blcad.json").toStdString()));
+  CHECK_FALSE(workbench.validate_inspection(session, preview));
+  CHECK(snapshot(session) == before);
+}
+
+TEST_CASE(
+    "STEP geometry inspection rejects changed registered bytes until explicit checksum refresh",
+    "[gui][step-import-workbench][step-import-inspection][step-import-freshness]") {
+  GuiDocumentSession session;
+  create(session, false);
+  QTemporaryDir directory;
+  REQUIRE(session.save_as(directory.filePath("model.blcad.json").toStdString()));
+  const auto asset = directory.filePath("source.step");
+  write_geometry(asset);
+  const GuiStepImportWorkbench workbench;
+  const auto registration = checked(
+      workbench.prepare_register(session, "Supplier", "source.step", StepImportMode::Reference));
+  REQUIRE(workbench.apply(session, registration));
+  REQUIRE(session.save());
+  const auto preview = checked(workbench.inspect_geometry(session, registration.source.id()));
+  CHECK(preview.registered_source);
+  const auto before = snapshot(session);
+  const auto undo_label = std::string(session.undo_label());
+  write_geometry(asset, 40);
+  const auto changed_bytes = bytes(asset);
+  CHECK_FALSE(workbench.validate_inspection(session, preview));
+  CHECK_FALSE(workbench.inspect_geometry(session, registration.source.id()));
+  CHECK(snapshot(session) == before);
+  CHECK_FALSE(session.dirty());
+  CHECK(session.undo_label() == undo_label);
+  const auto refresh = checked(workbench.prepare_refresh(session, registration.source.id()));
+  CHECK(snapshot(session) == before);
+  REQUIRE(workbench.apply(session, refresh));
+  const auto updated = checked(workbench.inspect_geometry(session, registration.source.id()));
+  CHECK(
+      geometry::RectangleExtrusionAdapter{}.summarize(updated.preview_shapes.front()).volume_mm3 ==
+      Catch::Approx(2000).margin(1e-5));
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == before);
+  CHECK_FALSE(workbench.validate_inspection(session, updated));
+  REQUIRE(session.can_redo());
+  CHECK_FALSE(workbench.inspect_geometry(session, registration.source.id()));
+  REQUIRE(session.can_redo());
+  CHECK(bytes(asset) == changed_bytes);
+  REQUIRE(QFile::remove(asset));
+  CHECK_FALSE(workbench.inspect_geometry(session, registration.source.id()));
+  CHECK(snapshot(session) == before);
+}
+
+TEST_CASE(
+    "Malformed STEP geometry leaves opaque source registration and inspection history separate",
+    "[gui][step-import-workbench][step-import-inspection]") {
+  GuiDocumentSession session;
+  create(session, false);
+  QTemporaryDir directory;
+  REQUIRE(session.save_as(directory.filePath("model.blcad.json").toStdString()));
+  write(directory.filePath("source.step"), "ISO-10303-21;\nnot transferable\nEND-ISO-10303-21;\n");
+  const GuiStepImportWorkbench workbench;
+  const auto before = snapshot(session);
+  CHECK_FALSE(
+      workbench.inspect_geometry(session, "Supplier", "source.step", StepImportMode::Reference));
+  CHECK(snapshot(session) == before);
+  CHECK_FALSE(session.can_undo());
+  const auto registry = checked(
+      workbench.prepare_register(session, "Supplier", "source.step", StepImportMode::Reference));
+  REQUIRE(workbench.apply(session, registry));
+  const auto registered = snapshot(session);
+  CHECK_FALSE(workbench.inspect_geometry(session, registry.source.id()));
+  CHECK(snapshot(session) == registered);
+  CHECK(session.undo_label() == "Register STEP source");
+}
 
 TEST_CASE("STEP source tasks require Save and register exact portable intent with atomic history",
           "[gui][step-import-workbench][step-import-source]") {

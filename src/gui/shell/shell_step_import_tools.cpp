@@ -13,6 +13,7 @@
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFileSystemWatcher>
 #include <QFormLayout>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -27,7 +28,9 @@
 #include <QStyleOption>
 #include <QTableWidget>
 #include <QTextDocument>
+#include <QTreeWidget>
 #include <QVBoxLayout>
+#include <algorithm>
 #include <cmath>
 #include <tuple>
 
@@ -73,6 +76,19 @@ QString state_text(StepImportFreshness state) {
   }
   return {};
 }
+QString shape_kind_text(geometry::StepImportedShapeKind kind) {
+  switch (kind) {
+  case geometry::StepImportedShapeKind::Solid:
+    return QStringLiteral("Solid");
+  case geometry::StepImportedShapeKind::Shell:
+    return QStringLiteral("Shell / Surface");
+  case geometry::StepImportedShapeKind::Face:
+    return QStringLiteral("Face / Surface");
+  case geometry::StepImportedShapeKind::Compound:
+    return QStringLiteral("Compound");
+  }
+  return {};
+}
 } // namespace
 
 struct ShellStepImportTools::Impl {
@@ -92,6 +108,11 @@ struct ShellStepImportTools::Impl {
   QPlainTextEdit* expected{};
   QPlainTextEdit* observed{};
   QLabel* summary{};
+  QLabel* geometry_summary{};
+  QLabel* geometry_units{};
+  QTreeWidget* geometry_products{};
+  QPlainTextEdit* geometry_diagnostics{};
+  QFileSystemWatcher* watcher{};
   bool active{};
   bool loading{};
   bool undo_available{};
@@ -100,6 +121,8 @@ struct ShellStepImportTools::Impl {
   std::filesystem::path original_path;
   std::string original_json;
   std::optional<GuiStepImportPreview> candidate;
+  std::optional<GuiStepImportGeometryPreview> inspection;
+  std::optional<GuiViewportCameraBookmark> inspection_camera;
 
   bool available() const {
     const auto& session = window.session();
@@ -131,6 +154,26 @@ struct ShellStepImportTools::Impl {
   }
   void invalidate() {
     candidate.reset();
+    inspection.reset();
+    if (watcher) {
+      const auto files = watcher->files();
+      const auto directories = watcher->directories();
+      if (!files.empty())
+        watcher->removePaths(files);
+      if (!directories.empty())
+        watcher->removePaths(directories);
+    }
+    window.viewport().clear_feature_preview();
+    if (inspection_camera) {
+      (void)window.viewport().restore_camera_bookmark(*inspection_camera);
+      inspection_camera.reset();
+    }
+    if (geometry_products) {
+      geometry_products->clear();
+      geometry_units->clear();
+      geometry_diagnostics->clear();
+      geometry_summary->setText(QStringLiteral("No geometry inspection prepared."));
+    }
     apply->setEnabled(false);
     if (window.session().task().command_id() == task_id)
       (void)window.session().task().return_to_editing();
@@ -172,6 +215,100 @@ struct ShellStepImportTools::Impl {
     status->setText(state_text(value.state()));
     expected->setPlainText(text(value.source().sha256_digest()));
     observed->setPlainText(text(value.observed_sha256_digest().value_or("")));
+  }
+  void show_geometry(const GuiStepImportGeometryPreview& value) {
+    const auto& imported = value.geometry;
+    QStringList units;
+    for (const auto& unit : imported.units)
+      units.push_back(QStringLiteral("%1 × %2 → mm")
+                          .arg(text(unit.declared_length_unit))
+                          .arg(unit.length_to_mm, 0, 'g', 12));
+    geometry_units->setText(units.join(QStringLiteral("; ")));
+    auto* definitions = new QTreeWidgetItem(geometry_products, {QStringLiteral("Definitions")});
+    for (const auto& product : imported.products) {
+      const auto kind = product.is_assembly ? QStringLiteral("Assembly")
+                        : product.source_kind
+                            ? QStringLiteral("Part / ") + shape_kind_text(*product.source_kind)
+                            : QStringLiteral("Part");
+      auto* item = new QTreeWidgetItem(
+          definitions,
+          {product.name.empty() ? QStringLiteral("Unnamed Product") : text(product.name), kind,
+           QStringLiteral("%1 bodies").arg(product.bodies.size())});
+      item->setToolTip(0, text(product.name) + "\n" + text(product.definition_key));
+      for (const auto& body : product.bodies) {
+        const auto& bounds = body.bounds_mm;
+        auto* row = new QTreeWidgetItem(
+            item, {body.name.empty() ? QStringLiteral("Unnamed Body") : text(body.name),
+                   shape_kind_text(body.source_kind),
+                   QStringLiteral("%1 × %2 × %3 mm")
+                       .arg(bounds[3] - bounds[0], 0, 'g', 8)
+                       .arg(bounds[4] - bounds[1], 0, 'g', 8)
+                       .arg(bounds[5] - bounds[2], 0, 'g', 8)});
+        row->setToolTip(0, QStringLiteral("%1\n%2\nVolume: %3 mm³\nArea: %4 mm²\nFaces: %5")
+                               .arg(text(body.name))
+                               .arg(text(body.definition_key))
+                               .arg(body.volume_mm3, 0, 'g', 12)
+                               .arg(body.area_mm2, 0, 'g', 12)
+                               .arg(body.face_count));
+      }
+    }
+    auto* occurrences = new QTreeWidgetItem(geometry_products, {QStringLiteral("Occurrences")});
+    const auto append = [&](auto&& self, QTreeWidgetItem* parent,
+                            std::optional<std::size_t> definition,
+                            std::vector<std::size_t> ancestors) -> void {
+      for (const auto& occurrence : imported.occurrences) {
+        if (occurrence.parent_definition != definition ||
+            occurrence.product_definition >= imported.products.size())
+          continue;
+        const auto& product = imported.products[occurrence.product_definition];
+        auto* item = new QTreeWidgetItem(
+            parent, {occurrence.name.empty() ? text(product.name) : text(occurrence.name),
+                     product.is_assembly ? QStringLiteral("Assembly occurrence")
+                                         : QStringLiteral("Part occurrence"),
+                     text(product.name)});
+        const auto& m = occurrence.transform.matrix;
+        item->setToolTip(
+            0, QStringLiteral("%1\n%2\nDirect translation: %3, %4, %5 mm")
+                   .arg(occurrence.name.empty() ? text(product.name) : text(occurrence.name))
+                   .arg(text(product.name))
+                   .arg(m[3], 0, 'g', 12)
+                   .arg(m[7], 0, 'g', 12)
+                   .arg(m[11], 0, 'g', 12));
+        if (std::find(ancestors.begin(), ancestors.end(), occurrence.product_definition) ==
+            ancestors.end()) {
+          auto chain = ancestors;
+          chain.push_back(occurrence.product_definition);
+          self(self, item, occurrence.product_definition, std::move(chain));
+        }
+      }
+    };
+    append(append, occurrences, std::nullopt, {});
+    geometry_products->expandToDepth(1);
+    QStringList diagnostics;
+    for (const auto& diagnostic : imported.diagnostics)
+      diagnostics.push_back(text(diagnostic));
+    geometry_diagnostics->setPlainText(diagnostics.join('\n'));
+    geometry_summary->setText(
+        QStringLiteral(
+            "%1 product definitions, %2 body definitions, %3 occurrences. "
+            "%4 posed bodies are previewed. Inspection does not import or change the document.")
+            .arg(imported.products.size())
+            .arg(imported.body_count())
+            .arg(imported.occurrences.size())
+            .arg(value.preview_shapes.size()));
+  }
+  void watch_inspection() {
+    if (!inspection)
+      return;
+    const auto root = inspection->document_path.parent_path();
+    const auto asset = root / inspection->source.project_relative_asset_path();
+    QStringList paths{QString::fromStdString(asset.string())};
+    for (auto parent = asset.parent_path(); !parent.empty(); parent = parent.parent_path()) {
+      paths.push_back(QString::fromStdString(parent.string()));
+      if (parent == root)
+        break;
+    }
+    watcher->addPaths(paths);
   }
   Result<std::size_t> catalog_status() {
     const auto reports = workbench.inspect_sources(window.session());
@@ -238,7 +375,7 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
       QStringLiteral(
           "Link a STEP file in the document directory or a subdirectory. Choose the import mode "
           "explicitly. "
-          "Source files are preserved; geometry is not read here yet. "
+          "Inspect Geometry previews the file without importing it. Source files are preserved. "
           "Inspect changed files first and explicitly accept their new checksum."),
       content);
   hint->setWordWrap(true);
@@ -333,6 +470,30 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
     *target = value;
   }
   ui.summary = label("summary");
+  auto* geometry_button = make_gui_button(QStringLiteral("Inspect Geometry"), content);
+  geometry_button->setObjectName("blcad.step_import.inspect_geometry");
+  content_layout->addWidget(geometry_button);
+  ui.geometry_summary = label("geometry_summary");
+  ui.geometry_units = label("geometry_units");
+  ui.geometry_products = new QTreeWidget(content);
+  ui.geometry_products->setObjectName("blcad.step_import.geometry_products");
+  ui.geometry_products->setColumnCount(3);
+  ui.geometry_products->setHeaderLabels({"Product / Body", "Kind", "Dimensions / Definition"});
+  ui.geometry_products->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  ui.geometry_products->setSelectionMode(QAbstractItemView::NoSelection);
+  ui.geometry_products->header()->setSectionResizeMode(QHeaderView::Stretch);
+  ui.geometry_products->setMinimumWidth(0);
+  ui.geometry_products->setMinimumHeight(160);
+  ui.geometry_products->setMaximumHeight(220);
+  ui.geometry_products->setTextElideMode(Qt::ElideMiddle);
+  content_layout->addWidget(ui.geometry_products);
+  ui.geometry_diagnostics = new QPlainTextEdit(content);
+  ui.geometry_diagnostics->setObjectName("blcad.step_import.geometry_diagnostics");
+  ui.geometry_diagnostics->setReadOnly(true);
+  ui.geometry_diagnostics->setMinimumWidth(0);
+  ui.geometry_diagnostics->setMaximumHeight(100);
+  ui.geometry_diagnostics->setPlaceholderText(QStringLiteral("Geometry inspection diagnostics"));
+  content_layout->addWidget(ui.geometry_diagnostics);
   content_layout->addStretch();
   scroll->setWidget(content);
   layout->addWidget(scroll);
@@ -353,6 +514,31 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   ui.dock->setWidget(panel);
   window.addDockWidget(Qt::RightDockWidgetArea, ui.dock);
   ui.dock->hide();
+  ui.watcher = new QFileSystemWatcher(this);
+  const auto source_changed = [this] {
+    auto& ui = *impl_;
+    if (!ui.active || !ui.inspection)
+      return;
+    if (!ui.current()) {
+      cancel();
+      return;
+    }
+    auto current = ui.workbench.validate_inspection(ui.window.session(), *ui.inspection);
+    if (!current) {
+      const auto report =
+          inspect_step_import_source(ui.inspection->source, ui.original_path.parent_path());
+      ui.invalidate();
+      if (report)
+        ui.report(report.value());
+      ui.summary->setText(text(current.error().message()));
+    } else {
+      // An atomic replacement can keep accepted bytes while removing the old inode's watch.
+      // Continue watching the replacement so its later in-place edits invalidate this preview.
+      ui.watch_inspection();
+    }
+  };
+  connect(ui.watcher, &QFileSystemWatcher::fileChanged, this, source_changed);
+  connect(ui.watcher, &QFileSystemWatcher::directoryChanged, this, source_changed);
   qApp->installEventFilter(this);
   ui.dock->installEventFilter(this);
   connect(ui.source, &QComboBox::currentIndexChanged, this, [this] { impl_->select(); });
@@ -400,6 +586,8 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
       impl_->summary->setText(text(result.error().message()));
   };
   connect(inspect_button, &QPushButton::clicked, this, [this, report] { report(inspect()); });
+  connect(geometry_button, &QPushButton::clicked, this,
+          [this, report] { report(inspect_geometry()); });
   connect(preview_button, &QPushButton::clicked, this, [this, report] { report(preview()); });
   connect(ui.apply, &QPushButton::clicked, this, [this, report] { report(apply()); });
   connect(cancel_button, &QPushButton::clicked, this, [this] { cancel(); });
@@ -476,6 +664,52 @@ Result<std::size_t> ShellStepImportTools::inspect() {
       QStringLiteral("File readable. Prepare Register to save the source information."));
   return Result<std::size_t>::success(1);
 }
+Result<std::size_t> ShellStepImportTools::inspect_geometry() {
+  auto& ui = *impl_;
+  if (!ui.current()) {
+    cancel();
+    return Result<std::size_t>::failure(error("Document changed. Reopen source management."));
+  }
+  ui.invalidate();
+  const auto inspect = [&]() -> Result<GuiStepImportGeometryPreview> {
+    if (const auto* source = ui.selected()) {
+      const auto report = ui.workbench.inspect(ui.window.session(), source->id());
+      if (report)
+        ui.report(report.value());
+      return ui.workbench.inspect_geometry(ui.window.session(), source->id());
+    }
+    if (ui.mode->currentIndex() < 0)
+      return Result<GuiStepImportGeometryPreview>::failure(
+          error("Choose the import mode explicitly"));
+    return ui.workbench.inspect_geometry(
+        ui.window.session(), ui.name->text().trimmed().toStdString(), ui.path->text().toStdString(),
+        static_cast<StepImportMode>(ui.mode->currentData().toInt()));
+  };
+  auto result = inspect();
+  if (!result)
+    return Result<std::size_t>::failure(result.error());
+  const auto camera = ui.window.viewport().camera_bookmark();
+  auto shown = ui.window.viewport().set_feature_previews(result.value().preview_shapes);
+  if (!shown)
+    return shown;
+  ui.inspection_camera = camera;
+  ui.inspection = std::move(result.value());
+  ui.report(ui.inspection->report);
+  if (!ui.inspection->registered_source)
+    ui.expected->clear();
+  ui.show_geometry(*ui.inspection);
+  ui.watch_inspection();
+  auto valid = ui.workbench.validate_inspection(ui.window.session(), *ui.inspection);
+  if (!valid) {
+    ui.invalidate();
+    return valid;
+  }
+  (void)ui.window.session().task().show_preview();
+  ui.window.viewport().fit_feature_preview();
+  ui.summary->setText(QStringLiteral("Geometry inspection is read-only. Prepare a source change "
+                                     "separately to register or update its checksum."));
+  return shown;
+}
 Result<std::size_t> ShellStepImportTools::preview() {
   auto& ui = *impl_;
   if (!ui.current()) {
@@ -547,6 +781,18 @@ void ShellStepImportTools::refresh() {
   if (impl_->active && !impl_->current()) {
     cancel();
     return;
+  }
+  if (impl_->active && impl_->inspection) {
+    const auto current =
+        impl_->workbench.validate_inspection(impl_->window.session(), *impl_->inspection);
+    if (!current) {
+      const auto report =
+          inspect_step_import_source(impl_->inspection->source, impl_->original_path.parent_path());
+      impl_->invalidate();
+      if (report)
+        impl_->report(report.value());
+      impl_->summary->setText(text(current.error().message()));
+    }
   }
   impl_->action->setEnabled(impl_->available());
 }

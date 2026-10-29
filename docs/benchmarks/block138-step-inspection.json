@@ -1,0 +1,87 @@
+{
+  "workload": "connected20BladeCurvedRotor",
+  "samplePolicy": "first recorded plus five repeated inspections; exported source and OS cache warm; fixture construction and export excluded",
+  "sourceSha256": "b0a365381707499d0bb5b0a12b40e91878574b0113bebd3551f9c1ccde3d574d",
+  "bytes": 615000,
+  "products": 1,
+  "bodies": 1,
+  "faces": 122,
+  "occurrences": 1,
+  "volumeMm3": 75778.64478,
+  "samples": [
+    {
+      "snapshotMs": 0.436144,
+      "readerMs": 167.507629,
+      "previewMs": 0.017984
+    },
+    {
+      "snapshotMs": 0.590951,
+      "readerMs": 167.687861,
+      "previewMs": 0.027473
+    },
+    {
+      "snapshotMs": 0.557593,
+      "readerMs": 169.816735,
+      "previewMs": 0.022109
+    },
+    {
+      "snapshotMs": 0.577363,
+      "readerMs": 173.239226,
+      "previewMs": 0.020422
+    },
+    {
+      "snapshotMs": 0.552757,
+      "readerMs": 168.193361,
+      "previewMs": 0.020582
+    },
+    {
+      "snapshotMs": 0.560412,
+      "readerMs": 170.551753,
+      "previewMs": 0.01663
+    }
+  ],
+  "environment": {
+    "date": "2026-10-29",
+    "buildType": "Debug",
+    "compiler": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+    "occt": "7.6.3",
+    "qt": "6.4.2",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1370P",
+    "logicalCpus": 20,
+    "kernel": "7.0.0-38-generic"
+  },
+  "method": {
+    "warmSamples": 5,
+    "p50": "median of last five samples",
+    "p95": "nearest-rank ceil(0.95 * 5), the observed maximum; not a reliable tail estimate",
+    "readerScope": "includes its own secure snapshot, STEP parse/XDE transfer, validity/unit checks and deterministic definition construction",
+    "previewScope": "posed GeometryShape composition only, excludes rendering and GUI events",
+    "sourcePolicy": "Source digest remains accepted; STEP header timestamp makes regenerated file digests differ",
+    "buildAndGuiOverlap": false,
+    "portableBudget": null
+  },
+  "warmSummary": {
+    "snapshotMs": {
+      "p50": 0.560412,
+      "p95": 0.590951,
+      "min": 0.552757,
+      "max": 0.590951
+    },
+    "readerMs": {
+      "p50": 169.816735,
+      "p95": 173.239226,
+      "min": 167.687861,
+      "max": 173.239226
+    },
+    "previewMs": {
+      "p50": 0.020582,
+      "p95": 0.027473,
+      "min": 0.01663,
+      "max": 0.027473
+    }
+  },
+  "runtimeFreeze": {
+    "files": 904,
+    "sha256": "c465168447c31608584d4f7109c74b3ba6c1274d3f447c8d97808e961859118b"
+  }
+}

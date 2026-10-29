@@ -122,6 +122,9 @@ public:
   void set_sketch_selection_callback(SketchSelectionCallback callback);
   void set_context_menu_callback(std::function<void(QPoint)> callback);
   void fit_all();
+  // Fit only disposable preview geometry, excluding authored origin and datum
+  // presentations. The task owner restores its saved camera when clearing it.
+  void fit_feature_preview();
   // Explicit presentation notification for shell-owned model-space overlays.
   void set_view_changed_callback(std::function<void()> callback);
   // Explicit shell interaction capture also notifies presentation consumers,

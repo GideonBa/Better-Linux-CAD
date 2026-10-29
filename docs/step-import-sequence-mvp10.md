@@ -1,6 +1,6 @@
 # STEP Import Sequence MVP-10
 
-Status: Block 137 complete; Blocks 138–143 planned. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
+Status: Blocks 137–138 complete; Blocks 139–143 planned. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
 `docs/gui-shell-reset-sequence-mvp9r.md`); `docs/mvp-plan.md` is the status authority. An earlier
 revision numbered these blocks 132–138, before MVP-9R took that range; only the numbering moved,
 never the content or the ordering.
@@ -260,6 +260,19 @@ The closure command is `BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 QT_QPA_PLATFORM=offscre
 
 Primary boundary: deterministic STEP-to-Geometry translation.
 
+Implemented on `feat/step-xde-inspection` from verified main `61e60b6`
+(2026-10-29), after the issue queue is closed. The reader consumes a secure immutable
+SHA-256-verified snapshot through OCCT's stream path, rather than reopening an unchecked
+asset filename. External STEP references are rejected before transfer. Product-local
+body definitions and direct occurrence transforms remain separate derived data; equal
+definitions are not silently merged because their geometry or names match. Runtime ordering
+and ambiguity diagnostics do not establish the persistent topology authority of Block 139.
+
+The existing source registry task keeps Block-137 metadata registration/refresh/removal
+semantics. A separate geometry-inspection action shows product/body/unit diagnostics
+and disposable occurrence previews without creating Part features or accepting a changed
+source digest. The acceptance evidence below establishes completion of this boundary.
+
 Add a Geometry adapter using the OCCT STEP/XDE reader path. It must:
 
 - read supported STEP files without mutating Core intent;
@@ -278,6 +291,96 @@ Focused tag:
 ```text
 [geometry][step-import-reader]
 ```
+
+### Block 138 reader and inspection contract — 2026-10-29
+
+`read_verified_step_import_source` returns a disposable immutable byte snapshot using the
+same no-symlink descriptor walk, regular-file/readability checks, SHA-256 stream and
+before/after/reopened identity/size/timestamp checks as Block-137 inspection. Its digest must
+match the accepted `StepImportSource`; no model or source bytes are changed. The Geometry
+reader parses this snapshot with the STEP stream API and rejects recognized external-file
+references before XDE transfer. It never opens another source by an unchecked filename.
+
+`StepImportReader` returns product-local solid/surface bodies, supported names, original
+Solid/Shell/Face/Compound product classification, direct occurrence matrices, root occurrences,
+unit diagnostics and transfer diagnostics. Declared SI-prefix and recursively conversion-based
+length units are normalized to millimeters for both geometry and translation. Missing,
+unsupported, repeated/ambiguous length declarations and non-finite values fail. Placements must
+be proper rigid transforms; scaling and reflection are rejected explicitly. Finite direct matrices
+must also remain finite after rooted hierarchy and body-local placement composition, before either
+the reader result or posed preview is published. Empty, unsupported
+wire-only and invalid transfers publish no partial result. Optional OCCT ShapeFix/healing and
+additional sewing are disabled; transferred BRep validity is checked rather than silently
+repairing geometry. Reader settings, processing policy, auto-naming and unit globals are scoped
+and restored after success and failure; no background Geometry worker is introduced.
+
+Definitions retain XDE sharing only in transient maps. Canonical recursive geometry/topology
+signatures and sorted direct child-transform signatures determine runtime ordering. Names are
+metadata/secondary presentation order, never unique product identity. Distinct equal products
+and bodies remain separate records with explicit ambiguity/multiplicity diagnostics. Runtime
+keys and vector indices are inspection data, not persisted Body/topology identities and not an
+across-refresh recovery contract. Block 139 owns that later authority. A headless preview helper
+composes rooted direct occurrence chains onto local body shapes without flattening persistent
+Part intent or applying a definition location twice. Reading and preview share the same rooted
+placement checks and reject expansion beyond 100,000 posed body occurrences without a partial result.
+
+The existing **STEP Sources** task adds **Inspect Geometry** separately from metadata inspection,
+Register/Refresh/Remove and Apply. Registered sources must match their saved digest; a new draft
+can be inspected without being registered. A disposable product/body/occurrence tree, millimeter
+unit report and diagnostic panel accompany non-selectable posed viewport bodies. The authored
+scene, JSON, dirty state and Undo/Redo remain unchanged. Draft edits, Cancel/Escape/task close,
+Save As/Open/history restoration and changed/unavailable source notifications discard the
+inspection and restore its camera. Ordinary Save writes only accepted intent and keeps a valid
+read-only inspection. Changed bytes require an explicit source refresh before another geometry
+inspection. Atomic replacement with identical accepted bytes keeps the inspection valid and renews
+its file/directory watches, so a subsequent in-place change still discards the preview. Existing
+Block-137 opaque-byte metadata registration remains available; geometry
+inspection requires valid supported STEP. Imported semantic picking and persistent import commands
+remain Blocks 139–143.
+
+New focused tags are `[core][step-import-snapshot]`, `[geometry][step-import-reader]`,
+`[step-import-inspection]`, `[block138-step-inspection]` and `[native-step-inspection]`.
+An explicit opt-in `[step-import-profile]` observes six reads of the existing connected
+20-blade curved rotor, with fixture recompute/export outside timing and source-volume checks.
+It records snapshot, full reader and posed-preview timings without a portable performance budget.
+Raw observations and host/method details are retained in
+`docs/benchmarks/block138-step-inspection.json`.
+
+### Block 138 acceptance — 2026-10-29
+
+The same frozen runtime passes all five build targets and the following checks. Counts include
+existing affected workflows; skipped cases are the explicit native-only guards under offscreen Qt.
+
+| Check | Cases | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Focused source identity, freshness, JSON and byte snapshot | 12 | 681 | Passed |
+| Focused STEP reader, units, ordering, sharing and invalid placement | 12 | 634 | Passed |
+| Focused inspection/source task and required Shell inventory | 20 | 2,402 | 17 passed; 3 native-only skips |
+| Full Core | 560 | 17,987 | Passed |
+| Full Geometry | 491 | 36,718 | Passed |
+| Full offscreen GUI | 625 | 82,197 | 597 passed; 28 native-only skips |
+| Required Shell inventory after final status update | 3 | 306 | Passed |
+| Native 100% source/inspection/viewer/required inventory | 21 | 3,267 | Passed; no skips |
+| Native 150% inspection | 2 | 673 | Passed; no skips |
+| Isolated connected 20-blade rotor inspection profile | 1 | 64 | Passed; observations only |
+
+Native captures show a visible, correctly fitted preview in empty Part/Project documents and
+explicit source-refresh recovery at both scales. Assertions retain exact document/history
+invariance, cancellation/camera restoration, changed-byte rejection and file-watch continuity
+after identical-byte atomic replacement. Two overflow regressions and the watcher regression
+first failed against the unfixed implementation; their assertions are unchanged in the green run.
+
+The final **904-file** runtime freeze is
+`c465168447c31608584d4f7109c74b3ba6c1274d3f447c8d97808e961859118b`.
+Commands, exact log/capture locations, intermediate fixture corrections and native startup
+(intentional timeout **124**) live in `docs/development-setup.md`. The isolated 615,000-byte,
+122-face rotor has source-volume agreement at **75,778.64478 mm³**; its five warm reader samples
+have median **169.8 ms** and observed maximum **173.2 ms**. Reader time includes its verified
+snapshot; separate stage columns are not additive, and five warm samples establish no portable
+tail budget. No worker, persistent imported topology or imported feature is introduced.
+
+Block 138 is complete. Block 139 remains planned; the single implementation PR must be merged
+and main verified before starting that next boundary.
 
 ## Block 139 — Stable imported topology identity and recovery
 

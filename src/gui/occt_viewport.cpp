@@ -10,6 +10,8 @@
 #include <AIS_Shape.hxx>
 #include <Aspect_DisplayConnection.hxx>
 #include <Aspect_NeutralWindow.hxx>
+#include <BRepBndLib.hxx>
+#include <Bnd_Box.hxx>
 #include <Graphic3d_Camera.hxx>
 #include <OpenGl_Context.hxx>
 #include <OpenGl_FrameBuffer.hxx>
@@ -1086,6 +1088,23 @@ void OcctViewport::fit_all() {
     impl_->view->ZFitAll();
     render_update();
   }
+  rebuild_sketch_grid();
+}
+
+void OcctViewport::fit_feature_preview() {
+  if (impl_->view.IsNull() || impl_->feature_previews.empty())
+    return;
+  Bnd_Box bounds;
+  for (const auto& preview : impl_->feature_previews) {
+    const auto* shape = geometry::OcctShapeView::get(preview.item.shape);
+    if (shape && !shape->IsNull())
+      BRepBndLib::Add(*shape, bounds);
+  }
+  if (bounds.IsVoid())
+    return;
+  impl_->view->FitAll(bounds, 0.05, false);
+  impl_->view->ZFitAll();
+  render_update();
   rebuild_sketch_grid();
 }
 

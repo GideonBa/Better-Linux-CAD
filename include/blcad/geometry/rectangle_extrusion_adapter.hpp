@@ -62,6 +62,7 @@ private:
   friend class ShellAdapter;
   friend class DraftAdapter;
   friend class StepExporter;
+  friend class StepImportReader;
   friend class AssemblyStepExporter;
   friend class Sketch3DGeometryAdapter;
   friend class OcctShapeView;
