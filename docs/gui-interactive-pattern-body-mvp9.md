@@ -134,8 +134,8 @@ independent of chooser order and without toggling an already selected source. Ri
 retain their existing fresh defaults.
 
 Body tasks now own their offered semantic scope: all eligible transform sources, only non-target
-Boolean tools, all offered targets during target collection, or offered datum/construction axes
-during rotation-reference collection. Browser Body/reference picks explicitly reach the same
+Boolean tools, all offered targets during target collection, or offered datum/construction/semantic-edge
+axes during rotation-reference collection. Browser Body/reference picks explicitly reach the same
 acceptance path as viewport picks; the bridge copies shared selection before scope changes.
 Apply/Cancel restore the previous filter and scope. All three cancellation routes additionally
 restore complete still-valid context preselection. Invalid/hidden/missing sources, foreign tasks,
@@ -174,8 +174,9 @@ contract: `docs/file-format.md` and `docs/part-body-transform-ownership-mvp6.md`
 The 3D-Modell **Körper** group exposes **Kombinieren**, **Verschieben**, **Drehen** and **Skalieren**.
 Commands offer visible Bodies with current cached shapes; Boolean requires at least two solids.
 Transforms accept solid and surface Bodies. The existing World-coordinate transform contract is
-used, with independent X/Y/Z translation, datum/construction rotation axes, and an explicit scale
-center. Other coordinate spaces and semantic rotation edges remain headless capabilities.
+used, with independent X/Y/Z translation, explicit/line-derived datum axes, construction lines and
+supported straight semantic-edge rotation axes, and an explicit scale center. Other coordinate
+spaces remain headless capabilities.
 
 Boolean separates the target chooser from a multi-select tool list. **Zielkörper im Modell wählen**
 temporarily routes Body picks to the target; normal picks toggle tools. The target is unavailable as
@@ -274,3 +275,29 @@ Bounded here and not introduced implicitly by this block:
 
 Block 127 adds interactive PathCurve, Sweep, and Loft authoring with ordered-section picking over the
 same manipulator layer.
+
+## Body Rotate reference parity — Issue #111
+
+The rotation chooser labels explicit Datum Axis, Derived Datum Axis, Construction Line and Edge
+sources separately. Every entry carries its typed persistent identity; edge entries name the
+producer and semantic edge role. Only sources resolved by Geometry are offered. Unavailable authored
+references report their diagnostic in the chooser tooltip. Generated edges are the bounded semantic
+straight-edge families supported by `SemanticReferenceEvaluator`, never raw OCCT subshape indices.
+
+Axis collection temporarily offers Datum and Edge picks, scopes them to exactly the chooser entries
+and suspends manipulation grips. Its cache-aware edge presentations follow moved source geometry.
+Selection returns to Body collection after accepting the exact typed axis; Apply/Cancel remove the
+temporary presentations and restore the previous selection filter/scope. The selected Body list
+survives reference collection.
+
+The model-space referenced axis is resolved afresh by `BodyRotationAxisResolver` for both the
+manipulator frame and Geometry execution. Preview and Apply therefore share the same resolver,
+including the off-origin pivot and normalized direction. Explicit numeric axes retain the executor's
+consuming coordinate-frame interpretation. No new persistence format or Sketch-line reference kind
+is introduced; Sketch lines are the separate Issue #110.
+
+`[gui][shell-body][body-axis-parity]` compares equivalent off-origin 90° rotations, unchanged
+persistent state during preview, typed persistence, exact Undo/Redo and reopening. Geometry's matching tag checks all
+five representations, invalid references and cache-aware moved-source edge presentations.
+`[body-axis-native]` covers native ribbon/chooser/viewport collection, cancellation, downstream
+rotation after an upstream depth edit, exact local history, canonical reopening and STEP export.

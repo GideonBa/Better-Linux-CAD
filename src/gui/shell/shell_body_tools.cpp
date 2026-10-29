@@ -1,7 +1,8 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/gui_icons.hpp"
 
-#include "blcad/geometry/construction_line_resolver.hpp"
+#include "blcad/geometry/body_rotation_axis_resolver.hpp"
+#include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/occt_viewport.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -14,6 +15,7 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QStringList>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -260,31 +262,60 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
     return fail("Not enough visible recomputed bodies available");
   if (command == Command::BodyBoolean && !body_sources_->selectedItems().empty())
     boolean_target_->setCurrentIndex(body_sources_->row(body_sources_->selectedItems().front()));
-  for (const auto& datum : part->datum_axes()) {
-    if (datum.kind() != DatumAxisKind::Explicit)
-      continue;
-    auto reference = BodyTransformRotationAxis::create_datum_axis(datum.id());
-    if (!reference)
-      continue;
-    body_axis_->addItem(QString::fromStdString(datum.name()));
-    body_axes_.push_back({reference.value(), datum.origin(), normalized(datum.direction()),
-                          "datum-axis/" + datum.id().value()});
+  if (command == Command::BodyRotate) {
+    QStringList unavailable;
+    const auto append = [&](Result<BodyTransformRotationAxis> reference, const QString& label,
+                            std::string identity) {
+      if (!reference) {
+        unavailable.push_back(QString::fromStdString(reference.error().message()));
+        return;
+      }
+      auto resolved = geometry::BodyRotationAxisResolver{}.resolve(*part, reference.value(),
+                                                                   *session_.part_shape_cache());
+      if (!resolved) {
+        unavailable.push_back(label + ": " + QString::fromStdString(resolved.error().message()));
+        return;
+      }
+      body_axis_->addItem(label, QString::fromStdString(identity));
+      body_axes_.push_back({std::move(reference.value()), std::move(identity)});
+    };
+    for (const auto& datum : part->datum_axes())
+      append(BodyTransformRotationAxis::create_datum_axis(datum.id()),
+             (datum.kind() == DatumAxisKind::Explicit ? QStringLiteral("Datum Axis: ")
+                                                      : QStringLiteral("Derived Datum Axis: ")) +
+                 QString::fromStdString(datum.name()),
+             "datum-axis/" + datum.id().value());
+    for (const auto& line : part->construction_lines())
+      append(BodyTransformRotationAxis::create_construction_line(line.id()),
+             QStringLiteral("Construction Line: ") + QString::fromStdString(line.name()),
+             "construction-line/" + line.id().value());
+    auto generated = geometry::ViewportSceneBuilder{}.build_body_rotation_sources(
+        *part, *session_.part_shape_cache());
+    if (generated) {
+      for (const auto& source : generated.value())
+        if (const auto* edge = std::get_if<SemanticEdgeReference>(&source.reference)) {
+          const auto* producer = part->find_feature(edge->source_feature());
+          if (!producer)
+            continue;
+          append(BodyTransformRotationAxis::create_semantic_edge(*edge),
+                 QStringLiteral("Edge: ") +
+                     QString::fromStdString(producer->name() + " / " +
+                                            std::string(to_string(edge->edge()))),
+                 source.item.semantic_id);
+        }
+    } else
+      unavailable.push_back(QString::fromStdString(generated.error().message()));
+    body_axis_->setToolTip(
+        unavailable.empty()
+            ? QStringLiteral(
+                  "Choose a saved datum, construction line or supported straight feature edge")
+            : QStringLiteral("Unavailable axis sources:\n") + unavailable.join('\n'));
+    if (body_axes_.empty())
+      return fail("Create a resolvable rotation axis first");
+    for (std::size_t i = 0; i < body_axes_.size(); ++i)
+      if (body_axes_[i].semantic_id == "datum-axis/datum.axis.z")
+        body_axis_->setCurrentIndex(i);
   }
-  for (const auto& line : part->construction_lines()) {
-    auto resolved = geometry::ConstructionLineResolver{}.resolve(*part, line.id());
-    auto reference = BodyTransformRotationAxis::create_construction_line(line.id());
-    if (!resolved || !reference)
-      continue;
-    body_axis_->addItem(QString::fromStdString(line.name()));
-    body_axes_.push_back({reference.value(), resolved.value().point,
-                          normalized(resolved.value().direction),
-                          "construction-line/" + line.id().value()});
-  }
-  if (command == Command::BodyRotate && body_axes_.empty())
-    return fail("Create a rotation axis first");
-  for (std::size_t i = 0; i < body_axes_.size(); ++i)
-    if (body_axes_[i].semantic_id == "datum-axis/datum.axis.z")
-      body_axis_->setCurrentIndex(i);
   for (std::size_t n = 1;; ++n) {
     const auto suffix = std::to_string(n);
     body_feature_ = FeatureId("feature.bodyop." + suffix);
@@ -397,11 +428,20 @@ Result<std::size_t> ShellFeatureTools::rebuild_body_controller() {
     bool first = true;
     GuiFeatureManipulatorFrame frame;
     if (command_ == Command::BodyRotate) {
-      const auto& axis = body_axes_.at(body_axis_->currentIndex());
-      frame.origin = axis.origin;
-      frame.plane_normal = axis.direction;
-      frame.reference_direction = normalized(cross(
-          std::abs(axis.direction.x) < .9 ? Vector3{1, 0, 0} : Vector3{0, 1, 0}, axis.direction));
+      const int selected = body_axis_->currentIndex();
+      if (selected < 0 || static_cast<std::size_t>(selected) >= body_axes_.size())
+        return Result<std::size_t>::failure(
+            Error::validation("body.rotation.axis", "Choose a resolvable rotation axis"));
+      const auto& axis = body_axes_[selected];
+      auto resolved = geometry::BodyRotationAxisResolver{}.resolve(
+          *session_.part_document(), axis.reference, *session_.part_shape_cache());
+      if (!resolved)
+        return Result<std::size_t>::failure(resolved.error());
+      const auto& [origin, direction] = resolved.value();
+      frame.origin = origin;
+      frame.plane_normal = direction;
+      frame.reference_direction = normalized(
+          cross(std::abs(direction.x) < .9 ? Vector3{1, 0, 0} : Vector3{0, 1, 0}, direction));
     } else if (command_ == Command::BodyScale)
       frame.origin = body_scale_center_;
     for (int i = 0; i < body_sources_->count(); ++i) {
@@ -474,10 +514,11 @@ void ShellFeatureTools::synchronize_body_editors() {
 void ShellFeatureTools::update_body_pick_mode() {
   const QSignalBlocker block(body_reference_button_);
   body_reference_button_->setChecked(body_reference_picking_);
-  const auto kind = body_reference_picking_ && command_ == Command::BodyRotate
-                        ? GuiSelectionKind::Datum
-                        : GuiSelectionKind::Body;
-  viewport_.set_selection_filter_mask(selection_kind_bit(kind));
+  const auto mask =
+      body_reference_picking_ && command_ == Command::BodyRotate
+          ? selection_kind_bit(GuiSelectionKind::Datum) | selection_kind_bit(GuiSelectionKind::Edge)
+          : selection_kind_bit(GuiSelectionKind::Body);
+  viewport_.set_selection_filter_mask(mask);
   std::vector<std::string> scope;
   if (body_reference_picking_ && command_ == Command::BodyRotate) {
     for (const auto& axis : body_axes_)
@@ -491,6 +532,8 @@ void ShellFeatureTools::update_body_pick_mode() {
     }
   }
   viewport_.set_selection_semantic_scope(std::move(scope));
+  if (command_ == Command::BodyRotate)
+    window_.refresh_feature_selection_scene();
   synchronize_overlay();
 }
 
@@ -499,7 +542,7 @@ bool ShellFeatureTools::accept_body_selection(const GuiSelection& selection) {
     return false;
   if (body_reference_picking_ && command_ == Command::BodyRotate) {
     for (std::size_t i = 0; i < body_axes_.size(); ++i)
-      if (selection.kind == GuiSelectionKind::Datum &&
+      if ((selection.kind == GuiSelectionKind::Datum || selection.kind == GuiSelectionKind::Edge) &&
           body_axes_[i].semantic_id == selection.semantic_id) {
         const QSignalBlocker block(body_axis_);
         body_axis_->setCurrentIndex(i);

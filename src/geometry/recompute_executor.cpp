@@ -3,6 +3,7 @@
 #include "blcad/core/sketch_contour.hpp"
 
 #include "blcad/geometry/construction_line_resolver.hpp"
+#include "blcad/geometry/body_rotation_axis_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/dimension_driven_profile_resolver.hpp"
 #include "blcad/geometry/profile_region_classifier.hpp"
@@ -166,30 +167,7 @@ resolve_rotation_axis(const PartDocument& document, const BodyTransform& transfo
     return Result<std::pair<Point3, Vector3>>::success(
         {frame_point(frame, axis.explicit_origin()),
          normalized(frame_vector(frame, axis.explicit_direction()))});
-  if (axis.kind() == BodyTransformRotationAxisKind::DatumAxis) {
-    const DatumAxis* datum = document.find_datum_axis(axis.datum_axis());
-    if (datum->kind() == DatumAxisKind::Explicit)
-      return Result<std::pair<Point3, Vector3>>::success({datum->origin(), datum->direction()});
-    auto line = ConstructionLineResolver{}.resolve(document, datum->source_construction_line());
-    if (line.has_error())
-      return Result<std::pair<Point3, Vector3>>::failure(line.error());
-    return Result<std::pair<Point3, Vector3>>::success(
-        {line.value().point, line.value().direction});
-  }
-  if (axis.kind() == BodyTransformRotationAxisKind::ConstructionLine) {
-    auto line = ConstructionLineResolver{}.resolve(document, axis.construction_line());
-    if (line.has_error())
-      return Result<std::pair<Point3, Vector3>>::failure(line.error());
-    return Result<std::pair<Point3, Vector3>>::success(
-        {line.value().point, line.value().direction});
-  }
-  auto edge = SemanticReferenceEvaluator{}.resolve_edge(document, *axis.semantic_edge(), cache);
-  if (edge.has_error())
-    return Result<std::pair<Point3, Vector3>>::failure(edge.error());
-  return Result<std::pair<Point3, Vector3>>::success(
-      {edge.value().start, normalized({edge.value().end.x - edge.value().start.x,
-                                       edge.value().end.y - edge.value().start.y,
-                                       edge.value().end.z - edge.value().start.z})});
+  return BodyRotationAxisResolver{}.resolve(document, axis, cache);
 }
 
 [[nodiscard]] Result<GeometryShape> resolve_cached_body_input(const PartDocument& document,
@@ -2106,6 +2084,52 @@ validate_extrude_construction_profile(const PartDocument& document, const Featur
 }
 
 } // namespace
+
+Result<std::pair<Point3, Vector3>>
+BodyRotationAxisResolver::resolve(const PartDocument& document,
+                                  const BodyTransformRotationAxis& axis,
+                                  const ShapeCache& cache) const {
+  const auto fail = [](const std::string& id, const std::string& message) {
+    return Result<std::pair<Point3, Vector3>>::failure(Error::validation(id, message));
+  };
+  Point3 origin;
+  Vector3 direction;
+  if (axis.kind() == BodyTransformRotationAxisKind::DatumAxis) {
+    const auto* datum = document.find_datum_axis(axis.datum_axis());
+    if (!datum)
+      return fail(axis.datum_axis().value(), "Rotation datum axis no longer exists");
+    if (datum->kind() == DatumAxisKind::Explicit) {
+      origin = datum->origin();
+      direction = datum->direction();
+    } else {
+      auto line = ConstructionLineResolver{}.resolve(document, datum->source_construction_line());
+      if (!line)
+        return Result<std::pair<Point3, Vector3>>::failure(line.error());
+      origin = line.value().point;
+      direction = line.value().direction;
+    }
+  } else if (axis.kind() == BodyTransformRotationAxisKind::ConstructionLine) {
+    auto line = ConstructionLineResolver{}.resolve(document, axis.construction_line());
+    if (!line)
+      return Result<std::pair<Point3, Vector3>>::failure(line.error());
+    origin = line.value().point;
+    direction = line.value().direction;
+  } else if (axis.kind() == BodyTransformRotationAxisKind::SemanticEdge && axis.semantic_edge()) {
+    auto edge = SemanticReferenceEvaluator{}.resolve_edge(document, *axis.semantic_edge(), cache);
+    if (!edge)
+      return Result<std::pair<Point3, Vector3>>::failure(edge.error());
+    origin = edge.value().start;
+    direction = {edge.value().end.x - origin.x, edge.value().end.y - origin.y,
+                 edge.value().end.z - origin.z};
+  } else
+    return fail("body.rotation.axis",
+                "Explicit rotation axes require the consuming transform coordinate frame");
+  const double length = std::hypot(direction.x, direction.y, direction.z);
+  if (!std::isfinite(length) || length <= k_tolerance)
+    return fail("body.rotation.axis", "Rotation reference has no finite nonzero direction");
+  return Result<std::pair<Point3, Vector3>>::success(
+      {origin, {direction.x / length, direction.y / length, direction.z / length}});
+}
 
 Result<std::vector<ClosedProfileCurveSegment>> detail::resolve_loft_alignment_section(
     const PartDocument& document, const ProfileSectionReference& section, const ShapeCache& cache) {
