@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_hole_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
@@ -343,7 +344,7 @@ ShellHoleTools::ShellHoleTools(ShellWindow& window, ShellRibbon& ribbon, int mod
   column->addWidget(scroll);
   auto* buttons = new QHBoxLayout;
   const auto button = [&](const char* name, const QString& label) {
-    auto* result = new QPushButton(label, panel);
+    auto* result = make_gui_button(label, panel);
     result->setObjectName(QStringLiteral("blcad.hole.") + name);
     if (QString::fromLatin1(name) == QStringLiteral("apply"))
       result->setProperty("guiRole", "primary");

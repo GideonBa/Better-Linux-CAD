@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_sketch_3d_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/core/sketch_3d_interaction.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
@@ -991,7 +992,7 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   ui.detach->setObjectName("blcad.sketch3d.detach");
   form->addRow(ui.detach);
   const auto stage_button = [&](const char* id, const QString& label) {
-    auto* result = new QPushButton(label, inputs);
+    auto* result = make_gui_button(label, inputs);
     result->setObjectName(QStringLiteral("blcad.sketch3d.") + id);
     form->addRow(result);
     return result;
@@ -1069,7 +1070,7 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   layout->addWidget(ui.summary);
   auto* buttons = new QHBoxLayout;
   const auto button = [&](const char* id, const QString& label) {
-    auto* result = new QPushButton(label, panel);
+    auto* result = make_gui_button(label, panel);
     result->setObjectName(QStringLiteral("blcad.sketch3d.") + id);
     if (QString::fromLatin1(id) == QStringLiteral("apply"))
       result->setProperty("guiRole", "primary");

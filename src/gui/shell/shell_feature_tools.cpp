@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 
 #include "blcad/core/body.hpp"
@@ -295,10 +296,10 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   build_spatial_controls(panel);
   build_surface_controls(panel);
   auto* buttons = new QHBoxLayout();
-  apply_button_ = new QPushButton(QStringLiteral("Apply"), dock_contents);
+  apply_button_ = make_gui_button(QStringLiteral("Apply"), dock_contents);
   apply_button_->setObjectName(QStringLiteral("blcad.feature.apply"));
   apply_button_->setProperty("guiRole", "primary");
-  cancel_button_ = new QPushButton(QStringLiteral("Cancel"), dock_contents);
+  cancel_button_ = make_gui_button(QStringLiteral("Cancel"), dock_contents);
   cancel_button_->setObjectName(QStringLiteral("blcad.feature.cancel"));
   buttons->addWidget(apply_button_);
   buttons->addWidget(cancel_button_);

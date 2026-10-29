@@ -42,7 +42,7 @@ protected:
         painter.drawEllipse(endpoint, 4.5, 4.5);
       }
       painter.setFont(appearance::numeric_font());
-      painter.setPen(QColor::fromRgb(appearance::paper));
+      painter.setPen(QColor::fromRgb(appearance::text));
       if (!presentation.value_text.empty()) {
         const QString text = QString::fromStdString(presentation.value_text);
         const QPointF origin = endpoint + QPointF(9.0, 16.0);
@@ -50,13 +50,13 @@ protected:
                                  .boundingRect(text)
                                  .translated(origin)
                                  .adjusted(-4.0, -2.0, 4.0, 2.0);
-        painter.fillRect(badge, QColor::fromRgb(appearance::paper));
-        painter.setPen(QColor::fromRgb(appearance::blue));
+        painter.fillRect(badge, QColor::fromRgb(appearance::panel));
+        painter.setPen(QColor::fromRgb(appearance::accent));
         painter.drawRect(badge);
-        painter.setPen(QColor::fromRgb(appearance::ink));
+        painter.setPen(QColor::fromRgb(appearance::text));
         painter.drawText(origin, text);
       }
-      painter.setPen(QColor::fromRgb(appearance::paper));
+      painter.setPen(QColor::fromRgb(appearance::text));
       if (presentation.handle_id.ends_with(".x") || presentation.handle_id.ends_with(".y") ||
           presentation.handle_id.ends_with(".z"))
         painter.drawText(endpoint + QPointF(8, -8),

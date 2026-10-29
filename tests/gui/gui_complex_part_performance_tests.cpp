@@ -5,6 +5,8 @@
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/gui_interactive_finishing.hpp"
 #include "blcad/gui/occt_viewport.hpp"
+#include "blcad/gui/gui_sketch_dimensions.hpp"
+#include "blcad/gui/gui_sketch_drag.hpp"
 
 #include <QApplication>
 #include <QElapsedTimer>
@@ -14,6 +16,8 @@
 #include <QJsonObject>
 #include <QSysInfo>
 #include <QTimer>
+#include <QMouseEvent>
+#include <QTemporaryDir>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -155,9 +159,113 @@ TEST_CASE("Complex rotor previews reuse clean producers and recompute changed de
   CHECK(serialize_part_document_to_json(*session.part_document()).value() == applied);
 }
 
+TEST_CASE("Deep curved rotor dimension and drag sequences preserve history and stale guards",
+          "[gui][preview-cache][complex-part-sequence]") {
+  for (const int blades : {5, 20, 40}) {
+    CAPTURE(blades);
+    auto fixture = test::rotor_performance_sequence_part(blades);
+    GuiDocumentSession session;
+    REQUIRE(session.create_part(fixture.id(), fixture.name()));
+    REQUIRE(session.commit_part_transaction("Deep rotor", [&](PartDocument& part) {
+      part = fixture;
+      return Result<std::size_t>::success(1);
+    }));
+    const auto original = serialize_part_document_to_json(*session.part_document()).value();
+    const auto blade = geometry::OcctShapeView::get(
+        *session.part_shape_cache()->find_feature_shape(FeatureId("feature.blade")));
+    auto edited = *session.part_document();
+    REQUIRE(edited.set_parameter_value(ParameterId("hub.height"),
+                                       Quantity::length_mm(5.9, "hub.height").value()));
+    auto cached = detail::recompute_preview_geometry(session, edited, {"hub.height"});
+    REQUIRE(cached);
+    CHECK(geometry::OcctShapeView::get(
+              *cached.value().find_feature_shape(FeatureId("feature.blade"))) == blade);
+    auto cold = geometry::ShapeCache::create(ShapeCacheId("deep.rotor.oracle")).value();
+    REQUIRE(geometry::GeometryRecomputeExecutor{}.execute_document(edited, cold));
+    CHECK(geometry::RectangleExtrusionAdapter{}
+              .summarize(*cached.value().find_body_shape(BodyId("body.rotor")))
+              .volume_mm3 ==
+          Catch::Approx(geometry::RectangleExtrusionAdapter{}
+                            .summarize(*cold.find_body_shape(BodyId("body.rotor")))
+                            .volume_mm3)
+              .epsilon(1e-10)
+              .margin(1e-6));
+    for (const auto& transform : fixture.body_transforms()) {
+      REQUIRE(cached.value().find_feature_shape(FeatureId(transform.id().value())));
+      CHECK(geometry::OcctShapeView::get(
+                *cached.value().find_feature_shape(FeatureId(transform.id().value()))) !=
+            geometry::OcctShapeView::get(*session.part_shape_cache()->find_feature_shape(
+                FeatureId(transform.id().value()))));
+    }
+    CHECK(serialize_part_document_to_json(*session.part_document()).value() == original);
+
+    const auto intent = SketchDimensionIntent::create(
+                            SketchDimensionId("dimension.tip"), SketchDimensionKind::Length,
+                            SketchDimensionMode::Driving,
+                            {SketchConstraintIntentTarget::entity("entity/blade.tip").value()},
+                            ParameterId("blade.tip.dimension"))
+                            .value();
+    auto dimension =
+        GuiSketchDimensionController::create(session, SketchId("sketch.blade"), intent);
+    REQUIRE(dimension);
+    REQUIRE(dimension.value().preview().authoring.accepted);
+    REQUIRE(dimension.value().commit(session));
+    REQUIRE(GuiSketchDimensionController::edit_literal(
+        session, SketchId("sketch.blade"), SketchDimensionId("dimension.tip"),
+        Quantity::length_mm(4.05, "blade.tip.dimension").value()));
+    CHECK(session.part_document()
+              ->find_parameter(ParameterId("blade.tip.dimension"))
+              ->value()
+              .millimeters() == Catch::Approx(4.05));
+    const auto dimensioned = serialize_part_document_to_json(*session.part_document()).value();
+    auto drag = GuiSketchDragController::create(session, SketchId("sketch.blade"));
+    REQUIRE(drag);
+    auto handle = std::find_if(
+        drag.value().handles().begin(), drag.value().handles().end(), [](const auto& item) {
+          return item.kind == GuiSketchDragHandleKind::Endpoint && item.position.x < 45;
+        });
+    REQUIRE(handle != drag.value().handles().end());
+    const auto target = Point2{handle->position.x + .1, handle->position.y + .1};
+    REQUIRE(drag.value().begin(handle->id));
+    for (int index = 0; index < 32; ++index)
+      REQUIRE(drag.value().queue_pointer(index == 31 ? target : handle->position));
+    REQUIRE(drag.value().process_pending());
+    CHECK(drag.value().solve_count() == 1);
+    CHECK(drag.value().processed_pointer() == target);
+    CHECK(serialize_part_document_to_json(*session.part_document()).value() == dimensioned);
+    REQUIRE(drag.value().commit_session_constraints(session));
+    const auto dragged = serialize_part_document_to_json(*session.part_document()).value();
+    CHECK(dragged != dimensioned);
+    CHECK(geometry::RectangleExtrusionAdapter{}
+              .summarize(*session.part_shape_cache()->find_body_shape(BodyId("body.rotor")))
+              .solid_count == 1);
+    REQUIRE(session.undo());
+    CHECK(serialize_part_document_to_json(*session.part_document()).value() == dimensioned);
+    REQUIRE(session.redo());
+    CHECK(serialize_part_document_to_json(*session.part_document()).value() == dragged);
+    auto stale = GuiSketchDragController::create(session, SketchId("sketch.blade"));
+    REQUIRE(stale);
+    REQUIRE(stale.value().begin(stale.value().handles().front().id));
+    REQUIRE(stale.value().flush(stale.value().handles().front().position));
+    REQUIRE(session.undo());
+    CHECK_FALSE(stale.value().commit_session_constraints(session));
+    CHECK(serialize_part_document_to_json(*session.part_document()).value() == dimensioned);
+    REQUIRE(session.redo());
+    QTemporaryDir directory;
+    REQUIRE(directory.isValid());
+    const auto path = directory.filePath("deep-rotor.blcad").toStdString();
+    REQUIRE(session.save_as(path));
+    GuiDocumentSession reopened;
+    REQUIRE(reopened.open_file(path));
+    CHECK(serialize_part_document_to_json(*reopened.part_document()).value() == dragged);
+    CHECK(reopened.sketch_dimension_catalogs() == session.sketch_dimension_catalogs());
+  }
+}
+
 // Explicit opt-in: timing observations are not portable correctness budgets.
 TEST_CASE("Profile one curved rotor through finishing preview and native publication",
           "[.][gui][complex-part-profile]") {
+  const bool sequence = qEnvironmentVariableIsSet("BLCAD_PROFILE_SEQUENCE");
   const int samples = std::max(1, qEnvironmentVariableIntValue("BLCAD_PROFILE_SAMPLES"));
   const int requested_blades = qEnvironmentVariableIntValue("BLCAD_PROFILE_BLADES");
   const std::vector<int> sizes =
@@ -175,7 +283,8 @@ TEST_CASE("Profile one curved rotor through finishing preview and native publica
     viewport.clear_feature_preview();
     viewport.clear_scene();
     CAPTURE(blades);
-    auto fixture = test::rotor_performance_part(blades);
+    auto fixture = sequence ? test::rotor_performance_sequence_part(blades)
+                            : test::rotor_performance_part(blades);
     GuiDocumentSession session;
     REQUIRE(session.create_part(fixture.id(), fixture.name()));
     REQUIRE(session.commit_part_transaction("Rotor", [&](PartDocument& part) {
@@ -192,6 +301,8 @@ TEST_CASE("Profile one curved rotor through finishing preview and native publica
         event_delay, cold_candidate, full_publication, cached_publication, full_redraw,
         cached_redraw;
     std::vector<double> full_events, cached_events, full_readback, cached_readback;
+    std::vector<double> solver, dimension, drag, picking, apply, undo, redo, complete_preview,
+        complete_event_delay;
     for (int iteration = 0; iteration < samples; ++iteration) {
       selection.push_back(measured_ms([&] {
         auto result = geometry::FinishingSelectionBuilder::build(
@@ -277,6 +388,92 @@ TEST_CASE("Profile one curved rotor through finishing preview and native publica
       cached_redraw.push_back(measured_ms([&] { render(cached_events, cached_readback); }));
       viewport.clear_feature_preview();
       CHECK(serialize_part_document_to_json(*session.part_document()).value() == before);
+      if (sequence) {
+        auto handles = GuiSketchDragController::create(session, SketchId("sketch.blade"));
+        REQUIRE(handles);
+        solver.push_back(measured_ms([&] {
+          auto solved = SketchConstraintSolver{}.solve(handles.value().source_topology(),
+                                                       handles.value().source_system());
+          REQUIRE(solved);
+          CHECK(solved.value().status == SketchSolveStatus::UnderConstrained);
+        }));
+        auto intent = SketchDimensionIntent::create(
+                          SketchDimensionId("dimension.tip"), SketchDimensionKind::Length,
+                          SketchDimensionMode::Driving,
+                          {SketchConstraintIntentTarget::entity("entity/blade.tip").value()},
+                          ParameterId("blade.tip.dimension"))
+                          .value();
+        dimension.push_back(measured_ms([&] {
+          auto result =
+              GuiSketchDimensionController::create(session, SketchId("sketch.blade"), intent);
+          INFO((result ? "valid dimension" : result.error().message()));
+          REQUIRE(result);
+          CHECK(result.value().preview().authoring.accepted);
+        }));
+        auto handle = std::find_if(handles.value().handles().begin(),
+                                   handles.value().handles().end(), [](const auto& item) {
+                                     return item.kind == GuiSketchDragHandleKind::Endpoint &&
+                                            item.position.x > 85;
+                                   });
+        REQUIRE(handle != handles.value().handles().end());
+        REQUIRE(handles.value().begin(handle->id));
+        drag.push_back(measured_ms([&] {
+          // Exercise the existing latest-pointer coalescing on curved topology.
+          for (int step = 1; step <= 32; ++step)
+            REQUIRE(handles.value().queue_pointer(
+                {handle->position.x + step * .001, handle->position.y + step * .001}));
+          REQUIRE(handles.value().process_pending());
+        }));
+        CHECK(handles.value().solve_count() == 1);
+        handles.value().cancel();
+
+        if (viewport.native_viewer_available()) {
+          viewport.set_standard_view(GuiStandardView::Top);
+          viewport.set_selection_filter_mask(selection_kind_bit(GuiSelectionKind::Body));
+          auto screen = viewport.model_to_screen({10, 10, 6});
+          REQUIRE(screen);
+          const QPointF point(screen.value().x, screen.value().y);
+          picking.push_back(measured_ms([&] {
+            QMouseEvent move(QEvent::MouseMove, point, viewport.mapToGlobal(point), Qt::NoButton,
+                             Qt::NoButton, Qt::NoModifier);
+            QApplication::sendEvent(&viewport, &move);
+            QMouseEvent release(QEvent::MouseButtonRelease, point, viewport.mapToGlobal(point),
+                                Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+            QApplication::sendEvent(&viewport, &release);
+          }));
+          REQUIRE(viewport.selected_semantic());
+          CHECK(viewport.selected_semantic()->semantic_id == "body/body.rotor");
+          viewport.clear_selection();
+        }
+        QElapsedTimer complete;
+        complete.start();
+        bool event_delivered = false;
+        QTimer::singleShot(0, &viewport, [&] {
+          complete_event_delay.push_back(complete.nsecsElapsed() / 1e6);
+          event_delivered = true;
+        });
+        complete_preview.push_back(measured_ms([&] {
+          auto result = fillet.preview_shape(session);
+          REQUIRE(result);
+          REQUIRE(viewport.set_feature_preview(result.value(), "body/body.rotor"));
+          qApp->processEvents();
+          REQUIRE_FALSE(viewport.grab().isNull());
+        }));
+        REQUIRE(event_delivered);
+        viewport.clear_feature_preview();
+        apply.push_back(measured_ms([&] { REQUIRE(fillet.apply(session)); }));
+        CHECK(
+            geometry::RectangleExtrusionAdapter{}
+                .summarize(*session.part_shape_cache()->find_body_shape(BodyId("body.rotor")))
+                .volume_mm3 ==
+            Catch::Approx(geometry::RectangleExtrusionAdapter{}.summarize(*cached_shape).volume_mm3)
+                .epsilon(1e-10)
+                .margin(1e-6));
+        undo.push_back(measured_ms([&] { REQUIRE(session.undo()); }));
+        redo.push_back(measured_ms([&] { REQUIRE(session.redo()); }));
+        REQUIRE(session.undo());
+        CHECK(serialize_part_document_to_json(*session.part_document()).value() == before);
+      }
     }
     models.push_back(
         QJsonObject{{"blades", blades},
@@ -300,6 +497,23 @@ TEST_CASE("Profile one curved rotor through finishing preview and native publica
                     {"full_preview_readback", distribution(full_readback)},
                     {"cached_preview_readback", distribution(cached_readback)},
                     {"queued_event_delay", distribution(event_delay)}});
+    if (sequence) {
+      auto model = models.last().toObject();
+      model.insert("serial_transforms", static_cast<int>(fixture.body_transforms().size()));
+      model.insert("producer_count",
+                   static_cast<int>(session.part_shape_cache()->feature_shape_count()));
+      model.insert("solver", distribution(solver));
+      model.insert("dimension_preview", distribution(dimension));
+      model.insert("coalesced_drag_32_points", distribution(drag));
+      if (!picking.empty())
+        model.insert("native_mouse_pick", distribution(picking));
+      model.insert("apply_including_history_and_recompute", distribution(apply));
+      model.insert("undo_including_recompute", distribution(undo));
+      model.insert("redo_including_recompute", distribution(redo));
+      model.insert("preview_publication_events_and_capture", distribution(complete_preview));
+      model.insert("complete_preview_queued_event_delay", distribution(complete_event_delay));
+      models.replace(models.size() - 1, model);
+    }
   }
   QFile cpuinfo("/proc/cpuinfo");
   QString cpu;
@@ -310,6 +524,7 @@ TEST_CASE("Profile one curved rotor through finishing preview and native publica
         break;
       }
   const QJsonDocument report(QJsonObject{{"platform", QApplication::platformName()},
+                                         {"deep_sequence", sequence},
                                          {"viewport_lifetime", "persistent"},
                                          {"viewport_width_dip", viewport.width()},
                                          {"viewport_height_dip", viewport.height()},

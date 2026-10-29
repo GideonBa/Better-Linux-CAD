@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_construction_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
@@ -181,10 +182,10 @@ ShellConstructionTools::ShellConstructionTools(ShellWindow& window, ShellRibbon&
   scroll->setWidget(inputs);
   column->addWidget(scroll);
   auto* buttons = new QHBoxLayout;
-  apply_ = new QPushButton(QStringLiteral("Apply"), panel);
+  apply_ = make_gui_button(QStringLiteral("Apply"), panel);
   apply_->setObjectName("blcad.construction.apply");
   apply_->setProperty("guiRole", "primary");
-  auto* cancel = new QPushButton(QStringLiteral("Cancel"), panel);
+  auto* cancel = make_gui_button(QStringLiteral("Cancel"), panel);
   cancel->setObjectName("blcad.construction.cancel");
   buttons->addWidget(apply_);
   buttons->addWidget(cancel);

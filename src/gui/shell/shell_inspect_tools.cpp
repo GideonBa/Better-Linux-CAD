@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/core/assembly_leaf_occurrence.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/gui/gui_step_import_workbench.hpp"
@@ -204,10 +205,10 @@ ShellInspectTools::ShellInspectTools(ShellWindow& window, ShellRibbon& ribbon, i
   scroll->setWidget(inputs);
   column->addWidget(scroll);
   auto* buttons = new QHBoxLayout;
-  auto* run = new QPushButton(QStringLiteral("Analyze"), panel);
+  auto* run = make_gui_button(QStringLiteral("Analyze"), panel);
   run->setObjectName("blcad.inspect.run");
   run->setProperty("guiRole", "primary");
-  auto* close = new QPushButton(QStringLiteral("Close"), panel);
+  auto* close = make_gui_button(QStringLiteral("Close"), panel);
   close->setObjectName("blcad.inspect.close");
   buttons->addWidget(run);
   buttons->addWidget(close);

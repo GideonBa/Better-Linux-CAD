@@ -96,4 +96,24 @@ inline PartDocument rotor_performance_part(int blades, const char* hub_feature =
   return part;
 }
 
+// Serial alignment operations create a real deep producer chain. Paired
+// translations preserve the tip coordinates used by independent pick oracles.
+inline PartDocument rotor_performance_sequence_part(int blades) {
+  auto part = rotor_performance_part(blades);
+  const int depth = blades <= 5 ? 4 : blades <= 20 ? 12 : 24;
+  for (int index = 0; index < depth; ++index) {
+    auto transform = BodyTransform::create_translate(
+        BodyTransformId("align." + std::to_string(index)), BodyId("body.rotor"),
+        BodyTransformCoordinateSpace::World, std::nullopt, {0, 0, index % 2 == 0 ? 0.05 : -0.05},
+        false, false);
+    REQUIRE(transform);
+    REQUIRE(part.add_body_transform(transform.value()));
+  }
+  REQUIRE(part.add_parameter(
+      Parameter::create_length(ParameterId("blade.tip.dimension"), "Blade tip",
+                               Quantity::length_mm(4, "blade.tip.dimension").value())
+          .value()));
+  return part;
+}
+
 } // namespace blcad::test

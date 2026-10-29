@@ -296,6 +296,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_step_import_workbench.cpp
     src/gui/gui_document_browser.cpp
     src/gui/gui_appearance.cpp
+    src/gui/gui_icons.cpp
     src/gui/gui_document_session.cpp
     src/gui/gui_part_foundation_workbench.cpp
     src/gui/gui_part_operations_workbench.cpp
@@ -349,6 +350,7 @@ if(BLCAD_BUILD_GUI)
       $<INSTALL_INTERFACE:include>
   )
   target_compile_features(blcad_gui PUBLIC cxx_std_20)
+  include(assets/gui/pixelarticons/resources.cmake)
   qt_add_resources(
     blcad_gui blcad_gui_assets
     PREFIX "/blcad/gui"
@@ -366,6 +368,7 @@ if(BLCAD_BUILD_GUI)
       assets/gui/fonts/Barlow-OFL.txt
       assets/gui/fonts/BarlowCondensed-OFL.txt
       assets/gui/fonts/IBMPlexMono-OFL.txt
+      ${BLCAD_PIXELARTICON_RESOURCES}
   )
   target_link_libraries(
     blcad_gui
@@ -613,10 +616,14 @@ if(BLCAD_BUILD_TESTS)
   endif()
 
   if(BLCAD_BUILD_GUI)
+    add_library(blcad_geometry_test_support STATIC tests/support/geometry_volume_oracle.cpp)
+    target_link_libraries(blcad_geometry_test_support PRIVATE BLCAD::geometry)
+    target_include_directories(blcad_geometry_test_support SYSTEM PRIVATE ${OpenCASCADE_INCLUDE_DIR})
     add_executable(
       blcad_gui_tests
       tests/gui/gui_test_main.cpp
       tests/gui/gui_appearance_tests.cpp
+      tests/gui/gui_icons_tests.cpp
       tests/gui/gui_rapid_dimension_tests.cpp
       tests/gui/gui_shell_reference_visibility_workflow_tests.cpp
       tests/gui/gui_assembly_workbench_tests.cpp
@@ -632,6 +639,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_raw_profile_transaction_tests.cpp
       tests/gui/gui_sketch_conic_workflow_tests.cpp
       tests/gui/gui_shell_dimension_workflow_tests.cpp
+      tests/gui/gui_dimension_label_interaction_tests.cpp
       tests/gui/gui_shell_feature_tools_tests.cpp
       tests/gui/gui_shell_finishing_tools_tests.cpp
       tests/gui/gui_shell_pattern_tools_tests.cpp
@@ -685,7 +693,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_interactive_assembly_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )
-    target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2)
+    target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2 blcad_geometry_test_support)
     target_compile_definitions(blcad_gui_tests PRIVATE BLCAD_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     set_source_files_properties(tests/gui/gui_complex_part_performance_tests.cpp PROPERTIES
       COMPILE_DEFINITIONS "BLCAD_PROFILE_BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\"")
