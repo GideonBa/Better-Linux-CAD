@@ -8,7 +8,11 @@
 #include "blcad/core/project_json.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
 #include "blcad/geometry/sketch_finish.hpp"
+#include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/gui/gui_sketch_dimensions.hpp"
+#include "blcad/core/sketch_modify.hpp"
+#include "blcad/core/sketch_constraint_authoring_json.hpp"
+#include "blcad/core/sketch_dimension_authoring_json.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_construction_tools.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
@@ -46,6 +50,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QPushButton>
 #include <QScreen>
 #include <QScrollArea>
@@ -5237,4 +5242,237 @@ TEST_CASE("Combined UI curved Cut recovers direction and extent on offset and ob
   ui.file("export_part_step", directory.filePath("curved-cut.step"));
   CHECK(ui.bytes(directory.filePath("curved-cut.step")).startsWith("ISO-10303-21;"));
   ui.idle();
+}
+
+TEST_CASE("Native construction conversion retains curved intent through dimensions drag extrusion "
+          "and cut",
+          "[gui][integration][construction-conversion][construction-native-workflow]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native Qt/OCCT presentation and pointer acceptance");
+  WorkflowUi ui;
+  ui.fit_first_screen();
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Construction conversion");
+  const auto sketch_id = ui.rectangle("datum.xy", {0, 0}, {120, 80});
+  ui.tree(sketch_id.value(), true);
+  REQUIRE(ui.window.active_sketch() == sketch_id);
+  const auto sketch = [&]() -> const Sketch& {
+    return *ui.window.session().part_document()->find_sketch(sketch_id);
+  };
+  const auto visible = [&](Point2 point) {
+    auto& viewport = ui.window.viewport();
+    for (int attempt = 0; attempt < 12; ++attempt) {
+      const auto screen = checked(viewport.sketch_plane_to_screen(point));
+      if (viewport.rect().adjusted(12, 12, -12, -12).contains(QPoint(screen.x, screen.y)))
+        return;
+      const auto center = viewport.rect().center();
+      QWheelEvent wheel(QPointF(center), QPointF(viewport.mapToGlobal(center)), {}, {0, -120},
+                        Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+      QApplication::sendEvent(&viewport, &wheel);
+      ui.flush();
+    }
+    FAIL("Construction workflow input is outside the visible viewport");
+  };
+  visible({125, 85});
+  visible({-5, -5});
+  ui.command("sketch.create.center_radius_circle");
+  ui.plane_pick({80, 30});
+  ui.plane_pick({89, 30});
+  const auto circle_id = sketch().circle_profiles().front().id();
+  ui.command("sketch.create.ellipse");
+  ui.plane_pick({30, 30});
+  ui.plane_pick({45, 30});
+  ui.plane_pick({30, 42});
+  REQUIRE(sketch().spline_segments().size() == 4);
+  std::vector<SketchEntityId> ellipse;
+  for (const auto& curve : sketch().spline_segments())
+    ellipse.push_back(curve.id());
+  ui.command("sketch.create.three_point_arc");
+  ui.plane_pick({50, 60});
+  ui.plane_pick({70, 72});
+  ui.plane_pick({90, 60});
+  REQUIRE(sketch().arc_segments().size() == 1);
+  const auto arc_id = sketch().arc_segments().front().id();
+  const auto outer_id = sketch().closed_profiles().front().id();
+  const auto catalogs = [&] {
+    return checked(serialize_sketch_constraint_catalog_to_json(
+               checked(ui.window.session().sketch_constraint_catalog(sketch_id)))) +
+           checked(serialize_sketch_dimension_catalog_to_json(
+               checked(ui.window.session().sketch_dimension_catalog(sketch_id))));
+  };
+  const auto state = [&] { return ui.snapshot() + catalogs(); };
+  const auto exact_history = [&](const std::string& before, const std::string& after) {
+    ui.command("undo");
+    CHECK(state() == before);
+    ui.command("redo");
+    CHECK(state() == after);
+    if (!ui.window.active_sketch())
+      ui.tree(sketch_id.value(), true);
+  };
+  const auto hover = [&](Point2 point) {
+    visible(point);
+    const auto screen = checked(ui.window.viewport().sketch_plane_to_screen(point));
+    QMouseEvent move(QEvent::MouseMove, {screen.x, screen.y},
+                     ui.window.viewport().mapToGlobal(QPoint(screen.x, screen.y)), Qt::NoButton,
+                     Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(&ui.window.viewport(), &move);
+    ui.flush();
+    return screen;
+  };
+  const auto select_curve = [&](const SketchEntityId& id, bool append) {
+    const auto sampler = blcad::detail::curve_sampler_for(sketch(), id);
+    REQUIRE(sampler);
+    const auto point = blcad::detail::sampler_point(*sampler, .37);
+    const auto screen = hover(point);
+    REQUIRE(ui.window.viewport().hovered_sketch_hit());
+    REQUIRE(ui.window.viewport().hovered_sketch_hit()->kind == GuiSketchHitKind::Curve);
+    const auto expected = ui.window.viewport().hovered_sketch_hit()->semantic_id;
+    REQUIRE(expected == "sketch/" + sketch_id.value() + "/entity/" + id.value());
+    ui.click_at(ui.window.viewport(), {screen.x, screen.y},
+                append ? Qt::ControlModifier : Qt::NoModifier);
+    REQUIRE(std::any_of(ui.window.session().selection().entries().begin(),
+                        ui.window.session().selection().entries().end(),
+                        [&](const auto& selected) { return selected.semantic_id == expected; }));
+  };
+  const auto circle_point = [&] {
+    const auto* circle = sketch().find_circle_profile(circle_id);
+    const double radius = ui.window.session()
+                              .part_document()
+                              ->find_parameter(circle->diameter_parameter())
+                              ->value()
+                              .millimeters() /
+                          2;
+    return Point2{circle->center().x + radius / std::sqrt(2.0),
+                  circle->center().y + radius / std::sqrt(2.0)};
+  };
+  const auto select_circle = [&](bool append) {
+    // Pick the opposite side from the diameter value rectangle. At high DPI
+    // the opaque value text can legitimately cover the north-east curve.
+    const auto point = circle_point();
+    const auto center = sketch().find_circle_profile(circle_id)->center();
+    const auto screen = hover({2 * center.x - point.x, 2 * center.y - point.y});
+    REQUIRE(ui.window.viewport().hovered_sketch_hit());
+    REQUIRE(ui.window.viewport().hovered_sketch_hit()->kind == GuiSketchHitKind::Curve);
+    REQUIRE(ui.window.viewport().hovered_sketch_hit()->semantic_id ==
+            "sketch/" + sketch_id.value() + "/profile/" + circle_id.value());
+    ui.click_at(ui.window.viewport(), {screen.x, screen.y},
+                append ? Qt::ControlModifier : Qt::NoModifier);
+  };
+  select_circle(false);
+  for (const auto& id : ellipse)
+    select_curve(id, true);
+  select_curve(arc_id, true);
+  REQUIRE(ui.window.session().selection().size() == 6);
+  const auto initial = state();
+  const auto initial_catalogs = catalogs();
+  ui.command("sketch.operation.construction");
+  REQUIRE(ui.action("sketch.operation.construction").isChecked());
+  CHECK(sketch().find_circle_profile(circle_id)->construction());
+  CHECK(sketch().find_arc_segment(arc_id)->construction());
+  for (const auto& id : ellipse)
+    CHECK(sketch().find_spline_segment(id)->construction());
+  CHECK_FALSE(sketch().profile_has_construction(outer_id));
+  CHECK(catalogs() == initial_catalogs);
+  const auto auxiliary = state();
+  exact_history(initial, auxiliary);
+  auto regions =
+      geometry::SketchFinishService::analyze(*ui.window.session().part_document(), sketch());
+  REQUIRE(regions);
+  REQUIRE(regions.value().regions.size() == 1);
+  CHECK(regions.value().diagnostics.empty());
+  ui.capture("construction-curved-auxiliary");
+
+  ui.command("sketch.dimension.rapid");
+  hover(circle_point());
+  REQUIRE(ui.window.sketch_tools().rapid_dimension_candidate());
+  ui.plane_pick(circle_point());
+  const auto center = sketch().find_circle_profile(circle_id)->center();
+  const Point2 label{center.x + 18, center.y + 12};
+  hover(label);
+  ui.plane_pick(label);
+  ui.key(ui.window, Qt::Key_Escape);
+  REQUIRE(checked(ui.window.session().sketch_dimension_catalog(sketch_id)).dimensions().size() ==
+          1);
+  CHECK(sketch().find_circle_profile(circle_id)->construction());
+  const auto before_drag = state();
+  const Point2 destination{center.x + 5, center.y + 5};
+  visible(destination);
+  const auto start = checked(ui.window.viewport().sketch_plane_to_screen(center));
+  const auto end = checked(ui.window.viewport().sketch_plane_to_screen(destination));
+  REQUIRE(std::hypot(end.x - start.x, end.y - start.y) > QApplication::startDragDistance());
+  ui.mouse(ui.window.viewport(), {start.x, start.y}, QEvent::MouseButtonPress);
+  ui.flush();
+  ui.mouse(ui.window.viewport(), {end.x, end.y}, QEvent::MouseMove);
+  ui.flush();
+  ui.mouse(ui.window.viewport(), {end.x, end.y}, QEvent::MouseButtonRelease);
+  ui.flush();
+  CHECK(std::hypot(sketch().find_circle_profile(circle_id)->center().x - center.x,
+                   sketch().find_circle_profile(circle_id)->center().y - center.y) > 1);
+  CHECK(sketch().find_circle_profile(circle_id)->construction());
+  const auto after_drag = state();
+  exact_history(before_drag, after_drag);
+  ui.capture("construction-dimensioned-dragged");
+  ui.roundtrip(directory.filePath("construction-auxiliary.blcad.json"));
+  ui.tree(sketch_id.value(), true);
+  CHECK(sketch().find_circle_profile(circle_id)->construction());
+  CHECK(sketch().find_arc_segment(arc_id)->construction());
+  for (const auto& id : ellipse)
+    CHECK(sketch().find_spline_segment(id)->construction());
+
+  // Restore only the closed inner geometry; the open helper remains auxiliary.
+  select_circle(false);
+  for (const auto& id : ellipse)
+    select_curve(id, true);
+  REQUIRE(ui.action("sketch.operation.construction").isChecked());
+  const auto before_restore = state();
+  const auto retained_catalogs = catalogs();
+  ui.command("sketch.operation.construction");
+  CHECK_FALSE(sketch().find_circle_profile(circle_id)->construction());
+  for (const auto& id : ellipse)
+    CHECK_FALSE(sketch().find_spline_segment(id)->construction());
+  CHECK(sketch().find_arc_segment(arc_id)->construction());
+  CHECK(catalogs() == retained_catalogs);
+  const auto restored = state();
+  exact_history(before_restore, restored);
+  ui.capture("construction-restored-regions");
+  ui.command("finish_sketch");
+  // Several eligible regions require an explicit existing profile identity.
+  REQUIRE(ui.window.feature_tools().select_profile(sketch_id, outer_id));
+  const auto before_extrude = state();
+  const auto body = ui.extrude(8);
+  const double volume = ui.summary(body).volume_mm3;
+  CHECK(volume > 1000);
+  CHECK(volume < 120 * 80 * 8);
+  const auto after_extrude = state();
+  ui.command("undo");
+  CHECK(state() == before_extrude);
+  ui.command("redo");
+  CHECK(state() == after_extrude);
+  ui.rectangle("datum.xy", {90, 55}, {110, 75});
+  const auto before_cut = state();
+  ui.command("extrude");
+  ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
+  ui.data(ui.widget<QComboBox>("blcad.extrude.target"), QString::fromStdString(body.value()));
+  ui.scalar("3 mm");
+  ui.button("blcad.feature.apply");
+  CHECK(ui.summary(body).volume_mm3 == Approx(volume - 1200).margin(.001));
+  const auto after_cut = state();
+  ui.command("undo");
+  CHECK(state() == before_cut);
+  ui.command("redo");
+  CHECK(state() == after_cut);
+  ui.roundtrip(directory.filePath("construction-machined.blcad.json"));
+  CHECK(ui.summary(body).volume_mm3 == Approx(volume - 1200).margin(.001));
+  auto full = checked(geometry::ShapeCache::create(ShapeCacheId("construction.full")));
+  checked(geometry::GeometryRecomputeExecutor{}.execute_document(
+      *ui.window.session().part_document(), full));
+  REQUIRE(full.find_body_shape(body));
+  CHECK(geometry::RectangleExtrusionAdapter{}.summarize(*full.find_body_shape(body)).volume_mm3 ==
+        Approx(ui.summary(body).volume_mm3).margin(1e-6));
+  ui.capture("construction-machined-solid");
+  const auto step = directory.filePath("construction-machined.step");
+  ui.file("export_part_step", step);
+  CHECK(ui.bytes(step).startsWith("ISO-10303-21;"));
+  CHECK(state() == after_cut);
 }

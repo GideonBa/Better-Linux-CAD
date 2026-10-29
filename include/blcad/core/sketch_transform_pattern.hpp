@@ -209,12 +209,12 @@ private:
       } else if constexpr (std::is_same_v<T, ArcSegment>) {
         auto r = ArcSegment::create_three_point(std::move(id), f(v.start()), f(v.mid()), f(v.end()));
         if (r.has_error()) return Result<Curve>::failure(r.error());
-        return Result<Curve>::success(Curve(std::move(r.value())));
+        return Result<Curve>::success(Curve(r.value().with_construction(v.construction())));
       } else {
         auto r = SplineSegment::create_cubic_bezier(std::move(id), f(v.start()), f(v.control1()),
                                                     f(v.control2()), f(v.end()), v.weights());
         if (r.has_error()) return Result<Curve>::failure(r.error());
-        return Result<Curve>::success(Curve(std::move(r.value())));
+        return Result<Curve>::success(Curve(r.value().with_construction(v.construction())));
       }
     }, curve);
   }

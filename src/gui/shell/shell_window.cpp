@@ -118,8 +118,10 @@ QTreeWidgetItem* find_item_by_semantic_id(QTreeWidgetItem* item, const QString& 
 std::optional<ProfileId> unique_profile(const Sketch& sketch) {
   std::optional<ProfileId> result;
   std::size_t count = 0U;
-  const auto visit = [&result, &count](const auto& profiles) {
+  const auto visit = [&result, &count, &sketch](const auto& profiles) {
     for (const auto& profile : profiles) {
+      if (sketch.profile_has_construction(profile.id()))
+        continue;
       result = profile.id();
       ++count;
     }

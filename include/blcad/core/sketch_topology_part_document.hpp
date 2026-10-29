@@ -82,10 +82,6 @@ public:
       if (current.reference())
         return Result<Sketch>::failure(Error::validation(
             current.id(), "authored legacy curves cannot materialize as reference geometry"));
-      if (current.construction() && current.kind() != SketchTopologyEntityKind::Line)
-        return Result<Sketch>::failure(Error::validation(
-            current.id(),
-            "construction curve flags require canonical Sketch topology JSON persistence"));
       auto id = sketch_entity_id(current);
       if (id.has_error()) return Result<Sketch>::failure(id.error());
 
@@ -112,7 +108,8 @@ public:
         if (end.has_error()) return Result<Sketch>::failure(end.error());
         auto arc = ArcSegment::create_three_point(id.value(), start.value(), mid.value(), end.value());
         if (arc.has_error()) return Result<Sketch>::failure(arc.error());
-        auto added = result.value().add_entity(std::move(arc.value()));
+        auto added =
+            result.value().add_entity(arc.value().with_construction(current.construction()));
         if (added.has_error()) return Result<Sketch>::failure(added.error());
       } else {
         auto start = point(current, 0U);
@@ -126,7 +123,8 @@ public:
         auto spline = SplineSegment::create_cubic_bezier(
             id.value(), start.value(), control1.value(), control2.value(), end.value(), current.weights());
         if (spline.has_error()) return Result<Sketch>::failure(spline.error());
-        auto added = result.value().add_entity(std::move(spline.value()));
+        auto added =
+            result.value().add_entity(spline.value().with_construction(current.construction()));
         if (added.has_error()) return Result<Sketch>::failure(added.error());
       }
     }
@@ -184,7 +182,8 @@ public:
       auto profile = RectangleProfile::create(legacy.id(), legacy.width_parameter(),
                                               legacy.height_parameter(), center.value());
       if (profile.has_error()) return Result<Sketch>::failure(profile.error());
-      auto added = result.value().add_profile(std::move(profile.value()));
+      auto added = result.value().add_profile(
+          profile.value().with_construction(current.value()->construction()));
       if (added.has_error()) return Result<Sketch>::failure(added.error());
     }
     for (const auto& legacy : source.circle_profiles()) {
@@ -196,7 +195,8 @@ public:
       if (center.has_error()) return Result<Sketch>::failure(center.error());
       auto profile = CircleProfile::create(legacy.id(), legacy.diameter_parameter(), center.value());
       if (profile.has_error()) return Result<Sketch>::failure(profile.error());
-      auto added = result.value().add_profile(std::move(profile.value()));
+      auto added = result.value().add_profile(
+          profile.value().with_construction(current.value()->construction()));
       if (added.has_error()) return Result<Sketch>::failure(added.error());
     }
     for (const auto& legacy : source.closed_profiles()) {

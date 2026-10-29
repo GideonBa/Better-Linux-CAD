@@ -1794,3 +1794,75 @@ verified main `736f100` (its accepted full-suite results are **549 / 17,217** an
 this issue's full regression targets the changed GUI layer. No performance profile or later numbered
 block is claimed by this fix. Logs use `/tmp/blcad-issue104-{build-final,focused-final,native-final,
 native-150-final,gui-final,native-broad-final,startup-final}.log`.
+
+
+## Issue #109 — reversible construction conversion (2026-10-29)
+
+`Sketch::set_construction` changes only editable curve/profile roles after validating the entire
+selection. The shell publishes one transaction, preserves the selected identities after its scene
+refresh and rejects downstream-invalid conversions atomically. Optional curved-role persistence,
+eligible-profile counting, shared point identity and native dashed wire presentation are documented
+in `file-format.md`, `sketch-shared-topology-mvp8.md` and `gui-sketch-transform-pattern-mvp8.md`.
+Keep builds, source edits, correctness GUI suites and separate startup serial; no timing profile is
+part of this issue. Core/Geometry correctness tests can accompany one GUI suite.
+
+```bash
+cmake --build --preset dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app blcad_export_step -j6
+./build/dev-gui/blcad_core_tests
+./build/dev-gui/blcad_geometry_tests
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[construction-conversion]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue109-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[construction-conversion]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue109-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[construction-conversion]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue109-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[construction-conversion],[shell-sketch],[sketch-create],[sketch-create-conics],[sketch-transform-pattern],[sketch-offset-project],[spline-create-workflow],[sketch-drag],[sketch-dimension-workflow],[coincident-closure],[cut-material-workflow],[block136-profile-context],[shell-combined-profile-context],[native-viewer-lifecycle],[integration][gui-feature-coverage]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+All five targets build. Final full Core passes **555 / 17,463**; full Geometry passes **461 /
+35,315**. Core/Geometry production inputs and Geometry binaries are unchanged by final Core composite-fixture,
+native pick-fixture and GUI projection-role refinements; no redundant Geometry rerun is claimed. The full GUI suite includes conversion/projection regressions with the native-only workflow explicitly
+skipped offscreen. Core regressions first reproduced rejected construction arcs/splines and
+silently flattened circle flags. A later GUI review regression guards unlinked projection role
+selection across equal text in curve/profile id namespaces; role inheritance uses the existing
+geometry-source precedence. Added coverage includes exact rational roles through JSON,
+malformed flag rejection, overlapping/nested generated groups, stable shared point ids, transforms,
+copies, splits, spline control edits and whole-selection reference rejection. Geometry proof checks
+raw/materialized eligibility, visible auxiliary curves, hole volume exclusion and restored eligibility.
+GUI proof adds retained dimension/constraint catalogs, one Undo step, no-op history and downstream
+hole recompute versus rejected outer-profile rollback.
+
+The native complex workflow creates a rectangle, a circle, a rational ellipse and an open arc. It
+selects six curves with real viewport clicks, converts through the visible ribbon action, authors a
+diameter, drags the auxiliary circle, saves/reopens, restores only the closed inner curves, then
+Extrudes and Cuts with exact local Undo/Redo and another Save/Open. Several eligible regions use the
+existing explicit profile-selection client before the Extrude ribbon task. Final cached Body volume
+matches empty-cache recompute; STEP export does not alter intent. Picks stay inside the viewport.
+The circle is selected opposite the opaque diameter label at high DPI, retaining strict Curve kind,
+full Sketch-qualified semantic identity, selection and button-center checks. Hit rules are unchanged.
+The historical composite profile bridge remains line-contour-only; the new nested fixture respects
+that boundary. Native-only coverage is explicit, not substituted by the offscreen pass.
+
+The final native affected-family run and required shell gate pass **101 / 7,086**, without skips.
+Final scaled construction/projection proof passes **5 / 614** at 150%, without skips; its source
+inputs also cover the four earlier native construction cases.
+The initial full GUI run reached **580 passed / 21 expected native-only skips** with one inventory
+proof-source mismatch: a shared family filter matched two files. Dedicated per-file proof filters
+correct that metadata; targeted projection/inventory checks pass **4 / 342**. The final full GUI
+run passes **603 cases — 582 passed, 21 expected native-only skips; 81,234 assertions** and
+supersedes that pre-review result. Captures `construction-dimensioned-dragged` and
+`construction-machined-solid` were inspected at both 100% and 150%: auxiliary curves remain visible
+and dimensionable, restored inner loops remain distinct and the machined Body survives reopening.
+
+Separate native startup reaches expected timeout **124**. Final broad/scaled/startup logs contain
+no High-severity, BadDrawable or BadWindow errors; the pre-existing OCCT Medium depth/stencil visual
+warning remains. All 889 final fingerprints remain unchanged through broad/scaled/full GUI/startup
+verification. No performance profile or later numbered block is claimed by this issue.
+
+The final manifest records **889** code/asset/build and runtime inventory inputs (including the new
+profile-role helper and both coverage JSONs), SHA-256
+`6b59f69ddc9bc43af74f844dbe0a9875ad7d308cab4d4a2bd7dc644de0356352` at
+`/tmp/blcad-issue109-source-freeze-final.json`. Earlier reproduction/diagnostic logs are separate
+from final proof. Final logs use `/tmp/blcad-issue109-{core-full-final,geometry-full,
+gui-full-final,native-final-2,native-150-review-final,native-broad-final,startup-final}.log`;
+final build logs are `/tmp/blcad-issue109-build-review-final.log` (all requested targets after review)
+and `/tmp/blcad-issue109-build-final-core.log` (Core fixture/all requested targets).

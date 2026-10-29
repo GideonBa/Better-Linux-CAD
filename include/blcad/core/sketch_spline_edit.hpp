@@ -184,7 +184,8 @@ public:
         candidate_segments[segment_index].id(), points[0], points[1], points[2], points[3],
         candidate_segments[segment_index].weights());
     if (replacement.has_error()) return Result<std::size_t>::failure(replacement.error());
-    candidate_segments[segment_index] = std::move(replacement.value());
+    candidate_segments[segment_index] =
+        replacement.value().with_construction(candidate_segments[segment_index].construction());
 
     // Preserve explicit chain connectivity when an endpoint is moved.
     if (point_index == 0U && (segment_index > 0U || closed)) {
@@ -196,7 +197,8 @@ public:
           candidate_segments[previous_index].id(), previous[0], previous[1], previous[2],
           previous[3], candidate_segments[previous_index].weights());
       if (updated.has_error()) return Result<std::size_t>::failure(updated.error());
-      candidate_segments[previous_index] = std::move(updated.value());
+      candidate_segments[previous_index] =
+          updated.value().with_construction(candidate_segments[previous_index].construction());
     }
     if (point_index == 3U && (segment_index + 1U < candidate_segments.size() || closed)) {
       const auto next_index = (segment_index + 1U) % candidate_segments.size();
@@ -206,7 +208,8 @@ public:
                                                         next[0], next[1], next[2], next[3],
                                                         candidate_segments[next_index].weights());
       if (updated.has_error()) return Result<std::size_t>::failure(updated.error());
-      candidate_segments[next_index] = std::move(updated.value());
+      candidate_segments[next_index] =
+          updated.value().with_construction(candidate_segments[next_index].construction());
     }
     segments_ = std::move(candidate_segments);
     return Result<std::size_t>::success(segment_index);
@@ -297,8 +300,10 @@ public:
         segments_[junction_index + 1U].weights());
     if (first_segment.has_error()) return Result<std::size_t>::failure(first_segment.error());
     if (second_segment.has_error()) return Result<std::size_t>::failure(second_segment.error());
-    segments_[junction_index] = std::move(first_segment.value());
-    segments_[junction_index + 1U] = std::move(second_segment.value());
+    segments_[junction_index] =
+        first_segment.value().with_construction(segments_[junction_index].construction());
+    segments_[junction_index + 1U] =
+        second_segment.value().with_construction(segments_[junction_index + 1U].construction());
     return Result<std::size_t>::success(junction_index);
   }
 
@@ -543,7 +548,8 @@ private:
       auto segment = SplineSegment::create_cubic_bezier(generated_id(index), p1, control1,
                                                         control2, p2);
       if (segment.has_error()) return Result<std::size_t>::failure(segment.error());
-      rebuilt.push_back(std::move(segment.value()));
+      rebuilt.push_back(segment.value().with_construction(
+          !segments_.empty() && segments_[std::min(index, segments_.size() - 1U)].construction()));
     }
     segments_ = std::move(rebuilt);
     return Result<std::size_t>::success(segments_.size());

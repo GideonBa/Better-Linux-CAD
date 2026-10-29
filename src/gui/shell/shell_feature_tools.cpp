@@ -75,7 +75,7 @@ std::optional<std::pair<SketchId, ProfileId>> parse_profile_semantic(std::string
 bool shell_feature_profile_available(const PartDocument& part, const SketchId& sketch_id,
                                      const ProfileId& profile_id) {
   const Sketch* sketch = part.find_sketch(sketch_id);
-  if (sketch == nullptr)
+  if (sketch == nullptr || sketch->profile_has_construction(profile_id))
     return false;
   // CircularHolePattern is subtractive pattern intent, not a region supported
   // by the shell's additive Extrude/Revolve commands.

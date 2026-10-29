@@ -359,12 +359,32 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/interactive-sketcher-mvp8-acceptance.md",
-        "scope": "Planar authoring, explicit single/batch reference repair, failed-recompute and bounded missing-source Part opening/history, plus existing Core diagnostic suggestions with validated Preview/Apply and visible unsupported/manual actions.",
+        "scope": "Planar authoring with reversible line/arc/circle/spline construction roles, explicit single/batch reference repair, failed-recompute and bounded missing-source Part opening/history, plus existing Core diagnostic suggestions with validated Preview/Apply and visible unsupported/manual actions.",
         "gaps": [],
         "proofs": [
           {
             "filter": "[sketch-mouse-operations]",
             "source": "tests/gui/gui_shell_sketch_operations_tests.cpp"
+          },
+          {
+            "filter": "[construction-groups]",
+            "source": "tests/gui/gui_shell_sketch_operations_tests.cpp"
+          },
+          {
+            "filter": "[construction-selection]",
+            "source": "tests/gui/gui_shell_sketch_operations_tests.cpp"
+          },
+          {
+            "filter": "[construction-downstream]",
+            "source": "tests/gui/gui_shell_sketch_operations_tests.cpp"
+          },
+          {
+            "filter": "[construction-projection]",
+            "source": "tests/gui/gui_shell_sketch_operations_tests.cpp"
+          },
+          {
+            "filter": "[construction-native-workflow]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           },
           {
             "filter": "[spline-create-workflow]",

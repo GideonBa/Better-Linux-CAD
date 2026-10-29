@@ -1,4 +1,5 @@
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/core/sketch_profile_roles.hpp"
 #include "blcad/core/sketch_contour.hpp"
 
 #include "blcad/geometry/construction_line_resolver.hpp"
@@ -693,16 +694,18 @@ resolve_axis_reference(const PartDocument& document, const AxisReference& refere
           geometry_error(semantic->source_feature().value(),
                          "semantic axis requires a circular subtractive-extrude producer"));
     const Sketch* sketch = document.find_sketch(source->input_sketch());
-    if (sketch == nullptr || sketch->circle_profiles().size() != 1U ||
-        sketch->profile_count() != 1U)
+    const auto* circle = sketch == nullptr ? nullptr
+                         : source->profile()
+                             ? sketch->find_circle_profile(*source->profile())
+                             : sole_sketch_geometry_profile(*sketch, sketch->circle_profiles());
+    if (circle == nullptr || circle->construction())
       return Result<std::pair<Point3, Vector3>>::failure(
           geometry_error(semantic->source_feature().value(),
                          "semantic axis producer requires exactly one circle profile"));
     auto workplane = workplane_resolver.resolve_for_sketch(document, *sketch, shape_cache);
     if (workplane.has_error())
       return Result<std::pair<Point3, Vector3>>::failure(workplane.error());
-    const CircleProfile& circle = sketch->circle_profiles().front();
-    const Point3 origin = workplane_resolver.evaluate_point(workplane.value(), circle.center());
+    const Point3 origin = workplane_resolver.evaluate_point(workplane.value(), circle->center());
     Vector3 direction = workplane.value().normal;
     if (source->direction() == ExtrudeDirection::OppositeSketchNormal)
       direction = {-direction.x, -direction.y, -direction.z};
@@ -913,6 +916,10 @@ evaluate_thin_profile_vertices(const PartDocument& document, const Sketch& sketc
     return Result<std::vector<Point3>>::failure(geometry_error(
         sketch.id().value(), "thin extrusion currently requires exactly one open line segment"));
   const LineSegment& line = sketch.line_segments().front();
+  if (line.construction())
+    return Result<std::vector<Point3>>::failure(geometry_error(
+        line.id().value(),
+        "Construction geometry cannot define a thin extrusion; convert it back to geometry"));
   const double dx = line.end().x - line.start().x;
   const double dy = line.end().y - line.start().y;
   const double line_length = std::sqrt(dx * dx + dy * dy);
@@ -948,9 +955,7 @@ evaluate_thin_profile_vertices(const PartDocument& document, const Sketch& sketc
 }
 
 [[nodiscard]] bool has_no_profiles(const Sketch& sketch) noexcept {
-  return sketch.rectangle_profiles().empty() && sketch.circle_profiles().empty() &&
-         sketch.closed_profiles().empty() && sketch.arc_closed_profiles().empty() &&
-         sketch.composite_closed_profiles().empty() && sketch.circular_hole_patterns().empty();
+  return sketch_geometry_profile_count(sketch) == 0;
 }
 
 [[nodiscard]] double orientation(Point2 a, Point2 b, Point2 c) noexcept {
@@ -1889,6 +1894,9 @@ resolve_loft_closed_section(const PartDocument& document, const ProfileSectionRe
     return Result<std::vector<ClosedProfileCurveSegment>>::failure(workplane.error());
   std::vector<ClosedProfileCurveSegment> curves;
   const ProfileId& profile_id = reference.profile();
+  auto profile_valid = validate_part_feature_input_reference(document, reference);
+  if (!profile_valid)
+    return Result<std::vector<ClosedProfileCurveSegment>>::failure(profile_valid.error());
   if (const RectangleProfile* rectangle = sketch->find_rectangle_profile(profile_id)) {
     const Parameter* width = document.find_parameter(rectangle->width_parameter());
     const Parameter* height = document.find_parameter(rectangle->height_parameter());
@@ -2006,75 +2014,95 @@ resolve_surface_trimming(const PartDocument& document, const TrimmingReference& 
 template <typename KindSize>
 [[nodiscard]] bool has_exactly_one_profile_of_kind(const Sketch& sketch,
                                                    KindSize kind_size) noexcept {
-  return kind_size(sketch) == 1U && sketch.profile_count() == 1U;
+  return count_sketch_geometry_profiles(sketch, kind_size(sketch)) == 1U &&
+         sketch_geometry_profile_count(sketch) == 1U;
 }
 
 [[nodiscard]] bool has_exactly_one_rectangle_profile(const Sketch& sketch) noexcept {
   return has_exactly_one_profile_of_kind(
-      sketch, [](const Sketch& s) { return s.rectangle_profiles().size(); });
+      sketch, [](const Sketch& s) -> const auto& { return s.rectangle_profiles(); });
 }
 
 [[nodiscard]] bool has_exactly_one_closed_profile(const Sketch& sketch) noexcept {
   return has_exactly_one_profile_of_kind(
-      sketch, [](const Sketch& s) { return s.closed_profiles().size(); });
+      sketch, [](const Sketch& s) -> const auto& { return s.closed_profiles(); });
 }
 
 [[nodiscard]] bool has_exactly_one_arc_closed_profile(const Sketch& sketch) noexcept {
   return has_exactly_one_profile_of_kind(
-      sketch, [](const Sketch& s) { return s.arc_closed_profiles().size(); });
+      sketch, [](const Sketch& s) -> const auto& { return s.arc_closed_profiles(); });
 }
 
 [[nodiscard]] bool has_exactly_one_composite_closed_profile(const Sketch& sketch) noexcept {
   return has_exactly_one_profile_of_kind(
-      sketch, [](const Sketch& s) { return s.composite_closed_profiles().size(); });
+      sketch, [](const Sketch& s) -> const auto& { return s.composite_closed_profiles(); });
 }
 
 [[nodiscard]] bool has_exactly_one_circle_profile(const Sketch& sketch) noexcept {
   return has_exactly_one_profile_of_kind(
-      sketch, [](const Sketch& s) { return s.circle_profiles().size(); });
+      sketch, [](const Sketch& s) -> const auto& { return s.circle_profiles(); });
 }
 
 [[nodiscard]] bool has_exactly_one_circular_hole_pattern(const Sketch& sketch) noexcept {
   return has_exactly_one_profile_of_kind(
-      sketch, [](const Sketch& s) { return s.circular_hole_patterns().size(); });
+      sketch, [](const Sketch& s) -> const auto& { return s.circular_hole_patterns(); });
 }
 
 [[nodiscard]] const RectangleProfile* extrude_rectangle_profile(const Sketch& sketch,
                                                                 const Feature& feature) noexcept {
   if (feature.profile().has_value())
     return sketch.find_rectangle_profile(*feature.profile());
-  return has_exactly_one_rectangle_profile(sketch) ? &sketch.rectangle_profiles().front() : nullptr;
+  return sole_sketch_geometry_profile(sketch, sketch.rectangle_profiles());
 }
 
 [[nodiscard]] const CircleProfile* extrude_circle_profile(const Sketch& sketch,
                                                           const Feature& feature) noexcept {
   if (feature.profile().has_value())
     return sketch.find_circle_profile(*feature.profile());
-  return has_exactly_one_circle_profile(sketch) ? &sketch.circle_profiles().front() : nullptr;
+  return sole_sketch_geometry_profile(sketch, sketch.circle_profiles());
 }
 
 [[nodiscard]] const ClosedProfile* extrude_closed_profile(const Sketch& sketch,
                                                           const Feature& feature) noexcept {
   if (feature.profile().has_value())
     return sketch.find_closed_profile(*feature.profile());
-  return has_exactly_one_closed_profile(sketch) ? &sketch.closed_profiles().front() : nullptr;
+  return sole_sketch_geometry_profile(sketch, sketch.closed_profiles());
 }
 
 [[nodiscard]] const ArcClosedProfile* extrude_arc_profile(const Sketch& sketch,
                                                           const Feature& feature) noexcept {
   if (feature.profile().has_value())
     return sketch.find_arc_closed_profile(*feature.profile());
-  return has_exactly_one_arc_closed_profile(sketch) ? &sketch.arc_closed_profiles().front()
-                                                    : nullptr;
+  return sole_sketch_geometry_profile(sketch, sketch.arc_closed_profiles());
 }
 
 [[nodiscard]] const CompositeClosedProfile*
 extrude_composite_profile(const Sketch& sketch, const Feature& feature) noexcept {
   if (feature.profile().has_value())
     return sketch.find_composite_closed_profile(*feature.profile());
-  return has_exactly_one_composite_closed_profile(sketch)
-             ? &sketch.composite_closed_profiles().front()
-             : nullptr;
+  return sole_sketch_geometry_profile(sketch, sketch.composite_closed_profiles());
+}
+
+[[nodiscard]] Result<std::size_t>
+validate_extrude_construction_profile(const PartDocument& document, const Feature& feature) {
+  const auto* sketch = document.find_sketch(feature.input_sketch());
+  if (!sketch)
+    return Result<std::size_t>::success(0);
+  const auto selected = feature.profile();
+  const bool has_geometry_curves =
+      std::any_of(sketch->line_segments().begin(), sketch->line_segments().end(),
+                  [](const auto& c) { return !c.construction(); }) ||
+      std::any_of(sketch->arc_segments().begin(), sketch->arc_segments().end(),
+                  [](const auto& c) { return !c.construction(); }) ||
+      std::any_of(sketch->spline_segments().begin(), sketch->spline_segments().end(),
+                  [](const auto& c) { return !c.construction(); });
+  if ((selected && sketch->profile_has_construction(*selected)) ||
+      (!selected && sketch->profile_count() != 0 && sketch_geometry_profile_count(*sketch) == 0 &&
+       !has_geometry_curves))
+    return Result<std::size_t>::failure(validation_error(
+        selected ? selected->value() : sketch->id().value(),
+        "Construction geometry cannot bound a solid profile; convert it back to geometry"));
+  return Result<std::size_t>::success(0);
 }
 
 } // namespace
@@ -2413,6 +2441,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
   Result<GeometryShape> tool = Result<GeometryShape>::failure(
       geometry_error(feature->id().value(), "unsupported revolve profile region"));
   const ProfileId& profile_id = feature->profile().profile();
+  auto profile_valid = validate_part_feature_input_reference(document, feature->profile());
+  if (!profile_valid)
+    return Result<std::size_t>::failure(profile_valid.error());
   if (const RectangleProfile* rectangle = sketch->find_rectangle_profile(profile_id)) {
     const Parameter* width = document.find_parameter(rectangle->width_parameter());
     const Parameter* height = document.find_parameter(rectangle->height_parameter());
@@ -2584,6 +2615,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
     if (workplane.has_error())
       return Result<std::size_t>::failure(workplane.error());
     const ProfileId& profile_id = profile_reference.profile();
+    auto profile_valid = validate_part_feature_input_reference(document, profile_reference);
+    if (!profile_valid)
+      return Result<std::size_t>::failure(profile_valid.error());
     std::vector<ClosedProfileCurveSegment> curves;
     if (const RectangleProfile* rectangle = sketch->find_rectangle_profile(profile_id)) {
       const Parameter* width = document.find_parameter(rectangle->width_parameter());
@@ -3146,6 +3180,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     return Result<std::size_t>::failure(
         geometry_error(feature->id().value(), "only additive extrude features are supported"));
   }
+  auto profile_role = validate_extrude_construction_profile(document, *feature);
+  if (!profile_role)
+    return profile_role;
   if (feature->direction() == ExtrudeDirection::Path ||
       !feature->extrude_intent().is_historical_additive_default() ||
       (feature->body_result_context().has_value() &&
@@ -3356,6 +3393,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     return Result<std::size_t>::failure(
         geometry_error(feature->id().value(), "only subtractive extrude features are supported"));
   }
+  auto profile_role = validate_extrude_construction_profile(document, *feature);
+  if (!profile_role)
+    return profile_role;
   if (feature->direction() == ExtrudeDirection::Path ||
       !feature->extrude_intent().is_historical_subtractive_default() ||
       (feature->body_result_context().has_value() &&

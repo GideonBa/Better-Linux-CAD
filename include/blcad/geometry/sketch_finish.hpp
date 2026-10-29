@@ -43,7 +43,8 @@ public:
     std::vector<ResolvedSketchRegionLine> curves;
     const auto collect = [&curves](const auto& entities) {
       for (const auto& entity : entities)
-        curves.push_back({entity.id(), entity.start(), entity.end()});
+        if (!entity.construction())
+          curves.push_back({entity.id(), entity.start(), entity.end()});
     };
     for (const auto& line : sketch.line_segments())
       if (!line.construction())

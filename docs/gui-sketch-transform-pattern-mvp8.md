@@ -32,6 +32,37 @@ clears the previous preview, explains the error, and disables Apply. Apply re-ev
 document and publishes exactly one atomic transaction, including downstream feature recompute.
 Undo/Redo and Save/Open use the existing document and intent persistence.
 
+## Reversible construction conversion — issue #109
+
+**Construction Geometry** (`sketch.operation.construction`) is a checkable action in the Transform
+group. Select editable lines, arcs, spline spans, parameter-backed circles/rectangles or persistent
+closed/arc-closed/composite groups. If every target is auxiliary, the checked action restores normal
+geometry; an ordinary or mixed selection converts all targets to construction. Group selections
+expand to their existing source curves and duplicate members are processed once. An empty,
+unsupported, stale or associative projected/reference selection disables the action with an actionable reason;
+headless calls reject the whole request before mutation. Detach a projected reference before editing
+its role. Finish or cancel an active authoring command before conversion.
+
+`Sketch::set_construction` owns the role-only change. The shell's `convert_construction` publishes
+it through one Part transaction with downstream recompute. Curve/profile/endpoint ids, exact
+coordinates, rational weights, parameters, constraints, dimensions, references and group membership
+remain intact. Conversion creates no replacement curves or duplicate constraints. Line conversion
+uses the ordinary Construction role; switching a Centerline to normal geometry removes its centerline
+role, and a later generic conversion produces Construction. Centerline authoring remains separate.
+
+Unlinked editable projection snapshots remain ordinary local curves, as defined in
+`gui-sketch-offset-project-mvp8.md`; their role follows the actual selected curve/profile type.
+Equal raw text in the distinct curve/profile id namespaces never transfers another object's role.
+Associative projected point/line references retain their read-only authority.
+
+Construction curves are visible, selectable and dimensionable. Entire auxiliary groups are published
+as dashed wire presentations; a partially auxiliary group has individual source curves without a
+filled region. Raw inference, implicit contained holes and explicit feature profile inputs exclude
+construction. Conversion back restores region eligibility from the same primitives. A conversion
+that invalidates a downstream feature is rejected by the atomic session transaction. Undo/Redo and
+Save/Open use the existing Part document and unchanged intent catalogs. See `file-format.md` and
+`sketch-shared-topology-mvp8.md` for optional curved-role fields and shared point identity.
+
 ## Authority boundary
 
 ```text

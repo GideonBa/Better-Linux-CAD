@@ -1128,7 +1128,9 @@ private:
                                               sampler_point(target_sampler.value(), kept_end));
     if (arc.has_error())
       return Result<SketchModifyResult>::failure(arc.error());
-    return build(sketch, {}, {SketchModifyCurve(std::move(arc.value()))}, {}, {target.value()},
+    return build(sketch, {},
+                 {SketchModifyCurve(arc.value().with_construction(circle->construction()))}, {},
+                 {target.value()},
                  {{result_id, SketchModifyEndSelector::Start, upper_cut.cutter_entity,
                    upper_cut.cutter_endpoint},
                   {result_id, SketchModifyEndSelector::End, lower_cut.cutter_entity,
@@ -1435,14 +1437,16 @@ private:
                                                    sampler_point(*sampler, to));
       if (result.has_error())
         return Result<SketchModifyCurve>::failure(result.error());
-      return Result<SketchModifyCurve>::success(std::move(result.value()));
+      return Result<SketchModifyCurve>::success(
+          result.value().with_construction(arc->construction()));
     }
     if (const auto* spline = sketch.find_spline_segment(id)) {
       const auto curve = spline->curve().interval(from, to);
       auto result = SplineSegment::create_cubic_bezier(std::move(new_id), curve.poles[0],
           curve.poles[1], curve.poles[2], curve.poles[3], curve.weights);
       if (!result) return Result<SketchModifyCurve>::failure(result.error());
-      return Result<SketchModifyCurve>::success(std::move(result.value()));
+      return Result<SketchModifyCurve>::success(
+          result.value().with_construction(spline->construction()));
     }
     return Result<SketchModifyCurve>::failure(
         Error::validation(id.value(), "subcurve target must be a line, arc, or spline"));
@@ -1472,7 +1476,8 @@ private:
                                                    support_point(*sampler, hi));
       if (result.has_error())
         return Result<SketchModifyCurve>::failure(result.error());
-      return Result<SketchModifyCurve>::success(std::move(result.value()));
+      return Result<SketchModifyCurve>::success(
+          result.value().with_construction(arc->construction()));
     }
     return Result<SketchModifyCurve>::failure(
         Error::validation(id.value(), "extend target must be a line or arc"));
@@ -1497,7 +1502,9 @@ private:
     auto second = SplineSegment::create_cubic_bezier(std::move(second_id), b.poles[0], b.poles[1],
                                                     b.poles[2], b.poles[3], b.weights);
     if (!second) return Result<std::vector<detail::SketchModifyCurve>>::failure(second.error());
-    return Result<std::vector<detail::SketchModifyCurve>>::success({first.value(), second.value()});
+    return Result<std::vector<detail::SketchModifyCurve>>::success(
+        {first.value().with_construction(spline.construction()),
+         second.value().with_construction(spline.construction())});
   }
 
   [[nodiscard]] static double curve_length(const detail::CurveSampler& curve, double from,
@@ -1640,9 +1647,14 @@ private:
                        center.y + size * direction.y / length};
       auto arc = ArcSegment::create_three_point(connector, a, mid, b);
       if (!arc) return Result<SketchModifyResult>::failure(arc.error());
-      replacements.push_back(arc.value());
+      replacements.push_back(arc.value().with_construction(
+          sketch.curve_is_construction(first_id) && sketch.curve_is_construction(second_id)));
     } else {
-      auto line = LineSegment::create(connector, a, b);
+      auto line = LineSegment::create(connector, a, b,
+                                      sketch.curve_is_construction(first_id) &&
+                                              sketch.curve_is_construction(second_id)
+                                          ? SketchLineRole::Construction
+                                          : SketchLineRole::Geometry);
       if (!line) return Result<SketchModifyResult>::failure(line.error());
       replacements.push_back(line.value());
     }
@@ -1741,10 +1753,12 @@ private:
                                                     mid, second_point);
       if (created.has_error())
         return Result<SketchModifyResult>::failure(created.error());
-      arc = std::move(created.value());
+      arc = created.value().with_construction(first->construction() && second->construction());
     } else {
-      auto created =
-          LineSegment::create(corner_id(sketch, "line.chamfer."), first_point, second_point);
+      auto created = LineSegment::create(
+          corner_id(sketch, "line.chamfer."), first_point, second_point,
+          first->construction() && second->construction() ? SketchLineRole::Construction
+                                                          : SketchLineRole::Geometry);
       if (created.has_error())
         return Result<SketchModifyResult>::failure(created.error());
       chamfer_line = std::move(created.value());

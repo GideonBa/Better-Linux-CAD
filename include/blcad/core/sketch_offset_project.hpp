@@ -103,7 +103,7 @@ public:
       if (!curve)
         return Result<SketchOffsetProjectResult>::failure(curve.error());
       Sketch candidate = source;
-      auto added = candidate.add_entity(std::move(curve.value()));
+      auto added = candidate.add_entity(curve.value().with_construction(arc->construction()));
       if (!added)
         return Result<SketchOffsetProjectResult>::failure(added.error());
       return Result<SketchOffsetProjectResult>::success({std::move(candidate), {id}});

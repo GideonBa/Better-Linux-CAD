@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blcad/core/part_document.hpp"
+#include "blcad/core/sketch_profile_roles.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -29,14 +30,14 @@ resolve_rectangular_extrude_profile(const PartDocument& document, const Feature&
       feature.extrude_intent().taper_angle_deg().value_or(0.0) != 0.0)
     return fail();
   const auto* sketch = document.find_sketch(feature.input_sketch());
-  if (!sketch || (!feature.profile() && sketch->profile_count() != 1U))
+  if (!sketch || (!feature.profile() && sketch_geometry_profile_count(*sketch) != 1U))
     return fail();
   const RectangleProfile* rectangle =
-      feature.profile()
-          ? sketch->find_rectangle_profile(*feature.profile())
-          : (sketch->rectangle_profiles().size() == 1U ? &sketch->rectangle_profiles().front()
-                                                       : nullptr);
+      feature.profile() ? sketch->find_rectangle_profile(*feature.profile())
+                        : sole_sketch_geometry_profile(*sketch, sketch->rectangle_profiles());
   if (rectangle) {
+    if (rectangle->construction())
+      return fail();
     const auto* width = document.find_parameter(rectangle->width_parameter());
     const auto* height = document.find_parameter(rectangle->height_parameter());
     if (!width || !height || width->type() != ParameterType::Length ||
@@ -47,9 +48,8 @@ resolve_rectangular_extrude_profile(const PartDocument& document, const Feature&
         {rectangle->center(), width->value().millimeters(), height->value().millimeters()});
   }
   const ClosedProfile* profile =
-      feature.profile()
-          ? sketch->find_closed_profile(*feature.profile())
-          : (sketch->closed_profiles().size() == 1U ? &sketch->closed_profiles().front() : nullptr);
+      feature.profile() ? sketch->find_closed_profile(*feature.profile())
+                        : sole_sketch_geometry_profile(*sketch, sketch->closed_profiles());
   if (!profile || profile->line_segments().size() != 4U)
     return fail();
   auto vertices = sketch->closed_profile_vertices(*profile);

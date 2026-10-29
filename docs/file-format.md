@@ -12,6 +12,15 @@ Sketch `line_segments[]` optionally stores `role`: `geometry` (default when miss
 sketch entities for constraints and transformations, and are excluded from automatic profile
 inference. The role survives save/open, solver materialization, splitting and copying.
 
+The issue #109 follow-up adds optional boolean `construction` to `arc_segments[]`,
+`spline_segments[]`, `circle_profiles[]` and `rectangle_profiles[]`. Missing means false; the writer
+omits false to retain historical canonical JSON. Non-boolean values fail loading. Exact poles,
+rational weights, three-point arcs, profile parameters and ids are unchanged by role conversion.
+Closed/arc-closed/composite containers retain their original curve membership; eligibility derives
+from the member roles rather than a duplicated container flag. Construction geometry remains
+available to dimensions, constraints and references, but cannot bound an explicit solid profile or
+an implicit hole. No transient selection, role-change preview or resolved geometry is serialized.
+
 ## Interleaved Part feature order — 2026-10-25
 
 Part JSON optionally includes `feature_order`, an ordered array of executable Feature and

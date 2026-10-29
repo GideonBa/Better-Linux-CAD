@@ -777,16 +777,22 @@ reference_generated_line_from_json(const json& line_json) {
 }
 
 [[nodiscard]] Result<ArcSegment> arc_segment_from_json(const json& arc_json) {
-  return ArcSegment::create_three_point(
+  auto arc = ArcSegment::create_three_point(
       SketchEntityId(arc_json.at("id").get<std::string>()), point2_from_json(arc_json.at("start")),
       point2_from_json(arc_json.at("mid")), point2_from_json(arc_json.at("end")));
+  if (arc)
+    arc.value() = arc.value().with_construction(arc_json.value("construction", false));
+  return arc;
 }
 
 [[nodiscard]] json arc_segment_to_json(const ArcSegment& arc) {
-  return json{{"id", arc.id().value()},
-              {"start", point2_to_json(arc.start())},
-              {"mid", point2_to_json(arc.mid())},
-              {"end", point2_to_json(arc.end())}};
+  json value{{"id", arc.id().value()},
+             {"start", point2_to_json(arc.start())},
+             {"mid", point2_to_json(arc.mid())},
+             {"end", point2_to_json(arc.end())}};
+  if (arc.construction())
+    value["construction"] = true;
+  return value;
 }
 
 [[nodiscard]] Result<SplineSegment> spline_segment_from_json(const json& spline_json) {
@@ -800,12 +806,15 @@ reference_generated_line_from_json(const json& line_json) {
         spline_json.at("weights").size() != 4U)) ||
       (kind == "cubic_bezier" && spline_json.contains("weights")))
     return Result<SplineSegment>::failure(json_error("rational cubic requires exactly four weights"));
-  return SplineSegment::create_cubic_bezier(
+  auto spline = SplineSegment::create_cubic_bezier(
       SketchEntityId(spline_json.at("id").get<std::string>()),
       point2_from_json(spline_json.at("start")), point2_from_json(spline_json.at("control1")),
       point2_from_json(spline_json.at("control2")), point2_from_json(spline_json.at("end")),
       kind == "rational_cubic_bezier" ? spline_json.at("weights").get<std::array<double, 4>>()
                                       : std::array<double, 4>{1, 1, 1, 1});
+  if (spline)
+    spline.value() = spline.value().with_construction(spline_json.value("construction", false));
+  return spline;
 }
 
 [[nodiscard]] json spline_segment_to_json(const SplineSegment& spline) {
@@ -816,6 +825,8 @@ reference_generated_line_from_json(const json& line_json) {
               {"control2", point2_to_json(spline.control2())},
               {"end", point2_to_json(spline.end())}};
   if (spline.rational()) value["weights"] = spline.weights();
+  if (spline.construction())
+    value["construction"] = true;
   return value;
 }
 
@@ -1120,7 +1131,8 @@ driving_dimension_from_json(const json& dimension_json) {
         point2_from_json(rectangle_json.at("center")));
     if (rectangle.has_error())
       return Result<Sketch>::failure(rectangle.error());
-    auto added = sketch.value().add_profile(rectangle.value());
+    auto added = sketch.value().add_profile(
+        rectangle.value().with_construction(rectangle_json.value("construction", false)));
     if (added.has_error())
       return Result<Sketch>::failure(added.error());
   }
@@ -1131,7 +1143,8 @@ driving_dimension_from_json(const json& dimension_json) {
                               point2_from_json(circle_json.at("center")));
     if (circle.has_error())
       return Result<Sketch>::failure(circle.error());
-    auto added = sketch.value().add_profile(circle.value());
+    auto added = sketch.value().add_profile(
+        circle.value().with_construction(circle_json.value("construction", false)));
     if (added.has_error())
       return Result<Sketch>::failure(added.error());
   }
@@ -3830,17 +3843,23 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       sketch_json["geometric_constraints"].push_back(geometric_constraint_to_json(constraint));
     for (const auto& dimension : sketch.driving_dimensions())
       sketch_json["driving_dimensions"].push_back(driving_dimension_to_json(dimension));
-    for (const auto& profile : sketch.rectangle_profiles())
-      sketch_json["rectangle_profiles"].push_back(
-          json{{"id", profile.id().value()},
-               {"center", point2_to_json(profile.center())},
-               {"width_parameter", profile.width_parameter().value()},
-               {"height_parameter", profile.height_parameter().value()}});
-    for (const auto& profile : sketch.circle_profiles())
-      sketch_json["circle_profiles"].push_back(
-          json{{"id", profile.id().value()},
-               {"center", point2_to_json(profile.center())},
-               {"diameter_parameter", profile.diameter_parameter().value()}});
+    for (const auto& profile : sketch.rectangle_profiles()) {
+      json value{{"id", profile.id().value()},
+                 {"center", point2_to_json(profile.center())},
+                 {"width_parameter", profile.width_parameter().value()},
+                 {"height_parameter", profile.height_parameter().value()}};
+      if (profile.construction())
+        value["construction"] = true;
+      sketch_json["rectangle_profiles"].push_back(std::move(value));
+    }
+    for (const auto& profile : sketch.circle_profiles()) {
+      json value{{"id", profile.id().value()},
+                 {"center", point2_to_json(profile.center())},
+                 {"diameter_parameter", profile.diameter_parameter().value()}};
+      if (profile.construction())
+        value["construction"] = true;
+      sketch_json["circle_profiles"].push_back(std::move(value));
+    }
     for (const auto& profile : sketch.closed_profiles())
       sketch_json["closed_profiles"].push_back(
           json{{"id", profile.id().value()},

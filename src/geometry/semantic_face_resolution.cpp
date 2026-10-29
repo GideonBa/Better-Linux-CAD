@@ -151,6 +151,9 @@ expected_cylinder(const PartDocument& document, const ShapeCache& cache,
   if (sketch == nullptr || profile == nullptr)
     return Result<ExpectedCylinder>::failure(
         face_error(id, concat("cylindrical ", feature_label, " face profile must exist")));
+  if (profile->construction())
+    return Result<ExpectedCylinder>::failure(face_error(
+        id, "Construction circle cannot supply solid topology; convert it back to geometry"));
   const Parameter* diameter = document.find_parameter(profile->diameter_parameter());
   if (diameter == nullptr || diameter->type() != ParameterType::Length)
     return Result<ExpectedCylinder>::failure(face_error(
