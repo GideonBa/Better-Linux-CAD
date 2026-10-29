@@ -1727,6 +1727,10 @@ Application/library implementation is unchanged by this acceptance slice. Exact 
 locations and final numbered-documentation inventory live in the STEP sequence and development setup.
 Final Shell inventory passes **3 / 313** after completion advances through Block 143.
 
+Delivery: [PR #135](https://github.com/GideonBa/Better-Linux-CAD/pull/135), verified implementation
+commit `220d030`. All runtime fingerprints remain unchanged. This delivery completes the requested
+work through Block 143; later implementation remains unassigned.
+
 ## Next planning boundary — Block 144 (unassigned; not started)
 
 STEP Import MVP-10 ends at Block 143. The next phase has no assigned implementation scope or tag.

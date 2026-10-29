@@ -837,6 +837,10 @@ Final Shell inventory passes **3 / 313** after the numbered plan records complet
 The first STEP Import MVP is complete through Block 143. Subsequent phases remain unassigned;
 the numbered successor 144 is a future planning boundary, with no implementation started here.
 
+Delivery: [PR #135](https://github.com/GideonBa/Better-Linux-CAD/pull/135), verified implementation
+commit `220d030`. All runtime fingerprints remain unchanged. This delivery completes the requested
+work through Block 143; later implementation remains unassigned.
+
 ## Explicit deferrals after Block 143
 
 ```text

@@ -2665,5 +2665,8 @@ negative matrix to actual tests. Reused Block-142 malformed-structure fixtures r
 regression; their pure candidate construction is distinguished from session/cache/output failure
 transactions. All runtime inputs remain the final **978-file** freeze recorded above.
 
-STEP Import MVP-10 is complete through Block 143. The reviewed changes are ready for one focused
-commit/PR and a regular protected merge. Final delivery stops at this requested boundary.
+STEP Import MVP-10 is complete through Block 143. Final delivery stops at this requested boundary.
+
+Delivery: [PR #135](https://github.com/GideonBa/Better-Linux-CAD/pull/135), verified implementation
+commit `220d030`. All runtime fingerprints remain unchanged. The branch contains only this
+integrated acceptance slice and its documentation; later implementation remains unassigned.
