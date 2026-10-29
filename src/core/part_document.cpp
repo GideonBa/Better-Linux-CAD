@@ -473,6 +473,14 @@ validate_generated_vertex_reference(const PartDocument& document,
     auto valid = validate_part_feature_input_reference(document, **face);
     if (valid.has_error())
       return valid;
+    if (extent.mode() == ExtrudeExtentMode::Between)
+      if (const auto* imported = std::get_if<ImportedTopologyReference>(&(**face).source())) {
+        const auto* catalog = document.find_imported_topology_catalog(imported->catalog());
+        const auto* entry = catalog ? catalog->find(imported->entry()) : nullptr;
+        if (!entry || entry->descriptor.geometry != ImportedGeometryClass::Plane)
+          return Result<std::size_t>::failure(Error::validation(
+              feature.id().value(), "between extent requires planar imported faces"));
+      }
   }
   if (feature.extrude_intent().thin().has_value()) {
     const auto& thin = *feature.extrude_intent().thin();

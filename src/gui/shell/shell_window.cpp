@@ -1249,11 +1249,15 @@ bool ShellWindow::redo() {
 void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& selection) {
   if (synchronizing_selection_)
     return;
+  if (!selection && step_import_tools_)
+    step_import_tools_->clear_selected_reference();
   synchronize_selection_filter();
   session_.selection().clear();
   selected_semantic_id_.clear();
   bool selected_feature_profile = false;
   if (selection && session_.selection().add(*selection)) {
+    if (step_import_tools_)
+      (void)step_import_tools_->accept_selection(*selection);
     if (hole_tools_)
       (void)hole_tools_->accept_selection(*selection);
     if (construction_tools_)

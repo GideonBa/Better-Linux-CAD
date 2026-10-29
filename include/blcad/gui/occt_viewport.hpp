@@ -80,6 +80,12 @@ public:
                        std::vector<std::string> replaced_bodies = {});
   [[nodiscard]] std::size_t feature_preview_count() const noexcept;
   void clear_feature_preview();
+  // Disposable semantic faces/edges/vertices layered over a read-only preview.
+  // Geometry supplies exact shapes; picking returns only BLCAD semantic ids.
+  [[nodiscard]] Result<std::size_t>
+  set_preview_selection_targets(std::vector<geometry::ViewportSceneItem> targets);
+  void clear_preview_selection_targets();
+  [[nodiscard]] std::size_t preview_selection_target_count() const noexcept;
   [[nodiscard]] bool feature_preview_replaces(std::string_view semantic_id) const noexcept;
   void clear_scene();
   void set_display_mode(GuiViewportDisplayMode mode);
@@ -123,7 +129,8 @@ public:
   void set_context_menu_callback(std::function<void(QPoint)> callback);
   void fit_all();
   // Fit only disposable preview geometry, excluding authored origin and datum
-  // presentations. The task owner restores its saved camera when clearing it.
+  // presentations. Standard views retain this focus until cleared or Fit All.
+  // The task owner restores its saved camera when clearing the preview.
   void fit_feature_preview();
   // Explicit presentation notification for shell-owned model-space overlays.
   void set_view_changed_callback(std::function<void()> callback);

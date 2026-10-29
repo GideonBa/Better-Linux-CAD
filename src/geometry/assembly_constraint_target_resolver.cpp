@@ -5,6 +5,7 @@
 #include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 
 #include <algorithm>
 #include <array>
@@ -597,6 +598,41 @@ AssemblyConstraintTargetResolver::resolve_geometric(const Project& project,
   auto context = resolve_target_context(project, target);
   if (context.has_error()) {
     return Result<AssemblyResolvedGeometricTarget>::failure(context.error());
+  }
+
+  if (is_imported_topology_target_spelling(target.semantic_reference())) {
+    auto identity = parse_imported_topology_target_spelling(target.semantic_reference());
+    if (!identity)
+      return Result<AssemblyResolvedGeometricTarget>::failure(identity.error());
+    if (import_context_ == nullptr)
+      return Result<AssemblyResolvedGeometricTarget>::failure(
+          validation_error(target.semantic_reference(),
+                           "imported target requires an explicit verified source context"));
+    auto recovered = import_context_->resolve(*context.value().part, identity.value());
+    if (!recovered)
+      return Result<AssemblyResolvedGeometricTarget>::failure(recovered.error());
+    if (!recovered.value().descriptor)
+      return Result<AssemblyResolvedGeometricTarget>::failure(validation_error(
+          target.semantic_reference(), "imported target has no resolved geometry descriptor"));
+    const auto& descriptor = *recovered.value().descriptor;
+    auto kind = imported_topology_assembly_source_kind(descriptor);
+    auto analytic = imported_topology_analytic_descriptor(descriptor);
+    if (!kind)
+      return Result<AssemblyResolvedGeometricTarget>::failure(kind.error());
+    if (!analytic)
+      return Result<AssemblyResolvedGeometricTarget>::failure(analytic.error());
+    AssemblyGeometricTargetSourceMetadata metadata;
+    metadata.referenced_part_document = context.value().part->id();
+    metadata.imported_topology = identity.value();
+    return validated_geometric_target(AssemblyResolvedGeometricTarget{
+        AssemblyLocalGeometricTargetEndpointIdentity{target.component_instance(),
+                                                     target.semantic_reference()},
+        kind.value(),
+        metadata,
+        analytic.value(),
+        assembly_geometric_target_capabilities(kind.value()),
+        AssemblyGeometricTargetCoordinateSpace::ComponentLocal,
+        {context.value().component->transform()}});
   }
 
   if (is_assembly_reference_target_spelling(target.semantic_reference())) {

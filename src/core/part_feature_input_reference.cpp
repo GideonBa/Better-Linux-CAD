@@ -126,6 +126,8 @@ std::string_view to_string(PartFeatureInputSourceKind source_kind) noexcept {
     return "semantic_circular_edge";
   case PartFeatureInputSourceKind::ResultEdge:
     return "result_edge";
+  case PartFeatureInputSourceKind::ImportedTopology:
+    return "imported_topology";
   case PartFeatureInputSourceKind::Body:
     return "body";
   }
@@ -162,6 +164,54 @@ bool part_feature_input_role_accepts(PartFeatureInputRole role,
     return capability == PartFeatureInputCapability::Body;
   }
   return false;
+}
+
+Result<AxisReference> AxisReference::create_imported(PartFeatureInputRole role,
+                                                     ImportedTopologyReference reference) {
+  const auto capability = reference.capability() == ImportedTopologyCapability::Axis
+                              ? PartFeatureInputCapability::Axis
+                              : PartFeatureInputCapability::Line;
+  if (reference.capability() != ImportedTopologyCapability::Axis &&
+      reference.capability() != ImportedTopologyCapability::Line)
+    return Result<AxisReference>::failure(validation_error(
+        reference.source_node_id(), "imported axis input requires Axis or Line capability"));
+  auto valid = validate_role(role, capability, reference.source_node_id());
+  if (!valid)
+    return Result<AxisReference>::failure(valid.error());
+  return Result<AxisReference>::success(AxisReference(role, capability, std::move(reference)));
+}
+
+Result<PlaneReference> PlaneReference::create_imported(PartFeatureInputRole role,
+                                                       ImportedTopologyReference reference) {
+  if (reference.capability() != ImportedTopologyCapability::Plane)
+    return Result<PlaneReference>::failure(
+        validation_error(reference.source_node_id(), "imported input requires Plane capability"));
+  auto valid = validate_role(role, PartFeatureInputCapability::Plane, reference.source_node_id());
+  if (!valid)
+    return Result<PlaneReference>::failure(valid.error());
+  return Result<PlaneReference>::success(PlaneReference(role, std::move(reference)));
+}
+
+Result<FaceReference> FaceReference::create_imported(PartFeatureInputRole role,
+                                                     ImportedTopologyReference reference) {
+  if (reference.capability() != ImportedTopologyCapability::Face)
+    return Result<FaceReference>::failure(
+        validation_error(reference.source_node_id(), "imported input requires Face capability"));
+  auto valid = validate_role(role, PartFeatureInputCapability::Face, reference.source_node_id());
+  if (!valid)
+    return Result<FaceReference>::failure(valid.error());
+  return Result<FaceReference>::success(FaceReference(role, std::move(reference)));
+}
+
+Result<EdgeReference> EdgeReference::create_imported(PartFeatureInputRole role,
+                                                     ImportedTopologyReference reference) {
+  if (reference.capability() != ImportedTopologyCapability::Edge)
+    return Result<EdgeReference>::failure(
+        validation_error(reference.source_node_id(), "imported input requires Edge capability"));
+  auto valid = validate_role(role, PartFeatureInputCapability::Edge, reference.source_node_id());
+  if (!valid)
+    return Result<EdgeReference>::failure(valid.error());
+  return Result<EdgeReference>::success(EdgeReference(role, std::move(reference)));
 }
 
 Result<ProfileRegionReference> ProfileRegionReference::create(SketchId sketch, ProfileId profile,
@@ -274,6 +324,8 @@ const AxisReferenceSource& AxisReference::source() const noexcept {
   return source_;
 }
 PartFeatureInputSourceKind AxisReference::source_kind() const noexcept {
+  if (std::holds_alternative<ImportedTopologyReference>(source_))
+    return PartFeatureInputSourceKind::ImportedTopology;
   if (std::holds_alternative<SketchLineReference>(source_))
     return PartFeatureInputSourceKind::SketchLine;
   if (std::holds_alternative<DatumAxisId>(source_))
@@ -292,6 +344,8 @@ std::string AxisReference::source_node_id() const {
           return source.value();
         else if constexpr (std::is_same_v<T, SketchLineReference>)
           return source.sketch().value();
+        else if constexpr (std::is_same_v<T, ImportedTopologyReference>)
+          return source.source_node_id();
         else
           return source.source_feature().value();
       },
@@ -338,6 +392,8 @@ const PlaneReferenceSource& PlaneReference::source() const noexcept {
   return source_;
 }
 PartFeatureInputSourceKind PlaneReference::source_kind() const noexcept {
+  if (std::holds_alternative<ImportedTopologyReference>(source_))
+    return PartFeatureInputSourceKind::ImportedTopology;
   if (std::holds_alternative<DatumPlaneId>(source_))
     return PartFeatureInputSourceKind::DatumPlane;
   if (std::holds_alternative<ConstructionPlaneId>(source_))
@@ -348,7 +404,9 @@ std::string PlaneReference::source_node_id() const {
   return std::visit(
       [](const auto& source) -> std::string {
         using T = std::decay_t<decltype(source)>;
-        if constexpr (std::is_same_v<T, SemanticFaceReference>)
+        if constexpr (std::is_same_v<T, ImportedTopologyReference>)
+          return source.source_node_id();
+        else if constexpr (std::is_same_v<T, SemanticFaceReference>)
           return source.source_feature().value();
         else
           return source.value();
@@ -382,12 +440,21 @@ const FaceReferenceSource& FaceReference::source() const noexcept {
   return source_;
 }
 PartFeatureInputSourceKind FaceReference::source_kind() const noexcept {
+  if (std::holds_alternative<ImportedTopologyReference>(source_))
+    return PartFeatureInputSourceKind::ImportedTopology;
   return std::holds_alternative<SemanticFaceReference>(source_)
              ? PartFeatureInputSourceKind::SemanticPlanarFace
              : PartFeatureInputSourceKind::SemanticCylindricalFace;
 }
 std::string FaceReference::source_node_id() const {
-  return std::visit([](const auto& source) { return source.source_feature().value(); }, source_);
+  return std::visit(
+      [](const auto& source) {
+        if constexpr (std::is_same_v<std::decay_t<decltype(source)>, ImportedTopologyReference>)
+          return source.source_node_id();
+        else
+          return source.source_feature().value();
+      },
+      source_);
 }
 
 ResultEdgeReference::ResultEdgeReference(FeatureId feature, int type, double length,
@@ -467,6 +534,8 @@ const EdgeReferenceSource& EdgeReference::source() const noexcept {
   return source_;
 }
 PartFeatureInputSourceKind EdgeReference::source_kind() const noexcept {
+  if (std::holds_alternative<ImportedTopologyReference>(source_))
+    return PartFeatureInputSourceKind::ImportedTopology;
   if (std::holds_alternative<SemanticEdgeReference>(source_))
     return PartFeatureInputSourceKind::SemanticLinearEdge;
   return std::holds_alternative<SemanticCircularEdgeReference>(source_)
@@ -474,7 +543,14 @@ PartFeatureInputSourceKind EdgeReference::source_kind() const noexcept {
              : PartFeatureInputSourceKind::ResultEdge;
 }
 std::string EdgeReference::source_node_id() const {
-  return std::visit([](const auto& source) { return source.source_feature().value(); }, source_);
+  return std::visit(
+      [](const auto& source) {
+        if constexpr (std::is_same_v<std::decay_t<decltype(source)>, ImportedTopologyReference>)
+          return source.source_node_id();
+        else
+          return source.source_feature().value();
+      },
+      source_);
 }
 
 BodyReference::BodyReference(PartFeatureInputRole role, BodyId body)
@@ -550,7 +626,9 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
   return std::visit(
       [&](const auto& source) -> Result<std::size_t> {
         using T = std::decay_t<decltype(source)>;
-        if constexpr (std::is_same_v<T, DatumAxisId>) {
+        if constexpr (std::is_same_v<T, ImportedTopologyReference>)
+          return validate_imported_topology_reference(document, source);
+        else if constexpr (std::is_same_v<T, DatumAxisId>) {
           return document.find_datum_axis(source) != nullptr
                      ? Result<std::size_t>::success(1U)
                      : Result<std::size_t>::failure(
@@ -577,7 +655,9 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
   return std::visit(
       [&](const auto& source) -> Result<std::size_t> {
         using T = std::decay_t<decltype(source)>;
-        if constexpr (std::is_same_v<T, DatumPlaneId>)
+        if constexpr (std::is_same_v<T, ImportedTopologyReference>)
+          return validate_imported_topology_reference(document, source);
+        else if constexpr (std::is_same_v<T, DatumPlaneId>)
           return document.find_datum_plane(source) != nullptr
                      ? Result<std::size_t>::success(1U)
                      : Result<std::size_t>::failure(
@@ -598,7 +678,9 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
   return std::visit(
       [&](const auto& source) -> Result<std::size_t> {
         using T = std::decay_t<decltype(source)>;
-        if constexpr (std::is_same_v<T, SemanticFaceReference>)
+        if constexpr (std::is_same_v<T, ImportedTopologyReference>)
+          return validate_imported_topology_reference(document, source);
+        else if constexpr (std::is_same_v<T, SemanticFaceReference>)
           return validate_feature_source(document, source.source_feature(), "semantic planar face");
         else
           return validate_generated_topology_reference(document,
@@ -612,7 +694,9 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
   return std::visit(
       [&](const auto& source) -> Result<std::size_t> {
         using T = std::decay_t<decltype(source)>;
-        if constexpr (std::is_same_v<T, ResultEdgeReference>) {
+        if constexpr (std::is_same_v<T, ImportedTopologyReference>)
+          return validate_imported_topology_reference(document, source);
+        else if constexpr (std::is_same_v<T, ResultEdgeReference>) {
           const auto& id = source.source_feature();
           if (document.find_feature(id) || document.find_revolve_feature(id) ||
               document.find_sweep_feature(id) || document.find_loft_feature(id) ||

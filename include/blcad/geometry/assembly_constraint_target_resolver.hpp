@@ -10,6 +10,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct ComponentLocalPlanarDescriptor {
   Point3 origin;
   Vector3 x_axis;
@@ -73,6 +75,9 @@ struct ResolvedAssemblyInsertConstraintTarget {
 // solver capability. Existing family-specific methods remain compatibility APIs.
 class AssemblyConstraintTargetResolver {
 public:
+  AssemblyConstraintTargetResolver() = default;
+  explicit AssemblyConstraintTargetResolver(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyResolvedGeometricTarget>
   resolve_geometric(const Project& project, const AssemblyConstraintTarget& target) const;
 
@@ -84,6 +89,9 @@ public:
 
   [[nodiscard]] Result<ResolvedAssemblyInsertConstraintTarget>
   resolve_insert(const Project& project, const AssemblyConstraintTarget& target) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

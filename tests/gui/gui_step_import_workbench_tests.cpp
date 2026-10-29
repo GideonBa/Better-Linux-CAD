@@ -1,6 +1,7 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/geometry/step_exporter.hpp"
+#include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/gui/gui_analysis_export_workbench.hpp"
 #include "blcad/gui/gui_assembly_workbench.hpp"
 #include "blcad/gui/gui_document_browser.hpp"
@@ -12,6 +13,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+
+#include <cmath>
 
 using namespace blcad;
 using namespace blcad::gui;
@@ -59,6 +62,51 @@ void write_geometry(const QString& path, double width = 20) {
       checked(Quantity::length_mm(width)), checked(Quantity::length_mm(10)),
       checked(Quantity::length_mm(5))));
   REQUIRE(geometry::StepExporter{}.write_step(shape, path.toStdString()));
+}
+void write_product_geometry(const QString& path,
+                            const std::vector<std::pair<double, double>>& sizes) {
+  auto part = checked(PartDocument::create(DocumentId("supplier.products"), "Supplier products"));
+  REQUIRE(part.add_datum_plane(checked(DatumPlane::xy())));
+  for (std::size_t i = 0; i < sizes.size(); ++i) {
+    const auto suffix = std::to_string(i);
+    for (const auto& [name, length] : std::vector<std::pair<std::string, double>>{
+             {"width.", sizes[i].first}, {"height.", 10}, {"depth.", sizes[i].second}})
+      REQUIRE(part.add_parameter(checked(Parameter::create_length(
+          ParameterId(name + suffix), name + suffix, checked(Quantity::length_mm(length))))));
+    const BodyId body("body." + suffix);
+    REQUIRE(part.add_body(checked(Body::create(body, "Product " + suffix, BodyKind::Solid))));
+    auto sketch = checked(Sketch::create(SketchId("sketch." + suffix), "Profile " + suffix,
+                                         DatumPlaneId("datum.xy")));
+    REQUIRE(sketch.add_profile(checked(RectangleProfile::create(ProfileId("profile." + suffix),
+                                                                ParameterId("width." + suffix),
+                                                                ParameterId("height." + suffix)))));
+    REQUIRE(part.add_sketch(sketch));
+    auto feature = checked(Feature::create_additive_extrude(FeatureId("feature." + suffix),
+                                                            "Extrusion " + suffix, sketch.id(),
+                                                            ParameterId("depth." + suffix)));
+    feature = checked(feature.with_body_result_context(checked(
+        FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody, std::nullopt, body))));
+    REQUIRE(part.add_feature(feature));
+  }
+  auto cache = checked(geometry::ShapeCache::create(ShapeCacheId("supplier.products")));
+  REQUIRE(geometry::GeometryRecomputeExecutor{}.execute_document(part, cache));
+  const auto exported =
+      checked(geometry::StepExporter{}.write_part_step(part, cache, path.toStdString()));
+  REQUIRE(exported.exported_body_count == sizes.size());
+}
+std::size_t product_index(const geometry::StepImportGeometry& imported, double width,
+                          double depth) {
+  for (std::size_t index = 0; index < imported.products.size(); ++index) {
+    const auto& product = imported.products[index];
+    if (!product.is_assembly && product.bodies.size() == 1) {
+      const auto& bounds = product.bodies.front().bounds_mm;
+      if (std::abs(bounds[3] - bounds[0] - width) < 1e-6 &&
+          std::abs(bounds[5] - bounds[2] - depth) < 1e-6)
+        return index;
+    }
+  }
+  FAIL("Expected supplier product dimensions were not transferred");
+  return 0;
 }
 } // namespace
 
@@ -179,6 +227,207 @@ TEST_CASE(
   CHECK_FALSE(workbench.inspect_geometry(session, registry.source.id()));
   CHECK(snapshot(session) == registered);
   CHECK(session.undo_label() == "Register STEP source");
+}
+
+TEST_CASE("Imported topology capture is an explicit atomic catalog transaction shared by Part and "
+          "Project",
+          "[gui][step-import-workbench][step-import-topology-workbench]") {
+  const bool project = GENERATE(false, true);
+  GuiDocumentSession session;
+  create(session, project);
+  QTemporaryDir directory;
+  REQUIRE(session.save_as(directory.filePath(filename(project)).toStdString()));
+  write_geometry(directory.filePath("source.step"));
+  const auto asset = bytes(directory.filePath("source.step"));
+  const GuiStepImportWorkbench workbench;
+  const auto registry = checked(
+      workbench.prepare_register(session, "Supplier", "source.step", StepImportMode::Reference));
+  REQUIRE(workbench.apply(session, registry));
+  REQUIRE(session.save());
+  const auto before = snapshot(session);
+  const auto undo = std::string(session.undo_label());
+  auto preview = checked(workbench.prepare_topology(session, registry.source.id(), 0));
+  CHECK_FALSE(preview.accepted_catalog);
+  CHECK(snapshot(session) == before);
+  CHECK_FALSE(session.dirty());
+  CHECK(session.undo_label() == undo);
+  REQUIRE_FALSE(preview.catalog.entries().empty());
+  for (const auto& entry : preview.catalog.entries()) {
+    const auto* resolved = preview.recovery.find(entry.id);
+    REQUIRE(resolved);
+    CHECK(resolved->status == ImportedTopologyRecoveryStatus::Resolved);
+    REQUIRE_FALSE(resolved->shape.empty());
+    REQUIRE_FALSE(resolved->capabilities.empty());
+    auto reference = checked(ImportedTopologyReference::create(preview.catalog.id(), entry.id,
+                                                               resolved->capabilities.front()));
+    CHECK(geometry::StepImportTopology{}.resolve(preview.recovery, reference));
+    const auto spelling = checked(make_imported_topology_target_spelling(reference));
+    CHECK(checked(parse_imported_topology_target_spelling(spelling)) == reference);
+  }
+  auto forged = preview;
+  forged.captured_product_index = 9999;
+  CHECK_FALSE(workbench.apply_topology(session, forged));
+  CHECK(snapshot(session) == before);
+  REQUIRE(workbench.apply_topology(session, preview));
+  const auto accepted = snapshot(session);
+  CHECK(accepted != before);
+  CHECK(session.undo_label() == "Capture imported topology catalog");
+  CHECK_FALSE(workbench.apply_topology(session, preview));
+  CHECK_FALSE(workbench.prepare_topology(session, registry.source.id(), 0));
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == before);
+  REQUIRE(session.redo());
+  CHECK(snapshot(session) == accepted);
+  REQUIRE(session.save());
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(session.file_path()));
+  CHECK(snapshot(reopened) == accepted);
+  const auto restored = checked(workbench.inspect_topology(reopened, preview.catalog.id()));
+  CHECK(restored.accepted_catalog);
+  CHECK(restored.catalog == preview.catalog);
+  CHECK(checked(workbench.apply_topology(reopened, restored)) == 0);
+  CHECK_FALSE(reopened.dirty());
+  CHECK_FALSE(reopened.can_undo());
+  const auto remove = [&](auto& document) {
+    return document.remove_imported_topology_catalog(preview.catalog.id());
+  };
+  REQUIRE((project ? reopened.commit_project_transaction("Remove catalog", remove)
+                   : reopened.commit_part_transaction("Remove catalog", remove)));
+  REQUIRE(reopened.undo());
+  REQUIRE(reopened.can_redo());
+  const auto unchanged = checked(workbench.inspect_topology(reopened, preview.catalog.id()));
+  CHECK(checked(workbench.apply_topology(reopened, unchanged)) == 0);
+  CHECK(reopened.can_redo());
+  CHECK(snapshot(reopened) == accepted);
+  CHECK(bytes(directory.filePath("source.step")) == asset);
+}
+
+TEST_CASE("Imported topology Apply rejects an edited public preview targeting an already captured "
+          "product",
+          "[gui][step-import-workbench][step-import-topology-workbench][step-import-topology-"
+          "duplicate]") {
+  GuiDocumentSession session;
+  create(session, false);
+  QTemporaryDir directory;
+  REQUIRE(session.save_as(directory.filePath("products.blcad.json").toStdString()));
+  const auto path = directory.filePath("products.step");
+  write_product_geometry(path, {{20, 5}, {40, 5}});
+  const auto asset = bytes(path);
+  const GuiStepImportWorkbench workbench;
+  const auto registry = checked(
+      workbench.prepare_register(session, "Products", "products.step", StepImportMode::Reference));
+  REQUIRE(workbench.apply(session, registry));
+  const auto inspected = checked(workbench.inspect_geometry(session, registry.source.id()));
+  const auto first = product_index(inspected.geometry, 20, 5);
+  const auto second = product_index(inspected.geometry, 40, 5);
+  REQUIRE(first != second);
+  const auto captured = checked(workbench.prepare_topology(session, registry.source.id(), first));
+  REQUIRE(workbench.apply_topology(session, captured));
+  CHECK_FALSE(workbench.prepare_topology(session, registry.source.id(), first));
+  auto edited = checked(workbench.prepare_topology(session, registry.source.id(), second));
+  const auto before = snapshot(session);
+  const auto undo = std::string(session.undo_label());
+  edited.catalog = checked(geometry::StepImportTopology{}.create_catalog(
+      edited.catalog.id(), edited.inspection.geometry, first));
+  edited.recovery =
+      checked(geometry::StepImportTopology{}.recover(edited.catalog, edited.inspection.geometry));
+  edited.captured_product_index = first;
+  REQUIRE(workbench.validate_topology(session, edited));
+  CHECK_FALSE(workbench.apply_topology(session, edited));
+  CHECK(snapshot(session) == before);
+  CHECK(session.undo_label() == undo);
+  CHECK(session.part_document()->imported_topology_catalogs().size() == 1);
+  CHECK(bytes(path) == asset);
+}
+
+TEST_CASE("Ambiguous captured products do not block a different product excluded by exact product "
+          "evidence",
+          "[gui][step-import-workbench][step-import-topology-workbench][step-import-topology-"
+          "duplicate]") {
+  const bool shares_trimmed_face = GENERATE(false, true);
+  CAPTURE(shares_trimmed_face);
+  const double width = shares_trimmed_face ? 20 : 40;
+  const double depth = shares_trimmed_face ? 10 : 5;
+  GuiDocumentSession session;
+  create(session, false);
+  QTemporaryDir directory;
+  REQUIRE(session.save_as(directory.filePath("products.blcad.json").toStdString()));
+  const auto path = directory.filePath("products.step");
+  write_product_geometry(path, {{20, 5}, {20, 5}, {width, depth}});
+  const auto asset = bytes(path);
+  const GuiStepImportWorkbench workbench;
+  const auto registry = checked(
+      workbench.prepare_register(session, "Products", "products.step", StepImportMode::Reference));
+  REQUIRE(workbench.apply(session, registry));
+  const auto inspected = checked(workbench.inspect_geometry(session, registry.source.id()));
+  REQUIRE(inspected.geometry.products.size() == 3);
+  const auto repeated = product_index(inspected.geometry, 20, 5);
+  const auto distinct = product_index(inspected.geometry, width, depth);
+  const auto captured =
+      checked(workbench.prepare_topology(session, registry.source.id(), repeated));
+  bool ambiguous = false;
+  for (const auto& entry : captured.recovery.entries)
+    ambiguous = ambiguous || entry.status == ImportedTopologyRecoveryStatus::Ambiguous;
+  REQUIRE(ambiguous);
+  REQUIRE(workbench.apply_topology(session, captured));
+  const auto before = snapshot(session);
+  const auto undo = std::string(session.undo_label());
+  const auto fresh = workbench.prepare_topology(session, registry.source.id(), distinct);
+  INFO((fresh ? "prepared" : fresh.error().message()));
+  REQUIRE(fresh);
+  CHECK(snapshot(session) == before);
+  CHECK(session.undo_label() == undo);
+  REQUIRE(workbench.apply_topology(session, fresh.value()));
+  CHECK(session.part_document()->imported_topology_catalogs().size() == 2);
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == before);
+  REQUIRE(session.redo());
+  CHECK(session.part_document()->imported_topology_catalogs().size() == 2);
+  CHECK(bytes(path) == asset);
+}
+
+TEST_CASE(
+    "Imported topology preview fails stale Apply and retains baseline IDs after source refresh",
+    "[gui][step-import-workbench][step-import-topology-workbench]") {
+  GuiDocumentSession session;
+  create(session, false);
+  QTemporaryDir directory;
+  REQUIRE(session.save_as(directory.filePath("model.blcad.json").toStdString()));
+  const auto asset = directory.filePath("source.step");
+  write_geometry(asset);
+  const GuiStepImportWorkbench workbench;
+  const auto registry = checked(
+      workbench.prepare_register(session, "Supplier", "source.step", StepImportMode::EditableBody));
+  REQUIRE(workbench.apply(session, registry));
+  auto preview = checked(workbench.prepare_topology(session, registry.source.id(), 0));
+  const auto before = snapshot(session);
+  REQUIRE(session.save_as(directory.filePath("moved.blcad.json").toStdString()));
+  CHECK_FALSE(workbench.apply_topology(session, preview));
+  CHECK(snapshot(session) == before);
+  preview = checked(workbench.prepare_topology(session, registry.source.id(), 0));
+  REQUIRE(workbench.apply_topology(session, preview));
+  const auto catalog = preview.catalog;
+  const auto accepted = snapshot(session);
+  write_geometry(asset, 40);
+  CHECK_FALSE(workbench.inspect_topology(session, catalog.id()));
+  CHECK_FALSE(workbench.validate_topology(session, preview));
+  CHECK(snapshot(session) == accepted);
+  const auto refresh = checked(workbench.prepare_refresh(session, registry.source.id()));
+  REQUIRE(workbench.apply(session, refresh));
+  const auto recovered = checked(workbench.inspect_topology(session, catalog.id()));
+  CHECK(recovered.catalog == catalog);
+  bool lost = false;
+  for (const auto& entry : recovered.recovery.entries)
+    if (entry.status != ImportedTopologyRecoveryStatus::Resolved) {
+      lost = true;
+      CHECK(entry.shape.empty());
+      CHECK_FALSE(entry.descriptor);
+    }
+  CHECK(lost);
+  const auto refreshed = snapshot(session);
+  CHECK(checked(workbench.apply_topology(session, recovered)) == 0);
+  CHECK(snapshot(session) == refreshed);
+  CHECK(session.part_document()->find_imported_topology_catalog(catalog.id()) != nullptr);
 }
 
 TEST_CASE("STEP source tasks require Save and register exact portable intent with atomic history",

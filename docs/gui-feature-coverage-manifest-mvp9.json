@@ -16,7 +16,7 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/gui-shell-reset-sequence-mvp9r.md",
-        "scope": "Document create/open/save, dirty-work protection, undo/redo and presentation reset. STEP source geometry inspection reads digest-verified snapshots and displays product/body/unit diagnostics with temporary posed occurrence previews, without changing document intent; cancellation, lifecycle changes and changed assets invalidate the preview.",
+        "scope": "Document create/open/save, dirty-work protection, undo/redo and presentation reset. STEP source geometry inspection reads digest-verified snapshots and displays product/body/unit diagnostics with temporary posed occurrence previews, without changing document intent. Imported topology catalogs use explicit transactional Apply, persistent typed identities, recovery diagnostics, capability filters and disposable semantic picking. Cancellation, lifecycle changes and changed assets invalidate derived inspection and topology selection.",
         "gaps": [],
         "proofs": [
           {
@@ -34,6 +34,14 @@
           {
             "filter": "[native-step-inspection]",
             "source": "tests/gui/gui_shell_step_import_tests.cpp"
+          },
+          {
+            "filter": "[block139-step-topology]",
+            "source": "tests/gui/gui_shell_step_import_tests.cpp"
+          },
+          {
+            "filter": "[native-step-topology]",
+            "source": "tests/gui/gui_shell_step_import_tests.cpp"
           }
         ],
         "actions": [
@@ -48,7 +56,10 @@
         "widgets": [
           "blcad.step_import.task",
           "blcad.step_import.inspect_geometry",
-          "blcad.step_import.geometry_products"
+          "blcad.step_import.geometry_products",
+          "blcad.step_import.topology_prepare",
+          "blcad.step_import.topology_entries",
+          "blcad.step_import.topology_filter"
         ]
       }
     },

@@ -29,12 +29,17 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct GeometryRecomputeSummary {
   std::size_t executed_feature_count = 0;
 };
 
 class GeometryRecomputeExecutor {
 public:
+  GeometryRecomputeExecutor() = default;
+  explicit GeometryRecomputeExecutor(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   // The same resolved, transformed axis used by feature execution. Interactive
   // clients use this frame without introducing a second reference evaluator.
   [[nodiscard]] Result<std::pair<Point3, Vector3>>
@@ -112,6 +117,7 @@ public:
                                                                   ShapeCache& shape_cache) const;
 
 private:
+  [[nodiscard]] Result<std::size_t> validate_import_sources() const;
   [[nodiscard]] Result<std::size_t> execute_path_extrude(const PartDocument& document,
                                                          const Feature& feature,
                                                          ShapeCache& shape_cache) const;
@@ -141,6 +147,7 @@ private:
   LinearPatternAdapter linear_pattern_adapter_;
   MirrorAdapter mirror_adapter_;
   WorkplaneResolver workplane_resolver_;
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

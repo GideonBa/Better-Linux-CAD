@@ -34,7 +34,8 @@ Result<GeometryShape> DraftAdapter::apply(const PartDocument& document, const Dr
                                           const GeometryShape& target,
                                           const ShapeCache& shape_cache, Vector3 pull_direction,
                                           Point3 neutral_origin, Vector3 neutral_normal,
-                                          double angle_deg) const {
+                                          double angle_deg,
+                                          StepImportTopologyContext* import_context) const {
   if (target.empty() || !std::isfinite(angle_deg) || std::abs(angle_deg) <= kTolerance ||
       std::abs(angle_deg) >= 90.0 || length(pull_direction) <= kTolerance ||
       length(neutral_normal) <= kTolerance)
@@ -47,7 +48,7 @@ Result<GeometryShape> DraftAdapter::apply(const PartDocument& document, const Dr
     BRepOffsetAPI_DraftAngle builder(target_shape);
     for (const FaceReference& reference : feature.faces()) {
       auto face = resolve_semantic_face(document, shape_cache, target_shape, reference,
-                                        feature.id(), "draft");
+                                        feature.id(), "draft", import_context);
       if (face.has_error())
         return Result<GeometryShape>::failure(face.error());
       builder.Add(face.value(), gp_Dir(direction.x, direction.y, direction.z),

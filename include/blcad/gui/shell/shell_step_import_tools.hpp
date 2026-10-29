@@ -7,6 +7,7 @@
 namespace blcad::gui {
 class ShellWindow;
 class ShellRibbon;
+struct GuiSelection;
 
 // Owns source registration and disposable STEP geometry inspection.
 class ShellStepImportTools final : public QObject {
@@ -16,6 +17,9 @@ public:
   [[nodiscard]] Result<std::size_t> begin();
   [[nodiscard]] Result<std::size_t> inspect();
   [[nodiscard]] Result<std::size_t> inspect_geometry();
+  [[nodiscard]] Result<std::size_t> prepare_topology();
+  [[nodiscard]] bool accept_selection(const GuiSelection&);
+  void clear_selected_reference();
   [[nodiscard]] Result<std::size_t> preview();
   [[nodiscard]] Result<std::size_t> apply();
   [[nodiscard]] bool active() const noexcept;

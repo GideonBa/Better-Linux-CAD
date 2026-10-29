@@ -113,6 +113,12 @@ struct ShellStepImportTools::Impl {
   QTreeWidget* geometry_products{};
   QPlainTextEdit* geometry_diagnostics{};
   QFileSystemWatcher* watcher{};
+  QComboBox* topology_product{};
+  QComboBox* topology_catalog{};
+  QComboBox* topology_filter{};
+  QTreeWidget* topology_entries{};
+  QPlainTextEdit* topology_reference{};
+  QPushButton* topology_prepare{};
   bool active{};
   bool loading{};
   bool undo_available{};
@@ -123,6 +129,11 @@ struct ShellStepImportTools::Impl {
   std::optional<GuiStepImportPreview> candidate;
   std::optional<GuiStepImportGeometryPreview> inspection;
   std::optional<GuiViewportCameraBookmark> inspection_camera;
+  std::optional<GuiStepImportTopologyPreview> topology;
+  std::vector<std::pair<std::string, ImportedTopologyReference>> topology_targets;
+  std::optional<std::uint32_t> previous_pick_mask;
+  std::optional<std::vector<std::string>> previous_pick_scope;
+  std::optional<GuiSelection> previous_pick_selection;
 
   bool available() const {
     const auto& session = window.session();
@@ -154,6 +165,21 @@ struct ShellStepImportTools::Impl {
   }
   void invalidate() {
     candidate.reset();
+    topology.reset();
+    topology_targets.clear();
+    window.viewport().clear_preview_selection_targets();
+    if (previous_pick_mask) {
+      const auto mask = *previous_pick_mask;
+      previous_pick_mask.reset();
+      window.viewport().set_selection_filter_mask(mask);
+      window.viewport().set_selection_semantic_scope(previous_pick_scope);
+      previous_pick_scope.reset();
+      if (previous_pick_selection)
+        (void)window.viewport().select_semantic(previous_pick_selection->semantic_id);
+      else
+        window.viewport().clear_selection();
+      previous_pick_selection.reset();
+    }
     inspection.reset();
     if (watcher) {
       const auto files = watcher->files();
@@ -174,6 +200,10 @@ struct ShellStepImportTools::Impl {
       geometry_diagnostics->clear();
       geometry_summary->setText(QStringLiteral("No geometry inspection prepared."));
     }
+    if (topology_entries) {
+      topology_entries->clear();
+      topology_reference->clear();
+    }
     apply->setEnabled(false);
     if (window.session().task().command_id() == task_id)
       (void)window.session().task().return_to_editing();
@@ -182,6 +212,10 @@ struct ShellStepImportTools::Impl {
     if (loading || !active)
       return;
     invalidate();
+    if (topology_product) {
+      const QSignalBlocker blocker(topology_product);
+      topology_product->clear();
+    }
     status->setProperty("freshness", -1);
     status->setText(QStringLiteral("Not Inspected"));
     expected->clear();
@@ -202,6 +236,26 @@ struct ShellStepImportTools::Impl {
     mode->setEnabled(!entry);
     browse->setEnabled(!entry);
     operation->setCurrentIndex(entry ? 1 : 0);
+    {
+      const QSignalBlocker blocker(topology_catalog);
+      topology_catalog->clear();
+      topology_catalog->addItem(QStringLiteral("Capture New Catalog"), QString());
+      const auto append = [&](const auto& owner) {
+        for (const auto& catalog : owner.imported_topology_catalogs())
+          if (entry && catalog.source() == entry->id())
+            topology_catalog->addItem(text(catalog.id().value()), text(catalog.id().value()));
+      };
+      if (window.session().part_document())
+        append(*window.session().part_document());
+      else
+        append(*window.session().project());
+      if (topology_catalog->count() > 1)
+        topology_catalog->setCurrentIndex(1);
+    }
+    topology_prepare->setText(topology_catalog->currentData().toString().isEmpty()
+                                  ? QStringLiteral("Prepare Topology Catalog")
+                                  : QStringLiteral("Inspect Saved Catalog"));
+    topology_product->setEnabled(topology_catalog->currentData().toString().isEmpty());
     auto* model = static_cast<QStandardItemModel*>(operation->model());
     for (int row = 0; row < operation->count(); ++row)
       model->item(row)->setEnabled(entry ? row != 0 : row == 0);
@@ -218,6 +272,21 @@ struct ShellStepImportTools::Impl {
   }
   void show_geometry(const GuiStepImportGeometryPreview& value) {
     const auto& imported = value.geometry;
+    const auto selected_product = topology_product->currentData();
+    {
+      const QSignalBlocker blocker(topology_product);
+      topology_product->clear();
+      for (std::size_t i = 0; i < imported.products.size(); ++i) {
+        const auto& product = imported.products[i];
+        if (!product.is_assembly && !product.bodies.empty())
+          topology_product->addItem(product.name.empty() ? QStringLiteral("Unnamed Product")
+                                                         : text(product.name),
+                                    static_cast<qulonglong>(i));
+      }
+      const int previous = topology_product->findData(selected_product);
+      if (previous >= 0)
+        topology_product->setCurrentIndex(previous);
+    }
     QStringList units;
     for (const auto& unit : imported.units)
       units.push_back(QStringLiteral("%1 × %2 → mm")
@@ -296,6 +365,90 @@ struct ShellStepImportTools::Impl {
             .arg(imported.body_count())
             .arg(imported.occurrences.size())
             .arg(value.preview_shapes.size()));
+  }
+  Result<std::size_t> update_topology_targets() {
+    topology_targets.clear();
+    topology_reference->clear();
+    if (!topology)
+      return Result<std::size_t>::success(0);
+    const auto valid = workbench.validate_topology(window.session(), *topology);
+    if (!valid)
+      return valid;
+    const int requested = topology_filter->currentData().toInt();
+    std::vector<geometry::ViewportSceneItem> targets;
+    std::vector<std::string> scope;
+    for (const auto& entry : topology->catalog.entries()) {
+      const auto* resolved = topology->recovery.find(entry.id);
+      if (!resolved || resolved->status != ImportedTopologyRecoveryStatus::Resolved ||
+          resolved->shape.empty() || !resolved->descriptor)
+        continue;
+      auto capability =
+          entry.descriptor.kind == ImportedTopologyKind::Body   ? ImportedTopologyCapability::Body
+          : entry.descriptor.kind == ImportedTopologyKind::Face ? ImportedTopologyCapability::Face
+          : entry.descriptor.kind == ImportedTopologyKind::Edge ? ImportedTopologyCapability::Edge
+                                                                : ImportedTopologyCapability::Point;
+      if (requested >= 0)
+        capability = static_cast<ImportedTopologyCapability>(requested);
+      if (std::find(resolved->capabilities.begin(), resolved->capabilities.end(), capability) ==
+          resolved->capabilities.end())
+        continue;
+      auto reference =
+          ImportedTopologyReference::create(topology->catalog.id(), entry.id, capability);
+      if (!reference)
+        return Result<std::size_t>::failure(reference.error());
+      auto spelling = make_imported_topology_target_spelling(reference.value());
+      if (!spelling)
+        return Result<std::size_t>::failure(spelling.error());
+      const auto kind = entry.descriptor.kind == ImportedTopologyKind::Body
+                            ? entry.descriptor.body_kind == BodyKind::Surface
+                                  ? geometry::ViewportSceneKind::SurfaceBody
+                                  : geometry::ViewportSceneKind::SolidBody
+                        : entry.descriptor.kind == ImportedTopologyKind::Face
+                            ? geometry::ViewportSceneKind::Face
+                        : entry.descriptor.kind == ImportedTopologyKind::Edge
+                            ? geometry::ViewportSceneKind::Edge
+                            : geometry::ViewportSceneKind::Vertex;
+      targets.push_back({kind, spelling.value(), resolved->shape});
+      scope.push_back(spelling.value());
+      topology_targets.emplace_back(spelling.value(), std::move(reference.value()));
+    }
+    window.viewport().set_selection_filter_mask(0xFFFFFFFFU);
+    window.viewport().set_selection_semantic_scope(std::move(scope));
+    return window.viewport().set_preview_selection_targets(std::move(targets));
+  }
+  void show_topology() {
+    topology_entries->clear();
+    if (!topology)
+      return;
+    std::size_t resolved_count{}, lost{}, ambiguous{};
+    for (const auto& entry : topology->catalog.entries()) {
+      const auto* resolved = topology->recovery.find(entry.id);
+      if (!resolved)
+        continue;
+      if (resolved->status == ImportedTopologyRecoveryStatus::Resolved)
+        ++resolved_count;
+      else if (resolved->status == ImportedTopologyRecoveryStatus::Lost)
+        ++lost;
+      else
+        ++ambiguous;
+      QStringList capabilities;
+      for (auto capability : resolved->capabilities)
+        capabilities.push_back(text(to_string(capability)));
+      auto* row = new QTreeWidgetItem(
+          topology_entries, {text(entry.id.value()), text(to_string(entry.descriptor.kind)),
+                             text(to_string(resolved->status)), capabilities.join(", ")});
+      row->setData(0, Qt::UserRole, text(entry.id.value()));
+      row->setToolTip(0, text(entry.id.value()) + "\n" + text(resolved->diagnostic));
+      for (int column = 1; column < topology_entries->columnCount(); ++column)
+        row->setToolTip(column, row->text(column));
+    }
+    geometry_summary->setText(
+        QStringLiteral("Catalog %1: %2 Resolved, %3 Lost, %4 Ambiguous. Product-local coordinates. "
+                       "Only uniquely resolved targets can be selected.")
+            .arg(text(topology->catalog.id().value()))
+            .arg(resolved_count)
+            .arg(lost)
+            .arg(ambiguous));
   }
   void watch_inspection() {
     if (!inspection)
@@ -494,6 +647,51 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   ui.geometry_diagnostics->setMaximumHeight(100);
   ui.geometry_diagnostics->setPlaceholderText(QStringLiteral("Geometry inspection diagnostics"));
   content_layout->addWidget(ui.geometry_diagnostics);
+  auto* topology_form = new QFormLayout;
+  ui.topology_catalog = new QComboBox(content);
+  ui.topology_catalog->setObjectName("blcad.step_import.topology_catalog");
+  topology_form->addRow(QStringLiteral("Topology Catalog"), ui.topology_catalog);
+  ui.topology_product = new QComboBox(content);
+  ui.topology_product->setObjectName("blcad.step_import.topology_product");
+  ui.topology_product->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+  ui.topology_product->setMinimumContentsLength(12);
+  topology_form->addRow(QStringLiteral("Selected Product"), ui.topology_product);
+  ui.topology_filter = new QComboBox(content);
+  ui.topology_filter->setObjectName("blcad.step_import.topology_filter");
+  ui.topology_filter->addItem(QStringLiteral("Any Topology"), -1);
+  for (auto capability : {ImportedTopologyCapability::Body, ImportedTopologyCapability::Face,
+                          ImportedTopologyCapability::Edge, ImportedTopologyCapability::Plane,
+                          ImportedTopologyCapability::Cylinder, ImportedTopologyCapability::Axis,
+                          ImportedTopologyCapability::Line, ImportedTopologyCapability::Circle,
+                          ImportedTopologyCapability::Point})
+    ui.topology_filter->addItem(text(to_string(capability)), static_cast<int>(capability));
+  topology_form->addRow(QStringLiteral("Pick Capability"), ui.topology_filter);
+  content_layout->addLayout(topology_form);
+  ui.topology_prepare = make_gui_button(QStringLiteral("Prepare Topology Catalog"), content);
+  ui.topology_prepare->setObjectName("blcad.step_import.topology_prepare");
+  content_layout->addWidget(ui.topology_prepare);
+  ui.topology_entries = new QTreeWidget(content);
+  ui.topology_entries->setObjectName("blcad.step_import.topology_entries");
+  ui.topology_entries->setColumnCount(4);
+  ui.topology_entries->setHeaderLabels({"Stable ID", "Kind", "Recovery", "Capabilities"});
+  // QTreeView defaults to a separately stretched last section with its own
+  // retained minimum width. Let all four Stretch sections share the viewport.
+  ui.topology_entries->header()->setStretchLastSection(false);
+  ui.topology_entries->header()->setSectionResizeMode(QHeaderView::Stretch);
+  ui.topology_entries->header()->setMinimumSectionSize(40);
+  ui.topology_entries->setRootIsDecorated(false);
+  ui.topology_entries->setMinimumHeight(170);
+  ui.topology_entries->setMaximumHeight(230);
+  ui.topology_entries->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  content_layout->addWidget(ui.topology_entries);
+  ui.topology_reference = new QPlainTextEdit(content);
+  ui.topology_reference->setObjectName("blcad.step_import.topology_reference");
+  ui.topology_reference->setReadOnly(true);
+  ui.topology_reference->setWordWrapMode(QTextOption::WrapAnywhere);
+  ui.topology_reference->setMaximumHeight(90);
+  ui.topology_reference->setPlaceholderText(
+      QStringLiteral("Select a resolved imported face, edge or vertex."));
+  content_layout->addWidget(ui.topology_reference);
   content_layout->addStretch();
   scroll->setWidget(content);
   layout->addWidget(scroll);
@@ -588,6 +786,37 @@ ShellStepImportTools::ShellStepImportTools(ShellWindow& window, ShellRibbon& rib
   connect(inspect_button, &QPushButton::clicked, this, [this, report] { report(inspect()); });
   connect(geometry_button, &QPushButton::clicked, this,
           [this, report] { report(inspect_geometry()); });
+  connect(ui.topology_prepare, &QPushButton::clicked, this,
+          [this, report] { report(prepare_topology()); });
+  connect(ui.topology_catalog, &QComboBox::currentIndexChanged, this, [this] {
+    auto& ui = *impl_;
+    if (ui.loading || !ui.active)
+      return;
+    ui.invalidate();
+    const bool capture = ui.topology_catalog->currentData().toString().isEmpty();
+    ui.topology_product->setEnabled(capture);
+    ui.topology_prepare->setText(capture ? QStringLiteral("Prepare Topology Catalog")
+                                         : QStringLiteral("Inspect Saved Catalog"));
+  });
+  connect(ui.topology_product, &QComboBox::currentIndexChanged, this, [this] {
+    if (!impl_->loading && impl_->active)
+      impl_->invalidate();
+  });
+  connect(ui.topology_filter, &QComboBox::currentIndexChanged, this, [this, report] {
+    if (impl_->active && impl_->topology)
+      report(impl_->update_topology_targets());
+  });
+  connect(
+      ui.topology_entries, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem* row) {
+        if (!row || !impl_->topology)
+          return;
+        for (const auto& [semantic, reference] : impl_->topology_targets)
+          if (reference.entry().value() == row->data(0, Qt::UserRole).toString().toStdString()) {
+            (void)impl_->window.viewport().select_semantic(semantic);
+            return;
+          }
+        impl_->topology_reference->setPlainText(row->toolTip(0));
+      });
   connect(preview_button, &QPushButton::clicked, this, [this, report] { report(preview()); });
   connect(ui.apply, &QPushButton::clicked, this, [this, report] { report(apply()); });
   connect(cancel_button, &QPushButton::clicked, this, [this] { cancel(); });
@@ -747,15 +976,115 @@ Result<std::size_t> ShellStepImportTools::preview() {
                            "checksum in one step."));
   return Result<std::size_t>::success(1);
 }
+Result<std::size_t> ShellStepImportTools::prepare_topology() {
+  auto& ui = *impl_;
+  if (!ui.current()) {
+    cancel();
+    return Result<std::size_t>::failure(error("Document changed. Reopen source management."));
+  }
+  const auto* selected = ui.selected();
+  if (!selected)
+    return Result<std::size_t>::failure(
+        error("Register the STEP source before capturing topology."));
+  const auto source_id = selected->id();
+  const auto catalog_id = ui.topology_catalog->currentData().toString().toStdString();
+  const auto product = ui.topology_product->currentData();
+  if (catalog_id.empty() && !product.isValid())
+    return Result<std::size_t>::failure(error("Inspect Geometry and choose a product first."));
+  ui.invalidate();
+  auto result = catalog_id.empty()
+                    ? ui.workbench.prepare_topology(ui.window.session(), source_id,
+                                                    static_cast<std::size_t>(product.toULongLong()))
+                    : ui.workbench.inspect_topology(ui.window.session(),
+                                                    ImportedTopologyCatalogId(catalog_id));
+  if (!result)
+    return Result<std::size_t>::failure(result.error());
+  ui.inspection_camera = ui.window.viewport().camera_bookmark();
+  ui.inspection = result.value().inspection;
+  ui.topology = std::move(result.value());
+  std::vector<geometry::GeometryShape> bodies;
+  for (const auto& entry : ui.topology->catalog.entries())
+    if (entry.descriptor.kind == ImportedTopologyKind::Body)
+      if (const auto* resolved = ui.topology->recovery.find(entry.id);
+          resolved && resolved->status == ImportedTopologyRecoveryStatus::Resolved &&
+          !resolved->shape.empty())
+        bodies.push_back(resolved->shape);
+  if (!bodies.empty()) {
+    auto shown = ui.window.viewport().set_feature_previews(std::move(bodies));
+    if (!shown) {
+      ui.invalidate();
+      return shown;
+    }
+  }
+  ui.report(ui.inspection->report);
+  ui.show_geometry(*ui.inspection);
+  ui.show_topology();
+  ui.previous_pick_mask = ui.window.viewport().selection_filter_mask();
+  ui.previous_pick_scope = ui.window.viewport().selection_semantic_scope();
+  ui.previous_pick_selection = ui.window.viewport().selected_semantic();
+  auto targets = ui.update_topology_targets();
+  if (!targets) {
+    ui.invalidate();
+    return targets;
+  }
+  ui.watch_inspection();
+  ui.apply->setEnabled(!ui.topology->accepted_catalog);
+  (void)ui.window.session().task().show_preview();
+  ui.window.viewport().fit_feature_preview();
+  ui.summary->setText(
+      ui.topology->accepted_catalog
+          ? QStringLiteral(
+                "Saved topology is inspected read-only. Stable catalog IDs are retained.")
+          : QStringLiteral("Apply captures the displayed topology catalog in one history step. "
+                           "It does not create imported Part geometry."));
+  return Result<std::size_t>::success(ui.topology->catalog.entries().size());
+}
+bool ShellStepImportTools::accept_selection(const GuiSelection& selection) {
+  auto& ui = *impl_;
+  if (!ui.current() || !ui.topology ||
+      !ui.workbench.validate_topology(ui.window.session(), *ui.topology))
+    return false;
+  const auto target =
+      std::find_if(ui.topology_targets.begin(), ui.topology_targets.end(),
+                   [&](const auto& value) { return value.first == selection.semantic_id; });
+  if (target == ui.topology_targets.end())
+    return false;
+  auto resolved = geometry::StepImportTopology{}.resolve(ui.topology->recovery, target->second);
+  if (!resolved)
+    return false;
+  ui.topology_reference->setPlainText(text(target->first));
+  ui.topology_reference->setToolTip(
+      ui.topology->accepted_catalog
+          ? QStringLiteral("Resolved persistent imported reference")
+          : QStringLiteral("Resolved draft reference; Apply captures its catalog"));
+  const QSignalBlocker blocker(ui.topology_entries);
+  for (int i = 0; i < ui.topology_entries->topLevelItemCount(); ++i) {
+    auto* row = ui.topology_entries->topLevelItem(i);
+    if (row->data(0, Qt::UserRole).toString().toStdString() == target->second.entry().value()) {
+      ui.topology_entries->setCurrentItem(row);
+      ui.topology_entries->scrollToItem(row);
+      break;
+    }
+  }
+  return true;
+}
+void ShellStepImportTools::clear_selected_reference() {
+  if (!impl_->active || !impl_->topology)
+    return;
+  impl_->topology_reference->clear();
+  const QSignalBlocker blocker(impl_->topology_entries);
+  impl_->topology_entries->setCurrentItem(nullptr);
+}
 Result<std::size_t> ShellStepImportTools::apply() {
   auto& ui = *impl_;
   if (!ui.current()) {
     cancel();
     return Result<std::size_t>::failure(error("Document changed. Reopen source management."));
   }
-  if (!ui.candidate)
+  if (!ui.candidate && (!ui.topology || ui.topology->accepted_catalog))
     return Result<std::size_t>::failure(error("Prepare the change first"));
-  const auto result = ui.workbench.apply(ui.window.session(), *ui.candidate);
+  const auto result = ui.topology ? ui.workbench.apply_topology(ui.window.session(), *ui.topology)
+                                  : ui.workbench.apply(ui.window.session(), *ui.candidate);
   if (!result) {
     ui.invalidate();
     return result;

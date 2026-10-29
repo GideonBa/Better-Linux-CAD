@@ -11,6 +11,7 @@
 namespace blcad::geometry {
 
 class ShapeCache;
+class StepImportTopologyContext;
 
 // Shared semantic face resolution for the face-driven Part features (Draft,
 // Shell). Both resolve a persisted `FaceReference` — semantic planar or
@@ -22,6 +23,7 @@ class ShapeCache;
 [[nodiscard]] Result<TopoDS_Face>
 resolve_semantic_face(const PartDocument& document, const ShapeCache& cache,
                       const TopoDS_Shape& target, const FaceReference& reference,
-                      const FeatureId& id, std::string_view feature_label);
+                      const FeatureId& id, std::string_view feature_label,
+                      StepImportTopologyContext* import_context = nullptr);
 
 } // namespace blcad::geometry

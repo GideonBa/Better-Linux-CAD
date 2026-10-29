@@ -3,6 +3,7 @@
 #include "blcad/core/assembly_document.hpp"
 #include "blcad/core/datum_plane.hpp"
 #include "blcad/core/id.hpp"
+#include "blcad/core/imported_topology.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/spatial.hpp"
 
@@ -21,6 +22,11 @@ enum class AssemblyGeometricTargetSourceKind {
   GeneratedLinearEdge,
   GeneratedCircularEdge,
   GeneratedVertex,
+  ImportedPlanarFace,
+  ImportedCylindricalFace,
+  ImportedLinearEdge,
+  ImportedCircularEdge,
+  ImportedVertex,
   DatumPlane,
   DatumAxis,
   ConstructionLine,
@@ -81,6 +87,7 @@ struct AssemblyGeometricTargetSourceMetadata {
   std::optional<SemanticFace> semantic_face;
   std::optional<SemanticAxis> semantic_axis;
   std::optional<SemanticSeatingPlane> semantic_seating_plane;
+  std::optional<ImportedTopologyReference> imported_topology{};
 
   friend bool operator==(const AssemblyGeometricTargetSourceMetadata&,
                          const AssemblyGeometricTargetSourceMetadata&) = default;

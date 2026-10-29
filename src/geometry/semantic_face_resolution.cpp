@@ -3,6 +3,8 @@
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
+#include "blcad/geometry/occt_shape_view.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 
 #include <BRepAdaptor_Surface.hxx>
 #include <GeomAbs_SurfaceType.hxx>
@@ -227,7 +229,29 @@ resolve_cylindrical(const PartDocument& document, const ShapeCache& cache,
 Result<TopoDS_Face> resolve_semantic_face(const PartDocument& document, const ShapeCache& cache,
                                           const TopoDS_Shape& target,
                                           const FaceReference& reference, const FeatureId& id,
-                                          std::string_view feature_label) {
+                                          std::string_view feature_label,
+                                          StepImportTopologyContext* import_context) {
+  if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
+    if (import_context == nullptr)
+      return Result<TopoDS_Face>::failure(
+          face_error(id, "imported face requires an explicit verified source context"));
+    auto current = import_context->resolve(document, *imported);
+    if (!current)
+      return Result<TopoDS_Face>::failure(current.error());
+    if (!current.value().descriptor)
+      return Result<TopoDS_Face>::failure(face_error(id, "imported face is not resolved"));
+    auto match = StepImportTopology{}.match_subshape(*current.value().descriptor, target);
+    if (!match)
+      return Result<TopoDS_Face>::failure(match.error());
+    if (match.value().status != ImportedTopologyRecoveryStatus::Resolved)
+      return Result<TopoDS_Face>::failure(
+          face_error(id, std::string("imported face on target body is ") +
+                             std::string(to_string(match.value().status))));
+    const auto* shape = OcctShapeView::get(match.value().shape);
+    if (shape == nullptr || shape->ShapeType() != TopAbs_FACE)
+      return Result<TopoDS_Face>::failure(face_error(id, "imported target is not a face"));
+    return Result<TopoDS_Face>::success(TopoDS::Face(*shape));
+  }
   if (std::holds_alternative<SemanticFaceReference>(reference.source()))
     return resolve_planar(document, cache, target,
                           std::get<SemanticFaceReference>(reference.source()), id, feature_label);

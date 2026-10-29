@@ -18,6 +18,7 @@
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Prs3d_LineAspect.hxx>
+#include <Prs3d_PointAspect.hxx>
 #include <Quantity_Color.hxx>
 #include <SelectMgr_EntityOwner.hxx>
 #include <Standard_Failure.hxx>
@@ -360,6 +361,31 @@ Quantity_Color feature_preview_color() {
   return Quantity_Color(0.25, 0.75, 1.0, Quantity_TOC_RGB);
 }
 
+void style_preview_selection(const geometry::ViewportSceneItem& item,
+                             const Handle(AIS_Shape) & interactive) {
+  if (interactive.IsNull())
+    return;
+  const auto color = presentation_color(item.kind);
+  interactive->SetColor(color);
+  if (item.kind == geometry::ViewportSceneKind::Face ||
+      item.kind == geometry::ViewportSceneKind::SolidBody ||
+      item.kind == geometry::ViewportSceneKind::SurfaceBody) {
+    interactive->SetTransparency(.96);
+    interactive->SetHilightMode(0);
+    interactive->Attributes()->SetFaceBoundaryDraw(true);
+  }
+  interactive->Attributes()->SetPointAspect(new Prs3d_PointAspect(Aspect_TOM_O_POINT, color, 3));
+}
+void prioritize_preview_selection(const geometry::ViewportSceneItem& item,
+                                  const Handle(AIS_Shape) & interactive) {
+  if (interactive.IsNull() || interactive->GlobalSelOwner().IsNull())
+    return;
+  interactive->GlobalSelOwner()->SetPriority(item.kind == geometry::ViewportSceneKind::Vertex ? 8
+                                             : item.kind == geometry::ViewportSceneKind::Edge ? 6
+                                             : item.kind == geometry::ViewportSceneKind::Face ? 4
+                                                                                              : 1);
+}
+
 bool sketch_profile_face(const geometry::ViewportSceneItem& item) {
   if (item.kind != geometry::ViewportSceneKind::SketchEntity ||
       item.semantic_id.find("/profile/") == std::string::npos)
@@ -477,8 +503,11 @@ struct OcctViewport::Impl {
   Aspect_Drawable native_drawable{0};
   std::vector<Presentation> presentations;
   std::vector<Presentation> feature_previews;
+  std::vector<Presentation> preview_selection_targets;
+  bool feature_preview_focus{false};
   std::vector<std::string> feature_preview_replaced_bodies;
   std::unordered_map<const AIS_InteractiveObject*, std::size_t> owner_to_index;
+  std::unordered_map<const AIS_InteractiveObject*, std::size_t> preview_owner_to_index;
   std::string initialization_error;
   bool initialization_attempted{false};
 };
@@ -623,6 +652,9 @@ Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneI
         impl_->context->SetSelectionModeActive(preview.interactive, 0, false,
                                                AIS_SelectionModesConcurrency_Single, true);
       }
+    for (const auto& target : impl_->preview_selection_targets)
+      if (!target.interactive.IsNull())
+        impl_->context->Display(target.interactive, false);
   }
   impl_->presentations = std::move(candidate);
   impl_->owner_to_index.clear();
@@ -658,6 +690,60 @@ Result<std::size_t> OcctViewport::set_feature_preview(geometry::GeometryShape sh
   return set_feature_previews({std::move(shape)}, std::move(replaced));
 }
 
+Result<std::size_t>
+OcctViewport::set_preview_selection_targets(std::vector<geometry::ViewportSceneItem> targets) {
+  std::unordered_set<std::string> ids;
+  for (const auto& item : impl_->presentations)
+    ids.insert(item.item.semantic_id);
+  std::vector<Impl::Presentation> candidates;
+  for (auto& item : targets) {
+    if (item.semantic_id.empty() || item.shape.empty() || !ids.insert(item.semantic_id).second)
+      return Result<std::size_t>::failure(viewport_error("Invalid or duplicate preview target"));
+    Handle(AIS_Shape) interactive;
+    if (!impl_->context.IsNull()) {
+      const auto* native = geometry::OcctShapeView::get(item.shape);
+      if (!native || native->IsNull())
+        return Result<std::size_t>::failure(viewport_error("Preview target has no native shape"));
+      interactive = new AIS_Shape(*native);
+      style_preview_selection(item, interactive);
+    }
+    candidates.push_back({std::move(item), std::move(interactive)});
+  }
+  clear_preview_selection_targets();
+  impl_->preview_selection_targets = std::move(candidates);
+  for (std::size_t i = 0; i < impl_->preview_selection_targets.size(); ++i) {
+    auto& target = impl_->preview_selection_targets[i];
+    if (!target.interactive.IsNull()) {
+      impl_->context->Display(target.interactive, false);
+      impl_->preview_owner_to_index.emplace(target.interactive.get(), i);
+    }
+  }
+  apply_display_mode();
+  apply_selection_filters();
+  update();
+  return Result<std::size_t>::success(impl_->preview_selection_targets.size());
+}
+void OcctViewport::clear_preview_selection_targets() {
+  const bool selected =
+      selected_semantic_ &&
+      std::any_of(impl_->preview_selection_targets.begin(), impl_->preview_selection_targets.end(),
+                  [&](const auto& target) {
+                    return target.item.semantic_id == selected_semantic_->semantic_id;
+                  });
+  for (const auto& target : impl_->preview_selection_targets)
+    if (!impl_->context.IsNull() && !target.interactive.IsNull())
+      impl_->context->Remove(target.interactive, false);
+  impl_->preview_selection_targets.clear();
+  impl_->preview_owner_to_index.clear();
+  if (selected)
+    clear_selection();
+  else
+    render_update();
+}
+std::size_t OcctViewport::preview_selection_target_count() const noexcept {
+  return impl_->preview_selection_targets.size();
+}
+
 Result<std::size_t> OcctViewport::set_feature_previews(std::vector<geometry::GeometryShape> shapes,
                                                        std::vector<std::string> replaced_bodies) {
   if (shapes.empty() && replaced_bodies.empty())
@@ -686,6 +772,7 @@ Result<std::size_t> OcctViewport::set_feature_previews(std::vector<geometry::Geo
     if (!impl_->context.IsNull() && !previous.interactive.IsNull())
       impl_->context->Remove(previous.interactive, false);
   impl_->feature_previews = std::move(candidates);
+  impl_->feature_preview_focus = false;
   impl_->feature_preview_replaced_bodies = std::move(replaced_bodies);
   for (const auto& preview : impl_->feature_previews)
     if (!impl_->context.IsNull() && !preview.interactive.IsNull()) {
@@ -707,6 +794,7 @@ bool OcctViewport::feature_preview_replaces(std::string_view semantic_id) const 
 }
 
 void OcctViewport::clear_feature_preview() {
+  impl_->feature_preview_focus = false;
   if (impl_->feature_previews.empty() && impl_->feature_preview_replaced_bodies.empty())
     return;
   for (const auto& preview : impl_->feature_previews)
@@ -724,7 +812,10 @@ void OcctViewport::clear_scene() {
     render_update();
   }
   impl_->presentations.clear();
+  impl_->preview_selection_targets.clear();
+  impl_->preview_owner_to_index.clear();
   impl_->feature_previews.clear();
+  impl_->feature_preview_focus = false;
   impl_->feature_preview_replaced_bodies.clear();
   apply_sketch_focus();
   impl_->owner_to_index.clear();
@@ -763,7 +854,10 @@ void OcctViewport::set_standard_view(GuiStandardView view) {
   plane_camera_.reset();
   if (!impl_->view.IsNull()) {
     impl_->view->SetProj(occt_orientation(view));
-    fit_all();
+    if (impl_->feature_preview_focus)
+      fit_feature_preview();
+    else
+      fit_all();
   } else {
     // Keep headless camera mappings consistent with OCCT's +Z-up views.
     // SetProj otherwise has no effect without a native viewer.
@@ -1083,6 +1177,7 @@ void OcctViewport::set_context_menu_callback(
 }
 
 void OcctViewport::fit_all() {
+  impl_->feature_preview_focus = false;
   if (!impl_->view.IsNull() && !impl_->presentations.empty()) {
     impl_->view->FitAll(0.05, false);
     impl_->view->ZFitAll();
@@ -1092,7 +1187,10 @@ void OcctViewport::fit_all() {
 }
 
 void OcctViewport::fit_feature_preview() {
-  if (impl_->view.IsNull() || impl_->feature_previews.empty())
+  if (impl_->feature_previews.empty())
+    return;
+  impl_->feature_preview_focus = true;
+  if (impl_->view.IsNull() || impl_->view->Window().IsNull())
     return;
   Bnd_Box bounds;
   for (const auto& preview : impl_->feature_previews) {
@@ -1158,11 +1256,12 @@ bool OcctViewport::select_semantic(std::string_view semantic_id) {
     }
   }
 
-  const auto found = std::find_if(impl_->presentations.begin(), impl_->presentations.end(),
-                                  [semantic_id](const Impl::Presentation& presentation) {
-                                    return presentation.item.semantic_id == semantic_id;
-                                  });
-  if (found == impl_->presentations.end())
+  const Impl::Presentation* found = nullptr;
+  for (const auto* presentations : {&impl_->presentations, &impl_->preview_selection_targets})
+    for (const auto& presentation : *presentations)
+      if (presentation.item.semantic_id == semantic_id)
+        found = &presentation;
+  if (!found)
     return false;
   GuiSelection selection{selection_kind(found->item.kind), found->item.semantic_id};
   if (!selection_allowed(selection))
@@ -1554,6 +1653,17 @@ void OcctViewport::initialize_native_viewer() {
                                                AIS_SelectionModesConcurrency_Single, true);
       }
     }
+    impl_->preview_owner_to_index.clear();
+    for (std::size_t i = 0; i < impl_->preview_selection_targets.size(); ++i) {
+      auto& target = impl_->preview_selection_targets[i];
+      const auto* native = geometry::OcctShapeView::get(target.item.shape);
+      if (!native || native->IsNull())
+        continue;
+      target.interactive = new AIS_Shape(*native);
+      style_preview_selection(target.item, target.interactive);
+      impl_->context->Display(target.interactive, false);
+      impl_->preview_owner_to_index.emplace(target.interactive.get(), i);
+    }
     set_projection(projection_);
     apply_display_mode();
     apply_selection_filters();
@@ -1605,6 +1715,8 @@ void OcctViewport::initialize_gl() {
     const QPoint size = to_render_point({gl_surface_->width(), gl_surface_->height()});
     neutral_window->SetSize(size.x(), size.y());
     impl_->view->SetWindow(neutral_window, gl_context->RenderingContext());
+    if (impl_->feature_preview_focus)
+      fit_feature_preview();
     // A Sketch may have been entered before the top-level window was shown
     // (tests, restored sessions, or deferred docks). Apply the stored plane
     // camera now that OCCT has a real window, then replace the temporary
@@ -1627,6 +1739,9 @@ void OcctViewport::initialize_gl() {
       presentation.interactive.Nullify();
     for (auto& preview : impl_->feature_previews)
       preview.interactive.Nullify();
+    for (auto& target : impl_->preview_selection_targets)
+      target.interactive.Nullify();
+    impl_->preview_owner_to_index.clear();
     impl_->owner_to_index.clear();
     impl_->view.Nullify();
     impl_->context.Nullify();
@@ -1685,6 +1800,9 @@ void OcctViewport::apply_display_mode() {
           display_mode_ == GuiViewportDisplayMode::ShadedWithEdges);
       impl_->context->SetDisplayMode(preview.interactive, mode, false);
     }
+  for (const auto& target : impl_->preview_selection_targets)
+    if (!target.interactive.IsNull())
+      impl_->context->SetDisplayMode(target.interactive, mode, false);
   render_update();
 }
 
@@ -1699,6 +1817,15 @@ void OcctViewport::apply_selection_filters() {
                                            selection_allowed({kind, presentation.item.semantic_id}),
                                            AIS_SelectionModesConcurrency_Single, true);
     apply_selection_priority(presentation.item, presentation.interactive);
+  }
+  for (auto& target : impl_->preview_selection_targets) {
+    if (target.interactive.IsNull())
+      continue;
+    impl_->context->SetSelectionModeActive(
+        target.interactive, 0,
+        selection_allowed({selection_kind(target.item.kind), target.item.semantic_id}),
+        AIS_SelectionModesConcurrency_Single, true);
+    prioritize_preview_selection(target.item, target.interactive);
   }
   render_update();
 }
@@ -1999,9 +2126,12 @@ std::optional<GuiSelection> OcctViewport::detected_selection() const {
   if (detected.IsNull())
     return std::nullopt;
   const auto found = impl_->owner_to_index.find(detected.get());
-  if (found == impl_->owner_to_index.end())
+  const auto preview = impl_->preview_owner_to_index.find(detected.get());
+  if (found == impl_->owner_to_index.end() && preview == impl_->preview_owner_to_index.end())
     return std::nullopt;
-  const auto& item = impl_->presentations[found->second].item;
+  const auto& item = preview != impl_->preview_owner_to_index.end()
+                         ? impl_->preview_selection_targets[preview->second].item
+                         : impl_->presentations[found->second].item;
   GuiSelection selection{selection_kind(item.kind), item.semantic_id};
   if (!selection_allowed(selection))
     return std::nullopt;

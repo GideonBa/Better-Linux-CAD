@@ -192,6 +192,9 @@ struct AssemblyHierarchyConstraintEquationDescriptor {
 // graph/solver integration owns relationship participation filtering.
 class AssemblyHierarchyConstraintTargetResolver {
 public:
+  AssemblyHierarchyConstraintTargetResolver() = default;
+  explicit AssemblyHierarchyConstraintTargetResolver(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyResolvedGeometricTarget>
   resolve_geometric(const Project& project, const AssemblyHierarchyConstraintTarget& target) const;
 
@@ -203,6 +206,9 @@ public:
 
   [[nodiscard]] Result<AssemblyHierarchyInsertConstraintTargetDescriptor>
   resolve_insert(const Project& project, const AssemblyHierarchyConstraintTarget& target) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 // Builds read-only Mate/Distance/Angle/Concentric/Insert and generic

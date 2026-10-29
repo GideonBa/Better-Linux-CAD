@@ -11,6 +11,7 @@
 #include "blcad/geometry/profile_region_classifier.hpp"
 #include "blcad/geometry/reference_generated_profile_resolver.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
 #include "blcad/geometry/sketch_region_finder.hpp"
 #include "loft_section_alignment_internal.hpp"
@@ -579,15 +580,41 @@ resolve_mirror_sources(const MirrorFeature& feature, const ShapeCache& shape_cac
   return Result<std::vector<GeometryShape>>::success(std::move(sources));
 }
 
+[[nodiscard]] Result<ResolvedWorkplane>
+resolve_imported_plane(const PartDocument& document, const ImportedTopologyReference& reference,
+                       StepImportTopologyContext* import_context) {
+  if (import_context == nullptr)
+    return Result<ResolvedWorkplane>::failure(geometry_error(
+        reference.source_node_id(), "imported plane requires an explicit verified source context"));
+  auto current = import_context->resolve(document, reference);
+  if (!current)
+    return Result<ResolvedWorkplane>::failure(current.error());
+  if (!current.value().descriptor)
+    return Result<ResolvedWorkplane>::failure(
+        geometry_error(reference.source_node_id(), "imported plane is not resolved"));
+  auto analytic = imported_topology_analytic_descriptor(*current.value().descriptor);
+  if (!analytic)
+    return Result<ResolvedWorkplane>::failure(analytic.error());
+  const auto* frame = std::get_if<AssemblyPlanarTargetDescriptor>(&analytic.value());
+  if (frame == nullptr)
+    return Result<ResolvedWorkplane>::failure(
+        geometry_error(reference.source_node_id(), "imported reference has no planar geometry"));
+  return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
+      DatumPlaneId{}, frame->origin, frame->x_axis, frame->y_axis, frame->normal, {}});
+}
+
 [[nodiscard]] Result<std::pair<Point3, Vector3>>
 resolve_mirror_plane(const PartDocument& document, const PlaneReference& reference,
-                     const ShapeCache& shape_cache, const WorkplaneResolver& resolver) {
+                     const ShapeCache& shape_cache, const WorkplaneResolver& resolver,
+                     StepImportTopologyContext* import_context) {
   Result<ResolvedWorkplane> plane = Result<ResolvedWorkplane>::failure(
       geometry_error(reference.source_node_id(), "unsupported mirror plane source"));
   if (const auto* datum = std::get_if<DatumPlaneId>(&reference.source())) {
     plane = resolver.resolve(document, *datum);
   } else if (const auto* construction = std::get_if<ConstructionPlaneId>(&reference.source())) {
     plane = resolver.resolve(document, DatumPlaneId(construction->value()));
+  } else if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
+    plane = resolve_imported_plane(document, *imported, import_context);
   } else {
     plane = resolver.resolve_generated_face(document,
                                             std::get<SemanticFaceReference>(reference.source()));
@@ -657,13 +684,33 @@ store_pattern_result(const PartDocument& document, const PatternFeature& feature
 
 [[nodiscard]] Result<std::pair<Point3, Vector3>>
 resolve_axis_reference(const PartDocument& document, const AxisReference& reference,
-                       const ShapeCache& shape_cache, const WorkplaneResolver& workplane_resolver) {
+                       const ShapeCache& shape_cache, const WorkplaneResolver& workplane_resolver,
+                       StepImportTopologyContext* import_context) {
   // The Sketch resolver already applies the current owned workplane transform.
   if (const auto* line = std::get_if<SketchLineReference>(&reference.source()))
     return SketchLineAxisResolver{}.resolve(document, *line, shape_cache);
   Result<std::pair<Point3, Vector3>> resolved = Result<std::pair<Point3, Vector3>>::failure(
       geometry_error(reference.source_node_id(), "unsupported axis source"));
-  if (const auto* datum = std::get_if<DatumAxisId>(&reference.source())) {
+  if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
+    if (import_context == nullptr)
+      return Result<std::pair<Point3, Vector3>>::failure(
+          geometry_error(reference.source_node_id(),
+                         "imported axis requires an explicit verified source context"));
+    auto current = import_context->resolve(document, *imported);
+    if (!current)
+      return Result<std::pair<Point3, Vector3>>::failure(current.error());
+    if (!current.value().descriptor)
+      return Result<std::pair<Point3, Vector3>>::failure(
+          geometry_error(reference.source_node_id(), "imported axis is not resolved"));
+    const auto& descriptor = *current.value().descriptor;
+    if (descriptor.geometry != ImportedGeometryClass::Line &&
+        descriptor.geometry != ImportedGeometryClass::Circle &&
+        descriptor.geometry != ImportedGeometryClass::Cylinder)
+      return Result<std::pair<Point3, Vector3>>::failure(geometry_error(
+          reference.source_node_id(), "imported reference has no Axis or Line capability"));
+    resolved =
+        Result<std::pair<Point3, Vector3>>::success({descriptor.origin, descriptor.direction});
+  } else if (const auto* datum = std::get_if<DatumAxisId>(&reference.source())) {
     const DatumAxis* axis = document.find_datum_axis(*datum);
     if (axis == nullptr)
       return Result<std::pair<Point3, Vector3>>::failure(
@@ -792,7 +839,10 @@ struct ResolvedExtrudeSpan {
 
 [[nodiscard]] Result<ResolvedWorkplane>
 resolve_limit_face_workplane(const PartDocument& document, const FaceReference& reference,
-                             const WorkplaneResolver& resolver) {
+                             const WorkplaneResolver& resolver,
+                             StepImportTopologyContext* import_context) {
+  if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source()))
+    return resolve_imported_plane(document, *imported, import_context);
   if (reference.source_kind() != PartFeatureInputSourceKind::SemanticPlanarFace)
     return Result<ResolvedWorkplane>::failure(geometry_error(
         reference.source_node_id(), "extrude limit Geometry currently requires a planar face"));
@@ -800,11 +850,10 @@ resolve_limit_face_workplane(const PartDocument& document, const FaceReference& 
                                          std::get<SemanticFaceReference>(reference.source()));
 }
 
-[[nodiscard]] Result<ResolvedExtrudeSpan>
-resolve_extrude_span(const PartDocument& document, const Feature& feature,
-                     const ResolvedWorkplane& sketch_workplane, Vector3 direction,
-                     const GeometryShape* target, const ClosedProfileAdapter& adapter,
-                     const WorkplaneResolver& workplane_resolver) {
+[[nodiscard]] Result<ResolvedExtrudeSpan> resolve_extrude_span(
+    const PartDocument& document, const Feature& feature, const ResolvedWorkplane& sketch_workplane,
+    Vector3 direction, const GeometryShape* target, const ClosedProfileAdapter& adapter,
+    const WorkplaneResolver& workplane_resolver, StepImportTopologyContext* import_context) {
   constexpr double kThroughAllMargin = 1.0;
   const auto& extent = feature.extrude_intent().extent();
   const auto distance = [&document, &feature](const std::optional<ParameterId>& id,
@@ -860,7 +909,8 @@ resolve_extrude_span(const PartDocument& document, const Feature& feature,
     return Result<ResolvedExtrudeSpan>::success({0.0, next.value()});
   }
   case ExtrudeExtentMode::ToFace: {
-    auto limit = resolve_limit_face_workplane(document, *extent.first_face(), workplane_resolver);
+    auto limit = resolve_limit_face_workplane(document, *extent.first_face(), workplane_resolver,
+                                              import_context);
     if (limit.has_error())
       return Result<ResolvedExtrudeSpan>::failure(limit.error());
     const double alignment =
@@ -876,8 +926,10 @@ resolve_extrude_span(const PartDocument& document, const Feature& feature,
     return Result<ResolvedExtrudeSpan>::success({0.0, end});
   }
   case ExtrudeExtentMode::Between: {
-    auto first = resolve_limit_face_workplane(document, *extent.first_face(), workplane_resolver);
-    auto second = resolve_limit_face_workplane(document, *extent.second_face(), workplane_resolver);
+    auto first = resolve_limit_face_workplane(document, *extent.first_face(), workplane_resolver,
+                                              import_context);
+    auto second = resolve_limit_face_workplane(document, *extent.second_face(), workplane_resolver,
+                                               import_context);
     if (first.has_error())
       return Result<ResolvedExtrudeSpan>::failure(first.error());
     if (second.has_error())
@@ -2225,7 +2277,7 @@ Result<std::vector<ClosedProfileCurveSegment>> detail::resolve_loft_alignment_se
 
 Result<std::pair<Point3, Vector3>> GeometryRecomputeExecutor::resolve_feature_axis(
     const PartDocument& document, const AxisReference& reference, const ShapeCache& cache) const {
-  return resolve_axis_reference(document, reference, cache, workplane_resolver_);
+  return resolve_axis_reference(document, reference, cache, workplane_resolver_, import_context_);
 }
 
 Result<std::vector<SweepPathSegment>>
@@ -2359,6 +2411,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_path_extrude(const PartDo
   auto stored = store_feature_result(document, feature, std::move(result), working_cache);
   if (stored.has_error())
     return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored;
 }
@@ -2469,7 +2523,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_richer_extrude(
   ResolvedWorkplane span_workplane = workplane.value();
   span_workplane.origin = profile_center;
   auto span = resolve_extrude_span(document, feature, span_workplane, direction, target.value(),
-                                   closed_profile_adapter_, workplane_resolver_);
+                                   closed_profile_adapter_, workplane_resolver_, import_context_);
   if (span.has_error())
     return Result<std::size_t>::failure(span.error());
 
@@ -2522,7 +2576,14 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_richer_extrude(
       return Result<std::size_t>::failure(combined.error());
     result = std::move(combined.value());
   }
-  return store_feature_result(document, feature, std::move(result), shape_cache);
+  ShapeCache working_cache = shape_cache;
+  auto stored = store_feature_result(document, feature, std::move(result), working_cache);
+  if (!stored)
+    return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
+  shape_cache = std::move(working_cache);
+  return stored;
 }
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocument& document,
@@ -2544,7 +2605,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
   auto workplane = workplane_resolver_.resolve_for_sketch(document, *sketch, working_cache);
   if (workplane.has_error())
     return Result<std::size_t>::failure(workplane.error());
-  auto axis = resolve_axis_reference(document, feature->axis(), working_cache, workplane_resolver_);
+  auto axis = resolve_axis_reference(document, feature->axis(), working_cache, workplane_resolver_,
+                                     import_context_);
   if (axis.has_error())
     return Result<std::size_t>::failure(axis.error());
   const ResolvedRevolveAngles angles = resolve_revolve_angles(feature->extent());
@@ -2649,6 +2711,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
   auto stored = store_revolve_result(document, *feature, std::move(result), working_cache);
   if (stored.has_error())
     return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored;
 }
@@ -2807,6 +2871,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
   auto stored = store_sweep_result(document, *feature, std::move(result), working_cache);
   if (stored.has_error())
     return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored;
 }
@@ -2964,6 +3030,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
   auto stored = store_loft_result(document, *feature, std::move(result), working_cache);
   if (stored.has_error())
     return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored;
 }
@@ -3075,6 +3143,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
   auto stored = store_surface_result(document, *feature, std::move(result.value()), working_cache);
   if (stored.has_error())
     return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored;
 }
@@ -3105,8 +3175,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
   auto sources = resolve_pattern_sources(*feature, working_cache, target.value());
   if (sources.has_error())
     return Result<std::size_t>::failure(sources.error());
-  auto direction =
-      resolve_axis_reference(document, feature->direction(), working_cache, workplane_resolver_);
+  auto direction = resolve_axis_reference(document, feature->direction(), working_cache,
+                                          workplane_resolver_, import_context_);
   if (direction.has_error())
     return Result<std::size_t>::failure(direction.error());
   Vector3 signed_direction = normalized(direction.value().second);
@@ -3173,6 +3243,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
   auto stored = store_pattern_result(document, *feature, std::move(result), working_cache);
   if (stored.has_error())
     return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored;
 }
@@ -3202,7 +3274,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_circular_pattern(
   auto sources = resolve_pattern_sources(*feature, working_cache, target.value());
   if (sources.has_error())
     return Result<std::size_t>::failure(sources.error());
-  auto axis = resolve_axis_reference(document, feature->axis(), working_cache, workplane_resolver_);
+  auto axis = resolve_axis_reference(document, feature->axis(), working_cache, workplane_resolver_,
+                                     import_context_);
   if (axis.has_error())
     return Result<std::size_t>::failure(axis.error());
   auto instances = circular_pattern_adapter_.generate_instances(
@@ -3263,6 +3336,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_circular_pattern(
   auto stored = store_pattern_result(document, *feature, std::move(result), working_cache);
   if (stored.has_error())
     return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored;
 }
@@ -3284,8 +3359,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_mirror(const PartDocument
   auto sources = resolve_mirror_sources(*feature, working_cache, target.value());
   if (sources.has_error())
     return Result<std::size_t>::failure(sources.error());
-  auto plane =
-      resolve_mirror_plane(document, feature->mirror_plane(), working_cache, workplane_resolver_);
+  auto plane = resolve_mirror_plane(document, feature->mirror_plane(), working_cache,
+                                    workplane_resolver_, import_context_);
   if (plane.has_error())
     return Result<std::size_t>::failure(plane.error());
   auto reflected = mirror_adapter_.reflect_sources(feature->id(), sources.value(),
@@ -3324,6 +3399,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_mirror(const PartDocument
   auto stored = store_pattern_result(document, *feature, std::move(result), working_cache);
   if (stored.has_error())
     return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored;
 }
@@ -3765,12 +3842,14 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument
   if (target.has_error())
     return Result<std::size_t>::failure(target.error());
   auto result = fillet_adapter_.apply(document, *feature, *target.value(), working_cache,
-                                      radius->value().millimeters());
+                                      radius->value().millimeters(), import_context_);
   if (result.has_error())
     return Result<std::size_t>::failure(result.error());
   auto stored = store_fillet_result(document, *feature, std::move(result.value()), working_cache);
   if (stored.has_error())
     return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored;
 }
@@ -3814,12 +3893,14 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_chamfer(const PartDocumen
   if (target.has_error())
     return Result<std::size_t>::failure(target.error());
   auto result = chamfer_adapter_.apply(document, *feature, *target.value(), working_cache,
-                                       first->value().millimeters(), second_value);
+                                       first->value().millimeters(), second_value, import_context_);
   if (result.has_error())
     return Result<std::size_t>::failure(result.error());
   auto stored = store_chamfer_result(document, *feature, std::move(result.value()), working_cache);
   if (stored.has_error())
     return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored;
 }
@@ -3847,12 +3928,14 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_shell(const PartDocument&
   if (target.has_error())
     return Result<std::size_t>::failure(target.error());
   auto result = shell_adapter_.apply(document, *feature, *target.value(), working_cache,
-                                     thickness->value().millimeters());
+                                     thickness->value().millimeters(), import_context_);
   if (result.has_error())
     return Result<std::size_t>::failure(result.error());
   auto stored = store_shell_result(document, *feature, std::move(result.value()), working_cache);
   if (stored.has_error())
     return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored;
 }
@@ -3881,21 +3964,23 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_draft(const PartDocument&
   if (target.has_error())
     return Result<std::size_t>::failure(target.error());
   auto direction = resolve_axis_reference(document, feature->pull_direction(), working_cache,
-                                          workplane_resolver_);
+                                          workplane_resolver_, import_context_);
   if (direction.has_error())
     return Result<std::size_t>::failure(direction.error());
-  auto plane =
-      resolve_mirror_plane(document, feature->neutral_plane(), working_cache, workplane_resolver_);
+  auto plane = resolve_mirror_plane(document, feature->neutral_plane(), working_cache,
+                                    workplane_resolver_, import_context_);
   if (plane.has_error())
     return Result<std::size_t>::failure(plane.error());
-  auto result = draft_adapter_.apply(document, *feature, *target.value(), working_cache,
-                                     direction.value().second, plane.value().first,
-                                     plane.value().second, angle->value().degrees());
+  auto result = draft_adapter_.apply(
+      document, *feature, *target.value(), working_cache, direction.value().second,
+      plane.value().first, plane.value().second, angle->value().degrees(), import_context_);
   if (result.has_error())
     return Result<std::size_t>::failure(result.error());
   auto stored = store_draft_result(document, *feature, std::move(result.value()), working_cache);
   if (stored.has_error())
     return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored;
 }
@@ -3948,6 +4033,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(const PartDo
     return stored_body;
 
   working_cache.clear_final_shape();
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return stored_body;
 }
@@ -4066,6 +4153,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_body_transform(
   } else {
     working_cache.clear_final_shape();
   }
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
   shape_cache = std::move(working_cache);
   return body_result;
 }
@@ -4088,7 +4177,10 @@ Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const RecomputePlan& plan,
                                         ShapeCache& shape_cache) const {
   ShapeCache working_cache = shape_cache;
-  ShapeCache& execution_cache = document.bodies().empty() ? shape_cache : working_cache;
+  const bool transactional_cache = !document.bodies().empty() ||
+                                   !document.imported_topology_catalogs().empty() ||
+                                   import_context_ != nullptr;
+  ShapeCache& execution_cache = transactional_cache ? working_cache : shape_cache;
   GeometryRecomputeSummary summary;
   for (const RecomputeStep& step : plan.steps()) {
     if (const auto* support = document.find_result_face_workplane(DatumPlaneId(step.node_id))) {
@@ -4165,7 +4257,10 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     ++summary.executed_feature_count;
   }
 
-  if (!document.bodies().empty())
+  auto fresh = validate_import_sources();
+  if (!fresh)
+    return Result<GeometryRecomputeSummary>::failure(fresh.error());
+  if (transactional_cache)
     shape_cache = std::move(working_cache);
   return Result<GeometryRecomputeSummary>::success(summary);
 }
@@ -4177,7 +4272,10 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
   if (!references)
     return Result<GeometryRecomputeSummary>::failure(references.error());
   ShapeCache working_cache = shape_cache;
-  ShapeCache& execution_cache = document.bodies().empty() ? shape_cache : working_cache;
+  const bool transactional_cache = !document.bodies().empty() ||
+                                   !document.imported_topology_catalogs().empty() ||
+                                   import_context_ != nullptr;
+  ShapeCache& execution_cache = transactional_cache ? working_cache : shape_cache;
   GeometryRecomputeSummary summary;
   std::vector<std::string> executable_ids;
   if (document.bodies().empty()) {
@@ -4266,9 +4364,16 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     ++summary.executed_feature_count;
   }
 
-  if (!document.bodies().empty())
+  auto fresh = validate_import_sources();
+  if (!fresh)
+    return Result<GeometryRecomputeSummary>::failure(fresh.error());
+  if (transactional_cache)
     shape_cache = std::move(working_cache);
   return Result<GeometryRecomputeSummary>::success(summary);
+}
+
+Result<std::size_t> GeometryRecomputeExecutor::validate_import_sources() const {
+  return import_context_ ? import_context_->validate_sources() : Result<std::size_t>::success(0);
 }
 
 } // namespace blcad::geometry

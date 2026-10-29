@@ -28,7 +28,8 @@ constexpr double kTolerance = 1.0e-6;
 Result<GeometryShape> FilletAdapter::apply(const PartDocument& document,
                                            const FilletFeature& feature,
                                            const GeometryShape& target,
-                                           const ShapeCache& shape_cache, double radius_mm) const {
+                                           const ShapeCache& shape_cache, double radius_mm,
+                                           StepImportTopologyContext* import_context) const {
   if (target.empty() || !std::isfinite(radius_mm) || radius_mm <= 0.0)
     return Result<GeometryShape>::failure(
         fillet_error(feature.id(), "fillet target and positive finite radius are required"));
@@ -37,7 +38,7 @@ Result<GeometryShape> FilletAdapter::apply(const PartDocument& document,
     BRepFilletAPI_MakeFillet builder(target_shape);
     for (const auto& reference : feature.edges()) {
       auto edge = resolve_semantic_edge(document, shape_cache, target_shape, reference,
-                                        feature.id(), "fillet");
+                                        feature.id(), "fillet", import_context);
       if (edge.has_error())
         return Result<GeometryShape>::failure(edge.error());
       builder.Add(radius_mm, edge.value());

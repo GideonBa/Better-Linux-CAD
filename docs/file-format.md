@@ -960,14 +960,66 @@ resolve relative to the saved containing document. Explicit refresh checks the o
 reinspects the asset before replacing only its digest. Exact path, freshness, save relocation and GUI
 contracts are in `docs/step-import-sequence-mvp10.md`.
 
-## Remaining STEP import persistence — Blocks 138–143
+## Imported topology catalog persistence — Block 139
+
+Part and Project envelopes add optional ordered `imported_topology_catalogs` arrays; embedded Parts
+own independent catalogs. Empty arrays are omitted, preserving canonical legacy bytes and existing
+envelope versions. Loading is filesystem-free: sources load before catalogs, and catalogs before
+their consuming Part feature references. A catalog record has exactly `id`, `source`,
+`captured_sha256_digest`, `product_key`, integer `descriptor_version` (currently **1**) and `entries`.
+It covers one selected source product definition. `source` must exist in the same owner registry.
+The digest and product key are lowercase SHA-256 capture evidence; neither establishes persistent
+selection identity. Explicit source refresh retains this baseline and every catalog/entry id.
+
+Each entry has exactly `id`, nullable `parent_body` and `descriptor`. Imported Body entry ids are
+separate from authored `BodyId` outputs. Body entries have no parent; every Face/Edge/Vertex entry
+must name a Body entry within its catalog. Entry ids are unique within that catalog; catalog ids are
+unique within their Part/Project owner. Authored array order and identity are retained by Open/Save.
+
+Version-1 descriptors have exactly these fields:
+
+| Field | Frozen spelling and meaning |
+| --- | --- |
+| `kind` | `body`, `face`, `edge` or `vertex` |
+| `geometry` | `opaque`, `plane`, `cylinder`, `line`, `circle` or `point` |
+| `body_kind` | `solid`/`surface` for a Body, otherwise null |
+| `centroid`, `origin`, `direction` | Exact `{x,y,z}` numeric records |
+| `bounds_mm` | Six finite numbers: xmin/ymin/zmin/xmax/ymax/zmax |
+| `measure` | Nonnegative volume/area/length by topology kind; zero for a vertex |
+| `radius_mm` | Positive for cylinder/circle, zero for other classes |
+| `samples` | Array of finite `{x,y,z}` recovery samples in product-local mm |
+| `boundary_keys` | Sorted array of lowercase SHA-256 normalized boundary/incidence witnesses |
+| `geometry_key` | Lowercase SHA-256 normalized equation/topology witness |
+
+Analytic directions are unit vectors with their first significant component positive. Plane/line/
+cylinder origins use the canonical closest point to the coordinate origin; circles store their
+center. Descriptors retain explicit recovery evidence, not resolved current geometry authority.
+Body/Face measures must be positive; analytic line/circle edges have positive length. A valid
+degenerate opaque edge may retain zero length without gaining an analytic capability. Wrong types,
+unknown fields/enums/versions, non-finite or negative metrics, inverted bounds, malformed digests,
+duplicate ids and invalid parent/source ownership fail closed. No STEP/XDE/traversal identity is
+persisted. Unsupported analytic geometry retains an opaque witness without invented primitives.
+An opaque Face/Edge exposes only its explicit generic Face/Edge capability to existing topology
+consumers; it gains no Plane/Axis/Line/Circle/Cylinder/Point projection.
+
+Imported Part Axis/Plane/Face/Edge inputs use `source_kind: "imported_topology"` with a nested
+`reference` containing exactly `catalog`, `entry` and explicit lowercase `capability`. Existing
+role/capability fields remain present where the enclosing feature schema requires them. Core
+validates ownership and supported capability; Geometry subsequently resolves current verified source
+bytes as Resolved/Lost/Ambiguous. Lost/Ambiguous states and resolved handles are not saved. A Part
+catalog contributes dependency node `imported-catalog:<catalog-id>`; source refresh invalidates it
+and its consumers without changing the saved baseline. Referenced catalogs and sources cannot be
+removed silently. Assembly endpoint spelling is canonical
+`imported:<encoded-catalog-id>:<encoded-entry-id>:<capability>` with uppercase percent escapes for
+bytes outside `[A-Za-z0-9_-]`; it is disjoint from existing `ref:`, `topo:` and dotted feature targets.
+
+## Remaining STEP import persistence — Blocks 140–143
 
 Planned persistent import intent includes:
 
 ```text
 selected imported product/body definitions
 persistent BLCAD BodyId outputs for EditableBody
-semantic imported-topology catalog and recovery descriptors
 ```
 
 Planned persistence must not include:
@@ -981,7 +1033,7 @@ STEP entity numbers
 reader transfer maps
 OCCT traversal indices
 resolved imported topology handles
-derived Plane/Axis/Line/Point/Circle/Cylinder descriptors
+resolved current Plane/Axis/Line/Point/Circle/Cylinder descriptors
 ```
 
 Reference mode stores immutable imported Part/source intent suitable for ComponentInstance use.

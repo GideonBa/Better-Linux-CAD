@@ -16,6 +16,33 @@
 using namespace blcad;
 using namespace blcad::gui;
 
+TEST_CASE("Interactive finishing imported identities retain canonical reference namespaces",
+          "[gui][interactive-finishing][step-import-topology-workbench]") {
+  const auto first = ImportedTopologyReference::create(
+      ImportedTopologyCatalogId("a:b"), ImportedTopologyId("c"), ImportedTopologyCapability::Edge);
+  const auto second = ImportedTopologyReference::create(
+      ImportedTopologyCatalogId("a"), ImportedTopologyId("b:c"), ImportedTopologyCapability::Edge);
+  REQUIRE(first);
+  REQUIRE(second);
+  const auto edge = EdgeReference::create_imported(PartFeatureInputRole::FilletEdge, first.value());
+  const auto other =
+      EdgeReference::create_imported(PartFeatureInputRole::FilletEdge, second.value());
+  REQUIRE(edge);
+  REQUIRE(other);
+  CHECK(interactive_edge_identity(edge.value()) ==
+        make_imported_topology_target_spelling(first.value()).value());
+  CHECK(interactive_edge_identity(edge.value()) != interactive_edge_identity(other.value()));
+  const auto imported_face = ImportedTopologyReference::create(
+      ImportedTopologyCatalogId("a:b"), ImportedTopologyId("c"), ImportedTopologyCapability::Face);
+  REQUIRE(imported_face);
+  const auto face =
+      FaceReference::create_imported(PartFeatureInputRole::ShellRemovalFace, imported_face.value());
+  REQUIRE(face);
+  CHECK(interactive_face_identity(face.value()) ==
+        make_imported_topology_target_spelling(imported_face.value()).value());
+  CHECK(interactive_face_identity(face.value()) != interactive_edge_identity(edge.value()));
+}
+
 namespace {
 
 Parameter length(const char* id, double value) {

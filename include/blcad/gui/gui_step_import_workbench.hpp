@@ -2,6 +2,7 @@
 
 #include "blcad/core/step_import_freshness.hpp"
 #include "blcad/geometry/step_import_reader.hpp"
+#include "blcad/geometry/step_import_topology.hpp"
 #include "blcad/gui/gui_document_session.hpp"
 
 namespace blcad::gui {
@@ -36,6 +37,14 @@ struct GuiStepImportGeometryPreview {
   std::vector<geometry::GeometryShape> preview_shapes;
 };
 
+struct GuiStepImportTopologyPreview {
+  GuiStepImportGeometryPreview inspection;
+  ImportedTopologyCatalog catalog;
+  geometry::ImportedTopologyRecovery recovery;
+  bool accepted_catalog{false};
+  std::optional<std::size_t> captured_product_index;
+};
+
 class GuiStepImportWorkbench {
 public:
   [[nodiscard]] Result<GuiStepImportPreview>
@@ -56,6 +65,14 @@ public:
                    std::string project_relative_asset_path, StepImportMode) const;
   [[nodiscard]] Result<std::size_t> validate_inspection(const GuiDocumentSession&,
                                                         const GuiStepImportGeometryPreview&) const;
+  [[nodiscard]] Result<GuiStepImportTopologyPreview>
+  prepare_topology(const GuiDocumentSession&, StepImportSourceId, std::size_t product_index) const;
+  [[nodiscard]] Result<GuiStepImportTopologyPreview>
+  inspect_topology(const GuiDocumentSession&, ImportedTopologyCatalogId) const;
+  [[nodiscard]] Result<std::size_t> validate_topology(const GuiDocumentSession&,
+                                                      const GuiStepImportTopologyPreview&) const;
+  [[nodiscard]] Result<std::size_t> apply_topology(GuiDocumentSession&,
+                                                   const GuiStepImportTopologyPreview&) const;
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession&, const GuiStepImportPreview&) const;
 };
 

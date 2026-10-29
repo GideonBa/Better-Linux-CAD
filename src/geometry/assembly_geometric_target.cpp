@@ -151,6 +151,50 @@ validate_source_metadata(const AssemblyResolvedGeometricTarget& target) {
     // Exact reference-geometry source ids/grammar are intentionally introduced in
     // Block 32. The endpoint semantic-reference string remains exact identity here.
     break;
+  case AssemblyGeometricTargetSourceKind::ImportedPlanarFace:
+  case AssemblyGeometricTargetSourceKind::ImportedCylindricalFace:
+  case AssemblyGeometricTargetSourceKind::ImportedLinearEdge:
+  case AssemblyGeometricTargetSourceKind::ImportedCircularEdge:
+  case AssemblyGeometricTargetSourceKind::ImportedVertex: {
+    if (!source.imported_topology || source.source_feature || source.source_profile ||
+        source.semantic_face || source.semantic_axis || source.semantic_seating_plane)
+      return Result<std::size_t>::failure(validation_error(
+          "imported target must retain its catalog reference without a generated producer"));
+    const auto spelling = make_imported_topology_target_spelling(*source.imported_topology);
+    const auto endpoint =
+        std::visit([](const auto& value) { return value.semantic_reference; }, target.endpoint);
+    if (!spelling || spelling.value() != endpoint)
+      return Result<std::size_t>::failure(
+          validation_error("imported target metadata must match its exact semantic endpoint"));
+    const auto capability = source.imported_topology->capability();
+    using Capability = ImportedTopologyCapability;
+    bool supported = false;
+    switch (target.source_kind) {
+    case AssemblyGeometricTargetSourceKind::ImportedPlanarFace:
+      supported = capability == Capability::Plane || capability == Capability::Face;
+      break;
+    case AssemblyGeometricTargetSourceKind::ImportedCylindricalFace:
+      supported = capability == Capability::Cylinder || capability == Capability::Axis ||
+                  capability == Capability::Face;
+      break;
+    case AssemblyGeometricTargetSourceKind::ImportedLinearEdge:
+      supported = capability == Capability::Line || capability == Capability::Edge;
+      break;
+    case AssemblyGeometricTargetSourceKind::ImportedCircularEdge:
+      supported = capability == Capability::Circle || capability == Capability::Axis ||
+                  capability == Capability::Point || capability == Capability::Edge;
+      break;
+    case AssemblyGeometricTargetSourceKind::ImportedVertex:
+      supported = capability == Capability::Point;
+      break;
+    default:
+      break;
+    }
+    if (!supported)
+      return Result<std::size_t>::failure(validation_error(
+          "imported endpoint capability does not match its resolved analytic source kind"));
+    break;
+  }
   }
 
   return Result<std::size_t>::success(1U);
@@ -159,16 +203,21 @@ validate_source_metadata(const AssemblyResolvedGeometricTarget& target) {
 [[nodiscard]] bool descriptor_matches_source_kind(const AssemblyResolvedGeometricTarget& target) {
   switch (target.source_kind) {
   case AssemblyGeometricTargetSourceKind::GeneratedPlanarFace:
+  case AssemblyGeometricTargetSourceKind::ImportedPlanarFace:
   case AssemblyGeometricTargetSourceKind::DatumPlane:
     return std::holds_alternative<AssemblyPlanarTargetDescriptor>(target.descriptor);
   case AssemblyGeometricTargetSourceKind::GeneratedCylindricalFace:
+  case AssemblyGeometricTargetSourceKind::ImportedCylindricalFace:
     return std::holds_alternative<AssemblyCylindricalSurfaceTargetDescriptor>(target.descriptor);
   case AssemblyGeometricTargetSourceKind::GeneratedLinearEdge:
+  case AssemblyGeometricTargetSourceKind::ImportedLinearEdge:
   case AssemblyGeometricTargetSourceKind::ConstructionLine:
     return std::holds_alternative<AssemblyLineTargetDescriptor>(target.descriptor);
   case AssemblyGeometricTargetSourceKind::GeneratedCircularEdge:
+  case AssemblyGeometricTargetSourceKind::ImportedCircularEdge:
     return std::holds_alternative<AssemblyCircularEdgeTargetDescriptor>(target.descriptor);
   case AssemblyGeometricTargetSourceKind::GeneratedVertex:
+  case AssemblyGeometricTargetSourceKind::ImportedVertex:
   case AssemblyGeometricTargetSourceKind::ConstructionPoint:
     return std::holds_alternative<AssemblyPointTargetDescriptor>(target.descriptor);
   case AssemblyGeometricTargetSourceKind::DatumAxis:
@@ -239,6 +288,16 @@ validate_descriptor(const AssemblyGeometricTargetDescriptor& descriptor) {
 
 std::string_view to_string(AssemblyGeometricTargetSourceKind kind) noexcept {
   switch (kind) {
+  case AssemblyGeometricTargetSourceKind::ImportedPlanarFace:
+    return "ImportedPlanarFace";
+  case AssemblyGeometricTargetSourceKind::ImportedCylindricalFace:
+    return "ImportedCylindricalFace";
+  case AssemblyGeometricTargetSourceKind::ImportedLinearEdge:
+    return "ImportedLinearEdge";
+  case AssemblyGeometricTargetSourceKind::ImportedCircularEdge:
+    return "ImportedCircularEdge";
+  case AssemblyGeometricTargetSourceKind::ImportedVertex:
+    return "ImportedVertex";
   case AssemblyGeometricTargetSourceKind::GeneratedPlanarFace:
     return "GeneratedPlanarFace";
   case AssemblyGeometricTargetSourceKind::GeneratedCylindricalFace:
@@ -297,19 +356,24 @@ std::vector<AssemblyGeometricTargetCapability>
 assembly_geometric_target_capabilities(AssemblyGeometricTargetSourceKind kind) {
   switch (kind) {
   case AssemblyGeometricTargetSourceKind::GeneratedPlanarFace:
+  case AssemblyGeometricTargetSourceKind::ImportedPlanarFace:
   case AssemblyGeometricTargetSourceKind::DatumPlane:
     return {AssemblyGeometricTargetCapability::Plane};
   case AssemblyGeometricTargetSourceKind::GeneratedCylindricalFace:
+  case AssemblyGeometricTargetSourceKind::ImportedCylindricalFace:
     return {AssemblyGeometricTargetCapability::Axis,
             AssemblyGeometricTargetCapability::Cylinder};
   case AssemblyGeometricTargetSourceKind::GeneratedLinearEdge:
+  case AssemblyGeometricTargetSourceKind::ImportedLinearEdge:
   case AssemblyGeometricTargetSourceKind::ConstructionLine:
     return {AssemblyGeometricTargetCapability::Line};
   case AssemblyGeometricTargetSourceKind::GeneratedCircularEdge:
+  case AssemblyGeometricTargetSourceKind::ImportedCircularEdge:
     return {AssemblyGeometricTargetCapability::Axis,
             AssemblyGeometricTargetCapability::Point,
             AssemblyGeometricTargetCapability::Circle};
   case AssemblyGeometricTargetSourceKind::GeneratedVertex:
+  case AssemblyGeometricTargetSourceKind::ImportedVertex:
   case AssemblyGeometricTargetSourceKind::ConstructionPoint:
     return {AssemblyGeometricTargetCapability::Point};
   case AssemblyGeometricTargetSourceKind::DatumAxis:

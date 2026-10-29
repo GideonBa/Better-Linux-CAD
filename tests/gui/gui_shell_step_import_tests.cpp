@@ -5,6 +5,7 @@
 #include "blcad/core/step_import_source.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
+#include "blcad/geometry/circular_cut_adapter.hpp"
 #include "blcad/geometry/step_exporter.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
@@ -16,6 +17,7 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QCryptographicHash>
+#include <QCursor>
 #include <QDialog>
 #include <QDir>
 #include <QDockWidget>
@@ -23,6 +25,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QInputDialog>
+#include <QHeaderView>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -85,6 +88,15 @@ void write_inspection_geometry(const QString& path, double width = 20) {
   auto shape = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(
       checked(Quantity::length_mm(width)), checked(Quantity::length_mm(10)),
       checked(Quantity::length_mm(5))));
+  shape = checked(geometry::BodyTransformAdapter{}.translate(shape, {1000, 2000, 3000}));
+  REQUIRE(geometry::StepExporter{}.write_step(shape, path.toStdString()));
+}
+void write_topology_geometry(const QString& path, double width = 20) {
+  auto shape = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(
+      checked(Quantity::length_mm(width)), checked(Quantity::length_mm(10)),
+      checked(Quantity::length_mm(5))));
+  shape = checked(
+      geometry::CircularCutAdapter{}.cut_circular_hole(shape, checked(Quantity::length_mm(4))));
   shape = checked(geometry::BodyTransformAdapter{}.translate(shape, {1000, 2000, 3000}));
   REQUIRE(geometry::StepExporter{}.write_step(shape, path.toStdString()));
 }
@@ -191,7 +203,9 @@ public:
     INFO("Ribbon command: " << id.toStdString());
     auto& selected = action(id);
     REQUIRE(selected.isEnabled());
-    const int tab = id.startsWith("sketch.") || id == "finish_sketch" ? 1 : 0;
+    const int tab = id.startsWith("sketch.") || id == "finish_sketch" ? 1
+                    : id.startsWith("view_")                          ? 2
+                                                                      : 0;
     window.ribbon().set_current_tab(tab);
     flush();
     for (auto* button : window.ribbon().findChildren<QToolButton*>()) {
@@ -1012,6 +1026,194 @@ TEST_CASE(
   CHECK(ui.snapshot() == refreshed);
   CHECK_FALSE(ui.window.session().dirty());
   CHECK(bytes(asset) == current_asset);
+}
+
+TEST_CASE(
+    "Native imported topology catalogs persist stable references and pick exact analytic targets",
+    "[gui][integration][block139-step-topology][native-step-topology]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires real OCCT imported topology picking");
+  const bool project = GENERATE(false, true);
+  CAPTURE(project);
+  SourceUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto document =
+      directory.filePath(project ? "topology.blcad.project.json" : "topology.blcad.json");
+  const auto asset = directory.filePath("supplier.step");
+  write_topology_geometry(asset);
+  const auto original_asset = bytes(asset);
+  REQUIRE((project ? ui.window.new_project("Topology inspection")
+                   : ui.window.new_part("Topology inspection")));
+  ui.file("save_as", document);
+  ui.begin();
+  ui.draft("Supplier plate", "supplier.step", StepImportMode::Reference);
+  ui.preview();
+  ui.apply();
+  ui.command("save");
+  const auto source_id = QString::fromStdString(ui.sources().front().id().value());
+  const auto registered = ui.snapshot();
+  auto& idle_filter = ui.widget<QComboBox>("blcad.selection.filter");
+  ui.choose(idle_filter, idle_filter.findData(selection_kind_bit(GuiSelectionKind::Face)));
+  const auto original_mask = ui.window.viewport().selection_filter_mask();
+  const auto original_scope = ui.window.viewport().selection_semantic_scope();
+  ui.begin();
+  ui.source(source_id);
+  ui.button("inspect_geometry");
+  REQUIRE(ui.field<QComboBox>("topology_product").count() == 1);
+  ui.button("topology_prepare");
+  INFO(ui.field<QLabel>("summary").text().toStdString());
+  REQUIRE(ui.field<QPushButton>("apply").isEnabled());
+  REQUIRE(ui.window.viewport().preview_selection_target_count() > 20);
+  CHECK(ui.snapshot() == registered);
+  CHECK_FALSE(ui.window.session().dirty());
+  auto& entries = ui.field<QTreeWidget>("topology_entries");
+  REQUIRE(entries.topLevelItemCount() > 20);
+  for (int i = 0; i < entries.topLevelItemCount(); ++i)
+    CHECK(entries.topLevelItem(i)->text(2) == "resolved");
+  const auto pick = [&](ImportedTopologyCapability capability, Point3 point,
+                        GuiSelectionKind kind) {
+    INFO("Pick capability: " << to_string(capability)
+                             << ", expected kind: " << static_cast<int>(kind));
+    auto& filter = ui.field<QComboBox>("topology_filter");
+    ui.choose(filter, filter.findData(static_cast<int>(capability)));
+    const auto left = checked(ui.window.viewport().model_to_screen({990, 2000, 3002.5}));
+    const auto right = checked(ui.window.viewport().model_to_screen({1010, 2000, 3002.5}));
+    REQUIRE(std::hypot(right.x - left.x, right.y - left.y) >= 80);
+    const auto screen = checked(ui.window.viewport().model_to_screen(point));
+    REQUIRE(screen.x > 3);
+    REQUIRE(screen.x < ui.window.viewport().width() - 3);
+    REQUIRE(screen.y > 3);
+    REQUIRE(screen.y < ui.window.viewport().height() - 3);
+    ui.window.raise();
+    ui.window.activateWindow();
+    QCursor::setPos(ui.window.viewport().mapToGlobal(QPoint{qRound(screen.x), qRound(screen.y)}));
+    QMouseEvent move(QEvent::MouseMove, {screen.x, screen.y},
+                     ui.window.viewport().mapToGlobal(QPoint{qRound(screen.x), qRound(screen.y)}),
+                     Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(&ui.window.viewport(), &move);
+    ui.click_at(ui.window.viewport(), {screen.x, screen.y});
+    const auto selected = ui.window.viewport().selected_semantic();
+    REQUIRE(selected);
+    CHECK(selected->kind == kind);
+    const auto spelling =
+        ui.field<QPlainTextEdit>("topology_reference").toPlainText().toStdString();
+    REQUIRE_FALSE(spelling.empty());
+    CHECK(spelling == selected->semantic_id);
+    const auto reference = checked(parse_imported_topology_target_spelling(spelling));
+    CHECK(reference.capability() == capability);
+    CHECK(ui.snapshot() == registered);
+    return reference;
+  };
+  ui.command("view_top");
+  const auto face =
+      pick(ImportedTopologyCapability::Plane, {1006, 2002, 3005}, GuiSelectionKind::Face);
+  const auto edge =
+      pick(ImportedTopologyCapability::Line, {1005, 1995, 3005}, GuiSelectionKind::Edge);
+  const auto vertex =
+      pick(ImportedTopologyCapability::Point, {990, 1995, 3005}, GuiSelectionKind::Vertex);
+  const auto circle =
+      pick(ImportedTopologyCapability::Circle, {1002, 2000, 3005}, GuiSelectionKind::Edge);
+  ui.command("view_isometric");
+  const auto cylinder =
+      pick(ImportedTopologyCapability::Cylinder, {1000, 2002, 3003.5}, GuiSelectionKind::Face);
+  const auto axis =
+      pick(ImportedTopologyCapability::Axis, {1000, 2002, 3003.5}, GuiSelectionKind::Face);
+  ui.reveal(entries);
+  CHECK(ui.field<QScrollArea>("scroll").horizontalScrollBar()->maximum() == 0);
+  INFO("Topology table viewport " << entries.viewport()->width() << ", header length "
+                                  << entries.header()->length() << ", section widths "
+                                  << entries.columnWidth(0) << ',' << entries.columnWidth(1) << ','
+                                  << entries.columnWidth(2) << ',' << entries.columnWidth(3));
+  CHECK(entries.horizontalScrollBar()->maximum() == 0);
+  ui.capture(project ? "step-topology-project-picking" : "step-topology-part-picking");
+  ui.apply();
+  const auto accepted = ui.snapshot();
+  CHECK(accepted != registered);
+  CHECK(ui.window.session().undo_label() == "Capture imported topology catalog");
+  CHECK(ui.window.viewport().preview_selection_target_count() == 0);
+  CHECK(ui.window.viewport().selection_filter_mask() == original_mask);
+  CHECK(ui.window.viewport().selection_semantic_scope() == original_scope);
+  const auto catalog =
+      project ? ui.window.session().project()->imported_topology_catalogs().front()
+              : ui.window.session().part_document()->imported_topology_catalogs().front();
+  for (const auto& reference : {face, edge, vertex, circle, cylinder, axis}) {
+    CHECK(reference.catalog() == catalog.id());
+    CHECK(catalog.find(reference.entry()));
+  }
+  ui.command("undo");
+  CHECK(ui.snapshot() == registered);
+  ui.command("redo");
+  CHECK(ui.snapshot() == accepted);
+  ui.roundtrip(document);
+  // Opening a document resets the idle filter to All; each later task must
+  // restore that current choice rather than the pre-Open Faces choice.
+  const auto reopened_mask = ui.window.viewport().selection_filter_mask();
+  const auto reopened_scope = ui.window.viewport().selection_semantic_scope();
+  CHECK(reopened_mask == 0xFFFFFFFFU);
+  ui.begin();
+  ui.source(source_id);
+  REQUIRE_FALSE(ui.field<QComboBox>("topology_catalog").currentData().toString().isEmpty());
+  ui.button("topology_prepare");
+  REQUIRE(ui.window.viewport().preview_selection_target_count() > 0);
+  CHECK_FALSE(ui.field<QPushButton>("apply").isEnabled());
+  ui.command("view_top");
+  auto& filter = ui.field<QComboBox>("topology_filter");
+  ui.choose(filter, filter.findData(static_cast<int>(ImportedTopologyCapability::Plane)));
+  const auto screen = checked(ui.window.viewport().model_to_screen({1006, 2002, 3005}));
+  ui.click_at(ui.window.viewport(), {screen.x, screen.y});
+  REQUIRE(ui.window.viewport().selected_semantic());
+  CHECK(checked(parse_imported_topology_target_spelling(
+            ui.window.viewport().selected_semantic()->semantic_id)) == face);
+  CHECK(ui.snapshot() == accepted);
+  write_topology_geometry(asset, 40);
+  const auto changed_asset = bytes(asset);
+  ui.flush();
+  CHECK(ui.window.viewport().preview_selection_target_count() == 0);
+  CHECK_FALSE(ui.window.viewport().feature_preview_active());
+  CHECK(ui.snapshot() == accepted);
+  ui.preview();
+  ui.apply();
+  const auto refreshed = ui.snapshot();
+  CHECK(refreshed != accepted);
+  ui.begin();
+  ui.source(source_id);
+  ui.button("topology_prepare");
+  auto& recovered = ui.field<QTreeWidget>("topology_entries");
+  ui.choose(filter, filter.findData(-1));
+  bool lost = false;
+  for (int i = 0; i < recovered.topLevelItemCount(); ++i)
+    if (recovered.topLevelItem(i)->text(2) != "resolved") {
+      lost = true;
+      const auto id = recovered.topLevelItem(i)->data(0, Qt::UserRole).toString();
+      const auto* entry = catalog.find(ImportedTopologyId(id.toStdString()));
+      REQUIRE(entry);
+      const auto capability =
+          entry->descriptor.kind == ImportedTopologyKind::Body   ? ImportedTopologyCapability::Body
+          : entry->descriptor.kind == ImportedTopologyKind::Face ? ImportedTopologyCapability::Face
+          : entry->descriptor.kind == ImportedTopologyKind::Edge
+              ? ImportedTopologyCapability::Edge
+              : ImportedTopologyCapability::Point;
+      const auto reference =
+          checked(ImportedTopologyReference::create(catalog.id(), entry->id, capability));
+      CHECK_FALSE(ui.window.viewport().select_semantic(
+          checked(make_imported_topology_target_spelling(reference))));
+    }
+  CHECK(lost);
+  const auto* unchanged =
+      project ? ui.window.session().project()->find_imported_topology_catalog(catalog.id())
+              : ui.window.session().part_document()->find_imported_topology_catalog(catalog.id());
+  REQUIRE(unchanged);
+  CHECK(*unchanged == catalog);
+  ui.reveal(recovered);
+  ui.capture(project ? "step-topology-project-recovery" : "step-topology-part-recovery");
+  ui.key(ui.window.viewport(), Qt::Key_Escape);
+  CHECK(ui.window.viewport().preview_selection_target_count() == 0);
+  CHECK(ui.window.viewport().selection_filter_mask() == reopened_mask);
+  CHECK(ui.window.viewport().selection_semantic_scope() == reopened_scope);
+  CHECK(ui.snapshot() == refreshed);
+  CHECK(changed_asset != original_asset);
+  CHECK(bytes(asset) == changed_asset);
 }
 
 TEST_CASE("Embedded STEP source catalog rows cannot apply a prepared Project source operation",

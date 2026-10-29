@@ -11,6 +11,7 @@
 namespace blcad::geometry {
 
 class ShapeCache;
+class StepImportTopologyContext;
 
 // Shared semantic edge resolution for the edge-driven Part features (Fillet,
 // Chamfer). Both resolve a persisted `EdgeReference` — semantic linear or
@@ -30,6 +31,7 @@ class ShapeCache;
 [[nodiscard]] Result<TopoDS_Edge>
 resolve_semantic_edge(const PartDocument& document, const ShapeCache& cache,
                       const TopoDS_Shape& target, const EdgeReference& reference,
-                      const FeatureId& id, std::string_view feature_label);
+                      const FeatureId& id, std::string_view feature_label,
+                      StepImportTopologyContext* import_context = nullptr);
 
 } // namespace blcad::geometry

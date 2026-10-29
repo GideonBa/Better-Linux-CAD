@@ -1,5 +1,6 @@
 #include "blcad/core/part_document_json.hpp"
 #include "step_import_json.hpp"
+#include "imported_topology_json.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -176,6 +177,22 @@ composite_inner_contours_from_json(const json& values) {
       json_error("unsupported semantic vertex in part document json"));
 }
 
+template <typename Reference>
+Result<Reference> imported_input_from_json(const json& value, PartFeatureInputRole role,
+                                           std::size_t field_count) {
+  if (value.size() != field_count || !value.contains("reference"))
+    return Result<Reference>::failure(json_error("imported feature reference has invalid fields"));
+  auto imported = detail::imported_reference_from_json(value.at("reference"));
+  if (!imported)
+    return Result<Reference>::failure(imported.error());
+  auto reference = Reference::create_imported(role, std::move(imported.value()));
+  if (reference && value.contains("capability") &&
+      value.at("capability") != to_string(reference.value().expected_capability()))
+    return Result<Reference>::failure(
+        json_error("imported feature capability does not match its typed reference"));
+  return reference;
+}
+
 [[nodiscard]] json semantic_edge_reference_to_json(const SemanticEdgeReference& reference) {
   return json{{"source_feature", reference.source_feature().value()},
               {"edge", std::string(to_string(reference.edge()))}};
@@ -199,6 +216,11 @@ composite_inner_contours_from_json(const json& values) {
 }
 
 [[nodiscard]] json edge_treatment_edge_to_json(const EdgeReference& edge) {
+  if (const auto* imported = std::get_if<ImportedTopologyReference>(&edge.source())) {
+    json value{{"source_kind", "imported_topology"},
+               {"reference", detail::imported_reference_to_json(*imported)}};
+    return value;
+  }
   if (const auto* source = std::get_if<ResultEdgeReference>(&edge.source())) {
     json samples = json::array();
     for (auto p : source->samples())
@@ -227,6 +249,8 @@ composite_inner_contours_from_json(const json& values) {
   if (!value.is_object() || !value.contains("source_kind") || !value.at("source_kind").is_string())
     return Result<EdgeReference>::failure(json_error("edge treatment edge requires source_kind"));
   const std::string kind = value.at("source_kind").get<std::string>();
+  if (kind == "imported_topology")
+    return imported_input_from_json<EdgeReference>(value, role, 2);
   if (kind == "result_edge" && value.size() == 5U && value.contains("source_feature") &&
       value.at("source_feature").is_string() && value.contains("curve_type") &&
       value.at("curve_type").is_number_integer() && value.at("curve_type") >= 0 &&
@@ -1208,6 +1232,13 @@ driving_dimension_from_json(const json& dimension_json) {
 }
 
 [[nodiscard]] json extrude_limit_face_to_json(const FaceReference& reference) {
+  if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
+    json value{{"source_kind", "imported_topology"},
+               {"reference", detail::imported_reference_to_json(*imported)}};
+    value["role"] = to_string(reference.role());
+    value["capability"] = to_string(reference.expected_capability());
+    return value;
+  }
   json value{{"role", std::string(to_string(reference.role()))},
              {"capability", std::string(to_string(reference.expected_capability()))},
              {"source_kind", std::string(to_string(reference.source_kind()))}};
@@ -1230,6 +1261,9 @@ driving_dimension_from_json(const json& dimension_json) {
     return Result<FaceReference>::failure(
         json_error("extrude limit face requires role and Face capability"));
   const std::string source_kind = value.value("source_kind", "");
+  if (source_kind == "imported_topology")
+    return imported_input_from_json<FaceReference>(value, PartFeatureInputRole::ExtrudeLimitFace,
+                                                   4);
   if (source_kind == "semantic_planar_face") {
     if (value.size() != 5U || !value.contains("source_feature") || !value.contains("face"))
       return Result<FaceReference>::failure(
@@ -1524,6 +1558,11 @@ feature_body_result_context_from_json(const json& feature_json) {
 }
 
 [[nodiscard]] json revolve_axis_to_json(const AxisReference& axis) {
+  if (const auto* imported = std::get_if<ImportedTopologyReference>(&axis.source())) {
+    json value{{"source_kind", "imported_topology"},
+               {"reference", detail::imported_reference_to_json(*imported)}};
+    return value;
+  }
   json value{{"source_kind", std::string(to_string(axis.source_kind()))}};
   switch (axis.source_kind()) {
   case PartFeatureInputSourceKind::DatumAxis:
@@ -1580,6 +1619,8 @@ feature_body_result_context_from_json(const json& feature_json) {
       !axis_json.at("source_kind").is_string())
     return Result<AxisReference>::failure(json_error("pattern axis requires source_kind"));
   const std::string source_kind = axis_json.at("source_kind").get<std::string>();
+  if (source_kind == "imported_topology")
+    return imported_input_from_json<AxisReference>(axis_json, PartFeatureInputRole::PatternAxis, 2);
   if (source_kind == "datum_axis" && axis_json.size() == 2U && axis_json.contains("datum_axis") &&
       axis_json.at("datum_axis").is_string())
     return AxisReference::create_datum_axis(
@@ -1635,6 +1676,11 @@ feature_body_result_context_from_json(const json& feature_json) {
 }
 
 [[nodiscard]] json mirror_plane_to_json(const PlaneReference& plane) {
+  if (const auto* imported = std::get_if<ImportedTopologyReference>(&plane.source())) {
+    json value{{"source_kind", "imported_topology"},
+               {"reference", detail::imported_reference_to_json(*imported)}};
+    return value;
+  }
   json value{{"source_kind", std::string(to_string(plane.source_kind()))}};
   if (plane.source_kind() == PartFeatureInputSourceKind::DatumPlane)
     value["datum_plane"] = std::get<DatumPlaneId>(plane.source()).value();
@@ -1652,6 +1698,8 @@ feature_body_result_context_from_json(const json& feature_json) {
   if (!value.is_object() || !value.contains("source_kind") || !value.at("source_kind").is_string())
     return Result<PlaneReference>::failure(json_error("mirror plane requires source_kind"));
   const std::string kind = value.at("source_kind").get<std::string>();
+  if (kind == "imported_topology")
+    return imported_input_from_json<PlaneReference>(value, PartFeatureInputRole::MirrorPlane, 2);
   if (kind == "datum_plane" && value.size() == 2U && value.contains("datum_plane") &&
       value.at("datum_plane").is_string())
     return PlaneReference::create_datum_plane(
@@ -1847,6 +1895,13 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
 }
 
 [[nodiscard]] json shell_removal_face_to_json(const FaceReference& reference) {
+  if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
+    json value{{"source_kind", "imported_topology"},
+               {"reference", detail::imported_reference_to_json(*imported)}};
+    value["role"] = to_string(reference.role());
+    value["capability"] = to_string(reference.expected_capability());
+    return value;
+  }
   json value{{"role", std::string(to_string(reference.role()))},
              {"capability", std::string(to_string(reference.expected_capability()))},
              {"source_kind", std::string(to_string(reference.source_kind()))}};
@@ -1869,6 +1924,9 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
     return Result<FaceReference>::failure(
         json_error("shell removal face requires role and Face capability"));
   const std::string source_kind = value.value("source_kind", "");
+  if (source_kind == "imported_topology")
+    return imported_input_from_json<FaceReference>(value, PartFeatureInputRole::ShellRemovalFace,
+                                                   4);
   if (source_kind == "semantic_planar_face") {
     if (value.size() != 5U || !value.contains("source_feature") ||
         !value.at("source_feature").is_string() || !value.contains("face") ||
@@ -1943,6 +2001,13 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
 }
 
 [[nodiscard]] json draft_face_to_json(const FaceReference& reference) {
+  if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
+    json value{{"source_kind", "imported_topology"},
+               {"reference", detail::imported_reference_to_json(*imported)}};
+    value["role"] = to_string(reference.role());
+    value["capability"] = to_string(reference.expected_capability());
+    return value;
+  }
   json value{{"role", std::string(to_string(reference.role()))},
              {"capability", std::string(to_string(reference.expected_capability()))},
              {"source_kind", std::string(to_string(reference.source_kind()))}};
@@ -1965,6 +2030,8 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
     return Result<FaceReference>::failure(
         json_error("draft face requires draft_face role and Face capability"));
   const std::string kind = value.value("source_kind", "");
+  if (kind == "imported_topology")
+    return imported_input_from_json<FaceReference>(value, PartFeatureInputRole::DraftFace, 4);
   if (kind == "semantic_planar_face" && value.size() == 5U && value.contains("source_feature") &&
       value.at("source_feature").is_string() && value.contains("face") &&
       value.at("face").is_string()) {
@@ -1994,6 +2061,13 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
 }
 
 [[nodiscard]] json draft_pull_direction_to_json(const AxisReference& direction) {
+  if (const auto* imported = std::get_if<ImportedTopologyReference>(&direction.source())) {
+    json value{{"source_kind", "imported_topology"},
+               {"reference", detail::imported_reference_to_json(*imported)}};
+    value["role"] = to_string(direction.role());
+    value["capability"] = to_string(direction.expected_capability());
+    return value;
+  }
   json value{{"role", std::string(to_string(direction.role()))},
              {"capability", std::string(to_string(direction.expected_capability()))},
              {"source_kind", std::string(to_string(direction.source_kind()))}};
@@ -2034,6 +2108,9 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
                                                     ? PartFeatureInputCapability::Axis
                                                     : PartFeatureInputCapability::Line;
   const std::string kind = value.at("source_kind").get<std::string>();
+  if (kind == "imported_topology")
+    return imported_input_from_json<AxisReference>(value, PartFeatureInputRole::DraftPullDirection,
+                                                   4);
   if (kind == "datum_axis" && capability == PartFeatureInputCapability::Axis &&
       value.size() == 4U && value.contains("datum_axis") && value.at("datum_axis").is_string())
     return AxisReference::create_datum_axis(PartFeatureInputRole::DraftPullDirection,
@@ -2066,6 +2143,13 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
 }
 
 [[nodiscard]] json draft_neutral_plane_to_json(const PlaneReference& plane) {
+  if (const auto* imported = std::get_if<ImportedTopologyReference>(&plane.source())) {
+    json value{{"source_kind", "imported_topology"},
+               {"reference", detail::imported_reference_to_json(*imported)}};
+    value["role"] = to_string(plane.role());
+    value["capability"] = to_string(plane.expected_capability());
+    return value;
+  }
   json value{{"role", std::string(to_string(plane.role()))},
              {"capability", std::string(to_string(plane.expected_capability()))},
              {"source_kind", std::string(to_string(plane.source_kind()))}};
@@ -2088,6 +2172,9 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
     return Result<PlaneReference>::failure(
         json_error("draft neutral plane requires role Plane capability and source_kind"));
   const std::string kind = value.at("source_kind").get<std::string>();
+  if (kind == "imported_topology")
+    return imported_input_from_json<PlaneReference>(value, PartFeatureInputRole::DraftNeutralPlane,
+                                                    4);
   if (kind == "datum_plane" && value.size() == 4U && value.contains("datum_plane") &&
       value.at("datum_plane").is_string())
     return PlaneReference::create_datum_plane(
@@ -2316,6 +2403,8 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
                                                std::move(edge.value()),
                                                PartFeatureInputCapability::Axis);
   }
+  if (source_kind == "imported_topology")
+    axis = imported_input_from_json<AxisReference>(axis_json, PartFeatureInputRole::RevolveAxis, 2);
   if (source_kind == "sketch_line" && axis_json.size() == 3U && axis_json.contains("sketch") &&
       axis_json.contains("entity") && axis_json.at("sketch").is_string() &&
       axis_json.at("entity").is_string()) {
@@ -2897,7 +2986,11 @@ boundary_curve_reference_from_json(const json& value) {
 [[nodiscard]] bool extrude_reference_features_available(const PartDocument& document,
                                                         const Feature& feature) {
   const auto available = [&document](const std::optional<FaceReference>& face) {
-    return !face.has_value() || document.find_feature(FeatureId(face->source_node_id())) != nullptr;
+    if (!face)
+      return true;
+    if (std::holds_alternative<ImportedTopologyReference>(face->source()))
+      return static_cast<bool>(validate_part_feature_input_reference(document, *face));
+    return document.find_feature(FeatureId(face->source_node_id())) != nullptr;
   };
   return available(feature.extrude_intent().extent().first_face()) &&
          available(feature.extrude_intent().extent().second_face());
@@ -3766,6 +3859,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   if (!document.step_import_sources().empty())
     root["step_import_sources"] =
         detail::step_import_sources_to_json(document.step_import_sources());
+  if (!document.imported_topology_catalogs().empty())
+    root["imported_topology_catalogs"] =
+        detail::imported_catalogs_to_json(document.imported_topology_catalogs());
   root["bodies"] = json::array();
   for (const auto& body : document.bodies())
     root["bodies"].push_back(json{{"id", body.id().value()},
@@ -4483,6 +4579,9 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     auto sources = detail::load_step_import_sources(root, document.value());
     if (!sources)
       return Result<PartDocument>::failure(sources.error());
+    auto catalogs = detail::load_imported_catalogs(root, document.value());
+    if (!catalogs)
+      return Result<PartDocument>::failure(catalogs.error());
     const json body_array = root.value("bodies", json::array());
     if (!body_array.is_array())
       return Result<PartDocument>::failure(

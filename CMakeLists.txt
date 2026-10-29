@@ -101,6 +101,7 @@ add_library(
   src/core/sweep_feature.cpp
   src/core/step_import_source.cpp
   src/core/step_import_freshness.cpp
+  src/core/imported_topology.cpp
 )
 add_library(BLCAD::core ALIAS blcad_core)
 
@@ -217,6 +218,8 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/sketch_region_finder.cpp
     src/geometry/step_exporter.cpp
     src/geometry/step_import_reader.cpp
+    src/geometry/step_import_topology.cpp
+    src/geometry/step_import_topology_context.cpp
     src/geometry/workplane_resolver.cpp
   )
   add_library(BLCAD::geometry ALIAS blcad_geometry)
@@ -408,6 +411,7 @@ if(BLCAD_BUILD_TESTS)
     blcad_core_tests
     tests/core/feature_update_command_tests.cpp
     tests/core/step_import_source_tests.cpp
+    tests/core/imported_topology_tests.cpp
     tests/core/assembly_angle_constraint_tests.cpp
     tests/core/assembly_constraint_graph_tests.cpp
     tests/core/assembly_constraint_tests.cpp
@@ -602,6 +606,8 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/spline_profile_pipeline_tests.cpp
       tests/geometry/step_exporter_tests.cpp
       tests/geometry/step_import_reader_tests.cpp
+      tests/geometry/step_import_topology_tests.cpp
+      tests/geometry/step_import_target_tests.cpp
       tests/geometry/step_import_profile_tests.cpp
       tests/geometry/viewport_scene_tests.cpp
       tests/geometry/assembly_interaction_tests.cpp
