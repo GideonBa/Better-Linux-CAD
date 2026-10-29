@@ -14,7 +14,9 @@ namespace {
   return std::visit(
       [](const auto& source) {
         using T = std::decay_t<decltype(source)>;
-        if constexpr (std::is_same_v<T, SemanticFaceReference>)
+        if constexpr (std::is_same_v<T, ImportedTopologyReference>)
+          return make_imported_topology_target_spelling(source).value();
+        else if constexpr (std::is_same_v<T, SemanticFaceReference>)
           return source.source_feature().value() + ":" + std::string(to_string(source.face()));
         else
           return source.source_feature().value() + ":" + source.source_profile().value() + ":" +

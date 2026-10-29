@@ -499,7 +499,7 @@ Blocks 132 (QOpenGLWidget viewport), 133 (`ShellWindow` + `ShellRibbon`, origin 
 implemented; Block 136 restores full bounded feature coverage and is accepted with full offscreen,
 native Qt/OCCT and closure checks. Block 137 adds verified STEP source intent, freshness and shell
 management. Block 138 adds the verified STEP/XDE reader and read-only geometry inspection.
-All Blocks through 138 are complete; Block 139 (imported topology identity/recovery) is next.
+All Blocks through 139 are complete; Block 140 (immutable imported Reference Parts) is planned.
 Source contracts and acceptance evidence live in `docs/step-import-sequence-mvp10.md`; the completed shell milestone
 lives in `docs/gui-shell-acceptance-mvp9r.md`. Dated proof sections below retain their original
 incremental status.
@@ -2209,3 +2209,81 @@ snapshot; these columns are not additive. Fixture creation/export, rendering, GU
 and native publication are excluded. Five warm samples do not establish a reliable tail
 budget, and the already-written file was in the OS cache. The generated STEP header timestamp
 changes its byte digest across exports; the code recreates the same geometric workload.
+
+### Block 139 — Imported topology identity and recovery (accepted 2026-10-29)
+
+The catalog/JSON, normalized Geometry recovery, explicit source context, Part/Assembly consumers
+and source-task semantic selection are implemented on `feat/step-import-topology` from merged
+main `ca2db6e`. Exact ownership, immutable-baseline, three-state recovery and capability contracts
+live in `docs/step-import-sequence-mvp10.md` and `docs/file-format.md`. All runtime acceptance
+gates pass on 2026-10-29; numbered completion advances through Block 139 only.
+
+```bash
+cmake --build build/dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app blcad_export_step -j 8
+./build/dev-gui/blcad_core_tests "[step-import-topology]"
+./build/dev-gui/blcad_geometry_tests "[step-import-topology-recovery],[step-import-assembly-target]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[step-import-topology-workbench],[block139-step-topology],[step-import-inspection],[step-import-workbench],[block137-step-import],[integration][gui-feature-coverage]"
+mkdir -p /tmp/blcad139-native-100 /tmp/blcad139-native-150
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad139-native-100 QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[native-step-topology],[native-step-inspection],[step-import-workbench],[block137-step-import],[native-viewer-lifecycle],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad139-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[native-step-topology]"
+./build/dev-gui/blcad_core_tests
+./build/dev-gui/blcad_geometry_tests
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+Native selection must exercise actual Face/Edge/Vertex clicks and exact analytic capability filters,
+Part/Project catalog Apply/history/reopen, lost-topology display and source-change invalidation.
+The new Part proof executes an authored Mirror through an imported Plane, resolves imported axes,
+uses imported planar faces for ToFace/Between extents, and applies a real Fillet to an exactly matching
+authored edge. Nested Assembly target proof uses
+shared Part intent and three noncommuting transforms with independent numeric position/direction
+oracles. A stale source must fail without changing the prior cache or persisted intent. These focused
+and native checks pass together with the full regression and separate startup.
+
+Review regressions first reproduced the remaining defects against unchanged production paths.
+`/tmp/blcad139-duplicate-red.log` records **2 failing cases / 5 failed checks**: Apply accepted a
+reconstructed public preview for an already captured product, while an unrelated ambiguous product
+blocked a distinct capture (including a distinct product sharing a trimmed face but excluded by the
+global exact-product rule). `/tmp/blcad139-legacy-red.log` records **1 failing case / 12 failed checks**:
+full and incremental legacy recompute removed prior feature/final shapes after missing-context or
+stale-source failure. Their assertions pass unchanged in the final focused suites.
+The first native pass also exposed origin-inclusive fitting after standard-view changes; preview
+focus now survives those changes and deferred GL initialization. The native case requires a useful
+on-screen model span before real analytic picks. Its later filter-restoration oracle records the
+document-open reset separately from the initial strict Face-filter restoration after Apply.
+
+The first broad Geometry run aborted in the existing Revolute sweep analyzer. A focused GDB run
+reproduced the stack-canary failure at its `Project` copy boundary. Ninja inspection found exactly
+two old object files with **zero recorded header dependencies** (the sweep analyzer and Loft pipeline
+tests); the sweep object predated the changed `Project` layout and had been omitted by incremental
+builds. The compiler rules themselves correctly use `-MD`/`-MF`. Invalidating exactly those two
+local artifacts and rebuilding all five targets restores **485 nonempty dependency records**;
+the unchanged focused sweep suite passes **5 / 373** (`/tmp/blcad139-sweep-rebuilt.log`). This is a
+local build-artifact repair, with no repository rule or test change. The complete suites are rerun
+against the repaired build and pass.
+
+Final verified runtime freeze: **914 files**, SHA-256
+`47ae3f7a77d1ce76f6379ef9e51537ea2a86aa7b5371b967250c37088b564cf4`,
+`/tmp/blcad139-source-freeze.json`; check with `python3 /tmp/blcad139-freeze.py check`.
+All five targets build (`/tmp/blcad139-build-8.log`). Focused Core passes **6 / 247**,
+Geometry **15 / 1,878**, and GUI **24 cases — 22 passed, 2 expected native-only skips /
+3,348 assertions** (`/tmp/blcad139-{core,geometry,gui}-focused-final.log`). Unchanged review
+regressions are included. Full Core passes **566 / 18,234** and Geometry **506 / 38,596**
+(`/tmp/blcad139-{core,geometry}-final.log`). Native source/topology/inspection, viewer lifecycle and
+required coverage pass **26 / 5,137** at 100% (`/tmp/blcad139-native-final-100.log`); the new native
+topology case passes **1 / 934** at 150% (`/tmp/blcad139-native-final-150.log`). Both Part and
+Project runs use real analytic picks, Apply/history/reopen and explicit source refresh with Lost
+rows remaining unselectable. Captures are in `/tmp/blcad139-closure-native-{100,150}`.
+
+Full GUI passes **631 cases — 602 passed, 29 expected native-only skips / 83,143 assertions**
+(`/tmp/blcad139-gui-final.log`). Separate native startup reaches intentional **124**
+(`/tmp/blcad139-startup.log`). All eight new Part/Project picking/recovery captures at 100% and
+150% were visually reviewed: useful model framing, readable capability/recovery controls and no
+horizontal table overflow. Native logs contain the existing Medium Visual warning; no High severity
+OpenGL or drawable/context failure is present. All 914 final runtime fingerprints remain unchanged.
+Final documentation/coverage inventory passes **3 / 309**
+(`/tmp/blcad139-final-inventory.log`) after advancing the plan through Block 139; historical
+Block-136 coverage ownership is preserved.
+Delivery: [PR #131](https://github.com/GideonBa/Better-Linux-CAD/pull/131), verified implementation
+commit `95f15a6`; its documentation-only follow-up preserves all 914 runtime fingerprints.

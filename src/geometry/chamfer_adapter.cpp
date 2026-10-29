@@ -143,7 +143,8 @@ Result<GeometryShape> ChamferAdapter::apply(const PartDocument& document,
                                             const ChamferFeature& feature,
                                             const GeometryShape& target,
                                             const ShapeCache& shape_cache, double first_value,
-                                            std::optional<double> second_value) const {
+                                            std::optional<double> second_value,
+                                            StepImportTopologyContext* import_context) const {
   if (target.empty() || !std::isfinite(first_value) || first_value <= 0.0 ||
       (second_value.has_value() && (!std::isfinite(*second_value) || *second_value <= 0.0)))
     return Result<GeometryShape>::failure(
@@ -157,7 +158,7 @@ Result<GeometryShape> ChamferAdapter::apply(const PartDocument& document,
     BRepFilletAPI_MakeChamfer builder(target_shape);
     for (const EdgeReference& reference : feature.edges()) {
       auto edge = resolve_semantic_edge(document, shape_cache, target_shape, reference,
-                                        feature.id(), "chamfer");
+                                        feature.id(), "chamfer", import_context);
       if (edge.has_error())
         return Result<GeometryShape>::failure(edge.error());
       if (feature.mode() == ChamferMode::EqualDistance) {

@@ -29,8 +29,8 @@ constexpr double kTolerance = 1.0e-6;
 
 Result<GeometryShape> ShellAdapter::apply(const PartDocument& document, const ShellFeature& feature,
                                           const GeometryShape& target,
-                                          const ShapeCache& shape_cache,
-                                          double thickness_mm) const {
+                                          const ShapeCache& shape_cache, double thickness_mm,
+                                          StepImportTopologyContext* import_context) const {
   if (target.empty() || !std::isfinite(thickness_mm) || thickness_mm <= 0.0)
     return Result<GeometryShape>::failure(
         shell_error(feature.id(), "shell target and positive finite thickness are required"));
@@ -39,7 +39,7 @@ Result<GeometryShape> ShellAdapter::apply(const PartDocument& document, const Sh
     TopTools_ListOfShape closing_faces;
     for (const FaceReference& reference : feature.removed_faces()) {
       auto face = resolve_semantic_face(document, shape_cache, target_shape, reference,
-                                        feature.id(), "shell");
+                                        feature.id(), "shell", import_context);
       if (face.has_error())
         return Result<GeometryShape>::failure(face.error());
       closing_faces.Append(face.value());

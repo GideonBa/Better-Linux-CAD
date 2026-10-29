@@ -2,6 +2,7 @@
 
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
+#include <algorithm>
 
 namespace blcad::gui {
 namespace {
@@ -28,6 +29,12 @@ Result<std::string> snapshot(const GuiDocumentSession& session) {
 const StepImportSource* source(const GuiDocumentSession& session, StepImportSourceId id) {
   return session.part_document() ? session.part_document()->find_step_import_source(id)
          : session.project()     ? session.project()->find_step_import_source(id)
+                                 : nullptr;
+}
+const ImportedTopologyCatalog* topology_catalog(const GuiDocumentSession& session,
+                                                ImportedTopologyCatalogId id) {
+  return session.part_document() ? session.part_document()->find_imported_topology_catalog(id)
+         : session.project()     ? session.project()->find_imported_topology_catalog(id)
                                  : nullptr;
 }
 struct OwnedSource {
@@ -104,6 +111,86 @@ Result<GuiStepImportPreview> prepare_existing(const GuiDocumentSession& session,
     return Result<GuiStepImportPreview>::failure(json.error());
   return Result<GuiStepImportPreview>::success(
       {operation, std::move(candidate), std::move(report.value()), path.value(), json.value()});
+}
+
+Result<std::size_t> validate_new_topology_product(const GuiDocumentSession& session,
+                                                  const geometry::StepImportGeometry& imported,
+                                                  std::size_t selected,
+                                                  const ImportedTopologyCatalog& candidate) {
+  const auto rejected = [] {
+    return Result<std::size_t>::failure(
+        invalid("Selected STEP product already has a topology catalog or indistinguishable "
+                "capture evidence; inspect the saved catalog"));
+  };
+  if (selected >= imported.products.size())
+    return rejected();
+  // This is a disposable evidence query, never a different accepted source or persistent product.
+  const auto scoped_product = [&](std::size_t index) {
+    return geometry::StepImportGeometry{
+        imported.source, imported.units, {imported.products[index]}, {}, {}};
+  };
+  std::vector<std::optional<std::string>> product_keys(imported.products.size());
+  product_keys[selected] = candidate.product_key();
+  const geometry::StepImportTopology adapter;
+  const auto& catalogs = session.part_document()
+                             ? session.part_document()->imported_topology_catalogs()
+                             : session.project()->imported_topology_catalogs();
+  for (const auto& accepted : catalogs) {
+    if (accepted.source() != imported.source.id())
+      continue;
+    auto current = adapter.recover(accepted, imported);
+    if (!current)
+      return Result<std::size_t>::failure(current.error());
+    bool ambiguous = false, resolved_elsewhere = false;
+    for (const auto& saved : accepted.entries()) {
+      if (saved.descriptor.kind != ImportedTopologyKind::Body)
+        continue;
+      const auto* entry = current.value().find(saved.id);
+      if (!entry)
+        continue;
+      if (entry->status == ImportedTopologyRecoveryStatus::Resolved) {
+        if (entry->product_index == selected)
+          return rejected();
+        resolved_elsewhere = true;
+      }
+      ambiguous = ambiguous || entry->status == ImportedTopologyRecoveryStatus::Ambiguous;
+    }
+    if (accepted.product_key() == candidate.product_key())
+      return rejected();
+    if (!ambiguous || resolved_elsewhere)
+      continue;
+    // Full-source recovery first restricts ownership to exact baseline product witnesses. A
+    // selected-only fallback must not invent ownership that this global rule already excludes.
+    bool exact_product_elsewhere = false;
+    for (std::size_t index = 0; index < imported.products.size(); ++index) {
+      if (index == selected || imported.products[index].is_assembly ||
+          imported.products[index].bodies.empty())
+        continue;
+      if (!product_keys[index]) {
+        auto probe = adapter.create_catalog(candidate.id(), scoped_product(index), 0);
+        if (!probe)
+          return Result<std::size_t>::failure(probe.error());
+        product_keys[index] = probe.value().product_key();
+      }
+      if (*product_keys[index] == accepted.product_key()) {
+        exact_product_elsewhere = true;
+        break;
+      }
+    }
+    if (exact_product_elsewhere)
+      continue;
+    auto scoped = adapter.recover(accepted, scoped_product(selected));
+    if (!scoped)
+      return Result<std::size_t>::failure(scoped.error());
+    for (const auto& saved : accepted.entries()) {
+      if (saved.descriptor.kind != ImportedTopologyKind::Body)
+        continue;
+      const auto* entry = scoped.value().find(saved.id);
+      if (entry && entry->status != ImportedTopologyRecoveryStatus::Lost)
+        return rejected();
+    }
+  }
+  return Result<std::size_t>::success(1);
 }
 
 Result<GuiStepImportGeometryPreview>
@@ -265,6 +352,107 @@ GuiStepImportWorkbench::validate_inspection(const GuiDocumentSession& session,
     return Result<std::size_t>::failure(
         invalid("STEP source changed or became unavailable; inspect again"));
   return Result<std::size_t>::success(preview.preview_shapes.size());
+}
+Result<GuiStepImportTopologyPreview>
+GuiStepImportWorkbench::prepare_topology(const GuiDocumentSession& session, StepImportSourceId id,
+                                         std::size_t product_index) const {
+  auto inspection = inspect_geometry(session, std::move(id));
+  if (!inspection)
+    return Result<GuiStepImportTopologyPreview>::failure(inspection.error());
+  std::size_t next = 1;
+  while (topology_catalog(session,
+                          ImportedTopologyCatalogId("step.catalog.gui." + std::to_string(next))))
+    ++next;
+  const geometry::StepImportTopology adapter;
+  auto catalog =
+      adapter.create_catalog(ImportedTopologyCatalogId("step.catalog.gui." + std::to_string(next)),
+                             inspection.value().geometry, product_index);
+  if (!catalog)
+    return Result<GuiStepImportTopologyPreview>::failure(catalog.error());
+  auto duplicate = validate_new_topology_product(session, inspection.value().geometry,
+                                                 product_index, catalog.value());
+  if (!duplicate)
+    return Result<GuiStepImportTopologyPreview>::failure(duplicate.error());
+  auto valid =
+      session.part_document()
+          ? PartDocument(*session.part_document()).add_imported_topology_catalog(catalog.value())
+          : Project(*session.project()).add_imported_topology_catalog(catalog.value());
+  if (!valid)
+    return Result<GuiStepImportTopologyPreview>::failure(valid.error());
+  auto recovery = adapter.recover(catalog.value(), inspection.value().geometry);
+  if (!recovery)
+    return Result<GuiStepImportTopologyPreview>::failure(recovery.error());
+  return Result<GuiStepImportTopologyPreview>::success(
+      {std::move(inspection.value()), std::move(catalog.value()), std::move(recovery.value()),
+       false, product_index});
+}
+Result<GuiStepImportTopologyPreview>
+GuiStepImportWorkbench::inspect_topology(const GuiDocumentSession& session,
+                                         ImportedTopologyCatalogId id) const {
+  const auto* catalog = topology_catalog(session, std::move(id));
+  if (!catalog)
+    return Result<GuiStepImportTopologyPreview>::failure(
+        invalid("Imported topology catalog does not exist"));
+  auto inspection = inspect_geometry(session, catalog->source());
+  if (!inspection)
+    return Result<GuiStepImportTopologyPreview>::failure(inspection.error());
+  auto recovery = geometry::StepImportTopology{}.recover(*catalog, inspection.value().geometry);
+  if (!recovery)
+    return Result<GuiStepImportTopologyPreview>::failure(recovery.error());
+  return Result<GuiStepImportTopologyPreview>::success(
+      {std::move(inspection.value()), *catalog, std::move(recovery.value()), true, std::nullopt});
+}
+Result<std::size_t>
+GuiStepImportWorkbench::validate_topology(const GuiDocumentSession& session,
+                                          const GuiStepImportTopologyPreview& preview) const {
+  auto valid = validate_inspection(session, preview.inspection);
+  if (!valid)
+    return valid;
+  if (preview.catalog.source() != preview.inspection.source.id() ||
+      preview.recovery.catalog != preview.catalog.id() ||
+      preview.recovery.source != preview.catalog.source() ||
+      preview.recovery.current_sha256_digest != preview.inspection.source.sha256_digest())
+    return Result<std::size_t>::failure(
+        invalid("Imported topology evidence does not match the source"));
+  const auto* current = topology_catalog(session, preview.catalog.id());
+  if (preview.accepted_catalog ? !current || *current != preview.catalog : current != nullptr)
+    return Result<std::size_t>::failure(
+        invalid("Imported topology catalog changed; inspect again"));
+  return Result<std::size_t>::success(preview.catalog.entries().size());
+}
+Result<std::size_t>
+GuiStepImportWorkbench::apply_topology(GuiDocumentSession& session,
+                                       const GuiStepImportTopologyPreview& preview) const {
+  auto valid = validate_topology(session, preview);
+  if (!valid)
+    return valid;
+  if (preview.accepted_catalog)
+    return Result<std::size_t>::success(0);
+  // Recreate capture from the verified current bytes and compare immutable intent;
+  // editable public preview records cannot smuggle altered descriptors into Apply.
+  auto inspected = inspect_geometry(session, preview.catalog.source());
+  if (!inspected)
+    return Result<std::size_t>::failure(inspected.error());
+  if (!preview.captured_product_index)
+    return Result<std::size_t>::failure(invalid("Captured STEP product is no longer available"));
+  auto expected = geometry::StepImportTopology{}.create_catalog(
+      preview.catalog.id(), inspected.value().geometry, *preview.captured_product_index);
+  if (!expected || expected.value() != preview.catalog)
+    return Result<std::size_t>::failure(
+        invalid("Imported topology capture changed; prepare it again"));
+  const auto mutation = [&](auto& document) -> Result<std::size_t> {
+    auto duplicate = validate_new_topology_product(
+        session, inspected.value().geometry, *preview.captured_product_index, expected.value());
+    if (!duplicate)
+      return duplicate;
+    auto current = validate_topology(session, preview);
+    if (!current)
+      return current;
+    return document.add_imported_topology_catalog(preview.catalog);
+  };
+  return session.part_document()
+             ? session.commit_part_transaction("Capture imported topology catalog", mutation)
+             : session.commit_project_transaction("Capture imported topology catalog", mutation);
 }
 Result<std::size_t> GuiStepImportWorkbench::apply(GuiDocumentSession& session,
                                                   const GuiStepImportPreview& preview) const {

@@ -368,7 +368,7 @@ AssemblyHierarchyConstraintTargetResolver::resolve_geometric(
     return Result<AssemblyResolvedGeometricTarget>::failure(local_target.error());
   }
 
-  const AssemblyConstraintTargetResolver local_resolver;
+  const AssemblyConstraintTargetResolver local_resolver(import_context_);
   auto resolved = local_resolver.resolve_geometric(local_project.value(), local_target.value());
   if (resolved.has_error()) {
     return Result<AssemblyResolvedGeometricTarget>::failure(resolved.error());

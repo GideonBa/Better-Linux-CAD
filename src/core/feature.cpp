@@ -148,14 +148,22 @@ Result<ExtrudeExtentIntent> ExtrudeExtentIntent::between(FaceReference first_fac
       second_face.role() != PartFeatureInputRole::ExtrudeLimitFace)
     return Result<ExtrudeExtentIntent>::failure(Error::validation(
         "extrude_extent", "between extent requires two ExtrudeLimitFace references"));
-  if (first_face.source_kind() != PartFeatureInputSourceKind::SemanticPlanarFace ||
-      second_face.source_kind() != PartFeatureInputSourceKind::SemanticPlanarFace)
+  const auto planar_candidate = [](const FaceReference& face) {
+    return face.source_kind() == PartFeatureInputSourceKind::SemanticPlanarFace ||
+           face.source_kind() == PartFeatureInputSourceKind::ImportedTopology;
+  };
+  if (!planar_candidate(first_face) || !planar_candidate(second_face))
     return Result<ExtrudeExtentIntent>::failure(Error::validation(
         "extrude_extent", "between extent requires two semantic planar face references"));
-  const auto& first_identity = std::get<SemanticFaceReference>(first_face.source());
-  const auto& second_identity = std::get<SemanticFaceReference>(second_face.source());
-  if (first_identity.source_feature() == second_identity.source_feature() &&
-      first_identity.face() == second_identity.face())
+  bool same = false;
+  if (const auto* first = std::get_if<ImportedTopologyReference>(&first_face.source())) {
+    const auto* second = std::get_if<ImportedTopologyReference>(&second_face.source());
+    same = second && *first == *second;
+  } else if (const auto* second = std::get_if<SemanticFaceReference>(&second_face.source())) {
+    const auto& first = std::get<SemanticFaceReference>(first_face.source());
+    same = first.source_feature() == second->source_feature() && first.face() == second->face();
+  }
+  if (same)
     return Result<ExtrudeExtentIntent>::failure(Error::validation(
         "extrude_extent", "between extent requires two distinct semantic planar faces"));
   return Result<ExtrudeExtentIntent>::success(

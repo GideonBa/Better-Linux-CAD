@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 138
-current_block: 139
-current_boundary: Stable imported topology identity and recovery
-current_tag: "[core][step-import-topology]"
+implemented_through: Block 139
+current_block: 140
+current_boundary: Immutable Reference Parts in assemblies
+current_tag: "[core][step-reference-part]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -19,7 +19,7 @@ phase_status:
   mvp_8: "Interactive Sketcher — Blocks 106–121 implemented; MVP complete"
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 implemented; MVP complete"
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
-  mvp_10: "STEP Import — Blocks 137–138 implemented; Blocks 139–143 planned"
+  mvp_10: "STEP Import — Blocks 137–139 implemented; Blocks 140–143 planned"
 ---
 
 # MVP Plan
@@ -31,10 +31,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 138
-current block        Block 139 (planned)
+implemented through  Block 139
+current block        Block 140 (planned; starts after Block-139 merge)
 current phase        STEP Import MVP-10
-current boundary     Stable imported topology identity and recovery
+current boundary     Immutable Reference Parts in assemblies
 ```
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
@@ -57,6 +57,9 @@ complex workflows, full regression and native evidence live in `docs/step-import
 Block 138 is complete on 2026-10-29: verified immutable STEP bytes feed the deterministic XDE
 reader and read-only product/body/unit inspection. Its full regression, native proofs and realistic
 rotor measurements are recorded in the same sequence and `docs/development-setup.md`.
+Block 139 is complete on 2026-10-29: persisted imported topology catalogs, strict recovery, real
+Part/Assembly target consumers and native semantic inspection are accepted. Block 140 starts only
+after its PR is merged; Blocks 140–143 remain planned.
 
 ## Phase map
 
@@ -71,7 +74,7 @@ MVP-7   GUI Feature Validation                        Blocks 95–105 implemente
 MVP-8   Interactive Sketcher                          Blocks 106–121 implemented
 MVP-9   Interactive Part & Assembly Modeling          Blocks 122–131 implemented
 MVP-9R  GUI Shell Reset                                 Blocks 132–136 implemented
-MVP-10  STEP Import                         Blocks 137–138 implemented; Blocks 139–143 planned
+MVP-10  STEP Import            Blocks 137–139 implemented; Blocks 140–143 planned
 ```
 
 Canonical phase sequences:
@@ -1543,7 +1546,7 @@ GitHub search finds no open issues or PRs. No numbered implementation block is a
 With the issue queue complete and merged, execute **Blocks 138 → 139 → 140 → 141 → 142 →
 143**, each with the architecture boundaries, GUI access and acceptance gates in
 `docs/step-import-sequence-mvp10.md`. This queue is a plan, not evidence that any later block is
-complete; Blocks 137–138 are complete and Blocks 139–143 remain planned.
+complete; Blocks 137–139 are complete and Blocks 140–143 remain planned.
 
 ## Implemented Block 138 — STEP/XDE reader and geometry inspection (2026-10-29)
 
@@ -1566,21 +1569,43 @@ observed maximum**, without a portable budget claim. All **904** runtime fingerp
 unchanged. Exact commands, red-before-fix regressions, captures and raw timing observations live in
 `docs/development-setup.md` and `docs/benchmarks/block138-step-inspection.json`.
 Delivery: [PR #130](https://github.com/GideonBa/Better-Linux-CAD/pull/130), verified implementation
-commit `4a7fdd6`. Merge this single PR and verify main before starting Block 139.
+commit `4a7fdd6`. PR #130 merged as `ca2db6e`; main exactly matches tested head `a0aaa7c`,
+all 904 runtime fingerprints match and fresh GitHub searches find no open issues or PRs.
 
-## Next numbered technical step — Block 139 (planned)
+## Implemented Block 139 — Imported topology identity and recovery (2026-10-29)
 
-After the single Block-138 PR is merged and main is verified, introduce persisted imported
-body/face/edge/vertex identities with normalized recovery descriptors and explicit
-Resolved/Lost/Ambiguous outcomes. Freeze supported analytic capabilities and resolve imported
-semantic references for downstream Part inputs and local/cross-hierarchy Assembly targets.
-Exact boundaries and focused tags live in `docs/step-import-sequence-mvp10.md`.
+Branch `feat/step-import-topology` starts from verified main `ca2db6e`, after PR #130 is merged.
+The implementation adds persisted imported body/face/edge/vertex identities with normalized
+recovery descriptors and explicit Resolved/Lost/Ambiguous outcomes. Supported analytic capabilities
+are frozen; imported semantic references resolve for downstream Part inputs and local/cross-hierarchy
+Assembly targets.
+Exact boundaries and focused tags live in `docs/step-import-sequence-mvp10.md`. Core catalog intent,
+Geometry recovery/capability resolution and the GUI display/filter/picking client are implemented.
+All five targets build; focused Core **6 / 247**, Geometry **15 / 1,878** and GUI
+**24 cases — 22 passed, 2 expected native-only skips / 3,348 assertions** pass. Full Core
+**566 / 18,234**, Geometry **506 / 38,596**, native 100% **26 / 5,137** and native 150%
+**1 / 934** pass. Full GUI passes **631 cases — 602 passed, 29 expected native-only skips /
+83,143 assertions**; separate native startup reaches intentional **124**. All **914** runtime
+fingerprints remain unchanged. Reviewed regression cases protect duplicate capture, independent
+products, fixed asset roots, exact analytic limits and prior cache retention after source failure.
+Contracts, local build-artifact repair and complete evidence live in `docs/development-setup.md`
+and the STEP import sequence. Delivery: [PR #131](https://github.com/GideonBa/Better-Linux-CAD/pull/131),
+verified implementation commit `95f15a6`. This single PR is merged before Block 140 starts.
+
+## Current numbered technical step — Block 140 (planned)
+
+After the Block-139 PR is merged and main is verified, implement immutable imported Reference Part
+definitions with shared/nested Assembly instances, exact target/constraint/joint/motion support,
+analysis and STEP export. Add explicit insert/refresh/convert commands and matching GUI access.
+Reference mode rejects Part edits; conversion creates a separate EditableBody Part. Exact boundaries
+and focused tags remain in `docs/step-import-sequence-mvp10.md`.
 
 ## Later phases
 
 Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R
 is complete through Block 136. STEP Import MVP-10 has completed source management and geometry
-inspection in Blocks 137–138; Blocks 139–143 remain planned in `docs/step-import-sequence-mvp10.md`.
+inspection and imported topology identity/recovery in Blocks 137–139; Blocks 140–143 remain planned in
+`docs/step-import-sequence-mvp10.md`.
 
 
 Issue #113 follow-up (2026-10-28) rejects ineffective/full-target Cuts with distinct correction

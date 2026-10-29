@@ -7,12 +7,14 @@
 namespace blcad::geometry {
 
 class ShapeCache;
+class StepImportTopologyContext;
 
 class ShellAdapter {
 public:
   [[nodiscard]] Result<GeometryShape>
   apply(const PartDocument& document, const ShellFeature& feature, const GeometryShape& target,
-        const ShapeCache& shape_cache, double thickness_mm) const;
+        const ShapeCache& shape_cache, double thickness_mm,
+        StepImportTopologyContext* import_context = nullptr) const;
 };
 
 } // namespace blcad::geometry

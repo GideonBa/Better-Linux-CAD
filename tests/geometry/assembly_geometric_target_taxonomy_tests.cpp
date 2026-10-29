@@ -135,6 +135,13 @@ AssemblyGeometricTargetSourceMetadata synthetic_metadata(AssemblyGeometricTarget
   case AssemblyGeometricTargetSourceKind::ConstructionLine:
   case AssemblyGeometricTargetSourceKind::ConstructionPoint:
     break;
+  case AssemblyGeometricTargetSourceKind::ImportedPlanarFace:
+  case AssemblyGeometricTargetSourceKind::ImportedCylindricalFace:
+  case AssemblyGeometricTargetSourceKind::ImportedLinearEdge:
+  case AssemblyGeometricTargetSourceKind::ImportedCircularEdge:
+  case AssemblyGeometricTargetSourceKind::ImportedVertex:
+    FAIL("Imported sources use the verified STEP fixtures in step_import_target_tests.cpp");
+    break;
   }
   return metadata;
 }

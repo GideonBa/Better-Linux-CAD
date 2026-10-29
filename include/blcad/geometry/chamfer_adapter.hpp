@@ -9,14 +9,14 @@
 namespace blcad::geometry {
 
 class ShapeCache;
+class StepImportTopologyContext;
 
 class ChamferAdapter {
 public:
-  [[nodiscard]] Result<GeometryShape> apply(const PartDocument& document,
-                                            const ChamferFeature& feature,
-                                            const GeometryShape& target,
-                                            const ShapeCache& shape_cache, double first_value,
-                                            std::optional<double> second_value) const;
+  [[nodiscard]] Result<GeometryShape>
+  apply(const PartDocument& document, const ChamferFeature& feature, const GeometryShape& target,
+        const ShapeCache& shape_cache, double first_value, std::optional<double> second_value,
+        StepImportTopologyContext* import_context = nullptr) const;
 };
 
 } // namespace blcad::geometry

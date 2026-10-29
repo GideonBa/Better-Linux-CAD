@@ -1,6 +1,6 @@
 # STEP Import Sequence MVP-10
 
-Status: Blocks 137–138 complete; Blocks 139–143 planned. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
+Status: Blocks 137–139 complete; Blocks 140–143 planned. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
 `docs/gui-shell-reset-sequence-mvp9r.md`); `docs/mvp-plan.md` is the status authority. An earlier
 revision numbered these blocks 132–138, before MVP-9R took that range; only the numbering moved,
 never the content or the ordering.
@@ -379,12 +379,19 @@ have median **169.8 ms** and observed maximum **173.2 ms**. Reader time includes
 snapshot; separate stage columns are not additive, and five warm samples establish no portable
 tail budget. No worker, persistent imported topology or imported feature is introduced.
 
-Block 138 is complete. Block 139 remains planned; the single implementation PR must be merged
-and main verified before starting that next boundary.
+Block 138 is complete and delivered in PR #130, merged as `ca2db6e`. Main exactly matches
+tested head `a0aaa7c`, including all 904 runtime fingerprints; Block 139 begins below.
 
 ## Block 139 — Stable imported topology identity and recovery
 
 Primary boundary: persistent selection identity over foreign geometry.
+
+Implementation started on `feat/step-import-topology` from verified main `ca2db6e` after
+Block 138 is merged as PR #130. Core owns persisted catalog identities and normalized recovery
+metadata; Geometry owns current-shape matching and analytic capabilities; the existing source
+inspection task supplies display, filtering and semantic picking. Block 139 is accepted on
+2026-10-29 after focused, full, native, visual and startup verification. Reference Part and
+ImportedBodyFeature integration remain Blocks 140–141.
 
 Introduce semantic imported body/face/edge/vertex identities that are independent of STEP entity
 numbers and OCCT traversal order. Initial import creates a persisted BLCAD import-topology catalog
@@ -418,6 +425,83 @@ Focused tags:
 [geometry][step-import-topology-recovery]
 [geometry][step-import-assembly-target]
 ```
+
+### Block 139 accepted catalog and resolution contract
+
+Each `ImportedTopologyCatalog` captures one selected source product definition. Its own BLCAD id,
+source id, baseline digest, normalized product evidence and ordered entries are persistent intent.
+Entries have BLCAD Body/Face/Edge/Vertex ids; subtopology names an enclosing Body entry in the same
+catalog. These are catalog identities, not Block-141 authored `BodyId` outputs. The initial runtime
+product selector and current product/body vector indices never enter JSON. Names, STEP entity ids,
+XDE labels, OCCT addresses and enumeration order never resolve a saved reference.
+
+Version-1 descriptors store product-local millimeter bounds, centroid, volume/area/length, exact
+analytic classification where supported, canonical origins/directions/radii, samples and complete
+trimmed boundary/equation witnesses. Physical equation and topology evidence is normalized before
+hashing; the Block-138 runtime definition keys are not reused as recovery authority. Length-like
+scalar evidence uses a `1e-7` grid and directions use `1e-10`; full descriptor comparisons additionally
+check the frozen `1e-6` geometric tolerance. Closest-to-origin plane/axis/line origins and a positive
+first nonzero direction component remove arbitrary analytic parameter frames. Catalog ids and entry
+ids remain unchanged during explicit source-digest refresh; the baseline descriptors are immutable.
+
+Recovery first checks complete Body evidence. A changed Body may instead recover through the
+intersection of owners carrying its surviving complete trimmed-Face witnesses, with Body-kind and
+product coherence checks. Edge/Vertex evidence alone never reidentifies a changed Body. Missing
+evidence is Lost; conflicting or multiple indistinguishable owners are Ambiguous. Each saved entity
+then requires exactly one full witness match inside the recovered owner. A changed face may be Lost
+while an unchanged face on the same changed Body remains Resolved. There is no nearest, best-score,
+name, traversal-position or multiplicity tie-break and no silent rewrite of saved references.
+
+`ImportedTopologyReference` contains catalog id, entry id and explicit capability. Part Axis/Plane/
+Face/Edge input variants validate ownership and capability and depend on the catalog node; source
+refresh invalidates dependent catalog nodes. Source removal is blocked while catalogs own it, and a
+referenced catalog cannot be removed. Part/Project JSON omits empty catalog arrays and keeps all
+legacy canonical output; exact fields, normalized descriptors and reference spellings are frozen in
+`docs/file-format.md`. Missing external assets do not prevent loading saved intent.
+
+Plane, cylindrical-face Axis/Cylinder, linear-edge Line, circular-edge Circle/Axis/center Point and
+vertex Point capabilities use their exact recovered geometry. Explicit generic Face/Edge capabilities
+also support existing topological Part consumers, including opaque surfaces/curves; these never
+acquire an invented analytic primitive. A shared full trimmed-witness matcher checks imported
+finishing references against actual target-body faces/edges rather than attaching an unrelated
+external primitive with similar bounds.
+
+`StepImportTopologyContext` receives the saved document's asset root explicitly and binds it once to
+an absolute root. It shares verified reader snapshots within one operation, binds cached
+source/catalog values to the actual owning Part,
+rejects stale intent, and revalidates accepted source bytes before publication. An absent context
+fails explicitly for imported inputs. Real Mirror/axis, planar extrusion limits and finishing paths
+consume these references;
+local and occurrence-qualified Assembly target resolution reuse the same recovery and exact
+capability projection. Imported target metadata retains the typed catalog reference, with no fake
+generated `FeatureId`. Nested placement applies the existing exact inner-to-outer transform chain.
+Imported Part creation, feature-result authority and source-refresh commands for those imported
+Parts remain Blocks 140–141; the Block-137 metadata source task keeps its explicit digest contract.
+
+The source task adds an explicit **Prepare Topology Catalog** operation with existing Apply/Undo/Redo.
+It revalidates document/path/source evidence and securely recreates the candidate before one catalog
+transaction. Both preparation and Apply reject duplicate capture of the selected product; ambiguity
+in an unrelated product does not block a distinct product with no matching evidence. Accepted
+catalogs are inspected without replacing baseline ids/descriptors; no-op Apply preserves history.
+Product-local Body previews, recovery rows, capability filters and native semantic
+Face/Edge/Vertex picking show canonical `imported:` references through a separate disposable viewport
+selection layer. Inspection focus stays fitted to preview bounds across standard-view changes until
+the preview is cleared or the user chooses Fit All. Existing full occurrence inspection remains the
+Block-138 action. Cancellation,
+document lifecycle and source changes clear derived topology selection and restore prior scope/masks.
+
+Additional focused tags are `[step-import-part-input]`, `[step-import-topology-workbench]`,
+`[block139-step-topology]` and `[native-step-topology]`. Core, recovery, real Part/Assembly consumers,
+GUI history/freshness and native picking tests pass. All five targets build; full Core passes
+**566 / 18,234**, Geometry **506 / 38,596**, and GUI **631 cases — 602 passed, 29 expected
+native-only skips / 83,143 assertions**. Native 100% passes **26 / 5,137**; the new native topology
+case passes at 150% **1 / 934**, with actual Part and Project picks at both scales. Separate native
+startup reaches intentional **124**. All **914** runtime fingerprints remain unchanged. Exact
+commands, unchanged red-to-green regressions, local artifact repair and visually reviewed captures
+live in `docs/development-setup.md`. Blocks 140–143 remain planned, and the next branch starts only
+after this block is merged.
+Delivery: [PR #131](https://github.com/GideonBa/Better-Linux-CAD/pull/131), verified implementation
+commit `95f15a6`; the delivery-documentation follow-up changes no runtime source.
 
 ## Block 140 — Reference Part integration with assemblies
 

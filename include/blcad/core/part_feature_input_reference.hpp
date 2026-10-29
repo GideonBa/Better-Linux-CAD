@@ -3,6 +3,7 @@
 #include "blcad/core/datum_plane.hpp"
 #include "blcad/core/generated_topology_reference.hpp"
 #include "blcad/core/id.hpp"
+#include "blcad/core/imported_topology.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/sketch_line_reference.hpp"
 
@@ -51,6 +52,7 @@ enum class PartFeatureInputSourceKind {
   SemanticCylindricalFace,
   SemanticCircularEdge,
   ResultEdge,
+  ImportedTopology,
   Body,
 };
 
@@ -80,11 +82,14 @@ private:
   PartFeatureInputRole role_;
 };
 
-using AxisReferenceSource = std::variant<DatumAxisId, ConstructionLineId, SemanticAxisReference,
-                                         SemanticEdgeReference, SketchLineReference>;
+using AxisReferenceSource =
+    std::variant<DatumAxisId, ConstructionLineId, SemanticAxisReference, SemanticEdgeReference,
+                 SketchLineReference, ImportedTopologyReference>;
 
 class AxisReference {
 public:
+  [[nodiscard]] static Result<AxisReference> create_imported(PartFeatureInputRole role,
+                                                             ImportedTopologyReference reference);
   [[nodiscard]] static Result<AxisReference> create_sketch_line(PartFeatureInputRole role,
                                                                 SketchLineReference line);
   [[nodiscard]] static Result<AxisReference> create_datum_axis(PartFeatureInputRole role,
@@ -112,10 +117,13 @@ private:
   AxisReferenceSource source_;
 };
 
-using PlaneReferenceSource = std::variant<DatumPlaneId, ConstructionPlaneId, SemanticFaceReference>;
+using PlaneReferenceSource = std::variant<DatumPlaneId, ConstructionPlaneId, SemanticFaceReference,
+                                          ImportedTopologyReference>;
 
 class PlaneReference {
 public:
+  [[nodiscard]] static Result<PlaneReference> create_imported(PartFeatureInputRole role,
+                                                              ImportedTopologyReference reference);
   [[nodiscard]] static Result<PlaneReference> create_datum_plane(PartFeatureInputRole role,
                                                                  DatumPlaneId plane);
   [[nodiscard]] static Result<PlaneReference> create_construction_plane(PartFeatureInputRole role,
@@ -135,10 +143,13 @@ private:
   PlaneReferenceSource source_;
 };
 
-using FaceReferenceSource = std::variant<SemanticFaceReference, SemanticCylindricalFaceReference>;
+using FaceReferenceSource = std::variant<SemanticFaceReference, SemanticCylindricalFaceReference,
+                                         ImportedTopologyReference>;
 
 class FaceReference {
 public:
+  [[nodiscard]] static Result<FaceReference> create_imported(PartFeatureInputRole role,
+                                                             ImportedTopologyReference reference);
   [[nodiscard]] static Result<FaceReference> create_planar(PartFeatureInputRole role,
                                                            SemanticFaceReference face);
   [[nodiscard]] static Result<FaceReference>
@@ -188,11 +199,13 @@ private:
   std::array<Point3, sample_count> samples_;
 };
 
-using EdgeReferenceSource =
-    std::variant<SemanticEdgeReference, SemanticCircularEdgeReference, ResultEdgeReference>;
+using EdgeReferenceSource = std::variant<SemanticEdgeReference, SemanticCircularEdgeReference,
+                                         ResultEdgeReference, ImportedTopologyReference>;
 
 class EdgeReference {
 public:
+  [[nodiscard]] static Result<EdgeReference> create_imported(PartFeatureInputRole role,
+                                                             ImportedTopologyReference reference);
   [[nodiscard]] static Result<EdgeReference> create_linear(PartFeatureInputRole role,
                                                            SemanticEdgeReference edge);
   [[nodiscard]] static Result<EdgeReference> create_circular(PartFeatureInputRole role,

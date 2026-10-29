@@ -30,6 +30,8 @@ private:
 
 struct DocumentIdTag;
 struct StepImportSourceIdTag;
+struct ImportedTopologyCatalogIdTag;
+struct ImportedTopologyIdTag;
 struct ParameterIdTag;
 struct DatumPlaneIdTag;
 struct DatumAxisIdTag;
@@ -60,6 +62,8 @@ struct BodyTransformIdTag;
 
 using DocumentId = TypedId<DocumentIdTag>;
 using StepImportSourceId = TypedId<StepImportSourceIdTag>;
+using ImportedTopologyCatalogId = TypedId<ImportedTopologyCatalogIdTag>;
+using ImportedTopologyId = TypedId<ImportedTopologyIdTag>;
 using ParameterId = TypedId<ParameterIdTag>;
 using DatumPlaneId = TypedId<DatumPlaneIdTag>;
 using DatumAxisId = TypedId<DatumAxisIdTag>;

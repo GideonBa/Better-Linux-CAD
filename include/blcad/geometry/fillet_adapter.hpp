@@ -7,11 +7,12 @@
 
 namespace blcad::geometry {
 class ShapeCache;
+class StepImportTopologyContext;
 class FilletAdapter {
 public:
-  [[nodiscard]] Result<GeometryShape> apply(const PartDocument& document,
-                                            const FilletFeature& feature,
-                                            const GeometryShape& target,
-                                            const ShapeCache& shape_cache, double radius_mm) const;
+  [[nodiscard]] Result<GeometryShape>
+  apply(const PartDocument& document, const FilletFeature& feature, const GeometryShape& target,
+        const ShapeCache& shape_cache, double radius_mm,
+        StepImportTopologyContext* import_context = nullptr) const;
 };
 } // namespace blcad::geometry

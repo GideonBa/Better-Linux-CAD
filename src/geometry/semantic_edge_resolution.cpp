@@ -1,4 +1,6 @@
 #include "semantic_edge_resolution.hpp"
+#include "blcad/geometry/occt_shape_view.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "blcad/geometry/shape_cache.hpp"
@@ -211,7 +213,29 @@ bool result_edge_witness_matches(const ResultEdgeReference& actual,
 Result<TopoDS_Edge> resolve_semantic_edge(const PartDocument& document, const ShapeCache& cache,
                                           const TopoDS_Shape& target,
                                           const EdgeReference& reference, const FeatureId& id,
-                                          std::string_view feature_label) {
+                                          std::string_view feature_label,
+                                          StepImportTopologyContext* import_context) {
+  if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
+    if (import_context == nullptr)
+      return Result<TopoDS_Edge>::failure(
+          edge_error(id, "imported edge requires an explicit verified source context"));
+    auto current = import_context->resolve(document, *imported);
+    if (!current)
+      return Result<TopoDS_Edge>::failure(current.error());
+    if (!current.value().descriptor)
+      return Result<TopoDS_Edge>::failure(edge_error(id, "imported edge is not resolved"));
+    auto match = StepImportTopology{}.match_subshape(*current.value().descriptor, target);
+    if (!match)
+      return Result<TopoDS_Edge>::failure(match.error());
+    if (match.value().status != ImportedTopologyRecoveryStatus::Resolved)
+      return Result<TopoDS_Edge>::failure(
+          edge_error(id, std::string("imported edge on target body is ") +
+                             std::string(to_string(match.value().status))));
+    const auto* shape = OcctShapeView::get(match.value().shape);
+    if (shape == nullptr || shape->ShapeType() != TopAbs_EDGE)
+      return Result<TopoDS_Edge>::failure(edge_error(id, "imported target is not an edge"));
+    return Result<TopoDS_Edge>::success(TopoDS::Edge(*shape));
+  }
   if (const auto* expected = std::get_if<ResultEdgeReference>(&reference.source())) {
     auto valid = validate_part_feature_input_reference(document, reference);
     if (!valid)
