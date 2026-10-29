@@ -9,6 +9,8 @@
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <QApplication>
+#include <QCursor>
+#include <QWheelEvent>
 #include <QDir>
 #include <QEventLoop>
 #include <QImage>
@@ -73,7 +75,7 @@ struct DimensionUi {
   ShellWindow window;
   SketchId sketch_id{"fixture.sketch"};
 
-  DimensionUi() {
+  explicit DimensionUi(bool oblique = false) {
     window.resize(1280, 800);
     if (QApplication::platformName() == "xcb") {
       auto* screen = QGuiApplication::screenAt(QPoint(0, 0));
@@ -92,7 +94,17 @@ struct DimensionUi {
     if (QApplication::platformName() == "xcb")
       REQUIRE(window.viewport().native_viewer_available());
     REQUIRE(window.new_part("Dimension input"));
-    REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
+    if (oblique) {
+      REQUIRE(window.session().commit_part_transaction(
+          "Oblique dimension plane", [](PartDocument& part) {
+            return part.add_construction_plane(checked(ConstructionPlane::create_explicit(
+                ConstructionPlaneId("dimension.plane"), "Dimension plane", {5, 7, 9}, {.8, 0, -.6},
+                {0, 1, 0}, {.6, 0, .8})));
+          }));
+      window.refresh();
+    }
+    REQUIRE(window.viewport().select_semantic(oblique ? "construction-plane/dimension.plane"
+                                                      : "datum-plane/datum.xy"));
     REQUIRE(window.create_sketch_on_selection());
     sketch_id = *window.active_sketch();
   }
@@ -123,6 +135,7 @@ struct DimensionUi {
     window.session().selection().clear();
     window.viewport().clear_selection();
     window.sketch_tools().publish_scene();
+    pointer(window.viewport().rect().center());
     window.viewport().setFocus();
     events();
     REQUIRE(await_ui(
@@ -158,9 +171,21 @@ struct DimensionUi {
     FAIL("dimension annotation missing");
     return {};
   }
+  void place_visible_label(const SketchDimensionId& id, Point2 desired) {
+    auto plane = checked(GuiSketchWorkbench{}.plane_view(window.session(), sketch()));
+    auto mapping = checked(GuiSketchPlaneMapping::create(
+        plane, [&](GuiSketchScreenPoint p) { return window.viewport().screen_to_view_ray(p); },
+        [&](Point3 p) { return window.viewport().model_to_screen(p); }));
+    const auto shown = checked(window.viewport().sketch_dimension_screen_layout(annotation(id)));
+    const auto current = checked(mapping.screen_to_plane(shown.label_anchor));
+    const auto offset = catalog().find(id)->label_offset();
+    REQUIRE(GuiSketchDimensionController::set_label_offset(
+        window.session(), sketch(), id,
+        {offset.x + desired.x - current.x, offset.y + desired.y - current.y}));
+  }
   QPointF label(const SketchDimensionId& id, double horizontal = 0) {
     const auto a = annotation(id);
-    const auto center = checked(window.viewport().sketch_plane_to_screen(a.point));
+    const auto center = checked(window.viewport().sketch_dimension_screen_layout(a)).label_anchor;
     const auto layout = sketch_annotation_layout(QString::fromStdString(a.label), true);
     // Stay one DIP inside the painted border, beyond the old 12-DIP pick disk.
     const double dx = horizontal * (layout.bounds.width() * 0.5 - 1.0);
@@ -176,7 +201,17 @@ struct DimensionUi {
                       modifiers);
     QApplication::sendEvent(&window.viewport(), &event);
   }
+  void pointer(QPointF point) {
+    if (QApplication::platformName() == "xcb") {
+      // Native enter/focus events must refer to the same position as the
+      // synthetic button event, and finish before a press can start a drag.
+      QCursor::setPos(window.viewport().mapToGlobal(point.toPoint()));
+      QGuiApplication::sync();
+      events();
+    }
+  }
   void click(QPointF point, Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
+    pointer(point);
     // Deliver a complete click before flushing native events, as the combined
     // shell workflows do. A queued OS MouseMove at the old physical cursor
     // position must not turn a synthetic stationary click into a label drag.
@@ -187,6 +222,8 @@ struct DimensionUi {
   QLineEdit& double_click(QPointF point, bool preceding_click = true) {
     if (preceding_click)
       click(point);
+    else
+      pointer(point);
     mouse(QEvent::MouseButtonDblClick, point);
     mouse(QEvent::MouseButtonRelease, point);
     events();
@@ -400,12 +437,8 @@ TEST_CASE(
   REQUIRE(ids.size() == 3U);
   // Intentionally stack two labels exactly. Real clicks cycle them in stable ID order.
   const auto anchor = ui.annotation(ids[0]).point;
-  for (std::size_t i = 0; i < ids.size(); ++i) {
-    const auto point = ui.annotation(ids[i]).point;
-    REQUIRE(GuiSketchDimensionController::set_label_offset(
-        ui.window.session(), ui.sketch(), ids[i],
-        {anchor.x - point.x + (i == 2 ? 45 : 0), anchor.y - point.y + 40}));
-  }
+  for (std::size_t i = 0; i < ids.size(); ++i)
+    ui.place_visible_label(ids[i], {anchor.x + (i == 2 ? 45 : 0), anchor.y + 40});
   const auto driver = *ui.catalog().find(ids[0])->parameter();
   const double dependent_value = ui.value(ids[0]) * 2;
   REQUIRE(ui.window.session().commit_part_transaction("Dependent formula", [&](PartDocument& part) {
@@ -544,4 +577,164 @@ TEST_CASE("Measured annotation rectangles take precedence and stay DIP-sized acr
       {center.x + layout.bounds.right() + 2, center.y + layout.bounds.bottom() + 2}));
   CHECK(std::none_of(outside.begin(), outside.end(),
                      [](const auto& hit) { return hit.kind == GuiSketchHitKind::Dimension; }));
+}
+
+TEST_CASE("Native neighboring dimension families remain attached through label movement zoom and "
+          "oblique planes",
+          "[gui][integration][dimension-layout-native]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native Qt/OCCT dimension painting and pointer input");
+  const bool oblique = GENERATE(false, true);
+  CAPTURE(oblique);
+  DimensionUi ui(oblique);
+  REQUIRE(ui.window.session().commit_part_transaction(
+      "Dimension presentation fixture", [&](PartDocument& part) {
+        REQUIRE(part.add_parameter(checked(Parameter::create_length(
+            ParameterId("hole.diameter"), "Hole diameter", checked(Quantity::length_mm(14))))));
+        const auto* original = part.find_sketch(ui.sketch());
+        REQUIRE(original);
+        auto sketch =
+            checked(Sketch::create(original->id(), original->name(), original->workplane()));
+        const std::vector<Point2> corners{{-35, -25}, {35, -25}, {35, 25}, {-35, 25}};
+        for (std::size_t i = 0; i < corners.size(); ++i)
+          REQUIRE(sketch.add_entity(checked(LineSegment::create(
+              SketchEntityId("plate." + std::to_string(i)), corners[i], corners[(i + 1) % 4]))));
+        for (const auto& line : std::vector<std::pair<const char*, std::pair<Point2, Point2>>>{
+                 {"offset", {{-30, -20}, {-10, -8}}},
+                 {"angle.base", {{-5, -18}, {15, -18}}},
+                 {"angle.sloped", {{-5, -18}, {10, -3}}}})
+          REQUIRE(sketch.add_entity(checked(LineSegment::create(
+              SketchEntityId(line.first), line.second.first, line.second.second))));
+        const double h = 6 / std::sqrt(2.0);
+        REQUIRE(sketch.add_entity(checked(ArcSegment::create_three_point(
+            SketchEntityId("left.arc"), {-24, 12}, {-18 - h, 12 + h}, {-18, 18}))));
+        REQUIRE(sketch.add_profile(checked(
+            CircleProfile::create(ProfileId("hole"), ParameterId("hole.diameter"), {22, 12}))));
+        return part.update_sketch(std::move(sketch));
+      }));
+  const auto topology = ui.topology();
+  const auto point_targets = [&](const char* name) {
+    const auto* line = topology.find_entity(name);
+    REQUIRE(line);
+    return std::vector{checked(SketchConstraintIntentTarget::point(line->points()[0])),
+                       checked(SketchConstraintIntentTarget::point(line->points()[1]))};
+  };
+  const auto entity = [](const char* name) {
+    return checked(SketchConstraintIntentTarget::entity(name));
+  };
+  const auto circle =
+      std::find_if(topology.entities().begin(), topology.entities().end(), [](const auto& e) {
+        return e.kind() == SketchTopologyEntityKind::CircleProfile;
+      });
+  REQUIRE(circle != topology.entities().end());
+  std::vector<SketchDimensionId> ids;
+  const auto dimension = [&](const char* id, SketchDimensionKind kind,
+                             std::vector<SketchConstraintIntentTarget> targets, Point2 label) {
+    auto intent = checked(SketchDimensionIntent::create(
+        SketchDimensionId(id), kind, SketchDimensionMode::Reference, std::move(targets)));
+    checked(GuiSketchDimensionController::add(ui.window.session(), ui.sketch(), intent));
+    const auto initial = ui.annotation(intent.id()).point;
+    REQUIRE(GuiSketchDimensionController::set_label_offset(
+        ui.window.session(), ui.sketch(), intent.id(), {label.x - initial.x, label.y - initial.y}));
+    ids.push_back(intent.id());
+  };
+  dimension("horizontal", SketchDimensionKind::HorizontalDistance, point_targets("entity/offset"),
+            {-20, -35});
+  dimension("vertical", SketchDimensionKind::VerticalDistance, point_targets("entity/offset"),
+            {-40, -14});
+  dimension("aligned", SketchDimensionKind::AlignedDistance, point_targets("entity/offset"),
+            {0, -30});
+  dimension("length", SketchDimensionKind::Length, {entity("entity/plate.0")}, {0, -65});
+  dimension("angle", SketchDimensionKind::Angle,
+            {entity("entity/angle.base"), entity("entity/angle.sloped")}, {18, -3});
+  dimension("radius", SketchDimensionKind::Radius, {entity("entity/left.arc")}, {-50, 22});
+  dimension("arc-length", SketchDimensionKind::ArcLength, {entity("entity/left.arc")}, {-20, 46});
+  dimension("diameter", SketchDimensionKind::Diameter,
+            {checked(SketchConstraintIntentTarget::entity(circle->id()))}, {65, 20});
+  REQUIRE(ui.catalog().dimensions().size() == 8);
+  ui.clear();
+  ui.window.viewport().fit_all();
+  events();
+  const auto zoom = [&](int delta) {
+    const auto local = QPointF(ui.window.viewport().rect().center());
+    QWheelEvent event(local, ui.window.viewport().mapToGlobal(local.toPoint()), {}, {0, delta},
+                      Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+    QApplication::sendEvent(&ui.window.viewport(), &event);
+    events();
+  };
+  zoom(-240);
+  const auto before = ui.snapshot();
+  const auto prefix = oblique ? QStringLiteral("dimension-layout-oblique")
+                              : QStringLiteral("dimension-layout-normal");
+  for (std::size_t i = 0; i < ids.size(); ++i) {
+    const auto a =
+        checked(ui.window.viewport().sketch_dimension_screen_layout(ui.annotation(ids[i])));
+    REQUIRE(a.text_bounds);
+    for (std::size_t j = i + 1; j < ids.size(); ++j) {
+      const auto b =
+          checked(ui.window.viewport().sketch_dimension_screen_layout(ui.annotation(ids[j])));
+      REQUIRE(b.text_bounds);
+      CAPTURE(ids[i].value(), ids[j].value());
+      CHECK((a.text_bounds->right() < b.text_bounds->left() ||
+             b.text_bounds->right() < a.text_bounds->left() ||
+             a.text_bounds->bottom() < b.text_bounds->top() ||
+             b.text_bounds->bottom() < a.text_bounds->top()));
+    }
+  }
+  for (const auto& id : ids) {
+    ui.clear();
+    ui.click(ui.label(id));
+    const auto& selected = ui.window.session().selection().entries();
+    REQUIRE(selected.size() == 1);
+    CHECK(selected.front().semantic_id.ends_with("/dimension/" + id.value()));
+    CHECK(ui.snapshot() == before);
+  }
+  ui.capture(prefix + "-neighbors");
+  ui.clear();
+  const auto line_pick = checked(ui.window.viewport().sketch_plane_to_screen({-28, -35}));
+  ui.click({line_pick.x, line_pick.y});
+  REQUIRE(ui.window.session().selection().entries().size() == 1);
+  CHECK(ui.window.session().selection().entries().front().semantic_id.ends_with(
+      "/dimension/horizontal"));
+  ui.clear();
+  const auto false_chord = checked(ui.window.viewport().sketch_plane_to_screen({-20, -14}));
+  ui.click({false_chord.x, false_chord.y});
+  CHECK(std::none_of(ui.window.session().selection().entries().begin(),
+                     ui.window.session().selection().entries().end(), [](const auto& selection) {
+                       return selection.semantic_id.ends_with("/dimension/horizontal");
+                     }));
+  CHECK(ui.snapshot() == before);
+  ui.clear();
+  const auto initial_offset = ui.catalog().find(SketchDimensionId("horizontal"))->label_offset();
+  const auto start = ui.label(SketchDimensionId("horizontal"));
+  const auto end = checked(ui.window.viewport().sketch_plane_to_screen({-18, -40}));
+  QCursor::setPos(ui.window.viewport().mapToGlobal(start.toPoint()));
+  QGuiApplication::sync();
+  events();
+  ui.mouse(QEvent::MouseButtonPress, start);
+  QCursor::setPos(ui.window.viewport().mapToGlobal(QPoint(qRound(end.x), qRound(end.y))));
+  ui.mouse(QEvent::MouseMove, {end.x, end.y});
+  events();
+  CHECK(ui.snapshot() == before);
+  ui.capture(prefix + "-drag-preview");
+  ui.mouse(QEvent::MouseButtonRelease, {end.x, end.y});
+  events();
+  const auto moved = ui.catalog().find(SketchDimensionId("horizontal"))->label_offset();
+  CHECK(std::hypot(moved.x - initial_offset.x, moved.y - initial_offset.y) > 2);
+  CHECK(ui.topology() == topology);
+  const auto after = ui.snapshot();
+  REQUIRE(after != before);
+  REQUIRE(ui.window.undo());
+  CHECK(ui.snapshot() == before);
+  REQUIRE(ui.window.redo());
+  CHECK(ui.snapshot() == after);
+  zoom(120);
+  CHECK(ui.snapshot() == after);
+  ui.clear();
+  ui.click(ui.label(SketchDimensionId("horizontal")));
+  REQUIRE(ui.window.session().selection().entries().size() == 1);
+  CHECK(ui.window.session().selection().entries().front().semantic_id.ends_with(
+      "/dimension/horizontal"));
+  ui.capture(prefix + "-zoomed");
+  ui.roundtrip();
 }

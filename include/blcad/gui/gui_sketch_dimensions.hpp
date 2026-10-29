@@ -24,9 +24,18 @@ struct GuiSketchDimensionPreview {
 class GuiSketchDimensionController {
 public:
   [[nodiscard]] static std::string annotation_label(const geometry::SketchDimensionGlyph& glyph) {
-    if (glyph.token == "R" || glyph.token == "Ø")
+    if (glyph.token == "R" || glyph.token == "Ø" || glyph.token == "⌒")
       return glyph.token + " " + glyph.value_text;
     return glyph.value_text;
+  }
+
+  [[nodiscard]] static GuiSketchAnnotationPrimitive
+  annotation_for(const geometry::SketchDimensionGlyph& glyph) {
+    GuiSketchAnnotationPrimitive result{
+        glyph.semantic_id,           glyph.candidate_id,      glyph.anchor,
+        GuiSketchHitKind::Dimension, annotation_label(glyph), glyph.leader};
+    result.dimension_layout = glyph.layout;
+    return result;
   }
 
   // Provision an optional driving parameter only inside the accepted operation.
@@ -124,12 +133,7 @@ public:
         candidate, measurement, state);
     if (glyph.has_error())
       return Result<GuiSketchDimensionController>::failure(glyph.error());
-    GuiSketchAnnotationPrimitive annotation{glyph.value().semantic_id,
-                                            glyph.value().candidate_id,
-                                            glyph.value().anchor,
-                                            GuiSketchHitKind::Dimension,
-                                            {},
-                                            {}};
+    auto annotation = annotation_for(glyph.value());
     return Result<GuiSketchDimensionController>::success(GuiSketchDimensionController(
         session.part_document()->id(), std::move(topology.value()),
         std::move(constraints.value()), std::move(dimensions.value()),
@@ -300,8 +304,7 @@ public:
     std::vector<GuiSketchAnnotationPrimitive> annotations;
     annotations.reserve(glyphs.value().size());
     for (const auto& glyph : glyphs.value())
-      annotations.push_back({glyph.semantic_id, glyph.candidate_id, glyph.anchor,
-                             GuiSketchHitKind::Dimension, annotation_label(glyph), glyph.leader});
+      annotations.push_back(annotation_for(glyph));
     return Result<std::vector<GuiSketchAnnotationPrimitive>>::success(
         std::move(annotations));
   }

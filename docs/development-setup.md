@@ -2044,3 +2044,75 @@ No numbered implementation block is advanced.
 Delivery: [PR #128](https://github.com/GideonBa/Better-Linux-CAD/pull/128), implementation
 commit `76b68ed`. The final documentation-link commit changes only Markdown; runtime
 fingerprints and the verified implementation remain unchanged.
+
+### Issue #106 — explicit dimension presentation
+
+The offset-point regression first failed **2 of 9 assertions**: horizontal/vertical values
+were correct but the compatibility span remained diagonal (`/tmp/blcad-issue106-red.log`).
+The implementation separates measured references, placed model geometry and projected strokes,
+text bounds and terminators. Paint, inline-editor placement, click and box picking share the
+projected result. The presentation rules and official standards verification boundary are in
+`docs/gui-sketch-dimension-authoring-mvp8.md`; no full DIN/ISO conformity is asserted.
+
+```bash
+cmake --build build/dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app blcad_export_step -j 8
+./build/dev-gui/blcad_geometry_tests "[dimension-projection],[sketch-dimensions]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[dimension-layout],[dimension-label-input],[rapid-dimension],[integration][gui-feature-coverage]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue106-native-100 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 ./build/dev-gui/blcad_gui_tests "[dimension-layout-native],[dimension-label-input]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue106-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[dimension-layout-native],[dimension-label-input]"
+```
+
+Create capture directories first. Native tests prepare source geometry through authoring APIs,
+then exercise displayed captions and strokes with actual viewport mouse/key events. The new
+normal/oblique fixture has eight neighboring reference dimensions, actual partial-arc radius
+and arc length, label-drag preview/release, zoom, exact Undo/Redo and canonical reopen.
+Native pointer setup synchronizes the physical cursor before button events; the existing
+focus-readiness, precise semantic selection and unmodified persistence assertions stay strict.
+An initial oblique fixture omitted the shell refresh after direct source setup; that setup
+was corrected before final verification. Intermediate checks are not final-source evidence.
+
+Final runtime freeze: **900 files**, SHA-256
+`b4f7acb415f38811c77a731cbeb439c9c9aec042d50b6c2af282051de8dec78d`,
+`/tmp/blcad-issue106-source-freeze.json`; verify with
+`python3 /tmp/blcad-issue106-freeze.py check`. All five targets build
+(`/tmp/blcad-issue106-build-final-4.log`). Complete Core passes **557 / 17,711** and
+Geometry **479 / 36,084** (`core-full-final-2`, `geometry-full-final-2`). Native layout and
+existing dimension input pass **8 / 2,074** at both 100% and 150%
+(`/tmp/blcad-issue106-native-final-{100,150}-2.log`). Neighboring dimensions and oblique
+label-drag/zoom captures were inspected across both scales. Labels deliberately moved onto
+another caption retain the existing foreground-selection and overlap-cycling behavior;
+this change does not introduce automatic collision avoidance.
+
+Visual review of the 150% neighboring-dimension capture exposed tight manual fixture
+placements. The fixture now asserts that every pair of initial displayed text rectangles is
+disjoint, in addition to exact mouse selection. Its length and circular captions are spaced
+explicitly; the interrupted full run (`gui-full-before-label-spacing`) is not final evidence.
+
+The Shell coverage registry requires proof files named `gui_shell_*`. The existing
+dimension input/native presentation test is therefore renamed to
+`tests/gui/gui_shell_dimension_label_interaction_tests.cpp`; its native proof filters
+are registered there. The deterministic layout unit tests remain a separate non-shell
+proof, without weakening the inventory validator or its source/tag matching.
+
+The native 100%/150% runs above precede only that mechanical file rename and registry
+correction; their test content and all production sources are unchanged. The rebuilt final
+layout/inventory check passes **10 / 572** (`gui-coverage-final`); the affected native gate
+passes **52 / 1,840**, without skips or unmatched filters (`native-broad-final`):
+
+```bash
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue106-native-broad QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[dimension-layout],[sketch-hit-test],[sketch-box-selection],[sketch-dimension-workflow],[rapid-dimension],[sketch-constraints],[sketch-drag],[hermes-design-workflow],[native-viewer-lifecycle],[integration][gui-feature-coverage]"
+```
+
+Separate native startup reaches intentional timeout **124** (`/tmp/blcad-issue106-startup.log`).
+No High-severity, BadDrawable, BadWindow or unmatched-filter message appears in the completed
+native/startup gates. The existing OCCT Medium incomplete visual depth/stencil warning remains.
+
+Final complete offscreen GUI passes **620 cases — 594 passed, 26 expected native-only
+skips / 81,956 assertions** (`/tmp/blcad-issue106-gui-full-final.log`). The final 900-file
+runtime manifest remains unchanged after all completed gates. The platform skips are
+reported explicitly; affected native dimension/Sketch/desktop/viewer cases were exercised
+as listed above. No numbered implementation block is advanced by this issue.
+
+Delivery: [PR #129](https://github.com/GideonBa/Better-Linux-CAD/pull/129), implementation
+commit `8dd28dc`. The delivery-link commit changes only Markdown and preserves the verified
+runtime fingerprints.

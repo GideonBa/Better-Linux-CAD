@@ -3,6 +3,7 @@
 #include "blcad/core/part_document.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/spatial.hpp"
+#include "blcad/geometry/sketch_dimension_layout.hpp"
 #include "blcad/gui/gui_sketch_workbench.hpp"
 #include "blcad/gui/gui_types.hpp"
 
@@ -134,6 +135,7 @@ struct GuiSketchAnnotationPrimitive {
   // Painted label rectangle in logical DIPs, relative to its projected anchor.
   // The Qt viewport supplies font metrics; the interaction controller stays Qt-free.
   std::optional<GuiSketchScreenRect> label_bounds_dip{};
+  std::optional<geometry::SketchDimensionLayout> dimension_layout{};
 };
 
 struct GuiSketchInteractionScene {

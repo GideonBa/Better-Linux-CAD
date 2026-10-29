@@ -1,3 +1,4 @@
+#include "blcad/gui/gui_sketch_dimension_layout.hpp"
 #include "blcad/gui/occt_viewport.hpp"
 #include "blcad/gui/gui_appearance.hpp"
 #include "blcad/gui/gui_sketch_annotation_layout.hpp"
@@ -109,7 +110,7 @@ public:
     GuiSketchScreenPoint point;
     QString label;
     bool dimension{true};
-    std::vector<GuiSketchScreenPoint> leader; // dimension line extremities (screen)
+    std::optional<GuiDimensionScreenLayout> layout;
     std::string semantic_id;
   };
 
@@ -223,40 +224,28 @@ protected:
       painter.drawRect(QRectF(snap_point_->x - 3.0, snap_point_->y - 3.0, 6.0, 6.0));
     }
 
-    // Dimension leaders: the dimension line across the measured extremities
-    // with arrowheads, plus a thin extension to the value badge.
+    // The same resolved strokes and terminators are consumed by hit testing.
     for (const auto& annotation : annotations_) {
-      if (annotation.leader.size() < 2U)
+      if (!annotation.layout)
         continue;
-      const QPointF a(annotation.leader.front().x, annotation.leader.front().y);
-      const QPointF b(annotation.leader.back().x, annotation.leader.back().y);
-      QPen pen(QColor(150, 190, 235, 220), 1.2);
-      painter.setPen(pen);
       painter.setBrush(Qt::NoBrush);
-      painter.drawLine(a, b);
-      // Arrowheads pointing outward at both ends.
-      const QPointF direction = b - a;
-      const double length = std::hypot(direction.x(), direction.y());
-      if (length > 1.0e-3) {
-        const QPointF unit = direction / length;
-        const QPointF normal(-unit.y(), unit.x());
-        constexpr double kArrow = 7.0;
-        const auto arrow = [&](const QPointF tip, const QPointF along) {
-          const QPointF base = tip - along * kArrow;
-          painter.setBrush(QColor(150, 190, 235, 220));
-          const QPointF poly[3] = {tip, base + normal * (kArrow * 0.42),
-                                   base - normal * (kArrow * 0.42)};
-          painter.drawPolygon(poly, 3);
-        };
-        arrow(a, -unit);
-        arrow(b, unit);
+      for (const auto& stroke : annotation.layout->strokes) {
+        const bool main = stroke.role == GuiDimensionStrokeRole::Dimension;
+        painter.setPen(QPen(QColor(150, 190, 235, main ? 220 : 160), main ? 1.2 : .8));
+        for (std::size_t i = 1; i < stroke.points.size(); ++i) {
+          const auto a = stroke.points[i - 1], b = stroke.points[i];
+          painter.drawLine(QPointF(a.x, a.y), QPointF(b.x, b.y));
+        }
       }
-      // Thin extension from the dimension-line midpoint to the value badge.
-      const QPointF midpoint = (a + b) * 0.5;
-      QPen extension(QColor(150, 190, 235, 120), 0.8, Qt::DotLine);
-      painter.setPen(extension);
+      painter.setPen(QPen(QColor(150, 190, 235, 220), 1));
+      painter.setBrush(QColor(150, 190, 235, 220));
+      for (const auto& arrow : annotation.layout->arrows) {
+        const QPointF points[3]{{arrow.polygon[0].x, arrow.polygon[0].y},
+                                {arrow.polygon[1].x, arrow.polygon[1].y},
+                                {arrow.polygon[2].x, arrow.polygon[2].y}};
+        painter.drawPolygon(points, 3);
+      }
       painter.setBrush(Qt::NoBrush);
-      painter.drawLine(midpoint, QPointF(annotation.point.x, annotation.point.y));
     }
 
     // Selected and hovered badges remain visible above overlapping labels.
@@ -1794,6 +1783,21 @@ void OcctViewport::set_sketch_dimension_preview(
   rebuild_sketch_annotations();
 }
 
+Result<GuiDimensionScreenLayout>
+OcctViewport::sketch_dimension_screen_layout(const GuiSketchAnnotationPrimitive& annotation) const {
+  if (!sketch_interaction_)
+    return Result<GuiDimensionScreenLayout>::failure(Error::validation(
+        annotation.semantic_id, "Dimension projection requires an active Sketch mapping"));
+  auto displayed = annotation;
+  if (!displayed.label_bounds_dip) {
+    const auto bounds = sketch_annotation_layout(QString::fromStdString(annotation.label), true)
+                            .bounds.adjusted(-1, -1, 1, 1);
+    displayed.label_bounds_dip =
+        GuiSketchScreenRect{{bounds.left(), bounds.top()}, {bounds.right(), bounds.bottom()}};
+  }
+  return resolve_dimension_screen_layout(displayed, sketch_interaction_->mapping());
+}
+
 void OcctViewport::rebuild_sketch_annotations() {
   auto* overlay = static_cast<SketchInteractionOverlay*>(sketch_overlay_);
   if (overlay == nullptr)
@@ -1809,15 +1813,16 @@ void OcctViewport::rebuild_sketch_annotations() {
       auto screen = sketch_interaction_->mapping().plane_to_screen(annotation.point);
       if (!screen)
         continue;
-      std::vector<GuiSketchScreenPoint> leader;
-      leader.reserve(annotation.leader.size());
-      for (const auto& plane_point : annotation.leader) {
-        auto leader_screen = sketch_interaction_->mapping().plane_to_screen(plane_point);
-        if (leader_screen)
-          leader.push_back(leader_screen.value());
+      std::optional<GuiDimensionScreenLayout> layout;
+      if (annotation.hit_kind == GuiSketchHitKind::Dimension) {
+        auto resolved = sketch_dimension_screen_layout(annotation);
+        if (resolved) {
+          screen.value() = resolved.value().label_anchor;
+          layout = std::move(resolved.value());
+        }
       }
       badges.push_back({screen.value(), QString::fromStdString(annotation.label),
-                        annotation.hit_kind == GuiSketchHitKind::Dimension, std::move(leader),
+                        annotation.hit_kind == GuiSketchHitKind::Dimension, std::move(layout),
                         annotation.semantic_id});
     }
   }

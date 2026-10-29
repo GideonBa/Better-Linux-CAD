@@ -303,6 +303,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_part_operations_workbench.cpp
     src/gui/gui_selection_model.cpp
     src/gui/gui_sketch_interaction.cpp
+    src/gui/gui_sketch_dimension_layout.cpp
     src/gui/gui_sketch_create.cpp
     src/gui/gui_sketch_drag.cpp
     src/gui/gui_sketch_workbench.cpp
@@ -640,7 +641,8 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_raw_profile_transaction_tests.cpp
       tests/gui/gui_sketch_conic_workflow_tests.cpp
       tests/gui/gui_shell_dimension_workflow_tests.cpp
-      tests/gui/gui_dimension_label_interaction_tests.cpp
+      tests/gui/gui_shell_dimension_label_interaction_tests.cpp
+      tests/gui/gui_dimension_layout_tests.cpp
       tests/gui/gui_shell_feature_tools_tests.cpp
       tests/gui/gui_shell_finishing_tools_tests.cpp
       tests/gui/gui_shell_pattern_tools_tests.cpp

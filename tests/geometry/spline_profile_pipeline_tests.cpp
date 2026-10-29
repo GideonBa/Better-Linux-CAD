@@ -288,8 +288,8 @@ TEST_CASE("Block 115 dimension glyphs distinguish driving and reference values d
   CHECK(driving_glyph.value().token == "L");
   CHECK(driving_glyph.value().value_text == "20.000 mm");
   CHECK(reference_glyph.value().value_text == "(20.000 mm)");
-  CHECK(driving_glyph.value().anchor.x == Catch::Approx(10.88).margin(1.0e-9));
-  CHECK(driving_glyph.value().anchor.y == Catch::Approx(0.88).margin(1.0e-9));
+  CHECK(driving_glyph.value().anchor.x == Catch::Approx(10.0).margin(1.0e-9));
+  CHECK(driving_glyph.value().anchor.y == Catch::Approx(1.6).margin(1.0e-9));
 }
 
 TEST_CASE("Block 116 chamfer output resolves through the Geometry region pipeline",
@@ -421,4 +421,33 @@ TEST_CASE("Profile traversal reverses rational poles and weights without changin
   REQUIRE(cache.final_shape());
   CHECK(RectangleExtrusionAdapter{}.summarize(*cache.final_shape()).volume_mm3 ==
         Catch::Approx(std::acos(-1.0) * 20 * 10 * 3).epsilon(1e-8));
+}
+
+TEST_CASE("Projected dimensions span the measured projection instead of an endpoint diagonal",
+          "[geometry][dimension-layout][dimension-projection]") {
+  auto sketch =
+      Sketch::create(SketchId("offset.points"), "Offset points", DatumPlaneId("datum.xy")).value();
+  add_line(sketch, "diagonal", {0, 0}, {30, 20});
+  const auto topology = SketchTopology::migrate_legacy(sketch).value();
+  const auto* line = topology.find_entity("entity/diagonal");
+  REQUIRE(line);
+  const std::vector targets{SketchConstraintIntentTarget::point(line->points()[0]).value(),
+                            SketchConstraintIntentTarget::point(line->points()[1]).value()};
+  for (const auto kind :
+       {SketchDimensionKind::HorizontalDistance, SketchDimensionKind::VerticalDistance}) {
+    const auto intent = SketchDimensionIntent::create(SketchDimensionId("projected"), kind,
+                                                      SketchDimensionMode::Reference, targets)
+                            .value();
+    const auto measurement = SketchDimensionMeasurementEvaluator::measure(topology, intent).value();
+    const auto glyph =
+        SketchDimensionGlyphLayoutResolver{}.resolve(topology, intent, measurement).value();
+    REQUIRE(glyph.leader.size() == 2);
+    if (kind == SketchDimensionKind::HorizontalDistance) {
+      CHECK(measurement.value.millimeters() == Catch::Approx(30));
+      CHECK(glyph.leader[0].y == glyph.leader[1].y);
+    } else {
+      CHECK(measurement.value.millimeters() == Catch::Approx(20));
+      CHECK(glyph.leader[0].x == glyph.leader[1].x);
+    }
+  }
 }

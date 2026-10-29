@@ -243,7 +243,7 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/gui-sketch-dimension-authoring-mvp8.md",
-        "scope": "Standalone Part parameter catalog and direct consumers; local typed literal/Length-Count formula creation and editing with full-model Preview and atomic Apply; existing property and driving Sketch dimension edits. Identity/category changes and Assembly parameter management retain their documented Core boundaries.",
+        "scope": "Standalone Part parameter catalog and direct consumers; local typed literal/Length-Count formula creation and editing with full-model Preview and atomic Apply; existing property and driving Sketch dimension edits. Identity/category changes and Assembly parameter management retain their documented Core boundaries. Dimension families expose separate true-reference witnesses, projected spans, angular/arc-length arcs, circle terminators and shared painted/picked text geometry, including moved labels, zoom, oblique planes and logical-DIP metrics.",
         "gaps": [],
         "proofs": [
           {
@@ -261,6 +261,14 @@
           {
             "filter": "[shell-combined-parameters]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[dimension-layout-native]",
+            "source": "tests/gui/gui_shell_dimension_label_interaction_tests.cpp"
+          },
+          {
+            "filter": "[dimension-label-input]",
+            "source": "tests/gui/gui_shell_dimension_label_interaction_tests.cpp"
           }
         ],
         "actions": [

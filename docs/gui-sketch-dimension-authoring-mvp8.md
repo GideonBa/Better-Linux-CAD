@@ -232,9 +232,10 @@ anchor, with deterministic distance/identity tie-breaking; repeated clicks cycle
 stack. An unchanged badge click preserves that cycle and creates no document/history transaction.
 Normal badges use the theme accent border, panel background and readable text color. Selected
 badges use the application highlight/text colors and paint above overlapping labels;
-hovered badges receive an outline. Existing dimension lines and their midpoint-to-badge extensions
-are selectable within the curve pick tolerance, below real geometry in the hit order. The
-family-specific dimension line/arc presentation follow-up remains tracked by issue #106.
+hovered badges receive an outline. Explicit family-specific measure lines/arcs, extension lines,
+leaders and terminator triangles are selectable within the curve pick tolerance, below real geometry
+in the hit order. Issue #106 replaces the generic midpoint connector; the shared screen layout also
+supplies the painted text anchor and rectangle, including its view-sized clearance from the line.
 
 A left double-click resolves the visible badge at the event position independently of prior
 selection and opens its driving editor. The matching release is consumed so it cannot cycle to a
@@ -435,3 +436,71 @@ only this fixture differs from the earlier broad-run source freeze. Commands and
 Block 116 owns trim, extend, split, Sketch corner fillet, and Sketch corner chamfer. Those commands may
 consume Block-114 constraints and Block-115 dimensions during topology rewrite, but they must define
 explicit dependency-remap or fail-closed behavior rather than silently retargeting authored intent.
+
+
+## Explicit dimension presentation (issue #106)
+
+The presentation separates immutable measured references from nominal plane-space placement,
+dimension lines/arcs, extension lines, label leaders, origin marks and terminators.
+`SketchDimensionGlyph` carries `SketchDimensionLayout`; controller-created and Rapid Dimension
+annotations retain that data. `place_dimension_layout` reflows it from the current placement,
+including uncommitted label drags. The compatibility `leader` field is only a linear/radial span;
+it is not the authority for family layout and never substitutes a chord for an arc.
+
+Selected editor conventions:
+
+| Family | Measured geometry and presentation |
+| --- | --- |
+| Horizontal / vertical | Actual target points retain witnesses to a horizontal / vertical projected measure span. Label movement changes placement without substituting an endpoint diagonal. |
+| Aligned / point-to-point / line length | The measure span stays parallel to the actual measured segment, with perpendicular extension lines. |
+| Radius | One terminator identifies the actual circular boundary and the leader originates at the true center. For a partial arc, attachment is constrained to its real swept interval. |
+| Diameter | Two terminators span opposite boundaries through the true circle center. Partial-arc diameter describes its underlying circle. |
+| Angle | An arc about the actual intersection of the directed measured lines follows the same signed sector as the measured angle. Parallel lines have no invented vertex: leaders identify both actual entities. |
+| Arc length | The value remains source radius × actual three-point-arc sweep. A separate offset arc and radial end witnesses identify that interval; `⌒` distinguishes its caption from a linear chord. |
+
+`resolve_dimension_screen_layout` is shared by painting and picking. It projects each curve,
+adaptively samples arcs to a 0.25-DIP chord error (bounded subdivision), and supplies the actual
+text rectangle and arrow triangles. Witness gaps are up to 3 DIPs (shortened for very short
+witnesses), with 5-DIP overruns. Arrows are 7 DIPs long and move outside a short span when needed.
+Main and auxiliary lines use the existing colors, with 1.2- and 0.8-DIP strokes respectively.
+The measured label rectangle is kept 3 DIPs clear of its line, along its screen normal or outward
+from an angle/length arc. Text stays horizontal. These are explicit interactive-editor metrics,
+not assertions about physical drawing line classes or printed scales.
+
+The stored placement remains in Sketch-local coordinates. Font metrics, text clearance and
+terminators are resolved per view, so zoom, rotated planes and display scale do not change model
+intent. `OcctViewport::sketch_dimension_screen_layout` exposes the same displayed layout to inline
+editor placement and native interaction tests. Label and box picking use its displayed anchor;
+stroke picking uses exactly its polylines/triangles, without a hidden chord or synthetic diagonal.
+An opaque value badge retains priority over underlying geometry. No catalog schema, parameter
+binding, dimension meaning or label-offset persistence changes.
+
+### Standards target and verification boundary
+
+The selected target is [DIN EN ISO 129-1:2022-02](https://www.dinmedia.de/en/standard/din-en-iso-129-1/333197796),
+which DIN identifies with ISO 129-1:2018 plus Amendment 1:2020. The official
+[ISO publication record](https://www.iso.org/standard/64007.html) and
+[public ISO preview](https://www.iso.org/obp/ui?_escaped_fragment_=iso%3Astd%3Aiso%3A129%3A-1%3Aed-2%3Av1%3Aen)
+were checked on 2026-10-29. The published scope concerns presentation of nominal dimensions;
+public clauses 3.1.2–3.1.3 distinguish measure lines from feature-extension lines. This supports
+the explicit separation above. The later ISO/AWI revision is still under development and is not
+the selected published target.
+
+The numerical DIP metrics, screen-facing text, interactive badges and degenerate-angle fallback
+above are documented product decisions. The complete standard, its amended figures and normative
+cross-references have not been reviewed here; no full DIN/ISO conformity or certification is claimed.
+A later conformity claim requires a separate review against the complete applicable text. This
+issue implements clear interactive presentation rather than a tolerancing or drawing-export system.
+
+The deterministic regression covers offset-point projections, oblique aligned lengths, the true
+intersection of two angle lines, a clockwise partial arc away from +X, diameter endpoints,
+zoom-invariant witness gaps and terminators, caption clearance and painted-only hit geometry.
+Native input adds eight adjacent dimensions on normal/oblique planes, label movement, zoom,
+exact history and reopen at 100%/150%; the existing edit/delete/overlap suite remains included.
+Manual label placement can still create overlaps; the existing selected-badge priority and
+selection cycling resolve those stacks. No automatic label-collision solver is introduced.
+Full verification commands and exact results are recorded in `docs/development-setup.md`.
+
+Delivery: [PR #129](https://github.com/GideonBa/Better-Linux-CAD/pull/129), implementation
+commit `8dd28dc`. The delivery-link commit changes only Markdown and preserves the verified
+runtime fingerprints.
