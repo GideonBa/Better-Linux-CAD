@@ -237,6 +237,14 @@ reference entities.
 Canonical topology JSON persists both flags. A state not representable by historical PartDocument
 Sketch JSON is not silently flattened through the compatibility bridge.
 
+The issue #104 line-creation follow-up retains distinct endpoint ids and persists automatic
+Coincident intent in the existing constraint catalog. Picked `(SketchId, SketchPointId)` evidence
+is transient; raw snap-candidate strings and coordinate equality do not establish identity.
+Continuation, closure and restart therefore gain persistent coupling without extending the
+PartDocument topology bridge or welding unrelated coincident locations. Internal Polyline junctions
+use the same transaction path. Ordered-profile sharing and explicit alias migration remain separate
+authorities. See `docs/gui-sketch-basic-creation-mvp8.md` for the input and history contract.
+
 For Block 109, reference points are constants. Current projected point/line topology has no invented
 resolved point coordinates, so historical projected-reference constraints adapted to the solver report
 `InvalidReference` until the later associative-reference owner supplies a coordinate-capable target.

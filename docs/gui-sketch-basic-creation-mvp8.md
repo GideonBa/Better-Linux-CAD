@@ -36,7 +36,7 @@ controller to the Qt actions, viewport pointer events, numeric HUD keys, and Esc
 ## Implemented tools
 
 ```text
-Point                  1 pick   -> ConstructionPoint (PartDocument construction geometry)
+Point                  1 pick   -> SketchPoint in the active Sketch
 Line                   2 picks  -> one LineSegment
 Polyline               2+ picks -> chained LineSegments; Enter or double-click finishes
 Corner rectangle       2 picks  -> 4 LineSegments + ClosedProfile
@@ -71,16 +71,33 @@ They are enabled exactly when a Part Sketch workspace is active and idle.
 
 ## Picks, snapping, and identity
 
-Every accepted pick is the Block-107 snapped plane coordinate; the controller records the snap
-family for automatic-constraint preview. Snap candidate ids never become persistent identity:
-lines are created with their own endpoint coordinates, and only explicit ordered profile
-connectivity produces shared Block-108 point identity. Persistent shared junctions for open
-polylines or against existing entities require canonical topology JSON persistence and remain
-outside Block 111; the fail-closed Block-108 PartDocument bridge is not weakened.
+Every accepted pick is the Block-107 snapped plane coordinate. For supported line creation, an
+endpoint pick also carries transient `(SketchId, SketchPointId)` evidence resolved from the exact
+snap candidate's curve and endpoint role. Coincident coordinates never choose the target. At an
+overlap, the selected candidate determines which existing point is related; other coincident
+locations stay independent. The point must still exist in the same Sketch at the accepted position
+when expansion/commit validates it. Missing, moved or foreign evidence fails without partial intent.
 
-Polyline junctions are therefore numerically coincident but distinct point identities, exactly as
-`docs/sketch-shared-topology-mvp8.md` documents for unrelated coincident endpoints; Block 114 may
-later relate them with explicit Coincident intent.
+The issue #104 follow-up makes accepted canonical endpoint snaps persistent for Line, Polyline,
+Construction Line and Centerline. Consecutive Polyline segments receive internal Coincident intent.
+The shell's repeating Line carries the newly committed endpoint identity into its next first pick,
+so continuation, closure and restarted commands use the same path. Geometry and inferred relations
+share one `commit_part_sketch_intent_transaction`; relations have `Automatic` provenance, with no
+second post-commit constraint transaction. Duplicate/self pairs and zero-length segments are rejected
+or omitted as appropriate. Undo/Redo and Save/Open include the relations with the geometry.
+
+Snap candidate strings, pixels and OCCT indices are never stored as model identity. Created
+endpoints retain their own canonical ids; Coincident intent couples them without welding unrelated
+points or inventing canonical topology JSON persistence. Ordered profiles and fitted families keep
+their existing shared-point authority. Other snap families remain geometric inference. In particular,
+virtual parametric-profile corners and unresolved projected/reference endpoints without a canonical
+point target do not acquire invented detached point identities. The fail-closed compatibility bridge
+and reference-target limits in `docs/sketch-shared-topology-mvp8.md` remain authoritative.
+
+The viewport press phase snapshots its resolved snap before deferred creation runs. A later hover
+cannot change that accepted point. Cancellation, tool replacement or pick backout invalidate pending
+presses; automatic Line/Point rearming retains the logical input session so bursts stay ordered across
+successive segments. Source evidence, session tokens and queued input are transient GUI state.
 
 ## Rubber-band preview and inference
 
@@ -89,10 +106,13 @@ the current hover point; composite tools preview the complete closed corner ring
 anchors exist. The preview is published through the new transient
 `OcctViewport::set_sketch_preview_polyline(...)` overlay and is never model state.
 
-Automatic constraints are **previewed only**: pick/hover snap families map to constraint names
+Pick/hover snap families map to possible constraint-preview names
 (`Endpoint/Origin/Intersection -> coincident`, `Midpoint -> midpoint`, `Center/Quadrant ->
 concentric`, `Axis -> point_on_object`, `Horizontal/VerticalInference -> horizontal/vertical`,
-`AlignmentX/Y -> aligned`). Persistent automatic constraint authoring remains Block 114.
+`AlignmentX/Y -> aligned`). These hints remain transient. Supported canonical endpoint snaps and
+internal line junctions persist through the automatic Coincident path above; other inference kinds
+do not imply that a persistent relation was created. Compound-shape automatic recipes retain their
+existing constraint-authoring authority.
 
 ## Numeric heads-up input
 
@@ -113,11 +133,12 @@ pick. `Backspace` edits the entry; `Esc` clears it before popping picks.
 ## Command lifecycle and cancellation
 
 The binder walks the frozen Block-106 machine: tool start enters `CollectingPicks`; completion
-walks `NumericInput -> Preview -> commit_command` and publishes exactly one workbench transaction:
+walks `NumericInput -> Preview -> commit_command` and publishes exactly one session transaction:
 
 ```text
-curves/profiles      GuiSketchWorkbench::edit_sketch("Create sketch <tool>", ...)
-point / helper lines  Sketch point / LineSegment with an explicit helper role
+curves/profiles/points/helper lines
+  GuiDocumentSession::commit_part_sketch_intent_transaction("Create sketch <tool>", ...)
+  insert primitives, add automatic recipes, solve/validate, publish together
 ```
 
 `Esc` backs out one stage at a time: numeric entry first, then the newest pick, then the command.
@@ -169,3 +190,20 @@ dimension authoring, Block 116 trim/extend/split/fillet/chamfer, Block 117 offse
 Block 118 transforms/patterns, Block 119 regions/Finish Sketch, and Block 120 Interactive Sketch3D
 are implemented in their canonical contracts. Block 121 integrated acceptance is implemented and
 accepted in `docs/interactive-sketcher-mvp8-acceptance.md`; Block 122 is next.
+
+## Endpoint persistence follow-up — issue #104, 2026-10-29
+
+Four added cases and two strengthened existing pointer-loop cases reproduce and guard the missing
+closure/restart relation and the former separate history entry. Coverage includes an exact loop,
+a 4-DIP endpoint snap, twelve segments, an overlapping but unrelated endpoint, Save/Open and drag,
+polyline internal/external links, missing/moved/foreign target rejection, zero-length rejection,
+press-time snapshot versus later hover, cancellation/restart and a three-press queued burst.
+The transaction tests compare canonical document/catalog JSON and assert no partial lines or intent.
+
+Final focused checks pass **6 / 313** offscreen and **6 / 331** natively at both 100% and 150%,
+without native skips. Native fixtures keep every input inside the visible viewport, using ordinary
+wheel zoom when necessary. Captures `endpoint-overlap-after-drag` and
+`endpoint-twelve-segment-after-drag` were inspected at both scales: the selected relation follows
+its source, the unrelated overlapping endpoint stays independent and the twelve-edge region remains
+closed after reopen/drag. Broader validation and source fingerprints are recorded in
+`docs/development-setup.md`. This fix advances no numbered implementation block.

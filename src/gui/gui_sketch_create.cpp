@@ -467,6 +467,14 @@ Result<std::size_t> GuiSketchCreateController::add_pick(GuiSketchCreatePick pick
     return Result<std::size_t>::failure(create_error("select a source curve for tangent creation"));
   if (!finite(pick.point))
     return Result<std::size_t>::failure(create_error("Sketch pick coordinates must be finite"));
+  if (pick.endpoint_target &&
+      (pick.endpoint_target->sketch != sketch_ || pick.endpoint_target->point.empty() ||
+       pick.snap != GuiSketchSnapKind::Endpoint ||
+       (tool_ != GuiSketchCreateTool::Line && tool_ != GuiSketchCreateTool::Polyline &&
+        tool_ != GuiSketchCreateTool::ConstructionLine &&
+        tool_ != GuiSketchCreateTool::Centerline)))
+    return Result<std::size_t>::failure(
+        create_error("endpoint relation requires a line pick in the same Sketch"));
   if (!accepts_more_picks())
     return Result<std::size_t>::failure(
         create_error("the active Sketch creation tool already has all required picks"));
@@ -826,6 +834,72 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
     }
     return Result<std::size_t>::success(result.lines.size());
   };
+  const auto append_endpoint_relations = [&]() -> Result<std::size_t> {
+    if (result.lines.empty() || (result.lines.size() == 1U &&
+                                 std::none_of(picks_.begin(), picks_.end(), [](const auto& pick) {
+                                   return pick.endpoint_target.has_value();
+                                 })))
+      return Result<std::size_t>::success(0);
+    auto previous = SketchTopology::migrate_legacy(*sketch);
+    if (!previous)
+      return Result<std::size_t>::failure(previous.error());
+    for (const auto& pick : picks_) {
+      if (!pick.endpoint_target)
+        continue;
+      const auto* target = previous.value().find_point(pick.endpoint_target->point);
+      if (pick.endpoint_target->sketch != sketch_ || !target ||
+          distance(target->position(), pick.point) > kEpsilon)
+        return Result<std::size_t>::failure(
+            create_error("snapped endpoint changed or disappeared; pick it again"));
+    }
+    auto candidate = *sketch;
+    for (const auto& line : result.lines) {
+      auto added = candidate.add_entity(line);
+      if (!added)
+        return added;
+    }
+    auto topology = SketchTopology::migrate_legacy(candidate);
+    if (!topology)
+      return Result<std::size_t>::failure(topology.error());
+    const auto endpoint = [&](std::size_t line, bool end) {
+      return topology.value()
+          .find_entity("entity/" + result.lines[line].id().value())
+          ->points()[end ? 1U : 0U];
+    };
+    const auto relate = [&](const SketchPointId& first,
+                            const SketchPointId& second) -> Result<std::size_t> {
+      if (first == second)
+        return Result<std::size_t>::success(0);
+      if (!topology.value().find_point(first) || !topology.value().find_point(second))
+        return Result<std::size_t>::failure(create_error("endpoint identity is unavailable"));
+      auto a = SketchConstraintIntentTarget::point(first);
+      auto b = SketchConstraintIntentTarget::point(second);
+      if (!a || !b)
+        return Result<std::size_t>::failure(!a ? a.error() : b.error());
+      for (const auto& recipe : result.constraint_recipes)
+        if (recipe.kind == SketchSolverConstraintKind::Coincident && recipe.targets.size() == 2U &&
+            ((recipe.targets[0] == a.value() && recipe.targets[1] == b.value()) ||
+             (recipe.targets[1] == a.value() && recipe.targets[0] == b.value())))
+          return Result<std::size_t>::success(0);
+      result.constraint_recipes.push_back({SketchSolverConstraintKind::Coincident,
+                                           {},
+                                           {std::move(a.value()), std::move(b.value())}});
+      return Result<std::size_t>::success(1);
+    };
+    for (std::size_t index = 1; index < result.lines.size(); ++index) {
+      auto added = relate(endpoint(index - 1, true), endpoint(index, false));
+      if (!added)
+        return added;
+    }
+    for (std::size_t index = 0; index < picks_.size(); ++index)
+      if (picks_[index].endpoint_target) {
+        auto added = relate(index == 0 ? endpoint(0, false) : endpoint(index - 1, true),
+                            picks_[index].endpoint_target->point);
+        if (!added)
+          return added;
+      }
+    return Result<std::size_t>::success(result.constraint_recipes.size());
+  };
   const auto append_ellipse = [&](const EllipseGeometry& ellipse, double start,
                                   double sweep) -> Result<std::size_t> {
     const std::size_t segment_count = std::max<std::size_t>(
@@ -868,6 +942,9 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
       return Result<GuiSketchCreateExpansion>::failure(line.error());
     result.lines.push_back(std::move(line.value()));
     result.label = "Create sketch helper line";
+    auto related = append_endpoint_relations();
+    if (!related)
+      return Result<GuiSketchCreateExpansion>::failure(related.error());
     return Result<GuiSketchCreateExpansion>::success(std::move(result));
   }
   case GuiSketchCreateTool::Line:
@@ -882,6 +959,9 @@ GuiSketchCreateController::expansion(const PartDocument& document) const {
     auto appended = append_chain(points, false);
     if (appended.has_error())
       return Result<GuiSketchCreateExpansion>::failure(appended.error());
+    auto related = append_endpoint_relations();
+    if (!related)
+      return Result<GuiSketchCreateExpansion>::failure(related.error());
     return Result<GuiSketchCreateExpansion>::success(std::move(result));
   }
   case GuiSketchCreateTool::CornerRectangle:

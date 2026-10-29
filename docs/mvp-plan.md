@@ -1336,7 +1336,7 @@ missing shell/persistence integration; these tickets do not claim that every rep
 
 | Area | Issue | Evidence / current status | Suggested priority |
 | --- | --- | --- | --- |
-| Sketch endpoint snaps | [#104](https://github.com/GideonBa/Better-Linux-CAD/issues/104) | Confirmed persistence gap for loop closure / restarted Line | P2 |
+| Sketch endpoint snaps | [#104](https://github.com/GideonBa/Better-Linux-CAD/issues/104) | Implemented: stable picked endpoint identity; automatic Coincident geometry/history transaction; native loop/restart/overlap/12-segment and persistence/drag proof | P2 |
 | Coincident → closed region | [#105](https://github.com/GideonBa/Better-Linux-CAD/issues/105) | Exact Coincident equality groups implemented; cross-layer/native regression in `gui-sketch-regions-finish-mvp8.md` | P1 |
 | Dimension line layout | [#106](https://github.com/GideonBa/Better-Linux-CAD/issues/106) | Confirmed family-specific rendering gaps; DIN/ISO target recorded | P2 |
 | Dimension double-click editing | [#107](https://github.com/GideonBa/Better-Linux-CAD/issues/107) | Implemented: shared badge rectangle and independent double-click resolution; native proof | P1 |
@@ -1397,7 +1397,7 @@ the complete issue, inspect the staged diff, run appropriate headless/native che
 contracts and evidence, commit and normally push, then merge its PR through main's rules. Fetch and
 verify the delivered tree before starting the next issue from main. Do not stack unfinished PRs.
 
-The current open-issue queue is **#114 → #104 → #109 → #111 → #110 → #112 → #106**. Existing
+The adopted issue queue is **#114 → #104 → #109 → #111 → #110 → #112 → #106**. Existing
 merged #105/#107/#108/#113 fixes remain regression coverage. Start with #114's remaining full-model
 Apply/history hotspot, then complete the endpoint, construction, axis, face-support and dimension
 presentation acceptance criteria in their own issues. Reading dependency plans does not start their
@@ -1405,6 +1405,8 @@ implementation. Close an issue only when its acceptance criteria and evidence ar
 
 **Implementation and acceptance complete: #114**, branch `fix/complex-part-history-cache`, based
 on main `8e72a8e`; deliver through its single PR before starting #104 from verified merged main.
+Delivered by [PR #123](https://github.com/GideonBa/Better-Linux-CAD/pull/123), merge `736f100`;
+issue #114 is closed and the delivered tree matches the tested commit `8003646` exactly.
 The new isolated five-sample 40-blade baseline measures warm Apply p95 **5,080.7 ms**, Undo
 **5,256.0 ms** and Redo **5,071.9 ms**. Conservative affected-root transactions and a four-state
 runtime history LRU reduce these to **126.3 / 15.9 / 18.4 ms**. Atomic publication, strict validation,
@@ -1420,6 +1422,18 @@ remain unchanged through validation. Exact raw measurements, provenance and chec
 `docs/gui-modeling-workspace-mvp9.md` and `docs/development-setup.md`. The 40-blade JSON p95
 **22.949 ms** remains above the unchanged local **20 ms** target; cache-miss history and conservative
 fallbacks still perform real full geometry work. No release SLA or universal latency bound is claimed.
+
+**Implementation and acceptance complete: #104**, branch `fix/persistent-line-endpoint-snaps`,
+based on verified main `736f100`; deliver its single PR before starting #109 from verified merged
+main. Stable canonical endpoint evidence replaces coordinate-based post-commit chain coupling.
+Geometry and automatic Coincident recipes share one history transaction. Closure, restart, overlap,
+twelve segments, persistence/drag, stale-target rejection and queued input are covered by **6 / 313**
+offscreen and **6 / 331** natively at both 100% and 150%. The full GUI suite passes **578 / 20
+expected native-only skips / 81,018 assertions**; native affected-sketch and required shell acceptance
+pass **82 / 3,609**, without skips. Five targets build; Core/Geometry remain unchanged from verified
+main. The input manifest and exact checks live in `docs/development-setup.md`, with behavior in
+`docs/gui-sketch-basic-creation-mvp8.md`. Remaining order: **#109 → #111 → #110 → #112 → #106**;
+Blocks 138–143 remain planned.
 
 After all open issues are complete and merged, execute **Blocks 138 → 139 → 140 → 141 → 142 →
 143**, each with the architecture boundaries, GUI access and acceptance gates in
