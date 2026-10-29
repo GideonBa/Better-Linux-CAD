@@ -35,8 +35,9 @@ Rotation-axis identity is explicit and supports:
 
 - finite explicit origin plus non-zero direction;
 - existing `DatumAxisId`;
-- existing `ConstructionLineId`; or
-- validated `SemanticEdgeReference`.
+- existing `ConstructionLineId`;
+- validated `SemanticEdgeReference`; or
+- an editable Sketch line identified by `(SketchId, SketchEntityId)` (Issue #110).
 
 Mirror, non-uniform scale, arbitrary authored matrices, and inferred coordinate references are not
 part of Block 56.
@@ -113,3 +114,14 @@ Focused tags:
 Block 57 now executes translation, rotation, and uniform scaling, moves explicitly requested owned
 frames/geometry, re-resolves semantic/projected references, and proves that unowned Sketches remain
 fixed. Its canonical Geometry contract is `docs/part-body-transform-geometry-mvp6.md`.
+
+
+## Sketch-line rotation sources — Issue #110
+
+`BodyTransformRotationAxisKind::SketchLine` stores a `SketchLineReference`, serialized as
+`{"kind":"sketch_line","sketch":"sketch.axis","entity":"line.axis"}`. Adding the transform
+validates the line's membership and installs the source Sketch dependency. Endpoint/plane changes
+therefore invalidate the transform through the existing graph; normal/construction/centerline role
+changes preserve identity. Geometry resolves the current cache-aware Sketch plane exactly once.
+This source is a model-space spatial axis, independent of the consuming transform's explicit
+numeric coordinate frame. Invalid/deleted sources produce repair diagnostics without retargeting.

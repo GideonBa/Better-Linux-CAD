@@ -1920,3 +1920,63 @@ The pre-existing OCCT Medium visual-depth/stencil warning remains (90 entries in
 All 890 runtime fingerprints remain unchanged through the final focused-native, scaled, full GUI,
 broad and startup checks. Broad/startup logs are `/tmp/blcad-issue111-native-broad.log` and
 `/tmp/blcad-issue111-startup.log`. No new numbered implementation block is claimed.
+
+## Issue #110 — persistent Sketch-line rotation axes (2026-10-29)
+
+Revolve and Body Rotate store an exact `(SketchId, SketchEntityId)` source for editable normal,
+construction and centerline segments. `SketchLineAxisResolver` resolves their current endpoints
+through the current cache-aware workplane exactly once. Both consumers depend on the source
+Sketch. The existing axis choosers provide the Sketch-line collection route; existing model-pick
+scopes remain bounded to their prior sources. Contracts are in `file-format.md`,
+`part-feature-input-reference-mvp6.md`, `part-revolve-intent-mvp6.md`,
+`part-body-transform-ownership-mvp6.md` and `gui-interactive-extrude-revolve-mvp9.md`.
+
+Keep source edits, builds, GUI suites and separate startup serial. Core/Geometry correctness tests
+may accompany one GUI suite; no timing profile is part of this issue.
+
+```bash
+cmake --build --preset dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app blcad_export_step -j6
+./build/dev-gui/blcad_core_tests "[sketch-line-axis]"
+./build/dev-gui/blcad_geometry_tests "[sketch-line-axis],[sketch-line-axis-revolve]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[gui][shell-body][sketch-line-axis],[sketch-line-axis-revolve]"
+./build/dev-gui/blcad_core_tests
+./build/dev-gui/blcad_geometry_tests
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue110-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[sketch-line-axis-native]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue110-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[sketch-line-axis-native]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad-issue110-native QT_QPA_PLATFORM=xcb ./build/dev-gui/blcad_gui_tests "[shell-body],[block136-revolve],[shell-combined-revolve-controls],[shell-combined-body-context],[shell-combined-revolve-pattern],[shell-combined-bodies],[body-axis-native],[block136-body-context],[shell-combined-construction],[block136-feature-edit],[native-viewer-lifecycle],[integration][gui-feature-coverage]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+All five targets build. The initial red Body Rotate selector test reproduces all three absent line
+roles (**1 / 24, 3 failures**). Focused Geometry passes **3 / 213** and focused GUI **2 / 120**.
+Full final Core passes **557 / 17,711**, including strict new JSON fields/types, retained scoped
+identity across equal entity ids, renamed same-coordinate source rejection, duplicate-id rejection
+and endpoint invalidation of both consumers. Full Geometry passes **466 / 35,655**, including posed
+owned-Sketch axis equivalence against an explicit World-axis rotation, oblique workplane/endpoint
+edits, incremental/full Revolve equality and retained profile-plane/crossing guards.
+
+The native workflow passes **1 case / 851 assertions** at both 100% and 150%, without skips. Its
+three generator paths author normal, construction and centerline axes through real ribbon/numeric
+input. Each chooses the exact oblique off-origin Sketch-line identity for a 180° Revolve and a 90°
+Body Rotate, drags the original line endpoint in the native viewport, verifies the changed volume
+independently using the profile's swept-centroid volume, and authors a downstream two-instance
+linear pattern. Exact local Undo/Redo, full recompute, canonical Save/Open and STEP pass. Captures
+of the selected axis, edited endpoint and resulting model were inspected at both scales. Existing
+strict popup, pointer, focus and visible-input assertions remain.
+
+The final runtime input manifest has **892** files, SHA-256
+`fcc386c0d1050239c58052fb0776e8394086df69c1e8d3b0cde9da01785f189f`, stored at
+`/tmp/blcad-issue110-source-freeze.json`; check with `/tmp/blcad-issue110-freeze.py check`.
+Logs use `/tmp/blcad-issue110-{red,build,build-2,core-full,geometry-full,native-first,native-150,
+gui-full}.log`. This issue adds a typed source family without advancing a numbered implementation
+block; Pattern/Draft axes and associative projected-line records do not gain new source variants.
+
+The final full offscreen GUI suite passes **609 cases: 586 passed, 23 expected native-only skips;
+81,564 assertions**. The final affected native Body/Revolve/construction/Feature Edit workflows and
+required shell gate pass **45 / 7,735**, without skips or unmatched filters. Separate startup reaches
+intentional timeout **124**. Final native/scaled/broad/startup logs contain no High-severity,
+BadDrawable or BadWindow errors. The pre-existing OCCT Medium visual-depth/stencil warning remains
+(112 entries in the broad batch). All 892 runtime fingerprints remain unchanged through the final
+full Core/Geometry, native, scaled, full GUI, broad and startup checks. Final broad/startup logs are
+`/tmp/blcad-issue110-native-broad-final.log` and `/tmp/blcad-issue110-startup-final.log`.

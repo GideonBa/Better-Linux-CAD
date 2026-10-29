@@ -749,8 +749,8 @@ Ownership records store `sketch`, `owning_body`, and one of `drives_body`, `cons
 `reference_only`. Transform records store stable id/body identity, `translate`, `rotate`, or
 `uniform_scale`, coordinate space, optional referenced coordinate frame, the selected kind's exact
 numeric/axis fields, and both associative-application flags. Transform array order is the persistent
-stack order. Rotation axes use `explicit`, `datum_axis`, `construction_line`, or `semantic_edge`
-identity. Older files missing either array restore empty collections; no Body, ownership, or
+stack order. Rotation axes use `explicit`, `datum_axis`, `construction_line`, `semantic_edge`, or
+`sketch_line` identity. Older files missing either array restore empty collections; no Body, ownership, or
 transform is inferred.
 
 Block 58 adds reusable typed Part-feature input values but intentionally no standalone top-level
@@ -772,7 +772,7 @@ stores `revolve` or `revolve_cut`, a typed sketch/profile-region identity, one t
 one strict `full`, `angle`, or `symmetric` extent object, and the mandatory Body operation/result
 fields. Partial Angle stores `angle_deg` plus `positive|negative` side; Symmetric stores the total
 included `angle_deg`; Full stores neither. Axis source kinds are `datum_axis`,
-`construction_line`, `semantic_axis`, and `semantic_linear_edge`, each with only its matching
+`construction_line`, `semantic_axis`, `semantic_linear_edge`, and `sketch_line`, each with only its matching
 identity payload. Missing arrays restore zero Revolve records. Malformed mode-specific fields,
 unsupported sources, invalid body-operation pairings, and unresolved references fail closed.
 Canonical details are in `docs/part-revolve-intent-mvp6.md`.
@@ -989,3 +989,26 @@ EditableBody mode stores an `ImportedBodyFeature` at the beginning of normal Par
 later BLCAD features remain ordinary persistent model intent. Missing or digest-mismatched assets
 fail closed, and an explicit source refresh is required before persisted digest/topology recovery
 state may change.
+
+
+### Sketch-line rotation axes — Issue #110
+
+Revolve axis payloads add the strict source family
+`{"source_kind":"sketch_line","sketch":"sketch.axis","entity":"line.axis"}`. Body Rotate uses
+`{"kind":"sketch_line","sketch":"sketch.axis","entity":"line.axis"}` inside `rotation_axis`.
+Both store exactly the nonempty SketchId/SketchEntityId pair; additional fields, wrong types,
+missing identities and unsupported source geometry fail closed. Old axis payloads and canonical
+bytes are unchanged. The existing Part format version is retained as an additive source family;
+older readers reject the unsupported new discriminator.
+
+Normal, construction and centerline `LineSegment` records are eligible. Their role is not an axis
+identity and changing a role retains the reference. Equal line ids in different Sketches remain
+different sources; duplicate line ids in one Sketch are already invalid. Referenced/projected
+records and curves are not silently converted to editable straight lines. Resolution never retargets
+by coordinates or array position. Missing sources retain a diagnostic identifying the exact pair.
+
+The source Sketch is the dependency node, so endpoint edits and its existing workplane dependencies
+invalidate both consumers. Geometry maps current line endpoints through the current cache-aware
+workplane exactly once, including owned-reference transforms. Resolved points/directions and OCCT
+geometry remain derived; no detached frame snapshot or new top-level array is written. Revolve
+keeps its in-plane and non-crossing profile checks; Body Rotate accepts spatial axes.

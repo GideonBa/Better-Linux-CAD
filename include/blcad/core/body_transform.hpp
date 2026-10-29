@@ -3,6 +3,7 @@
 #include "blcad/core/datum_plane.hpp"
 #include "blcad/core/id.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/core/sketch_line_reference.hpp"
 #include "blcad/core/spatial.hpp"
 
 #include <optional>
@@ -13,7 +14,13 @@ namespace blcad {
 
 enum class BodyTransformKind { Translate, Rotate, UniformScale };
 enum class BodyTransformCoordinateSpace { World, BodyLocal, SketchLocal, ConstructionReference };
-enum class BodyTransformRotationAxisKind { Explicit, DatumAxis, ConstructionLine, SemanticEdge };
+enum class BodyTransformRotationAxisKind {
+  Explicit,
+  DatumAxis,
+  ConstructionLine,
+  SemanticEdge,
+  SketchLine
+};
 
 [[nodiscard]] std::string_view to_string(BodyTransformKind kind) noexcept;
 [[nodiscard]] std::string_view to_string(BodyTransformCoordinateSpace space) noexcept;
@@ -21,6 +28,11 @@ enum class BodyTransformRotationAxisKind { Explicit, DatumAxis, ConstructionLine
 
 class BodyTransformRotationAxis {
 public:
+  [[nodiscard]] static Result<BodyTransformRotationAxis>
+  create_sketch_line(SketchLineReference line);
+  [[nodiscard]] const std::optional<SketchLineReference>& sketch_line() const noexcept {
+    return sketch_line_;
+  }
   [[nodiscard]] static Result<BodyTransformRotationAxis> create_explicit(Point3 origin,
                                                                          Vector3 direction);
   [[nodiscard]] static Result<BodyTransformRotationAxis> create_datum_axis(DatumAxisId axis);
@@ -40,7 +52,8 @@ private:
   BodyTransformRotationAxis(BodyTransformRotationAxisKind kind, Point3 explicit_origin,
                             Vector3 explicit_direction, DatumAxisId datum_axis,
                             ConstructionLineId construction_line,
-                            std::optional<SemanticEdgeReference> semantic_edge);
+                            std::optional<SemanticEdgeReference> semantic_edge,
+                            std::optional<SketchLineReference> sketch_line = std::nullopt);
 
   BodyTransformRotationAxisKind kind_ = BodyTransformRotationAxisKind::Explicit;
   Point3 explicit_origin_;
@@ -48,6 +61,7 @@ private:
   DatumAxisId datum_axis_;
   ConstructionLineId construction_line_;
   std::optional<SemanticEdgeReference> semantic_edge_;
+  std::optional<SketchLineReference> sketch_line_;
 };
 
 class BodyTransform {

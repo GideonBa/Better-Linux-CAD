@@ -20,9 +20,10 @@ Every Revolve record requires:
 - one mandatory `FeatureBodyResultContext`.
 
 Supported axis identities are `DatumAxis`, an axis-capable `ConstructionLine`,
-`SemanticAxisReference`, and an axis-capable semantic generated linear edge. A semantically modeled
-sketch centerline enters through the shared construction-line/axis identity boundary; raw sketch
-entity indices and OCCT topology are not persistent axis identity.
+`SemanticAxisReference`, an axis-capable semantic generated linear edge, and an editable Sketch
+line identified by `SketchLineReference(SketchId, SketchEntityId)` (Issue #110). Normal,
+construction and centerline roles are equally eligible and retain their original entity identity.
+Raw array indices and OCCT topology are not persistent axis identity.
 
 `Revolve` accepts NewBody, Join, and Intersect. `RevolveCut` requires Cut. NewBody requires an
 explicit produced Body and no target. Modifying modes require a target Body and use either an
@@ -99,3 +100,10 @@ Focused proof:
 
 Block 62 Geometry is implemented in `docs/part-revolve-geometry-mvp6.md`. Block 63 General Part
 Pattern Core model and JSON is the next boundary.
+
+
+Issue #110 adds strict `sketch_line` axis JSON with only `sketch` and `entity` string identities
+beside `source_kind`. The referenced Sketch feeds the Revolve dependency node, so endpoint and
+workplane changes invalidate it. Geometry resolves its current transformed frame; the existing
+profile-plane/non-crossing checks remain authoritative. This is independent of document
+ConstructionLine identity. See `file-format.md` for compatibility and failure policy.

@@ -89,8 +89,17 @@ std::string_view to_string(BodyTransformRotationAxisKind kind) noexcept {
     return "construction_line";
   case BodyTransformRotationAxisKind::SemanticEdge:
     return "semantic_edge";
+  case BodyTransformRotationAxisKind::SketchLine:
+    return "sketch_line";
   }
   return "unknown";
+}
+
+Result<BodyTransformRotationAxis>
+BodyTransformRotationAxis::create_sketch_line(SketchLineReference line) {
+  return Result<BodyTransformRotationAxis>::success(
+      BodyTransformRotationAxis(BodyTransformRotationAxisKind::SketchLine, {}, {}, DatumAxisId(),
+                                ConstructionLineId(), std::nullopt, std::move(line)));
 }
 
 Result<BodyTransformRotationAxis> BodyTransformRotationAxis::create_explicit(Point3 origin,
@@ -147,10 +156,11 @@ BodyTransformRotationAxis::semantic_edge() const noexcept {
 BodyTransformRotationAxis::BodyTransformRotationAxis(
     BodyTransformRotationAxisKind kind, Point3 explicit_origin, Vector3 explicit_direction,
     DatumAxisId datum_axis, ConstructionLineId construction_line,
-    std::optional<SemanticEdgeReference> semantic_edge)
+    std::optional<SemanticEdgeReference> semantic_edge,
+    std::optional<SketchLineReference> sketch_line)
     : kind_(kind), explicit_origin_(explicit_origin), explicit_direction_(explicit_direction),
       datum_axis_(std::move(datum_axis)), construction_line_(std::move(construction_line)),
-      semantic_edge_(std::move(semantic_edge)) {}
+      semantic_edge_(std::move(semantic_edge)), sketch_line_(std::move(sketch_line)) {}
 
 Result<BodyTransform> BodyTransform::create_translate(
     BodyTransformId id, BodyId body, BodyTransformCoordinateSpace coordinate_space,

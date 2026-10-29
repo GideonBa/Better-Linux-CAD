@@ -51,6 +51,19 @@ ShellFeatureTools::revolve_axis_choices(const GuiSketchPlaneView& plane) const {
     append(AxisReference::create_construction_line(PartFeatureInputRole::RevolveAxis, line.id(),
                                                    PartFeatureInputCapability::Axis),
            line.name(), "construction-line/" + line.id().value());
+  for (const auto& sketch : part->sketches())
+    for (const auto& line : sketch.line_segments()) {
+      auto reference = SketchLineReference::create(sketch.id(), line.id());
+      if (!reference)
+        continue;
+      const auto role = line.role() == SketchLineRole::Centerline ? "Centerline"
+                        : line.construction()                     ? "Construction"
+                                                                  : "Geometry";
+      append(
+          AxisReference::create_sketch_line(PartFeatureInputRole::RevolveAxis, reference.value()),
+          std::string("Sketch Line (") + role + "): " + sketch.name() + " / " + line.id().value(),
+          reference.value().identity());
+    }
   for (const auto& feature : part->features())
     if (feature.type() == FeatureType::SubtractiveExtrude) {
       auto semantic = SemanticAxisReference::create(feature.id());
@@ -202,6 +215,20 @@ Result<std::size_t> ShellFeatureTools::configure_revolve_candidate() {
           ? std::nullopt
           : std::optional<BodyId>{BodyId(revolve_target_->currentData().toString().toStdString())});
   auto frame = axis.frame;
+  auto resolved = geometry::GeometryRecomputeExecutor{}.resolve_feature_axis(
+      *session_.part_document(), axis.reference, *session_.part_shape_cache());
+  if (!resolved)
+    return Result<std::size_t>::failure(resolved.error());
+  frame.origin = resolved.value().first;
+  frame.axis = frame.plane_normal = normalized(resolved.value().second);
+  const auto projection = dot(frame.reference_direction, frame.axis);
+  frame.reference_direction = {frame.reference_direction.x - projection * frame.axis.x,
+                               frame.reference_direction.y - projection * frame.axis.y,
+                               frame.reference_direction.z - projection * frame.axis.z};
+  if (length(frame.reference_direction) <= 1e-9)
+    frame.reference_direction =
+        cross(std::abs(frame.axis.x) < .9 ? Vector3{1, 0, 0} : Vector3{0, 1, 0}, frame.axis);
+  frame.reference_direction = normalized(frame.reference_direction);
   if (revolve_extent_->currentIndex() == 0)
     controller.set_full();
   else if (revolve_extent_->currentIndex() == 2)

@@ -1542,6 +1542,12 @@ feature_body_result_context_from_json(const json& feature_json) {
     value["semantic_edge"] =
         semantic_edge_reference_to_json(std::get<SemanticEdgeReference>(axis.source()));
     break;
+  case PartFeatureInputSourceKind::SketchLine: {
+    const auto& line = std::get<SketchLineReference>(axis.source());
+    value["sketch"] = line.sketch().value();
+    value["entity"] = line.entity().value();
+    break;
+  }
   default:
     break;
   }
@@ -2310,6 +2316,17 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
                                                std::move(edge.value()),
                                                PartFeatureInputCapability::Axis);
   }
+  if (source_kind == "sketch_line" && axis_json.size() == 3U && axis_json.contains("sketch") &&
+      axis_json.contains("entity") && axis_json.at("sketch").is_string() &&
+      axis_json.at("entity").is_string()) {
+    auto line =
+        SketchLineReference::create(SketchId(axis_json.at("sketch").get<std::string>()),
+                                    SketchEntityId(axis_json.at("entity").get<std::string>()));
+    if (!line)
+      return Result<RevolveFeature>::failure(line.error());
+    axis = AxisReference::create_sketch_line(PartFeatureInputRole::RevolveAxis,
+                                             std::move(line.value()));
+  }
   if (axis.has_error())
     return Result<RevolveFeature>::failure(axis.error());
 
@@ -2993,8 +3010,17 @@ body_transform_rotation_axis_from_json(const json& value) {
       return Result<BodyTransformRotationAxis>::failure(edge.error());
     return BodyTransformRotationAxis::create_semantic_edge(std::move(edge.value()));
   }
+  if (kind == "sketch_line" && value.size() == 3U && value.contains("sketch") &&
+      value.contains("entity") && value.at("sketch").is_string() &&
+      value.at("entity").is_string()) {
+    auto line = SketchLineReference::create(SketchId(value.at("sketch").get<std::string>()),
+                                            SketchEntityId(value.at("entity").get<std::string>()));
+    if (!line)
+      return Result<BodyTransformRotationAxis>::failure(line.error());
+    return BodyTransformRotationAxis::create_sketch_line(std::move(line.value()));
+  }
   return Result<BodyTransformRotationAxis>::failure(
-      json_error("unsupported body transform rotation axis kind"));
+      json_error("unsupported or malformed body transform rotation axis kind"));
 }
 
 [[nodiscard]] Result<BodyTransform> body_transform_from_json(const json& value) {
@@ -3093,6 +3119,10 @@ body_transform_rotation_axis_from_json(const json& value) {
     break;
   case BodyTransformRotationAxisKind::SemanticEdge:
     value["semantic_edge"] = semantic_edge_reference_to_json(*axis.semantic_edge());
+    break;
+  case BodyTransformRotationAxisKind::SketchLine:
+    value["sketch"] = axis.sketch_line()->sketch().value();
+    value["entity"] = axis.sketch_line()->entity().value();
     break;
   }
   return value;

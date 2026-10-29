@@ -264,3 +264,100 @@ TEST_CASE("Revolve JSON rejects ambiguous angle and operation intent",
     CHECK(deserialize_part_document_from_json(root.dump()).has_error());
   }
 }
+
+TEST_CASE("Sketch-line rotation inputs preserve scoped identity and dirty both consumers",
+          "[core][revolve-feature][sketch-line-axis]") {
+  for (const auto role :
+       {SketchLineRole::Geometry, SketchLineRole::Construction, SketchLineRole::Centerline}) {
+    auto document = revolve_document();
+    auto axis_sketch = Sketch::create(SketchId("sketch.axis"), "Axis", DatumPlaneId("datum.xy"));
+    REQUIRE(axis_sketch);
+    REQUIRE(axis_sketch.value().add_entity(
+        LineSegment::create(SketchEntityId("line"), {20, 0}, {30, 10}, role).value()));
+    REQUIRE(document.add_sketch(axis_sketch.value()));
+    auto other = Sketch::create(SketchId("sketch.other"), "Other", DatumPlaneId("datum.xy"));
+    REQUIRE(other);
+    REQUIRE(other.value().add_entity(
+        LineSegment::create(SketchEntityId("line"), {0, 20}, {10, 20}).value()));
+    REQUIRE(document.add_sketch(other.value()));
+    auto source = SketchLineReference::create(axis_sketch.value().id(), SketchEntityId("line"));
+    REQUIRE(source);
+    CHECK(
+        source.value().identity() !=
+        SketchLineReference::create(other.value().id(), SketchEntityId("line")).value().identity());
+    auto axis =
+        AxisReference::create_sketch_line(PartFeatureInputRole::RevolveAxis, source.value());
+    REQUIRE(axis);
+    CHECK(axis.value().source_kind() == PartFeatureInputSourceKind::SketchLine);
+    CHECK(axis.value().source_node_id() == "sketch.axis");
+    REQUIRE(document.add_revolve_feature(
+        make_revolve("revolve.sketch", axis.value(), RevolveAngleExtent::full(), "body.full")));
+    REQUIRE(document.add_body_transform(
+        BodyTransform::create_rotate(
+            BodyTransformId("rotate.sketch"), BodyId("body.source"),
+            BodyTransformCoordinateSpace::World, std::nullopt,
+            BodyTransformRotationAxis::create_sketch_line(source.value()).value(), 90, false, false)
+            .value()));
+    auto serialized = serialize_part_document_to_json(document);
+    REQUIRE(serialized);
+    const auto json = nlohmann::json::parse(serialized.value());
+    CHECK(json.at("revolve_features").back().at("axis") ==
+          nlohmann::json{
+              {"source_kind", "sketch_line"}, {"sketch", "sketch.axis"}, {"entity", "line"}});
+    CHECK(json.at("body_transforms").back().at("rotation_axis") ==
+          nlohmann::json{{"kind", "sketch_line"}, {"sketch", "sketch.axis"}, {"entity", "line"}});
+    auto restored = deserialize_part_document_from_json(serialized.value());
+    REQUIRE(restored);
+    CHECK(serialize_part_document_to_json(restored.value()).value() == serialized.value());
+    CHECK(std::get<SketchLineReference>(
+              restored.value().revolve_features().back().axis().source()) == source.value());
+    CHECK(restored.value().body_transforms().back().rotation_axis()->sketch_line() ==
+          source.value());
+    auto extra_payload = json;
+    extra_payload["revolve_features"].back()["axis"]["origin"] = {0, 0, 0};
+    CHECK_FALSE(deserialize_part_document_from_json(extra_payload.dump()));
+    auto wrong_type = json;
+    wrong_type["body_transforms"].back()["rotation_axis"]["entity"] = 42;
+    CHECK_FALSE(deserialize_part_document_from_json(wrong_type.dump()));
+    auto renamed = json;
+    for (auto& record : renamed["sketches"])
+      if (record["id"] == "sketch.axis")
+        record["line_segments"][0]["id"] = "replacement";
+    auto missing = deserialize_part_document_from_json(renamed.dump());
+    REQUIRE_FALSE(missing);
+    CHECK(missing.error().object_id() == source.value().identity());
+    CHECK_FALSE(axis_sketch.value().add_entity(
+        LineSegment::create(SketchEntityId("line"), {100, 0}, {110, 10}, role).value()));
+    document.mark_all_clean();
+    auto edited =
+        Sketch::create(axis_sketch.value().id(), "Axis", DatumPlaneId("datum.xy")).value();
+    REQUIRE(edited.add_entity(
+        LineSegment::create(SketchEntityId("line"), {20, 0}, {32, 8}, role).value()));
+    REQUIRE(document.update_sketch(edited));
+    CHECK(document.invalidation_state().find("revolve.sketch")->status ==
+          InvalidationStatus::Dirty);
+    CHECK(document.invalidation_state().find("rotate.sketch")->status == InvalidationStatus::Dirty);
+    REQUIRE(document.validate_reference_sources());
+  }
+}
+
+TEST_CASE("Sketch-line axes reject missing and malformed identities without coordinate retargeting",
+          "[core][revolve-feature][sketch-line-axis]") {
+  CHECK_FALSE(SketchLineReference::create(SketchId(), SketchEntityId("line")));
+  CHECK_FALSE(SketchLineReference::create(SketchId("sketch"), SketchEntityId()));
+  auto document = revolve_document();
+  auto source =
+      SketchLineReference::create(SketchId("sketch.profile"), SketchEntityId("missing")).value();
+  CHECK_FALSE(validate_sketch_line_reference(document, source));
+  CHECK_FALSE(AxisReference::create_sketch_line(PartFeatureInputRole::PatternAxis, source));
+  CHECK_FALSE(document.add_revolve_feature(make_revolve(
+      "revolve.missing",
+      AxisReference::create_sketch_line(PartFeatureInputRole::RevolveAxis, source).value(),
+      RevolveAngleExtent::full(), "body.full")));
+  CHECK_FALSE(document.add_body_transform(
+      BodyTransform::create_rotate(BodyTransformId("missing"), BodyId("body.source"),
+                                   BodyTransformCoordinateSpace::World, std::nullopt,
+                                   BodyTransformRotationAxis::create_sketch_line(source).value(),
+                                   90, false, false)
+          .value()));
+}

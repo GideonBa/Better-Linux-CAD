@@ -1734,3 +1734,33 @@ coverage pass **34 / 7,497**, without skips. Separate startup reaches intentiona
 All 890 final runtime fingerprints remain unchanged. Native/scaled/broad/startup logs have no
 High-severity, BadDrawable or BadWindow errors; the pre-existing OCCT Medium visual-depth warning
 remains. Core code/tests/binary are unchanged from verified main `d32edff` (**555 / 17,463**).
+
+## Issue #110 — persistent Sketch-line axes (2026-10-29)
+
+Editable normal, construction and centerline segments are available through the existing Revolve
+and Body Rotate axis selectors. The persistent source is the exact `(SketchId, SketchEntityId)`
+pair; roles, display names, coordinates and chooser positions do not replace identity. Strict JSON
+and document membership checks reject malformed, missing, renamed and duplicate sources without
+coordinate retargeting. Both consumers depend on the Sketch node and its existing plane chain.
+Geometry shares one current-endpoint/cache-aware-workplane resolver, returning early to avoid a
+second application of owned-reference transforms. Revolve's in-plane/non-crossing rules remain.
+
+The initial Body Rotate regression fails on three missing role entries. Full Core passes **557 /
+17,711** and full Geometry **466 / 35,655**, including the explicit World-axis oracle for a posed
+owned Sketch, endpoint/oblique plane updates and incremental/full Revolve equivalence. Focused GUI
+selector/history proof passes **2 / 120**.
+
+`[sketch-line-axis-native]` passes **1 case / 851 assertions** at both 100% and 150%, without skips.
+Three generator paths author each line role through the actual ribbon, create an offset oblique
+180° Revolve and 90° Body Rotate, drag the retained source endpoint in the viewport and create a
+downstream two-instance linear pattern. An independent swept-centroid volume check verifies the
+axis edit changes both consumers' result. Exact local history, full recompute, canonical reopening
+and STEP pass. Captures at both scales were inspected; the existing strict native input checks
+remain. Reproduction commands, runtime fingerprints and exact logs live in `development-setup.md`.
+
+Final full GUI passes **609 cases — 586 passed, 23 expected native-only skips / 81,564 assertions**.
+Affected native workflows plus required shell coverage pass **45 / 7,735**, without skips or
+unmatched filters. Separate startup reaches intentional timeout **124**. All 892 final runtime
+fingerprints remain unchanged. Native/scaled/broad/startup logs contain no High-severity,
+BadDrawable or BadWindow errors; the pre-existing OCCT Medium visual-depth warning remains. No
+numbered implementation block is advanced by this source-family enhancement.

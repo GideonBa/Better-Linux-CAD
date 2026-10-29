@@ -104,6 +104,8 @@ std::string_view to_string(PartFeatureInputSourceKind source_kind) noexcept {
   switch (source_kind) {
   case PartFeatureInputSourceKind::SketchProfileRegion:
     return "sketch_profile_region";
+  case PartFeatureInputSourceKind::SketchLine:
+    return "sketch_line";
   case PartFeatureInputSourceKind::DatumAxis:
     return "datum_axis";
   case PartFeatureInputSourceKind::ConstructionLine:
@@ -202,6 +204,15 @@ AxisReference::AxisReference(PartFeatureInputRole role,
                              AxisReferenceSource source)
     : role_(role), expected_capability_(expected_capability), source_(std::move(source)) {}
 
+Result<AxisReference> AxisReference::create_sketch_line(PartFeatureInputRole role,
+                                                        SketchLineReference line) {
+  if (role != PartFeatureInputRole::RevolveAxis)
+    return Result<AxisReference>::failure(validation_error(
+        line.identity(), "Sketch-line axes currently support the RevolveAxis role"));
+  return Result<AxisReference>::success(
+      AxisReference(role, PartFeatureInputCapability::Axis, std::move(line)));
+}
+
 Result<AxisReference> AxisReference::create_datum_axis(PartFeatureInputRole role,
                                                        DatumAxisId axis) {
   if (axis.empty())
@@ -263,6 +274,8 @@ const AxisReferenceSource& AxisReference::source() const noexcept {
   return source_;
 }
 PartFeatureInputSourceKind AxisReference::source_kind() const noexcept {
+  if (std::holds_alternative<SketchLineReference>(source_))
+    return PartFeatureInputSourceKind::SketchLine;
   if (std::holds_alternative<DatumAxisId>(source_))
     return PartFeatureInputSourceKind::DatumAxis;
   if (std::holds_alternative<ConstructionLineId>(source_))
@@ -277,6 +290,8 @@ std::string AxisReference::source_node_id() const {
         using T = std::decay_t<decltype(source)>;
         if constexpr (std::is_same_v<T, DatumAxisId> || std::is_same_v<T, ConstructionLineId>)
           return source.value();
+        else if constexpr (std::is_same_v<T, SketchLineReference>)
+          return source.sketch().value();
         else
           return source.source_feature().value();
       },
@@ -511,6 +526,25 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
   return Result<std::size_t>::success(1U);
 }
 
+Result<std::size_t> validate_sketch_line_reference(const PartDocument& document,
+                                                   const SketchLineReference& reference) {
+  const auto* sketch = document.find_sketch(reference.sketch());
+  if (!sketch)
+    return Result<std::size_t>::failure(validation_error(
+        reference.identity(),
+        "Sketch-line axis source Sketch no longer exists; repair the source reference"));
+  const auto count =
+      std::count_if(sketch->line_segments().begin(), sketch->line_segments().end(),
+                    [&](const auto& line) { return line.id() == reference.entity(); });
+  if (count != 1)
+    return Result<std::size_t>::failure(validation_error(
+        reference.identity(),
+        count == 0 ? "Sketch-line axis entity is missing or is not an editable straight line; "
+                     "repair the source reference"
+                   : "Sketch-line axis entity is ambiguous; repair the source reference"));
+  return Result<std::size_t>::success(1);
+}
+
 Result<std::size_t> validate_part_feature_input_reference(const PartDocument& document,
                                                           const AxisReference& reference) {
   return std::visit(
@@ -526,6 +560,8 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
                      ? Result<std::size_t>::success(1U)
                      : Result<std::size_t>::failure(
                            validation_error(source.value(), "construction line source must exist"));
+        } else if constexpr (std::is_same_v<T, SketchLineReference>) {
+          return validate_sketch_line_reference(document, source);
         } else if constexpr (std::is_same_v<T, SemanticAxisReference>) {
           return validate_feature_source(document, source.source_feature(), "semantic axis");
         } else {

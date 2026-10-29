@@ -289,6 +289,20 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
       append(BodyTransformRotationAxis::create_construction_line(line.id()),
              QStringLiteral("Construction Line: ") + QString::fromStdString(line.name()),
              "construction-line/" + line.id().value());
+    for (const auto& sketch : part->sketches())
+      for (const auto& line : sketch.line_segments()) {
+        auto reference = SketchLineReference::create(sketch.id(), line.id());
+        if (!reference)
+          continue;
+        const auto role = line.role() == SketchLineRole::Centerline ? "Centerline"
+                          : line.construction()                     ? "Construction"
+                                                                    : "Geometry";
+        append(BodyTransformRotationAxis::create_sketch_line(reference.value()),
+               QStringLiteral("Sketch Line (%1): %2 / %3")
+                   .arg(QString::fromLatin1(role), QString::fromStdString(sketch.name()),
+                        QString::fromStdString(line.id().value())),
+               reference.value().identity());
+      }
     auto generated = geometry::ViewportSceneBuilder{}.build_body_rotation_sources(
         *part, *session_.part_shape_cache());
     if (generated) {
@@ -305,11 +319,12 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
         }
     } else
       unavailable.push_back(QString::fromStdString(generated.error().message()));
-    body_axis_->setToolTip(
-        unavailable.empty()
-            ? QStringLiteral(
-                  "Choose a saved datum, construction line or supported straight feature edge")
-            : QStringLiteral("Unavailable axis sources:\n") + unavailable.join('\n'));
+    body_axis_->setToolTip(unavailable.empty()
+                               ? QStringLiteral("Choose a saved datum, construction line, Sketch "
+                                                "line or supported straight feature edge. "
+                                                "Sketch lines are selected in this list.")
+                               : QStringLiteral("Unavailable axis sources:\n") +
+                                     unavailable.join('\n'));
     if (body_axes_.empty())
       return fail("Create a resolvable rotation axis first");
     for (std::size_t i = 0; i < body_axes_.size(); ++i)
