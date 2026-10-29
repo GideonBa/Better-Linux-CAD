@@ -2040,3 +2040,7 @@ also pass on the same final freeze (`core-full-final`, `geometry-full-final`), a
 check is skipped. The 25 GUI skips are expected platform guards; the affected native
 cases were exercised separately as listed above.
 No numbered implementation block is advanced.
+
+Delivery: [PR #128](https://github.com/GideonBa/Better-Linux-CAD/pull/128), implementation
+commit `76b68ed`. The final documentation-link commit changes only Markdown; runtime
+fingerprints and the verified implementation remain unchanged.

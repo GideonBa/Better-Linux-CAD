@@ -1485,7 +1485,7 @@ and evidence files are synchronized; see `docs/development-setup.md`. Delivered 
 closed and main exactly matches tested commit `873cbe6`. Remaining issue order: **#112 → #106**.
 Blocks 138–143 remain planned.
 
-**Completed implementation and verification: #112**, branch
+**Completed: #112**, branch
 `feat/associative-result-face-sketches`, from main `fd7d17f`. Eligible current planar faces now
 create a producer-bound support and Sketch atomically. Authored face origins survive OCCT Boolean,
 finishing and transform history; copy instances retain separate identities. Missing or split
@@ -1503,9 +1503,10 @@ polygon/Loft/Boolean/Fillet support workflows pass **2 / 1,021** at 100% and 150
 history, full recompute, Save/Open and STEP. The affected required native gate passes
 **39 / 6,975**, without skips or unmatched filters; separate startup reaches intentional **124**.
 All **896** final runtime fingerprints remain unchanged. Existing contracts, coverage and raw
-verification commands/logs are synchronized in `docs/development-setup.md`. Submit and merge the
-single issue PR before starting **#106**. Imported supports remain outside this issue and no
-numbered implementation block is advanced.
+verification commands/logs are synchronized in `docs/development-setup.md`. Delivered by
+[PR #128](https://github.com/GideonBa/Better-Linux-CAD/pull/128), with verified implementation
+commit `76b68ed`. The remaining issue queue is **#106**; start it only after this PR is merged.
+Imported supports remain outside this issue and no numbered implementation block is advanced.
 
 After all open issues are complete and merged, execute **Blocks 138 → 139 → 140 → 141 → 142 →
 143**, each with the architecture boundaries, GUI access and acceptance gates in
