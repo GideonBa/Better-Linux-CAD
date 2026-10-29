@@ -60,8 +60,10 @@ Result<GeometryShape> ShellAdapter::apply(const PartDocument& document, const Sh
     if (result.IsNull() || solid_count != 1U || !BRepCheck_Analyzer(result, true).IsValid())
       return Result<GeometryShape>::failure(
           shell_error(feature.id(), "shell produced an invalid or non-manifold solid result"));
-    return Result<GeometryShape>::success(
-        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(result))));
+    auto backing = std::make_shared<GeometryShape::Impl>(std::move(result));
+    backing->face_lineage =
+        detail::map_lineage(builder, backing->shape, target.impl_->face_lineage);
+    return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
   } catch (const Standard_Failure& failure) {
     const char* message = failure.GetMessageString();
     return Result<GeometryShape>::failure(

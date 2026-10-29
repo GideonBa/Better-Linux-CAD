@@ -440,3 +440,23 @@ identity collisions, lifecycle/guards, active Sketch restoration and actual ribb
 history/Save input. Reproduction and final results live in `docs/development-setup.md` and
 `docs/gui-shell-acceptance-mvp9r.md`. This restores the bounded planar/reference shell family;
 Block 136 still requires the remaining recorded families and integrated native acceptance.
+
+## Direct Sketch creation on a current Body face (issue #112)
+
+With the **Faces** filter, selecting an eligible planar face enables **Create 2D Sketch**.
+The command creates `Face Workplane N` (`workplane.face.N`) and the next `SketchN` in one
+transaction, then enters its normal Sketch workspace. Eligibility comes from the
+Geometry result-face catalog, including rooted extrusion/polygon faces and planar Loft,
+Boolean and finishing descendants. Curved or ambiguous supports are not offered.
+
+**Cancel Sketch**, or Escape after cancelling the active drawing/drag command, restores
+the state before this creation, including committed geometry in the unfinished Sketch.
+It leaves neither an orphan plane nor a creation history entry. Undo of the initial
+creation removes both records together and preserves Redo. Finish Sketch retains both
+records and hands its profile to Extrude/Revolve even when the original Faces filter
+remains selected; viewport picking continues to obey that filter.
+
+Cancellation preserves the current Save/Save As destination and saved-state markers.
+If the unfinished creation was saved, cancellation correctly leaves the restored model
+dirty rather than pretending the file contains the restored state. Save/Open reconstructs
+the associative support from its captured producer and authored origins.

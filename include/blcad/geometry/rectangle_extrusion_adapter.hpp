@@ -67,6 +67,7 @@ private:
   friend class OcctShapeView;
   friend class ViewportSceneBuilder;
   friend class FinishingSelectionBuilder;
+  friend class ResultFaceSupportGeometry;
   friend class MeasureSelectionBuilder;
   friend class AssemblyInteractionGeometry;
   friend class detail::AssemblyPartShapeDefinitionBuilder;

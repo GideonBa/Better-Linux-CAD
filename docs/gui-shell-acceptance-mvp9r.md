@@ -1764,3 +1764,31 @@ unmatched filters. Separate startup reaches intentional timeout **124**. All 892
 fingerprints remain unchanged. Native/scaled/broad/startup logs contain no High-severity,
 BadDrawable or BadWindow errors; the pre-existing OCCT Medium visual-depth warning remains. No
 numbered implementation block is advanced by this source-family enhancement.
+
+## Direct associative result-face Sketches — issue #112
+
+The existing **Faces → Create 2D Sketch** route now creates a typed result-face support
+and Sketch together. Cancel/idle Escape restores the pre-creation document and history;
+initial Undo/Redo removes/restores both records. Finishing hands the profile to modeling
+commands while preserving viewport filter semantics. Missing sources have the existing
+explicit Preview/Apply repair route. This extends the support family without advancing
+Block 138 or changing historical six-role records.
+
+`[result-face-native]` authors the base and pocket through visible UI input, checks the
+8→20 mm edit, local-coordinate retention, exact history, full recompute, reopening and
+STEP. `[result-face-producers-native]` opens explicit Core source fixtures for oblique
+polygon, Loft, Boolean and Fillet results, then picks their actual native faces and uses
+visible Sketch/Join/file workflows. `[result-face-sketch]` separately checks cancellation
+with committed Sketch geometry, Save As/dirty markers, pair history and previewed repair.
+Geometry `[result-face-support]` checks source lineage and fail-closed recovery. Final
+verification commands, counts and runtime fingerprints are recorded in
+`development-setup.md` after the complete source freeze.
+
+Final verification passes all five build targets, Core **557 / 17,711**, Geometry
+**478 / 36,075**, and GUI **612 cases — 587 passed, 25 expected native-only skips /
+81,685 assertions**. Targeted Geometry is **12 / 420**, UI/coverage **4 / 412**. Native
+workflows pass **2 / 1,021** at each 100%/150% scale, and the required affected native
+gate **39 / 6,975**, without skips or unmatched filters. Separate startup reaches timeout
+**124**. All **896** runtime fingerprints remain unchanged; no High-severity, BadDrawable
+or BadWindow message occurs. This is an unnumbered issue completion; Blocks 138–143
+remain planned.

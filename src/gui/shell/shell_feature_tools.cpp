@@ -375,8 +375,13 @@ std::optional<ShellFeatureTools::ProfileContext> ShellFeatureTools::profile_cont
 bool ShellFeatureTools::select_profile(SketchId sketch, ProfileId profile) {
   selected_open_line_.reset();
   const auto* part = session_.part_document();
-  if (!session_.selection().allows(GuiSelectionKind::SketchEntity) || part == nullptr ||
-      !shell_feature_profile_available(*part, sketch, profile)) {
+  const auto* source = part ? part->find_sketch(sketch) : nullptr;
+  const bool face_supported = source && part->find_result_face_workplane(source->workplane());
+  // Finish Sketch explicitly hands its authored profile to the next command.
+  // A face filter used to create its support must not discard that handoff;
+  // viewport picking still obeys the user's unchanged selection filter.
+  if ((!session_.selection().allows(GuiSelectionKind::SketchEntity) && !face_supported) ||
+      part == nullptr || !shell_feature_profile_available(*part, sketch, profile)) {
     selected_profile_.reset();
     refresh_enablement();
     return false;
@@ -400,7 +405,9 @@ bool ShellFeatureTools::select_open_line(SketchId sketch) {
   selected_open_line_.reset();
   const auto* part = session_.part_document();
   const auto* source = part ? part->find_sketch(sketch) : nullptr;
-  if (session_.selection().allows(GuiSelectionKind::SketchEntity) && source &&
+  if (source &&
+      (session_.selection().allows(GuiSelectionKind::SketchEntity) ||
+       part->find_result_face_workplane(source->workplane())) &&
       interactive_thin_line(*source))
     selected_open_line_ = std::move(sketch);
   refresh_enablement();

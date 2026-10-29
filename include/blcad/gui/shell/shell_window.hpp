@@ -123,6 +123,7 @@ public:
   [[nodiscard]] bool save_to(const QString& path); // empty → current session path
   [[nodiscard]] bool create_sketch_on_selection();
   [[nodiscard]] bool finish_active_sketch();
+  [[nodiscard]] bool cancel_face_supported_sketch();
   [[nodiscard]] bool undo();
   [[nodiscard]] bool redo();
 
@@ -160,10 +161,12 @@ private:
   void append_diagnostic(const Error& error);
   void show_error(const Error& error);
   [[nodiscard]] std::optional<DatumPlaneId> selected_datum_plane() const;
+  [[nodiscard]] std::optional<ResultFaceReference> selected_result_face() const;
 
   GuiDocumentSession session_;
   GuiSketchWorkbench sketch_workbench_;
   GuiSketchWorkspace sketch_workspace_;
+  std::optional<GuiDocumentSession> face_sketch_checkpoint_;
   GuiDocumentBrowser browser_model_;
   std::unique_ptr<ShellSketchTools> sketch_tools_;
   std::unique_ptr<ShellFeatureTools> feature_tools_;
@@ -195,6 +198,7 @@ private:
   QAction* action_save_as_{nullptr};
   QAction* action_create_sketch_{nullptr};
   QAction* action_finish_sketch_{nullptr};
+  QAction* action_cancel_face_sketch_{nullptr};
   std::unique_ptr<ShellNavigationTools> navigation_tools_;
   std::unique_ptr<ShellRepeatTools> repeat_tools_;
   std::unique_ptr<ShellContextTools> context_tools_;

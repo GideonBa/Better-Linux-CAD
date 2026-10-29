@@ -182,8 +182,10 @@ Result<GeometryShape> ChamferAdapter::apply(const PartDocument& document,
         !BRepCheck_Analyzer(result, true).IsValid())
       return Result<GeometryShape>::failure(
           chamfer_error(feature.id(), "chamfer produced an invalid solid result"));
-    return Result<GeometryShape>::success(
-        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(result))));
+    auto backing = std::make_shared<GeometryShape::Impl>(std::move(result));
+    backing->face_lineage =
+        detail::map_lineage(builder, backing->shape, target.impl_->face_lineage);
+    return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
   } catch (const Standard_Failure& failure) {
     const char* message = failure.GetMessageString();
     return Result<GeometryShape>::failure(chamfer_error(

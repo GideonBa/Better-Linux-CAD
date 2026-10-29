@@ -1,3 +1,4 @@
+#include "blcad/geometry/result_face_support.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 
 #include "blcad/gui/occt_viewport.hpp"
@@ -582,6 +583,19 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::finishing_selection_
           items.push_back(
               {edges ? geometry::ViewportSceneKind::Edge : geometry::ViewportSceneKind::Face,
                target.semantic_id, target.shape, SketchLineRole::Geometry, body.id().value()});
+      if (!edges) {
+        auto supports = geometry::ResultFaceSupportGeometry::selectable_faces(
+            *session_.part_document(), *session_.part_shape_cache(), body.id());
+        if (supports)
+          for (const auto& target : supports.value()) {
+            if (std::any_of(items.begin(), items.end(), [&](const auto& item) {
+                  return item.semantic_id == target.semantic_id;
+                }))
+              continue;
+            items.push_back({geometry::ViewportSceneKind::Face, target.semantic_id, target.shape,
+                             SketchLineRole::Geometry, body.id().value()});
+          }
+      }
     }
   }
   if (finishing())

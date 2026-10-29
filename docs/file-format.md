@@ -1012,3 +1012,43 @@ invalidate both consumers. Geometry maps current line endpoints through the curr
 workplane exactly once, including owned-reference transforms. Resolved points/directions and OCCT
 geometry remain derived; no detached frame snapshot or new top-level array is written. Revolve
 keeps its in-plane and non-crossing profile checks; Body Rotate accepts spatial axes.
+
+## Associative current-result-face workplanes (issue #112)
+
+The optional `result_face_workplanes` array is omitted when empty, preserving canonical
+historical documents. Each record has exactly `id`, `name` and `reference`; the reference
+has exactly `producer`, `body` and a nonempty `origins` array:
+
+```json
+{
+  "id": "workplane.face.1",
+  "name": "Face Workplane 1",
+  "reference": {
+    "producer": "feature.finish",
+    "body": "body.1",
+    "origins": [
+      {"feature": "feature.base", "role": "extrude/upper-cap"}
+    ]
+  }
+}
+```
+
+Origins contain exactly string `feature` and `role` fields and are sorted and unique.
+Producer/origin IDs are typed executable identities; the producer must produce the
+referenced solid Body and each extant origin must precede it. Roles describe authored
+generation rather than OCCT face positions. The transient Geometry lineage is rebuilt
+on recompute; BRep handles, raw face indices and world-space face snapshots are absent.
+
+Nonempty result-face supports require explicit `feature_order`. The reader validates
+that order against every executable exactly once and interleaves dependent Sketches,
+workplanes, ownership and construction records with the authored executable order.
+Thus a Sketch may follow a Loft, Boolean, finishing or Body-transform result without
+moving that producer after its consumer. Record-array order and canonical serialization
+remain stable. Malformed containers, unknown fields, wrong types, duplicates, invalid
+producer kinds, cycles and unresolved strict references fail atomically.
+
+Explicit `ReferenceRepair` loading may retain absent producer/origin IDs of these
+existing supports. An ID present under a different record kind is not missing. This
+mode retains repairable intent without calling its geometry fresh. Rebinding keeps the
+support and Sketch IDs, validates the complete graph and requires successful recompute
+before leaving repair mode. Old files without this array use the existing reader.

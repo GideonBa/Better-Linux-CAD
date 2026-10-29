@@ -287,7 +287,7 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/gui-sketch-workbench-mvp7.md",
-        "scope": "Seeded origins plus fourteen construction/workplane creation and same-ID editing modes, including generated edge/vertex points and parallel-through-point lines/planes, with native role-based reference collection, explicit position/frame/direction and new-offset grips, downstream recompute previews, atomic Apply, reference rebinding, history/persistence and Sketch entry.",
+        "scope": "Seeded origins plus fourteen construction/workplane creation and same-ID editing modes, including generated edge/vertex points and parallel-through-point lines/planes, with native role-based reference collection, explicit position/frame/direction and new-offset grips, downstream recompute previews, atomic Apply, reference rebinding, history/persistence and Sketch entry. Direct Sketch creation on eligible current planar result faces atomically creates its producer-bound support, with creation cancellation, lost/split repair, retained coordinates and downstream modeling through extrusion, Loft, Boolean and finishing sources.",
         "gaps": [],
         "proofs": [
           {
@@ -329,12 +329,25 @@
           {
             "filter": "[shell-combined-construction]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[result-face-sketch]",
+            "source": "tests/gui/gui_shell_construction_tools_tests.cpp"
+          },
+          {
+            "filter": "[result-face-native]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[result-face-producers-native]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
           "create_construction",
           "create_workplane",
-          "create_sketch"
+          "create_sketch",
+          "cancel_face_sketch"
         ],
         "widgets": [
           "blcad.shell.browser",

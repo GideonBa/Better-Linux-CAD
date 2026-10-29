@@ -66,6 +66,9 @@ public:
                                         const GuiPartSketchIntentMutation& mutation);
   [[nodiscard]] Result<std::size_t> commit_project_transaction(std::string label,
                                                                const GuiProjectMutation& mutation);
+  // Restore a cancelled creation, preserving any Save/Save As performed since
+  // the checkpoint and monotonically invalidating presentation caches.
+  void restore_creation_checkpoint(GuiDocumentSession checkpoint);
   [[nodiscard]] Result<std::size_t> undo();
   [[nodiscard]] Result<std::size_t> redo();
 

@@ -1,3 +1,5 @@
+#include "blcad/core/part_document_json.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -326,4 +328,45 @@ TEST_CASE("Block 87 rejects unsupported G2 continuity execution transactionally"
   CHECK(result.error().message().find("G2 loft continuity is unsupported") != std::string::npos);
   CHECK(shape_cache.feature_shape_count() == 0U);
   CHECK(shape_cache.body_shape_count() == 0U);
+}
+
+TEST_CASE("Planar Loft cap supports preserve source identity through section and plane edits",
+          "[geometry][result-face-support][result-face-loft]") {
+  auto part = new_body_loft_document();
+  auto cache = ShapeCache::create(ShapeCacheId("loft.support")).value();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  auto targets = ResultFaceSupportGeometry::selectable_faces(part, cache, BodyId("body.loft"));
+  REQUIRE(targets);
+  const auto found =
+      std::find_if(targets.value().begin(), targets.value().end(), [](const auto& target) {
+        return target.reference.origins().front().role ==
+               "loft/cap/13:sketch.second/14:profile.second";
+      });
+  REQUIRE(found != targets.value().end());
+  const auto plane =
+      ResultFaceWorkplane::create(DatumPlaneId("loft.support"), "Loft cap", found->reference)
+          .value();
+  REQUIRE(part.add_face_supported_sketch(
+      plane, Sketch::create(SketchId("attached"), "Attached", plane.id()).value()));
+  auto frame = WorkplaneResolver{}.resolve(part, plane.id(), cache);
+  REQUIRE(frame);
+  CHECK(frame.value().origin == Point3{0, 0, 20});
+  REQUIRE(part.set_parameter_value(ParameterId("second.width"), Quantity::length_mm(9).value()));
+  REQUIRE(part.update_construction_plane(
+      ConstructionPlane::create_explicit(ConstructionPlaneId("plane.second"), "Moved section",
+                                         {3, 4, 30}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1})
+          .value()));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  frame = WorkplaneResolver{}.resolve(part, plane.id(), cache);
+  REQUIRE(frame);
+  CHECK(frame.value().origin == Point3{3, 4, 30});
+  CHECK(frame.value().x_axis == Vector3{1, 0, 0});
+  const auto json = serialize_part_document_to_json(part);
+  REQUIRE(json);
+  auto reopened = deserialize_part_document_from_json(json.value());
+  REQUIRE(reopened);
+  CHECK(serialize_part_document_to_json(reopened.value()).value() == json.value());
+  auto full = ShapeCache::create(ShapeCacheId("loft.support.full")).value();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(reopened.value(), full));
+  CHECK(volume(cache, "body.loft") == Catch::Approx(volume(full, "body.loft")).margin(1e-7));
 }

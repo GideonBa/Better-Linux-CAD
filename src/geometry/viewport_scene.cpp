@@ -393,7 +393,7 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
     }
     const WorkplaneResolver workplane_resolver;
     for (const ConstructionPlane& plane : document.construction_planes()) {
-      auto resolved = workplane_resolver.resolve(document, plane.workplane_id());
+      auto resolved = workplane_resolver.resolve(document, plane.workplane_id(), shape_cache);
       if (!resolved)
         return Result<std::vector<ViewportSceneItem>>::failure(resolved.error());
       items.push_back({ViewportSceneKind::Datum, "construction-plane/" + plane.id().value(),
@@ -405,6 +405,15 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
       if (!resolved)
         return Result<std::vector<ViewportSceneItem>>::failure(resolved.error());
       items.push_back({ViewportSceneKind::Datum, "derived-workplane/" + plane.id().value(),
+                       wrap(make_plane_shape(resolved.value().origin, resolved.value().x_axis,
+                                             resolved.value().y_axis))});
+    }
+
+    for (const auto& plane : document.result_face_workplanes()) {
+      auto resolved = workplane_resolver.resolve(document, plane.id(), shape_cache);
+      if (!resolved)
+        return Result<std::vector<ViewportSceneItem>>::failure(resolved.error());
+      items.push_back({ViewportSceneKind::Datum, "result-face-workplane/" + plane.id().value(),
                        wrap(make_plane_shape(resolved.value().origin, resolved.value().x_axis,
                                              resolved.value().y_axis))});
     }

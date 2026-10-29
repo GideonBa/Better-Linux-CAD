@@ -358,6 +358,8 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
   append_part_nodes(datums, part, other_axes, GuiBrowserNodeKind::Datum, GuiSelectionKind::Datum, "datum-axis/");
   append_part_nodes(datums, part, part.derived_workplanes(), GuiBrowserNodeKind::Datum,
                     GuiSelectionKind::Datum, "derived-workplane/");
+  append_part_nodes(datums, part, part.result_face_workplanes(), GuiBrowserNodeKind::Datum,
+                    GuiSelectionKind::Datum, "result-face-workplane/");
   root.children.push_back(std::move(datums));
 
   auto construction = group("Construction");

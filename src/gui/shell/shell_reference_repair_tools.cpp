@@ -1,3 +1,4 @@
+#include "blcad/geometry/result_face_support.hpp"
 #include "blcad/gui/shell/shell_reference_repair_tools.hpp"
 #include "blcad/gui/gui_icons.hpp"
 
@@ -42,7 +43,7 @@ QString text(const std::string& value) {
 } // namespace
 
 struct ShellReferenceRepairTools::Impl {
-  enum class Kind { Plane, Point, Line };
+  enum class Kind { Plane, ResultPlane, Point, Line };
   struct Reference {
     Kind kind;
     std::string owner;
@@ -104,12 +105,20 @@ struct ShellReferenceRepairTools::Impl {
     // session never receives this partial cache or labels it fresh Geometry.
     const auto& part = selection_part();
     geometry::GeometryRecomputeExecutor executor;
-    for (const auto& feature : part.features())
-      if (feature.type() == FeatureType::AdditiveExtrude) {
-        auto producer_cache = cache.value();
-        if (executor.execute_additive_extrude(part, feature.id(), producer_cache))
-          cache.value() = std::move(producer_cache);
-      }
+    auto order = part.dependency_graph().topological_order();
+    if (!order)
+      return Result<std::size_t>::failure(order.error());
+    for (const auto& node : order.value()) {
+      DependencyGraph single;
+      if (!single.add_node(node))
+        continue;
+      auto plan = RecomputePlan::from_graph_and_changed_nodes(single, {node});
+      if (!plan)
+        continue;
+      auto provisional = cache.value();
+      if (executor.execute_plan(part, plan.value(), provisional))
+        cache.value() = std::move(provisional);
+    }
     selection_cache = std::move(cache.value());
     return Result<std::size_t>::success(selection_cache->feature_shape_count());
   }
@@ -170,6 +179,13 @@ struct ShellReferenceRepairTools::Impl {
                          source_id(plane.face_reference()),
                          text(plane.name()) + QStringLiteral(" / Face"),
                          status(geometry::WorkplaneResolver{}.resolve(part, plane.id()))});
+    for (const auto& plane : part.result_face_workplanes())
+      entries.push_back({Kind::ResultPlane,
+                         plane.id().value(),
+                         {},
+                         plane.reference().identity(),
+                         text(plane.name()) + QStringLiteral(" / Result face"),
+                         status(geometry::ResultFaceSupportGeometry::resolve(part, plane, cache))});
     for (const auto& sketch : part.sketches()) {
       for (const auto& point : sketch.projected_points())
         entries.push_back(
@@ -258,6 +274,26 @@ struct ShellReferenceRepairTools::Impl {
           add_projection(entry, replacement.value(), text(line.name() + " / " + line.id().value()),
                          line.id().value());
       }
+    if (entry.kind == Kind::ResultPlane) {
+      const auto* plane = part.find_result_face_workplane(DatumPlaneId(entry.owner));
+      for (const auto& body : part.bodies()) {
+        auto faces = geometry::ResultFaceSupportGeometry::selectable_faces(part, *selection_cache,
+                                                                           body.id());
+        if (!faces)
+          continue;
+        for (const auto& face : faces.value()) {
+          if (face.reference.identity() == entry.source)
+            continue;
+          auto replacement =
+              ResultFaceWorkplane::create(plane->id(), plane->name(), face.reference);
+          if (replacement)
+            choices.push_back({text(body.name() + " / " + face.label), face.reference.identity(),
+                               [replacement = replacement.value()](PartDocument& candidate) {
+                                 return candidate.update_result_face_workplane(replacement);
+                               }});
+        }
+      }
+    }
     auto sources =
         geometry::ViewportSceneBuilder{}.build_construction_sources(part, *selection_cache);
     if (sources)
@@ -548,6 +584,7 @@ Result<std::size_t> ShellReferenceRepairTools::preview() {
       return true;
     return std::any_of(affected.begin(), affected.end(), [&](const auto& id) {
       return item.semantic_id == "derived-workplane/" + id ||
+             item.semantic_id == "result-face-workplane/" + id ||
              item.semantic_id.starts_with("sketch/" + id + "/");
     });
   };

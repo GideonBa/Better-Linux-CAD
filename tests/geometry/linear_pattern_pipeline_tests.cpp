@@ -1,3 +1,5 @@
+#include "blcad/geometry/result_face_support.hpp"
+#include <cmath>
 #include "blcad/geometry/linear_pattern_adapter.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 
@@ -282,4 +284,45 @@ TEST_CASE("Block 64 incrementally recomputes count and spacing transactionally",
   CHECK(failed.error().object_id() == "pattern.linear");
   CHECK(volume(cache, "body.pattern") == Catch::Approx(3000.0));
   CHECK(bounds(cache, "body.pattern").maximum.x == Catch::Approx(55.0));
+}
+
+TEST_CASE("Pattern face supports retain authored copy identity when other similar copies remain",
+          "[geometry][result-face-support][result-face-pattern]") {
+  auto part =
+      new_body_pattern(false, LinearPatternExtentMode::Spacing, PatternDirectionSign::Positive);
+  auto cache = shape_cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  auto targets = ResultFaceSupportGeometry::selectable_faces(part, cache, BodyId("body.pattern"));
+  REQUIRE(targets);
+  const auto support_at = [&](double x) {
+    for (const auto& target : targets.value()) {
+      auto plane = ResultFaceWorkplane::create(DatumPlaneId("copy.support"), "Pattern face",
+                                               target.reference)
+                       .value();
+      auto frame = ResultFaceSupportGeometry::resolve(part, plane, cache);
+      if (frame && std::abs(frame.value().origin.x - x) < 1e-7 &&
+          std::abs(frame.value().origin.z - 10) < 1e-7 && frame.value().normal.z > 0.9)
+        return plane;
+    }
+    FAIL("Missing unique authored Pattern cap");
+    return ResultFaceWorkplane::create(DatumPlaneId("unreachable"), "Unreachable",
+                                       targets.value().front().reference)
+        .value();
+  };
+  const auto retained = support_at(20);
+  const auto removed = support_at(60);
+  REQUIRE(retained.reference().origins().front().feature == FeatureId("pattern.linear"));
+  REQUIRE(removed.reference() != retained.reference());
+  REQUIRE(part.set_parameter_value(ParameterId("pattern.count"), Quantity::count(3).value()));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  CHECK(ResultFaceSupportGeometry::resolve(part, retained, cache));
+  const auto lost = ResultFaceSupportGeometry::resolve(part, removed, cache);
+  REQUIRE_FALSE(lost);
+  CHECK(lost.error().message().find("Lost") != std::string::npos);
+  REQUIRE(part.set_parameter_value(ParameterId("pattern.extent"), Quantity::length_mm(30).value()));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  auto moved = ResultFaceSupportGeometry::resolve(part, retained, cache);
+  REQUIRE(moved);
+  CHECK(moved.value().origin.x == Catch::Approx(30));
+  CHECK(moved.value().origin.z == Catch::Approx(10));
 }

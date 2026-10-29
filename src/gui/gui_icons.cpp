@@ -197,7 +197,8 @@ QIcon gui_icon_for_browser_node(const GuiBrowserNode& node) {
     break;
   case Kind::Datum:
     if (!node.viewport_semantic_id.starts_with("datum-plane/") &&
-        !node.viewport_semantic_id.starts_with("derived-workplane/"))
+        !node.viewport_semantic_id.starts_with("derived-workplane/") &&
+        !node.viewport_semantic_id.starts_with("result-face-workplane/"))
       return {};
     kind = "Datum";
     break;

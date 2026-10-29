@@ -1480,9 +1480,32 @@ centerline generator paths pass **1 / 851** at each of 100% and 150%, authoring 
 Revolve, 90° Body Rotate, retained endpoint drag, downstream two-instance pattern, exact history,
 full recompute, canonical reopen and STEP. Final affected native/required shell gate **45 / 7,735**
 and separate startup **124** pass, with all 892 runtime fingerprints unchanged. Existing contract
-and evidence files are synchronized; see `docs/development-setup.md`. Its single PR is the delivery
-boundary; issue #112 starts only after merge and exact-tree verification on main. Remaining issue
-order: **#112 → #106**. Blocks 138–143 remain planned.
+and evidence files are synchronized; see `docs/development-setup.md`. Delivered by
+[PR #127](https://github.com/GideonBa/Better-Linux-CAD/pull/127), merge `fd7d17f`; issue #110 is
+closed and main exactly matches tested commit `873cbe6`. Remaining issue order: **#112 → #106**.
+Blocks 138–143 remain planned.
+
+**Completed implementation and verification: #112**, branch
+`feat/associative-result-face-sketches`, from main `fd7d17f`. Eligible current planar faces now
+create a producer-bound support and Sketch atomically. Authored face origins survive OCCT Boolean,
+finishing and transform history; copy instances retain separate identities. Missing or split
+supports fail closed and have an explicit previewed repair route. The cache-aware frame follows
+thickness/profile/datum/pose edits without rewriting local Sketch geometry or applying poses twice.
+Old six-role workplanes and old canonical files remain unchanged. New-file loading interleaves
+support metadata with the authored executable order. Cancel removes the pair and unfinished
+geometry, preserves Save As/dirty markers and advances model/presentation revisions; initial
+Undo/Redo removes/restores both records. Finish hands the profile to modeling through a Faces filter.
+
+All five targets build. Complete Core **557 / 17,711**, Geometry **478 / 36,075** and GUI
+**612 cases — 587 passed, 25 expected native-only skips / 81,685 assertions** pass. Focused
+Geometry is **12 / 420**, UI/coverage **4 / 412**. Native creation/pocket 8 → 20 mm, oblique
+polygon/Loft/Boolean/Fillet support workflows pass **2 / 1,021** at 100% and 150%, including exact
+history, full recompute, Save/Open and STEP. The affected required native gate passes
+**39 / 6,975**, without skips or unmatched filters; separate startup reaches intentional **124**.
+All **896** final runtime fingerprints remain unchanged. Existing contracts, coverage and raw
+verification commands/logs are synchronized in `docs/development-setup.md`. Submit and merge the
+single issue PR before starting **#106**. Imported supports remain outside this issue and no
+numbered implementation block is advanced.
 
 After all open issues are complete and merged, execute **Blocks 138 → 139 → 140 → 141 → 142 →
 143**, each with the architecture boundaries, GUI access and acceptance gates in

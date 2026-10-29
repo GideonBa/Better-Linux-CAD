@@ -585,8 +585,10 @@ ClosedProfileAdapter::cut_profile_through_all(const GeometryShape& target,
           make_geometry_error("closed profile cut produced an empty shape"));
     }
 
-    return Result<GeometryShape>::success(
-        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape))));
+    auto backing = std::make_shared<GeometryShape::Impl>(std::move(shape));
+    backing->face_lineage =
+        detail::map_lineage(cut_builder, backing->shape, target.impl_->face_lineage);
+    return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
   } catch (const Standard_Failure& failure) {
     return Result<GeometryShape>::failure(make_geometry_error(standard_failure_message(failure)));
   } catch (const std::exception& exception) {
@@ -654,8 +656,10 @@ Result<GeometryShape> ClosedProfileAdapter::cut_profile_with_holes_through_all(
           make_geometry_error("closed profile cut produced an empty shape"));
     }
 
-    return Result<GeometryShape>::success(
-        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape))));
+    auto backing = std::make_shared<GeometryShape::Impl>(std::move(shape));
+    backing->face_lineage =
+        detail::map_lineage(cut_builder, backing->shape, target.impl_->face_lineage);
+    return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
   } catch (const Standard_Failure& failure) {
     return Result<GeometryShape>::failure(make_geometry_error(standard_failure_message(failure)));
   } catch (const std::exception& exception) {
