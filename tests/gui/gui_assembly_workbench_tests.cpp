@@ -1,3 +1,5 @@
+#include "blcad/core/assembly_reference_target.hpp"
+#include "blcad/core/project_json.hpp"
 #include "blcad/gui/gui_assembly_workbench.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -85,25 +87,72 @@ TEST_CASE("Block 103 GUI stores joint families coordinates and state edits atomi
   REQUIRE(session.create_project(DocumentId("project.joint"), "Joint"));
   REQUIRE(workbench.add_part(session, make_part()));
   REQUIRE(workbench.add_root_member_part(session, DocumentId("part.block")));
-  REQUIRE(workbench.add_root_component(session, ComponentInstance::create(
-      ComponentInstanceId("component.a"), "A", DocumentId("part.block")).value()));
-  REQUIRE(workbench.add_root_component(session, ComponentInstance::create(
-      ComponentInstanceId("component.b"), "B", DocumentId("part.block")).value()));
-  auto joint = AssemblyJoint::create(AssemblyJointId("joint.revolute"), "Revolute",
-      AssemblyJointType::Revolute, target("component.a", "feature.hole.axis"),
-      target("component.b", "feature.hole.axis"), AssemblyJointState::Active,
-      Quantity::angle_deg(-90).value(), Quantity::angle_deg(90).value(),
-      Quantity::angle_deg(0).value()).value();
+  REQUIRE(workbench.add_root_component(
+      session,
+      ComponentInstance::create(ComponentInstanceId("component.a"), "A", DocumentId("part.block"))
+          .value()));
+  REQUIRE(workbench.add_root_component(
+      session,
+      ComponentInstance::create(ComponentInstanceId("component.b"), "B", DocumentId("part.block"))
+          .value()));
+  const auto frame = make_assembly_frame_target_spelling(DatumPlaneId("datum.xy"));
+  const auto plane = make_assembly_reference_target_spelling(DatumPlaneId("datum.xy"));
+  REQUIRE(frame);
+  REQUIRE(plane);
+  const auto joint_for = [](const std::string& semantic) {
+    return AssemblyJoint::create(
+        AssemblyJointId("joint.revolute"), "Revolute", AssemblyJointType::Revolute,
+        target("component.a", semantic.c_str()), target("component.b", semantic.c_str()),
+        AssemblyJointState::Active, Quantity::angle_deg(-90).value(),
+        Quantity::angle_deg(90).value(), Quantity::angle_deg(0).value());
+  };
+  const auto before = serialize_project_to_json(*session.project());
+  REQUIRE(before);
+  const std::string undo_label(session.undo_label()), redo_label(session.redo_label());
+  const bool can_undo = session.can_undo(), can_redo = session.can_redo();
+  const auto unchanged = [&] {
+    const auto current = serialize_project_to_json(*session.project());
+    REQUIRE(current);
+    CHECK(current.value() == before.value());
+    CHECK(session.undo_label() == undo_label);
+    CHECK(session.redo_label() == redo_label);
+    CHECK(session.can_undo() == can_undo);
+    CHECK(session.can_redo() == can_redo);
+  };
+  // A missing producer and an existing Plane without explicit Frame authority
+  // must both fail before either preview or Apply can publish joint intent.
+  for (const auto& semantic : {std::string("feature.hole.axis"), plane.value()}) {
+    INFO(semantic);
+    const auto invalid = joint_for(semantic);
+    REQUIRE(invalid);
+    const auto preview = workbench.preview_root_joint(session, invalid.value());
+    REQUIRE_FALSE(preview);
+    if (semantic == plane.value())
+      CHECK(preview.error().object_id() == "geometry.assembly_joint_target_compatibility");
+    unchanged();
+    CHECK_FALSE(workbench.apply_root_joint(session, invalid.value()));
+    unchanged();
+  }
+  const auto valid = joint_for(frame.value());
+  REQUIRE(valid);
+  const auto joint = valid.value();
   REQUIRE(workbench.preview_root_joint(session, joint));
+  unchanged();
   REQUIRE(workbench.apply_root_joint(session, joint));
   REQUIRE(workbench.set_root_joint_coordinate(session, AssemblyJointId("joint.revolute"),
-      AssemblyJointCoordinateRole::Rotation, Quantity::angle_deg(30).value()));
-  CHECK(session.project()->assembly().find_joint(AssemblyJointId("joint.revolute"))->coordinate_deg() == 30);
+                                              AssemblyJointCoordinateRole::Rotation,
+                                              Quantity::angle_deg(30).value()));
+  CHECK(session.project()
+            ->assembly()
+            .find_joint(AssemblyJointId("joint.revolute"))
+            ->coordinate_deg() == 30);
   REQUIRE(workbench.set_component_visibility(session, ComponentInstanceId("component.b"),
-                                              ComponentVisibility::Hidden));
+                                             ComponentVisibility::Hidden));
   REQUIRE(workbench.set_component_suppression(session, ComponentInstanceId("component.b"),
-                                               ComponentSuppressionState::Suppressed));
-  CHECK(session.project()->assembly().find_component_instance(ComponentInstanceId("component.b"))
+                                              ComponentSuppressionState::Suppressed));
+  CHECK(session.project()
+            ->assembly()
+            .find_component_instance(ComponentInstanceId("component.b"))
             ->suppression_state() == ComponentSuppressionState::Suppressed);
 }
 

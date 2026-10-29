@@ -1,6 +1,7 @@
 #include "blcad/geometry/assembly_flexible_subassembly_solver.hpp"
 
 #include "assembly_constraint_numeric_system.hpp"
+#include "assembly_cross_hierarchy_numeric_system.hpp"
 #include "assembly_numeric_solve_engine.hpp"
 #include "assembly_semantic_target_freshness.hpp"
 
@@ -16,8 +17,9 @@ namespace {
   return Error::validation(std::move(object_id), std::move(message));
 }
 
-[[nodiscard]] Result<std::size_t> validate_application_snapshot(const Project& project,
-                                                                const AssemblySolveResult& result) {
+[[nodiscard]] Result<std::size_t>
+validate_application_snapshot(const Project& project, const AssemblySolveResult& result,
+                              StepImportTopologyContext* import_context) {
   if (result.component_snapshots.size() != result.component_group.size()) {
     return Result<std::size_t>::failure(validation_error(
         "assembly.solver",
@@ -72,7 +74,8 @@ namespace {
   }
 
   auto semantic_freshness = detail::validate_semantic_target_part_snapshots(
-      project, semantic_target_part_documents, result.semantic_target_part_snapshots);
+      project, semantic_target_part_documents, result.semantic_target_part_snapshots,
+      import_context);
   if (semantic_freshness.has_error()) {
     return Result<std::size_t>::failure(semantic_freshness.error());
   }
@@ -188,19 +191,7 @@ struct ResolvedFlexibleSubassemblyOccurrence {
         "flexible subassembly solve target must resolve to a project-owned child assembly"));
   }
 
-  auto local_project = Project::create(project.id(), project.name(), *child);
-  if (local_project.has_error()) {
-    return local_project;
-  }
-
-  for (const PartDocument& part : project.part_documents()) {
-    auto added = local_project.value().add_part_document(part);
-    if (added.has_error()) {
-      return Result<Project>::failure(added.error());
-    }
-  }
-
-  return local_project;
+  return detail::make_cross_hierarchy_local_evaluation_view(project, occurrence.assembly_document);
 }
 
 } // namespace
@@ -239,7 +230,8 @@ AssemblyRigidBodySolver::solve(const Project& project,
 
   return detail::solve_numeric_relationships(
       project, connected_group,
-      detail::AssemblyNumericRelationshipSet{std::move(constraint_ids.value()), {}}, options);
+      detail::AssemblyNumericRelationshipSet{std::move(constraint_ids.value()), {}}, options,
+      import_context_);
 }
 
 Result<std::size_t> AssemblySolveResultApplier::apply(Project& project,
@@ -249,7 +241,7 @@ Result<std::size_t> AssemblySolveResultApplier::apply(Project& project,
         "assembly.solver", "only a converged assembly solve result can be applied"));
   }
 
-  auto validated = validate_application_snapshot(project, result);
+  auto validated = validate_application_snapshot(project, result, import_context_);
   if (validated.has_error()) {
     return Result<std::size_t>::failure(validated.error());
   }
@@ -263,6 +255,10 @@ Result<std::size_t> AssemblySolveResultApplier::apply(Project& project,
     }
   }
 
+  auto fresh = detail::revalidate_semantic_target_part_sources(
+      project, result.semantic_target_part_snapshots, import_context_);
+  if (!fresh)
+    return Result<std::size_t>::failure(fresh.error());
   project = std::move(candidate_project);
   return Result<std::size_t>::success(result.proposed_transforms.size());
 }
@@ -281,12 +277,16 @@ Result<AssemblyFlexibleSubassemblySolveResult> AssemblyFlexibleSubassemblySolver
     return Result<AssemblyFlexibleSubassemblySolveResult>::failure(local_project.error());
   }
 
-  const AssemblyRigidBodySolver solver;
+  const AssemblyRigidBodySolver solver(import_context_);
   auto local_result = solver.solve(local_project.value(), connected_group, options);
   if (local_result.has_error()) {
     return Result<AssemblyFlexibleSubassemblySolveResult>::failure(local_result.error());
   }
 
+  auto fresh = detail::revalidate_semantic_target_part_sources(
+      local_project.value(), local_result.value().semantic_target_part_snapshots, import_context_);
+  if (!fresh)
+    return Result<AssemblyFlexibleSubassemblySolveResult>::failure(fresh.error());
   return Result<AssemblyFlexibleSubassemblySolveResult>::success(
       AssemblyFlexibleSubassemblySolveResult{occurrence_path, occurrence.value().assembly_document,
                                              std::move(local_result.value())});
@@ -309,7 +309,7 @@ Result<std::size_t> AssemblyFlexibleSubassemblySolveResultApplier::apply(
     return Result<std::size_t>::failure(local_project.error());
   }
 
-  const AssemblySolveResultApplier local_applier;
+  const AssemblySolveResultApplier local_applier(import_context_);
   auto local_applied = local_applier.apply(local_project.value(), result.local_result);
   if (local_applied.has_error()) {
     return Result<std::size_t>::failure(local_applied.error());
@@ -338,6 +338,10 @@ Result<std::size_t> AssemblyFlexibleSubassemblySolveResultApplier::apply(
     }
   }
 
+  auto fresh = detail::revalidate_semantic_target_part_sources(
+      local_project.value(), result.local_result.semantic_target_part_snapshots, import_context_);
+  if (!fresh)
+    return Result<std::size_t>::failure(fresh.error());
   project = std::move(candidate_project);
   return Result<std::size_t>::success(local_applied.value());
 }

@@ -145,7 +145,7 @@ AssemblyGenericRelationshipEquationBuilder::build(const Project& project,
         "Perpendicular, or Angle intent"));
   }
 
-  const AssemblyConstraintTargetResolver resolver;
+  const AssemblyConstraintTargetResolver resolver(import_context_);
   auto target_a = resolver.resolve_geometric(project, constraint.target_a());
   if (target_a.has_error()) {
     return Result<AssemblyGenericRelationshipEquationDescriptor>::failure(target_a.error());

@@ -1,7 +1,11 @@
 #include "blcad/geometry/step_exporter.hpp"
 
+#include "blcad/geometry/body_result_inspector.hpp"
+#include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "geometry_shape_internal.hpp"
 #include "occt_failure_message.hpp"
+#include "step_export_transaction.hpp"
 
 #include <IFSelect_ReturnStatus.hxx>
 #include <Interface_Static.hxx>
@@ -22,6 +26,7 @@
 #include <algorithm>
 #include <exception>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -143,6 +148,30 @@ StepExporter::write_part_step(const PartDocument& document,
     return Result<PartStepExportSummary>::failure(
         make_export_error("part step export path must not be empty"));
   }
+  auto transaction = detail::StepExportTransaction::create(document, import_context_, path);
+  if (!transaction)
+    return Result<PartStepExportSummary>::failure(transaction.error());
+  auto observed = observe_imported_part_sources(document, import_context_);
+  if (!observed)
+    return Result<PartStepExportSummary>::failure(observed.error());
+  if (document.is_reference_part() || shape_cache.reference_result()) {
+    auto owned = shape_cache.validated_reference_result(document);
+    if (!owned)
+      return Result<PartStepExportSummary>::failure(owned.error());
+  }
+  std::optional<ShapeCache> recomputed;
+  const ShapeCache* export_cache = &shape_cache;
+  if (!document.imported_body_features().empty()) {
+    auto created = ShapeCache::create(ShapeCacheId("shape_cache.step_export.imported_base"));
+    if (!created)
+      return Result<PartStepExportSummary>::failure(created.error());
+    auto computed =
+        GeometryRecomputeExecutor(import_context_).execute_document(document, created.value());
+    if (!computed)
+      return Result<PartStepExportSummary>::failure(computed.error());
+    recomputed.emplace(std::move(created.value()));
+    export_cache = &*recomputed;
+  }
 
   std::vector<const Body*> visible_bodies;
   for (const Body& body : document.bodies()) {
@@ -173,7 +202,7 @@ StepExporter::write_part_step(const PartDocument& document,
     }
 
     for (const Body* body : visible_bodies) {
-      const GeometryShape* shape = shape_cache.find_body_shape(body->id());
+      const GeometryShape* shape = export_cache->find_body_shape(body->id());
       if (shape == nullptr) {
         return Result<PartStepExportSummary>::failure(make_export_error(
             "visible body '" + body->id().value() + "' has no cached result"));
@@ -210,20 +239,24 @@ StepExporter::write_part_step(const PartDocument& document,
       return Result<PartStepExportSummary>::failure(
           make_export_error("could not transfer multi-body XDE document to step model"));
     }
-    if (writer.Write(path.c_str()) != IFSelect_RetDone) {
+    if (writer.Write(transaction.value().writer_path().c_str()) != IFSelect_RetDone) {
       return Result<PartStepExportSummary>::failure(
           make_export_error("could not write part step file"));
     }
 
     std::error_code error_code;
-    const std::uintmax_t size = std::filesystem::file_size(path, error_code);
+    const std::uintmax_t size =
+        std::filesystem::file_size(transaction.value().writer_path(), error_code);
     if (error_code || size == 0U) {
       return Result<PartStepExportSummary>::failure(make_export_error(
           error_code ? "could not read back written part step file"
                      : "part step export produced an empty file"));
     }
     summary.exported_body_count = summary.bodies.size();
-    summary.written_bytes = static_cast<std::size_t>(size);
+    auto committed = transaction.value().commit();
+    if (!committed)
+      return Result<PartStepExportSummary>::failure(committed.error());
+    summary.written_bytes = committed.value();
     return Result<PartStepExportSummary>::success(std::move(summary));
   } catch (const Standard_Failure& failure) {
     return Result<PartStepExportSummary>::failure(
@@ -234,6 +267,30 @@ StepExporter::write_part_step(const PartDocument& document,
     return Result<PartStepExportSummary>::failure(
         make_export_error("unknown part step export error"));
   }
+}
+
+Result<std::size_t> StepExporter::write_document_step(const PartDocument& document,
+                                                      const ShapeCache& shape_cache,
+                                                      const std::string& path) const {
+  if (!document.bodies().empty()) {
+    auto exported = write_part_step(document, shape_cache, path);
+    return exported ? Result<std::size_t>::success(exported.value().written_bytes)
+                    : Result<std::size_t>::failure(exported.error());
+  }
+  auto transaction = detail::StepExportTransaction::create(document, import_context_, path);
+  if (!transaction)
+    return Result<std::size_t>::failure(transaction.error());
+  auto observed = observe_imported_part_sources(document, import_context_);
+  if (!observed)
+    return Result<std::size_t>::failure(observed.error());
+  auto final = BodyResultInspector{}.resolve_compatible_final_shape(document, shape_cache);
+  if (!final)
+    return Result<std::size_t>::failure(final.error());
+  auto written =
+      StepExporter{}.write_step(final.value(), transaction.value().writer_path().string());
+  if (!written)
+    return written;
+  return transaction.value().commit();
 }
 
 } // namespace blcad::geometry

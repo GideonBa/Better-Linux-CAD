@@ -2,6 +2,8 @@
 #include "blcad/core/project_json.hpp"
 #include "blcad/geometry/step_exporter.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/reference_part_geometry.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/gui/gui_analysis_export_workbench.hpp"
 #include "blcad/gui/gui_assembly_workbench.hpp"
 #include "blcad/gui/gui_document_browser.hpp"
@@ -15,6 +17,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <cmath>
+#include <nlohmann/json.hpp>
 
 using namespace blcad;
 using namespace blcad::gui;
@@ -730,4 +733,371 @@ TEST_CASE("STEP source presentation distinguishes registry kinds and delimited p
   CHECK(before == serialized);
   CHECK_FALSE(session.dirty());
   CHECK_FALSE(session.can_undo());
+}
+
+TEST_CASE(
+    "Reference Part preparation applies shared headless candidates with atomic Project history",
+    "[gui][step-reference-parts][block140-reference-parts]") {
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  GuiDocumentSession session;
+  create(session, true);
+  REQUIRE(session.save_as(directory.filePath(filename(true)).toStdString()));
+  write_geometry(directory.filePath("supplier.step"));
+  const GuiStepImportWorkbench workbench;
+  auto registration = checked(
+      workbench.prepare_register(session, "Supplier", "supplier.step", StepImportMode::Reference));
+  REQUIRE(workbench.apply(session, registration));
+  auto topology = checked(workbench.prepare_topology(session, registration.source.id(), 0));
+  REQUIRE(workbench.apply_topology(session, topology));
+  const auto captured = snapshot(session);
+  const auto history = session.undo_label();
+  GuiStepReferenceRequest request;
+  request.catalog = topology.catalog.id();
+  request.new_part = DocumentId("part.reference");
+  request.name = "Supplier Part";
+  request.target_assembly = session.project()->assembly().id();
+  request.instance = ComponentInstanceId("occurrence.first");
+  auto preview = checked(workbench.prepare_reference(session, request));
+  REQUIRE(preview.preview_shapes.size() == 1);
+  CHECK(snapshot(session) == captured);
+  CHECK(session.undo_label() == history);
+  auto forged = preview;
+  auto& forged_project =
+      std::get<geometry::StepReferenceProjectCandidate>(forged.candidate).project;
+  REQUIRE(forged_project.add_part_document(
+      checked(PartDocument::create(DocumentId("part.injected"), "Injected"))));
+  CHECK_FALSE(workbench.apply_reference(session, forged));
+  CHECK(snapshot(session) == captured);
+  REQUIRE(workbench.apply_reference(session, preview));
+  const auto inserted = snapshot(session);
+  REQUIRE(session.project()->part_document_count() == 1);
+  const auto* reference = session.project()->find_part_document(request.new_part);
+  REQUIRE(reference);
+  CHECK(reference->is_reference_part());
+  const auto binding = *reference->reference_part_definition();
+  REQUIRE(binding.outputs().size() == 1);
+  CHECK_FALSE(reference->bodies().empty());
+  CHECK_FALSE(session.commit_project_transaction("Replace immutable Part", [&](Project& project) {
+    *project.find_part_document(request.new_part) =
+        checked(PartDocument::create(request.new_part, "Illicit replacement"));
+    return Result<std::size_t>::success(1);
+  }));
+  CHECK(snapshot(session) == inserted);
+  CHECK_FALSE(
+      session.commit_project_transaction("Remove referenced immutable Part", [&](Project& project) {
+        std::erase_if(project.part_documents(),
+                      [&](const auto& part) { return part.id() == request.new_part; });
+        return Result<std::size_t>::success(1);
+      }));
+  CHECK(snapshot(session) == inserted);
+  const auto browser = GuiDocumentBrowser::build(session);
+  const auto* body_node = browser.find(binding.outputs().front().body.value());
+  REQUIRE(body_node);
+  for (const auto& property : body_node->properties)
+    CHECK_FALSE(property.editable);
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == captured);
+  REQUIRE(session.redo());
+  CHECK(snapshot(session) == inserted);
+  CHECK_FALSE(workbench.apply_reference(session, preview));
+  request.operation = GuiStepReferenceOperation::Repeat;
+  request.reference_part = request.new_part;
+  request.instance = ComponentInstanceId("occurrence.second");
+  request.transform.translation_mm = {40, 0, 0};
+  auto repeat = checked(workbench.prepare_reference(session, request));
+  REQUIRE(workbench.apply_reference(session, repeat));
+  CHECK(session.project()->part_document_count() == 1);
+  REQUIRE(session.project()->assembly().component_instance_count() == 2);
+  const auto repeated = snapshot(session);
+  request.operation = GuiStepReferenceOperation::Convert;
+  request.new_part = DocumentId("part.editable");
+  request.name = "Editable Copy";
+  auto convert = checked(workbench.prepare_reference(session, request));
+  CHECK(snapshot(session) == repeated);
+  REQUIRE(workbench.apply_reference(session, convert));
+  REQUIRE(session.project()->part_document_count() == 2);
+  const auto* editable = session.project()->find_part_document(request.new_part);
+  REQUIRE(editable);
+  CHECK_FALSE(editable->is_reference_part());
+  CHECK(editable->imported_body_features().size() == 1);
+  CHECK_FALSE(session.project()->assembly().has_member_part(editable->id()));
+  for (const auto& occurrence : session.project()->assembly().component_instances())
+    CHECK(occurrence.referenced_part_document() == request.reference_part);
+  const auto converted = snapshot(session);
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == repeated);
+  REQUIRE(session.redo());
+  CHECK(snapshot(session) == converted);
+  REQUIRE(session.save());
+  REQUIRE(session.open_file(directory.filePath(filename(true)).toStdString()));
+  CHECK(snapshot(session) == converted);
+  const auto unused_id = DocumentId("part.unused.reference");
+  auto unused = checked(geometry::StepReferenceCommands{}.create_definition(
+      registration.source, topology.catalog, unused_id, "Unused Reference",
+      directory.path().toStdString()));
+  REQUIRE(session.commit_project_transaction(
+      "Add unused Reference", [&](Project& project) { return project.add_part_document(unused); }));
+  REQUIRE(session.commit_project_transaction("Remove unused Reference", [&](Project& project) {
+    std::erase_if(project.part_documents(),
+                  [&](const auto& part) { return part.id() == unused_id; });
+    return Result<std::size_t>::success(1);
+  }));
+  CHECK_FALSE(session.project()->find_part_document(unused_id));
+  CHECK(snapshot(session) == converted);
+}
+
+TEST_CASE("Standalone Reference creation and conversion save new protected copies without "
+          "replacing intent",
+          "[gui][step-reference-parts][block140-reference-parts]") {
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  GuiDocumentSession session;
+  create(session, false);
+  const auto original_path = directory.filePath("source.blcad.json");
+  REQUIRE(session.save_as(original_path.toStdString()));
+  const auto asset_path = directory.filePath("supplier.step");
+  write_geometry(asset_path);
+  const auto asset_bytes = bytes(asset_path);
+  const GuiStepImportWorkbench workbench;
+  auto registration = checked(
+      workbench.prepare_register(session, "Supplier", "supplier.step", StepImportMode::Reference));
+  REQUIRE(workbench.apply(session, registration));
+  auto topology = checked(workbench.prepare_topology(session, registration.source.id(), 0));
+  REQUIRE(workbench.apply_topology(session, topology));
+  REQUIRE(session.save());
+  const auto original = snapshot(session);
+  const auto original_file = bytes(original_path);
+  GuiStepReferenceRequest request;
+  request.catalog = topology.catalog.id();
+  request.new_part = DocumentId("part.reference");
+  request.name = "Reference Copy";
+  auto create_reference = checked(workbench.prepare_reference(session, request));
+  CHECK_FALSE(workbench.apply_reference(session, create_reference));
+  const auto reference_path = directory.filePath("reference.blcad.json");
+  REQUIRE(workbench.save_editable_copy(session, create_reference, reference_path.toStdString()));
+  CHECK_FALSE(
+      workbench.save_editable_copy(session, create_reference, reference_path.toStdString()));
+  CHECK_FALSE(workbench.save_editable_copy(session, create_reference, original_path.toStdString()));
+  CHECK_FALSE(workbench.save_editable_copy(session, create_reference, asset_path.toStdString()));
+  CHECK(snapshot(session) == original);
+  CHECK(bytes(original_path) == original_file);
+  CHECK_FALSE(session.dirty());
+  REQUIRE(session.open_file(reference_path.toStdString()));
+  REQUIRE(session.part_document()->is_reference_part());
+  REQUIRE(session.part_shape_cache());
+  REQUIRE(session.part_shape_cache()->validated_reference_result(*session.part_document()));
+  const auto reference = snapshot(session);
+  CHECK_FALSE(session.commit_part_transaction("Replace immutable Part", [&](PartDocument& part) {
+    part = checked(PartDocument::create(part.id(), "Illicit editable replacement"));
+    return Result<std::size_t>::success(1);
+  }));
+  CHECK(snapshot(session) == reference);
+  request.operation = GuiStepReferenceOperation::Convert;
+  request.new_part = DocumentId("part.editable");
+  request.name = "Editable Copy";
+  auto conversion = checked(workbench.prepare_reference(session, request));
+  const auto editable_path = directory.filePath("editable.blcad.json");
+  REQUIRE(workbench.save_editable_copy(session, conversion, editable_path.toStdString()));
+  CHECK(snapshot(session) == reference);
+  CHECK_FALSE(session.can_undo());
+  CHECK_FALSE(session.dirty());
+  CHECK(bytes(asset_path) == asset_bytes);
+  REQUIRE(session.open_file(editable_path.toStdString()));
+  CHECK_FALSE(session.part_document()->is_reference_part());
+  REQUIRE(session.part_document()->imported_body_features().size() == 1);
+  REQUIRE(session.part_shape_cache());
+  CHECK(session.part_shape_cache()->feature_shape_count() == 1);
+  CHECK(session.part_shape_cache()->body_shape_count() == 1);
+  CHECK_FALSE(session.part_shape_cache()->reference_result());
+}
+
+TEST_CASE(
+    "Shared Reference refresh binds preview bytes and every owner before one history mutation",
+    "[gui][step-reference-parts][block140-reference-parts]") {
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  GuiDocumentSession session;
+  create(session, true);
+  REQUIRE(session.save_as(directory.filePath(filename(true)).toStdString()));
+  const auto asset = directory.filePath("supplier.step");
+  write_geometry(asset);
+  const GuiStepImportWorkbench workbench;
+  auto registration = checked(
+      workbench.prepare_register(session, "Supplier", "supplier.step", StepImportMode::Reference));
+  REQUIRE(workbench.apply(session, registration));
+  auto topology = checked(workbench.prepare_topology(session, registration.source.id(), 0));
+  REQUIRE(workbench.apply_topology(session, topology));
+  GuiStepReferenceRequest request;
+  request.catalog = topology.catalog.id();
+  request.new_part = DocumentId("part.reference");
+  request.name = "Supplier Part";
+  request.target_assembly = session.project()->assembly().id();
+  request.instance = ComponentInstanceId("occurrence.first");
+  REQUIRE(
+      workbench.apply_reference(session, checked(workbench.prepare_reference(session, request))));
+  REQUIRE(session.save());
+  const auto before = snapshot(session);
+  request.operation = GuiStepReferenceOperation::Refresh;
+  request.reference_part = request.new_part;
+  auto current = checked(workbench.prepare_reference(session, request));
+  REQUIRE(workbench.apply_reference(session, current));
+  CHECK_FALSE(session.dirty());
+  const auto revise = [&](const QByteArray& comment) {
+    auto contents = bytes(asset);
+    contents.replace(contents.indexOf("ENDSEC;"), 0, comment);
+    write(asset, contents);
+  };
+  revise("/* Supplier revision B */\n");
+  CHECK_FALSE(workbench.validate_reference(session, current));
+  auto refresh = checked(workbench.prepare_reference(session, request));
+  CHECK(snapshot(session) == before);
+  CHECK(
+      std::get<geometry::StepReferenceProjectCandidate>(refresh.candidate).affected_owners.size() ==
+      2);
+  revise("/* Supplier revision C */\n");
+  CHECK_FALSE(workbench.apply_reference(session, refresh));
+  CHECK(snapshot(session) == before);
+  refresh = checked(workbench.prepare_reference(session, request));
+  REQUIRE(workbench.apply_reference(session, refresh));
+  const auto after = snapshot(session);
+  CHECK(after != before);
+  const auto* reference = session.project()->find_part_document(request.reference_part);
+  REQUIRE(reference);
+  CHECK(*reference->find_imported_topology_catalog(topology.catalog.id()) == topology.catalog);
+  CHECK(reference->find_step_import_source(registration.source.id())->sha256_digest() ==
+        session.project()->find_step_import_source(registration.source.id())->sha256_digest());
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == before);
+  CHECK(session.recompute_status() == GuiRecomputeStatus::Failed);
+  CHECK_FALSE(session.reference_repair_mode());
+  CHECK(session.can_redo());
+  REQUIRE(session.redo());
+  CHECK(snapshot(session) == after);
+  CHECK(session.derived_results_fresh());
+  write_geometry(asset, 60);
+  CHECK_FALSE(workbench.prepare_reference(session, request));
+  CHECK(snapshot(session) == after);
+  REQUIRE(session.save());
+  REQUIRE(session.open_file(directory.filePath(filename(true)).toStdString()));
+  CHECK(snapshot(session) == after);
+  CHECK_FALSE(session.dirty());
+  CHECK(session.recompute_status() == GuiRecomputeStatus::Failed);
+  CHECK_FALSE(session.reference_repair_mode());
+}
+
+TEST_CASE("Project open and history retain accepted Reference intent when an active imported face "
+          "is lost",
+          "[gui][step-reference-parts][block140-reference-parts]") {
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto asset = directory.filePath("supplier.step");
+  const auto project_path = directory.filePath("lost-face.blcad.project.json");
+  const auto write_depth = [&](double depth) {
+    auto shape = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(
+        checked(Quantity::length_mm(20)), checked(Quantity::length_mm(10)),
+        checked(Quantity::length_mm(depth))));
+    REQUIRE(geometry::StepExporter{}.write_step(shape, asset.toStdString()));
+  };
+  write_depth(5);
+  GuiDocumentSession session;
+  create(session, true);
+  REQUIRE(session.save_as(project_path.toStdString()));
+  const GuiStepImportWorkbench workbench;
+  const auto registration = checked(
+      workbench.prepare_register(session, "Supplier", "supplier.step", StepImportMode::Reference));
+  REQUIRE(workbench.apply(session, registration));
+  const auto topology = checked(workbench.prepare_topology(session, registration.source.id(), 0));
+  REQUIRE(workbench.apply_topology(session, topology));
+  GuiStepReferenceRequest request;
+  request.catalog = topology.catalog.id();
+  request.new_part = DocumentId("part.reference");
+  request.name = "Reference";
+  request.target_assembly = session.project()->assembly().id();
+  request.instance = ComponentInstanceId("first");
+  REQUIRE(
+      workbench.apply_reference(session, checked(workbench.prepare_reference(session, request))));
+  request.operation = GuiStepReferenceOperation::Repeat;
+  request.reference_part = request.new_part;
+  request.instance = ComponentInstanceId("second");
+  REQUIRE(
+      workbench.apply_reference(session, checked(workbench.prepare_reference(session, request))));
+  const ImportedTopologyEntry* top{};
+  for (const auto& entry : topology.catalog.entries())
+    if (entry.descriptor.kind == ImportedTopologyKind::Face &&
+        entry.descriptor.geometry == ImportedGeometryClass::Plane &&
+        std::abs(entry.descriptor.centroid.z - 5) < 1e-7)
+      top = &entry;
+  REQUIRE(top);
+  const auto reference = checked(ImportedTopologyReference::create(
+      topology.catalog.id(), top->id, ImportedTopologyCapability::Plane));
+  const auto spelling = checked(make_imported_topology_target_spelling(reference));
+  REQUIRE(session.commit_project_transaction("Use imported top face", [&](Project& project) {
+    return project.assembly().add_constraint(checked(AssemblyConstraint::create(
+        AssemblyConstraintId("mate"), "Imported Mate", AssemblyConstraintType::Mate,
+        checked(AssemblyConstraintTarget::create(ComponentInstanceId("first"), spelling)),
+        checked(AssemblyConstraintTarget::create(ComponentInstanceId("second"), spelling)))));
+  }));
+  // Core accepts source intent independently of Geometry. The new depth keeps
+  // a complete bottom face, so the Body recovers while the selected top is Lost.
+  auto accepted = *session.project();
+  write_depth(8);
+  auto observed =
+      checked(inspect_step_import_asset(directory.path().toStdString(), "supplier.step"));
+  REQUIRE(observed.observed_sha256_digest());
+  auto* owned = accepted.find_part_document(request.reference_part);
+  REQUIRE(owned);
+  const auto expected = *owned->find_step_import_source(registration.source.id());
+  REQUIRE(owned->refresh_step_import_source(expected, *observed.observed_sha256_digest()));
+  REQUIRE(
+      accepted.refresh_step_import_source(registration.source, *observed.observed_sha256_digest()));
+  const auto accepted_bytes = bytes(asset);
+  geometry::StepImportTopologyContext context(directory.path().toStdString());
+  REQUIRE(geometry::ReferencePartGeometry{}.resolve(*owned, context));
+  const auto recovery = checked(context.recover(*owned, topology.catalog.id()));
+  REQUIRE(recovery->find(top->id));
+  CHECK(recovery->find(top->id)->status == ImportedTopologyRecoveryStatus::Lost);
+  const auto lost_json = checked(serialize_project_to_json(accepted));
+  REQUIRE(write_project_json_file(accepted, project_path.toStdString()));
+  GuiDocumentSession loaded;
+  REQUIRE(loaded.open_file(project_path.toStdString()));
+  CHECK(snapshot(loaded) == lost_json);
+  CHECK(loaded.recompute_status() == GuiRecomputeStatus::Failed);
+  CHECK_FALSE(loaded.reference_repair_mode());
+  CHECK_FALSE(loaded.dirty());
+  CHECK_FALSE(loaded.can_undo());
+  REQUIRE_FALSE(loaded.diagnostics().empty());
+  CHECK(loaded.diagnostics().back().message.find("lost") != std::string::npos);
+  CHECK_FALSE(loaded.commit_project_transaction(
+      "Keep unresolved relationship", [](Project&) { return Result<std::size_t>::success(1); }));
+  CHECK(snapshot(loaded) == lost_json);
+  REQUIRE(
+      loaded.commit_project_transaction("Remove unavailable relationship", [](Project& project) {
+        auto replacement =
+            checked(AssemblyDocument::create(project.assembly().id(), project.assembly().name()));
+        for (const auto& member : project.assembly().member_parts())
+          REQUIRE(replacement.add_member_part(member));
+        for (const auto& component : project.assembly().component_instances())
+          REQUIRE(replacement.add_component_instance(component));
+        project.assembly() = std::move(replacement);
+        return Result<std::size_t>::success(1);
+      }));
+  const auto repaired = snapshot(loaded);
+  CHECK(loaded.derived_results_fresh());
+  REQUIRE(loaded.undo());
+  CHECK(snapshot(loaded) == lost_json);
+  CHECK(loaded.recompute_status() == GuiRecomputeStatus::Failed);
+  CHECK(loaded.can_redo());
+  REQUIRE(loaded.redo());
+  CHECK(snapshot(loaded) == repaired);
+  CHECK(loaded.derived_results_fresh());
+  auto malformed = nlohmann::json::parse(lost_json);
+  // A genuinely Lost first endpoint must not hide a malformed second endpoint.
+  malformed["assembly"]["assembly_constraints"][0]["target_b"]["semantic_reference"] =
+      "imported:malformed";
+  const auto malformed_path = directory.filePath("malformed.blcad.project.json");
+  write(malformed_path, QByteArray::fromStdString(malformed.dump()));
+  CHECK_FALSE(loaded.open_file(malformed_path.toStdString(), true));
+  CHECK(snapshot(loaded) == repaired);
+  CHECK(bytes(asset) == accepted_bytes);
 }

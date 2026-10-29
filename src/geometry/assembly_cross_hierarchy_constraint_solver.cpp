@@ -169,12 +169,13 @@ make_relationship_snapshots(const Project& project,
   return Result<std::size_t>::success(expected_group.relationships.size());
 }
 
-[[nodiscard]] Result<AssemblyCrossHierarchySolveResult> make_solve_result(
-    const Project& source_project, const Project& solved_project,
-    const AssemblyCrossHierarchySolveGroup& solve_group,
-    const std::vector<ComponentTransformAuthority>& fixed_authorities,
-    const std::vector<ComponentTransformAuthority>& variable_authorities,
-    const detail::AssemblyNumericSolveOutcome& outcome) {
+[[nodiscard]] Result<AssemblyCrossHierarchySolveResult>
+make_solve_result(const Project& source_project, const Project& solved_project,
+                  const AssemblyCrossHierarchySolveGroup& solve_group,
+                  const std::vector<ComponentTransformAuthority>& fixed_authorities,
+                  const std::vector<ComponentTransformAuthority>& variable_authorities,
+                  const detail::AssemblyNumericSolveOutcome& outcome,
+                  StepImportTopologyContext* import_context) {
   auto authority_snapshots =
       detail::make_cross_hierarchy_authority_snapshots(source_project, solve_group.authorities);
   if (authority_snapshots.has_error()) {
@@ -193,7 +194,8 @@ make_relationship_snapshots(const Project& project,
   }
   auto semantic_target_part_snapshots = detail::make_semantic_target_part_snapshots(
       source_project,
-      detail::semantic_part_documents_from_authority_snapshots(authority_snapshots.value()));
+      detail::semantic_part_documents_from_authority_snapshots(authority_snapshots.value()),
+      import_context);
   if (semantic_target_part_snapshots.has_error()) {
     return Result<AssemblyCrossHierarchySolveResult>::failure(
         semantic_target_part_snapshots.error());
@@ -216,6 +218,10 @@ make_relationship_snapshots(const Project& project,
         authority, source_component.value()->transform(), solved_component.value()->transform()});
   }
 
+  auto fresh = detail::revalidate_semantic_target_part_sources(
+      source_project, semantic_target_part_snapshots.value(), import_context);
+  if (!fresh)
+    return Result<AssemblyCrossHierarchySolveResult>::failure(fresh.error());
   return Result<AssemblyCrossHierarchySolveResult>::success(AssemblyCrossHierarchySolveResult{
       outcome.state,
       outcome.iterations,
@@ -275,15 +281,16 @@ Result<AssemblyCrossHierarchySolveResult> AssemblyCrossHierarchyConstraintSolver
 
   const detail::AssemblyNumericResidualEvaluator evaluator =
       [&project, &solve_group, &variable_authorities,
-       length_scale = options.length_residual_scale_mm](const detail::NumericVector& values) {
+       length_scale = options.length_residual_scale_mm,
+       import_context = import_context_](const detail::NumericVector& values) {
         Project candidate_project = project;
         auto applied = detail::apply_cross_hierarchy_authority_variables(
             candidate_project, variable_authorities, values);
         if (applied.has_error()) {
           return Result<detail::NumericVector>::failure(applied.error());
         }
-        return detail::evaluate_cross_hierarchy_group_residuals(
-            candidate_project, solve_group, length_scale);
+        return detail::evaluate_cross_hierarchy_group_residuals(candidate_project, solve_group,
+                                                                length_scale, import_context);
       };
 
   auto outcome = detail::solve_numeric_variables(initial_variables.value(),
@@ -300,7 +307,7 @@ Result<AssemblyCrossHierarchySolveResult> AssemblyCrossHierarchyConstraintSolver
   }
 
   return make_solve_result(project, solved_project, solve_group, fixed_authorities,
-                           variable_authorities, outcome.value());
+                           variable_authorities, outcome.value(), import_context_);
 }
 
 Result<std::size_t> AssemblyCrossHierarchySolveResultApplier::apply(
@@ -338,9 +345,8 @@ Result<std::size_t> AssemblyCrossHierarchySolveResultApplier::apply(
     return Result<std::size_t>::failure(boundaries.error());
   }
   auto semantic_freshness = detail::validate_semantic_target_part_snapshots(
-      project,
-      detail::semantic_part_documents_from_authority_snapshots(result.authority_snapshots),
-      result.semantic_target_part_snapshots);
+      project, detail::semantic_part_documents_from_authority_snapshots(result.authority_snapshots),
+      result.semantic_target_part_snapshots, import_context_);
   if (semantic_freshness.has_error()) {
     return Result<std::size_t>::failure(semantic_freshness.error());
   }
@@ -352,6 +358,10 @@ Result<std::size_t> AssemblyCrossHierarchySolveResultApplier::apply(
     return Result<std::size_t>::failure(applied.error());
   }
 
+  auto fresh = detail::revalidate_semantic_target_part_sources(
+      project, result.semantic_target_part_snapshots, import_context_);
+  if (!fresh)
+    return Result<std::size_t>::failure(fresh.error());
   project = std::move(candidate_project);
   return applied;
 }

@@ -8,6 +8,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct AssemblyHierarchyRevoluteJointEquationDescriptor {
   AssemblyJointId joint;
   AssemblyJointTargetCompatibility compatibility;
@@ -25,9 +27,15 @@ struct AssemblyHierarchyRevoluteJointEquationDescriptor {
 // mathematics as the local joint seed.
 class AssemblyHierarchyRevoluteJointEquationBuilder {
 public:
+  AssemblyHierarchyRevoluteJointEquationBuilder() = default;
+  explicit AssemblyHierarchyRevoluteJointEquationBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyHierarchyRevoluteJointEquationDescriptor>
   build(const Project& project, const AssemblyHierarchyJoint& joint,
         const Quantity& requested_coordinate) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

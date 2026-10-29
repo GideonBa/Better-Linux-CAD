@@ -1,16 +1,38 @@
 #pragma once
 
 #include "blcad/core/id.hpp"
+#include "blcad/core/imported_part.hpp"
+#include "blcad/core/imported_topology.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/core/step_import_source.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
+namespace blcad {
+class PartDocument;
+}
+
 namespace blcad::geometry {
+
+struct CachedReferenceBodyShape {
+  ImportedBodyOutput output;
+  GeometryShape shape;
+};
+
+struct CachedReferencePartResult {
+  DocumentId part_document;
+  StepImportSource source;
+  ImportedTopologyCatalog catalog;
+  ImportedPartDefinition definition;
+  std::vector<CachedReferenceBodyShape> bodies;
+  GeometryShape shape;
+};
 
 struct CachedFeatureShape {
   FeatureId feature_id;
@@ -47,6 +69,12 @@ public:
   [[nodiscard]] Result<std::size_t> store_body_shape(BodyId body_id, FeatureId source_feature_id,
                                                      GeometryShape shape);
   [[nodiscard]] Result<bool> remove_body_shape(BodyId body_id);
+  [[nodiscard]] Result<std::size_t> store_reference_result(CachedReferencePartResult result);
+  [[nodiscard]] const CachedReferencePartResult* reference_result() const noexcept;
+  // Exact intent/owner check. A result from another Part, accepted digest,
+  // catalog baseline or body mapping cannot be presented as this document.
+  [[nodiscard]] Result<const CachedReferencePartResult*>
+  validated_reference_result(const PartDocument& document) const;
   [[nodiscard]] Result<std::size_t>
   store_body_transform_state(BodyTransformId transform_id, BodyId body_id,
                              GeometryAffineTransform cumulative_transform);
@@ -90,6 +118,7 @@ private:
   std::vector<CachedBodyShape> body_shapes_;
   std::vector<CachedBodyTransformState> body_transform_states_;
   std::vector<CachedReferenceTransform> reference_transforms_;
+  std::optional<CachedReferencePartResult> reference_result_;
   bool has_final_shape_ = false;
   FeatureId final_feature_id_;
   GeometryShape final_shape_;

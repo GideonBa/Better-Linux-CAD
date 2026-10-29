@@ -175,7 +175,8 @@ QAction* ShellFeatureTools::body_action(Command command) const noexcept {
 bool ShellFeatureTools::body_context_available(const BodyContext& context) const {
   if (!body_action(context.command) || session_.document_kind() != GuiDocumentKind::Part ||
       session_.workspace() != GuiWorkspace::Part || !session_.part_document() ||
-      !session_.part_shape_cache() || !session_.derived_results_fresh())
+      session_.part_document()->is_reference_part() || !session_.part_shape_cache() ||
+      !session_.derived_results_fresh())
     return false;
   const auto* body = session_.part_document()->find_body(context.body);
   const auto* shape = session_.part_shape_cache()->find_body_shape(context.body);

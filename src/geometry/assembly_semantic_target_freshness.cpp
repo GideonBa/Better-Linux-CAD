@@ -1,6 +1,7 @@
 #include "assembly_semantic_target_freshness.hpp"
 
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/geometry/assembly_import_validation.hpp"
 
 #include <algorithm>
 #include <string>
@@ -28,9 +29,12 @@ namespace {
 } // namespace
 
 Result<std::vector<AssemblySemanticTargetPartSnapshot>>
-make_semantic_target_part_snapshots(const Project& project,
-                                    std::vector<DocumentId> part_documents) {
+make_semantic_target_part_snapshots(const Project& project, std::vector<DocumentId> part_documents,
+                                    StepImportTopologyContext* import_context) {
   part_documents = canonical_part_documents(std::move(part_documents));
+  auto imported = validate_imported_assembly_inputs(project, import_context, part_documents);
+  if (!imported)
+    return Result<std::vector<AssemblySemanticTargetPartSnapshot>>::failure(imported.error());
   std::vector<AssemblySemanticTargetPartSnapshot> snapshots;
   snapshots.reserve(part_documents.size());
 
@@ -54,7 +58,8 @@ make_semantic_target_part_snapshots(const Project& project,
 
 Result<std::size_t> validate_semantic_target_part_snapshots(
     const Project& project, const std::vector<DocumentId>& expected_part_documents,
-    const std::vector<AssemblySemanticTargetPartSnapshot>& snapshots) {
+    const std::vector<AssemblySemanticTargetPartSnapshot>& snapshots,
+    StepImportTopologyContext* import_context) {
   const std::vector<DocumentId> expected = canonical_part_documents(expected_part_documents);
   if (snapshots.size() != expected.size()) {
     return Result<std::size_t>::failure(validation_error(
@@ -86,7 +91,20 @@ Result<std::size_t> validate_semantic_target_part_snapshots(
     }
   }
 
+  auto imported = validate_imported_assembly_inputs(project, import_context, expected);
+  if (!imported)
+    return Result<std::size_t>::failure(imported.error());
   return Result<std::size_t>::success(snapshots.size());
+}
+
+Result<std::size_t> revalidate_semantic_target_part_sources(
+    const Project& project, const std::vector<AssemblySemanticTargetPartSnapshot>& snapshots,
+    StepImportTopologyContext* import_context) {
+  std::vector<DocumentId> parts;
+  parts.reserve(snapshots.size());
+  for (const auto& snapshot : snapshots)
+    parts.push_back(snapshot.part_document);
+  return validate_semantic_target_part_snapshots(project, parts, snapshots, import_context);
 }
 
 } // namespace blcad::geometry::detail

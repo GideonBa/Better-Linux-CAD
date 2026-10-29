@@ -28,9 +28,8 @@ struct AssemblyNumericSolveOutcome {
 
 // Ordinary local assembly adapter retained for rigid-body and joint-motion users.
 [[nodiscard]] Result<AssemblySolveResult> solve_numeric_relationships(
-    const Project& project,
-    const std::vector<ComponentInstanceId>& connected_group,
-    const AssemblyNumericRelationshipSet& relationships,
-    AssemblyRigidBodySolverOptions options);
+    const Project& project, const std::vector<ComponentInstanceId>& connected_group,
+    const AssemblyNumericRelationshipSet& relationships, AssemblyRigidBodySolverOptions options,
+    StepImportTopologyContext* import_context = nullptr);
 
 } // namespace blcad::geometry::detail

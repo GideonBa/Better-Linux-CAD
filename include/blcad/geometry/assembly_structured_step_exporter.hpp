@@ -8,6 +8,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct AssemblyStructuredStepExportSummary {
   std::size_t recomputed_part_count = 0U;
   std::size_t exported_assembly_occurrence_count = 0U;
@@ -24,8 +26,14 @@ struct AssemblyStructuredStepExportSummary {
 // OCCT labels, part definitions, and STEP entities remain derived products.
 class AssemblyStructuredStepExporter {
 public:
+  AssemblyStructuredStepExporter() = default;
+  explicit AssemblyStructuredStepExporter(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyStructuredStepExportSummary>
   write_step(const Project& project, const std::string& path) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

@@ -10,6 +10,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 enum class AssemblySolveState {
   Converged,
   MaximumIterationsReached,
@@ -95,18 +97,30 @@ struct AssemblySolveResult {
 // free component RigidTransform values on a Project copy, and returns proposed updates.
 class AssemblyRigidBodySolver {
 public:
+  AssemblyRigidBodySolver() = default;
+  explicit AssemblyRigidBodySolver(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblySolveResult> solve(
       const Project& project,
       const std::vector<ComponentInstanceId>& connected_group,
       AssemblyRigidBodySolverOptions options = {}) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 // Explicit atomic mutation boundary for successful solve results. The applier rejects
 // non-converged and stale results before replacing any component transform.
 class AssemblySolveResultApplier {
 public:
+  AssemblySolveResultApplier() = default;
+  explicit AssemblySolveResultApplier(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<std::size_t> apply(Project& project,
                                           const AssemblySolveResult& result) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

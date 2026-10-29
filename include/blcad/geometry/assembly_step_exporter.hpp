@@ -9,6 +9,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct AssemblyStepExportSummary {
   std::size_t recomputed_part_count = 0U;
   std::size_t exported_component_count = 0U;
@@ -25,6 +27,9 @@ struct AssemblyStepExportSummary {
 // recomputed once per exported part document and combined into one OCCT compound.
 class AssemblyStepExporter {
 public:
+  AssemblyStepExporter() = default;
+  explicit AssemblyStepExporter(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<GeometryShape> build_posed_shape(const Project& project) const;
 
   [[nodiscard]] Result<AssemblyStepExportSummary> write_step(const Project& project,
@@ -38,6 +43,9 @@ private:
   };
 
   [[nodiscard]] Result<PosedAssemblyBuild> build(const Project& project) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

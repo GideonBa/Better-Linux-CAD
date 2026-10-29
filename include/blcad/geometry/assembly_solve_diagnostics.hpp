@@ -12,6 +12,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 enum class AssemblyDofClassification {
   NotEvaluated,
   NoVariableDof,
@@ -84,10 +86,16 @@ struct AssemblySolveDiagnostics {
 // deterministic numeric system used by AssemblyRigidBodySolver.
 class AssemblySolveDiagnosticsAnalyzer {
 public:
+  AssemblySolveDiagnosticsAnalyzer() = default;
+  explicit AssemblySolveDiagnosticsAnalyzer(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblySolveDiagnostics> analyze(
       const Project& project,
       const std::vector<ComponentInstanceId>& connected_group,
       AssemblySolveDiagnosticsOptions options = {}) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 struct AssemblyCrossHierarchySolveDiagnostics {
@@ -112,10 +120,16 @@ struct AssemblyCrossHierarchySolveDiagnostics {
 // AssemblyCrossHierarchyConstraintSolver.
 class AssemblyCrossHierarchySolveDiagnosticsAnalyzer {
 public:
+  AssemblyCrossHierarchySolveDiagnosticsAnalyzer() = default;
+  explicit AssemblyCrossHierarchySolveDiagnosticsAnalyzer(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyCrossHierarchySolveDiagnostics> analyze(
       const Project& project,
       const AssemblyCrossHierarchySolveGroup& solve_group,
       AssemblySolveDiagnosticsOptions options = {}) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

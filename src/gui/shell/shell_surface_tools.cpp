@@ -109,7 +109,8 @@ ShellFeatureTools::surface_context_for(Command command, const GuiSelection& sele
 std::optional<ShellFeatureTools::SurfaceContext>
 ShellFeatureTools::surface_context(Command command) const {
   if (active() || session_.task().active() || window_.active_sketch() ||
-      session_.reference_repair_mode() || session_.selection().size() != 1)
+      session_.reference_repair_mode() || !session_.part_document() ||
+      session_.part_document()->is_reference_part() || session_.selection().size() != 1)
     return std::nullopt;
   const auto& selection = session_.selection().entries().front();
   if (!session_.selection().allows(selection.kind) ||

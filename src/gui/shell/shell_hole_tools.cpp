@@ -111,8 +111,9 @@ struct ShellHoleTools::Impl {
   bool available() const {
     const auto& session = window.session();
     const auto* part = session.part_document();
-    return part && session.derived_results_fresh() && !session.reference_repair_mode() &&
-           !session.task().active() && !window.active_sketch() &&
+    return part && !part->is_reference_part() && session.derived_results_fresh() &&
+           !session.reference_repair_mode() && !session.task().active() &&
+           !window.active_sketch() &&
            std::any_of(part->bodies().begin(), part->bodies().end(),
                        [&](const auto& body) { return target_available(session, body); });
   }

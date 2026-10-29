@@ -27,7 +27,7 @@ AssemblySphericalJointEquationBuilder::build(const Project& project,
   if (joint.state() != AssemblyJointState::Active)
     return Result<AssemblySphericalJointEquationDescriptor>::failure(validation_error(
         joint.id().value(), "spherical equation construction requires an active joint"));
-  const AssemblyConstraintTargetResolver resolver;
+  const AssemblyConstraintTargetResolver resolver(import_context_);
   auto a = resolver.resolve_geometric(project, joint.target_a());
   if (a.has_error())
     return Result<AssemblySphericalJointEquationDescriptor>::failure(a.error());

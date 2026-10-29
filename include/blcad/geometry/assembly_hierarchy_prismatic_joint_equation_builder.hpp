@@ -4,6 +4,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct AssemblyHierarchyPrismaticJointEquationDescriptor {
   AssemblyJointId joint;
   AssemblyJointTargetCompatibility compatibility;
@@ -15,9 +17,15 @@ struct AssemblyHierarchyPrismaticJointEquationDescriptor {
 
 class AssemblyHierarchyPrismaticJointEquationBuilder {
 public:
+  AssemblyHierarchyPrismaticJointEquationBuilder() = default;
+  explicit AssemblyHierarchyPrismaticJointEquationBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyHierarchyPrismaticJointEquationDescriptor>
   build(const Project& project, const AssemblyHierarchyJoint& joint,
         const Quantity& requested_translation) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

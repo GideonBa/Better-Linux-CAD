@@ -1,7 +1,10 @@
 #include "blcad/geometry/shape_cache.hpp"
 
+#include "blcad/core/part_document.hpp"
+
 #include <algorithm>
 #include <iterator>
+#include <set>
 #include <utility>
 
 namespace blcad::geometry {
@@ -122,9 +125,73 @@ Result<bool> ShapeCache::remove_body_shape(BodyId body_id) {
   return Result<bool>::success(true);
 }
 
+Result<std::size_t> ShapeCache::store_reference_result(CachedReferencePartResult result) {
+  const auto invalid = [](std::string message) {
+    return Result<std::size_t>::failure(Error::validation(kShapeCacheObjectId, std::move(message)));
+  };
+  if (result.part_document.empty() || result.shape.empty() || result.bodies.empty() ||
+      result.bodies.size() != result.definition.outputs().size())
+    return invalid("reference cache requires a complete owned geometry result");
+  if (result.source.mode() != StepImportMode::Reference ||
+      result.source.id() != result.definition.source() ||
+      result.catalog.id() != result.definition.catalog() ||
+      result.catalog.source() != result.source.id())
+    return invalid("reference cache source, catalog and definition must agree");
+
+  std::set<std::string> bodies;
+  std::set<std::string> entries;
+  for (std::size_t index = 0; index < result.bodies.size(); ++index) {
+    const auto& body = result.bodies[index];
+    const auto* entry = result.catalog.find(body.output.imported_body);
+    if (body.output != result.definition.outputs()[index] || body.shape.empty() ||
+        body.output.body.empty() || !bodies.insert(body.output.body.value()).second ||
+        !entries.insert(body.output.imported_body.value()).second || entry == nullptr ||
+        entry->descriptor.kind != ImportedTopologyKind::Body ||
+        entry->descriptor.body_kind != body.output.kind)
+      return invalid("reference cache bodies must exactly match the selected catalog outputs");
+  }
+  const std::size_t count = result.bodies.size();
+  clear();
+  reference_result_ = std::move(result);
+  return Result<std::size_t>::success(count);
+}
+
+const CachedReferencePartResult* ShapeCache::reference_result() const noexcept {
+  return reference_result_ ? &*reference_result_ : nullptr;
+}
+
+Result<const CachedReferencePartResult*>
+ShapeCache::validated_reference_result(const PartDocument& document) const {
+  const auto invalid = [&document](std::string message) {
+    return Result<const CachedReferencePartResult*>::failure(
+        Error::geometry(document.id().value(), std::move(message)));
+  };
+  if (!document.is_reference_part() || !reference_result_)
+    return invalid("Reference Part requires its own computed reference result");
+  const auto& result = *reference_result_;
+  const auto* definition = document.reference_part_definition();
+  const auto* source = document.find_step_import_source(result.source.id());
+  const auto* catalog = document.find_imported_topology_catalog(result.catalog.id());
+  if (result.part_document != document.id() || definition == nullptr ||
+      result.definition != *definition || source == nullptr || result.source != *source ||
+      catalog == nullptr || result.catalog != *catalog)
+    return invalid("reference cache owner or source/catalog/body intent is stale");
+  if (document.bodies().size() != result.bodies.size())
+    return invalid("reference cache must cover the complete declared body set");
+  for (const auto& body : result.bodies) {
+    const auto* declared = document.find_body(body.output.body);
+    if (declared == nullptr || declared->kind() != body.output.kind)
+      return invalid("reference cache body must belong to the inspected Reference Part");
+  }
+  return Result<const CachedReferencePartResult*>::success(&result);
+}
+
 Result<std::size_t>
 ShapeCache::store_body_transform_state(BodyTransformId transform_id, BodyId body_id,
                                        GeometryAffineTransform cumulative_transform) {
+  if (reference_result_)
+    return Result<std::size_t>::failure(
+        Error::validation(kShapeCacheObjectId, "Reference Part cache rejects body transforms"));
   if (transform_id.empty() || body_id.empty())
     return Result<std::size_t>::failure(
         Error::validation(kShapeCacheObjectId, "body transform and body ids must not be empty"));
@@ -146,6 +213,9 @@ Result<std::size_t>
 ShapeCache::store_reference_transform(std::string reference_id, BodyId body_id,
                                       BodyTransformId source_transform_id,
                                       GeometryAffineTransform cumulative_transform) {
+  if (reference_result_)
+    return Result<std::size_t>::failure(
+        Error::validation(kShapeCacheObjectId, "Reference Part cache rejects modeled transforms"));
   if (reference_id.empty() || body_id.empty() || source_transform_id.empty())
     return Result<std::size_t>::failure(
         Error::validation(kShapeCacheObjectId, "reference transform ids must not be empty"));
@@ -176,6 +246,7 @@ void ShapeCache::clear() noexcept {
   body_shapes_.clear();
   body_transform_states_.clear();
   reference_transforms_.clear();
+  reference_result_.reset();
   clear_final_shape();
 }
 
@@ -221,6 +292,12 @@ const CachedBodyShape* ShapeCache::find_body_result(const BodyId& body_id) const
 }
 
 const GeometryShape* ShapeCache::find_body_shape(const BodyId& body_id) const noexcept {
+  if (reference_result_) {
+    const auto found =
+        std::find_if(reference_result_->bodies.begin(), reference_result_->bodies.end(),
+                     [&body_id](const auto& body) { return body.output.body == body_id; });
+    return found == reference_result_->bodies.end() ? nullptr : &found->shape;
+  }
   const CachedBodyShape* result = find_body_result(body_id);
   return result == nullptr ? nullptr : &result->shape;
 }
@@ -280,6 +357,9 @@ ShapeCache::ShapeCache(ShapeCacheId id) : id_(std::move(id)) {}
 
 Result<std::size_t> ShapeCache::validate_cache_input(const FeatureId& feature_id,
                                                      const GeometryShape& shape) const {
+  if (reference_result_)
+    return Result<std::size_t>::failure(
+        Error::validation(kShapeCacheObjectId, "Reference Part cache rejects feature results"));
   if (feature_id.empty()) {
     return Result<std::size_t>::failure(
         Error::validation(kShapeCacheObjectId, "feature id must not be empty"));

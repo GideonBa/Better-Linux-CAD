@@ -171,3 +171,13 @@ Current Revolute public APIs are preserved through an explicit adaptation bounda
 Block 43 vector motion drives, Blocks 44–46 Prismatic/Cylindrical/Planar, and Block 47 passive
 Spherical are implemented in their canonical joint documents. Spherical extends compatibility with
 `Point / Point`; oriented families retain `Frame / Frame`.
+
+## Explicit datum Frame inputs — Block 140 integration
+
+`frame:ref:datum_plane:<encoded-id>` explicitly selects the complete oriented frame of an owned Core
+datum plane. This is a separate endpoint from the existing Plane-only `ref:` target. It is eligible
+for the existing Frame/Frame joint contracts after finite, orthonormal, right-handed validation.
+Reference Parts carry three fixed BLCAD origin datums; selecting their explicit Frame permits real
+joint motion while imported faces, edges, axes and points retain the Block-139 capability matrix.
+Spherical remains passive and requires Point/Point inputs. No oriented frame is guessed from an
+imported analytic primitive. Block-140 validation is recorded in `docs/development-setup.md`.

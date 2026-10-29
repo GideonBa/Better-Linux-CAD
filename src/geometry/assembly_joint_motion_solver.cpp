@@ -3,6 +3,7 @@
 #include "assembly_constraint_numeric_system.hpp"
 #include "assembly_joint_drive_validation.hpp"
 #include "assembly_numeric_solve_engine.hpp"
+#include "assembly_semantic_target_freshness.hpp"
 
 #include "blcad/core/assembly_constraint_graph.hpp"
 #include "blcad/core/assembly_joint_graph.hpp"
@@ -228,11 +229,15 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointDrive drive
   auto solved = detail::solve_numeric_relationships(
       project, combined_group,
       detail::AssemblyNumericRelationshipSet{std::move(constraint_ids.value()), std::move(drives)},
-      options);
+      options, import_context_);
   if (solved.has_error()) {
     return Result<AssemblyJointMotionResult>::failure(solved.error());
   }
 
+  auto fresh = detail::revalidate_semantic_target_part_sources(
+      project, solved.value().semantic_target_part_snapshots, import_context_);
+  if (!fresh)
+    return Result<AssemblyJointMotionResult>::failure(fresh.error());
   return Result<AssemblyJointMotionResult>::success(AssemblyJointMotionResult{
       joint->id(), joint->coordinate_deg(), requested_deg, std::move(joint_snapshots),
       std::move(solved.value()), std::move(selected_drive.value().requested_coordinates)});
@@ -309,7 +314,7 @@ AssemblyJointMotionResultApplier::apply(Project& project,
   }
 
   Project candidate_project = project;
-  const AssemblySolveResultApplier solve_applier;
+  const AssemblySolveResultApplier solve_applier(import_context_);
   auto applied = solve_applier.apply(candidate_project, result.solve_result);
   if (applied.has_error()) {
     return Result<std::size_t>::failure(applied.error());
@@ -322,6 +327,10 @@ AssemblyJointMotionResultApplier::apply(Project& project,
       return Result<std::size_t>::failure(coordinate_updated.error());
   }
 
+  auto fresh = detail::revalidate_semantic_target_part_sources(
+      project, result.solve_result.semantic_target_part_snapshots, import_context_);
+  if (!fresh)
+    return Result<std::size_t>::failure(fresh.error());
   project = std::move(candidate_project);
   return Result<std::size_t>::success(applied.value());
 }

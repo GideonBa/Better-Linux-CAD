@@ -98,8 +98,9 @@ struct ShellParameterTools::Impl {
 
   bool available() const {
     const auto& session = window.session();
-    return session.part_document() && session.derived_results_fresh() &&
-           !session.reference_repair_mode() && !session.task().active() && !window.active_sketch();
+    return session.part_document() && !session.part_document()->is_reference_part() &&
+           session.derived_results_fresh() && !session.reference_repair_mode() &&
+           !session.task().active() && !window.active_sketch();
   }
   bool current() const {
     const auto& session = window.session();

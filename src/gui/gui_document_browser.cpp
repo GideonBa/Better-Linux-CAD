@@ -304,8 +304,18 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
       property("id", "Identifier", part.id().value(), GuiPropertyKind::Identifier, false, {},
                "Persistent document identifiers are read-only"),
       property("name", "Name", part.name()),
+      property("mode", "Part mode", part.is_reference_part() ? "Reference (read-only)" : "Editable",
+               GuiPropertyKind::Enumeration),
       property("status", "Recompute status", "document session", GuiPropertyKind::Status),
   };
+  if (const auto* binding = part.reference_part_definition()) {
+    root.properties.push_back(property("reference_source", "Reference source",
+                                       binding->source().value(), GuiPropertyKind::Reference));
+    root.properties.push_back(property("reference_catalog", "Topology catalog",
+                                       binding->catalog().value(), GuiPropertyKind::Reference));
+    root.properties.push_back(
+        property("editing", "Editing", "Convert to a new Editable Part in STEP Sources"));
+  }
 
   auto parameters = group("Parameters");
   for (const auto& parameter : part.parameters()) {
@@ -313,13 +323,14 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
     node.properties.push_back(property("type", "Type", std::string(to_string(parameter.type())),
                                        GuiPropertyKind::Enumeration));
     node.properties.push_back(property("value", "Value", quantity_value(parameter.value()),
-                                       GuiPropertyKind::Quantity, !parameter.is_expression()));
+                                       GuiPropertyKind::Quantity,
+                                       !part.is_reference_part() && !parameter.is_expression()));
     node.properties.push_back(property("unit", "Unit", std::string(parameter.value().unit())));
     node.properties.push_back(property("scope", "Scope", std::string(to_string(parameter.scope())),
                                        GuiPropertyKind::Enumeration));
-    node.properties.push_back(property("formula", "Expression",
-                                       parameter.formula().value_or("—"), GuiPropertyKind::Expression,
-                                       parameter.is_expression()));
+    node.properties.push_back(property("formula", "Expression", parameter.formula().value_or("—"),
+                                       GuiPropertyKind::Expression,
+                                       !part.is_reference_part() && parameter.is_expression()));
     parameters.children.push_back(std::move(node));
   }
   root.children.push_back(std::move(parameters));
@@ -380,6 +391,7 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
   root.children.push_back(std::move(paths));
 
   auto features = group("Features");
+  append_part_nodes(features, part, part.imported_body_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.revolve_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.sweep_features(), GuiBrowserNodeKind::Feature);
@@ -402,9 +414,10 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
     node.viewport_semantic_id = "body/" + body.id().value();
     node.properties.push_back(property("kind", "Kind", std::string(to_string(body.kind())),
                                        GuiPropertyKind::Enumeration));
-    node.properties.push_back(property("visibility", "Visible",
-                                       body.visibility() == BodyVisibility::Visible ? "true" : "false",
-                                       GuiPropertyKind::Boolean, true, {"true", "false"}));
+    node.properties.push_back(property(
+        "visibility", "Visible", body.visibility() == BodyVisibility::Visible ? "true" : "false",
+        GuiPropertyKind::Boolean, !part.is_reference_part(), {"true", "false"},
+        "Reference Parts are immutable; change occurrence visibility or create an Editable copy"));
     node.properties.push_back(property("active", "Active body", "not defined",
                                        GuiPropertyKind::Status, false, {},
                                        "The current Core model has no active-body intent"));

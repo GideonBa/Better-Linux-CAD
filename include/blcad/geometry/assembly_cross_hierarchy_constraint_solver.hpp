@@ -13,6 +13,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct AssemblyCrossHierarchyTransformAuthoritySnapshot {
   ComponentTransformAuthority authority;
   DocumentId referenced_part_document;
@@ -106,10 +108,16 @@ struct AssemblyCrossHierarchySolveResult {
 // and are evaluated in root-assembly space. No result is applied here.
 class AssemblyCrossHierarchyConstraintSolver {
 public:
+  AssemblyCrossHierarchyConstraintSolver() = default;
+  explicit AssemblyCrossHierarchyConstraintSolver(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyCrossHierarchySolveResult> solve(
       const Project& project,
       const AssemblyCrossHierarchySolveGroup& solve_group,
       AssemblyRigidBodySolverOptions options = {}) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 // Explicit Block-27 atomic mutation boundary. A result is applied only when its
@@ -117,9 +125,15 @@ public:
 // and conservative semantic target PartDocument snapshots all remain fresh.
 class AssemblyCrossHierarchySolveResultApplier {
 public:
+  AssemblyCrossHierarchySolveResultApplier() = default;
+  explicit AssemblyCrossHierarchySolveResultApplier(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<std::size_t> apply(
       Project& project,
       const AssemblyCrossHierarchySolveResult& result) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

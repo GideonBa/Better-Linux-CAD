@@ -13,6 +13,7 @@
 #include "blcad/geometry/sketch_3d_geometry_adapter.hpp"
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
 #include <BRepBuilderAPI_MakeEdge.hxx>
@@ -340,6 +341,23 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
     std::vector<ViewportSceneItem> items;
     items.reserve(shape_cache.body_shape_count() + document.datum_plane_count() +
                   document.datum_axis_count() + document.sketch_3d_count());
+    auto observed = observe_imported_part_sources(document, import_context_);
+    if (!observed)
+      return Result<std::vector<ViewportSceneItem>>::failure(observed.error());
+    if (document.is_reference_part()) {
+      auto reference = shape_cache.validated_reference_result(document);
+      if (!reference)
+        return Result<std::vector<ViewportSceneItem>>::failure(reference.error());
+      for (const auto& cached : reference.value()->bodies) {
+        const auto* body = document.find_body(cached.output.body);
+        if (!body || body->visibility() == BodyVisibility::Hidden || cached.shape.empty())
+          continue;
+        const auto kind = body->kind() == BodyKind::Surface ? ViewportSceneKind::SurfaceBody
+                                                            : ViewportSceneKind::SolidBody;
+        items.push_back({kind, "body/" + body->id().value(), cached.shape, SketchLineRole::Geometry,
+                         body->id().value()});
+      }
+    }
     for (const CachedBodyShape& cached : shape_cache.body_shapes()) {
       const Body* body = document.find_body(cached.body_id);
       if (body == nullptr || body->visibility() == BodyVisibility::Hidden || cached.shape.empty())
@@ -834,6 +852,11 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
         }
       }
     }
+    if (import_context_) {
+      auto valid = import_context_->validate_sources();
+      if (!valid)
+        return Result<std::vector<ViewportSceneItem>>::failure(valid.error());
+    }
     return Result<std::vector<ViewportSceneItem>>::success(std::move(items));
   } catch (const Standard_Failure& failure) {
     return Result<std::vector<ViewportSceneItem>>::failure(scene_error(
@@ -843,7 +866,7 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
 
 Result<std::vector<ViewportSceneItem>>
 ViewportSceneBuilder::build_project(const Project& project) const {
-  auto posed = detail::build_posed_leaf_shapes(project);
+  auto posed = detail::AssemblyPosedLeafShapeBuilder{import_context_}.build(project);
   if (posed.has_error())
     return Result<std::vector<ViewportSceneItem>>::failure(posed.error());
 

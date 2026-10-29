@@ -1,12 +1,12 @@
 #include "blcad/geometry/assembly_interference_analyzer.hpp"
 
 #include "assembly_posed_leaf_shapes.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "occt_failure_message.hpp"
+#include "solid_volume_properties.hpp"
 
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
-#include <BRepGProp.hxx>
-#include <GProp_GProps.hxx>
 #include <Standard_Failure.hxx>
 #include <TopoDS_Shape.hxx>
 
@@ -47,9 +47,7 @@ constexpr const char* kInterferenceAnalyzerId = "geometry.assembly_interference_
     return Result<double>::success(0.0);
   }
 
-  GProp_GProps volume_properties;
-  BRepGProp::VolumeProperties(common_shape, volume_properties);
-  const double volume = volume_properties.Mass();
+  const double volume = detail::solid_volume_mm3(common_shape);
   if (!std::isfinite(volume)) {
     return Result<double>::failure(
         make_geometry_error("interference overlap volume is not finite for pair " + pair_key));
@@ -69,7 +67,7 @@ AssemblyInterferenceAnalyzer::analyze(const Project& project,
                           "interference overlap volume tolerance must be finite and positive"));
   }
 
-  auto posed_leaves = detail::build_posed_leaf_shapes(project);
+  auto posed_leaves = detail::build_posed_leaf_shapes(project, import_context_);
   if (posed_leaves.has_error()) {
     return Result<AssemblyInterferenceAnalysis>::failure(posed_leaves.error());
   }
@@ -121,6 +119,11 @@ AssemblyInterferenceAnalyzer::analyze(const Project& project,
         make_geometry_error("unknown assembly interference analysis error"));
   }
 
+  if (import_context_) {
+    auto fresh = import_context_->validate_sources();
+    if (!fresh)
+      return Result<AssemblyInterferenceAnalysis>::failure(fresh.error());
+  }
   return Result<AssemblyInterferenceAnalysis>::success(std::move(analysis));
 }
 
@@ -138,7 +141,7 @@ AssemblyClearanceAnalyzer::analyze(const Project& project,
                           "interference overlap volume tolerance must be finite and positive"));
   }
 
-  auto posed_leaves = detail::build_posed_leaf_shapes(project);
+  auto posed_leaves = detail::build_posed_leaf_shapes(project, import_context_);
   if (posed_leaves.has_error()) {
     return Result<AssemblyClearanceAnalysis>::failure(posed_leaves.error());
   }
@@ -205,6 +208,11 @@ AssemblyClearanceAnalyzer::analyze(const Project& project,
         make_geometry_error("unknown assembly clearance analysis error"));
   }
 
+  if (import_context_) {
+    auto fresh = import_context_->validate_sources();
+    if (!fresh)
+      return Result<AssemblyClearanceAnalysis>::failure(fresh.error());
+  }
   return Result<AssemblyClearanceAnalysis>::success(std::move(analysis));
 }
 

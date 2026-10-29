@@ -310,7 +310,8 @@ make_motion_result(const Project& source_project, const Project& solved_project,
                    std::vector<AssemblyJointCoordinateDrive> requested_coordinates,
                    const std::vector<ComponentTransformAuthority>& fixed_authorities,
                    const std::vector<ComponentTransformAuthority>& variable_authorities,
-                   const detail::AssemblyNumericSolveOutcome& outcome) {
+                   const detail::AssemblyNumericSolveOutcome& outcome,
+                   StepImportTopologyContext* import_context) {
   auto authority_snapshots =
       detail::make_cross_hierarchy_authority_snapshots(source_project, motion_group.authorities);
   if (authority_snapshots.has_error()) {
@@ -328,7 +329,8 @@ make_motion_result(const Project& source_project, const Project& solved_project,
   }
   auto semantic_snapshots = detail::make_semantic_target_part_snapshots(
       source_project,
-      detail::semantic_part_documents_from_authority_snapshots(authority_snapshots.value()));
+      detail::semantic_part_documents_from_authority_snapshots(authority_snapshots.value()),
+      import_context);
   if (semantic_snapshots.has_error()) {
     return Result<AssemblyCrossHierarchyJointMotionResult>::failure(semantic_snapshots.error());
   }
@@ -350,6 +352,10 @@ make_motion_result(const Project& source_project, const Project& solved_project,
         authority, source_component.value()->transform(), solved_component.value()->transform()});
   }
 
+  auto fresh = detail::revalidate_semantic_target_part_sources(
+      source_project, semantic_snapshots.value(), import_context);
+  if (!fresh)
+    return Result<AssemblyCrossHierarchyJointMotionResult>::failure(fresh.error());
   return Result<AssemblyCrossHierarchyJointMotionResult>::success(
       AssemblyCrossHierarchyJointMotionResult{
           selected_joint.id(), selected_joint.coordinate_deg(), requested_coordinate_deg,
@@ -471,7 +477,8 @@ AssemblyCrossHierarchyJointMotionSolver::move(const Project& project, AssemblyJo
   const detail::AssemblyNumericResidualEvaluator evaluator =
       [&project, motion_group, &variable_authorities, joint_id,
        requested_coordinates = selected_drive.value().complete_coordinates,
-       length_scale = options.length_residual_scale_mm](const detail::NumericVector& values) {
+       length_scale = options.length_residual_scale_mm,
+       import_context = import_context_](const detail::NumericVector& values) {
         Project candidate_project = project;
         auto applied = detail::apply_cross_hierarchy_authority_variables(
             candidate_project, variable_authorities, values);
@@ -479,7 +486,8 @@ AssemblyCrossHierarchyJointMotionSolver::move(const Project& project, AssemblyJo
           return Result<detail::NumericVector>::failure(applied.error());
         }
         return detail::evaluate_cross_hierarchy_motion_group_residuals(
-            candidate_project, *motion_group, joint_id, requested_coordinates, length_scale);
+            candidate_project, *motion_group, joint_id, requested_coordinates, length_scale,
+            import_context);
       };
 
   auto outcome = detail::solve_numeric_variables(initial_variables.value(),
@@ -497,7 +505,8 @@ AssemblyCrossHierarchyJointMotionSolver::move(const Project& project, AssemblyJo
 
   return make_motion_result(project, solved_project, *motion_group, *selected_joint, requested_deg,
                             std::move(selected_drive.value().requested_coordinates),
-                            fixed_authorities, variable_authorities, outcome.value());
+                            fixed_authorities, variable_authorities, outcome.value(),
+                            import_context_);
 }
 
 Result<std::size_t> AssemblyCrossHierarchyJointMotionResultApplier::apply(
@@ -539,7 +548,7 @@ Result<std::size_t> AssemblyCrossHierarchyJointMotionResultApplier::apply(
   }
   auto semantic_freshness = detail::validate_semantic_target_part_snapshots(
       project, detail::semantic_part_documents_from_authority_snapshots(result.authority_snapshots),
-      result.semantic_target_part_snapshots);
+      result.semantic_target_part_snapshots, import_context_);
   if (semantic_freshness.has_error()) {
     return Result<std::size_t>::failure(semantic_freshness.error());
   }
@@ -564,6 +573,10 @@ Result<std::size_t> AssemblyCrossHierarchyJointMotionResultApplier::apply(
       return Result<std::size_t>::failure(coordinate_updated.error());
   }
 
+  auto fresh = detail::revalidate_semantic_target_part_sources(
+      project, result.semantic_target_part_snapshots, import_context_);
+  if (!fresh)
+    return Result<std::size_t>::failure(fresh.error());
   project = std::move(candidate_project);
   return applied;
 }

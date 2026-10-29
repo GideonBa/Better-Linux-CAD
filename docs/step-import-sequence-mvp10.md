@@ -1,6 +1,7 @@
 # STEP Import Sequence MVP-10
 
-Status: Blocks 137–139 complete; Blocks 140–143 planned. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
+Status: Blocks 137–140 complete; Blocks 141–143 planned. Block 141 starts only after the
+Block-140 PR is merged and main is verified. The sequence follows GUI Shell Reset MVP-9R (Blocks 132–136,
 `docs/gui-shell-reset-sequence-mvp9r.md`); `docs/mvp-plan.md` is the status authority. An earlier
 revision numbered these blocks 132–138, before MVP-9R took that range; only the numbering moved,
 never the content or the ordering.
@@ -507,6 +508,53 @@ commit `95f15a6`; the delivery-documentation follow-up changes no runtime source
 
 Primary boundary: immutable imported Part definitions as Assembly members.
 
+Implementation started on `feat/step-reference-parts` from verified main `d403460`, after PR #131
+merged with the tested runtime tree unchanged. Core immutable Part binding and ordered semantic
+Body mappings, a separate Reference geometry cache, explicit context propagation through Assembly
+operations, shared headless commands and matching GUI tasks are accepted on 2026-10-29 after
+focused, full, native, visual and startup verification. Numbered completion is through Block 140.
+Blocks 141–143 remain planned; Block 141 starts only after the Block-140 PR is merged and main is
+verified.
+
+Conversion must be usable at this boundary: its new EditableBody copy carries a real minimal
+ImportedBodyFeature intent and base cache. This foundation is implemented with Block 140 because
+its conversion command requires it; Block 141 retains direct EditableBody import creation, full
+incremental/downstream modeling, Part-workbench authoring and all its acceptance gates. Reference
+geometry itself uses an explicit non-feature cache and never receives a synthetic producer.
+
+The Block-139 capability matrix remains authoritative. Supported imported Point inputs permit
+passive Spherical joints; Spherical has no driven coordinate. Reference definitions carry the three
+exact immutable BLCAD origin datum planes (`datum.xy`, `datum.xz`, `datum.yz`). Their ordinary
+`ref:datum_plane:<id>` targets remain Plane-only; a separate explicit canonical
+`frame:ref:datum_plane:<id>` target provides the authored oriented Frame for driven joints such as
+Revolute. These frames are never inferred from foreign topology; imported axes and circles retain their existing capabilities. Other Frame inputs
+and Insert require an explicitly supported Frame target.
+
+The geometry integration uses one explicit containing-document asset root per operation. Recompute,
+typed targets, numeric residuals and finite-difference callbacks share that context; result snapshots
+and appliers verify the participating imported definitions and actual source bytes again. Imported
+interaction targets present the recovered trimmed face, edge or vertex under the exact component
+transform, with one presentation per analytic primitive. Native topology never replaces semantic
+identity. Local nested evaluation views retain their reachable child Assembly definitions.
+
+Shared Reference commands return candidate Core values for both GUI and headless clients. Creation
+owns the source/catalog and ordered Body mappings. Repetition reuses explicit definition identity;
+equal geometry alone never implies reuse. Inserting a complete product reuses only a definition
+covering every requested product Body and kind; an existing subset remains available through explicit
+Repeat and cannot silently narrow the new insertion. Refresh includes the Project registry and copied Part
+bindings to the same canonical asset or existing hardlink, reports affected owners, and validates
+active relationship inputs before publication. Conversion adds a new uninstantiated Editable Part;
+existing occurrences keep their original Reference definition. Standalone copies are exclusively
+created as new documents under the same asset root, preserving portable asset paths.
+
+Opening or undoing persisted imported intent remains possible after external bytes change. The
+session reports failed recompute, clears imported derived geometry and preserves history/Redo;
+it neither accepts a new digest nor changes external bytes implicitly. A persisted current-digest
+Project whose Body recovers but an owned active imported subentity is Lost/Ambiguous also opens
+with a scoped diagnostic and cleared derived presentation; malformed endpoint intent still fails.
+Prepare/Apply authoring still requires current valid imported geometry. Part authoring and document-value replacement
+cannot bypass the immutable Reference definition contract.
+
 Create a read-only imported `PartDocument` definition from one STEP product/body definition. It must
 participate in:
 
@@ -528,14 +576,43 @@ Focused tags:
 [geometry][assembly-step-reference-part]
 ```
 
+The Sources UI isolates product-local Refresh/Convert and standalone-copy previews, and
+child-definition Insert/Repeat previews, by temporarily hiding existing persistent scene
+presentations. Root-Assembly insertion/repetition retains its context. Native `IsDisplayed`
+assertions prove actual hiding/restoration, including fixed datums, and Cancel/Apply restore the
+saved camera. Preview publication preserves Core intent; Apply commits only the validated command.
+Reviewed 100% and 150% conversion captures show full geometry without overlapping occurrences or
+coplanar striping and retain reachable Apply/Close.
+
+All five targets build. Focused Core **11 / 1,070**, Geometry **27 / 3,037** and GUI
+**18 cases — 15 passed, 3 expected native-only skips / 2,138 assertions** pass. Full Core
+**577 / 19,304**, Geometry **533 / 41,638** and GUI **638 cases — 607 passed, 31 expected
+native-only skips / 83,543 assertions** pass. Native 100% passes **37 / 5,771** and native 150%
+passes **2 / 1,110**, including actual imported-vertex selection and committed 25-degree Revolute
+motion with Undo/Redo. Separate startup reaches intentional **124**; the historical bodyless Part
+CLI export passes with **19,170 bytes**.
+
+The final **961** runtime files are frozen under manifest SHA-256
+`b62553c647c81ea3d1df8038987d7aefc9c5dc7448c70a83bce602734e3de6a1`. Comparison with the native-gate
+inventory changes only `tests/gui/gui_assembly_workbench_tests.cpp`: its historical invalid-axis
+fixture now uses an existing explicit Frame and proves atomic missing/Plane-only rejection.
+Exact commands, full result counts, freshness/immutability regressions, export failure atomicity,
+dependency audit and visual evidence live in `docs/development-setup.md`.
+The final serialized documentation/GUI inventory passes **3 / 313** at this accepted boundary.
+
 ## Block 141 — EditableBody ImportedBodyFeature and downstream modeling
 
 Primary boundary: imported geometry as a Part feature-result authority.
 
-Add persistent `ImportedBodyFeature` intent referencing one `StepImportSource` and its imported body
-definitions. Its ordered outputs are persistent Block-48 `BodyId` values with `Solid` or `Surface`
-kind. Recompute reads the verified source, resolves the selected definitions, and seeds the normal
-multi-body `ShapeCache`/feature-result path.
+Status: planned. Start only after the Block-140 PR is merged and main is verified. Block 140
+supplies the real minimal `ImportedBodyFeature` intent/cache needed for conversion; that
+foundation does not complete this block.
+
+Extend the foundation with direct EditableBody import creation referencing one `StepImportSource`
+and its imported body definitions, and full downstream/incremental Part integration. Its ordered
+outputs are persistent Block-48 `BodyId` values with `Solid` or `Surface` kind. Recompute reads the
+verified source, resolves the selected definitions, and seeds the normal multi-body
+`ShapeCache`/feature-result path.
 
 Freeze:
 

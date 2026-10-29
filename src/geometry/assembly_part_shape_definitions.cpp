@@ -3,6 +3,7 @@
 #include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/shape_cache.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 
 #include "geometry_shape_internal.hpp"
 
@@ -21,7 +22,7 @@ AssemblyPartShapeDefinitionBuilder::build(const Project& project,
       std::unique(referenced_part_documents.begin(), referenced_part_documents.end()),
       referenced_part_documents.end());
 
-  const GeometryRecomputeExecutor recompute_executor;
+  const GeometryRecomputeExecutor recompute_executor(import_context_);
   const BodyResultInspector body_result_inspector;
   AssemblyPartShapeDefinitionsBuild build;
   build.definitions.reserve(referenced_part_documents.size());
@@ -51,6 +52,11 @@ AssemblyPartShapeDefinitionBuilder::build(const Project& project,
   }
 
   build.recomputed_part_count = build.definitions.size();
+  if (import_context_) {
+    auto fresh = import_context_->validate_sources();
+    if (!fresh)
+      return Result<AssemblyPartShapeDefinitionsBuild>::failure(fresh.error());
+  }
   return Result<AssemblyPartShapeDefinitionsBuild>::success(std::move(build));
 }
 

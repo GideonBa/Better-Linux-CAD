@@ -595,3 +595,16 @@ Canonical contracts:
 ## Next technical step — Block 44
 
 Blocks 41–43 typed coordinates, additive compatible JSON, and shared vector drives are implemented in `docs/assembly-joint-coordinate-model-mvp5.md`, `docs/assembly-joint-coordinate-json-mvp5.md`, and `docs/assembly-vector-joint-drive-mvp5.md`. Blocks 44–47 Prismatic, Cylindrical, Planar, and passive Spherical are implemented in their canonical documents. Blocks 48–94 Part Construction through deterministic 3D Sketch Geometry conversion are implemented; Block 79 connected PathCurve Core intent, JSON, and validation is implemented; Block 80 Sweep feature Core intent and JSON is implemented; Block 81 Basic Sweep Geometry is implemented; Block 82 3D path, twist, and guide-controlled Sweep is implemented; Block 83 Path-following Extrude and Extruded Cut is implemented; Block 84 ProfileSectionReference and Loft Core intent plus JSON is implemented; Block 85 Two-section Loft Geometry on arbitrary planes is implemented; Block 86 Multi-section Loft is implemented; Block 87 Guided and continuity-controlled Loft is implemented; Block 88 Surface feature Core intent and JSON is implemented; Block 89 Boundary and Fill Surface Geometry is implemented; Block 90 Trim and Extend Surface Geometry is implemented; Block 91 Stitch/Knit/Sew shell Geometry is implemented; Block 92 Closed shell to solid conversion is implemented; Block 93 multi-body STEP export is implemented; Block 94 integrated Part Construction MVP acceptance is implemented; Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is next.
+
+## Explicit datum-plane Frame targets — Block 140 integration
+
+The existing `ref:datum_plane:<encoded-id>` endpoint remains `DatumPlane -> Plane`. A separate
+canonical `frame:ref:datum_plane:<encoded-id>` endpoint selects `DatumPlaneFrame -> Plane + Axis +
+Frame`. The explicit Frame uses the owning Core datum's origin, X axis, Y axis and normal and must
+be finite, orthonormal and right-handed. It has no generated FeatureId. Invalid grammar, missing
+datums and invalid oriented frames fail closed. Local and hierarchy consumers share the same typed
+resolver; no axis-only or imported primitive receives a synthetic orientation.
+
+Reference Parts expose their three exact immutable BLCAD origin datums through both distinct
+endpoint forms. Existing authored datum targets and the Block-139 imported capability matrix retain
+their previous meaning. Block-140 acceptance is recorded in `docs/development-setup.md` after gates.

@@ -10,6 +10,7 @@
 #include <vector>
 
 namespace blcad::geometry {
+class StepImportTopologyContext;
 
 enum class ViewportSceneKind {
   SolidBody,
@@ -42,6 +43,8 @@ struct ConstructionSelectionTarget {
 // outside the presentation lifetime.
 class ViewportSceneBuilder {
 public:
+  ViewportSceneBuilder() = default;
+  explicit ViewportSceneBuilder(StepImportTopologyContext* context) : import_context_(context) {}
   [[nodiscard]] Result<std::vector<ViewportSceneItem>>
   build_part(const PartDocument& document, const ShapeCache& shape_cache) const;
   // Disposable, typed presentations of supported construction sources. Never
@@ -52,6 +55,9 @@ public:
   [[nodiscard]] Result<std::vector<ConstructionSelectionTarget>>
   build_body_rotation_sources(const PartDocument& document, const ShapeCache& shape_cache) const;
   [[nodiscard]] Result<std::vector<ViewportSceneItem>> build_project(const Project& project) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

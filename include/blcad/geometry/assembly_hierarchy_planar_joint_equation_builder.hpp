@@ -4,6 +4,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct AssemblyHierarchyPlanarJointEquationDescriptor {
   AssemblyJointId joint;
   AssemblyJointTargetCompatibility compatibility;
@@ -17,9 +19,15 @@ struct AssemblyHierarchyPlanarJointEquationDescriptor {
 
 class AssemblyHierarchyPlanarJointEquationBuilder {
 public:
+  AssemblyHierarchyPlanarJointEquationBuilder() = default;
+  explicit AssemblyHierarchyPlanarJointEquationBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyHierarchyPlanarJointEquationDescriptor>
   build(const Project& project, const AssemblyHierarchyJoint& joint, const Quantity& translation_u,
         const Quantity& translation_v, const Quantity& rotation_normal) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

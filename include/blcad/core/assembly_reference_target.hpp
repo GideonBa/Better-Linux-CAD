@@ -49,4 +49,11 @@ parse_assembly_reference_target_spelling(std::string_view spelling);
 // imply the spelling is well formed; parsing still fails closed.
 [[nodiscard]] bool is_assembly_reference_target_spelling(std::string_view spelling) noexcept;
 
+// Explicit oriented DatumPlane frame authority. A normal ref:datum_plane target
+// remains Plane-only; a caller chooses this separate frame intent for joints.
+// The inner ref spelling retains its existing canonical family/escape rules.
+[[nodiscard]] Result<std::string> make_assembly_frame_target_spelling(DatumPlaneId datum_plane);
+[[nodiscard]] Result<DatumPlaneId> parse_assembly_frame_target_spelling(std::string_view spelling);
+[[nodiscard]] bool is_assembly_frame_target_spelling(std::string_view spelling) noexcept;
+
 } // namespace blcad

@@ -5,6 +5,7 @@
 
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/gui_interactive_profile_materialization.hpp"
 #include "blcad/gui/gui_sketch_intent_remap.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
@@ -1462,6 +1463,7 @@ void ShellWindow::refresh() {
                            (step_import_tools_ && step_import_tools_->can_redo_after_cancel()));
   action_create_sketch_->setEnabled(
       has_document && !session_.reference_repair_mode() && !sketch_active &&
+      session_.part_document() && !session_.part_document()->is_reference_part() &&
       !session_.task().active() &&
       (selected_datum_plane().has_value() || selected_result_face().has_value()));
   action_finish_sketch_->setEnabled(sketch_active);
@@ -1602,13 +1604,28 @@ void ShellWindow::refresh_viewport_scene() {
     viewport_->clear_scene();
     return;
   }
-  const geometry::ViewportSceneBuilder builder;
-  auto scene = session_.part_document() != nullptr && session_.part_shape_cache() != nullptr
+  const auto imported = [](const PartDocument& part) {
+    return part.is_reference_part() || !part.imported_body_features().empty();
+  };
+  if (session_.recompute_status() == GuiRecomputeStatus::Failed &&
+      ((session_.part_document() && imported(*session_.part_document())) ||
+       (session_.project() && std::any_of(session_.project()->part_documents().begin(),
+                                          session_.project()->part_documents().end(), imported)))) {
+    // Open/history can retain valid intent with lost imported endpoints. Keep
+    // the authored scene empty while explicit, revalidated Source previews stay usable.
+    (void)viewport_->set_scene({});
+    return;
+  }
+  auto scene =
+      query_with_step_import_context(session_, [&](geometry::StepImportTopologyContext* context) {
+        const geometry::ViewportSceneBuilder builder{context};
+        return session_.part_document() && session_.part_shape_cache()
                    ? builder.build_part(*session_.part_document(), *session_.part_shape_cache())
-                   : (session_.project() != nullptr
-                          ? builder.build_project(*session_.project())
-                          : Result<std::vector<geometry::ViewportSceneItem>>::success({}));
+               : session_.project() ? builder.build_project(*session_.project())
+                                    : Result<std::vector<geometry::ViewportSceneItem>>::success({});
+      });
   if (scene.has_error()) {
+    viewport_->clear_scene();
     append_diagnostic(scene.error());
     return;
   }

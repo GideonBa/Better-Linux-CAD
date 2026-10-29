@@ -1,12 +1,12 @@
 #include "blcad/geometry/assembly_contact_analyzer.hpp"
 
 #include "assembly_posed_leaf_shapes.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "occt_failure_message.hpp"
+#include "solid_volume_properties.hpp"
 
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
-#include <BRepGProp.hxx>
-#include <GProp_GProps.hxx>
 #include <Standard_Failure.hxx>
 #include <TopoDS_Shape.hxx>
 
@@ -67,9 +67,7 @@ struct OrderedPosedOccurrence {
     return Result<double>::success(0.0);
   }
 
-  GProp_GProps volume_properties;
-  BRepGProp::VolumeProperties(common_shape, volume_properties);
-  const double volume = volume_properties.Mass();
+  const double volume = detail::solid_volume_mm3(common_shape);
   if (!std::isfinite(volume)) {
     return Result<double>::failure(
         make_geometry_error("contact overlap volume is not finite for pair " + pair_text));
@@ -137,7 +135,7 @@ AssemblyContactAnalyzer::analyze(const Project& project, AssemblyContactAnalysis
         kContactAnalyzerId, "contact overlap volume tolerance must be finite and positive"));
   }
 
-  auto posed_leaves = detail::build_posed_leaf_shapes(project);
+  auto posed_leaves = detail::build_posed_leaf_shapes(project, import_context_);
   if (posed_leaves.has_error()) {
     return Result<AssemblyContactAnalysis>::failure(posed_leaves.error());
   }
@@ -201,6 +199,11 @@ AssemblyContactAnalyzer::analyze(const Project& project, AssemblyContactAnalysis
         make_geometry_error("unknown assembly contact analysis error"));
   }
 
+  if (import_context_) {
+    auto fresh = import_context_->validate_sources();
+    if (!fresh)
+      return Result<AssemblyContactAnalysis>::failure(fresh.error());
+  }
   return Result<AssemblyContactAnalysis>::success(std::move(analysis));
 }
 

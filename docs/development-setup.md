@@ -499,7 +499,8 @@ Blocks 132 (QOpenGLWidget viewport), 133 (`ShellWindow` + `ShellRibbon`, origin 
 implemented; Block 136 restores full bounded feature coverage and is accepted with full offscreen,
 native Qt/OCCT and closure checks. Block 137 adds verified STEP source intent, freshness and shell
 management. Block 138 adds the verified STEP/XDE reader and read-only geometry inspection.
-All Blocks through 139 are complete; Block 140 (immutable imported Reference Parts) is planned.
+All Blocks through 140 are complete; Block 141 (EditableBody downstream modeling) is planned after
+the Block-140 PR is merged and main is verified.
 Source contracts and acceptance evidence live in `docs/step-import-sequence-mvp10.md`; the completed shell milestone
 lives in `docs/gui-shell-acceptance-mvp9r.md`. Dated proof sections below retain their original
 incremental status.
@@ -2287,3 +2288,83 @@ Final documentation/coverage inventory passes **3 / 309**
 Block-136 coverage ownership is preserved.
 Delivery: [PR #131](https://github.com/GideonBa/Better-Linux-CAD/pull/131), verified implementation
 commit `95f15a6`; its documentation-only follow-up preserves all 914 runtime fingerprints.
+
+### Block 140 — Reference Parts in assemblies (accepted 2026-10-29)
+
+Branch `feat/step-reference-parts` starts from verified main `d403460` after PR #131 is merged.
+Main exactly matches tested head `945cccd`, all 914 Block-139 runtime fingerprints match, and no
+open issues or PRs remain at this boundary. Core immutability/JSON, separate Reference shape
+authority, shared verified Assembly context and matching headless/GUI commands are accepted.
+Numbered completion advances through Block 140 only. Each source owner freezes before the common
+build; no tests or builds run while code changes are in flight. Focused tags are
+`[core][step-reference-part]` and `[geometry][assembly-step-reference-part]`, with native
+Part/Project workflow proof and the full regressions required before publication.
+
+Block-140 gate commands:
+
+```sh
+cmake --build build/dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app blcad_export_step -j 8
+./build/dev-gui/blcad_core_tests "[step-reference-part]"
+./build/dev-gui/blcad_geometry_tests "[assembly-step-reference-part],[step-reference-commands]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[gui][assembly-authoring],[gui][assembly-motion],[block137-step-import],[step-reference-part],[step-reference-parts],[block140-reference-parts],[integration][gui-feature-coverage]"
+mkdir -p /tmp/blcad140-native-100 /tmp/blcad140-native-150
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad140-native-100 QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[native-step-reference-parts],[native-step-topology],[native-step-inspection],[block136-assembly],[block136-assembly-context],[block136-assembly-advanced],[block136-assembly-analysis],[integration][gui-feature-coverage],[native-viewer-lifecycle]"
+BLCAD_UI_CAPTURE_DIR=/tmp/blcad140-native-150 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[native-step-reference-parts]"
+./build/dev-gui/blcad_core_tests
+./build/dev-gui/blcad_geometry_tests
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+./build/dev-gui/blcad_export_step examples/reference_plate.blcad.json /tmp/blcad140-cli-legacy.step
+```
+
+The frozen runtime inventory includes `examples/` as well as source, headers, tests, assets, CMake,
+scripts and coverage manifests. The common build is followed by an audit of Ninja dependency records;
+no source edits occur while a build or test is active. Native checks run sequentially with all other
+GUI/startup runs. Failed export cleanup removes a reserved temporary pathname only while its device
+and inode still match the retained descriptor; an independent replacement survives rollback.
+
+Validation accepted (2026-10-29): all five targets build
+(`/tmp/blcad140-build-11.log`). Focused Core **11 / 1,070**, Geometry **27 / 3,037** and GUI
+**18 cases — 15 passed, 3 expected native-only skips / 2,138 assertions** pass. The expanded GUI
+filter also covers existing STEP source workflow/lifecycle/catalog clients and joint authoring/motion.
+Full Core
+**577 / 19,304** and full Geometry **533 / 41,638** pass; their implementation remains unchanged
+through the final GUI-only corrections. The historical bodyless Part CLI export passes and writes
+**19,170 bytes**. Logs: `/tmp/blcad140-core-focused-2.log`,
+`/tmp/blcad140-geometry-focused-2.log`, `/tmp/blcad140-gui-focused-final.log`,
+`/tmp/blcad140-core-full.log`, `/tmp/blcad140-geometry-full.log` and
+`/tmp/blcad140-cli-legacy.log`.
+
+Final native 100% passes **37 / 5,771** and native 150% passes **2 / 1,110**
+(`/tmp/blcad140-native-100-final.log`, `/tmp/blcad140-native-150-final.log`). The native proof
+clicks an actual recovered imported vertex and checks the exact semantic endpoint. Keyboard input
+establishes real editor focus; the spinbox must hold 25 before Apply and the same sole Revolute
+joint must retain 25 degrees afterward, including exact Undo/Redo. No application motion-path
+change was required for that input proof.
+
+Product-local/child-definition previews isolate persistent scene presentations. Actual native
+`IsDisplayed` assertions verify hiding and restoration, root-Assembly placement retains context,
+and Cancel/Apply preserve the documented camera and Core authority. Reviewed 100% and 150%
+captures show the complete conversion geometry without coplanar striping or unrelated clipped
+occurrences, with readable fields and reachable Apply/Close. Captures are in
+`/tmp/blcad140-native-100/` and `/tmp/blcad140-native-150/`. An earlier full GUI run was interrupted
+before this correction; it is not an accepted gate. A subsequent full GUI run found one old
+joint-authoring fixture naming nonexistent `feature.hole.axis` even though its Part contains only
+the base extrusion and XY datum. Its corrected test uses a valid explicit Frame and verifies atomic
+preview/Apply rejection of missing and Plane-only targets, with JSON and complete history state
+unchanged. Production compatibility remains strict. All other full-suite cases passed in that run
+(`/tmp/blcad140-gui-full-pre-fixture-fix.log`). The final full GUI rerun passes **638 cases —
+607 passed, 31 expected native-only skips / 83,543 assertions**
+(`/tmp/blcad140-gui-full-final.log`).
+Separate native startup reaches its intentional **124** timeout (`/tmp/blcad140-startup-final.log`).
+
+All **961** runtime files remain frozen under final manifest SHA-256
+`b62553c647c81ea3d1df8038987d7aefc9c5dc7448c70a83bce602734e3de6a1`. The preserved native manifest
+is `1d6943711ef586ba557df7ebc960d33d3c0c0ba193953c1e801f5971b9708d3d`; comparison confirms only
+`tests/gui/gui_assembly_workbench_tests.cpp` changed afterward. All production and selected native
+test files are identical, so the native gates remain valid. All **496** Ninja dependency records
+are nonempty (`/tmp/blcad140-ninja-deps-final.log`). Only Markdown may change during gates.
+
+After updating numbered completion through Block 140, the serialized documentation/GUI coverage
+inventory passes **3 / 313** with Shell acceptance required
+(`/tmp/blcad140-final-inventory.log`). The runtime freeze remains unchanged.

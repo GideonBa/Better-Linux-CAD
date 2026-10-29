@@ -9,6 +9,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 // Canonical row order: normal alignment (3), normal separation (1),
 // U/V translation (2), then signed normal twist sine/cosine (2).
 struct PlanarJointResidualDescriptor {
@@ -45,6 +47,9 @@ struct AssemblyPlanarJointEquationDescriptor {
 
 class AssemblyPlanarJointEquationBuilder {
 public:
+  AssemblyPlanarJointEquationBuilder() = default;
+  explicit AssemblyPlanarJointEquationBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyPlanarJointEquationDescriptor>
   build(const Project& project, const AssemblyJoint& joint, const Quantity& translation_u,
         const Quantity& translation_v, const Quantity& rotation_normal) const;
@@ -54,6 +59,9 @@ public:
         const AssemblyResolvedGeometricTarget& target_a,
         const AssemblyResolvedGeometricTarget& target_b, const Quantity& translation_u,
         const Quantity& translation_v, const Quantity& rotation_normal) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

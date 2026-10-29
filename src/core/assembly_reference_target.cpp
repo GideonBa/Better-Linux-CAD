@@ -10,6 +10,7 @@ namespace blcad {
 namespace {
 
 constexpr std::string_view kReferencePrefix = "ref:";
+constexpr std::string_view kFramePrefix = "frame:";
 constexpr std::string_view kDatumPlaneToken = "datum_plane";
 constexpr std::string_view kDatumAxisToken = "datum_axis";
 constexpr std::string_view kConstructionLineToken = "construction_line";
@@ -218,6 +219,31 @@ parse_assembly_reference_target_spelling(std::string_view spelling) {
 bool is_assembly_reference_target_spelling(std::string_view spelling) noexcept {
   return spelling.size() > kReferencePrefix.size() &&
          spelling.substr(0U, kReferencePrefix.size()) == kReferencePrefix;
+}
+
+Result<std::string> make_assembly_frame_target_spelling(DatumPlaneId datum_plane) {
+  auto reference = make_assembly_reference_target_spelling(std::move(datum_plane));
+  if (!reference)
+    return Result<std::string>::failure(reference.error());
+  return Result<std::string>::success(std::string(kFramePrefix) + reference.value());
+}
+
+Result<DatumPlaneId> parse_assembly_frame_target_spelling(std::string_view spelling) {
+  if (!is_assembly_frame_target_spelling(spelling))
+    return Result<DatumPlaneId>::failure(
+        spelling_error(spelling, "assembly frame target must start with the frame: prefix"));
+  auto reference = parse_assembly_reference_target_spelling(spelling.substr(kFramePrefix.size()));
+  if (!reference)
+    return Result<DatumPlaneId>::failure(reference.error());
+  const auto* plane = std::get_if<DatumPlaneId>(&reference.value());
+  if (!plane)
+    return Result<DatumPlaneId>::failure(
+        spelling_error(spelling, "assembly frame target requires an explicit DatumPlane identity"));
+  return Result<DatumPlaneId>::success(*plane);
+}
+
+bool is_assembly_frame_target_spelling(std::string_view spelling) noexcept {
+  return spelling.starts_with(kFramePrefix);
 }
 
 } // namespace blcad

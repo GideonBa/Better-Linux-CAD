@@ -280,18 +280,19 @@ Result<ProjectUpdateResult> Project::set_assembly_parameter_value(ParameterId id
     return Result<ProjectUpdateResult>::failure(valid_structure.error());
   }
 
-  auto updated = assembly_.set_parameter_value(id, value);
+  auto candidate = *this;
+  auto updated = candidate.assembly_.set_parameter_value(id, value);
   if (updated.has_error()) {
     return Result<ProjectUpdateResult>::failure(updated.error());
   }
 
   std::vector<ProjectPartUpdate> part_updates;
-  for (PartDocument& part : part_documents_) {
-    if (!assembly_.has_member_part(part.id())) {
+  for (PartDocument& part : candidate.part_documents_) {
+    if (!candidate.assembly_.has_member_part(part.id())) {
       continue;
     }
 
-    auto applied = assembly_.apply_bindings_to(part);
+    auto applied = candidate.assembly_.apply_bindings_to(part);
     if (applied.has_error()) {
       return Result<ProjectUpdateResult>::failure(applied.error());
     }
@@ -308,6 +309,7 @@ Result<ProjectUpdateResult> Project::set_assembly_parameter_value(ParameterId id
     part_updates.emplace_back(part.id(), std::move(applied.value()), std::move(plan.value()));
   }
 
+  *this = std::move(candidate);
   return Result<ProjectUpdateResult>::success(ProjectUpdateResult(std::move(part_updates)));
 }
 

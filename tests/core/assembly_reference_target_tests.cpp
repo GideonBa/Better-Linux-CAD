@@ -1,7 +1,9 @@
 #include "blcad/core/assembly_constraint.hpp"
 #include "blcad/core/assembly_reference_target.hpp"
+#include "blcad/core/project_json.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 
 #include <string>
 #include <variant>
@@ -141,4 +143,85 @@ TEST_CASE("Assembly endpoints carry reference spellings unchanged",
       parse_assembly_reference_target_spelling(hierarchy_endpoint.value().semantic_reference());
   REQUIRE(roundtrip);
   CHECK(std::get<DatumAxisId>(roundtrip.value()).value() == "datum_axis.spindle");
+}
+
+TEST_CASE("Explicit DatumPlane frame targets preserve canonical identity without changing plain "
+          "references",
+          "[core][step-reference-part][assembly-reference-target-intent]") {
+  const auto frame = make_assembly_frame_target_spelling(DatumPlaneId("datum.xy"));
+  REQUIRE(frame);
+  CHECK(frame.value() == "frame:ref:datum_plane:datum%2Exy");
+  const auto parsed = parse_assembly_frame_target_spelling(frame.value());
+  REQUIRE(parsed);
+  CHECK(parsed.value() == DatumPlaneId("datum.xy"));
+  CHECK_FALSE(parse_assembly_reference_target_spelling(frame.value()));
+  const auto plain = make_assembly_reference_target_spelling(DatumPlaneId("datum.xy"));
+  REQUIRE(plain);
+  CHECK(plain.value() == "ref:datum_plane:datum%2Exy");
+  CHECK_FALSE(parse_assembly_frame_target_spelling(plain.value()));
+  for (const std::string raw : {"a.b/c%d:e", "frame:ref:datum_plane:x", "a%2Eb", "a.b"}) {
+    const auto spelled = make_assembly_frame_target_spelling(DatumPlaneId(raw));
+    REQUIRE(spelled);
+    const auto loaded = parse_assembly_frame_target_spelling(spelled.value());
+    REQUIRE(loaded);
+    CHECK(loaded.value().value() == raw);
+    CHECK(spelled.value().find('.') == std::string::npos);
+  }
+  CHECK_FALSE(make_assembly_frame_target_spelling(DatumPlaneId{}));
+  CHECK(is_assembly_frame_target_spelling("frame:"));
+  CHECK_FALSE(is_assembly_frame_target_spelling("ref:datum_plane:datum%2Exy"));
+  for (const auto* invalid :
+       {"", "frame:", "FRAME:ref:datum_plane:x", "frame:frame:ref:datum_plane:x",
+        "frame:ref:ref:datum_plane:x", "frame:ref:datum_axis:x", "frame:ref:construction_point:x",
+        "frame:ref:construction_line:x", "frame:ref:datum_plane:", "frame:ref:datum_plane:datum.xy",
+        "frame:ref:datum_plane:x%2e", "frame:ref:datum_plane:x%2", "frame:ref:datum_plane:x%GG",
+        "frame:ref:datum_plane:%41", "frame:ref:datum_plane:x:y", "frame:ref:datum_plane:x/y"}) {
+    INFO(invalid);
+    CHECK_FALSE(parse_assembly_frame_target_spelling(invalid));
+    if (is_assembly_frame_target_spelling(invalid)) {
+      CHECK_FALSE(AssemblyConstraintTarget::create(ComponentInstanceId("component"), invalid));
+      CHECK_FALSE(AssemblyHierarchyConstraintEndpoint::create({}, ComponentInstanceId("component"),
+                                                              invalid));
+    }
+  }
+}
+
+TEST_CASE("Explicit frame joint endpoints roundtrip through ordinary Project persistence",
+          "[core][step-reference-part][assembly-reference-target-intent]") {
+  auto part = PartDocument::create(DocumentId("part"), "Part");
+  REQUIRE(part);
+  REQUIRE(part.value().add_datum_plane(DatumPlane::xy().value()));
+  auto assembly = AssemblyDocument::create(DocumentId("assembly"), "Assembly");
+  REQUIRE(assembly);
+  REQUIRE(assembly.value().add_member_part(part.value().id()));
+  for (const auto* id : {"a", "b"}) {
+    auto instance = ComponentInstance::create(ComponentInstanceId(id), id, part.value().id());
+    REQUIRE(instance);
+    REQUIRE(assembly.value().add_component_instance(instance.value()));
+  }
+  const auto frame = make_assembly_frame_target_spelling(DatumPlaneId("datum.xy"));
+  REQUIRE(frame);
+  auto a = AssemblyConstraintTarget::create(ComponentInstanceId("a"), frame.value());
+  auto b = AssemblyConstraintTarget::create(ComponentInstanceId("b"), frame.value());
+  REQUIRE(a);
+  REQUIRE(b);
+  auto joint = AssemblyJoint::create(
+      AssemblyJointId("joint"), "Explicit frame joint", AssemblyJointType::Revolute, a.value(),
+      b.value(), AssemblyJointState::Active, Quantity::angle_deg(-180).value(),
+      Quantity::angle_deg(180).value(), Quantity::angle_deg(0).value());
+  REQUIRE(joint);
+  REQUIRE(assembly.value().add_joint(joint.value()));
+  auto project = Project::create(DocumentId("project"), "Project", assembly.value());
+  REQUIRE(project);
+  REQUIRE(project.value().add_part_document(part.value()));
+  const auto saved = serialize_project_to_json(project.value());
+  REQUIRE(saved);
+  const auto loaded = deserialize_project_from_json(saved.value());
+  REQUIRE(loaded);
+  CHECK(loaded.value().assembly().joints()[0].target_a().semantic_reference() == frame.value());
+  CHECK(serialize_project_to_json(loaded.value()).value() == saved.value());
+  auto invalid = nlohmann::json::parse(saved.value());
+  invalid["assembly"]["assembly_joints"][0]["target_a"]["semantic_reference"] =
+      "frame:ref:datum_axis:x";
+  CHECK_FALSE(deserialize_project_from_json(invalid.dump()));
 }

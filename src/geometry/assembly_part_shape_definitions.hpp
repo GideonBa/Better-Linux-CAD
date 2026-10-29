@@ -9,6 +9,10 @@
 #include <cstddef>
 #include <vector>
 
+namespace blcad::geometry {
+class StepImportTopologyContext;
+}
+
 namespace blcad::geometry::detail {
 
 struct AssemblyPartShapeDefinition {
@@ -26,8 +30,14 @@ struct AssemblyPartShapeDefinitionsBuild {
 // lexicographic PartDocumentId order.
 class AssemblyPartShapeDefinitionBuilder {
 public:
+  AssemblyPartShapeDefinitionBuilder() = default;
+  explicit AssemblyPartShapeDefinitionBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyPartShapeDefinitionsBuild>
   build(const Project& project, std::vector<DocumentId> referenced_part_documents) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 [[nodiscard]] const AssemblyPartShapeDefinition* find_assembly_part_shape_definition(

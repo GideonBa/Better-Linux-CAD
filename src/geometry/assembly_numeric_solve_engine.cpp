@@ -302,7 +302,8 @@ Result<AssemblyNumericSolveOutcome> solve_numeric_variables(
 
 Result<AssemblySolveResult> solve_numeric_relationships(
     const Project& project, const std::vector<ComponentInstanceId>& connected_group,
-    const AssemblyNumericRelationshipSet& relationships, AssemblyRigidBodySolverOptions options) {
+    const AssemblyNumericRelationshipSet& relationships, AssemblyRigidBodySolverOptions options,
+    StepImportTopologyContext* import_context) {
   auto options_validation = validate_options(options);
   if (options_validation.has_error()) {
     return Result<AssemblySolveResult>::failure(options_validation.error());
@@ -330,7 +331,7 @@ Result<AssemblySolveResult> solve_numeric_relationships(
   }
 
   auto semantic_target_part_snapshots =
-      make_semantic_target_part_snapshots(project, std::move(semantic_target_part_documents));
+      make_semantic_target_part_snapshots(project, semantic_target_part_documents, import_context);
   if (semantic_target_part_snapshots.has_error()) {
     return Result<AssemblySolveResult>::failure(semantic_target_part_snapshots.error());
   }
@@ -338,13 +339,14 @@ Result<AssemblySolveResult> solve_numeric_relationships(
   const NumericVector initial_variables = read_variables(project, variable_components);
   const AssemblyNumericResidualEvaluator evaluator =
       [&project, &variable_components, &relationships,
-       length_scale = options.length_residual_scale_mm](const NumericVector& candidate_values) {
+       length_scale = options.length_residual_scale_mm,
+       import_context](const NumericVector& candidate_values) {
         Project candidate_project = project;
         auto applied = apply_variables(candidate_project, variable_components, candidate_values);
         if (applied.has_error()) {
           return Result<NumericVector>::failure(applied.error());
         }
-        return evaluate_residuals(candidate_project, relationships, length_scale);
+        return evaluate_residuals(candidate_project, relationships, length_scale, import_context);
       };
 
   auto outcome = solve_numeric_variables(initial_variables, !fixed_components.empty(), evaluator,
@@ -360,6 +362,11 @@ Result<AssemblySolveResult> solve_numeric_relationships(
     return Result<AssemblySolveResult>::failure(applied.error());
   }
 
+  auto fresh = validate_semantic_target_part_snapshots(project, semantic_target_part_documents,
+                                                       semantic_target_part_snapshots.value(),
+                                                       import_context);
+  if (!fresh)
+    return Result<AssemblySolveResult>::failure(fresh.error());
   return Result<AssemblySolveResult>::success(make_solve_result(
       outcome.value(), project, solved_project, connected_group, fixed_components,
       variable_components, std::move(semantic_target_part_snapshots.value())));

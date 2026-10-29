@@ -9,6 +9,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 // Revolute-drive residuals reuse the semantic axis/seat endpoint family but
 // orient the common axis explicitly because target A defines positive rotation:
 //
@@ -55,6 +57,9 @@ struct AssemblyRevoluteJointEquationDescriptor {
 
 class AssemblyRevoluteJointEquationBuilder {
 public:
+  AssemblyRevoluteJointEquationBuilder() = default;
+  explicit AssemblyRevoluteJointEquationBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyRevoluteJointEquationDescriptor>
   build(const Project& project, const AssemblyJoint& joint,
         const Quantity& requested_coordinate) const;
@@ -64,6 +69,9 @@ public:
         const AssemblyResolvedGeometricTarget& target_a,
         const AssemblyResolvedGeometricTarget& target_b,
         const Quantity& requested_coordinate) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

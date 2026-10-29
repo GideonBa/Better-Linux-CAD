@@ -1,6 +1,7 @@
 #include "blcad/core/part_document_json.hpp"
 #include "step_import_json.hpp"
 #include "imported_topology_json.hpp"
+#include "imported_part_json.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -458,6 +459,18 @@ sketch_origin_override_from_json(const json& value) {
     return Result<Parameter>::failure(quantity.error());
   return Parameter::create_length(ParameterId(id), parameter_json.at("name").get<std::string>(),
                                   quantity.value());
+}
+
+[[nodiscard]] json datum_plane_to_json(const DatumPlane& datum_plane) {
+  const Vector3 normal = datum_plane.normal();
+  const char* plane_kind = normal.z != 0.0 ? "xy" : (normal.y != 0.0 ? "xz" : "yz");
+  return json{{"id", datum_plane.id().value()},
+              {"name", datum_plane.name()},
+              {"kind", plane_kind},
+              {"origin", point3_to_json(datum_plane.origin())},
+              {"x_axis", vector3_to_json(datum_plane.x_axis())},
+              {"y_axis", vector3_to_json(datum_plane.y_axis())},
+              {"normal", vector3_to_json(datum_plane.normal())}};
 }
 
 [[nodiscard]] Result<DatumPlane> datum_plane_from_json(const json& datum_plane_json) {
@@ -3862,6 +3875,13 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   if (!document.imported_topology_catalogs().empty())
     root["imported_topology_catalogs"] =
         detail::imported_catalogs_to_json(document.imported_topology_catalogs());
+  if (const auto* definition = document.reference_part_definition())
+    root["reference_part"] = detail::imported_part_to_json(*definition);
+  if (!document.imported_body_features().empty()) {
+    root["imported_body_features"] = json::array();
+    for (const auto& feature : document.imported_body_features())
+      root["imported_body_features"].push_back(detail::imported_body_feature_to_json(feature));
+  }
   root["bodies"] = json::array();
   for (const auto& body : document.bodies())
     root["bodies"].push_back(json{{"id", body.id().value()},
@@ -3884,15 +3904,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   for (const auto& datum_plane : document.datum_planes()) {
     // Principal planes are identified by their normal; the factories only
     // produce these three orientations.
-    const Vector3 normal = datum_plane.normal();
-    const char* plane_kind = normal.z != 0.0 ? "xy" : (normal.y != 0.0 ? "xz" : "yz");
-    root["datum_planes"].push_back(json{{"id", datum_plane.id().value()},
-                                        {"name", datum_plane.name()},
-                                        {"kind", plane_kind},
-                                        {"origin", point3_to_json(datum_plane.origin())},
-                                        {"x_axis", vector3_to_json(datum_plane.x_axis())},
-                                        {"y_axis", vector3_to_json(datum_plane.y_axis())},
-                                        {"normal", vector3_to_json(datum_plane.normal())}});
+    root["datum_planes"].push_back(datum_plane_to_json(datum_plane));
   }
   root["construction_points"] = json::array();
   for (const auto& point : document.construction_points()) {
@@ -4200,6 +4212,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
         executable_ids.insert(surface_feature_id(record).value());
     }
   };
+  collect(document.imported_body_features());
   collect(document.features());
   collect(document.revolve_features());
   collect(document.sweep_features());
@@ -4231,10 +4244,10 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   // producer and consumer. Independent families need no extra order metadata.
   std::unordered_map<std::string, std::size_t> historical_positions;
   for (const auto* family :
-       {"features", "revolve_features", "sweep_features", "loft_features", "surface_features",
-        "body_booleans", "part_patterns", "mirror_features", "edge_treatments", "shell_features",
-        "draft_features", "body_transforms"})
-    for (const auto& feature : root.at(family))
+       {"imported_body_features", "features", "revolve_features", "sweep_features", "loft_features",
+        "surface_features", "body_booleans", "part_patterns", "mirror_features", "edge_treatments",
+        "shell_features", "draft_features", "body_transforms"})
+    for (const auto& feature : root.value(family, json::array()))
       historical_positions.emplace(feature.at("id").get<std::string>(),
                                    historical_positions.size() + 1U);
   std::unordered_map<std::string, std::vector<std::string>> predecessors;
@@ -4279,6 +4292,53 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       return Result<PartDocument>::failure(json_error("unsupported part document json schema"));
     if (root.at("version").get<int>() != k_version)
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
+    if (root.contains("imported_body_features") && !root.at("imported_body_features").is_array())
+      return Result<PartDocument>::failure(json_error("imported_body_features must be an array"));
+    if (root.contains("reference_part")) {
+      auto definition = detail::imported_part_from_json(root.at("reference_part"));
+      if (!definition)
+        return Result<PartDocument>::failure(definition.error());
+      auto origin_planes = json::array();
+      for (const auto& plane : {DatumPlane::xy(), DatumPlane::xz(), DatumPlane::yz()}) {
+        if (!plane)
+          return Result<PartDocument>::failure(plane.error());
+        origin_planes.push_back(datum_plane_to_json(plane.value()));
+      }
+      if (!root.contains("datum_planes") || root.at("datum_planes") != origin_planes)
+        return Result<PartDocument>::failure(json_error(
+            "Reference Part requires exact immutable BLCAD XY, XZ and YZ origin records"));
+      for (const auto* field : {"parameters",
+                                "datum_axes",
+                                "construction_points",
+                                "construction_lines",
+                                "construction_planes",
+                                "derived_workplanes",
+                                "result_face_workplanes",
+                                "sketches",
+                                "sketches_3d",
+                                "path_curves",
+                                "features",
+                                "revolve_features",
+                                "sweep_features",
+                                "loft_features",
+                                "surface_features",
+                                "part_patterns",
+                                "mirror_features",
+                                "edge_treatments",
+                                "shell_features",
+                                "draft_features",
+                                "body_booleans",
+                                "sketch_ownerships",
+                                "body_transforms",
+                                "reference_statuses",
+                                "reference_remaps",
+                                "sketch_origin_overrides",
+                                "imported_body_features",
+                                "feature_order"})
+        if (root.contains(field) && (!root.at(field).is_array() || !root.at(field).empty()))
+          return Result<PartDocument>::failure(
+              json_error("Reference Part cannot contain authored Part intent"));
+    }
     if (root.contains("result_face_workplanes")) {
       const auto& supports = root.at("result_face_workplanes");
       if (!supports.is_array())
@@ -4296,14 +4356,15 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       // metadata with the authored executable order. A support can depend on
       // any preceding Loft/Boolean/finishing/transform producer.
       const std::vector<std::string> dependent_arrays{
-          "construction_points", "construction_lines", "construction_planes",
-          "derived_workplanes",  "datum_axes",         "sketches",
-          "sketches_3d",         "path_curves",        "features",
-          "revolve_features",    "sweep_features",     "loft_features",
-          "surface_features",    "body_booleans",      "part_patterns",
-          "mirror_features",     "edge_treatments",    "shell_features",
-          "draft_features",      "body_transforms",    "sketch_ownerships",
-          "reference_statuses",  "reference_remaps",   "sketch_origin_overrides"};
+          "construction_points",   "construction_lines", "construction_planes",
+          "derived_workplanes",    "datum_axes",         "sketches",
+          "sketches_3d",           "path_curves",        "features",
+          "revolve_features",      "sweep_features",     "loft_features",
+          "surface_features",      "body_booleans",      "part_patterns",
+          "mirror_features",       "edge_treatments",    "shell_features",
+          "draft_features",        "body_transforms",    "sketch_ownerships",
+          "reference_statuses",    "reference_remaps",   "sketch_origin_overrides",
+          "imported_body_features"};
       auto prelude = root;
       prelude.erase("result_face_workplanes");
       prelude.erase("feature_order");
@@ -4405,6 +4466,9 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
               [](auto& doc, const auto& value) { return doc.add_reference_remap(value); });
       enqueue("sketch_origin_overrides", sketch_origin_override_from_json,
               [](auto& doc, const auto& value) { return doc.add_sketch_origin_override(value); });
+      enqueue(
+          "imported_body_features", detail::imported_body_feature_from_json,
+          [](auto& doc, const auto& value) { return doc.add_imported_body_feature(value); }, true);
       enqueue(
           "features", feature_from_json,
           [](auto& doc, const auto& value) { return doc.add_feature(value); }, true);
@@ -4539,6 +4603,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       restore(part.sketches_, "sketches");
       restore(part.sketches_3d_, "sketches_3d");
       restore(part.path_curves_, "path_curves");
+      restore(part.imported_body_features_, "imported_body_features");
       restore(part.features_, "features");
       restore(part.revolve_features_, "revolve_features");
       restore(part.sweep_features_, "sweep_features");
@@ -4592,6 +4657,14 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         return Result<PartDocument>::failure(body.error());
       auto added = document.value().add_body(std::move(body.value()));
       if (added.has_error())
+        return Result<PartDocument>::failure(added.error());
+    }
+    for (const auto& feature_json : root.value("imported_body_features", json::array())) {
+      auto feature = detail::imported_body_feature_from_json(feature_json);
+      if (!feature)
+        return Result<PartDocument>::failure(feature.error());
+      auto added = document.value().add_imported_body_feature(std::move(feature.value()));
+      if (!added)
         return Result<PartDocument>::failure(added.error());
     }
     const auto& parameter_array = root.at("parameters");
@@ -5148,6 +5221,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         (candidate.*member).clear();
         restore_collections.emplace_back([&, member] { candidate.*member = saved.*member; });
       };
+      stage(&PartDocument::imported_body_features_, &PartDocument::add_imported_body_feature);
       stage(&PartDocument::features_, &PartDocument::add_feature);
       stage(&PartDocument::revolve_features_, &PartDocument::add_revolve_feature);
       stage(&PartDocument::sweep_features_, &PartDocument::add_sweep_feature);
@@ -5202,6 +5276,14 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         return Result<PartDocument>::failure(synced.error());
       for (const auto& restore : restore_collections)
         restore();
+    }
+    if (root.contains("reference_part")) {
+      auto definition = detail::imported_part_from_json(root.at("reference_part"));
+      if (!definition)
+        return Result<PartDocument>::failure(definition.error());
+      auto sealed = document.value().seal_reference_part(std::move(definition.value()));
+      if (!sealed)
+        return Result<PartDocument>::failure(sealed.error());
     }
     return document;
   } catch (const json::exception& exception) {

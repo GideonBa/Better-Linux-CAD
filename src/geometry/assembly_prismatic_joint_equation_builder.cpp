@@ -29,7 +29,7 @@ AssemblyPrismaticJointEquationBuilder::build(const Project& project, const Assem
   if (joint.state() != AssemblyJointState::Active)
     return Result<AssemblyPrismaticJointEquationDescriptor>::failure(validation_error(
         joint.id().value(), "prismatic equation construction requires an active joint"));
-  const AssemblyConstraintTargetResolver resolver;
+  const AssemblyConstraintTargetResolver resolver(import_context_);
   auto a = resolver.resolve_geometric(project, joint.target_a());
   if (a.has_error())
     return Result<AssemblyPrismaticJointEquationDescriptor>::failure(a.error());

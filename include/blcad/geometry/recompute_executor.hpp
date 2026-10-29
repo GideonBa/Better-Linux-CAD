@@ -70,6 +70,9 @@ public:
   [[nodiscard]] Result<std::size_t> execute_body_transform(const PartDocument& document,
                                                            BodyTransformId transform_id,
                                                            ShapeCache& shape_cache) const;
+  [[nodiscard]] Result<std::size_t> execute_imported_body_feature(const PartDocument& document,
+                                                                  FeatureId feature_id,
+                                                                  ShapeCache& shape_cache) const;
 
   [[nodiscard]] Result<std::size_t> execute_revolve(const PartDocument& document,
                                                     FeatureId feature_id,

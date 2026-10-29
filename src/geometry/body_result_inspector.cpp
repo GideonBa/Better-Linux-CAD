@@ -6,6 +6,16 @@ namespace blcad::geometry {
 
 Result<PartBodyInspection> BodyResultInspector::inspect(const PartDocument& document,
                                                         const ShapeCache& shape_cache) const {
+  if (shape_cache.reference_result() != nullptr) {
+    auto valid = shape_cache.validated_reference_result(document);
+    if (!valid)
+      return Result<PartBodyInspection>::failure(valid.error());
+  } else if (document.is_reference_part() &&
+             (shape_cache.body_shape_count() != 0 || shape_cache.feature_shape_count() != 0 ||
+              shape_cache.has_final_shape())) {
+    return Result<PartBodyInspection>::failure(Error::geometry(
+        document.id().value(), "Reference Part cannot consume an authored feature cache"));
+  }
   for (const CachedBodyShape& cached : shape_cache.body_shapes()) {
     if (document.find_body(cached.body_id) == nullptr) {
       return Result<PartBodyInspection>::failure(Error::validation(
@@ -26,6 +36,9 @@ Result<PartBodyInspection> BodyResultInspector::inspect(const PartDocument& docu
     if (const CachedBodyShape* cached = shape_cache.find_body_result(body.id())) {
       result.source_feature_id = cached->source_feature_id;
       result.shape_summary = shape_inspector_.summarize(cached->shape);
+    } else if (document.is_reference_part()) {
+      if (const auto* shape = shape_cache.find_body_shape(body.id()))
+        result.shape_summary = shape_inspector_.summarize(*shape);
     }
     inspection.bodies.push_back(std::move(result));
   }
@@ -36,6 +49,12 @@ Result<PartBodyInspection> BodyResultInspector::inspect(const PartDocument& docu
 Result<GeometryShape>
 BodyResultInspector::resolve_compatible_final_shape(const PartDocument& document,
                                                     const ShapeCache& shape_cache) const {
+  if (document.is_reference_part() || shape_cache.reference_result() != nullptr) {
+    auto result = shape_cache.validated_reference_result(document);
+    if (!result)
+      return Result<GeometryShape>::failure(result.error());
+    return Result<GeometryShape>::success(result.value()->shape);
+  }
   if (document.bodies().empty()) {
     const GeometryShape* shape = shape_cache.final_shape();
     if (shape == nullptr) {

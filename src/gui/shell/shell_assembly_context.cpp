@@ -1,6 +1,7 @@
 #include "blcad/core/assembly_constraint_graph.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 
 #include <QAction>
 #include <QComboBox>
@@ -53,7 +54,9 @@ ShellAssemblyTools::context_for(Command command, const GuiSelection& selection) 
   }
   if (selection.kind == GuiSelectionKind::AssemblyTarget &&
       (command == Command::Relationship || command == Command::Joint)) {
-    const auto targets = geometry::AssemblyInteractionGeometry::targets(*project);
+    const auto targets = query_with_step_import_context(session_, [&](auto* context) {
+      return geometry::AssemblyInteractionGeometry::targets(*project, context);
+    });
     if (targets)
       for (const auto& target : targets.value())
         if (target.presentation.semantic_id == selection.semantic_id)

@@ -16,16 +16,14 @@ namespace blcad::geometry::detail {
     const DocumentId& assembly_document);
 
 [[nodiscard]] Result<std::size_t> append_cross_hierarchy_local_relationship_residuals(
-    const Project& project,
-    const AssemblyLocalRelationshipIdentity& identity,
-    double length_residual_scale_mm,
-    NumericVector& residuals);
+    const Project& project, const AssemblyLocalRelationshipIdentity& identity,
+    double length_residual_scale_mm, NumericVector& residuals,
+    StepImportTopologyContext* import_context = nullptr);
 
 [[nodiscard]] Result<std::size_t> append_cross_hierarchy_project_relationship_residuals(
-    const Project& project,
-    const AssemblyProjectCrossHierarchyRelationshipIdentity& identity,
-    double length_residual_scale_mm,
-    NumericVector& residuals);
+    const Project& project, const AssemblyProjectCrossHierarchyRelationshipIdentity& identity,
+    double length_residual_scale_mm, NumericVector& residuals,
+    StepImportTopologyContext* import_context = nullptr);
 
 [[nodiscard]] Result<const ComponentInstance*> resolve_cross_hierarchy_authority_component(
     const Project& project,
@@ -41,8 +39,7 @@ namespace blcad::geometry::detail {
     const NumericVector& values);
 
 [[nodiscard]] Result<NumericVector> evaluate_cross_hierarchy_group_residuals(
-    const Project& project,
-    const AssemblyCrossHierarchySolveGroup& solve_group,
-    double length_residual_scale_mm);
+    const Project& project, const AssemblyCrossHierarchySolveGroup& solve_group,
+    double length_residual_scale_mm, StepImportTopologyContext* import_context = nullptr);
 
 } // namespace blcad::geometry::detail

@@ -6,6 +6,7 @@
 #include "blcad/geometry/body_transform_adapter.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -38,6 +39,31 @@ std::string path_identity(const std::vector<SubassemblyInstanceId>& path) {
   for (const auto& step : path)
     text += std::to_string(step.value().size()) + ":" + step.value() + "/";
   return text;
+}
+Result<geometry::AssemblyResolvedGeometricTarget>
+resolve_hierarchy_target(const Project& project,
+                         const AssemblyHierarchyConstraintEndpoint& endpoint,
+                         geometry::StepImportTopologyContext* context) {
+  auto query = geometry::AssemblyHierarchyConstraintTarget::create(
+      endpoint.occurrence_path(), endpoint.component_instance(), endpoint.semantic_reference());
+  if (!query)
+    return Result<geometry::AssemblyResolvedGeometricTarget>::failure(query.error());
+  return geometry::AssemblyHierarchyConstraintTargetResolver{context}.resolve_geometric(
+      project, query.value());
+}
+Result<std::size_t> validate_hierarchy_joint(const Project& project,
+                                             const AssemblyHierarchyJoint& joint,
+                                             geometry::StepImportTopologyContext* context) {
+  auto a = resolve_hierarchy_target(project, joint.target_a(), context);
+  auto b = resolve_hierarchy_target(project, joint.target_b(), context);
+  if (!a)
+    return Result<std::size_t>::failure(a.error());
+  if (!b)
+    return Result<std::size_t>::failure(b.error());
+  auto compatible = geometry::AssemblyJointTargetCompatibilityResolver{}.resolve(
+      joint.type(), a.value(), b.value());
+  return compatible ? Result<std::size_t>::success(2)
+                    : Result<std::size_t>::failure(compatible.error());
 }
 } // namespace
 bool ShellAssemblyTools::advanced() const noexcept {
@@ -75,6 +101,9 @@ void ShellAssemblyTools::create_advanced_controls(QWidget* panel) {
   });
 }
 Result<std::size_t> ShellAssemblyTools::build_hierarchy_targets() {
+  auto context = make_step_import_context(session_);
+  if (!context)
+    return Result<std::size_t>::failure(context.error());
   const auto& project = *session_.project();
   auto hierarchy = AssemblyHierarchyTraversal::build(project);
   if (!hierarchy)
@@ -96,7 +125,8 @@ Result<std::size_t> ShellAssemblyTools::build_hierarchy_targets() {
         if (!added)
           return added;
       }
-      auto targets = geometry::AssemblyInteractionGeometry::targets(local.value());
+      auto targets =
+          geometry::AssemblyInteractionGeometry::targets(local.value(), context.value().get());
       if (!targets)
         return Result<std::size_t>::failure(targets.error());
       found = local_targets.emplace(assembly->id().value(), std::move(targets.value())).first;
@@ -112,8 +142,8 @@ Result<std::size_t> ShellAssemblyTools::build_hierarchy_targets() {
           endpoint.value().semantic_reference());
       if (!query)
         return Result<std::size_t>::failure(query.error());
-      auto resolved = geometry::AssemblyHierarchyConstraintTargetResolver{}.resolve_geometric(
-          project, query.value());
+      auto resolved = geometry::AssemblyHierarchyConstraintTargetResolver{context.value().get()}
+                          .resolve_geometric(project, query.value());
       if (!resolved)
         continue;
       target.resolved = std::move(resolved.value());
@@ -142,6 +172,11 @@ Result<std::size_t> ShellAssemblyTools::build_hierarchy_targets() {
       target.label = path_text(occurrence.occurrence_path) + " / " + target.label;
       hierarchy_targets_.push_back({std::move(endpoint.value()), std::move(target)});
     }
+  }
+  if (context.value()) {
+    auto fresh = context.value()->validate_sources();
+    if (!fresh)
+      return fresh;
   }
   for (std::size_t i = 0; i < hierarchy_targets_.size(); ++i)
     first_->addItem(QString::fromStdString(hierarchy_targets_[i].target.label),
@@ -239,8 +274,19 @@ Result<AssemblyHierarchyJoint> ShellAssemblyTools::cross_joint() const {
     return Result<AssemblyHierarchyJoint>::failure(
         invalid("Select two compatible joint references"));
   const auto type = static_cast<AssemblyJointType>(joint_type_->currentIndex());
-  auto compatible = geometry::AssemblyJointTargetCompatibilityResolver{}.resolve(
-      type, a->target.resolved, b->target.resolved);
+  auto compatible =
+      query_with_step_import_context(session_, [&](auto* context) -> Result<std::size_t> {
+        auto current_a = resolve_hierarchy_target(*session_.project(), a->endpoint, context);
+        auto current_b = resolve_hierarchy_target(*session_.project(), b->endpoint, context);
+        if (!current_a)
+          return Result<std::size_t>::failure(current_a.error());
+        if (!current_b)
+          return Result<std::size_t>::failure(current_b.error());
+        auto result = geometry::AssemblyJointTargetCompatibilityResolver{}.resolve(
+            type, current_a.value(), current_b.value());
+        return result ? Result<std::size_t>::success(2)
+                      : Result<std::size_t>::failure(result.error());
+      });
   if (!compatible)
     return Result<AssemblyHierarchyJoint>::failure(compatible.error());
   Result<std::size_t> status = Result<std::size_t>::success(0);
@@ -264,6 +310,9 @@ void ShellAssemblyTools::update_advanced_second_choices() {
   second_->addItem(QStringLiteral("Select a compatible reference B"), -1);
   if (!a)
     return;
+  auto context = make_step_import_context(session_);
+  if (!context)
+    return;
   for (std::size_t i = 0; i < hierarchy_targets_.size(); ++i) {
     const auto& b = hierarchy_targets_[i];
     if (a->endpoint.occurrence_path() == b.endpoint.occurrence_path() &&
@@ -278,14 +327,27 @@ void ShellAssemblyTools::update_advanced_second_choices() {
                                                    : std::nullopt,
           type == AssemblyConstraintType::Angle ? std::optional(Quantity::angle_deg(0).value())
                                                 : std::nullopt);
-      compatible = query && geometry::AssemblyHierarchyConstraintEquationBuilder{}.build(
-                                *session_.project(), query.value());
-    } else
-      compatible = static_cast<bool>(geometry::AssemblyJointTargetCompatibilityResolver{}.resolve(
-          static_cast<AssemblyJointType>(joint_type_->currentIndex()), a->target.resolved,
-          b.target.resolved));
+      compatible =
+          query &&
+          geometry::AssemblyHierarchyConstraintEquationBuilder{context.value().get()}.build(
+              *session_.project(), query.value());
+    } else {
+      auto current_a =
+          resolve_hierarchy_target(*session_.project(), a->endpoint, context.value().get());
+      auto current_b =
+          resolve_hierarchy_target(*session_.project(), b.endpoint, context.value().get());
+      compatible = current_a && current_b &&
+                   geometry::AssemblyJointTargetCompatibilityResolver{}.resolve(
+                       static_cast<AssemblyJointType>(joint_type_->currentIndex()),
+                       current_a.value(), current_b.value());
+    }
     if (compatible)
       second_->addItem(QString::fromStdString(b.target.label), static_cast<int>(i));
+  }
+  if (context.value() && !context.value()->validate_sources()) {
+    second_->clear();
+    second_->addItem(QStringLiteral("Source changed; restart selection"), -1);
+    return;
   }
   const int row = second_->findData(previous);
   if (row >= 0)
@@ -394,6 +456,17 @@ void ShellAssemblyTools::synchronize_cross_motion() {
   sync_ = false;
 }
 Result<QString> ShellAssemblyTools::preview_advanced(Project& candidate) {
+  auto context = make_step_import_context(session_);
+  if (!context)
+    return Result<QString>::failure(context.error());
+  const auto finish = [&](QString text) -> Result<QString> {
+    if (context.value()) {
+      auto fresh = context.value()->validate_sources();
+      if (!fresh)
+        return Result<QString>::failure(fresh.error());
+    }
+    return Result<QString>::success(std::move(text));
+  };
   cross_solved_.reset();
   cross_moved_.reset();
   auto structure = candidate.validate_assembly_structure();
@@ -416,7 +489,7 @@ Result<QString> ShellAssemblyTools::preview_advanced(Project& candidate) {
                                      occurrence.assembly_document.value()) +
               (occurrence.active_path ? QString() : QStringLiteral(" [Suppressed]")) +
               (occurrence.visible_path ? QString() : QStringLiteral(" [Hidden]")) + "\n";
-    return Result<QString>::success(text);
+    return finish(text);
   }
   if (command_ == Command::CrossRelationship) {
     auto record = cross_relationship();
@@ -426,7 +499,8 @@ Result<QString> ShellAssemblyTools::preview_advanced(Project& candidate) {
     if (!query)
       return Result<QString>::failure(query.error());
     auto equations =
-        geometry::AssemblyHierarchyConstraintEquationBuilder{}.build(candidate, query.value());
+        geometry::AssemblyHierarchyConstraintEquationBuilder{context.value().get()}.build(
+            candidate, query.value());
     if (!equations)
       return Result<QString>::failure(equations.error());
     if (auto* existing = candidate.find_cross_hierarchy_constraint(record.value().id()))
@@ -453,25 +527,26 @@ Result<QString> ShellAssemblyTools::preview_advanced(Project& candidate) {
       return Result<QString>::failure(invalid("Select a complete connected hierarchy group"));
     const auto& group = cross_groups_.at(selected.front()->data(Qt::UserRole).toInt());
     auto diagnostics =
-        geometry::AssemblyCrossHierarchySolveDiagnosticsAnalyzer{}.analyze(candidate, group);
+        geometry::AssemblyCrossHierarchySolveDiagnosticsAnalyzer{context.value().get()}.analyze(
+            candidate, group);
     if (!diagnostics)
       return Result<QString>::failure(diagnostics.error());
-    auto solved = geometry::AssemblyCrossHierarchyConstraintSolver{}.solve(candidate, group);
+    auto solved = geometry::AssemblyCrossHierarchyConstraintSolver{context.value().get()}.solve(
+        candidate, group);
     if (!solved)
       return Result<QString>::failure(solved.error());
     if (!solved.value().converged())
       return Result<QString>::failure(invalid("Hierarchy group did not converge"));
-    auto applied =
-        geometry::AssemblyCrossHierarchySolveResultApplier{}.apply(candidate, solved.value());
+    auto applied = geometry::AssemblyCrossHierarchySolveResultApplier{context.value().get()}.apply(
+        candidate, solved.value());
     if (!applied)
       return Result<QString>::failure(applied.error());
     cross_solved_ = std::move(solved.value());
-    return Result<QString>::success(
-        QStringLiteral(
-            "Hierarchy group solved. Remaining degrees of freedom: %1; RMS: %2. Repeated "
-            "definitions share their internal placement.")
-            .arg(diagnostics.value().rank_summary.remaining_dof)
-            .arg(cross_solved_->residual_summary.final_rms, 0, 'g', 4));
+    return finish(QStringLiteral(
+                      "Hierarchy group solved. Remaining degrees of freedom: %1; RMS: %2. Repeated "
+                      "definitions share their internal placement.")
+                      .arg(diagnostics.value().rank_summary.remaining_dof)
+                      .arg(cross_solved_->residual_summary.final_rms, 0, 'g', 4));
   } else if (command_ == Command::CrossMotion) {
     const auto* joint = candidate.find_cross_hierarchy_joint(
         AssemblyJointId(joint_->currentData().toString().toStdString()));
@@ -486,18 +561,19 @@ Result<QString> ShellAssemblyTools::preview_advanced(Project& candidate) {
                  : Quantity::linear_displacement_mm(value_->value());
     if (!q)
       return Result<QString>::failure(q.error());
-    auto moved = geometry::AssemblyCrossHierarchyJointMotionSolver{}.move(
+    auto moved = geometry::AssemblyCrossHierarchyJointMotionSolver{context.value().get()}.move(
         candidate, geometry::AssemblyJointDrive{joint->id(), {{role, q.value()}}});
     if (!moved)
       return Result<QString>::failure(moved.error());
     if (!moved.value().converged())
       return Result<QString>::failure(invalid("Hierarchy motion did not converge"));
     auto applied =
-        geometry::AssemblyCrossHierarchyJointMotionResultApplier{}.apply(candidate, moved.value());
+        geometry::AssemblyCrossHierarchyJointMotionResultApplier{context.value().get()}.apply(
+            candidate, moved.value());
     if (!applied)
       return Result<QString>::failure(applied.error());
     cross_moved_ = std::move(moved.value());
-    return Result<QString>::success(
+    return finish(
         QStringLiteral("Hierarchy motion converged. RMS: %1. Only the chosen coordinate is "
                        "accepted; subassembly boundaries are preserved.")
             .arg(cross_moved_->residual_summary.final_rms, 0, 'g', 4));
@@ -505,31 +581,40 @@ Result<QString> ShellAssemblyTools::preview_advanced(Project& candidate) {
   structure = candidate.validate_assembly_structure();
   if (!structure)
     return Result<QString>::failure(structure.error());
-  return Result<QString>::success(
+  return finish(
       QStringLiteral("Occurrence references and inputs valid. Apply saves the relationship; "
                      "Solve Hierarchy or Move Hierarchy computes the placement."));
 }
 Result<std::size_t> ShellAssemblyTools::apply_advanced() {
   if (command_ == Command::CrossSolve && cross_solved_) {
     const auto result = *cross_solved_;
-    return session_.commit_project_transaction(
-        "Solve cross-hierarchy group", [result](Project& project) {
-          return geometry::AssemblyCrossHierarchySolveResultApplier{}.apply(project, result);
+    return commit_project_with_step_import_context(
+        session_, "Solve cross-hierarchy group", [result](Project& project, auto* context) {
+          return geometry::AssemblyCrossHierarchySolveResultApplier{context}.apply(project, result);
         });
   }
   if (command_ == Command::CrossMotion && cross_moved_) {
     const auto result = *cross_moved_;
-    return session_.commit_project_transaction(
-        "Move cross-hierarchy joint", [result](Project& project) {
-          return geometry::AssemblyCrossHierarchyJointMotionResultApplier{}.apply(project, result);
+    return commit_project_with_step_import_context(
+        session_, "Move cross-hierarchy joint", [result](Project& project, auto* context) {
+          return geometry::AssemblyCrossHierarchyJointMotionResultApplier{context}.apply(project,
+                                                                                         result);
         });
   }
   if (command_ == Command::CrossRelationship) {
     auto record = cross_relationship();
     if (!record)
       return Result<std::size_t>::failure(record.error());
-    return session_.commit_project_transaction(
-        "Author cross-hierarchy relationship", [record = record.value()](Project& project) {
+    return commit_project_with_step_import_context(
+        session_, "Author cross-hierarchy relationship",
+        [record = record.value()](Project& project, auto* context) -> Result<std::size_t> {
+          auto query = geometry::AssemblyHierarchyConstraintQuery::create(record);
+          if (!query)
+            return Result<std::size_t>::failure(query.error());
+          auto equations = geometry::AssemblyHierarchyConstraintEquationBuilder{context}.build(
+              project, query.value());
+          if (!equations)
+            return Result<std::size_t>::failure(equations.error());
           if (auto* existing = project.find_cross_hierarchy_constraint(record.id())) {
             *existing = record;
             return project.validate_assembly_structure();
@@ -541,8 +626,12 @@ Result<std::size_t> ShellAssemblyTools::apply_advanced() {
     auto record = cross_joint();
     if (!record)
       return Result<std::size_t>::failure(record.error());
-    return session_.commit_project_transaction(
-        "Author cross-hierarchy joint", [record = record.value()](Project& project) {
+    return commit_project_with_step_import_context(
+        session_, "Author cross-hierarchy joint",
+        [record = record.value()](Project& project, auto* context) -> Result<std::size_t> {
+          auto valid = validate_hierarchy_joint(project, record, context);
+          if (!valid)
+            return valid;
           if (auto* existing = project.find_cross_hierarchy_joint(record.id())) {
             *existing = record;
             return project.validate_assembly_structure();

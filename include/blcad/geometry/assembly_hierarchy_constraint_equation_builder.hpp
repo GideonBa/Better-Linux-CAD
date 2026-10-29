@@ -19,6 +19,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 // Read-only geometry-query endpoint retained by the target-resolution layer.
 // Persistent project intent uses the Core-owned
 // AssemblyHierarchyConstraintEndpoint; query construction accepts that Core
@@ -217,8 +219,14 @@ private:
 // persisted, or inserted into a local constraint graph.
 class AssemblyHierarchyConstraintEquationBuilder {
 public:
+  AssemblyHierarchyConstraintEquationBuilder() = default;
+  explicit AssemblyHierarchyConstraintEquationBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyHierarchyConstraintEquationDescriptor>
   build(const Project& project, const AssemblyHierarchyConstraintQuery& query) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry

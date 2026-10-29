@@ -3,6 +3,7 @@
 #include "assembly_constraint_numeric_system.hpp"
 #include "assembly_cross_hierarchy_numeric_system.hpp"
 #include "assembly_matrix_rank.hpp"
+#include "assembly_semantic_target_freshness.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -128,13 +129,17 @@ AssemblySolveDiagnosticsAnalyzer::analyze(const Project& project,
     return Result<AssemblySolveDiagnostics>::failure(options_validation.error());
   }
 
-  const AssemblyRigidBodySolver solver;
+  const AssemblyRigidBodySolver solver(import_context_);
   auto solved = solver.solve(project, connected_group, options.solver_options);
   if (solved.has_error()) {
     return Result<AssemblySolveDiagnostics>::failure(solved.error());
   }
 
   const AssemblySolveResult& solve_result = solved.value();
+  auto fresh = detail::revalidate_semantic_target_part_sources(
+      project, solve_result.semantic_target_part_snapshots, import_context_);
+  if (!fresh)
+    return Result<AssemblySolveDiagnostics>::failure(fresh.error());
   std::vector<ComponentInstanceId> variable_components = variable_components_from(solve_result);
 
   auto graph = AssemblyConstraintGraph::build(project.assembly());
@@ -180,15 +185,16 @@ AssemblySolveDiagnosticsAnalyzer::analyze(const Project& project,
   }
 
   Project evaluation_project = project;
-  const AssemblySolveResultApplier applier;
+  const AssemblySolveResultApplier applier(import_context_);
   auto applied = applier.apply(evaluation_project, solve_result);
   if (applied.has_error()) {
     return Result<AssemblySolveDiagnostics>::failure(applied.error());
   }
 
   detail::NumericVector variables = detail::read_variables(evaluation_project, variable_components);
-  auto residuals = detail::evaluate_residuals(evaluation_project, constraint_ids.value(),
-                                              options.solver_options.length_residual_scale_mm);
+  auto residuals =
+      detail::evaluate_residuals(evaluation_project, constraint_ids.value(),
+                                 options.solver_options.length_residual_scale_mm, import_context_);
   if (residuals.has_error()) {
     return Result<AssemblySolveDiagnostics>::failure(residuals.error());
   }
@@ -196,7 +202,7 @@ AssemblySolveDiagnosticsAnalyzer::analyze(const Project& project,
   const detail::AssemblyNumericSystemOptions numeric_options{
       options.solver_options.length_residual_scale_mm,
       options.solver_options.finite_difference_translation_step_mm,
-      options.solver_options.finite_difference_rotation_step_deg};
+      options.solver_options.finite_difference_rotation_step_deg, import_context_};
   auto jacobian = detail::build_central_difference_jacobian(evaluation_project, variable_components,
                                                             constraint_ids.value(), variables,
                                                             residuals.value(), numeric_options);
@@ -215,6 +221,10 @@ AssemblySolveDiagnosticsAnalyzer::analyze(const Project& project,
   const std::size_t remaining_dof = variables.size() - constrained_dof;
   const std::size_t residual_row_redundancy = residuals.value().size() - constrained_dof;
 
+  fresh = detail::revalidate_semantic_target_part_sources(
+      project, solve_result.semantic_target_part_snapshots, import_context_);
+  if (!fresh)
+    return Result<AssemblySolveDiagnostics>::failure(fresh.error());
   return Result<AssemblySolveDiagnostics>::success(AssemblySolveDiagnostics{
       solve_result.state, classify_dof(variables.size(), remaining_dof),
       AssemblyConstraintConsistencyClassification::LocallyConsistent,
@@ -237,13 +247,17 @@ AssemblyCrossHierarchySolveDiagnosticsAnalyzer::analyze(
     return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(options_validation.error());
   }
 
-  const AssemblyCrossHierarchyConstraintSolver solver;
+  const AssemblyCrossHierarchyConstraintSolver solver(import_context_);
   auto solved = solver.solve(project, solve_group, options.solver_options);
   if (solved.has_error()) {
     return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(solved.error());
   }
 
   const AssemblyCrossHierarchySolveResult& solve_result = solved.value();
+  auto fresh = detail::revalidate_semantic_target_part_sources(
+      project, solve_result.semantic_target_part_snapshots, import_context_);
+  if (!fresh)
+    return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(fresh.error());
   std::vector<ComponentTransformAuthority> variable_authorities =
       variable_authorities_from(solve_result);
 
@@ -272,7 +286,7 @@ AssemblyCrossHierarchySolveDiagnosticsAnalyzer::analyze(
   }
 
   Project evaluation_project = project;
-  const AssemblyCrossHierarchySolveResultApplier applier;
+  const AssemblyCrossHierarchySolveResultApplier applier(import_context_);
   auto applied = applier.apply(evaluation_project, solve_result);
   if (applied.has_error()) {
     return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(applied.error());
@@ -284,7 +298,8 @@ AssemblyCrossHierarchySolveDiagnosticsAnalyzer::analyze(
     return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(variables.error());
   }
   auto residuals = detail::evaluate_cross_hierarchy_group_residuals(
-      evaluation_project, solve_group, options.solver_options.length_residual_scale_mm);
+      evaluation_project, solve_group, options.solver_options.length_residual_scale_mm,
+      import_context_);
   if (residuals.has_error()) {
     return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(residuals.error());
   }
@@ -292,19 +307,19 @@ AssemblyCrossHierarchySolveDiagnosticsAnalyzer::analyze(
   const detail::AssemblyNumericSystemOptions numeric_options{
       options.solver_options.length_residual_scale_mm,
       options.solver_options.finite_difference_translation_step_mm,
-      options.solver_options.finite_difference_rotation_step_deg};
+      options.solver_options.finite_difference_rotation_step_deg, import_context_};
   const detail::AssemblyNumericResidualEvaluator evaluator =
       [&evaluation_project, &solve_group, &variable_authorities,
-       length_scale = options.solver_options.length_residual_scale_mm](
-          const detail::NumericVector& candidate_values) {
+       length_scale = options.solver_options.length_residual_scale_mm,
+       import_context = import_context_](const detail::NumericVector& candidate_values) {
         Project candidate_project = evaluation_project;
         auto candidate_applied = detail::apply_cross_hierarchy_authority_variables(
             candidate_project, variable_authorities, candidate_values);
         if (candidate_applied.has_error()) {
           return Result<detail::NumericVector>::failure(candidate_applied.error());
         }
-        return detail::evaluate_cross_hierarchy_group_residuals(
-            candidate_project, solve_group, length_scale);
+        return detail::evaluate_cross_hierarchy_group_residuals(candidate_project, solve_group,
+                                                                length_scale, import_context);
       };
   auto jacobian = detail::build_central_difference_jacobian(
       variables.value(), residuals.value(), numeric_options, evaluator);
@@ -323,6 +338,10 @@ AssemblyCrossHierarchySolveDiagnosticsAnalyzer::analyze(
   const std::size_t remaining_dof = variables.value().size() - constrained_dof;
   const std::size_t residual_row_redundancy = residuals.value().size() - constrained_dof;
 
+  fresh = detail::revalidate_semantic_target_part_sources(
+      project, solve_result.semantic_target_part_snapshots, import_context_);
+  if (!fresh)
+    return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(fresh.error());
   return Result<AssemblyCrossHierarchySolveDiagnostics>::success(
       AssemblyCrossHierarchySolveDiagnostics{
           solve_result.state, classify_dof(variables.value().size(), remaining_dof),

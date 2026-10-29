@@ -34,6 +34,8 @@ public:
 
   // Historical final-shape access is compatible only for a zero-Body document or exactly one
   // explicit Solid Body. Multi-body and Surface-only documents fail instead of selecting a shape.
+  // Reference Parts return their explicitly selected full definition, including many bodies or
+  // surfaces, from the separately owned reference cache result.
   [[nodiscard]] Result<GeometryShape>
   resolve_compatible_final_shape(const PartDocument& document, const ShapeCache& shape_cache) const;
 

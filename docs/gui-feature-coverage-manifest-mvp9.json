@@ -16,7 +16,7 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/gui-shell-reset-sequence-mvp9r.md",
-        "scope": "Document create/open/save, dirty-work protection, undo/redo and presentation reset. STEP source geometry inspection reads digest-verified snapshots and displays product/body/unit diagnostics with temporary posed occurrence previews, without changing document intent. Imported topology catalogs use explicit transactional Apply, persistent typed identities, recovery diagnostics, capability filters and disposable semantic picking. Cancellation, lifecycle changes and changed assets invalidate derived inspection and topology selection.",
+        "scope": "Document create/open/save, dirty-work protection, undo/redo and presentation reset. STEP source geometry inspection reads digest-verified snapshots and displays product/body/unit diagnostics with temporary posed occurrence previews, without changing document intent. Imported topology catalogs use explicit transactional Apply, persistent typed identities, recovery diagnostics, capability filters and disposable semantic picking. Cancellation, lifecycle changes and changed assets invalidate derived inspection and topology selection. Reference Part commands prepare and atomically insert/repeat shared immutable definitions, refresh every explicit same-asset binding, and create a separate Editable copy. Stale external geometry clears derived presentation during open/history while preserving persisted intent and Redo.",
         "gaps": [],
         "proofs": [
           {
@@ -42,6 +42,10 @@
           {
             "filter": "[native-step-topology]",
             "source": "tests/gui/gui_shell_step_import_tests.cpp"
+          },
+          {
+            "filter": "[native-step-reference-parts]",
+            "source": "tests/gui/gui_shell_step_import_tests.cpp"
           }
         ],
         "actions": [
@@ -59,7 +63,11 @@
           "blcad.step_import.geometry_products",
           "blcad.step_import.topology_prepare",
           "blcad.step_import.topology_entries",
-          "blcad.step_import.topology_filter"
+          "blcad.step_import.topology_filter",
+          "blcad.step_import.reference_operation",
+          "blcad.step_import.reference_part",
+          "blcad.step_import.reference_assembly",
+          "blcad.step_import.reference_prepare"
         ]
       }
     },
@@ -871,7 +879,7 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/gui-interactive-assembly-mvp9.md",
-        "scope": "Project creation, definition loading and root component/rigid-subassembly placement, including occurrence state editing and exact occurrence context starts. Read-only hierarchy validation reports rooted paths and visible active leaves. Repeated nested definitions retain distinct occurrence paths and rigid boundaries while sharing internal component transform authority. Definition import retains the existing rejection of Projects carrying cross-hierarchy intent that would require remapping.",
+        "scope": "Project creation, definition loading and root component/rigid-subassembly placement, including occurrence state editing and exact occurrence context starts. Read-only hierarchy validation reports rooted paths and visible active leaves. Repeated nested definitions retain distinct occurrence paths and rigid boundaries while sharing internal component transform authority. Definition import retains the existing rejection of Projects carrying cross-hierarchy intent that would require remapping. Immutable STEP Reference Parts use the same occurrence and operation contracts with an explicit verified source context; imported analytic inputs retain their capability matrix and the exact fixed BLCAD origin planes provide explicit Frame targets.",
         "gaps": [],
         "proofs": [
           {
@@ -901,6 +909,10 @@
           {
             "filter": "[shell-combined-assembly-hierarchy]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[native-step-reference-parts]",
+            "source": "tests/gui/gui_shell_step_import_tests.cpp"
           }
         ],
         "actions": [
@@ -927,7 +939,7 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/gui-interactive-assembly-mvp9.md",
-        "scope": "Compatibility-filtered root relationship/joint authoring and typed bounded coordinate slots; root semantic contexts seed the exact first endpoint. Project-level cross-hierarchy relationships and all five joint families can be created and edited through occurrence-qualified endpoints, names, active state and typed coordinates, preserving record identity. Cross authoring validates a disposable Project without moving occurrences; explicit solve or motion applies poses. Spherical joints remain passive.",
+        "scope": "Compatibility-filtered root relationship/joint authoring and typed bounded coordinate slots; root semantic contexts seed the exact first endpoint. Project-level cross-hierarchy relationships and all five joint families can be created and edited through occurrence-qualified endpoints, names, active state and typed coordinates, preserving record identity. Cross authoring validates a disposable Project without moving occurrences; explicit solve or motion applies poses. Spherical joints remain passive. Immutable STEP Reference Parts use the same occurrence and operation contracts with an explicit verified source context; imported analytic inputs retain their capability matrix and the exact fixed BLCAD origin planes provide explicit Frame targets.",
         "gaps": [],
         "proofs": [
           {
@@ -957,6 +969,10 @@
           {
             "filter": "[shell-combined-assembly-hierarchy]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[native-step-reference-parts]",
+            "source": "tests/gui/gui_shell_step_import_tests.cpp"
           }
         ],
         "actions": [
@@ -985,7 +1001,7 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/gui-interactive-assembly-mvp9.md",
-        "scope": "Root component-group solve and selected joint-coordinate motion with candidate poses and exact component context starts. Complete mixed local/cross geometric groups containing Project-level cross relationships expose converged preview and atomic authority-qualified application. Cross Revolute, Prismatic, Cylindrical and Planar motion drives one typed role while retaining other authored coordinates. Repeated child occurrences share internal direct transforms; rigid hierarchy boundaries remain unchanged. Freshness, limits and nonconvergence reject publication.",
+        "scope": "Root component-group solve and selected joint-coordinate motion with candidate poses and exact component context starts. Complete mixed local/cross geometric groups containing Project-level cross relationships expose converged preview and atomic authority-qualified application. Cross Revolute, Prismatic, Cylindrical and Planar motion drives one typed role while retaining other authored coordinates. Repeated child occurrences share internal direct transforms; rigid hierarchy boundaries remain unchanged. Freshness, limits and nonconvergence reject publication. Immutable STEP Reference Parts use the same occurrence and operation contracts with an explicit verified source context; imported analytic inputs retain their capability matrix and the exact fixed BLCAD origin planes provide explicit Frame targets.",
         "gaps": [],
         "proofs": [
           {
@@ -1015,6 +1031,10 @@
           {
             "filter": "[shell-combined-assembly-hierarchy]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[native-step-reference-parts]",
+            "source": "tests/gui/gui_shell_step_import_tests.cpp"
           }
         ],
         "actions": [

@@ -144,9 +144,12 @@ private:
   using Document = std::variant<std::monostate, PartDocument, Project>;
 
   [[nodiscard]] Result<std::string> serialize_current() const;
-  [[nodiscard]] Result<std::size_t> recompute_part(PartDocument& document,
-                                                   geometry::ShapeCache& cache) const;
-  [[nodiscard]] Result<std::vector<ProjectPartCache>> recompute_project(Project& project) const;
+  [[nodiscard]] Result<std::size_t>
+  recompute_part(PartDocument& document, geometry::ShapeCache& cache,
+                 const std::filesystem::path& asset_root = {}) const;
+  [[nodiscard]] Result<std::vector<ProjectPartCache>>
+  recompute_project(Project& project, const std::filesystem::path& asset_root = {},
+                    std::optional<Error>* import_failure = nullptr) const;
   [[nodiscard]] Result<std::size_t> restore_history(std::size_t index);
   [[nodiscard]] Result<geometry::ShapeCache>
   recompute_part_candidate(PartDocument& document, const std::string& json) const;

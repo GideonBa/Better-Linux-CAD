@@ -8,6 +8,8 @@
 
 namespace blcad::geometry {
 
+class StepImportTopologyContext;
+
 struct SphericalJointResidualDescriptor {
   Vector3 center_offset_mm;
 
@@ -34,6 +36,9 @@ struct AssemblySphericalJointEquationDescriptor {
 
 class AssemblySphericalJointEquationBuilder {
 public:
+  AssemblySphericalJointEquationBuilder() = default;
+  explicit AssemblySphericalJointEquationBuilder(StepImportTopologyContext* import_context)
+      : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblySphericalJointEquationDescriptor>
   build(const Project& project, const AssemblyJoint& joint) const;
 
@@ -41,6 +46,9 @@ public:
   build(AssemblyJointId joint, AssemblyJointType type,
         const AssemblyResolvedGeometricTarget& target_a,
         const AssemblyResolvedGeometricTarget& target_b) const;
+
+private:
+  StepImportTopologyContext* import_context_{};
 };
 
 } // namespace blcad::geometry
