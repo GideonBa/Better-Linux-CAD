@@ -1,34 +1,73 @@
 # User Interface Architecture
 
-> **GUI Shell Reset MVP-9R (Blocks 132–136):** the Qt shell layer described in parts of this
-> document (MainWindow, workspace tab bars, binder installation) was **deleted and replaced** in
-> Block 133 by `ShellWindow` + `ShellRibbon` (`src/gui/shell/`, contract:
-> `docs/gui-shell-reset-sequence-mvp9r.md`). The headless authorities documented here (session,
-> transactions, browser model, selection semantics, viewport contracts, sketch workspace) remain
-> canonical and are consumed unchanged by the new shell. Shell-widget specifics below are
-> historical until this document is rewritten at the end of MVP-9R (Block 136).
+The current desktop is `ShellWindow` + `ShellRibbon` (`src/gui/shell/`). Core/Geometry,
+transactions, browser semantics, selection and the OCCT viewport remain the authorities behind it.
+Numbered acceptance through STEP Import Block 143 and the current GUI revision are tracked only in
+`mvp-plan.md`. Older block-specific sections below describe the underlying contracts; historical
+MainWindow/widget names are not the current layout contract.
 
-Status: MVP-7 and Interactive Sketcher MVP-8 are accepted through Block 121. Blocks 95–105 provide
-the optional Qt shell, document transactions, OCCT viewport, deterministic browser/property surfaces,
-and semantic selection synchronization. Blocks 106–120 establish the contextual Sketch workspace,
-device-independent interaction, stable shared planar topology, deterministic solving, direct creation
-and modification, profile/Finish-Sketch workflows, and Interactive Sketch3D. Block 121 completes
-integrated coverage, equivalence, atomicity, and measured performance acceptance. Block 122 implements
-the selection-first Part/Surface/Assembly workspace. Block 123 implements reusable candidate-only
-viewport manipulators and numeric-HUD coupling. Block 124 implements interactive Extrude, path
-Extrude, and Revolve authoring; Block 125 implements interactive Fillet, Chamfer, Shell, and Draft
-authoring; Block 126 implements interactive Pattern, Mirror, Body Boolean, and Body Transform
-authoring; Block 127 implements interactive PathCurve, Sweep, and Loft authoring; Block 128 implements
-interactive Surface authoring and surface-to-solid conversion; Block 129 adds the feature edit
-lifecycle and Core feature-update commands; and Block 130 implements direct Assembly placement,
-compatibility-filtered relationships, joint-frame preview, and coordinate motion. Block 131 adds
-transient Measure and completes integrated MVP-9 acceptance. GUI Shell Reset MVP-9R is implemented
-through Block 135; Block 136 completes the replacement surface. STEP Import MVP-10 begins with
-Block 137.
+## Current desktop workflow — 2026-11-04
+
+The layout follows Inventor's separation of a persistent command area, model browser, central
+canvas and contextual property/task panels. Reference: Autodesk's [Inventor UI guidelines](https://forums.autodesk.com/autodesk/attachments/autodesk/inventor-programming-ilogic-forum-en/110509/1/Inventor-UI_Guidelines.pdf),
+[model browser](https://help.autodesk.com/cloudhelp/2026/ENU/Inventor-Help/files/GUID-EDF6B951-C309-44A8-868C-B72D99F6D5A7.htm)
+and [property panels](https://help.autodesk.com/cloudhelp/2022/ENU/Inventor-Help/files/GUID-3E5505B9-9F60-43A0-BF32-97D183B91A70.htm).
+This is a BLCAD implementation using its existing fonts, icon catalog and dark-violet colors; no
+Autodesk assets or unsupported commands are introduced.
+
+The ribbon sits above **all** docks at full window width. The browser and selected-object properties
+occupy the left, geometry the center, and the active task the right. Inputs scroll within tasks while
+Apply/Cancel remain with their existing owners. Empty Diagnostics is initially hidden; reported
+errors reveal it. View > User Interface toggles the supporting panels and Reset Layout restores
+their positions without changing the document, viewport camera, selection or active task.
+The active ribbon tab, chooser query and dock layout are transient UI state; they add no Part/Project
+file-format fields or undo records.
+
+| Surface | Commands and workflow |
+| --- | --- |
+| File | New Part, New Assembly, Open, Open for Repair, Save, Save As |
+| Quick Access | New, Open, Save, Undo, Redo and Repeat, accessible from every ribbon context |
+| 3D Model | Plane/face → Create 2D Sketch; profile → Extrude/Revolve; finishing, patterns, Body operations, Sweep/Loft, construction, Sketch3D and Hole |
+| Sketch | Finish/Cancel where supported; draw, constrain, dimension, modify, transform, project, grid and diagnostics; enabled only during Sketch editing |
+| Surface | Boundary, Fill, Trim, Extend, Stitch and Shell to Solid |
+| Assembly | Assembly creation, placement, relationships, joints/motion and STEP sources |
+| Inspect | Measure, Assembly analysis/exports and Sketch diagnostics |
+| Manage | Part STEP export, Parameters, Reference Repair and STEP sources |
+| View | Navigation, camera bookmarks, projection/display modes and recoverable supporting panels |
+
+`Find Command` / **Ctrl+K** opens a keyboard-searchable command chooser. All actions supplied through
+ribbon buttons, menu variants, File and Quick Access are explicitly registered; repeated presentations
+of the same QAction appear once. Search is case-insensitive and matches every typed word against
+command name and location. Results show location and shortcut. Unavailable commands remain visible
+with a muted presentation and an explanatory hint; Run Command is disabled. Owner enablement changes
+refresh the list while open. Enter or result activation runs only a currently visible, enabled action
+in an enabled context; Esc cancels without a command. The chooser closes before switching to the
+command's ribbon page and invoking its existing handler. No hidden selections, parameters, automatic
+Apply or new transaction routes are created.
+
+![Command search using the existing monochrome icon catalog](images/inventor-workflow-search.png)
+
+Typical Part flow remains: create/open → pick a plane or planar face → Create 2D Sketch → draw and
+constrain → Finish Sketch → choose the profile operation → review preview and Apply/Cancel. Undo,
+Redo and Save are reachable throughout that flow. Assembly and imported Reference/Editable workflows
+retain their existing capability restrictions. A new arrangement does not broaden geometric support;
+unsupported/ambiguous selections stay unavailable or fail with the existing diagnostic.
+
+The layout tests (`[workflow-layout]`) and existing combined/native workflow proofs verify this
+surface. Exact results and limitations live in `development-setup.md`; subjective discoverability and
+future CAD capabilities are not inferred from automated coverage.
 
 The UI is deliberately not built like FreeCAD. The goal is a modern, consistent, reduced interface
 with clear separation between model, parameters, features, Sketch topology, solver results, and
 Assembly. The UI operates Core/Geometry authorities; it must not own CAD or solver mathematics.
+
+Native Qt/OCCT feature preview with the full-width command surface (1280×800):
+
+![Inventor-inspired workflow layout with the original BLCAD visual identity](images/inventor-workflow-feature.png)
+
+The same preview at 1024×640 keeps Apply and Cancel reachable:
+
+![Compact feature preview with scrollable inputs](images/inventor-workflow-compact.png)
 
 ## Main areas
 

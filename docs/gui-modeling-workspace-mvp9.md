@@ -328,11 +328,11 @@ state. Active Block-123 handles are likewise transient and can be cleared withou
 
 ### Replacement-shell repeat (Block 136)
 
-`ShellWindow` explicitly owns `ShellRepeatTools`. The ribbon action
-`blcad.action.repeat_last_command` shows **Erneut: …** and has the window shortcut Ctrl+R.
-The explicit ribbon button `blcad.repeat.button` tracks the changing label in its minimum width,
-so the command name remains readable in a narrow scrollable ribbon. Redo is separately labelled
-**Wiederherstellen** and retains its standard shortcut/history semantics.
+`ShellWindow` explicitly owns `ShellRepeatTools`. The action
+`blcad.action.repeat_last_command` has the label **Repeat: …** and window shortcut Ctrl+R.
+Since Block 144 its explicit button `blcad.repeat.button` lives in persistent Quick Access. Its
+existing Repeat icon, dynamic tooltip and accessibility label identify the last accepted command;
+Ctrl+K also lists its current label. **Redo** retains its separate standard shortcut/history semantics.
 The record is transient and scoped to the current document. Save and Undo/Redo retain it; successful
 New Part, New Project and Open clear it. Failed Open and cancelled replacement retain it.
 

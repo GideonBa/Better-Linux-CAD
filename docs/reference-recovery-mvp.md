@@ -189,7 +189,7 @@ remain rejected. See `docs/mvp-plan.md` for the remaining scope.
 
 ## Repair-time loading and history — 2026-10-23
 
-**3D-Modell → Dokument → Zur Reparatur öffnen** explicitly opens a Part for reference repair. The
+**File → Open for Repair** explicitly opens a Part for reference repair (Block-144 placement). The
 session API is `open_file(path, discard_dirty, GuiDocumentOpenMode::ReferenceRepair)`. A Part may be
 retained when initial complete Geometry recompute fails. Normal Open remains strict. Project files,
 malformed intent and invalid constraint/dimension sidecars are rejected before session replacement.

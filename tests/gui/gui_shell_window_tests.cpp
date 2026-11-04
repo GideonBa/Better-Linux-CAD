@@ -121,11 +121,14 @@ TEST_CASE("Shell releases native viewer resources before destroying its top-leve
 TEST_CASE("Block 133 shell window builds ribbon browser and diagnostics",
           "[gui][shell][gui][ribbon]") {
   ShellWindow window;
-  CHECK(window.ribbon().tab_count() == 4);
+  CHECK(window.ribbon().tab_count() == 7);
   CHECK(window.ribbon().tab_title(3) == QStringLiteral("Assembly"));
   CHECK(window.ribbon().tab_title(0) == QStringLiteral("3D Model"));
   CHECK(window.ribbon().tab_title(1) == QStringLiteral("Sketch"));
-  CHECK(window.ribbon().tab_title(2) == QStringLiteral("View"));
+  CHECK(window.ribbon().tab_title(2) == QStringLiteral("Surface"));
+  CHECK(window.ribbon().tab_title(4) == QStringLiteral("Inspect"));
+  CHECK(window.ribbon().tab_title(5) == QStringLiteral("Manage"));
+  CHECK(window.ribbon().tab_title(6) == QStringLiteral("View"));
   CHECK(window.ribbon().current_tab() == 0);
   CHECK_FALSE(window.ribbon().tab_enabled(1));
   CHECK_FALSE(window.session().has_document());

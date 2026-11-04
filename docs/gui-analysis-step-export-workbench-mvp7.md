@@ -32,8 +32,8 @@ not mutate the source document.
 
 ## Replacement shell — Block 136 (2026-10-22)
 
-`ShellWindow` explicitly owns `ShellInspectTools`. The 3D-Modell ribbon provides Part STEP;
-the Baugruppe ribbon provides flattened STEP, structured STEP and Baugruppe analysieren.
+`ShellWindow` explicitly owns `ShellInspectTools`. Since Block 144, **Manage** provides Part to STEP;
+**Inspect** provides Flat STEP, Structured STEP and Analyze Assembly.
 Analysis and export require fresh geometry, the matching document kind, no active Sketch and no
 competing task. Empty Part export, invalid paths and writer failures report diagnostics.
 

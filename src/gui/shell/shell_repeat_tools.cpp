@@ -6,17 +6,16 @@
 #include <QKeySequence>
 #include <QToolButton>
 
-#include <algorithm>
 
 namespace blcad::gui {
-ShellRepeatTools::ShellRepeatTools(ShellWindow& window, ShellRibbon& ribbon, QWidget* edit_group)
+ShellRepeatTools::ShellRepeatTools(ShellWindow& window, ShellRibbon& ribbon)
     : QObject(&window), window_(window) {
   repeat_ = new QAction(this);
   repeat_->setObjectName(QStringLiteral("blcad.action.repeat_last_command"));
   repeat_->setShortcut(QKeySequence(QStringLiteral("Ctrl+R")));
   repeat_->setShortcutContext(Qt::WindowShortcut);
   window.addAction(repeat_);
-  button_ = ribbon.add_button(edit_group, repeat_);
+  button_ = ribbon.add_quick_action(repeat_);
   button_->setObjectName(QStringLiteral("blcad.repeat.button"));
   connect(repeat_, &QAction::triggered, this, [this] {
     if (!available())
@@ -54,9 +53,9 @@ void ShellRepeatTools::refresh() {
       command_ ? QStringLiteral("Restart %1 with current inputs (Ctrl+R)").arg(command_->text())
                : QStringLiteral("Apply a modeling command first"));
   repeat_->setEnabled(available());
-  // Ribbon rows can shrink to button minimum widths. Track the changing
-  // action label so the command name remains readable on both backends.
-  button_->setMinimumWidth(std::max(56, button_->sizeHint().width()));
+  // Keep the shared quick-access control and accessibility label current.
+  button_->setMinimumWidth(button_->sizeHint().width());
+  button_->setAccessibleName(repeat_->text());
 }
 
 void ShellRepeatTools::reset() {

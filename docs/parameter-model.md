@@ -73,7 +73,7 @@ Cyclic parameter dependencies must be detected and rejected (for example part A 
 
 ## Replacement-shell Part parameter manager — Block 136
 
-The Model ribbon's **Parameter verwalten** command (`blcad.action.parameters`) opens the owned
+The Manage ribbon's **Manage Parameters** command (`blcad.action.parameters`) opens the owned
 `ShellParameterTools` task (`blcad.shell.parameters_task`). It requires a fresh Part, no repair
 session, no active command and no planar Sketch editor. Project/Assembly parameter management is
 outside this bounded command. Existing parameter property and Sketch-dimension editors remain

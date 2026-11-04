@@ -8,6 +8,15 @@ unchanged. The startup splash is restored verbatim from the parent of redesign c
 The 2026-10-28 follow-up adds a curated Pixelarticons subset to the existing shell, retaining labels
 and text-only fallbacks for CAD functions without a representative symbol.
 
+## Workflow layout revision — 2026-11-04
+
+The Inventor-inspired layout revision changes command placement, not this design system. The ribbon
+now spans the entire window above its docks, with persistent File/Quick Access, seven workflow tabs
+and Ctrl+K command discovery. Diagnostics starts hidden and View restores supporting panels. Existing
+Barlow/IBM Plex Mono fonts, Pixelarticons assets, color tokens and startup artwork are unchanged.
+The current mapping and interaction contract are in `user-interface.md`; numbered progress is in
+`mvp-plan.md`. The earlier screenshots below remain historical layout examples.
+
 ## Implementation plan and acceptance
 
 | Phase | Deliverable | Acceptance | Status |

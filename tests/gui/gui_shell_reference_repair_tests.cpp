@@ -23,6 +23,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScrollArea>
@@ -203,10 +204,22 @@ void ribbon_command(ShellWindow& window, QAction& command, int tab) {
       click(*button);
       return;
     }
+  for (auto* button : window.ribbon().findChildren<QToolButton*>()) {
+    auto* menu = button->menu();
+    if (!button->isVisible() || !menu || !menu->actions().contains(&command))
+      continue;
+    QTimer::singleShot(0, menu, [menu, &command] {
+      menu->setActiveAction(&command);
+      QKeyEvent accept(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+      QApplication::sendEvent(menu, &accept);
+    });
+    click(*button);
+    return;
+  }
   FAIL("Ribbon button missing: " + command.objectName().toStdString());
 }
 void ribbon(ShellWindow& window) {
-  ribbon_command(window, action(window), 0);
+  ribbon_command(window, action(window), 5);
 }
 } // namespace
 
@@ -828,7 +841,7 @@ TEST_CASE(
   REQUIRE(window.viewport().feature_preview_active());
   auto* fit = window.findChild<QAction*>("blcad.action.fit");
   REQUIRE(fit);
-  ribbon_command(window, *fit, 2);
+  ribbon_command(window, *fit, 6);
   CHECK(window.viewport().feature_preview_active());
   CHECK(pending.count() == 5);
   CHECK(snapshot(window) == before);
@@ -998,7 +1011,7 @@ TEST_CASE("Native input repairs six missing face point and line sources in one s
   REQUIRE(window.viewport().feature_preview_active());
   auto* fit = window.findChild<QAction*>("blcad.action.fit");
   REQUIRE(fit);
-  ribbon_command(window, *fit, 2);
+  ribbon_command(window, *fit, 6);
   if (QApplication::platformName() == "xcb") {
     const auto captures = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
     if (!captures.isEmpty()) {
@@ -1156,7 +1169,7 @@ TEST_CASE(
   REQUIRE(window.viewport().feature_preview_active());
   auto* fit = window.findChild<QAction*>("blcad.action.fit");
   REQUIRE(fit);
-  ribbon_command(window, *fit, 2);
+  ribbon_command(window, *fit, 6);
   CHECK(snapshot(window) == before);
   CHECK(window.session().part_shape_cache() == nullptr);
   if (QApplication::platformName() == "xcb") {

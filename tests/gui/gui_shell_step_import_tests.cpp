@@ -227,15 +227,16 @@ public:
     INFO("Ribbon command: " << id.toStdString());
     auto& selected = action(id);
     REQUIRE(selected.isEnabled());
-    const int tab =
-        id.startsWith("sketch.") || id == "finish_sketch"                                       ? 1
-        : id.startsWith("view_") || id == "fit"                                                 ? 2
-        : id.startsWith("assembly_") || id.startsWith("export_assembly") || id == "new_project" ? 3
-                                                                                                : 0;
+    const int tab = id.startsWith("sketch.") || id == "finish_sketch"                        ? 1
+                    : id.startsWith("view_") || id == "fit"                                  ? 6
+                    : id.startsWith("export_assembly") || id == "assembly_analysis"          ? 4
+                    : id == "step_sources" || id == "parameters" || id == "export_part_step" ? 5
+                    : id.startsWith("assembly_") || id == "new_project"                      ? 3
+                                                                                             : 0;
     window.ribbon().set_current_tab(tab);
     flush();
     for (auto* button : window.ribbon().findChildren<QToolButton*>()) {
-      // STEP sources intentionally shares one action across the model and
+      // STEP sources intentionally shares one action across the Manage and
       // Assembly pages. QObject child order changes when a page is raised.
       if (!button->isVisible())
         continue;

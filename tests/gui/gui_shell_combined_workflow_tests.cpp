@@ -418,17 +418,29 @@ public:
     REQUIRE(selected.isEnabled());
     if (tab < 0)
       tab = id.startsWith("sketch.") || id == "finish_sketch" ? 1
-            : id.startsWith("assembly_") || id.startsWith("export_assembly_") || id == "new_project"
-                ? 3
-                : 0;
+            : id.startsWith("surface_")                       ? 2
+            : id.startsWith("measure_") || id == "assembly_analysis" ||
+                    id.startsWith("export_assembly_")
+                ? 4
+            : id == "parameters" || id == "export_part_step" || id == "step_sources" ||
+                    id == "reference_repair"
+                ? 5
+            : id.startsWith("assembly_") || id == "new_project" ? 3
+                                                                : 0;
     window.ribbon().set_current_tab(tab);
     flush();
+    // File/history commands have a persistent quick-access button as well as
+    // a File menu entry. Exercise the direct visible control first; a menu
+    // watchdog must not include the synchronous load of a large Part.
     for (auto* button : window.ribbon().findChildren<QToolButton*>()) {
-      if (button->defaultAction() == &selected) {
+      if (button->isVisible() && button->defaultAction() == &selected) {
         click(*button);
         return;
       }
-      if (auto* menu = button->menu(); menu && menu->actions().contains(&selected)) {
+    }
+    for (auto* button : window.ribbon().findChildren<QToolButton*>()) {
+      if (auto* menu = button->menu();
+          button->isVisible() && menu && menu->actions().contains(&selected)) {
         reveal(*button);
         // InstantPopup enters a nested Qt loop on mouse press. Activate its
         // menu row with Enter; a watchdog prevents a broken menu from hanging CI.
@@ -687,7 +699,7 @@ public:
     }
   }
   void standard_view(const QString& label) {
-    window.ribbon().set_current_tab(2);
+    window.ribbon().set_current_tab(6);
     flush();
     for (auto* button : window.ribbon().findChildren<QToolButton*>())
       if (button->defaultAction() && button->defaultAction()->text() == label) {
@@ -850,7 +862,7 @@ TEST_CASE("Hermes desktop authors dimensions previews and edits a solid through 
   ui.roundtrip(directory.filePath("instrument-bracket.blcad"));
   CHECK(ui.summary(body).volume_mm3 == Approx(7200).margin(1e-5));
   CHECK(checked(ui.window.session().sketch_dimension_catalog(sketch)).dimensions().size() == 1U);
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   select_body();
   ui.capture("hermes-model");
   ui.window.resize(QSize(1600, 1000).boundedTo(available));
@@ -1083,7 +1095,7 @@ TEST_CASE("Combined UI machining workflow edits upstream geometry then patterns 
     CHECK(ui.snapshot() == checkpoints[i]);
   }
   ui.roundtrip(directory.filePath("machined.blcad.json"));
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   ui.capture("combined-machining");
   const auto saved = ui.bytes(directory.filePath("machined.blcad.json"));
   ui.file("export_part_step", directory.filePath("machined.step"));
@@ -1325,7 +1337,7 @@ TEST_CASE("Combined UI path extrusion machines a prior cut and follows corrected
   CHECK(ui.window.feature_tools().manipulators().handles().empty());
   CHECK(ui.window.viewport().feature_preview_replaces("body/" + body.value()));
   CHECK(ui.snapshot() == states.back());
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   ui.capture("path-extrude-cut-preview");
   const auto routed_cut = ui.window.feature_tools().coordinator().extrude().feature_id();
   ui.button("blcad.feature.apply");
@@ -1438,7 +1450,7 @@ TEST_CASE(
   ui.text(ui.widget<QLineEdit>("blcad.extrude.thickness"), "3 mm");
   REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
   CHECK(ui.window.feature_tools().manipulators().handles().size() == 1);
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   ui.capture("thin-through-all-cut-preview");
   ui.button("blcad.feature.apply");
   CHECK(ui.summary(base).volume_mm3 == Approx(45120).margin(1e-5));
@@ -1509,21 +1521,21 @@ TEST_CASE("Combined UI view navigation preserves Sketch and machining state thro
       ui.window.session().part_document()->find_feature(base_feature)->length_parameter();
   const auto pocket = ui.rectangle("datum.xy", {-10, -5}, {10, 5});
   const auto before = ui.snapshot();
-  ui.command("view_top", 2);
-  ui.command("perspective", 2); // Capture an orthographic model view.
+  ui.command("view_top", 6);
+  ui.command("perspective", 6); // Capture an orthographic model view.
   REQUIRE(ui.window.viewport().projection() == GuiViewportProjection::Orthographic);
   const auto home = ui.window.viewport().camera_bookmark();
-  ui.command("capture_home", 2);
+  ui.command("capture_home", 6);
   auto& marks = ui.widget<QComboBox>("blcad.navigation.bookmarks");
   REQUIRE(marks.lineEdit());
   ui.text(*marks.lineEdit(), "Top");
-  ui.command("bookmark_save", 2);
-  ui.command("view_front", 2);
+  ui.command("bookmark_save", 6);
+  ui.command("view_front", 6);
   ui.text(*marks.lineEdit(), "Front");
-  ui.command("bookmark_save", 2);
+  ui.command("bookmark_save", 6);
   CHECK(marks.count() == 2);
-  ui.command("view_back", 2); // Actual ViewCube popup input.
-  ui.command("view_home", 2);
+  ui.command("view_back", 6); // Actual ViewCube popup input.
+  ui.command("view_home", 6);
   const auto home_restored = ui.window.viewport().camera_bookmark();
   CHECK(home_restored.eye.x == Approx(home.eye.x).margin(1e-7));
   CHECK(home_restored.eye.y == Approx(home.eye.y).margin(1e-7));
@@ -1547,10 +1559,10 @@ TEST_CASE("Combined UI view navigation preserves Sketch and machining state thro
   ui.choose(ui.widget<QComboBox>("blcad.extrude.operation"), 2);
   ui.scalar("6 mm");
   ui.text(ui.widget<QLineEdit>("blcad.extrude.taper"), "invalid");
-  ui.window.ribbon().set_current_tab(2);
+  ui.window.ribbon().set_current_tab(6);
   ui.flush();
   ui.choose(marks, marks.findText("Front"));
-  ui.command("bookmark_restore", 2);
+  ui.command("bookmark_restore", 6);
   CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
   CHECK_FALSE(ui.window.viewport().feature_preview_active());
   CHECK(ui.widget<QLineEdit>("blcad.extrude.taper").text() == "invalid");
@@ -1577,7 +1589,7 @@ TEST_CASE("Combined UI view navigation preserves Sketch and machining state thro
   CHECK(ui.window.feature_tools().coordinator().extrude().distance() == Approx(6));
   CHECK(ui.snapshot() == states.back());
   ui.flush();
-  ui.command("view_home", 2);
+  ui.command("view_home", 6);
   REQUIRE(ui.window.viewport().feature_preview_active());
   ui.capture("navigation-machining-preview");
   const auto cut = ui.window.feature_tools().coordinator().extrude().feature_id();
@@ -1599,11 +1611,11 @@ TEST_CASE("Combined UI view navigation preserves Sketch and machining state thro
   states.push_back(ui.snapshot());
   ui.history(states);
   CHECK(marks.count() == 2);
-  ui.window.ribbon().set_current_tab(2);
+  ui.window.ribbon().set_current_tab(6);
   ui.flush();
   ui.choose(marks, marks.findText("Top"));
-  ui.command("bookmark_restore", 2);
-  ui.command("bookmark_remove", 2);
+  ui.command("bookmark_restore", 6);
+  ui.command("bookmark_remove", 6);
   CHECK(marks.count() == 1);
   ui.capture("navigation-bookmarks-after-history");
   ui.roundtrip(directory.filePath("navigation.blcad"));
@@ -1653,7 +1665,7 @@ TEST_CASE(
   ui.choose(ui.widget<QComboBox>("blcad.extrude.extent"), 5);
   ui.choose(ui.widget<QComboBox>("blcad.extrude.pick_role"), 1);
   ui.standard_view("Right");
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   ui.limit_face(source, "right", {30, -10, 10});
   CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
   CHECK_FALSE(ui.window.viewport().feature_preview_active());
@@ -1892,7 +1904,7 @@ TEST_CASE(
   ui.command("redo");
   CHECK(ui.snapshot() == edited);
   ui.roundtrip(directory.filePath("loft.blcad.json"));
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   ui.capture("combined-loft");
   ui.idle();
 }
@@ -2120,7 +2132,7 @@ TEST_CASE(
   CHECK(ui.bytes(directory.filePath("automatic-loft.step")).startsWith("ISO-10303-21;"));
   CHECK(ui.snapshot() == saved);
   CHECK_FALSE(ui.window.session().dirty());
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   ui.capture("loft-automatic-unequal-spline-result");
   ui.idle();
 }
@@ -2234,7 +2246,7 @@ TEST_CASE("UI Loft aligns independently drawn sections through opt-out recovery 
   CHECK(ui.bytes(directory.filePath("aligned-loft.blcad.json")) == saved);
   CHECK(ui.snapshot() == corrected);
   CHECK_FALSE(ui.window.session().dirty());
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   ui.capture("loft-section-alignment-result");
   ui.idle();
 }
@@ -2444,7 +2456,7 @@ TEST_CASE("Combined UI edits a revolved source through a rotated scaled circular
   ui.button("blcad.measure.close");
   CHECK(ui.snapshot() == states.back());
   ui.roundtrip(directory.filePath("revolved-pattern.blcad.json"));
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   ui.capture("combined-revolve-pattern");
   ui.idle();
 }
@@ -2706,7 +2718,7 @@ TEST_CASE("Combined UI Assembly workflow imports an authored Part places relates
     CHECK(ui.snapshot() == solved);
     CHECK_FALSE(ui.window.session().dirty());
   }
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   ui.capture("combined-assembly");
   ui.idle();
 }
@@ -3052,7 +3064,7 @@ TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects
   const auto profile = ui.rectangle("datum.xy", {-2, -2}, {2, 2});
   const auto initial = ui.snapshot();
   ui.command("sketch_3d");
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   auto placement_camera = ui.window.viewport().camera_bookmark();
   placement_camera.eye = {150, 150, 165};
   placement_camera.target = {0, 0, 15};
@@ -3123,7 +3135,7 @@ TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects
   ui.button("blcad.sketch3d.preview");
   REQUIRE(ui.window.viewport().feature_preview_active());
   CHECK(ui.snapshot() == initial);
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   ui.capture("sketch3d-chain-preview");
   ui.button("blcad.sketch3d.apply");
   const auto spatial = ui.window.session().part_document()->sketches_3d().back().id();
@@ -3193,7 +3205,7 @@ TEST_CASE("Combined UI creates a spatial chain sweeps it edits endpoints rejects
   REQUIRE(ui.window.viewport().feature_preview_active());
   CHECK(ui.window.viewport().feature_preview_replaces("body/" + body.value()));
   CHECK(ui.snapshot() == swept);
-  ui.command("fit", 2);
+  ui.command("fit", 6);
   ui.capture("sketch3d-downstream-sweep-preview");
   ui.button("blcad.sketch3d.apply");
   const auto edited = ui.snapshot();
@@ -3570,7 +3582,7 @@ TEST_CASE("Combined UI filters constrain model selection while finishing and hol
   ui.tree(body.value());
   REQUIRE_FALSE(ui.window.session().selection().empty());
   CHECK(ui.window.session().selection().entries().front().kind == GuiSelectionKind::Body);
-  ui.command("view_top", 2);
+  ui.command("view_top", 6);
   if (QApplication::platformName() == "xcb") {
     const auto point = checked(ui.window.viewport().model_to_screen({15, 10, 12}));
     ui.click_at(ui.window.viewport(), {point.x, point.y});
@@ -3739,7 +3751,7 @@ TEST_CASE("Combined UI profile contexts restore cancelled cuts then author Thin 
     ui.click(ui.widget<QToolButton>("blcad.context." + id));
   };
   ui.tree(plate.value());
-  ui.command("view_top", 2);
+  ui.command("view_top", 6);
   if (QApplication::platformName() == "xcb") {
     ui.tree("datum.xy");
     REQUIRE_FALSE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
@@ -3853,7 +3865,7 @@ TEST_CASE("Combined UI spatial contexts seed chosen profiles recover Loft order 
   const auto path = ui.window.session().part_document()->path_curves().back().id();
   std::vector<std::string> states{ui.snapshot()};
   ui.tree(lower.value());
-  ui.command("view_top", 2);
+  ui.command("view_top", 6);
   if (QApplication::platformName() == "xcb") {
     ui.tree("datum.xy");
     REQUIRE_FALSE(ui.widget<QWidget>("blcad.context.toolbar").isVisible());
@@ -3968,7 +3980,7 @@ TEST_CASE(
   };
   const auto pick = [&](const BodyId& body, const std::string& role, bool edge,
                         const QString& view) {
-    ui.command(view, 2);
+    ui.command(view, 6);
     auto& filter = ui.widget<QComboBox>("blcad.selection.filter");
     ui.data(filter, selection_kind_bit(edge ? GuiSelectionKind::Edge : GuiSelectionKind::Face));
     ui.tree("datum.xy");
@@ -4090,7 +4102,7 @@ TEST_CASE("Combined UI pattern contexts chain reflected sources through upstream
     ui.click(ui.widget<QToolButton>("blcad.context." + id));
   };
   const auto pick = [&](const BodyId& body) {
-    ui.command("view_isometric", 2);
+    ui.command("view_isometric", 6);
     ui.data(ui.widget<QComboBox>("blcad.selection.filter"),
             selection_kind_bit(GuiSelectionKind::Body));
     ui.tree("datum.xy");
@@ -4230,7 +4242,7 @@ TEST_CASE("Combined UI Body contexts collect roles and preserve a Boolean Transf
     ui.click(ui.widget<QToolButton>("blcad.context." + id));
   };
   const auto pick = [&](const BodyId& body) {
-    ui.command("view_isometric", 2);
+    ui.command("view_isometric", 6);
     ui.data(ui.widget<QComboBox>("blcad.selection.filter"),
             selection_kind_bit(GuiSelectionKind::Body));
     ui.tree("datum.xy");
@@ -4954,7 +4966,7 @@ TEST_CASE("Combined UI complex rotor keeps preview recovery history and persiste
   REQUIRE(tip != targets.end());
   const int tip_row = static_cast<int>(std::distance(targets.begin(), tip));
   const auto begin = [&] {
-    ui.command("view_top", 2);
+    ui.command("view_top", 6);
     ui.command("fillet");
     if (QApplication::platformName() == "xcb") {
       const auto point = checked(ui.window.viewport().model_to_screen(tip->anchor));

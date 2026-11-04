@@ -145,7 +145,7 @@ public:
   void command(const QString& id) {
     auto& action = widget<QAction>("blcad.action." + id);
     REQUIRE(action.isEnabled());
-    window.ribbon().set_current_tab(id.startsWith("export_assembly") ? 3 : 0);
+    window.ribbon().set_current_tab(id.startsWith("export_assembly") ? 4 : 5);
     flush();
     for (auto* button : window.ribbon().findChildren<QToolButton*>()) {
       if (!button->isVisible())
