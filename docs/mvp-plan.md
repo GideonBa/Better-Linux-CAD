@@ -6,8 +6,8 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 143
 current_block: 144
-current_boundary: Future phase planning (not started; scope unassigned)
-current_tag: null
+current_boundary: Inventor-inspired workflow layout and regression acceptance
+current_tag: workflow-layout
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -32,14 +32,15 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 143
-current block        Block 144 (future planning only; not started)
-current phase        STEP Import MVP-10 complete; next phase unassigned
-current boundary     Future phase planning
+current block        Block 144 (GUI workflow revision; verification in progress)
+current phase        Inventor-inspired GUI workflow revision
+current boundary     Layout, command discovery and existing-workflow acceptance
 ```
 
-The numeric successor 144 reserves the next planning boundary. No Block-144 scope or implementation
-starts in this delivery. The requested work ends with completed Block 143; any later phase needs a
-separate plan based on measured import/topology gaps and the explicit deferrals in the STEP sequence.
+The 2026-11-04 user request assigns Block 144 to a GUI workflow and layout revision while
+preserving the existing visual identity. The scoped plan and acceptance table below keep completion
+through Block 143 until the new checks pass. Previously deferred CAD capabilities are not silently
+included or marked complete by a presentation change.
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
 modeling workspace and reusable candidate-only viewport manipulators; Block 124 adds interactive
@@ -1737,10 +1738,28 @@ Delivery: [PR #135](https://github.com/GideonBa/Better-Linux-CAD/pull/135), veri
 commit `220d030`. All runtime fingerprints remain unchanged. This delivery completes the requested
 work through Block 143; later implementation remains unassigned.
 
-## Next planning boundary — Block 144 (unassigned; not started)
+## Block 144 — Inventor-inspired workflow and layout (2026-11-04; in progress)
 
-STEP Import MVP-10 ends at Block 143. The next phase has no assigned implementation scope or tag.
-Retain the explicit deferred capabilities and plan from measured gaps before starting further work.
+User-authorized GUI revision begins on `feat/inventor-workflow-layout` from clean main
+`c9e4560`, after PR #136 merged and a fresh GitHub search confirmed no open PRs. Each delivery
+must merge normally through branch protection before another implementation branch starts.
+Typography (Barlow/IBM Plex Mono), Pixelarticons, dark-violet palette and CAD authorities remain
+unchanged. This block concerns presentation and access to existing functions, not new geometry.
+
+| Work | Acceptance | Status |
+| --- | --- | --- |
+| Full-width workspace | Ribbon spans above browser, viewport and task panels; compact/scaled native controls remain reachable | Implemented; final verification running |
+| Command organization | File/quick access across contexts; Model, Sketch, Surface, Assembly, Inspect, Manage, View route existing actions | Implemented; final verification running |
+| Command discovery | Ctrl+K searches registered actions/groups with shortcuts, live availability and original command execution | Implemented; final verification running |
+| Recoverable panels | View restores hidden properties/diagnostics and resets the supporting layout without cancelling tasks | Implemented; final verification running |
+| Regression acceptance | Full GUI suite plus focused native modeling, Sketch, Surface, Assembly, exchange, appearance and 150% checks | Pending |
+| Delivery | Reviewed diff, documented results, professional commit, normal push and protected PR merge | Pending |
+
+Contracts and workflow mapping are in `user-interface.md`; exact execution evidence will be recorded
+in `development-setup.md`. No claim of universal usability or new CAD capability follows from this
+layout pass. Previously deferred modeling capabilities remain scoped by their feature contracts.
+Block 144 is not accepted until its verification and delivery gates are met; completed status through
+Block 143 remains unchanged in the meantime.
 
 ## Later phases
 

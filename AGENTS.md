@@ -14,3 +14,6 @@
   remote history. Honor any later instruction that limits or postpones committing or publishing.
 - Respect protected-branch rules. Push implementation branches and open pull requests when the
   upstream requires them; do not rely on available bypass permissions.
+- Before starting a new implementation branch, verify that the preceding delivery PR is merged
+  and update main from upstream. Finish and merge one branch before starting the next; record
+  the plan, verification and delivery status in the existing documentation.
