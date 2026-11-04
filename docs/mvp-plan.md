@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 143
-current_block: 144
-current_boundary: Verified GUI workflow revision awaiting protected PR delivery
-current_tag: workflow-layout
+implemented_through: Block 144
+current_block: 145
+current_boundary: Future GUI follow-up planning (not started; scope unassigned)
+current_tag: null
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -20,6 +20,7 @@ phase_status:
   mvp_9: "Interactive Part & Assembly Modeling — Blocks 122–131 implemented; MVP complete"
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
+  gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
 ---
 
 # MVP Plan
@@ -31,16 +32,17 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 143
-current block        Block 144 (verified GUI workflow revision; PR delivery pending)
-current phase        Inventor-inspired GUI workflow revision
-current boundary     Protected PR delivery of verified layout and workflows
+implemented through  Block 144
+current block        Block 145 (future follow-up planning; not started)
+current phase        Inventor-inspired GUI workflow revision complete
+current boundary     Future GUI follow-up planning
 ```
 
 The 2026-11-04 user request assigns Block 144 to a GUI workflow and layout revision while
-preserving the existing visual identity. The scoped plan and acceptance table below keep completion
-through Block 143 until the new checks pass. Previously deferred CAD capabilities are not silently
-included or marked complete by a presentation change.
+preserving the existing visual identity. The scoped plan and acceptance table below are complete
+through Block 144. Block 145 is a future planning boundary with no assigned implementation.
+Previously deferred CAD capabilities retain their
+feature-specific contracts.
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
 modeling workspace and reusable candidate-only viewport manipulators; Block 124 adds interactive
@@ -1738,7 +1740,7 @@ Delivery: [PR #135](https://github.com/GideonBa/Better-Linux-CAD/pull/135), veri
 commit `220d030`. All runtime fingerprints remain unchanged. This delivery completes the requested
 work through Block 143; later implementation remains unassigned.
 
-## Block 144 — Inventor-inspired workflow and layout (verified 2026-11-05)
+## Implemented Block 144 — Inventor-inspired workflow and layout (2026-11-05)
 
 User-authorized GUI revision begins on `feat/inventor-workflow-layout` from clean main
 `c9e4560`, after PR #136 merged and a fresh GitHub search confirmed no open PRs. Each delivery
@@ -1753,7 +1755,7 @@ unchanged. This block concerns presentation and access to existing functions, no
 | Command discovery | Ctrl+K searches registered actions/groups with shortcuts, live availability and original command execution | Verified |
 | Recoverable panels | View restores hidden properties/diagnostics and resets the supporting layout without cancelling tasks | Verified |
 | Regression acceptance | Full GUI suite plus focused native modeling, Sketch, Surface, Assembly, exchange, appearance and 150% checks | Passed |
-| Delivery | Reviewed diff, documented results, professional commit, normal push and protected PR merge | PR publication pending |
+| Delivery | Reviewed diff, documented results, professional commit, normal push and protected PR merge | Delivered via PR #137 |
 
 Final GUI: **620 passed, 33 native-only skips / 85,483 assertions** across 653 cases. Broad native
 Qt/OCCT: **96 / 33,276**; initial 150% modeling/appearance: **13 / 1,565**; after the chooser-icon
@@ -1763,11 +1765,16 @@ are nonempty/valid. Final **948** runtime fingerprints stay unchanged. Existing 
 contracts, fonts, icon assets and color definitions are preserved. Runtime gates and actual captures
 are recorded in `development-setup.md` and `user-interface.md`.
 
-The planning/serial-delivery commit is `76705a1`. Implementation publication and the protected PR
-are the remaining delivery step; no new branch starts before that PR is merged and main updated.
+Delivery: [PR #137](https://github.com/GideonBa/Better-Linux-CAD/pull/137), implementation
+`e538be8`, following the separate planning/serial-delivery commit `76705a1`. This PR must merge
+normally and updated main must match the tested tree before any successor branch is created.
+Runtime fingerprints remain unchanged through this documentation-only delivery update.
 Previously deferred modeling capabilities remain scoped by their feature contracts.
-Block 144 is not accepted until its verification and delivery gates are met; completed status through
-Block 143 remains unchanged in the meantime.
+
+## Next planning boundary — Block 145 (unassigned; not started)
+
+The requested GUI workflow revision ends at Block 144. Further usability work should follow concrete
+user feedback or measured workflow gaps. No Block-145 scope or implementation starts in this delivery.
 
 ## Later phases
 

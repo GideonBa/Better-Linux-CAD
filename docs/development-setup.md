@@ -2763,3 +2763,10 @@ screenshots are outside that runtime freeze. Final full GUI passes **653 cases â
 startup and full-GUI verification. The earlier rotor menu watchdog does not recur. Source and staged
 diffs are reviewed; no Core/Geometry, persistence, font, palette, icon-asset or splash changes are
 included. The separate planning commit is `76705a1`; implementation delivery is recorded in the plan.
+
+
+Delivery is [PR #137](https://github.com/GideonBa/Better-Linux-CAD/pull/137), implementation `e538be8`
+after planning commit `76705a1`. The plan records completed implementation through Block 144;
+Block 145 is an unassigned planning boundary. The PR must merge normally before any successor
+branch starts, with main/tree/runtime verification after integration. This final acceptance/status
+update changes documentation only; the runtime freeze remains unchanged.
