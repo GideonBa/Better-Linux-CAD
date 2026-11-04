@@ -18,7 +18,7 @@ class ShellWindow;
 // task, parameter set or selection. No action discovery or trigger rewiring.
 class ShellRepeatTools final : public QObject {
 public:
-  ShellRepeatTools(ShellWindow&, ShellRibbon&, QWidget* edit_group);
+  ShellRepeatTools(ShellWindow&, ShellRibbon&);
   void remember(QAction& accepted_command);
   void reset();
   void refresh();

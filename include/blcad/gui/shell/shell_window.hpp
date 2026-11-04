@@ -16,6 +16,7 @@
 class QAction;
 class QCloseEvent;
 class QComboBox;
+class QDockWidget;
 class QPlainTextEdit;
 class QTableWidget;
 class QTableWidgetItem;
@@ -187,6 +188,9 @@ private:
   QTreeWidget* browser_tree_{nullptr};
   QTableWidget* properties_{nullptr};
   QPlainTextEdit* diagnostics_{nullptr};
+  QDockWidget* browser_dock_{nullptr};
+  QDockWidget* property_dock_{nullptr};
+  QDockWidget* diagnostics_dock_{nullptr};
   QComboBox* selection_filter_{nullptr};
 
   QAction* action_undo_{nullptr};
@@ -211,6 +215,9 @@ private:
   int tab_sketch_{-1};
   int tab_view_{-1};
   int tab_assembly_{-1};
+  int tab_surface_{-1};
+  int tab_inspect_{-1};
+  int tab_manage_{-1};
 
   std::optional<SketchId> active_sketch_;
   std::optional<GuiViewportCameraBookmark> sketch_camera_bookmark_;

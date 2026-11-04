@@ -189,8 +189,8 @@ when bytes changed. Save As into another directory requires matching assets at e
 location; it neither copies files nor silently rebases references. Document, Sketch-sidecar and STEP
 outputs cannot overwrite registered assets, including missing paths, canonical aliases and hardlinks.
 
-The browser exposes source identity, name, mode, path, digest and inspected state. **STEP-Quellen**
-on the model/Assembly ribbon opens one shell-owned task. Save first, choose an explicit mode, inspect
+The browser exposes source identity, name, mode, path, digest and inspected state. **STEP Sources**
+on the Manage/Assembly ribbon opens one shell-owned task (Block-144 placement). Save first, choose an explicit mode, inspect
 the file, prepare a change, then Apply. Existing fields stay read-only; refresh changes only the digest.
 Embedded Part entries show their owner and are read-only; the source chooser addresses only the
 current document's registry. Derived owner scope distinguishes root and embedded registries even

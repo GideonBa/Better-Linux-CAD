@@ -2689,3 +2689,77 @@ no work. Existing full Core/Geometry/GUI and native 100%/150% evidence above the
 runtime evidence. Final Shell inventory passes **3 / 313** after this plan correction
 (`/tmp/blcad-completion-audit-inventory.log`); no full suite or native test rerun is claimed for
 these Markdown-only edits.
+
+
+### Block 144 — Inventor-inspired workflow layout (2026-11-04–05)
+
+Starts from main `c9e4560` after merged PR #136, with no open PR. The active main ruleset requires
+PR delivery (zero approvals, no required status check); no bypass or direct push to main is used.
+Implementation retains the existing fonts, icon assets, palette and CAD/session owners. Changes
+cover full-width command placement, File/Quick Access, seven workflow tabs, command discovery and
+supporting dock recovery. `user-interface.md` owns current interaction and layout mapping.
+
+Initial five-target build passes. Initial offscreen focus passes **20 cases / 1,240 assertions**;
+initial native layout passes **4 / 89** with captures inspected at 1280×800 and 1024×640. The first
+sandboxed xcb process could not open display `:0`; the native repeat uses authorized display access.
+The known OCCT Medium depth/stencil visual warning appears. These are development results before
+final refinements and do not substitute for the final gates below.
+
+Reproduction (builds, source changes, GUI suites and startup remain serial):
+
+```bash
+cmake --build build/dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app blcad_export_step -j 8
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests
+QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[workflow-layout],[appearance],[icons],[shell-combined-workflow],[block136-inspect-export],[block136-reference-repair],[block136-sketch-diagnostics],[shell-repair-open-input],[integration][gui-step-import],[native-step-inspection],[native-step-topology],[integration][gui-feature-coverage],[gui][viewport],[sketch-ui-review],[native-viewer-lifecycle]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 ./build/dev-gui/blcad_gui_tests "[workflow-layout],[appearance],[icons]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+The initial sandboxed full-GUI run was deliberately interrupted (exit 130) after it established
+obsolete ribbon indexes/menu assumptions in STEP, repair and diagnostics input helpers and the
+sandbox's protected file-publication failures (`Could not publish STEP file`, structured copy hard
+links). The actual input helpers now use the new visible tabs/File menu; their modeling expectations
+remain unchanged. Final gates use regular filesystem access and are listed below. Existing
+Core/Geometry behavior is not expanded by this GUI change.
+
+
+The first complete run with normal filesystem access reaches **653 cases: 619 passed, 1 failed,
+33 native-only skips / 85,338 assertions** (`/tmp/blcad144-gui-delivery.log`). Its only failure is
+the combined 40-blade rotor's five-second menu watchdog around Open. The test now prefers the
+visible Quick Access control when a command also has a File menu entry, so the menu-only watchdog
+no longer includes synchronous Part loading. The same full run passes file publication, repair,
+all five new layout/discovery cases and the remaining modeling expectations. Final acceptance repeats on the corrected input route. A subsequent native screenshot review
+also replaces the new command chooser's colored Qt standard buttons with the existing Pixelarticons
+Check/Close assets; no modeling code changes. Focused native/scaled checks repeat after that
+presentation-only correction.
+
+
+Broad native Qt/OCCT passes **96 cases / 33,276 assertions**, without skips
+(`/tmp/blcad144-native-100.log`). It covers the command layout, appearance/icons, combined Sketch,
+Part, Surface and Assembly workflows, file exchange and repair, STEP inspection/topology/import,
+viewport lifecycle and coverage inventory. Initial 150% native verification passes **13 / 1,565**
+without skips (`/tmp/blcad144-native-150.log`), including actual dimension/feature/history/file input.
+The subsequent chooser-icon correction receives focused final native/scaled proof below; all other
+application behavior is identical. Feature captures at ordinary/compact sizes are reviewed and
+saved under `docs/images/inventor-workflow-{feature,compact}.png`.
+
+
+Final chooser/layout/icon verification passes **12 cases / 1,288 assertions** at both native 100%
+and 150%, without skips (`/tmp/blcad144-native-final.log`, `/tmp/blcad144-native-150-final.log`).
+Both capture sets are reviewed, including actual Ctrl+K, arrow navigation and Escape, and the final
+monochrome dialog is recorded as `docs/images/inventor-workflow-search.png`. Separate native startup
+reaches the intentional six-second timeout **124** (`/tmp/blcad144-startup.log`). Native logs contain
+only the existing Medium depth/stencil visual warning; no High-severity or drawable/window failures.
+All five requested targets build (`/tmp/blcad144-build-icons.log`); all **508** Ninja dependency
+records are nonempty and valid. Fonts, icon assets, palette definitions and splash sources are
+unchanged. Core/Geometry standalone suites were not rerun for this shell-only revision; the full GUI
+and native workflows exercise their existing modeling, persistence and exchange paths.
+
+The final **948-file** runtime manifest `/tmp/blcad144-runtime-freeze.json` covers `src/`, `include/`,
+`tests/`, `assets/`, `cmake/`, `scripts/`, `CMakeLists.txt` and `CMakePresets.json`; its SHA-256 is
+`f18e3f6a4f7e99d484aeb2b7dfd06e28a163b2e9ec4a330a64a2ac8a6b8bad7f`. Documentation and its native
+screenshots are outside that runtime freeze. Final full GUI passes **653 cases — 620 passed, 33 expected native-only skips / 85,483 assertions**
+(`/tmp/blcad144-gui-final.log`). All runtime hashes remain unchanged through final native, scaled,
+startup and full-GUI verification. The earlier rotor menu watchdog does not recur. Source and staged
+diffs are reviewed; no Core/Geometry, persistence, font, palette, icon-asset or splash changes are
+included. The separate planning commit is `76705a1`; implementation delivery is recorded in the plan.

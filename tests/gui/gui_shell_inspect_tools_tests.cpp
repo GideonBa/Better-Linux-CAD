@@ -305,7 +305,7 @@ TEST_CASE("Native shell analysis controls and STEP dialogs are reachable at 1280
   } restore_dialog_attribute{native_dialogs_disabled};
   ShellWindow window;
   project(window);
-  window.ribbon().set_current_tab(3);
+  window.ribbon().set_current_tab(4);
   auto& analysis = action(window, "assembly_analysis");
   QToolButton* open = nullptr;
   for (auto* candidate : window.findChildren<QToolButton*>())

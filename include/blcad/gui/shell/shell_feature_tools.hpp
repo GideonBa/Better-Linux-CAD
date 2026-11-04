@@ -68,7 +68,7 @@ public:
 
   ShellFeatureTools(ShellWindow& window, GuiDocumentSession& session,
                     const GuiSketchWorkbench& sketch_workbench, OcctViewport& viewport,
-                    ShellRibbon& ribbon, int model_tab);
+                    ShellRibbon& ribbon, int model_tab, int surface_tab);
   ~ShellFeatureTools() override;
 
   [[nodiscard]] bool active() const noexcept;

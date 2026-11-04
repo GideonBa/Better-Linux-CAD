@@ -258,9 +258,9 @@ ShellWindow::ShellWindow() {
   auto* column = new QVBoxLayout(central);
   column->setContentsMargins(0, 0, 0, 0);
   column->setSpacing(0);
-  ribbon_ = new ShellRibbon(central);
+  ribbon_ = new ShellRibbon(this);
+  setMenuWidget(ribbon_);
   viewport_ = new OcctViewport(central);
-  column->addWidget(ribbon_);
   column->addWidget(viewport_, 1);
   setCentralWidget(central);
 
@@ -292,23 +292,23 @@ ShellWindow::ShellWindow() {
                                                      sketch_workspace_, *viewport_, *ribbon_,
                                                      tab_sketch_);
   feature_tools_ = std::make_unique<ShellFeatureTools>(
-      *this, session_, sketch_workbench_, *viewport_, *ribbon_, tab_model_);
+      *this, session_, sketch_workbench_, *viewport_, *ribbon_, tab_model_, tab_surface_);
   measure_tools_ =
-      std::make_unique<ShellMeasureTools>(*this, session_, *viewport_, *ribbon_, tab_model_);
+      std::make_unique<ShellMeasureTools>(*this, session_, *viewport_, *ribbon_, tab_inspect_);
   assembly_tools_ =
       std::make_unique<ShellAssemblyTools>(*this, session_, *viewport_, *ribbon_, tab_assembly_);
   feature_edit_tools_ = std::make_unique<ShellFeatureEditTools>(*this);
-  inspect_tools_ = std::make_unique<ShellInspectTools>(*this, *ribbon_, tab_model_, tab_assembly_);
+  inspect_tools_ = std::make_unique<ShellInspectTools>(*this, *ribbon_, tab_manage_, tab_inspect_);
   construction_tools_ = std::make_unique<ShellConstructionTools>(*this, *ribbon_, tab_model_);
   reference_repair_tools_ =
-      std::make_unique<ShellReferenceRepairTools>(*this, *ribbon_, tab_model_);
+      std::make_unique<ShellReferenceRepairTools>(*this, *ribbon_, tab_manage_);
   sketch_diagnostics_tools_ =
-      std::make_unique<ShellSketchDiagnosticsTools>(*this, *ribbon_, tab_model_, tab_sketch_);
+      std::make_unique<ShellSketchDiagnosticsTools>(*this, *ribbon_, tab_inspect_, tab_sketch_);
   sketch_3d_tools_ = std::make_unique<ShellSketch3DTools>(*this, *ribbon_, tab_model_);
-  parameter_tools_ = std::make_unique<ShellParameterTools>(*this, *ribbon_, tab_model_);
+  parameter_tools_ = std::make_unique<ShellParameterTools>(*this, *ribbon_, tab_manage_);
   hole_tools_ = std::make_unique<ShellHoleTools>(*this, *ribbon_, tab_model_);
   step_import_tools_ =
-      std::make_unique<ShellStepImportTools>(*this, *ribbon_, tab_model_, tab_assembly_);
+      std::make_unique<ShellStepImportTools>(*this, *ribbon_, tab_manage_, tab_assembly_);
   context_tools_ = std::make_unique<ShellContextTools>(*this);
   statusBar()->showMessage(QStringLiteral("Ready"));
   refresh();
@@ -343,11 +343,14 @@ ShellWindow::~ShellWindow() {
 void ShellWindow::build_ribbon() {
   tab_model_ = ribbon_->add_tab(QStringLiteral("3D Model"));
   tab_sketch_ = ribbon_->add_tab(QStringLiteral("Sketch"));
-  tab_view_ = ribbon_->add_tab(QStringLiteral("View"));
+  tab_surface_ = ribbon_->add_tab(QStringLiteral("Surface"));
   tab_assembly_ = ribbon_->add_tab(QStringLiteral("Assembly"));
 
-  // 3D-Modell → Dokument
-  auto* document_group = ribbon_->add_group(tab_model_, QStringLiteral("Document"));
+  tab_inspect_ = ribbon_->add_tab(QStringLiteral("Inspect"));
+  tab_manage_ = ribbon_->add_tab(QStringLiteral("Manage"));
+  tab_view_ = ribbon_->add_tab(QStringLiteral("View"));
+
+  // File and history remain available in every modeling context.
   action_new_part_ = new QAction(QStringLiteral("New"), this);
   action_new_part_->setObjectName("blcad.action.new_part");
   action_new_part_->setShortcut(QKeySequence::New);
@@ -399,11 +402,11 @@ void ShellWindow::build_ribbon() {
     if (!path.isEmpty())
       (void)save_to(path);
   });
-  ribbon_->add_button(document_group, action_new_part_);
-  ribbon_->add_button(document_group, action_open_);
-  ribbon_->add_small_button(document_group, action_open_repair_);
-  ribbon_->add_button(document_group, action_save_);
-  ribbon_->add_button(document_group, action_save_as_);
+  for (auto* action :
+       {action_new_part_, action_open_, action_open_repair_, action_save_, action_save_as_})
+    ribbon_->add_file_action(action);
+  for (auto* action : {action_new_part_, action_open_, action_save_})
+    ribbon_->add_quick_action(action);
   // Keep the standard document shortcuts active regardless of the visible
   // ribbon tab or the widget that currently owns keyboard focus.
   addAction(action_new_part_);
@@ -411,8 +414,7 @@ void ShellWindow::build_ribbon() {
   addAction(action_save_);
   addAction(action_save_as_);
 
-  // 3D-Modell → Bearbeiten (undo/redo, always available via shortcut)
-  auto* edit_group = ribbon_->add_group(tab_model_, QStringLiteral("Modify"));
+  // Share the original history actions with the always-visible quick access row.
   action_undo_ = new QAction(QStringLiteral("Undo"), this);
   action_undo_->setObjectName("blcad.action.undo");
   action_undo_->setShortcut(QKeySequence::Undo);
@@ -423,19 +425,19 @@ void ShellWindow::build_ribbon() {
   action_redo_->setShortcut(QKeySequence::Redo);
   action_redo_->setShortcutContext(Qt::WindowShortcut);
   connect(action_redo_, &QAction::triggered, this, [this] { (void)redo(); });
-  ribbon_->add_button(edit_group, action_undo_);
-  ribbon_->add_button(edit_group, action_redo_);
+  ribbon_->add_quick_action(action_undo_);
+  ribbon_->add_quick_action(action_redo_);
   // Shortcuts must fire regardless of which ribbon tab is visible.
   addAction(action_undo_);
   addAction(action_redo_);
-  repeat_tools_ = std::make_unique<ShellRepeatTools>(*this, *ribbon_, edit_group);
+  repeat_tools_ = std::make_unique<ShellRepeatTools>(*this, *ribbon_);
 
   // 3D-Modell → Skizze
   auto* sketch_group = ribbon_->add_group(tab_model_, QStringLiteral("Sketch"));
   action_create_sketch_ = new QAction(QStringLiteral("Create 2D Sketch"), this);
   action_create_sketch_->setObjectName("blcad.action.create_sketch");
-  action_create_sketch_->setToolTip(
-      QStringLiteral("Select an origin plane, then start a sketch on that plane"));
+  action_create_sketch_->setToolTip(QStringLiteral(
+      "Select an origin/construction plane or a planar body face, then create a sketch"));
   connect(action_create_sketch_, &QAction::triggered, this,
           [this] { (void)create_sketch_on_selection(); });
   ribbon_->add_button(sketch_group, action_create_sketch_);
@@ -493,8 +495,9 @@ void ShellWindow::build_ribbon() {
 }
 
 void ShellWindow::build_docks() {
-  auto* browser_dock = new QDockWidget(QStringLiteral("Model"), this);
-  browser_dock->setFeatures(QDockWidget::DockWidgetMovable);
+  auto* browser_dock = browser_dock_ = new QDockWidget(QStringLiteral("Model"), this);
+  browser_dock->setObjectName(QStringLiteral("blcad.shell.model_dock"));
+  browser_dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
   browser_tree_ = new QTreeWidget(browser_dock);
   browser_tree_->setObjectName("blcad.shell.browser");
   browser_tree_->setHeaderLabel(QStringLiteral("No Document"));
@@ -580,7 +583,8 @@ void ShellWindow::build_docks() {
 
   // Property inspector below the model tree: read-only for most properties,
   // editable for the ones Core contracts support (parameter value/expression).
-  auto* property_dock = new QDockWidget(QStringLiteral("Properties"), this);
+  auto* property_dock = property_dock_ = new QDockWidget(QStringLiteral("Properties"), this);
+  property_dock->setObjectName(QStringLiteral("blcad.shell.property_dock"));
   property_dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
   properties_ = new QTableWidget(property_dock);
   properties_->setObjectName("blcad.shell.properties");
@@ -601,7 +605,8 @@ void ShellWindow::build_docks() {
   connect(properties_, &QTableWidget::itemChanged, this,
           [this](QTableWidgetItem* item) { handle_property_changed(item); });
 
-  auto* diagnostics_dock = new QDockWidget(QStringLiteral("Diagnostics"), this);
+  auto* diagnostics_dock = diagnostics_dock_ = new QDockWidget(QStringLiteral("Diagnostics"), this);
+  diagnostics_dock->setObjectName(QStringLiteral("blcad.shell.diagnostics_dock"));
   diagnostics_dock->setFeatures(QDockWidget::DockWidgetMovable |
                                 QDockWidget::DockWidgetClosable);
   diagnostics_ = new QPlainTextEdit(diagnostics_dock);
@@ -610,8 +615,28 @@ void ShellWindow::build_docks() {
   diagnostics_->setPlaceholderText(QStringLiteral("Diagnostics appear here"));
   diagnostics_dock->setWidget(diagnostics_);
   addDockWidget(Qt::BottomDockWidgetArea, diagnostics_dock);
-  // Keep diagnostics present without competing with the model on first show.
   resizeDocks({diagnostics_dock}, {112}, Qt::Vertical);
+  diagnostics_dock->hide();
+  auto* panels = ribbon_->add_group(tab_view_, QStringLiteral("User Interface"));
+  for (auto* dock : {browser_dock_, property_dock_, diagnostics_dock_})
+    ribbon_->add_small_button(panels, dock->toggleViewAction());
+  auto* restore = new QAction(QStringLiteral("Reset Layout"), this);
+  restore->setObjectName(QStringLiteral("blcad.action.reset_layout"));
+  restore->setToolTip(
+      QStringLiteral("Restore browser, properties and diagnostics to their default positions"));
+  connect(restore, &QAction::triggered, this, [this] {
+    addDockWidget(Qt::LeftDockWidgetArea, browser_dock_);
+    splitDockWidget(browser_dock_, property_dock_, Qt::Vertical);
+    addDockWidget(Qt::BottomDockWidgetArea, diagnostics_dock_);
+    browser_dock_->show();
+    property_dock_->show();
+    diagnostics_dock_->hide();
+    resizeDocks({browser_dock_, property_dock_}, {260, 260}, Qt::Horizontal);
+    resizeDocks({browser_dock_, property_dock_}, {400, 180}, Qt::Vertical);
+  });
+  ribbon_->add_small_button(panels, restore);
+  resizeDocks({browser_dock, property_dock}, {260, 260}, Qt::Horizontal);
+  resizeDocks({browser_dock, property_dock}, {400, 180}, Qt::Vertical);
 }
 
 void ShellWindow::wire_viewport() {
@@ -1671,6 +1696,7 @@ void ShellWindow::append_diagnostic(const Error& error) {
   if (!already_recorded)
     session_.report_error(error);
   diagnostics_->appendPlainText(diagnostic_line(error));
+  diagnostics_dock_->show();
 }
 
 void ShellWindow::show_error(const Error& error) {

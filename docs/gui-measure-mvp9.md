@@ -1,14 +1,14 @@
 # GUI Measure MVP-9
 
-Status: headless authority introduced in Block 131; replacement-shell integration implemented as a
-Block-136 slice. Assembly authoring, browser feature editing and whole-block acceptance remain open.
+Status: headless authority introduced in Block 131; replacement-shell integration accepted in
+Block 136. Block 144 places its commands on Inspect. Numbered status is owned by `mvp-plan.md`.
 
 ## Ownership and read-only boundary
 
 `ShellWindow` explicitly owns `ShellMeasureTools` and wires it to the ribbon, document session,
 viewport selection and view-change notification. There is no binder, component discovery or polling.
-The 3D-Modell **Prüfen** group exposes **Abstand**, **Winkel**, **Radius / Durchmesser** and
-**Körperdaten**. They open the dedicated **Messen** task dock through `GuiMeasureController`.
+The **Inspect** ribbon exposes **Distance**, **Angle**, **Radius / Diameter** and
+**Body Summary**. They open the dedicated Measure task dock through `GuiMeasureController`.
 
 Measure reserves the transient `inspect.measure` task so modeling commands cannot start concurrently.
 It never opens a document transaction or changes parameters, geometry, persistence, dirty state or

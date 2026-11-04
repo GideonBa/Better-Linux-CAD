@@ -106,6 +106,7 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
       (void)window_.new_project(name);
   });
   ribbon.add_button(document, create);
+  ribbon.add_file_action(create);
   import_action_ = new QAction(QStringLiteral("Load Definition"), this);
   import_action_->setObjectName("blcad.action.assembly_import");
   connect(import_action_, &QAction::triggered, this, [this] {

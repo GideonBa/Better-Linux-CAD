@@ -1,13 +1,12 @@
 # GUI Interactive Surface Authoring and Surface-to-Solid MVP-9
 
-Status: headless authority implemented in Block 128; replacement-shell integration implemented as a
-Block-136 slice, including selection-first contexts. Block 136 remains open for Assembly contexts,
-advanced Assembly controls and integrated acceptance.
+Status: headless authority implemented in Block 128; replacement-shell integration and selection-first
+contexts accepted in Block 136. Block 144 places these commands on Surface; `mvp-plan.md` owns status.
 
 ## Authority and transaction boundary
 
 `ShellFeatureTools`, owned explicitly by `ShellWindow`, presents the six Surface commands in the
-3D-Modell ribbon's **Flächen** group and the shared feature task panel. It calls the existing
+**Surface** ribbon’s **Create and Modify** group and the shared feature task panel. It calls the existing
 `GuiInteractiveFeatureCoordinator` and `GuiInteractiveSurfaceController`; it installs no binder,
 searches no foreign widget tree and uses no polling timer.
 

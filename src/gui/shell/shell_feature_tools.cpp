@@ -153,7 +153,8 @@ std::optional<double> parse_numeric(const QString& source, std::string_view expe
 
 ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& session,
                                      const GuiSketchWorkbench& sketch_workbench,
-                                     OcctViewport& viewport, ShellRibbon& ribbon, int model_tab)
+                                     OcctViewport& viewport, ShellRibbon& ribbon, int model_tab,
+                                     int surface_tab)
     : QObject(&window), window_(window), session_(session), sketch_workbench_(sketch_workbench),
       viewport_(viewport), coordinator_(&session_, &layer_) {
   auto* feature_group = ribbon.add_group(model_tab, QStringLiteral("Create"));
@@ -246,7 +247,7 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
       action_loft_ = action;
   }
 
-  auto* surface_group = ribbon.add_group(model_tab, QStringLiteral("Faces"));
+  auto* surface_group = ribbon.add_group(surface_tab, QStringLiteral("Create and Modify"));
   for (const auto& [command, label, id] :
        {std::tuple{Command::BoundarySurface, "Boundary Surface", "surface_boundary"},
         std::tuple{Command::FillSurface, "Fill Surface", "surface_fill"},

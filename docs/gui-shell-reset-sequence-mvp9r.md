@@ -1,5 +1,11 @@
 # GUI Shell Reset Sequence MVP-9R
 
+> Current presentation follow-up (2026-11-04): Block 144 reorganizes the same shell into a
+> full-width ribbon, persistent File/Quick Access and Model/Sketch/Surface/Assembly/Inspect/
+> Manage/View tabs with Ctrl+K discovery and recoverable supporting docks. `user-interface.md`
+> owns that current placement contract. The Block 132–136 architecture, explicit ownership,
+> transactions and feature acceptance below remain in force; original ribbon placement is historical.
+
 Status: Blocks 132–136 implemented and accepted on 2026-10-25. Current completion evidence lives in
 `docs/gui-shell-acceptance-mvp9r.md`; `docs/mvp-plan.md` owns numbered status. STEP Import MVP-10
 follows in planned Blocks 137–143. Dated entries below preserve each slice's historical state.

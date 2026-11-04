@@ -456,11 +456,11 @@ TEST_CASE("Native ribbon list preview cancel apply history and save combine diag
   QTemporaryDir directory;
   const auto path = seed(window, directory);
   const auto before = snapshot(window);
-  ribbon(window, "sketch_diagnostics", 0);
+  ribbon(window, "sketch_diagnostics", 4);
   mouse_select(window, "duplicate_fixed_endpoint/line:start");
   click(control<QPushButton>(window, "preview"));
   REQUIRE(window.viewport().feature_preview_active());
-  ribbon(window, "fit", 2);
+  ribbon(window, "fit", 6);
   if (QApplication::platformName() == "xcb") {
     const auto captures = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
     if (!captures.isEmpty()) {
@@ -470,7 +470,7 @@ TEST_CASE("Native ribbon list preview cancel apply history and save combine diag
   }
   click(control<QPushButton>(window, "cancel"));
   CHECK(snapshot(window) == before);
-  ribbon(window, "sketch_diagnostics", 0);
+  ribbon(window, "sketch_diagnostics", 4);
   mouse_select(window, "duplicate_fixed_endpoint/line:start");
   click(control<QPushButton>(window, "preview"));
   click(control<QPushButton>(window, "apply"));
