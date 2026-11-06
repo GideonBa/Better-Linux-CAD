@@ -2798,4 +2798,6 @@ GUI binary. Source and staged documentation diffs are reviewed before delivery.
 Builds, full CAD suites and native Qt/OCCT are not rerun for these documentation-only changes.
 The new feature/native tests and performance budgets are planned obligations, not measured or
 executed results. Actual native interaction evidence is required by their implementation blocks.
-Delivery/merge state is recorded in `mvp-plan.md`; no successor implementation begins here.
+Delivery is PR #138 with reviewed plan commit `86fc04f`; this final delivery-record update is
+documentation only and retains the same runtime tree. `mvp-plan.md` records the protected-merge
+handoff; no successor implementation begins here.

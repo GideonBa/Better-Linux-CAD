@@ -1811,8 +1811,11 @@ passes: Markdown/contract links, all 60 consecutive blocks and backward dependen
 scenario IDs, unchanged implementation boundary, documentation-only path scope and `git diff --check`.
 Existing GUI shell coverage passes **3 / 313**, without skips. Builds/full CAD/native runs are not
 repeated for documentation changes; future test gates are not claimed as executed. Exact commands
-are recorded in `development-setup.md`. Diff/staged review and normal PR delivery follow;
-implemented status remains through Block 144.
+are recorded in `development-setup.md`. Source/staged diffs are reviewed. Delivery:
+[PR #138](https://github.com/GideonBa/Better-Linux-CAD/pull/138), plan commit `86fc04f`, on the
+normally pushed `docs/inventor-feature-parity-plan` branch. Merge through the required PR path,
+refresh main and compare its tree with the reviewed branch before starting Block 145. This
+planning delivery leaves implemented status through Block 144.
 
 ## Later phases
 
