@@ -120,6 +120,29 @@ invalid input cannot apply the previous value. Other feature families retain the
 behavior until their own controls are migrated. Apply/Cancel stay outside scrolling group content.
 No persistence change or nested Sketch editing is introduced; 145C owns that separate lifecycle.
 
+Block 145C1 design (2026-11-06): the existing `GuiDocumentSession` gains
+`begin_part_workflow()`, `publish_part_workflow(label)`, `cancel_part_workflow()` and
+`part_workflow_active()`. Begin requires an idle, strict, fresh editable Part at a committed history
+state, with no enclosing workflow. It snapshots the complete session, including both Sketch sidecar
+catalogs and existing Undo/Redo.
+The snapshot is immutable and shared only when the session itself is copied. Existing Sketch and
+feature transactions operate on the disposable working session; there is no second solver/history
+format. Local Undo/Redo cannot cross the workflow's entry state or expose pre-existing redo entries.
+Document replacement/close are rejected until the workflow ends, even with discard requested.
+
+Save/Save As while a workflow is active uses the committed entry snapshot through the existing
+atomic main/constraint/dimension save transaction. The chosen path and saved-state metadata survive
+Cancel. Dirty state describes committed unsaved work; the UI in C2 must also identify the active
+draft. Failed saves preserve existing file/path state. Cancel restores the complete entry intent,
+catalogs, selection, visibility, workspace and Undo/Redo branch, with monotonically newer model/
+presentation revisions. Publication validates complete draft intent, both catalogs and downstream
+geometry through `publish_part_state` on a copy of the entry session, then publishes once with one
+Undo label. Failure leaves the workflow correctable; no intermediate history or files become
+committed. Publishing unchanged intent is a no-op without an Undo entry. No Core/JSON/schema changes
+are introduced. This API is initially headless and unused by Qt commands; C2 must wire ownership,
+source revalidation, consumer/task guards and actual native breadcrumb/Create Another evidence
+before the shared lifecycle can be claimed as implemented.
+
 1. A compatible preselection starts the command with its first semantic input populated; command-first
    entry activates that selector. Input rows have labelled roles, selection counts, clear controls,
    active-state emphasis and matching canvas highlights. A valid second input never replaces the first

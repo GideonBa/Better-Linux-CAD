@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 144
 current_block: 145
-current_boundary: Block 145B verified in PR #140; merge before slice C
+current_boundary: Block 145C1 verified in PR #141; merge before breadcrumb UI
 current_tag: "[parity-b145]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -34,9 +34,9 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 144
-current block        Block 145 (in progress; slice B)
+current block        Block 145 (in progress; slice C1)
 current phase        Shared workflow contract and evidence inventory
-current boundary     Shared controls verified; deliver before breadcrumb lifecycle
+current boundary     Complete Part workflow transaction before breadcrumb UI
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1826,8 +1826,9 @@ for the next slice/branch.
 | Slice | Deliverable | Status |
 | --- | --- | --- |
 | 145A | Extend existing capability inventory with explicit planned/implemented API/command/proof mappings, reject invalid evidence, capture reproducible unchanged-intent/geometry and timing baseline | Merged via PR #139 |
-| 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Verified; delivery PR #140 |
-| 145C | Existing-owner Sketch/feature breadcrumb transition, complete candidate restoration and Create Another lifecycle; native integration and closure | Not started |
+| 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Merged via PR #140 |
+| 145C1 | Extend existing GuiDocumentSession with a complete transient Part-workflow checkpoint, committed-only Save and one-history publication; headless failure/history/sidecar tests | Verified; delivery PR #141 |
+| 145C2 | Existing-owner Extrude/Sketch breadcrumb transition and Create Another, using C1; combined native/compact/scaled integration and Block-145 closure | Not started |
 
 145A starts on `feat/advanced-workflow-evidence` from clean `dbff649`, after verified merged
 PR #138 and refreshed main. `user-interface.md` owns the slice design and baseline boundaries.
@@ -1867,7 +1868,24 @@ repeat are documented in `development-setup.md`. Captures are reviewed, startup 
 124, and runtime fingerprints remain unchanged. Numbered completion remains at 144.
 
 Delivery: [PR #140](https://github.com/GideonBa/Better-Linux-CAD/pull/140), implementation `84fd6e1`.
-Merge normally, verify the merged tree and refresh main before starting 145C.
+PR #140 is merged as `6c15fe1`; its reviewed tree matches refreshed main. Slice C is split before
+implementation because nested Sketch commands need an explicit session transaction boundary.
+`feat/compound-part-workflow` starts from verified `6c15fe1`. C1 extends the existing session's
+history/publication authority; it adds no document schema or second model/solver. `user-interface.md`
+owns the bounded API and Save/Cancel/failure design. C2 alone wires visible breadcrumb transitions;
+no UI adoption or Block-145 completion is claimed by C1.
+
+C1 implements the complete checkpoint in the existing session authority, with committed-only
+main/sidecar Save and Save As, isolated local history, one final validated publication, full Cancel
+and immutable entry state when sessions are copied. Eleven new transaction cases pass **655
+assertions**. GUI/application build, formatting and diff review pass; broader focus passes **35
+cases, 1 native-only skip / 2,223 assertions**. Full GUI passes **637 cases, 33 native-only skips /
+86,508 assertions**. Native existing-workflow compatibility passes **5 / 462** at both 100% and
+150%, without skips. Exact commands, source freeze and scope limits live in `development-setup.md`.
+C2 remains required, and implemented-through remains 144.
+
+Delivery: [PR #141](https://github.com/GideonBa/Better-Linux-CAD/pull/141), implementation `861a5c6`.
+Merge normally, verify the resulting tree and refresh main before starting the UI adopter.
 
 ## Later phases
 

@@ -662,6 +662,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_analysis_export_workbench_tests.cpp
       tests/gui/gui_command_state_tests.cpp
       tests/gui/gui_document_session_tests.cpp
+      tests/gui/gui_part_workflow_transaction_tests.cpp
       tests/gui/gui_step_import_workbench_tests.cpp
       tests/gui/gui_imported_body_preview_tests.cpp
       tests/gui/gui_shell_step_import_tests.cpp

@@ -7,13 +7,13 @@
 #include "blcad/core/sketch_constraint_catalog_system.hpp"
 #include "blcad/core/sketch_dimension_authoring_json.hpp"
 #include "blcad/core/sketch_dimension_catalog_system.hpp"
+#include "blcad/geometry/assembly_import_validation.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/reference_part_geometry.hpp"
 #include "blcad/geometry/result_face_support.hpp"
-#include "blcad/geometry/assembly_import_validation.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
-#include "blcad/gui/gui_step_import_workbench.hpp"
 #include "blcad/gui/gui_pending_feature_inputs.hpp"
+#include "blcad/gui/gui_step_import_workbench.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -21,11 +21,11 @@
 #include <cstdint>
 #include <fstream>
 #include <iterator>
+#include <nlohmann/json.hpp>
 #include <system_error>
-#include <utility>
 #include <unordered_map>
 #include <unordered_set>
-#include <nlohmann/json.hpp>
+#include <utility>
 
 namespace blcad::gui {
 namespace {
@@ -931,6 +931,22 @@ Result<std::uintmax_t> GuiDocumentSession::save() {
 }
 
 Result<std::uintmax_t> GuiDocumentSession::save_as(const std::filesystem::path& path) {
+  if (part_workflow_base_) {
+    // Reuse the complete existing save transaction, including both sidecars and
+    // protected imported assets. Draft Sketch commands must never leak to disk.
+    auto committed = *part_workflow_base_;
+    auto saved = committed.save_as(path);
+    if (!saved) {
+      record_error(saved.error());
+      return saved;
+    }
+    file_path_ = std::move(committed.file_path_);
+    saved_json_ = std::move(committed.saved_json_);
+    saved_sketch_constraint_catalogs_ = std::move(committed.saved_sketch_constraint_catalogs_);
+    saved_sketch_dimension_catalogs_ = std::move(committed.saved_sketch_dimension_catalogs_);
+    record_information(path.string(), "committed document saved; workflow draft retained");
+    return saved;
+  }
   if (!has_document()) {
     const auto error = session_error("save requires an active document");
     record_error(error);
@@ -1232,6 +1248,75 @@ void GuiDocumentSession::restore_creation_checkpoint(GuiDocumentSession checkpoi
   *this = std::move(checkpoint);
 }
 
+Result<std::size_t> GuiDocumentSession::begin_part_workflow() {
+  if (part_workflow_base_ || !part_document() || part_document()->is_reference_part() ||
+      reference_repair_mode_ || task_.active() || workspace_ != GuiWorkspace::Part ||
+      !derived_results_fresh())
+    return Result<std::size_t>::failure(
+        session_error("Part workflow requires an idle fresh Part and no enclosing workflow"));
+  const auto json = serialize_current();
+  if (!json || history_.empty() || json.value() != history_[history_index_].json)
+    return Result<std::size_t>::failure(
+        session_error("Part workflow requires a committed history state"));
+  part_workflow_base_ = std::make_shared<const GuiDocumentSession>(*this);
+  // Keep the complete original branch in the checkpoint, but never offer its
+  // pre-existing redo entries as local draft operations.
+  history_.erase(history_.begin() + static_cast<std::ptrdiff_t>(history_index_ + 1U),
+                 history_.end());
+  std::erase_if(part_history_geometry_,
+                [this](const auto& item) { return item.history_index > history_index_; });
+  return Result<std::size_t>::success(1U);
+}
+
+Result<std::size_t> GuiDocumentSession::publish_part_workflow(std::string label) {
+  if (!part_workflow_base_ || !part_document() || label.empty() ||
+      workspace_ != GuiWorkspace::Part ||
+      part_document()->id() != part_workflow_base_->part_document()->id())
+    return Result<std::size_t>::failure(session_error("invalid Part workflow publication"));
+
+  auto json = serialize_current();
+  if (!json)
+    return Result<std::size_t>::failure(json.error());
+  auto accepted = *part_workflow_base_;
+  // Save/Save As can have happened while the draft was open. Keep its actual
+  // committed path/metadata when replacing the working session.
+  accepted.file_path_ = file_path_;
+  accepted.saved_json_ = saved_json_;
+  accepted.saved_sketch_constraint_catalogs_ = saved_sketch_constraint_catalogs_;
+  accepted.saved_sketch_dimension_catalogs_ = saved_sketch_dimension_catalogs_;
+  const auto& entry = accepted.history_[accepted.history_index_];
+  const bool changed = json.value() != entry.json ||
+                       sketch_constraint_catalogs_ != entry.sketch_constraints ||
+                       sketch_dimension_catalogs_ != entry.sketch_dimensions;
+  if (changed) {
+    auto published = accepted.publish_part_state(*part_document(), sketch_constraint_catalogs_,
+                                                 sketch_dimension_catalogs_, std::move(label), 1U);
+    if (!published) {
+      record_error(published.error());
+      return published;
+    }
+  }
+  accepted.task_ = task_;
+  accepted.workspace_ = workspace_;
+  accepted.hidden_presentations_ = hidden_presentations_;
+  const auto next_revision = std::max(model_revision(), accepted.model_revision()) + 1U;
+  accepted.visibility_revision_ = std::max(visibility_revision_, accepted.visibility_revision_);
+  accepted.presentation_revision_ = accepted.visibility_revision_ + next_revision;
+  *this = std::move(accepted);
+  return Result<std::size_t>::success(changed ? 1U : 0U);
+}
+
+void GuiDocumentSession::cancel_part_workflow() {
+  if (!part_workflow_base_)
+    return;
+  auto checkpoint = *part_workflow_base_;
+  restore_creation_checkpoint(std::move(checkpoint));
+}
+
+bool GuiDocumentSession::part_workflow_active() const noexcept {
+  return bool(part_workflow_base_);
+}
+
 Result<std::size_t> GuiDocumentSession::undo() {
   if (!can_undo())
     return Result<std::size_t>::failure(session_error("nothing to undo"));
@@ -1245,7 +1330,7 @@ Result<std::size_t> GuiDocumentSession::redo() {
 }
 
 bool GuiDocumentSession::close(bool discard_dirty) noexcept {
-  if (task_.active() || (dirty() && !discard_dirty))
+  if (part_workflow_base_ || task_.active() || (dirty() && !discard_dirty))
     return false;
   reset_document();
   return true;
@@ -1300,9 +1385,10 @@ bool GuiDocumentSession::has_document() const noexcept {
 }
 
 bool GuiDocumentSession::dirty() const noexcept {
-  if (!has_document() || history_.empty())
+  const auto& committed = part_workflow_base_ ? *part_workflow_base_ : *this;
+  if (!committed.has_document() || committed.history_.empty())
     return false;
-  const auto& current = history_[history_index_];
+  const auto& current = committed.history_[committed.history_index_];
   return !saved_json_ || current.json != *saved_json_ || !saved_sketch_constraint_catalogs_ ||
          current.sketch_constraints != *saved_sketch_constraint_catalogs_ ||
          !saved_sketch_dimension_catalogs_ ||
@@ -1322,7 +1408,8 @@ GuiRecomputeStatus GuiDocumentSession::recompute_status() const noexcept {
 }
 
 bool GuiDocumentSession::can_undo() const noexcept {
-  return history_index_ > 0U && !task_.active();
+  const auto boundary = part_workflow_base_ ? part_workflow_base_->history_index_ : 0U;
+  return history_index_ > boundary && !task_.active();
 }
 
 bool GuiDocumentSession::can_redo() const noexcept {
@@ -1612,6 +1699,8 @@ void GuiDocumentSession::diagnose_step_import_sources() {
 }
 
 Result<std::size_t> GuiDocumentSession::reject_replacement_if_needed(bool discard_dirty) const {
+  if (part_workflow_base_)
+    return Result<std::size_t>::failure(session_error("apply or cancel the active Part workflow"));
   if (task_.active())
     return Result<std::size_t>::failure(session_error("active task must be applied or cancelled"));
   if (dirty() && !discard_dirty)
