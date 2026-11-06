@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 144
 current_block: 145
-current_boundary: Future GUI follow-up planning (not started; scope unassigned)
+current_boundary: Advanced modeling workflow program planned through Block 204; implementation not started
 current_tag: null
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,6 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
+  advanced_modeling_workflows: "Blocks 145–204 planned; implementation not started"
 ---
 
 # MVP Plan
@@ -33,16 +34,17 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 144
-current block        Block 145 (future follow-up planning; not started)
-current phase        Inventor-inspired GUI workflow revision complete
-current boundary     Future GUI follow-up planning
+current block        Block 145 (planned; implementation not started)
+current phase        Advanced modeling workflow implementation planning
+current boundary     Blocks 145–204 allocated; implementation not started
 ```
 
-The 2026-11-04 user request assigns Block 144 to a GUI workflow and layout revision while
-preserving the existing visual identity. The scoped plan and acceptance table below are complete
-through Block 144. Block 145 is a future planning boundary with no assigned implementation.
-Previously deferred CAD capabilities retain their
-feature-specific contracts.
+The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
+detailed implementation and combined-test plan for the identified remaining capabilities inside
+existing workspaces. [The consolidated sequence](inventor-parity-sequence.md) allocates Blocks
+145–204; [the test plan](inventor-parity-test-plan.md) and the planned workflow section of
+`user-interface.md` define evidence and Inventor-like interaction. All new blocks are planned and
+not started. Previously implemented feature contracts remain in force until deliberately extended.
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
 modeling workspace and reusable candidate-only viewport manipulators; Block 124 adds interactive
@@ -1771,10 +1773,46 @@ normally and updated main must match the tested tree before any successor branch
 Runtime fingerprints remain unchanged through this documentation-only delivery update.
 Previously deferred modeling capabilities remain scoped by their feature contracts.
 
-## Next planning boundary — Block 145 (unassigned; not started)
+## Planned Blocks 145–204 — Advanced modeling workflows
 
-The requested GUI workflow revision ends at Block 144. Further usability work should follow concrete
-user feedback or measured workflow gaps. No Block-145 scope or implementation starts in this delivery.
+Status authority: every block in the following ranges is **Planned; implementation not started**.
+The next implementation block is 145. The 2026-11-06 request authorizes this plan; this documentation
+delivery does not implement any of its features. Detailed block inputs, outputs, dependencies,
+contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
+negative cases, combination matrix, native proof and performance protocol live in
+`inventor-parity-test-plan.md`. Shared UI/layout behavior is owned by the planned section of
+`user-interface.md`. Existing catalog lists are mapped there rather than assigned competing sequences.
+
+| Phase | Blocks | Assigned scope | Status |
+| --- | --- | --- | --- |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Planned; not started |
+| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
+| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
+| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
+| E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
+| F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
+| G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
+| H | 199–204 | Motion/contact extensions, finite measurement, quality/thickness analysis, measured performance and final combined acceptance | Planned; not started |
+
+Advance individual completed blocks or named slices only after their full criteria and relevant
+native checks pass. A phase range remains incomplete while any constituent block is open. Serial
+PR/merge discipline applies to implementation and planning deliveries; no successor branch starts
+before the preceding PR is merged and main refreshed. Deferred drawings/BOMs, sheet metal,
+CAM/FEM, automatic fastener libraries and general physical dynamics are not assigned here.
+
+### Planning delivery — 2026-11-06
+
+Starts from clean main `e08280c` after GitHub confirms PR #137 merged and no open PRs. Main is
+fetched and fast-forward verified before `docs/inventor-feature-parity-plan` is created. This change
+reconciles existing catalogs, adds the serial block sequence and combined test obligations, and
+extends the existing UI authority with a clearly labelled future workflow contract. Runtime code,
+test implementations, file schemas and accepted capability inventories are unchanged. Validation
+passes: Markdown/contract links, all 60 consecutive blocks and backward dependencies, all 37
+scenario IDs, unchanged implementation boundary, documentation-only path scope and `git diff --check`.
+Existing GUI shell coverage passes **3 / 313**, without skips. Builds/full CAD/native runs are not
+repeated for documentation changes; future test gates are not claimed as executed. Exact commands
+are recorded in `development-setup.md`. Diff/staged review and normal PR delivery follow;
+implemented status remains through Block 144.
 
 ## Later phases
 
@@ -1782,7 +1820,8 @@ Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Sh
 is complete through Block 136. STEP Import MVP-10 is complete through Block 143, including source
 management, geometry inspection, semantic topology/recovery, immutable Reference Parts in
 assemblies, EditableBody downstream modeling, structured STEP Projects and integrated end-to-end
-acceptance in `docs/step-import-sequence-mvp10.md`. Later phases remain unassigned.
+acceptance in `docs/step-import-sequence-mvp10.md`. The next assigned program is the planned
+advanced workflow sequence above; capabilities outside Blocks 145–204 remain unassigned.
 
 
 Issue #113 follow-up (2026-10-28) rejects ineffective/full-target Cuts with distinct correction

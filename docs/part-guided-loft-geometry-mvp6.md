@@ -1,5 +1,9 @@
 # Part Guided and Continuity-controlled Loft Geometry MVP-6
 
+Planned extension: [Blocks 168–169](inventor-parity-sequence.md) own richer binding intent
+and independently verified G2. The existing G2 rejection below remains correct until that
+execution is implemented and accepted; support-face and longitudinal continuity stay distinct.
+
 Status: implemented in Block 87.
 
 Block 87 executes the persistent primary-path, ordered-guide, and continuity intent introduced in

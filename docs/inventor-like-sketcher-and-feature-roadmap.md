@@ -5,6 +5,13 @@ Status: capability catalog. The numbered implementation authority is now
 `docs/interactive-modeling-sequence-mvp9.md` for Blocks 122–131 (feature, surface, and assembly
 interaction).
 
+Planning reconciliation (2026-11-06): those phases and STEP Import through Block 143 are complete;
+Block 144 supplies the current shell layout. [The consolidated advanced sequence](inventor-parity-sequence.md)
+owns the remaining assigned work in 145–204, with one ownership mapping to this catalog and the
+exact contracts. [The combined test plan](inventor-parity-test-plan.md) and the planned section of
+`user-interface.md` own acceptance and workflow. The older baseline, Stage A–G list and target
+lists below are historical capability context; they must not be scheduled as another implementation.
+
 This document records the target that BLCAD should eventually grow from its current minimal CAD-kernel MVP into a serious parametric sketch and feature system. The reference quality bar is an Inventor-like workflow: rich 2D sketches, 3D sketches, constraints, dimensions, automatic profile detection, feature creation from profiles, and advanced curve/surface workflows.
 
 The goal is not to clone Autodesk Inventor's UI, names, or proprietary behavior. The goal is to document the broad CAD capabilities that users expect from an Inventor-class sketch environment and to map them into BLCAD's own architecture.

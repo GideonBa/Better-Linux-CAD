@@ -1,5 +1,12 @@
 # Project and Save File Format
 
+Planned evolution (2026-11-06): [Blocks 145–204](inventor-parity-sequence.md) assign history state,
+revision-pinned resources, new feature families, equation/spatial constraints, model states,
+occurrence poses and cross-document references. These are not current JSON fields. Each owning
+block must specify exact spellings, schema/version/defaults, strict unknown-intent behavior and
+legacy migration here before its first writer change. Preserve current `feature_order`, imported
+source/catalog identities and sidecar ownership; do not implement the plan as a parallel save format.
+
 Status: implemented save-format seeds exist for single-part model intent including persistent Solid/Surface Body records, Feature Body-result operations, Body Booleans, BodyTransform stacks, and SketchOwnership records; assembly parameters, embedded Project JSON, part component occurrences, rigid child assembly occurrences, local Mate/Concentric/Distance/Insert/Angle intent, Project-level cross-hierarchy geometric intent, local and occurrence-qualified Revolute joint intent with typed `coordinates[]` plus historical scalar compatibility, semantic generated feature/axis/seat targets, `ref:` reference-geometry targets, canonical `topo:` generated-topology semantic targets, and authored transform/state records.
 
 The save format stores parametric and semantic model intent. OCCT shapes, hierarchy traversal state, occurrence graphs, transform authorities, generated-topology producer classification/recovery results, resolved geometry, residuals, Jacobians, solve/motion results, freshness snapshots, proposals, diagnostics, Block-110 semantic drag handles, pointer samples, temporary drag targets/augmented topology, live previews, and exchange products are derived. Block 110 adds no JSON schema field. Block-111 creation picks, numeric buffers, rubber-band

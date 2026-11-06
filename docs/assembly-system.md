@@ -1,8 +1,14 @@
 # Assembly System with Constraints
 
-Status: component instances, explicit placement/state updates, Mate/Concentric/Distance/Insert intent records, deterministic active-constraint connectivity, generated planar-face/circular-axis/circular-seat target resolution, explicit rigid-transform evaluation, Mate/Distance/Concentric/Insert residual construction, Mate/Distance/Concentric numeric solving, explicit atomic result application, and read-only local Jacobian-rank/remaining-DOF diagnostics are implemented.
+Status: architecture overview with historical pipeline descriptions. Assembly MVP-5 through Block 47,
+the accepted interactive workflows and structured STEP import are implemented; `mvp-plan.md` and
+the feature-specific Assembly contracts own current status and exact behavior. Old “next” statements
+below preserve their original phase context and are not a new execution queue.
 
-Insert numeric-system, solver, application, and shared DOF integration is the next assembly block.
+[Blocks 189–199](inventor-parity-sequence.md) consolidate model states, independent flexible
+occurrence poses, directed adaptive cross-document references, coordinated Assembly holes and
+broader motion/contact analysis. Existing shared-child local solving and Assembly parameter bindings
+remain supported; they are extended rather than replaced by viewer transforms or a second solver.
 
 ## Core model
 

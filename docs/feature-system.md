@@ -1,6 +1,12 @@
 # Feature System
 
-Status: target architecture. Additive/Subtractive Extrude, multi-body identity/results, Body Booleans, associative BodyTransform/SketchOwnership execution, and Block-58 reusable Part feature semantic inputs are implemented; richer Extrude/Cut intent is the Block-59 boundary.
+Status: architecture and capability catalog. Part Construction through Block 94, its GUI workflows
+through Block 136, STEP import through 143 and the Block-144 layout are accepted; `mvp-plan.md`
+owns exact status. Historical future-tense sections and the proposed sequence below are not an
+active queue. [Blocks 145–204](inventor-parity-sequence.md) consolidate the remaining assigned
+extensions: history/suppression 146–148, Hole/Thread 152–157, advanced curves/surfaces 159–174,
+Fillet 175–179, Rib/Web 180–181, Emboss/Engrave 182–184 and Direct Edit 185–187. Existing typed
+feature families/result contexts are extended; no generic feature-base rewrite is required first.
 
 Features are the parametric operations a part is built from. Each feature has inputs, parameters, references, and a computed geometry output. The central rule is that a feature stores the *rule* for computing geometry, not only the finished body. The OCCT shape is a cache.
 

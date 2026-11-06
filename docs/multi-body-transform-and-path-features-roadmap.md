@@ -1,7 +1,10 @@
 # Multi-body transforms and path-feature roadmap
 
-Status: target architecture. Multi-body/result/Boolean/transform foundations are implemented
-through Block 57; path features and the remaining richer feature families stay planned.
+Status: capability catalog. Multi-body/result/Boolean/transform and path/Loft/Surface foundations
+are implemented through Part Construction Block 94. The original model sketches and future-tense
+sequence below are historical targets, not a current queue. [Blocks 145–204](inventor-parity-sequence.md)
+own the assigned extensions, especially history 146–148, materials 149–151 and curve/surface
+execution 166–174. Reuse existing Body/PathCurve/transform authorities; do not add a second store.
 
 This document records future model intent for multi-body part files, body transforms, boolean operations between bodies, path-following extrudes, path-following lofts, and associative sketch/body transform behavior. It is written as an AI-readable implementation roadmap.
 

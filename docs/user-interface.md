@@ -69,6 +69,89 @@ The same preview at 1024×640 keeps Apply and Cancel reachable:
 
 ![Compact feature preview with scrollable inputs](images/inventor-workflow-compact.png)
 
+## Planned Inventor-like workflow contract
+
+Planning request: 2026-11-06. This section is the shared UI target for
+[Blocks 145–204](inventor-parity-sequence.md), not a claim that the following new controls exist.
+The Block-144 layout above remains the current implemented baseline. Numbered status belongs to
+`mvp-plan.md`; [UI01 and the combined test plan](inventor-parity-test-plan.md) own acceptance evidence.
+
+The target closely follows Inventor's command organization, model-browser interaction and ordered
+property-panel workflows, while retaining BLCAD's fonts, icons and dark-violet palette. Extend the
+current full-width ribbon, persistent File/Quick Access, left browser, central OCCT canvas and
+owned property/task panels. Keep task docking/floating recoverable, with the current right-hand
+task location as the default. Do not replace the accepted shell or force a new window per feature.
+Use Autodesk's [property panels](https://help.autodesk.com/cloudhelp/2026/ENU/Inventor-Help/files/GUID-3E5505B9-9F60-43A0-BF32-97D183B91A70.htm)
+and [browser](https://help.autodesk.com/cloudhelp/2026/ENU/Inventor-Help/files/GUID-EDF6B951-C309-44A8-868C-B72D99F6D5A7.htm)
+as workflow references. The detailed behavior below is BLCAD's planned implementation contract.
+
+### Shared property panel behavior
+
+1. A compatible preselection starts the command with its first semantic input populated; command-first
+   entry activates that selector. Input rows have labelled roles, selection counts, clear controls,
+   active-state emphasis and matching canvas highlights. A valid second input never replaces the first
+   because focus moved invisibly. Unsupported or ambiguous targets have an explicit reason.
+2. Groups progress from input geometry to behavior, dimensions and advanced settings. Collapsible
+   accordion groups expose required fields by default; collapsed invalid groups still show their
+   error. Order-specific sections/rails/stations have visible add/remove/reorder controls.
+3. Panel fields, dimensional HUD and model manipulators share one candidate value. Displayed formula
+   parameters remain bound unless the user explicitly changes that binding. Units, signed directions,
+   approximation limits and source revisions are visible where they affect a decision.
+4. Breadcrumbs show feature, source Sketch and Assembly/Part edit context. A supported switch into a
+   source Sketch suspends the feature candidate under the same owner; returning revalidates it against
+   the changed source. Cancel restores the complete pre-command transaction. Unrelated nested tasks
+   remain disallowed. Block 145 establishes this lifecycle before feature-specific adoption.
+5. Preview visibility is explicit. Input highlighting remains available while a disposable result is
+   shown. Errors identify the affected field/source and can be corrected without restarting. Apply
+   becomes available only for a complete current candidate; stale jobs cannot enable it.
+6. Keep Apply/Cancel outside the scrolling input region. Where meaningful, Apply/Create Another
+   commits once and starts a fresh candidate with retained settings but no hidden target selections.
+   Presets store compatible settings and revision-pinned catalog choices, never live document IDs.
+7. Enter accepts the focused value; Tab/Shift+Tab moves focus; Ctrl+Enter commits a valid candidate.
+   Existing command-specific Sketch completion keys retain their documented meaning. Escape cancels
+   the active drag/input gesture first, then the complete task. No shortcut commits incomplete input.
+8. Double-click in the browser edits the real persistent feature through the same panel. Context-menu
+   Edit and in-model feature glyphs route through that same controller. Mode conversion is explicit;
+   reordering/suppression and End of Part are separate commands with distinct Undo labels.
+9. Ctrl+K indexes every delivered action and reports unavailability. Repeat remains available from
+   Quick Access. Status/diagnostics name the feature and correction; error text alone does not replace
+   input highlighting. Use text/icon as well as color for errors, selection roles and result status.
+
+### Planned command placement and workflows
+
+| Ribbon/context | Planned commands | Required workflow |
+| --- | --- | --- |
+| Model → Modify | Hole, Thread, advanced Fillet, Direct Edit | preselect face/edge → choose operation → dimensions/manipulators → preview → Apply; browser double-click edits the same intent |
+| Model → Create | Rib/Web, Emboss/Engrave, improved Sweep/Loft | select sketch/profile/path/support roles in order → direction/mapping/continuity → preview → Apply |
+| Sketch → Draw/Constrain | Equation Curve, Smooth/G2 | author formulas/domain or select compatible junction → check solved preview/DOF → commit → Finish Sketch |
+| Model → 3D Sketch context | spatial curves, relations, dimensions and curve grips | choose spatial plane/axis locks → create/constrain → manipulate solved geometry → finish to path/Sweep/Loft |
+| Surface → Create/Modify | Offset, Thicken, improved Loft, Trim/Extend and gap inspection | choose faces/quilt/boundaries → output and side/continuity → select kept region → validate gaps/thickness → Apply |
+| Browser → history | Suppress/Unsuppress, Reorder, End of Part | preview dependent effects → validated complete-history update; prefix context always visibly labelled |
+| Manage/properties | Materials, Model States and variant table | choose scope/state → edit typed assignments/overrides → preview complete affected model → one Apply |
+| Assembly → relationships/design | Flexible occurrence, Edit Part in Context, adaptive references, coordinated Hole | choose occurrence/driver/participants → inspect root/Part context → solve/rebuild candidate → root transaction |
+| Assembly → representations | model states, positions and design views | select the clearly labelled representation type → preview/activate → explicitly author/save changes to that type |
+| Inspect | Physical Properties, finite Measure, Zebra, Curvature, Section, Thickness, Motion/Contact | choose actual scope → compute with visible units/precision/status → inspect overlay/copy → close |
+
+For Hole, use the familiar top-to-bottom order: positions → target/direction → bore/seat type →
+termination → thread → advanced checks. For Fillet, keep constant/variable/face/full-round as modes
+of the same feature tool; highlight edge stations and face roles directly. Direct Edit exposes its
+Move/Rotate/Size/Delete choice beside the existing triad and provides matching numeric fields.
+In-context Assembly editing always shows the root and edited definition/occurrence in the breadcrumb.
+An Assembly Hole participant table makes every affected Part and recipe visible before Apply.
+
+### Interaction and layout acceptance
+
+- Native tests use actual pointer/keyboard actions on the current `ShellWindow` and OCCT viewport.
+  Check 1280×800, 1024×640 and 100%/150% scale, with real long names, formulas, diagnostics and lists.
+- No required selector, validation message or completion action may be clipped or covered. Dock
+  resize/reset/reopen must retain the candidate and meaningful focus without changing model intent.
+- Verify preselection versus command-first equivalence, keyboard-only use, cross-highlights,
+  breadcrumbs, multiple selectors, parameter/HUD binding, exact release, cancellation and repeated use.
+- UI tests assert complete physical/transaction outcomes as well as enabled widgets. Captures are
+  reviewed for visual correctness; controller coverage cannot substitute for visible usability.
+- Keep current command locations and native regressions working during incremental delivery. New
+  groups appear only when their actual headless capability and diagnostics are implemented.
+
 ## Main areas
 
 | UI area | Purpose |

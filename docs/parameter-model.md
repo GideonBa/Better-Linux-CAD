@@ -3,6 +3,13 @@
 Status: implemented bounded Part parameters, expressions, Assembly bindings and replacement-shell
 parameter management. The wider scope/navigation model below remains target architecture.
 
+The wider assigned execution order is consolidated in [Blocks 189–198](inventor-parity-sequence.md):
+model states/variants, cross-document adaptive references and contextual Assembly authoring.
+Material dimensional types/resources are assigned earlier to 149–151, and curve-local equation
+variables to 160. Existing Part expressions and Assembly-to-Part bindings stay authoritative.
+The historical implementation sequence below is not an independent queue; no second expression
+evaluator or implicit global-parameter scope is introduced by the new plan.
+
 Parameters are first-class objects. Features reference them by identity, and the graphical table
 uses the same validated model and dependency graph as recompute and persistence.
 

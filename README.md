@@ -45,6 +45,8 @@ Start here:
 - [`docs/development-setup.md`](docs/development-setup.md) — building, testing, and focused test tags
 - [`docs/file-format.md`](docs/file-format.md) — save-format authority
 - [`docs/user-interface.md`](docs/user-interface.md) — UI architecture and interaction authority
+- [`docs/inventor-parity-sequence.md`](docs/inventor-parity-sequence.md) — planned advanced modeling blocks and existing contract ownership
+- [`docs/inventor-parity-test-plan.md`](docs/inventor-parity-test-plan.md) — planned feature, combination, native UI and performance acceptance
 
 Per-phase sequence contracts, each canonical for its block range:
 

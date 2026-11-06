@@ -1,6 +1,13 @@
 # Pattern and Mirror Features
 
-Status: target architecture. Not implemented yet.
+Status: capability catalog. Feature/Body linear and circular Pattern and Mirror are implemented
+through Blocks 63–67 with accepted GUI workflows. Exact contracts live in
+`part-pattern-core-mvp6.md`, `part-linear-pattern-geometry-mvp6.md`,
+`part-circular-pattern-geometry-mvp6.md` and `part-mirror-intent-mvp6.md`.
+[Block 156](inventor-parity-sequence.md#block-156-placement-patterns-and-stable-hole-consumers)
+owns the planned Hole placement/instance/skip integration; do not build a competing pattern model
+inside HoleFeature. General component/curve-driven pattern and automatic fastener generation remain
+catalog targets outside this program. The sequence below is historical capability context.
 
 Mirror, linear pattern, and circular pattern must preserve the design intent of the seed feature, not just copy finished geometry. Pattern and mirror operations are themselves normal features in the feature tree: they have parameters, are managed by the dependency graph, and recompute on change.
 
