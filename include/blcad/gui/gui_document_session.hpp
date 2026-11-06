@@ -12,6 +12,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -69,6 +70,13 @@ public:
   // Restore a cancelled creation, preserving any Save/Save As performed since
   // the checkpoint and monotonically invalidating presentation caches.
   void restore_creation_checkpoint(GuiDocumentSession checkpoint);
+  // Compose existing Part/Sketch transactions into one disposable workflow.
+  // Save publishes the committed entry state until publish succeeds. A copied
+  // session shares only the immutable checkpoint, never mutable draft intent.
+  [[nodiscard]] Result<std::size_t> begin_part_workflow();
+  [[nodiscard]] Result<std::size_t> publish_part_workflow(std::string label);
+  void cancel_part_workflow();
+  [[nodiscard]] bool part_workflow_active() const noexcept;
   [[nodiscard]] Result<std::size_t> undo();
   [[nodiscard]] Result<std::size_t> redo();
 
@@ -173,6 +181,7 @@ private:
   void reset_document() noexcept;
 
   Document document_;
+  std::shared_ptr<const GuiDocumentSession> part_workflow_base_;
   std::string display_name_;
   std::filesystem::path file_path_;
   GuiWorkspace workspace_{GuiWorkspace::Part};

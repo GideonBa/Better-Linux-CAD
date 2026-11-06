@@ -2904,3 +2904,55 @@ that freeze. Source and staged review precede protected PR delivery. Block 145 r
 
 Delivery: [PR #140](https://github.com/GideonBa/Better-Linux-CAD/pull/140), implementation `84fd6e1`.
 The final delivery record changes documentation only; runtime fingerprints remain unchanged.
+
+## Block 145C1 complete Part workflow transaction — 2026-11-06
+
+C1 starts on `feat/compound-part-workflow` from verified main `6c15fe1` after normal merge of
+PR #140 and exact tree comparison. The existing `GuiDocumentSession` owns the transient checkpoint;
+its normal validated transactions, full sidecar history and atomic save publication are reused.
+No Core/Geometry intent or JSON schema changes. Qt breadcrumb/Create Another adoption remains C2.
+
+The focused tests combine actual source parameter changes, constraint/dimension catalogs and a
+headless Extrude producing 2400 mm³. They require one final history entry, full Undo/Redo, complete
+Cancel (including selection/filter/visibility/workspace/task state), preserved old redo branches,
+committed-only Save/Save As/reopen for all three files, failed-save path/byte invariance, failed
+geometry publication followed by correction, scope/replacement guards, immutable checkpoints in
+copied sessions, no-op publication and catalog-only edits. Missing committed sidecars must be
+removed rather than populated from draft catalogs. Length values remain strictly positive; the
+geometry-failure injection uses a positive sub-tolerance height, rather than an invalid Quantity.
+
+```bash
+cmake --build build/dev-gui --target blcad_gui_tests blcad_app -j8
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[part-workflow]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[part-workflow],[document-session],[feature-edit],[parity-b145],[gui][shell-coverage]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests
+```
+
+Final GUI/application build passes (`/tmp/blcad145c1-build.log`). The transaction focus passes
+**11 cases / 655 assertions**, without skips (`/tmp/blcad145c1-transaction-focus.log`). Broader
+session/feature-edit/evidence/property focus passes **36 cases — 35 passed, 1 expected native-only
+skip / 2,223 assertions** (`/tmp/blcad145c1-focused.log`). Full offscreen GUI passes **670 cases —
+637 passed, 33 expected native-only skips / 86,508 assertions** (`/tmp/blcad145c1-gui-full.log`).
+No native breadcrumb evidence or whole-Block-145 completion is claimed by C1.
+
+
+Native compatibility on the same frozen implementation passes **5 cases / 462 assertions** at
+both 100% and 150%, without skips. These exercise the existing dimension/Extrude/feature-edit/history/
+reopen/STEP workflow and property controls; they do not exercise a Qt breadcrumb, since C1 has no UI
+adopter. Logs: `/tmp/blcad145c1-native-{100,150}.log`. Fresh compact feature capture at 150% is
+reviewed; completion controls remain reachable. Commands run serially:
+
+```bash
+QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad145c1-native-100 ./build/dev-gui/blcad_gui_tests "[hermes-design-workflow],[property-controls]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad145c1-native-150 ./build/dev-gui/blcad_gui_tests "[hermes-design-workflow],[property-controls]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+The 953 source/test/asset/build-script fingerprints (including six `.gitkeep` placeholders) in
+`/tmp/blcad145c1-runtime-freeze.json` remain unchanged through these checks; SHA-256 of the compact
+inventory is `2c5030e8b8dfc330c75583e48996d6ef7042609d8996b9e13c0a997bfd11f5fe`.
+Formatting and diff checks pass. Full standalone Core/Geometry suites are not rerun for this
+GUI-session-only change; full GUI and native compatibility exercise their existing consumers.
+
+Separate native startup reaches the intentional timeout **124**. Logs retain the existing Medium
+depth/stencil warning, with no High-severity or drawable failure. No native retry is required in C1.

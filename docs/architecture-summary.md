@@ -59,6 +59,15 @@ own BRep, constraint mathematics, dimension measurements, units, parameter expre
 authority, recompute, persistent Sketch topology, target identity, spline representation, or text
 persistence.
 
+## Complete Part workflow transactions — Block 145C1
+
+The existing `GuiDocumentSession` remains the sole history and sidecar publication authority.
+Its transient workflow checkpoint composes existing validated Sketch/feature transactions into one
+root Apply and restores the complete prior session on Cancel. Save writes committed entry intent
+while draft work is active. Exact API, failure, metadata, history and adoption boundaries are owned
+by [the shared UI contract](user-interface.md#shared-property-panel-behavior); no persistent schema
+or replacement transaction database is introduced. Qt breadcrumb adoption belongs to 145C2.
+
 ## PartDocument and Part construction authority
 
 `PartDocument` is persistent parametric definition authority. Implemented Part intent includes typed
