@@ -61,6 +61,9 @@ Result<geometry::AssemblyRevoluteSweepAnalysis> GuiAnalysisExportWorkbench::anal
 
 Result<std::size_t> GuiAnalysisExportWorkbench::preflight_step_export(
     const GuiDocumentSession& session, const GuiStepExportRequest& request) const {
+  if (session.part_workflow_active())
+    return Result<std::size_t>::failure(Error::export_error(
+        "gui.step_export", "Apply or cancel the Part workflow before STEP export."));
   if (request.output.empty())
     return Result<std::size_t>::failure(Error::export_error("gui.step_export", "output path must not be empty"));
   const auto protected_source = validate_step_import_output_path(session, request.output);

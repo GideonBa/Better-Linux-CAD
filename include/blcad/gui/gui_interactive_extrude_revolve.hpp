@@ -161,10 +161,32 @@ private:
     second_distance_parameter_.reset();
     pending_second_distance_parameter_.reset();
     active_ = true;
+    source_valid_ = true;
   }
 
 public:
   [[nodiscard]] bool active() const noexcept { return active_; }
+
+  // An explicit source-Sketch round trip retains authored feature settings but
+  // replaces pending profile materialization with the current source. A failed
+  // revalidation cannot subsequently publish an older pending Sketch.
+  [[nodiscard]] Result<std::size_t> refresh_source(const GuiDocumentSession& session) {
+    source_valid_ = false;
+    const auto* part = session.part_document();
+    const auto* sketch = part ? part->find_sketch(sketch_) : nullptr;
+    if (!active_ || !sketch)
+      return fail("the selected source Sketch is unavailable");
+    if (profile_) {
+      auto pending = prepare_interactive_profile(*part, sketch_, *profile_);
+      if (!pending)
+        return Result<std::size_t>::failure(pending.error());
+      pending_profile_materialization_ = std::move(pending.value());
+    } else if (!interactive_thin_line(*sketch)) {
+      return fail("restore the selected single open line before returning to Extrude");
+    }
+    source_valid_ = true;
+    return Result<std::size_t>::success(1U);
+  }
 
   void set_operation(FeatureBodyOperationMode operation, std::optional<BodyId> target = std::nullopt) {
     operation_ = operation;
@@ -281,6 +303,8 @@ public:
   // Every interactive controller exposes the same `handles()` surface so the
   // coordinator can publish them without knowing which family is active.
   [[nodiscard]] std::vector<GuiViewportManipulatorHandle> handles() const {
+    if (!source_valid_)
+      return {};
     std::vector<GuiViewportManipulatorHandle> handles;
     if (auto handle = extent_handle()) handles.push_back(std::move(*handle));
     if (auto handle = taper_handle()) handles.push_back(std::move(*handle));
@@ -528,6 +552,9 @@ private:
   }
 
   [[nodiscard]] Result<Feature> build_feature() const {
+    if (!source_valid_)
+      return Result<Feature>::failure(Error::validation(
+          sketch_.value(), "Source Sketch is invalid; edit it again or cancel and reselect."));
     auto context = build_context();
     if (context.has_error()) return Result<Feature>::failure(context.error());
 
@@ -588,6 +615,7 @@ private:
   }
 
   bool active_{false};
+  bool source_valid_{true};
   SketchId sketch_{""};
   std::optional<ProfileId> profile_;
   FeatureId feature_{""};

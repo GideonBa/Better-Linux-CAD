@@ -23,6 +23,7 @@ class QFormLayout;
 class QLineEdit;
 class QSpinBox;
 class QPushButton;
+class QToolButton;
 class QString;
 class QWidget;
 
@@ -151,6 +152,11 @@ public:
   [[nodiscard]] bool select_open_line(SketchId sketch);
   void clear_profile_selection() noexcept;
   [[nodiscard]] Result<std::size_t> begin_extrude();
+  [[nodiscard]] Result<std::size_t> edit_extrude_source_sketch();
+  void resume_extrude_source_sketch(SketchId finished);
+  [[nodiscard]] bool editing_source_sketch() const noexcept {
+    return editing_source_sketch_;
+  }
   [[nodiscard]] bool accept_extrude_selection(const GuiSelection& selection);
   [[nodiscard]] std::vector<geometry::ViewportSceneItem> extrude_selection_items() const;
   [[nodiscard]] Result<std::size_t> begin_revolve(std::optional<DatumAxisId> axis = std::nullopt);
@@ -326,6 +332,9 @@ private:
   void build_extrude_controls(QWidget* panel);
   void clear_extrude_diagnostics();
   void reset_extrude_controls(GuiFeatureManipulatorFrame frame);
+  void refresh_extrude_reference_choices(bool preserve);
+  void refresh_extrude_frame(const GuiSketchPlaneView& plane, SketchId sketch);
+  void refresh_extrude_breadcrumbs();
   void update_extrude_controls();
   void update_extrude_pick_mode();
   void restore_extrude_selection();
@@ -419,6 +428,12 @@ private:
 
   QWidget* overlay_{nullptr};
   QDockWidget* task_dock_{nullptr};
+  QWidget* feature_breadcrumbs_{nullptr};
+  QLabel* feature_context_{nullptr};
+  QToolButton* feature_breadcrumb_{nullptr};
+  QToolButton* source_breadcrumb_{nullptr};
+  std::optional<ProfileContext> extrude_source_;
+  bool editing_source_sketch_{false};
   QLabel* task_summary_{nullptr};
   QAction* action_apply_{nullptr};
   QLabel* value_label_{nullptr};

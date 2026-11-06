@@ -1,6 +1,6 @@
 #include "blcad/gui/shell/shell_measure_tools.hpp"
-#include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_appearance.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
@@ -204,8 +204,8 @@ ShellMeasureTools::~ShellMeasureTools() {
 }
 
 Result<std::size_t> ShellMeasureTools::begin(GuiMeasureKind kind) {
-  if (active() || session_.task().active() || window_.active_sketch() || !session_.has_document() ||
-      !session_.derived_results_fresh())
+  if (active() || session_.part_workflow_active() || session_.task().active() ||
+      window_.active_sketch() || !session_.has_document() || !session_.derived_results_fresh())
     return fail("Measure requires a document with current geometry without an active command");
   auto built = rebuild_catalogue();
   if (!built)
@@ -471,7 +471,8 @@ void ShellMeasureTools::refresh_presentation() {
   overlay->update();
 }
 void ShellMeasureTools::refresh() {
-  const bool available = !active() && !session_.task().active() && !window_.active_sketch() &&
+  const bool available = !active() && !session_.part_workflow_active() &&
+                         !session_.task().active() && !window_.active_sketch() &&
                          session_.derived_results_fresh();
   const bool part_shapes =
       session_.part_shape_cache() && (session_.part_shape_cache()->body_shape_count() ||

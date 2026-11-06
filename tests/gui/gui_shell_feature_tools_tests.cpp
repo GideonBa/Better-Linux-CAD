@@ -437,9 +437,14 @@ TEST_CASE("Finish Sketch cancels a re-armed Line step and exposes the closed pro
 
   REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
   CHECK_FALSE(feature_tools.extrude_action().isEnabled());
+  // Root cancellation restores a complete session checkpoint. Reacquire by
+  // semantic identity instead of retaining a borrowed Sketch across replacement.
+  const auto* restored = window.session().part_document()->find_sketch(SketchId("sketch.skizze1"));
+  REQUIRE(restored != nullptr);
+  REQUIRE(restored->closed_profiles().size() == 1U);
   const std::string line_semantic =
       "sketch/sketch.skizze1/entity/" +
-      finished->closed_profiles().front().line_segments().front().value();
+      restored->closed_profiles().front().line_segments().front().value();
   REQUIRE(window.viewport().select_semantic(line_semantic));
   REQUIRE(feature_tools.extrude_action().isEnabled());
   feature_tools.extrude_action().trigger();

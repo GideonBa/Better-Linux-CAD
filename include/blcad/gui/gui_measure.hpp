@@ -30,6 +30,8 @@ struct GuiMeasureResult {
 class GuiMeasureController {
 public:
   [[nodiscard]] Result<std::size_t> begin(const GuiDocumentSession& session, GuiMeasureKind kind) {
+    if (session.part_workflow_active())
+      return fail("Apply or cancel the Part workflow before Measure.");
     if (!session.has_document())
       return fail("Measure requires an active document");
     kind_ = kind;
@@ -67,6 +69,8 @@ public:
   }
 
   [[nodiscard]] Result<GuiMeasureResult> preview(const GuiDocumentSession& session) const {
+    if (session.part_workflow_active())
+      return preview_fail("Apply or cancel the Part workflow before Measure.");
     if (!active_)
       return preview_fail("no Measure command is active");
     if (!session.derived_results_fresh())

@@ -324,6 +324,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/occt_viewport.cpp
     src/gui/shell/shell_feature_tools.cpp
     src/gui/shell/shell_extrude_tools.cpp
+    src/gui/shell/shell_feature_workflow.cpp
     src/gui/shell/shell_property_controls.cpp
     src/gui/shell/shell_revolve_tools.cpp
     src/gui/shell/shell_finishing_tools.cpp
@@ -663,6 +664,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_command_state_tests.cpp
       tests/gui/gui_document_session_tests.cpp
       tests/gui/gui_part_workflow_transaction_tests.cpp
+      tests/gui/gui_feature_source_workflow_tests.cpp
       tests/gui/gui_step_import_workbench_tests.cpp
       tests/gui/gui_imported_body_preview_tests.cpp
       tests/gui/gui_shell_step_import_tests.cpp

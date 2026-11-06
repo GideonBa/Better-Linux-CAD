@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 144
 current_block: 145
-current_boundary: Block 145C1 verified in PR #141; merge before breadcrumb UI
+current_boundary: Block 145C2 verified; protected delivery before profile/Create Another
 current_tag: "[parity-b145]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -34,9 +34,9 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 144
-current block        Block 145 (in progress; slice C1)
+current block        Block 145 (in progress; slice C2)
 current phase        Shared workflow contract and evidence inventory
-current boundary     Complete Part workflow transaction before breadcrumb UI
+current boundary     Existing-owner Extrude/source Sketch navigation
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1827,8 +1827,9 @@ for the next slice/branch.
 | --- | --- | --- |
 | 145A | Extend existing capability inventory with explicit planned/implemented API/command/proof mappings, reject invalid evidence, capture reproducible unchanged-intent/geometry and timing baseline | Merged via PR #139 |
 | 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Merged via PR #140 |
-| 145C1 | Extend existing GuiDocumentSession with a complete transient Part-workflow checkpoint, committed-only Save and one-history publication; headless failure/history/sidecar tests | Verified; delivery PR #141 |
-| 145C2 | Existing-owner Extrude/Sketch breadcrumb transition and Create Another, using C1; combined native/compact/scaled integration and Block-145 closure | Not started |
+| 145C1 | Extend existing GuiDocumentSession with a complete transient Part-workflow checkpoint, committed-only Save and one-history publication; headless failure/history/sidecar tests | Merged via PR #141 |
+| 145C2 | Existing-owner Extrude/source Sketch breadcrumbs using C1, revalidation, complete Cancel, committed-only Save and guarded consumers; native integration | Verified; protected delivery pending |
+| 145C3 | Explicit profile-selector command-first/Create Another lifecycle, retained compatible settings without hidden targets; whole-Block-145 native/compact/scaled closure | Not started |
 
 145A starts on `feat/advanced-workflow-evidence` from clean `dbff649`, after verified merged
 PR #138 and refreshed main. `user-interface.md` owns the slice design and baseline boundaries.
@@ -1885,7 +1886,26 @@ cases, 1 native-only skip / 2,223 assertions**. Full GUI passes **637 cases, 33 
 C2 remains required, and implemented-through remains 144.
 
 Delivery: [PR #141](https://github.com/GideonBa/Better-Linux-CAD/pull/141), implementation `861a5c6`.
-Merge normally, verify the resulting tree and refresh main before starting the UI adopter.
+PR #141 is merged as `dc0a235`; refreshed main matches the tested tree.
+`feat/feature-source-workflow` starts from that verified state. C2 delivers the source-edit
+transition and consumer guards; C3 separately delivers fresh profile collection/Create Another.
+The split keeps the root transaction and selection lifecycle reviewable without advancing Block 145.
+
+C2 adopts complete workflows in the current Extrude owner and existing Sketch workspace. It adds
+fixed Part/Draft and source breadcrumbs, explicit pending-source revalidation, refreshed frames and
+semantic limits, local Sketch history, complete root cancellation and one validated root Apply.
+STEP/full-model Measure guard draft geometry. A stale borrowed pointer in an old test is replaced
+with stable-ID lookup after cancellation; a genuine selection regression is fixed by rebuilding the
+restored scene before restoring selection. Contracts, actual Qt proof inventory and native images
+are updated. No Core/schema change and no C3 completion is claimed.
+
+GUI/application build, scoped formatting and diff checks pass. Focused affected families: **48
+passed, 2 native-only skips / 5,537 assertions**; feature/finish focus: **60 passed, 2 native-only
+skips / 2,392**. Full GUI: **641 passed, 34 native-only skips / 86,827**. Broad native: **57/59**
+pass; two existing cursor-settling failures in Surface/rotor dropdowns pass a focused complete repeat
+(**2 / 1,486**), without product or harness changes. Native 150%: **22 / 3,920**, no skips. Captures
+are reviewed and startup reaches intentional timeout 124. `development-setup.md` retains exact
+commands, failed initial attempts, freeze and scope limits. Implemented-through remains 144.
 
 ## Later phases
 
