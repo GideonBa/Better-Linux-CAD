@@ -3055,3 +3055,6 @@ Separate native startup reaches intentional timeout **124** (`/tmp/blcad145c2-st
 The known Medium depth/stencil warning remains; no High-severity or drawable failure is observed.
 All 955 runtime fingerprints remain unchanged through final native/scaled/startup verification.
 Final source/staged diff review and protected PR delivery follow; Block 145 remains open for C3.
+
+Delivery: [PR #142](https://github.com/GideonBa/Better-Linux-CAD/pull/142), implementation `11fd8a8`.
+The delivery-record commit changes documentation only and preserves the final runtime freeze.
