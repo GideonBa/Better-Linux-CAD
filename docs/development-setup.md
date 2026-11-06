@@ -2843,3 +2843,5 @@ inventory digest is `2d3b6cf35471d6800ae5999230f4bdfd8ab443516b53f3036a0a1f4d661
 
 Source/staged diff review and normal protected PR delivery are required. Block 145 remains open
 for shared controls (145B), breadcrumb/Create Another lifecycle (145C) and whole-block acceptance.
+Delivery is PR #139, implementation `40bcd79`; the final delivery-record edit changes documentation
+only and retains the same runtime inventory. Main must be refreshed after regular merge.

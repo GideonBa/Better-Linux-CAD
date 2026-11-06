@@ -1825,7 +1825,7 @@ for the next slice/branch.
 
 | Slice | Deliverable | Status |
 | --- | --- | --- |
-| 145A | Extend existing capability inventory with explicit planned/implemented API/command/proof mappings, reject invalid evidence, capture reproducible unchanged-intent/geometry and timing baseline | Implemented and verified; delivery in progress |
+| 145A | Extend existing capability inventory with explicit planned/implemented API/command/proof mappings, reject invalid evidence, capture reproducible unchanged-intent/geometry and timing baseline | Implemented and verified; PR #139 |
 | 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Not started |
 | 145C | Existing-owner Sketch/feature breadcrumb transition, complete candidate restoration and Create Another lifecycle; native integration and closure | Not started |
 
@@ -1847,6 +1847,10 @@ modeling/layout baseline passes **6 / 390** at both 100% and 150%; ordinary/comp
 reviewed. Exact commands, measured limits, sandbox file-publication retry and startup evidence
 live in `development-setup.md`. No new property controls, CAD operation or document schema are
 claimed by this slice. 145B/C remain required before completing Block 145.
+
+Delivery: [PR #139](https://github.com/GideonBa/Better-Linux-CAD/pull/139), implementation `40bcd79`.
+The documentation-only delivery record preserves the 943 runtime fingerprints. Merge normally,
+refresh main and verify the reviewed tree before creating the 145B branch.
 
 ## Later phases
 
