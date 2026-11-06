@@ -55,6 +55,23 @@ The extent arrow (`extrude.extent`, Linear), taper wheel (`extrude.taper`, Angul
 distance and thickness parameter values and adds the feature in one transaction, so undo reverts the
 parameter change and the feature together.
 
+## Shared property controls — Block 145B, 2026-11-06
+
+Extrude now uses the reusable Input Geometry, Behavior and Advanced groups defined in
+[user-interface.md](user-interface.md#shared-property-panel-behavior). Its existing first/second
+limit-face combos retain semantic-reference authority; visible Pick/Clear controls delegate to the
+same role-filtered viewport selection. Clearing a required face disables Apply, including after
+reselecting the same face with signals blocked by selection synchronization. Collapsed invalid
+groups retain a text diagnostic indicator. The selected profile summary uses the source Sketch name.
+
+Ctrl+Enter validates the displayed primary scalar, then the complete candidate before Apply; it
+cannot commit a previous valid scalar while rejected text is displayed. Apply/Cancel remain outside
+the scrolling groups. The shared scalar/manipulator row stays above those groups, and all groups
+start expanded; these deliberate layout choices preserve existing feature-family input paths.
+This slice changes presentation only. Nested Sketch editing and Create Another belong to 145C.
+Executable proofs are `[property-controls-widget]` and `[property-controls-native]`; ordinary and
+scaled native evidence is recorded in `development-setup.md`.
+
 ## Replacement-shell extent editor — Block 136, 2026-10-24
 
 The existing Extrusion task now exposes all seven scalar/face termination modes, `NewBody`,

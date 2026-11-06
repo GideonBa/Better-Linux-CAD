@@ -2845,3 +2845,62 @@ Source/staged diff review and normal protected PR delivery are required. Block 1
 for shared controls (145B), breadcrumb/Create Another lifecycle (145C) and whole-block acceptance.
 Delivery is PR #139, implementation `40bcd79`; the final delivery-record edit changes documentation
 only and retains the same runtime inventory. Main must be refreshed after regular merge.
+
+
+## Block 145B shared property controls — 2026-11-06
+
+Slice B starts from verified main `ff39198` after merged PR #139. Reusable property groups and
+semantic selector presentation are adopted in the existing Extrude owner. No Core/Geometry/schema
+change is made; breadcrumb transactions and Create Another remain assigned to 145C. Tests cover
+keyboard collapse, plain-text diagnostics/accessibility, Pick/Clear owner lifetime, blocked-signal
+selection synchronization, disabled inputs, invalid/corrected fields, compact completion controls,
+Ctrl+Enter's actual typed scalar, and physical native first/second face picking.
+
+```bash
+cmake --build build/dev-gui --target blcad_gui_tests blcad_app -j8
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[parity-b145],[gui][shell-coverage],[block136-extrude-extents],[block136-extrude-limit-picking],[block136-thin-extrude]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests
+QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad145b-native-100 ./build/dev-gui/blcad_gui_tests "[property-controls],[shell-combined-workflow],[workflow-layout],[appearance],[icons]"
+```
+
+Final GUI test/application build passes (`/tmp/blcad145b-build.log`). Focused offscreen passes
+**28 cases — 27 passed, 1 expected native-only skip / 3,682 assertions**
+(`/tmp/blcad145b-focused.log`). The native property-controls focus separately passes **4 / 183**,
+without skips (`/tmp/blcad145b-native-focus.log`). Full offscreen GUI passes **659 cases —
+626 passed, 33 expected native-only skips / 85,853 assertions** (`/tmp/blcad145b-gui-full.log`).
+Broad native 100% passes **57 / 23,719**, without skips (`/tmp/blcad145b-native-100.log`).
+Native 150% passes **12 / 1,862**, without skips (`/tmp/blcad145b-native-150-repeat.log`). The first
+150% run passed all affected feature assertions but missed one Down-arrow navigation in the existing
+command-search test (row remained 0); its identical fresh-process repeat passes the whole filter.
+This native focus observation is retained rather than counted as an initial clean run. No search
+implementation change is included. Full Core/Geometry suites are not rerun for this presentation
+slice; full GUI and native combinations exercise their existing consumers.
+
+During development the physical scalar oracle caught Ctrl+Enter applying the old 10 mm depth
+instead of the typed 8 mm when native focus changed. The final route validates displayed text
+regardless of focus; it produces exactly one 1600 mm³ solid and one undoable feature. A second
+regression caught stale selection counts when the existing viewport owner blocks combo signals;
+explicit presentation synchronization now refreshes count and Clear enablement without issuing
+another pick callback. Source profile summaries use the existing selection helpers, since the idle
+command-discovery helper deliberately returns no context during a task.
+
+The scaled command is:
+
+```bash
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad145b-native-150 ./build/dev-gui/blcad_gui_tests "[property-controls],[hermes-design-workflow],[workflow-layout],[shell-combined-extrude-extents],[shell-combined-extrude-limit-picking]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+Captures under `/tmp/blcad145b-native-{100,150}` are inspected: ordinary and compact panels retain
+reachable Apply/Cancel, source names and ordered groups; native both-limit capture shows the
+selected semantic faces and valid result. At 150% the scroll area carries the longer form without
+pushing completion controls offscreen. Startup reaches intentional timeout **124**. The known
+Medium depth/stencil warning remains; no High-severity/drawable failure is observed.
+
+Final source formatting and `git diff --check` pass. The 797 code/test/CMake fingerprints frozen in
+`/tmp/blcad145b-runtime-freeze.json` are unchanged through focused/full/native checks (digest
+`f45229c2857acd480651763b952f23fb369b2f9eec1e0d2476fbcd8ce31ec7fd`). Documentation is outside
+that freeze. Source and staged review precede protected PR delivery. Block 145 remains open for C.
+
+Delivery: [PR #140](https://github.com/GideonBa/Better-Linux-CAD/pull/140), implementation `84fd6e1`.
+The final delivery record changes documentation only; runtime fingerprints remain unchanged.

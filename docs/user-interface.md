@@ -72,8 +72,8 @@ The same preview at 1024×640 keeps Apply and Cancel reachable:
 ## Planned Inventor-like workflow contract
 
 Planning request: 2026-11-06. This section is the shared UI target for
-[Blocks 145–204](inventor-parity-sequence.md), not a claim that the following new controls exist.
-The Block-144 layout above remains the current implemented baseline. Numbered status belongs to
+[Blocks 145–204](inventor-parity-sequence.md), a target whose delivered slices are recorded below.
+The Block-144 layout above remains the shell baseline; Block 145 adds shared controls serially. Numbered status belongs to
 `mvp-plan.md`; [UI01 and the combined test plan](inventor-parity-test-plan.md) own acceptance evidence.
 
 The target closely follows Inventor's command organization, model-browser interaction and ordered
@@ -102,8 +102,23 @@ solid and canonical JSON invariance, using three fresh-session and ten reused-co
 Fresh-session timing is not a cold-process benchmark. An explicitly requested artifact records
 all raw samples, environment, source/runtime SHA-256 inventory and geometry/intent evidence;
 it makes no latency guarantee. Existing native modeling/layout tests supply the unchanged UI
-baseline at ordinary/compact sizes and 100%/150% scales. New property controls and breadcrumb
-behavior remain unimplemented until 145B/C pass their gates. No file-format or Core change occurs.
+baseline at ordinary/compact sizes and 100%/150% scales. Slice 145B implements the property
+controls below; breadcrumb behavior remains assigned to 145C. No file-format or Core change occurs.
+
+Block 145B design (2026-11-06): `ShellPropertyGroup` provides a keyboard-toggleable heading,
+owned content and a plain-text diagnostic that remains indicated in a collapsed heading.
+`ShellPropertySelector` wraps an existing semantic-reference combo, exposes Pick/Clear and a
+selection count, and delegates active picking to its existing command owner. It stores no model
+identity or selection authority. Extrude adopts Input Geometry, Behavior and Advanced groups;
+first/second limit-face selectors reuse its existing capability-filtered pick roles and overlays.
+Clearing a required face invalidates Apply until explicitly reselected. Groups begin expanded to
+preserve discoverability and existing command input paths; collapse is transient. The shared scalar
+HUD row remains above these groups to preserve the common manipulator flow across feature families.
+Field/group diagnostics use text as well as styling; changing modes clears obsolete diagnostics.
+Ctrl+Enter is adopted first by Extrude and validates its displayed scalar input before applying;
+invalid input cannot apply the previous value. Other feature families retain their existing keyboard
+behavior until their own controls are migrated. Apply/Cancel stay outside scrolling group content.
+No persistence change or nested Sketch editing is introduced; 145C owns that separate lifecycle.
 
 1. A compatible preselection starts the command with its first semantic input populated; command-first
    entry activates that selector. Input rows have labelled roles, selection counts, clear controls,
