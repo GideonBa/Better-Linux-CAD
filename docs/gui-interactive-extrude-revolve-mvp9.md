@@ -72,6 +72,27 @@ This slice changes presentation only. Nested Sketch editing and Create Another b
 Executable proofs are `[property-controls-widget]` and `[property-controls-native]`; ordinary and
 scaled native evidence is recorded in `development-setup.md`.
 
+## Source Sketch breadcrumb — Block 145C2, 2026-11-06
+
+The existing Extrude owner opens the complete Part workflow defined in
+[user-interface.md](user-interface.md#shared-property-panel-behavior), and displays a fixed
+Part/Draft context plus Extrude/source Sketch breadcrumbs above scrolling inputs. Entering the
+source suspends that feature task and uses the accepted Sketch workspace/tools. Extrude fields
+are disabled until Finish Sketch or the Extrude breadcrumb returns. Source Sketch Cancel ends the
+whole workflow; Sketch gesture Escape retains its existing priority. Local Sketch Undo/Redo cannot
+cross the workflow entry state. Ordinary Sketch entry keeps its existing behavior.
+
+`GuiInteractiveExtrudeController::refresh_source` explicitly revalidates the retained source identity,
+replaces pending raw-profile materialization and retains authored settings/new inputs. A rejected
+source disables future Preview/Apply until corrected; the old pending Sketch cannot overwrite edits.
+The shell refreshes manipulator frames and semantic limit choices while retaining selected identities.
+Complete Apply runs the existing controller on a disposable session copy, then publishes the root
+workflow once. Failure leaves the working source/settings correctable. Save/Save As writes entry
+intent and both entry sidecars. STEP export and full-model Measure reject active workflow drafts.
+No schema or new geometric capability is added. Create Another and command-first profile collection
+remain slice 145C3. Source controller/widget/native proofs use `[source-sketch-workflow]` and its
+more specific tags; actual acceptance results belong in `development-setup.md`.
+
 ## Replacement-shell extent editor — Block 136, 2026-10-24
 
 The existing Extrusion task now exposes all seven scalar/face termination modes, `NewBody`,

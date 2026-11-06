@@ -2959,3 +2959,102 @@ depth/stencil warning, with no High-severity or drawable failure. No native retr
 
 Delivery: [PR #141](https://github.com/GideonBa/Better-Linux-CAD/pull/141), implementation `861a5c6`.
 The delivery-record commit is documentation only and preserves the runtime freeze.
+
+
+## Block 145C2 source Sketch breadcrumb — 2026-11-06
+
+C2 starts on `feat/feature-source-workflow` from verified main `dc0a235`, after normal merge of
+PR #141 and exact tree comparison. The current Extrude owner adopts C1's complete Part workflow.
+A fixed Part/Draft context and compact Extrude/source breadcrumb row sit above scrolling inputs;
+Sketch editing uses the existing workspace/tools. Local Undo/Redo, complete Cancel, committed-only
+Save, pending-source revalidation, current frames/limit choices and root-only publication are
+covered. STEP and full-model Measure reject a workflow draft. No Core/schema change occurs.
+C3 still owns command-first profile collection/Create Another and complete Block-145 acceptance.
+
+```bash
+cmake --build build/dev-gui --target blcad_gui_tests blcad_app -j8
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[source-sketch-workflow],[property-controls-widget],[part-workflow]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[parity-b145],[gui][shell-coverage],[block136-extrude-extents],[block136-extrude-limit-picking],[block136-thin-extrude],[block136-path-extrude]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[block136-path-extrude],[gui][shell-coverage]"
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests
+```
+
+Build passes (`/tmp/blcad145c2-build.log`). Initial source/property/transaction focus passes
+**19 cases — 18 passed, 1 expected native-only skip / 1,080 assertions**
+(`/tmp/blcad145c2-focused.log`). Final broader focus passes **50 cases — 48 passed, 2 expected
+native-only skips / 5,537 assertions** (`/tmp/blcad145c2-focused-final.log`). Path/Coverage passes
+**11 / 1,260**, without skips (`/tmp/blcad145c2-path-coverage.log`). The shell inventory keeps only
+actual Qt widget/native proof sources in its `shell.proofs`; controller/consumer proofs remain in
+their owning contracts/tests until the whole shared workflow entry is adopted in C3.
+
+The first new UI fixture attempted Extrude immediately after Save As, which invalidates its prior
+profile handoff in the existing shell. It now explicitly selects the source Sketch in the browser
+before command entry. No change to that existing selection policy is hidden in C2. Native initial
+source focus passes **5 / 551**, without skips (`/tmp/blcad145c2-native-focus.log`), including a
+physically selected and typed driving dimension, 6400 mm³ final geometry, failed input recovery,
+complete cancellation, one-step Undo/Redo and reopening. The subsequent breadcrumb caption/layout
+refinement is covered by final frozen full/native checks below; this initial run alone is not
+claimed as final native acceptance.
+
+Runtime source/test/asset/build-script freeze contains 955 files in
+`/tmp/blcad145c2-runtime-freeze.json`; compact-inventory SHA-256 is
+`33fd9b98982e002c5e6bf71f3fc6f139a25915bbab8a2d539da1c503d1be4227`.
+The full GUI and final native checks run serially against this unchanged implementation.
+
+
+The first full run stops at case 159 because an existing Finish-Sketch test retained a borrowed
+Sketch pointer across complete workflow cancellation. GDB locates the invalid dereference in the
+test's line-semantic construction. The test now reacquires the restored Sketch by stable ID before
+continuing; no durable raw-pointer guarantee is introduced. The subsequent broad feature/finish
+focus also catches selection being cleared by the late scene rebuild after cancellation. The owner
+now rebuilds the restored scene before reapplying its prior semantic selection, preserving browser-
+only session selection where no viewport target existed. The new source-widget case checks exact
+entry selection after source edits and Cancel. These corrections invalidate the initial full run;
+full/native final acceptance repeats against the updated freeze above.
+
+Final Shell-feature/Finish-Sketch/source focus passes **62 cases — 60 passed, 2 expected native-only
+skips / 2,392 assertions** (`/tmp/blcad145c2-finish-regression.log`). Scoped formatting of changed
+tracked lines produces an empty patch; newly added source/test files also pass clang-format checks.
+Unrelated existing formatting is preserved.
+
+Final full offscreen GUI passes **675 cases — 641 passed, 34 expected native-only skips /
+86,827 assertions** (`/tmp/blcad145c2-gui-full.log`). All runtime fingerprints match the updated
+freeze. Final native/scaled acceptance follows on that same source.
+
+
+Final broad native 100% executes **59 cases — 57 passed, 2 failed / 22,785 passed assertions**
+(`/tmp/blcad145c2-native-100.log`). Both failures are the existing popup harness's native cursor-
+settling precondition in Surface contexts and the complex rotor parameter chooser: requested row
+positions remain correct, but actual desktop cursor positions differ, once outside the first screen.
+No product or harness logic is changed to hide this condition. A targeted fresh-process repeat of
+both complete workflows passes **2 cases / 1,486 assertions**, without skips
+(`/tmp/blcad145c2-native-popup-repeat.log`), including 20/40-blade rotor variants. The new source,
+selection, property and viewer cases pass in the original broad run.
+
+Native 150% passes **22 cases / 3,920 assertions**, without skips
+(`/tmp/blcad145c2-native-150.log`). It includes source editing, physical dimension label input,
+compact completion controls, ordinary modeling/history/reopen, all affected Extrude modes and
+selection/Finish-Sketch regressions. These final commands run serially against the freeze:
+
+```bash
+QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad145c2-native-100 ./build/dev-gui/blcad_gui_tests "[source-sketch-workflow],[shell-combined-workflow],[property-controls],[workflow-layout],[extrude-regression],[native-viewer-lifecycle]"
+QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad145c2-native-100 ./build/dev-gui/blcad_gui_tests "[shell-combined-surface-context],[complex-part-workflow]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad145c2-native-150 ./build/dev-gui/blcad_gui_tests "[source-sketch-workflow],[property-controls],[hermes-design-workflow],[workflow-layout],[shell-combined-extrude-extents],[shell-combined-extrude-limit-picking],[shell-combined-thin-extrude],[shell-combined-path-extrude],[extrude-regression]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+Final ordinary/compact source and return captures at both scales are inspected. The source view
+shows the existing Sketch ribbon/tools and disabled Extrude inputs; return restores the authored
+8 mm depth, current preview and reachable Apply/Cancel. Representative real captures are checked
+in at `docs/images/extrude-source-sketch.png` and `docs/images/extrude-source-compact.png`. Long
+breadcrumb captions elide visually while retaining their full accessible name. Full standalone
+Core/Geometry suites are not rerun: no source in those libraries changes; full GUI and native
+combinations exercise their current geometry and persistence consumers.
+
+Separate native startup reaches intentional timeout **124** (`/tmp/blcad145c2-startup.log`).
+The known Medium depth/stencil warning remains; no High-severity or drawable failure is observed.
+All 955 runtime fingerprints remain unchanged through final native/scaled/startup verification.
+Final source/staged diff review and protected PR delivery follow; Block 145 remains open for C3.
+
+Delivery: [PR #142](https://github.com/GideonBa/Better-Linux-CAD/pull/142), implementation `11fd8a8`.
+The delivery-record commit changes documentation only and preserves the final runtime freeze.

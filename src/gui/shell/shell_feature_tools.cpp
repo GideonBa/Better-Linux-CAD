@@ -30,6 +30,7 @@
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStatusBar>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -313,7 +314,38 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   scroll->setWidgetResizable(true);
   scroll->setFrameShape(QFrame::NoFrame);
   scroll->setWidget(panel);
+  feature_breadcrumbs_ = new QWidget(dock_contents);
+  feature_breadcrumbs_->setObjectName("blcad.feature.breadcrumbs");
+  auto* context_column = new QVBoxLayout(feature_breadcrumbs_);
+  context_column->setContentsMargins(0, 0, 0, 0);
+  feature_context_ = new QLabel(feature_breadcrumbs_);
+  feature_context_->setObjectName("blcad.feature.edit_context");
+  feature_context_->setTextFormat(Qt::PlainText);
+  feature_context_->setWordWrap(true);
+  context_column->addWidget(feature_context_);
+  auto* trail = new QHBoxLayout();
+  feature_breadcrumb_ = new QToolButton(feature_breadcrumbs_);
+  feature_breadcrumb_->setObjectName("blcad.feature.breadcrumb");
+  feature_breadcrumb_->setText(QStringLiteral("Extrude"));
+  source_breadcrumb_ = new QToolButton(feature_breadcrumbs_);
+  source_breadcrumb_->setObjectName("blcad.feature.source_breadcrumb");
+  source_breadcrumb_->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
+  trail->addWidget(feature_breadcrumb_);
+  trail->addWidget(new QLabel(QStringLiteral("/"), feature_breadcrumbs_));
+  trail->addWidget(source_breadcrumb_);
+  trail->addStretch(1);
+  context_column->addLayout(trail);
+  dock_column->addWidget(feature_breadcrumbs_);
   dock_column->addWidget(scroll, 1);
+  connect(source_breadcrumb_, &QToolButton::clicked, this, [this] {
+    const auto result = edit_extrude_source_sketch();
+    if (!result)
+      report(result.error());
+  });
+  connect(feature_breadcrumb_, &QToolButton::clicked, this, [this] {
+    if (editing_source_sketch_)
+      (void)window_.finish_active_sketch();
+  });
   dock_column->addLayout(buttons);
   task_dock_->setWidget(dock_contents);
   window_.addDockWidget(Qt::RightDockWidgetArea, task_dock_);
@@ -334,7 +366,7 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   cancel_button_->installEventFilter(this);
 
   connect(numeric_editor_, &QLineEdit::editingFinished, this, [this] {
-    if (synchronizing_numeric_ || !active())
+    if (synchronizing_numeric_ || !active() || editing_source_sketch_)
       return;
     const auto preview = set_numeric_text(numeric_editor_->text());
     if (preview.has_error())
@@ -528,10 +560,18 @@ Result<std::size_t> ShellFeatureTools::begin_extrude() {
   if (body.has_error())
     return Result<std::size_t>::failure(body.error());
 
+  const auto workflow = session_.begin_part_workflow();
+  if (!workflow)
+    return workflow;
+  extrude_source_ =
+      ProfileContext{sketch, open_line ? std::nullopt : std::optional(selected.value().second)};
   preview_valid_ = false;
-  if (!session_.task().begin("part.extrude") || !session_.task().begin_parameter_editing())
+  if (!session_.task().begin("part.extrude") || !session_.task().begin_parameter_editing()) {
+    session_.cancel_part_workflow();
+    extrude_source_.reset();
     return Result<std::size_t>::failure(
         Error::validation("gui.shell.feature", "Could not start extrude task"));
+  }
   GuiFeatureManipulatorFrame frame{plane.value().origin, plane.value().normal, plane.value().normal,
                                    plane.value().x_axis};
   auto begun = coordinator_.begin_extrude_with_new_inputs(
@@ -539,22 +579,11 @@ Result<std::size_t> ShellFeatureTools::begin_extrude() {
       "Extrude " + suffix, std::move(parameter.value()), std::move(body.value()), frame);
   if (begun.has_error()) {
     (void)session_.task().cancel();
+    session_.cancel_part_workflow();
+    extrude_source_.reset();
     return begun;
   }
-  if (open_line) {
-    const auto& line = part->find_sketch(sketch)->line_segments().front();
-    const auto& view = plane.value();
-    const double dx = line.end().x - line.start().x, dy = line.end().y - line.start().y;
-    const double length = std::hypot(dx, dy);
-    const Point2 middle{(line.start().x + line.end().x) / 2, (line.start().y + line.end().y) / 2};
-    const Point3 origin{view.origin.x + middle.x * view.x_axis.x + middle.y * view.y_axis.x,
-                        view.origin.y + middle.x * view.x_axis.y + middle.y * view.y_axis.y,
-                        view.origin.z + middle.x * view.x_axis.z + middle.y * view.y_axis.z};
-    const Vector3 left{(-dy * view.x_axis.x + dx * view.y_axis.x) / length,
-                       (-dy * view.x_axis.y + dx * view.y_axis.y) / length,
-                       (-dy * view.x_axis.z + dx * view.y_axis.z) / length};
-    coordinator_.extrude().set_thin_manipulator_frame({origin, left, view.normal, view.x_axis});
-  }
+  refresh_extrude_frame(plane.value(), sketch);
   command_ = Command::Extrude;
   previous_selection_mask_ = viewport_.selection_filter_mask();
   previous_semantic_scope_ = viewport_.selection_semantic_scope();
@@ -980,7 +1009,26 @@ Result<std::size_t> ShellFeatureTools::apply() {
   auto preview = preview_and_publish();
   if (preview.has_error())
     return Result<std::size_t>::failure(preview.error());
-  auto applied = coordinator_.apply();
+  auto applied = [&]() -> Result<std::size_t> {
+    if (command_ != Command::Extrude)
+      return coordinator_.apply();
+    if (!session_.part_workflow_active())
+      return Result<std::size_t>::failure(
+          Error::validation("gui.shell.feature", "The Extrude workflow is no longer active."));
+    auto accepted = session_;
+    auto controller = coordinator_.extrude();
+    auto changed = controller.apply(accepted);
+    if (!changed)
+      return changed;
+    const auto label =
+        extrude_direction_->currentIndex() == 2 ? "Apply Path Extrude" : "Apply Extrude";
+    auto published = accepted.publish_part_workflow(label);
+    if (!published)
+      return published;
+    session_ = std::move(accepted);
+    coordinator_.cancel();
+    return changed;
+  }();
   if (applied.has_error())
     return applied;
   QAction* accepted_action = command_ == Command::Extrude   ? action_extrude_
@@ -1005,6 +1053,9 @@ Result<std::size_t> ShellFeatureTools::apply() {
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
   const bool restore_scope = finishing() || pattern() || body_operation() || spatial() || surface();
   command_ = Command::None;
+  if (was_extrude) {
+    extrude_source_.reset();
+  }
   if (restore_scope)
     viewport_.set_selection_semantic_scope(previous_semantic_scope_);
   if (restore_selection) {
@@ -1035,6 +1086,9 @@ Result<std::size_t> ShellFeatureTools::apply() {
 
 void ShellFeatureTools::cancel() noexcept {
   const bool was_active = command_ != Command::None || coordinator_.active();
+  if (editing_source_sketch_)
+    window_.abort_feature_source_sketch_view();
+  editing_source_sketch_ = false;
   if (coordinator_.active())
     coordinator_.cancel();
   if (viewport_.mouseGrabber() == &viewport_)
@@ -1050,6 +1104,10 @@ void ShellFeatureTools::cancel() noexcept {
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
   const bool restore_scope = finishing() || pattern() || body_operation() || spatial() || surface();
   command_ = Command::None;
+  if (was_extrude) {
+    session_.cancel_part_workflow();
+    extrude_source_.reset();
+  }
   if (restore_scope)
     viewport_.set_selection_semantic_scope(previous_semantic_scope_);
   if (restore_selection) {
@@ -1137,7 +1195,8 @@ void ShellFeatureTools::refresh_enablement() {
   refresh_body_enablement(idle_part);
   refresh_spatial_enablement(idle_part);
   refresh_surface_enablement(idle_part);
-  action_escape_->setEnabled(active());
+  action_escape_->setEnabled(active() && !editing_source_sketch_);
+  refresh_extrude_breadcrumbs();
   const std::string_view expected_command = command_id();
   const bool task_ready = session_.task().stage() == GuiTaskStage::Preview &&
                           session_.task().command_id() == expected_command;
@@ -1145,7 +1204,7 @@ void ShellFeatureTools::refresh_enablement() {
   if (action_apply_)
     // A corrected field can be validated even when its previous candidate
     // disabled Apply. apply() still validates the complete candidate.
-    action_apply_->setEnabled(active() && command_ == Command::Extrude);
+    action_apply_->setEnabled(active() && command_ == Command::Extrude && !editing_source_sketch_);
   cancel_button_->setEnabled(active());
   window_.refresh_context_toolbar();
 }
@@ -1243,13 +1302,14 @@ void ShellFeatureTools::synchronize_manipulator_editor(std::string_view handle) 
 }
 
 void ShellFeatureTools::synchronize_overlay() {
+  refresh_extrude_breadcrumbs();
   if (command_ == Command::Extrude)
-    extrude_controls_->setEnabled(layer_.active_handle_id().empty());
+    extrude_controls_->setEnabled(!editing_source_sketch_ && layer_.active_handle_id().empty());
   if (command_ == Command::Revolve)
     revolve_controls_->setEnabled(layer_.active_handle_id().empty());
-  const bool visible = active() && preview_valid_ && !layer_.handles().empty() &&
-                       !pattern_reference_picking_ && !body_reference_picking_ &&
-                       !extrude_reference_picking_;
+  const bool visible = active() && !editing_source_sketch_ && preview_valid_ &&
+                       !layer_.handles().empty() && !pattern_reference_picking_ &&
+                       !body_reference_picking_ && !extrude_reference_picking_;
   overlay_->setVisible(visible);
   if (visible) {
     overlay_->setGeometry(viewport_.rect());
@@ -1421,7 +1481,7 @@ bool ShellFeatureTools::eventFilter(QObject* watched, QEvent* event) {
     }
   }
 
-  if (event->type() == QEvent::KeyPress && active()) {
+  if (event->type() == QEvent::KeyPress && active() && !editing_source_sketch_) {
     const auto* key = static_cast<QKeyEvent*>(event);
     if (key->key() == Qt::Key_Escape) {
       handle_escape();

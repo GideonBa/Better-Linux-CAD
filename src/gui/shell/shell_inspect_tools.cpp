@@ -1,7 +1,7 @@
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
-#include "blcad/gui/gui_icons.hpp"
 #include "blcad/core/assembly_leaf_occurrence.hpp"
 #include "blcad/core/project_json.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_step_import_workbench.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -243,7 +243,8 @@ ShellInspectTools::ShellInspectTools(ShellWindow& window, ShellRibbon& ribbon, i
 
 bool ShellInspectTools::idle_and_fresh() const {
   return window_.session().has_document() && window_.session().derived_results_fresh() &&
-         !window_.session().task().active() && !window_.active_sketch();
+         !window_.session().part_workflow_active() && !window_.session().task().active() &&
+         !window_.active_sketch();
 }
 bool ShellInspectTools::source_unchanged() {
   const auto& session = window_.session();

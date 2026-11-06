@@ -515,7 +515,7 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/gui-interactive-extrude-revolve-mvp9.md",
-        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; all seven Extrude extents with role-based native selection/highlighting of bounded semantic source planes, four Body operations, reversed direction, a local second distance and taper; single-open-line Thin Extrude with three wall modes and atomic new thickness inputs; open-PathCurve Extrude with inherited orientation and no scalar inputs; Full/directed/Symmetric Revolve with typed compatible axes and operation-paired Cut intent; dedicated through-all single/bolt-circle cuts with typed inputs, bindings and complete atomic Preview/Apply. Rotation supports persistent editable Sketch-line identities in normal, construction and centerline roles through the existing axis selector, with current transformed workplanes and associative endpoint/plane updates. Block 145B adopts reusable Input Geometry/Behavior/Advanced property groups in Extrude, command-owned Pick/Clear limit-face selectors with counts and collapsed error diagnostics, and validated Ctrl+Enter completion. No new geometric capability or feature schema is added.",
+        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; all seven Extrude extents with role-based native selection/highlighting of bounded semantic source planes, four Body operations, reversed direction, a local second distance and taper; single-open-line Thin Extrude with three wall modes and atomic new thickness inputs; open-PathCurve Extrude with inherited orientation and no scalar inputs; Full/directed/Symmetric Revolve with typed compatible axes and operation-paired Cut intent; dedicated through-all single/bolt-circle cuts with typed inputs, bindings and complete atomic Preview/Apply. Rotation supports persistent editable Sketch-line identities in normal, construction and centerline roles through the existing axis selector, with current transformed workplanes and associative endpoint/plane updates. Block 145B adopts reusable Input Geometry/Behavior/Advanced property groups in Extrude, command-owned Pick/Clear limit-face selectors with counts and collapsed error diagnostics, and validated Ctrl+Enter completion. No new geometric capability or feature schema is added. Block 145C2 adds existing-owner Extrude/source Sketch breadcrumbs, complete draft cancellation, one root Apply with source intent, committed-only Save, explicit source refresh and guarded full-model STEP/Measure consumers. Create Another and command-first profile collection remain 145C3.",
         "gaps": [],
         "proofs": [
           {
@@ -593,6 +593,14 @@
           {
             "filter": "[property-controls-native]",
             "source": "tests/gui/gui_shell_extrude_extent_tests.cpp"
+          },
+          {
+            "filter": "[source-sketch-widget]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[source-sketch-native]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [

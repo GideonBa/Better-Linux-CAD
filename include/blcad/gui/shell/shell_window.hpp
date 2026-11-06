@@ -125,6 +125,9 @@ public:
   [[nodiscard]] bool create_sketch_on_selection();
   [[nodiscard]] bool finish_active_sketch();
   [[nodiscard]] bool cancel_face_supported_sketch();
+  // Narrow transition surface used only by the existing Extrude owner.
+  [[nodiscard]] bool enter_feature_source_sketch(SketchId sketch);
+  void abort_feature_source_sketch_view();
   [[nodiscard]] bool undo();
   [[nodiscard]] bool redo();
 
@@ -148,6 +151,7 @@ private:
   void reset_document_interaction();
   void reconcile_active_sketch();
   [[nodiscard]] bool enter_sketch(SketchId sketch);
+  void leave_sketch_view();
   void apply_viewport_selection(const std::optional<GuiSelection>& selection);
   void handle_tree_selection(QTreeWidgetItem* current);
   // Double-clicking a planar Sketch node re-enters it for editing.

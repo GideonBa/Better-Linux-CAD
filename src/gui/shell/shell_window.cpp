@@ -959,6 +959,10 @@ std::optional<ResultFaceReference> ShellWindow::selected_result_face() const {
 }
 
 bool ShellWindow::cancel_face_supported_sketch() {
+  if (feature_tools_ && feature_tools_->editing_source_sketch()) {
+    feature_tools_->cancel();
+    return true;
+  }
   if (!face_sketch_checkpoint_ || !active_sketch_)
     return false;
   reset_document_interaction();
@@ -1062,6 +1066,37 @@ bool ShellWindow::enter_sketch(SketchId sketch) {
   return true;
 }
 
+bool ShellWindow::enter_feature_source_sketch(SketchId sketch) {
+  return feature_tools_ && feature_tools_->editing_source_sketch() &&
+         enter_sketch(std::move(sketch));
+}
+
+void ShellWindow::abort_feature_source_sketch_view() {
+  if (!active_sketch_ || !feature_tools_ || !feature_tools_->editing_source_sketch())
+    return;
+  sketch_tools_->deactivate();
+  while (session_.task().active() && sketch_workspace_.escape(session_)) {
+  }
+  const auto cancelled = sketch_workspace_.cancel(session_);
+  if (!cancelled)
+    show_error(cancelled.error());
+  leave_sketch_view();
+}
+
+void ShellWindow::leave_sketch_view() {
+  viewport_->clear_sketch_interaction();
+  viewport_->clear_sketch_focus();
+  if (sketch_camera_bookmark_ && !viewport_->restore_camera_bookmark(*sketch_camera_bookmark_))
+    append_diagnostic(Error::geometry("gui.shell", "could not restore the pre-sketch camera"));
+  viewport_->set_selection_filter_mask(model_selection_filter_mask_);
+  viewport_->unsetCursor();
+  action_perspective_->setChecked(viewport_->projection() == GuiViewportProjection::Perspective);
+  active_sketch_.reset();
+  sketch_camera_bookmark_.reset();
+  ribbon_->set_tab_enabled(tab_sketch_, false);
+  ribbon_->set_current_tab(tab_model_);
+}
+
 bool ShellWindow::finish_active_sketch() {
   if (sketch_diagnostics_tools_)
     sketch_diagnostics_tools_->cancel();
@@ -1162,17 +1197,11 @@ bool ShellWindow::finish_active_sketch() {
   if (finished.has_error())
     return reject_finish(finished.error());
   face_sketch_checkpoint_.reset();
-  viewport_->clear_sketch_interaction();
-  viewport_->clear_sketch_focus();
-  if (sketch_camera_bookmark_ && !viewport_->restore_camera_bookmark(*sketch_camera_bookmark_))
-    append_diagnostic(Error::geometry("gui.shell", "could not restore the pre-sketch camera"));
-  viewport_->set_selection_filter_mask(model_selection_filter_mask_);
-  viewport_->unsetCursor();
-  action_perspective_->setChecked(viewport_->projection() == GuiViewportProjection::Perspective);
-  active_sketch_.reset();
-  sketch_camera_bookmark_.reset();
-  ribbon_->set_tab_enabled(tab_sketch_, false);
-  ribbon_->set_current_tab(tab_model_);
+  leave_sketch_view();
+  if (feature_tools_ && feature_tools_->editing_source_sketch()) {
+    feature_tools_->resume_extrude_source_sketch(finished_sketch);
+    return true;
+  }
   std::optional<ProfileId> finished_profile;
   if (feature_tools_) {
     const auto* part = session_.part_document();
@@ -1198,6 +1227,18 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (feature_tools_ && feature_tools_->editing_source_sketch()) {
+    sketch_tools_->cancel_tool();
+    while (session_.task().active() && sketch_workspace_.escape(session_)) {
+    }
+    const auto result = session_.undo();
+    if (!result) {
+      show_error(result.error());
+      return false;
+    }
+    refresh();
+    return true;
+  }
   if (step_import_tools_)
     step_import_tools_->cancel();
   if (hole_tools_)
@@ -1240,6 +1281,18 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (feature_tools_ && feature_tools_->editing_source_sketch()) {
+    sketch_tools_->cancel_tool();
+    while (session_.task().active() && sketch_workspace_.escape(session_)) {
+    }
+    const auto result = session_.redo();
+    if (!result) {
+      show_error(result.error());
+      return false;
+    }
+    refresh();
+    return true;
+  }
   if (step_import_tools_)
     step_import_tools_->cancel();
   if (hole_tools_)
@@ -1335,9 +1388,9 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
     return;
   session_.selection().clear();
   selected_semantic_id_.clear();
-  property_semantic_id_ =
-      current != nullptr ? current->data(0, kSemanticIdRole).toString().toStdString()
-                         : std::string{};
+  property_semantic_id_ = current != nullptr
+                              ? current->data(0, kSemanticIdRole).toString().toStdString()
+                              : std::string{};
   bool selected_feature_profile = false;
   if (current != nullptr) {
     const std::string viewport_id = current->data(0, kViewportIdRole).toString().toStdString();
@@ -1462,8 +1515,7 @@ void ShellWindow::handle_property_changed(QTableWidgetItem* item) {
       property_semantic_id_.empty() ? nullptr : browser_model_.find(property_semantic_id_);
   if (node == nullptr)
     return;
-  const auto edited =
-      edit_browser_property(session_, *node, key, item->text().toStdString(), true);
+  const auto edited = edit_browser_property(session_, *node, key, item->text().toStdString(), true);
   if (edited.has_error())
     show_error(edited.error());
   // Repopulate outside this itemChanged emission: refresh() rebuilds the table
@@ -1501,19 +1553,21 @@ void ShellWindow::refresh() {
       !session_.task().active() &&
       (selected_datum_plane().has_value() || selected_result_face().has_value()));
   action_finish_sketch_->setEnabled(sketch_active);
-  action_cancel_face_sketch_->setEnabled(sketch_active && face_sketch_checkpoint_.has_value());
+  action_cancel_face_sketch_->setEnabled(
+      sketch_active && (face_sketch_checkpoint_.has_value() ||
+                        (feature_tools_ && feature_tools_->editing_source_sketch())));
   action_perspective_->setEnabled(!sketch_active);
 
-  const QString name = has_document
-                           ? QString::fromStdString(std::string(session_.display_name()))
-                           : QString();
-  setWindowTitle(has_document
-                     ? QStringLiteral("%1%2 — BLCAD")
-                           .arg(name, session_.dirty() ? QStringLiteral(" *") : QString())
-                     : QStringLiteral("BLCAD"));
+  const QString name =
+      has_document ? QString::fromStdString(std::string(session_.display_name())) : QString();
+  setWindowTitle(has_document ? QStringLiteral("%1%2 — BLCAD")
+                                    .arg(name, session_.dirty() ? QStringLiteral(" *") : QString())
+                              : QStringLiteral("BLCAD"));
 
   if (session_.reference_repair_mode())
     setWindowTitle(windowTitle() + QStringLiteral(" [Repair]"));
+  if (session_.part_workflow_active())
+    setWindowTitle(windowTitle() + QStringLiteral(" [Draft]"));
 
   QStringList lines;
   for (const auto& diagnostic : session_.diagnostics())
@@ -1689,10 +1743,10 @@ void ShellWindow::refresh_viewport_scene() {
 
 void ShellWindow::append_diagnostic(const Error& error) {
   const auto& diagnostics = session_.diagnostics();
-  const bool already_recorded =
-      !diagnostics.empty() && diagnostics.back().category == error.category() &&
-      diagnostics.back().object_id == error.object_id() &&
-      diagnostics.back().message == error.message();
+  const bool already_recorded = !diagnostics.empty() &&
+                                diagnostics.back().category == error.category() &&
+                                diagnostics.back().object_id == error.object_id() &&
+                                diagnostics.back().message == error.message();
   if (!already_recorded)
     session_.report_error(error);
   diagnostics_->appendPlainText(diagnostic_line(error));
@@ -1701,8 +1755,8 @@ void ShellWindow::append_diagnostic(const Error& error) {
 
 void ShellWindow::show_error(const Error& error) {
   append_diagnostic(error);
-  statusBar()->showMessage(QStringLiteral("%1: %2").arg(
-      QString::fromStdString(error.object_id()), QString::fromStdString(error.message())));
+  statusBar()->showMessage(QStringLiteral("%1: %2").arg(QString::fromStdString(error.object_id()),
+                                                        QString::fromStdString(error.message())));
 }
 
 } // namespace blcad::gui

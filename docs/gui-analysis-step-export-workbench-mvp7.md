@@ -116,3 +116,12 @@ its root from the input document and preserves historical single-result Part exp
 The detailed immutable definition, refresh and conversion boundaries are maintained in
 `docs/step-import-sequence-mvp10.md`; accepted Block-140 validation is recorded in
 `docs/development-setup.md`.
+
+
+## Complete Part workflow guard — Block 145C2
+
+STEP preflight and export reject an active Part workflow before inspecting source paths, consuming
+working caches or writing output. A workflow's working session can contain unconfirmed source-Sketch
+edits. Apply or Cancel must finish it before exporting a committed full result. This is distinct from
+Save/Save As, which deliberately writes the workflow's committed entry snapshot through the existing
+three-file atomic save transaction. Existing export modes and STEP geometry contracts are unchanged.

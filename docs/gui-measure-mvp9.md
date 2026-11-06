@@ -79,3 +79,12 @@ distance. Native proof opens the ribbon command, clicks two actual model vertice
 picks both a circular edge and cylindrical face, and closes the reachable dock. Geometry proof checks
 World-space target extraction, unique/revision-scoped identities, invalid owners and intersecting-plane
 witness correctness. Optional `BLCAD_UI_CAPTURE_DIR` writes native review captures.
+
+
+## Complete Part workflow guard — Block 145C2
+
+`GuiMeasureController::begin` and `preview` reject an active `GuiDocumentSession` Part workflow.
+Its working geometry can include unconfirmed source-Sketch edits and must not be presented as a
+committed full-model measurement. Shell enablement uses the same boundary. Existing Sketch driving/
+reference dimensions keep their own accepted solver/measurement path. Apply or Cancel ends the
+workflow before full-model Measure resumes; no new measurement mathematics is introduced.

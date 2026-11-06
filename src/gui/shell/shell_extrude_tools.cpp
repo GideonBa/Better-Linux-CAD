@@ -11,6 +11,7 @@
 #include <QLineEdit>
 #include <QScopedValueRollback>
 #include <QSignalBlocker>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 #include <charconv>
@@ -199,6 +200,17 @@ void ShellFeatureTools::reset_extrude_controls(GuiFeatureManipulatorFrame frame)
   extrude_second_thickness_->setText(QStringLiteral("1"));
   extrude_second_distance_->setText(QStringLiteral("5"));
   extrude_taper_->clear();
+  refresh_extrude_reference_choices(false);
+  update_extrude_controls();
+}
+
+void ShellFeatureTools::refresh_extrude_reference_choices(bool preserve) {
+  const auto target = extrude_target_->currentData();
+  const auto path = extrude_path_->currentData();
+  const auto first = extrude_first_face_->currentData();
+  const auto second = extrude_second_face_->currentData();
+  const QSignalBlocker b1(extrude_target_), b2(extrude_path_), b3(extrude_first_face_),
+      b4(extrude_second_face_);
   extrude_target_->clear();
   extrude_path_->clear();
   extrude_first_face_->clear();
@@ -257,9 +269,16 @@ void ShellFeatureTools::reset_extrude_controls(GuiFeatureManipulatorFrame frame)
           extrude_second_face_->addItem(label, identity);
         }
   }
-  if (extrude_second_face_->count() > 1)
+  if (preserve) {
+    extrude_target_->setCurrentIndex(target.isValid() ? extrude_target_->findData(target) : -1);
+    extrude_path_->setCurrentIndex(path.isValid() ? extrude_path_->findData(path) : -1);
+    extrude_first_face_->setCurrentIndex(first.isValid() ? extrude_first_face_->findData(first)
+                                                         : -1);
+    extrude_second_face_->setCurrentIndex(second.isValid() ? extrude_second_face_->findData(second)
+                                                           : -1);
+  } else if (extrude_second_face_->count() > 1) {
     extrude_second_face_->setCurrentIndex(1);
-  update_extrude_controls();
+  }
 }
 
 void ShellFeatureTools::update_extrude_controls() {
@@ -320,7 +339,7 @@ void ShellFeatureTools::update_extrude_controls() {
 }
 
 void ShellFeatureTools::update_extrude_pick_mode() {
-  if (command_ != Command::Extrude || synchronizing_extrude_selection_)
+  if (command_ != Command::Extrude || editing_source_sketch_ || synchronizing_extrude_selection_)
     return;
   const QScopedValueRollback guard(synchronizing_extrude_selection_, true);
   const bool picking = extrude_pick_role_->currentIndex() > 0;
@@ -390,18 +409,20 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::extrude_selection_it
 
 void ShellFeatureTools::restore_extrude_selection() {
   const QScopedValueRollback guard(synchronizing_extrude_selection_, true);
-  const bool was_picking = extrude_reference_picking_;
+  const auto previous_selection = session_.selection();
   extrude_reference_picking_ = false;
   extrude_face_items_.clear();
   extrude_faces_.clear();
   viewport_.set_selection_semantic_scope(previous_semantic_scope_);
   viewport_.set_selection_filter_mask(previous_selection_mask_);
-  if (was_picking)
-    window_.refresh_feature_selection_scene();
+  // A complete workflow restore advances the scene revision. Rebuild before
+  // restoring selection, so the subsequent window refresh cannot clear it.
+  window_.refresh_feature_selection_scene();
   if (extrude_previous_selection_)
     (void)viewport_.select_semantic(extrude_previous_selection_->semantic_id);
   else {
     viewport_.clear_selection();
+    session_.selection() = previous_selection;
     selected_profile_ = extrude_previous_profile_;
     selected_open_line_ = extrude_previous_open_line_;
   }
@@ -420,6 +441,8 @@ void ShellFeatureTools::invalidate_extrude_preview() {
 }
 
 void ShellFeatureTools::refresh_extrude_preview() {
+  if (editing_source_sketch_)
+    return;
   if (command_ != Command::Extrude)
     return;
   update_extrude_controls();
@@ -436,6 +459,13 @@ Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {
     (group ? group : extrude_behavior_group_)->set_diagnostic(QString::fromStdString(message));
     return Result<std::size_t>::failure(Error::validation("extrude", std::move(message)));
   };
+  if (editing_source_sketch_)
+    return fail("Finish the source Sketch before applying Extrude.", extrude_geometry_group_);
+  if (extrude_source_) {
+    const auto plane = sketch_workbench_.plane_view(session_, extrude_source_->sketch);
+    if (!plane)
+      return fail(plane.error().message(), extrude_geometry_group_);
+  }
   if (!layer_.active_handle_id().empty())
     return Result<std::size_t>::success(0);
   auto& controller = coordinator_.extrude();

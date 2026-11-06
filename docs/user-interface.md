@@ -135,13 +135,38 @@ atomic main/constraint/dimension save transaction. The chosen path and saved-sta
 Cancel. Dirty state describes committed unsaved work; the UI in C2 must also identify the active
 draft. Failed saves preserve existing file/path state. Cancel restores the complete entry intent,
 catalogs, selection, visibility, workspace and Undo/Redo branch, with monotonically newer model/
-presentation revisions. Publication validates complete draft intent, both catalogs and downstream
+presentation revisions. Consumers reacquire current Part/Sketch objects by stable semantic ID after
+publication or cancellation; borrowed pointers into a replaced document are not durable handles.
+Publication validates complete draft intent, both catalogs and downstream
 geometry through `publish_part_state` on a copy of the entry session, then publishes once with one
 Undo label. Failure leaves the workflow correctable; no intermediate history or files become
 committed. Publishing unchanged intent is a no-op without an Undo entry. No Core/JSON/schema changes
-are introduced. This API is initially headless and unused by Qt commands; C2 must wire ownership,
-source revalidation, consumer/task guards and actual native breadcrumb/Create Another evidence
-before the shared lifecycle can be claimed as implemented.
+are introduced. This API was delivered headlessly in C1. C2 wires ownership, source revalidation and consumer/task
+guards for existing Extrude; C3 adds fresh profile collection/Create Another. The full shared
+lifecycle remains incomplete until those slices and their native evidence pass.
+
+Block 145C2 design (2026-11-06): existing Extrude opens a C1 Part workflow before its task.
+A fixed, visible Part/Draft context and Extrude/Sketch breadcrumb row sits above scrolling inputs.
+The source button suspends only that Extrude task and enters the existing Sketch workspace/tools;
+no second controller/shell is installed. Extrude fields remain visible but disabled while Sketch
+editing owns input. Finish Sketch or the Extrude breadcrumb returns to the same authored settings.
+Source identity is retained explicitly; deleted/unsupported source intent is diagnosed and never
+replaced with an arbitrary remaining region. The headless Extrude controller explicitly revalidates
+its pending profile against the current source, and blocks building until a failed revalidation is
+corrected. Manipulator frames and semantic face choices refresh without changing retained targets.
+
+Sketch commands retain their existing gesture/solve/validation rules and publish into C1's disposable
+working state. Local Sketch Undo/Redo stays inside that draft. Cancel Sketch while entered through
+this breadcrumb cancels the complete Extrude and its source changes; ordinary Sketch behavior stays
+unchanged. Escape cancels a Sketch gesture first, then the root workflow from idle Sketch input.
+Root Apply validates/commits on a copy and publishes the C1 workflow only after the entire feature
+and downstream geometry succeeds; failed Apply keeps settings/source changes correctable. Save and
+Save As keep C1's committed-only behavior; the window title marks Draft independently of dirty state.
+STEP export and full-model Measure/Inspect cannot consume a workflow draft as a committed result.
+No schema changes. Native views show the [source Sketch context](images/extrude-source-sketch.png)
+and [compact feature return](images/extrude-source-compact.png); completion controls remain fixed
+outside scrolling content. Existing feature-edit browser routing remains its accepted owner. Command-first
+profile collection and Create Another remain C3, so C2 alone cannot close Block 145.
 
 1. A compatible preselection starts the command with its first semantic input populated; command-first
    entry activates that selector. Input rows have labelled roles, selection counts, clear controls,

@@ -6045,3 +6045,208 @@ TEST_CASE(
   CHECK(ui.bytes(directory.filePath("supported.step")).startsWith("ISO-10303-21;"));
   ui.idle();
 }
+
+TEST_CASE("Extrude source breadcrumb keeps Sketch edits local and cancels the complete draft",
+          "[gui][integration][parity-b145][source-sketch-workflow][source-sketch-widget]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Source breadcrumb cancellation");
+  const auto sketch = ui.rectangle("datum.xy", {20, 20}, {50, 40});
+  const auto path = directory.filePath("committed.blcad");
+  ui.file("save_as", path);
+  ui.tree(sketch.value());
+  const auto before = ui.snapshot();
+  const auto constraints = ui.window.session().sketch_constraint_catalogs();
+  const auto dimensions = ui.window.session().sketch_dimension_catalogs();
+  const auto saved = ui.bytes(path);
+  const auto undo = std::string(ui.window.session().undo_label());
+  const auto selection = ui.window.session().selection().entries();
+  ui.command("extrude");
+  ui.scalar("8 mm");
+  CHECK(ui.window.windowTitle().contains("[Draft]"));
+  CHECK_FALSE(ui.window.session().dirty());
+  auto& source = ui.widget<QToolButton>("blcad.feature.source_breadcrumb");
+  REQUIRE(source.text() ==
+          QString::fromStdString(ui.window.session().part_document()->find_sketch(sketch)->name()));
+  ui.click(source);
+  REQUIRE(ui.window.feature_tools().editing_source_sketch());
+  REQUIRE(ui.window.active_sketch() == sketch);
+  CHECK_FALSE(ui.widget<QLineEdit>("blcad.manipulator_numeric_hud").isEnabled());
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK_FALSE(ui.window.feature_tools().apply());
+  CHECK_FALSE(ui.window.feature_tools().begin_revolve());
+  ui.command("sketch.create.point");
+  ui.plane_pick({12, 12});
+  ui.key(ui.window, Qt::Key_Escape);
+  const auto edited = ui.snapshot();
+  REQUIRE(edited != before);
+  ui.command("undo");
+  CHECK(ui.window.feature_tools().editing_source_sketch());
+  CHECK(ui.snapshot() == before);
+  ui.command("redo");
+  CHECK(ui.snapshot() == edited);
+  ui.command("save");
+  CHECK(ui.bytes(path) == saved);
+  ui.click(ui.widget<QToolButton>("blcad.feature.breadcrumb"));
+  REQUIRE_FALSE(ui.window.active_sketch());
+  CHECK_FALSE(ui.window.feature_tools().editing_source_sketch());
+  CHECK(ui.window.viewport().feature_preview_active());
+  CHECK(ui.widget<QLineEdit>("blcad.manipulator_numeric_hud").text() == "8");
+  ui.capture("source-breadcrumb-return");
+  ui.button("blcad.feature.cancel");
+  ui.idle();
+  CHECK(ui.snapshot() == before);
+  CHECK(ui.window.session().sketch_constraint_catalogs() == constraints);
+  CHECK(ui.window.session().sketch_dimension_catalogs() == dimensions);
+  CHECK(ui.window.session().undo_label() == undo);
+  CHECK(ui.window.session().selection().entries() == selection);
+  CHECK_FALSE(ui.window.session().dirty());
+  CHECK_FALSE(ui.window.windowTitle().contains("[Draft]"));
+
+  // The existing Sketch Cancel action now also handles this explicitly owned scope.
+  ui.command("extrude");
+  ui.click(source);
+  ui.command("sketch.create.point");
+  ui.plane_pick({12, 12});
+  ui.key(ui.window, Qt::Key_Escape);
+  ui.command("cancel_face_sketch", 1);
+  REQUIRE_FALSE(ui.window.active_sketch());
+  ui.idle();
+  CHECK(ui.snapshot() == before);
+
+  // Escape backs out the active Sketch input before cancelling its root workflow.
+  ui.command("extrude");
+  ui.click(source);
+  ui.command("sketch.create.line");
+  ui.plane_pick({15, 10});
+  ui.key(ui.window, Qt::Key_Escape);
+  CHECK(ui.window.feature_tools().editing_source_sketch());
+  CHECK(ui.window.sketch_tools().tool_active());
+  ui.key(ui.window, Qt::Key_Escape);
+  CHECK(ui.window.feature_tools().editing_source_sketch());
+  CHECK_FALSE(ui.window.sketch_tools().tool_active());
+  ui.key(ui.window, Qt::Key_Escape);
+  REQUIRE_FALSE(ui.window.active_sketch());
+  ui.idle();
+  CHECK(ui.snapshot() == before);
+}
+
+TEST_CASE(
+    "Native Extrude breadcrumb edits a driving Sketch dimension and publishes one complete feature",
+    "[gui][integration][parity-b145][source-sketch-workflow][source-sketch-native]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires the native Qt/OCCT viewer and physical dimension label picking.");
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Nested source dimension");
+  const QSize available = ui.window.screen()->availableGeometry().size() - QSize(32, 48);
+  ui.window.resize(QSize(1280, 800).boundedTo(available));
+  ui.flush();
+  REQUIRE(ui.window.viewport().native_viewer_available());
+  const auto sketch = ui.rectangle("datum.xy", {20, 20}, {50, 40});
+  const auto path = directory.filePath("source.blcad");
+  ui.file("save_as", path);
+  ui.tree(sketch.value());
+  const auto before = ui.snapshot();
+  const auto constraints = ui.window.session().sketch_constraint_catalogs();
+  const auto dimensions = ui.window.session().sketch_dimension_catalogs();
+  const auto saved = ui.bytes(path);
+  const auto initial_dimension_count =
+      checked(ui.window.session().sketch_dimension_catalog(sketch)).dimensions().size();
+  const auto edit_width = [&] {
+    ui.command("sketch.dimension.rapid");
+    const auto hover = [&](Point2 point) {
+      const auto screen = checked(ui.window.viewport().sketch_plane_to_screen(point));
+      QMouseEvent move(QEvent::MouseMove, {screen.x, screen.y},
+                       ui.window.viewport().mapToGlobal(QPoint(qRound(screen.x), qRound(screen.y))),
+                       Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+      QApplication::sendEvent(&ui.window.viewport(), &move);
+      ui.flush();
+    };
+    hover({35, 20});
+    REQUIRE(ui.window.sketch_tools().rapid_dimension_candidate());
+    ui.plane_pick({35, 20});
+    hover({35, 8});
+    REQUIRE(ui.window.sketch_tools().rapid_dimension_candidate());
+    ui.plane_pick({35, 8});
+    ui.key(ui.window, Qt::Key_Escape);
+    const auto catalogue = checked(ui.window.session().sketch_dimension_catalog(sketch));
+    REQUIRE(catalogue.dimensions().size() == initial_dimension_count + 1);
+    const auto annotations =
+        checked(GuiSketchDimensionController::accepted_annotations(ui.window.session(), sketch));
+    const auto found =
+        std::find_if(annotations.begin(), annotations.end(), [&](const auto& annotation) {
+          return annotation.candidate_id == catalogue.dimensions().back().id().value();
+        });
+    REQUIRE(found != annotations.end());
+    const auto layout = checked(ui.window.viewport().sketch_dimension_screen_layout(*found));
+    const QPointF point(layout.label_anchor.x, layout.label_anchor.y);
+    QCursor::setPos(ui.window.viewport().mapToGlobal(point.toPoint()));
+    QGuiApplication::sync();
+    ui.flush();
+    ui.click_at(ui.window.viewport(), point);
+    ui.mouse(ui.window.viewport(), point, QEvent::MouseButtonDblClick);
+    ui.mouse(ui.window.viewport(), point, QEvent::MouseButtonRelease);
+    ui.flush();
+    ui.text(ui.widget<QLineEdit>("sketch.dimension.editor"), "40 mm");
+    const auto parameter = catalogue.dimensions().back().parameter();
+    REQUIRE(parameter);
+    CHECK(ui.window.session().part_document()->find_parameter(*parameter)->value().millimeters() ==
+          Approx(40));
+  };
+  ui.command("extrude");
+  ui.scalar("8 mm");
+  ui.click(ui.widget<QToolButton>("blcad.feature.source_breadcrumb"));
+  REQUIRE(ui.window.active_sketch() == sketch);
+  edit_width();
+  CHECK(ui.snapshot() != before);
+  ui.capture("source-breadcrumb-sketch");
+  ui.command("save");
+  CHECK(ui.bytes(path) == saved);
+  ui.click(ui.widget<QToolButton>("blcad.feature.breadcrumb"));
+  REQUIRE_FALSE(ui.window.active_sketch());
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.taper"), "100 deg");
+  CHECK_FALSE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  CHECK_FALSE(ui.window.feature_tools().apply());
+  CHECK(ui.bytes(path) == saved);
+  ui.text(ui.widget<QLineEdit>("blcad.extrude.taper"), "");
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.window.resize(QSize(1024, 640).boundedTo(available));
+  ui.flush();
+  ui.reveal(ui.widget<QPushButton>("blcad.feature.apply"));
+  ui.reveal(ui.widget<QPushButton>("blcad.feature.cancel"));
+  ui.capture("source-breadcrumb-compact");
+  ui.button("blcad.feature.cancel");
+  ui.idle();
+  CHECK(ui.snapshot() == before);
+  CHECK(ui.window.session().sketch_constraint_catalogs() == constraints);
+  CHECK(ui.window.session().sketch_dimension_catalogs() == dimensions);
+  CHECK_FALSE(ui.window.session().dirty());
+  ui.window.resize(QSize(1280, 800).boundedTo(available));
+  ui.flush();
+  ui.command("extrude");
+  ui.scalar("8 mm");
+  ui.click(ui.widget<QToolButton>("blcad.feature.source_breadcrumb"));
+  edit_width();
+  ui.command("finish_sketch");
+  REQUIRE(ui.widget<QPushButton>("blcad.feature.apply").isEnabled());
+  ui.button("blcad.feature.apply");
+  ui.idle();
+  CHECK(ui.window.session().undo_label() == "Apply Extrude");
+  REQUIRE(ui.window.session().part_document()->features().size() == 1);
+  const auto body = ui.window.session().part_document()->bodies().front().id();
+  CHECK(ui.summary(body).volume_mm3 == Approx(6400).margin(1e-5));
+  const auto after = ui.snapshot();
+  ui.command("undo");
+  CHECK(ui.snapshot() == before);
+  CHECK(ui.window.session().sketch_constraint_catalogs() == constraints);
+  CHECK(ui.window.session().sketch_dimension_catalogs() == dimensions);
+  ui.command("redo");
+  CHECK(ui.snapshot() == after);
+  CHECK(ui.summary(body).volume_mm3 == Approx(6400).margin(1e-5));
+  ui.roundtrip(directory.filePath("complete.blcad"));
+  CHECK(ui.summary(body).volume_mm3 == Approx(6400).margin(1e-5));
+  ui.capture("source-breadcrumb-model");
+}
