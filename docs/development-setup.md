@@ -2956,3 +2956,6 @@ GUI-session-only change; full GUI and native compatibility exercise their existi
 
 Separate native startup reaches the intentional timeout **124**. Logs retain the existing Medium
 depth/stencil warning, with no High-severity or drawable failure. No native retry is required in C1.
+
+Delivery: [PR #141](https://github.com/GideonBa/Better-Linux-CAD/pull/141), implementation `861a5c6`.
+The delivery-record commit is documentation only and preserves the runtime freeze.

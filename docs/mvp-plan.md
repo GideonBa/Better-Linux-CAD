@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 144
 current_block: 145
-current_boundary: Block 145C1 verified; protected delivery before breadcrumb UI
+current_boundary: Block 145C1 verified in PR #141; merge before breadcrumb UI
 current_tag: "[parity-b145]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -1827,7 +1827,7 @@ for the next slice/branch.
 | --- | --- | --- |
 | 145A | Extend existing capability inventory with explicit planned/implemented API/command/proof mappings, reject invalid evidence, capture reproducible unchanged-intent/geometry and timing baseline | Merged via PR #139 |
 | 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Merged via PR #140 |
-| 145C1 | Extend existing GuiDocumentSession with a complete transient Part-workflow checkpoint, committed-only Save and one-history publication; headless failure/history/sidecar tests | Verified; protected delivery pending |
+| 145C1 | Extend existing GuiDocumentSession with a complete transient Part-workflow checkpoint, committed-only Save and one-history publication; headless failure/history/sidecar tests | Verified; delivery PR #141 |
 | 145C2 | Existing-owner Extrude/Sketch breadcrumb transition and Create Another, using C1; combined native/compact/scaled integration and Block-145 closure | Not started |
 
 145A starts on `feat/advanced-workflow-evidence` from clean `dbff649`, after verified merged
@@ -1883,6 +1883,9 @@ cases, 1 native-only skip / 2,223 assertions**. Full GUI passes **637 cases, 33 
 86,508 assertions**. Native existing-workflow compatibility passes **5 / 462** at both 100% and
 150%, without skips. Exact commands, source freeze and scope limits live in `development-setup.md`.
 C2 remains required, and implemented-through remains 144.
+
+Delivery: [PR #141](https://github.com/GideonBa/Better-Linux-CAD/pull/141), implementation `861a5c6`.
+Merge normally, verify the resulting tree and refresh main before starting the UI adopter.
 
 ## Later phases
 
