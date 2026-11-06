@@ -1,5 +1,9 @@
 # Part Sweep 3D Geometry MVP-6
 
+Planned extension: [Blocks 166–167](inventor-parity-sequence.md) own curve-preserving/tolerance
+policies and semantic-edge/multi-wire paths. Preserve the historical fixed-subdivision behavior
+below until an explicit compatible policy upgrade is implemented.
+
 Status: implemented in Block 82.
 
 Block 82 extends the transactional Block-81 Sweep executor from planar spines to spatial

@@ -1,8 +1,12 @@
 # Future MVP: Advanced Surfacing, 3D Sketches, Sweep, Loft, and Surface-to-Solid
 
-Status: partially implemented. Blocks 75–81 provide 3D Sketch Core and Geometry, richer curve
-intent, reusable PathCurves, persistent Sweep intent, and Sweep Geometry through spatial paths,
-twist, and guide control. Path-following Extrude, Loft, and surfacing remain planned.
+Status: capability catalog. Sketch3D, PathCurve, Sweep/path Extrude, Loft and the bounded Surface
+families are implemented through Blocks 75–94 and their accepted interaction blocks. G2 Loft,
+spatial constraint solving and broader surface operations remain extensions with exact existing
+limits in their feature contracts. [Blocks 159–174](inventor-parity-sequence.md) now own the
+remaining assigned execution order, including curve precision, G2, Offset/Thicken and curved
+Trim/Extend. Do not execute the old future-tense catalog as a second plan. General network/Class-A
+surface construction remains outside this bounded program.
 
 This document records the long-term requirement that BLCAD should support advanced 3D curve and surface modeling. This is intentionally separate from the first closed-profile sketch MVP and from construction geometry.
 

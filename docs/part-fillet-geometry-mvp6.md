@@ -1,5 +1,9 @@
 # Part Fillet Geometry MVP-6
 
+Planned extension: [Blocks 175–179](inventor-parity-sequence.md) own variable-radius, face,
+full-round and corner execution/UI. The constant-radius contract below remains current until
+those blocks supply their own verified extensions.
+
 Status: implemented in Block 69.
 
 Block 69 executes the Block-68 `FilletFeature` intent as constant-radius OCCT geometry. The

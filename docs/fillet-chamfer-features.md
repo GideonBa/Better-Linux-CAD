@@ -1,6 +1,12 @@
 # Fillet and Chamfer Features
 
-Status: target architecture. Not implemented yet; listed among core objects in the architecture summary.
+Status: capability catalog. Constant Fillet and all three Chamfer modes are implemented through
+Blocks 68–70 and their accepted GUI workflows. Exact implemented contracts are
+`part-edge-treatment-intent-mvp6.md`, `part-fillet-geometry-mvp6.md` and
+`part-chamfer-geometry-mvp6.md`. The future variable/face/full-round/corner extensions are assigned
+only to [Blocks 175–179](inventor-parity-sequence.md#phase-e-advanced-finishing-and-sketch-driven-features).
+Feature suppression/history is assigned to 146–148. The catalog and original MVP sequence below
+are historical design context, not another implementation queue or a claim of current support.
 
 Fillets (rounds) and chamfers are basic parametric features, not late corrections to a finished BRep body. A fillet replaces a sharp edge with a radius; a chamfer replaces it with a bevel. Both are stored as first-class features in the feature tree so they can be edited, suppressed, recomputed, and parameter-driven.
 

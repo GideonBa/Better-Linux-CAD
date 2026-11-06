@@ -1,5 +1,9 @@
 # Interactive Sketch3D MVP-8
 
+Planned extension: [Blocks 163–165](inventor-parity-sequence.md) own persistent spatial
+constraints, solver diagnostics and arc/spline/helix interaction. Reuse this existing Sketch3D
+authority; the accepted point/line boundary below is not a second implementation queue.
+
 Status: implemented in Block 120.
 
 Block 120 adds a headless direct-manipulation authority around the existing persistent `Sketch3D` model. It does not introduce a second spatial-curve representation and does not claim a full variational 3D constraint solver.

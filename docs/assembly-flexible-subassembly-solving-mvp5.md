@@ -1,5 +1,9 @@
 # Document-Scoped Flexible Subassembly Local Solving MVP-5
 
+Planned extension: [Blocks 192–193](inventor-parity-sequence.md) add occurrence-local pose
+authority and consumer integration. The document-local/shared-child contract below remains
+supported and is not reinterpreted as independent occurrence flexibility.
+
 Status: implemented.
 
 This document is canonical for document-scoped flexible-child solving. The implementation solves one shared child `AssemblyDocument` in its own local assembly space; it does not introduce occurrence-local internal pose overrides.

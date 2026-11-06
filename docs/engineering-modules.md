@@ -2,6 +2,13 @@
 
 Status: target architecture. Not implemented yet. These are a long-term differentiator, built after the parametric core, features, and assemblies.
 
+The material/catalog foundation is now assigned to [Blocks 149–151](inventor-parity-sequence.md),
+shared with semantic Hole/Thread standards in 152–157. This allocation supersedes the relative
+order of the proposed sequence below for those resources: a standard-parts library is not a
+prerequisite for material mass or the Hole Wizard. Bolt, shaft, bearing and gear assistants,
+automatic fastener placement and the full parts library remain outside Blocks 145–204. The
+already implemented bolt-circle/Assembly-binding seed is not reimplemented by this catalog.
+
 Engineering modules combine calculation, standards logic, and geometry generation. They are the main distinction from FreeCAD or simple modelers: the user should not have to assemble every detail by hand from tables, standards, and catalogs. Each module produces a normal parametric feature in the feature tree and can use parameters.
 
 ## Planned modules

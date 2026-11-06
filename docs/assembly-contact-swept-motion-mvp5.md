@@ -1,5 +1,9 @@
 # Rooted Assembly Contact Classification and Sampled Revolute Sweep MVP-5
 
+Planned extension: [Block 199](inventor-parity-sequence.md) owns broader trajectories, pruning
+and conservative interval analysis. Existing sampled Revolute/static classifications remain the
+current contract. Physical forces, friction and collision response stay outside this program.
+
 Status: implemented as Block 30 of `docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`.
 
 This document is canonical for typed rooted component-occurrence pair identity in posed contact analysis, static `Separated` / `Touching` / `Interfering` classification, and bounded deterministic sampled Revolute motion analysis.

@@ -2,6 +2,13 @@
 
 Status: target architecture. Not implemented yet.
 
+Execution planning is consolidated in [Blocks 152–157 and 196–198](inventor-parity-sequence.md).
+Blocks 149–151 own shared revisioned resources/materials; Block 156 owns integration with the existing
+Pattern authority. The conceptual `pattern_data` below must not create an independent pattern
+executor. The original MVP sequence below is superseded for scheduling by those blocks; this file
+retains Hole/Thread semantics and standards provenance. The new plan explicitly brings seat types
+into the Part phase and coordinated Assembly holes into their later cross-document phase.
+
 The replacement shell implements bounded plain cylindrical through-all single/bolt-circle cuts
 through `CircleProfile` / `CircularHolePattern` and `SubtractiveExtrude`; see
 `docs/gui-part-foundation-workbench-mvp7.md`. Those commands do not introduce the semantic

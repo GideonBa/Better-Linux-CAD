@@ -2770,3 +2770,34 @@ after planning commit `76705a1`. The plan records completed implementation throu
 Block 145 is an unassigned planning boundary. The PR must merge normally before any successor
 branch starts, with main/tree/runtime verification after integration. This final acceptance/status
 update changes documentation only; the runtime freeze remains unchanged.
+
+## Advanced workflow planning validation — 2026-11-06
+
+Documentation-only delivery from main `e08280c` on `docs/inventor-feature-parity-plan` after
+verified merged PR #137 and refreshed main. `inventor-parity-sequence.md` allocates 60 planned
+Blocks 145–204; `inventor-parity-test-plan.md` defines 37 scenario IDs, mandatory combinations and
+future native/performance gates. Existing catalog/feature owners link to that single future
+sequence; `user-interface.md` owns the clearly labelled planned Inventor-like interaction contract.
+No new feature, schema, runtime code or test implementation is delivered here.
+
+Validation:
+
+```bash
+git diff --check
+python3 /tmp/blcad-validate-planning.py
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[gui][shell-coverage]"
+```
+
+The temporary standard-library audit checks changed Markdown local links/anchors, referenced
+contract paths, paired code fences, unique consecutive blocks, backward-only prerequisites,
+defined scenario IDs and unchanged `implemented_through: Block 144` / `current_block: 145`.
+It also verifies that the changed paths contain only documentation. All checks pass. Existing
+shell coverage passes **3 test cases / 313 assertions**, with no skips, using the current built
+GUI binary. Source and staged documentation diffs are reviewed before delivery.
+
+Builds, full CAD suites and native Qt/OCCT are not rerun for these documentation-only changes.
+The new feature/native tests and performance budgets are planned obligations, not measured or
+executed results. Actual native interaction evidence is required by their implementation blocks.
+Delivery is PR #138 with reviewed plan commit `86fc04f`; this final delivery-record update is
+documentation only and retains the same runtime tree. `mvp-plan.md` records the protected-merge
+handoff; no successor implementation begins here.

@@ -1,5 +1,9 @@
 # GUI Measure MVP-9
 
+Planned extension: [Blocks 149–151 and 200–202](inventor-parity-sequence.md) own materials,
+physical properties, finite-domain measurement and quality inspection. Preserve the explicitly
+labelled supporting-geometry conventions below; new queries do not silently change old measurements.
+
 Status: headless authority introduced in Block 131; replacement-shell integration accepted in
 Block 136. Block 144 places its commands on Inspect. Numbered status is owned by `mvp-plan.md`.
 

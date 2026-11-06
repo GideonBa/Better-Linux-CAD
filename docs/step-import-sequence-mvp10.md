@@ -1,5 +1,9 @@
 # STEP Import Sequence MVP-10
 
+Planned extension: [Blocks 185–187](inventor-parity-sequence.md) add explicit downstream
+Direct Edit features and checked healing. The accepted immutable-base/source-refresh contracts
+below remain authoritative. Feature recognition and rewriting the imported base are not assigned.
+
 Status: Blocks 137–143 complete; STEP Import MVP-10 is accepted on 2026-10-29. PR #134 is merged
 and its verified main tree is the base for Block-143 integrated acceptance. The sequence follows
 GUI Shell Reset MVP-9R
