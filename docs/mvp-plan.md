@@ -6,8 +6,8 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 144
 current_block: 145
-current_boundary: Advanced modeling workflow program planned through Block 204; implementation not started
-current_tag: null
+current_boundary: Block 145A capability evidence and baseline implementation
+current_tag: "[parity-b145]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–204 planned; implementation not started"
+  advanced_modeling_workflows: "Block 145 in progress; Blocks 146–204 planned"
 ---
 
 # MVP Plan
@@ -34,9 +34,9 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 144
-current block        Block 145 (planned; implementation not started)
-current phase        Advanced modeling workflow implementation planning
-current boundary     Blocks 145–204 allocated; implementation not started
+current block        Block 145 (in progress; slice A)
+current phase        Shared workflow contract and evidence inventory
+current boundary     Capability evidence and measured baseline
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -44,7 +44,8 @@ detailed implementation and combined-test plan for the identified remaining capa
 existing workspaces. [The consolidated sequence](inventor-parity-sequence.md) allocates Blocks
 145–204; [the test plan](inventor-parity-test-plan.md) and the planned workflow section of
 `user-interface.md` define evidence and Inventor-like interaction. All new blocks are planned and
-not started. Previously implemented feature contracts remain in force until deliberately extended.
+not started at that planning delivery. The subsequent implementation request begins Block 145
+under the serial slice plan below. Previously implemented contracts remain in force until extended.
 
 Interactive Sketcher MVP-8 is complete and accepted. Blocks 122–123 establish the selection-first
 modeling workspace and reusable candidate-only viewport manipulators; Block 124 adds interactive
@@ -1775,9 +1776,8 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Planned Blocks 145–204 — Advanced modeling workflows
 
-Status authority: every block in the following ranges is **Planned; implementation not started**.
-The next implementation block is 145. The 2026-11-06 request authorizes this plan; this documentation
-delivery does not implement any of its features. Detailed block inputs, outputs, dependencies,
+Status authority: Block 145 is **In progress**; Blocks 146–204 are **Planned; not started**.
+The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
 `inventor-parity-test-plan.md`. Shared UI/layout behavior is owned by the planned section of
@@ -1785,7 +1785,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
-| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Planned; not started |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145 in progress; 146–151 not started |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
@@ -1816,6 +1816,41 @@ are recorded in `development-setup.md`. Source/staged diffs are reviewed. Delive
 normally pushed `docs/inventor-feature-parity-plan` branch. Merge through the required PR path,
 refresh main and compare its tree with the reviewed branch before starting Block 145. This
 planning delivery leaves implemented status through Block 144.
+
+### Block 145 serial implementation slices — 2026-11-06
+
+The implementation request authorizes the full sequence. Deliver the following coherent slices
+serially; none alone closes Block 145. A merged preceding PR and refreshed main are prerequisites
+for the next slice/branch.
+
+| Slice | Deliverable | Status |
+| --- | --- | --- |
+| 145A | Extend existing capability inventory with explicit planned/implemented API/command/proof mappings, reject invalid evidence, capture reproducible unchanged-intent/geometry and timing baseline | Implemented and verified; PR #139 |
+| 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Not started |
+| 145C | Existing-owner Sketch/feature breadcrumb transition, complete candidate restoration and Create Another lifecycle; native integration and closure | Not started |
+
+145A starts on `feat/advanced-workflow-evidence` from clean `dbff649`, after verified merged
+PR #138 and refreshed main. `user-interface.md` owns the slice design and baseline boundaries.
+No new CAD command or feature schema is introduced by the evidence slice. Keep the implementation
+boundary at 144 until all three slices and the complete Block-145 criteria pass.
+
+145A adds 24 explicit capability entries (existing Extrude plus 23 planned extensions), validates
+actual actions, declared/compiled headless APIs and registered nonhidden headless/native proof
+sources, and rejects fabricated disposition, ownership beyond the completed boundary, wrong
+sources, unresolved/OR filters and missing capabilities. Historical family acceptance records
+are unchanged. A reproducible Extrude baseline checks 1600 mm³ geometry, JSON invariance,
+Apply/Undo/Redo, three fresh-session and ten reused-controller samples with source/runtime hashes.
+The raw artifact is `benchmarks/block145a-workflow-baseline.json`.
+
+GUI test target builds. Focused coverage/baseline passes **6 / 1,523**, without skips. Native existing
+modeling/layout baseline passes **6 / 390** at both 100% and 150%; ordinary/compact captures are
+reviewed. Exact commands, measured limits, sandbox file-publication retry and startup evidence
+live in `development-setup.md`. No new property controls, CAD operation or document schema are
+claimed by this slice. 145B/C remain required before completing Block 145.
+
+Delivery: [PR #139](https://github.com/GideonBa/Better-Linux-CAD/pull/139), implementation `40bcd79`.
+The documentation-only delivery record preserves the 943 runtime fingerprints. Merge normally,
+refresh main and verify the reviewed tree before creating the 145B branch.
 
 ## Later phases
 

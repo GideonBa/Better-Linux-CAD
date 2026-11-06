@@ -2,8 +2,8 @@
 
 Planning baseline: 2026-11-06, main `e08280c`, after merged PR #137. This is the requested
 implementation plan for closing the identified gaps inside the existing Sketch, 3D Model,
-Surface, Assembly, Inspect and Manage workspaces. It allocates Blocks 145–204; implementation
-has not started. `mvp-plan.md` alone owns numbered implementation status.
+Surface, Assembly, Inspect and Manage workspaces. It allocates Blocks 145–204;
+`mvp-plan.md` alone owns current numbered implementation and serial-slice status.
 
 The delivery target is an Inventor-like engineering workflow backed by BLCAD's existing semantic
 model, transactional editing and OCCT boundary. It is a bounded capability program, not a claim

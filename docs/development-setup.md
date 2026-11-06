@@ -2801,3 +2801,47 @@ executed results. Actual native interaction evidence is required by their implem
 Delivery is PR #138 with reviewed plan commit `86fc04f`; this final delivery-record update is
 documentation only and retains the same runtime tree. `mvp-plan.md` records the protected-merge
 handoff; no successor implementation begins here.
+
+## Block 145A Capability evidence and baseline — 2026-11-06
+
+Starts on `feat/advanced-workflow-evidence` from refreshed main `dbff649`, after PR #138 merged.
+This is the first serial slice of 145. It adds an explicit 24-entry planned/implemented capability
+section to the existing coverage manifest and three actual tests; accepted historical family
+records remain semantically identical. No production CAD API, UI widget, command or file schema
+changes. The new source has per-file CMake build/OCCT metadata definitions, keeping kernel headers
+private to Geometry. Initial development compiler errors (private OCCT header and Catch2 INFO
+expression grouping) and the fixture's missing datum are corrected before final verification.
+
+```bash
+cmake --build build/dev-gui --target blcad_gui_tests -j 8
+QT_QPA_PLATFORM=offscreen BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_WORKFLOW_BASELINE=/tmp/blcad145a-baseline.json ./build/dev-gui/blcad_gui_tests "[parity-b145],[gui][shell-coverage]"
+QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad145a-native-100 ./build/dev-gui/blcad_gui_tests "[hermes-design-workflow],[workflow-layout]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad145a-native-150 ./build/dev-gui/blcad_gui_tests "[hermes-design-workflow],[workflow-layout]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+Final build passes (`/tmp/blcad145a-build.log`). Focused coverage/baseline passes **6 cases /
+1,523 assertions**, no skips (`/tmp/blcad145a-focused.log`). The first sandboxed artifact run
+passed its geometry/history assertions but could not commit Qt's atomic output file; the final
+identical run with regular filesystem access passes, including publication. Native original
+modeling/layout passes **6 / 390** at each scale, without skips, in the corresponding
+`/tmp/blcad145a-native-{100,150}.log`. Ordinary/compact feature and command captures in the listed
+directories are reviewed; completion controls remain reachable. Separate native startup reaches
+the intentional timeout **124**. Native logs retain the existing Medium depth/stencil warning,
+with no High-severity or drawable failures. Full Core/Geometry/GUI suites are not rerun for this
+test/inventory-only slice; the relevant coverage and real-input native baseline are executed.
+
+The checked raw report is [block145a-workflow-baseline.json](benchmarks/block145a-workflow-baseline.json).
+On recorded Debug/Qt/OCCT hardware, fresh-session preview samples have p50/p95 **0.795/1.150 ms**
+(3 trials); reused-controller previews have **0.769/0.890 ms** (10 trials). These measure only the
+existing simple Extrude `preview_shape`, excluding setup, validation readouts and UI publication;
+they are not a cold-process measurement or a portable latency guarantee. Every result has one
+solid and **1600 mm³**; preview preserves source JSON/revision/history. Apply/Undo/Redo and canonical
+reopening are also checked. Environment, raw samples, process-wide memory high-water mark and
+943 runtime fingerprints are in the report. All hashes match after final native verification;
+inventory digest is `2d3b6cf35471d6800ae5999230f4bdfd8ab443516b53f3036a0a1f4d6611e1ae`.
+
+Source/staged diff review and normal protected PR delivery are required. Block 145 remains open
+for shared controls (145B), breadcrumb/Create Another lifecycle (145C) and whole-block acceptance.
+Delivery is PR #139, implementation `40bcd79`; the final delivery-record edit changes documentation
+only and retains the same runtime inventory. Main must be refreshed after regular merge.

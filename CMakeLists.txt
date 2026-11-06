@@ -694,6 +694,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_construction_tools_tests.cpp
       tests/gui/gui_shell_combined_workflow_tests.cpp
       tests/gui/gui_shell_coverage_tests.cpp
+      tests/gui/gui_shell_workflow_evidence_tests.cpp
       tests/gui/gui_shell_assembly_tools_tests.cpp
       tests/gui/gui_shell_assembly_context_tests.cpp
       tests/gui/gui_shell_assembly_advanced_tests.cpp
@@ -732,6 +733,8 @@ if(BLCAD_BUILD_TESTS)
     target_compile_definitions(blcad_gui_tests PRIVATE BLCAD_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     set_source_files_properties(tests/gui/gui_complex_part_performance_tests.cpp PROPERTIES
       COMPILE_DEFINITIONS "BLCAD_PROFILE_BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\"")
+    set_source_files_properties(tests/gui/gui_shell_workflow_evidence_tests.cpp PROPERTIES
+      COMPILE_DEFINITIONS "BLCAD_WORKFLOW_BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\";BLCAD_WORKFLOW_OCCT_VERSION=\"${OpenCASCADE_MAJOR_VERSION}.${OpenCASCADE_MINOR_VERSION}.${OpenCASCADE_MAINTENANCE_VERSION}\"")
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
       target_compile_options(blcad_gui_tests PRIVATE -Wall -Wextra -Wpedantic)

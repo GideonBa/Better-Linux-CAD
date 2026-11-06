@@ -87,6 +87,24 @@ as workflow references. The detailed behavior below is BLCAD's planned implement
 
 ### Shared property panel behavior
 
+Block 145A design (2026-11-06): extend `gui-feature-coverage-manifest-mvp9.json` additively with
+`workflow_program`, leaving accepted historical family/shell records unchanged. Each unique
+capability has an owner, contract and explicit planned/implemented disposition. Implemented entries
+map actual shell action IDs to existing headless API declarations and separately registered headless
+and native proof filters/sources. Planned entries carry descriptive future command names and no
+implemented APIs/actions/proofs. The inventory is an audit, not runtime feature enablement or an
+implementation-status authority. Catch2 validates schema/paths, uniqueness, registered nonhidden
+proofs and source matches; negative fixtures reject fabricated implementation, unresolved/OR filters,
+wrong sources and evidence on planned entries. The existing Extrude provides the first mapping.
+
+The reproducible baseline measures the existing headless Extrude candidate's physical 20×10×8 mm
+solid and canonical JSON invariance, using three fresh-session and ten reused-controller previews.
+Fresh-session timing is not a cold-process benchmark. An explicitly requested artifact records
+all raw samples, environment, source/runtime SHA-256 inventory and geometry/intent evidence;
+it makes no latency guarantee. Existing native modeling/layout tests supply the unchanged UI
+baseline at ordinary/compact sizes and 100%/150% scales. New property controls and breadcrumb
+behavior remain unimplemented until 145B/C pass their gates. No file-format or Core change occurs.
+
 1. A compatible preselection starts the command with its first semantic input populated; command-first
    entry activates that selector. Input rows have labelled roles, selection counts, clear controls,
    active-state emphasis and matching canvas highlights. A valid second input never replaces the first
