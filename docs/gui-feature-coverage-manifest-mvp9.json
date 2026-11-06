@@ -1310,5 +1310,339 @@
       "pending_workflows": []
     }
   },
-  "current_shell_acceptance_contract": "docs/gui-shell-acceptance-mvp9r.md"
+  "current_shell_acceptance_contract": "docs/gui-shell-acceptance-mvp9r.md",
+  "workflow_program": {
+    "schema": "blcad.workflow-capability-evidence.v1",
+    "contract": "docs/inventor-parity-sequence.md",
+    "test_contract": "docs/inventor-parity-test-plan.md",
+    "note": "Disposition describes capability evidence only. Numbered completion belongs to mvp-plan.md. Registered proof existence does not substitute for execution, native viewer checks or reviewed captures.",
+    "capabilities": [
+      {
+        "capability": "existing-extrude",
+        "owner": 124,
+        "disposition": "implemented",
+        "contract": "docs/gui-interactive-extrude-revolve-mvp9.md",
+        "commands": [
+          "blcad.action.extrude"
+        ],
+        "apis": [
+          {
+            "source": "include/blcad/gui/gui_interactive_extrude_revolve.hpp",
+            "type": "GuiInteractiveExtrudeController",
+            "methods": [
+              "begin_with_new_inputs",
+              "preview_shape",
+              "apply"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[workflow-baseline]",
+            "source": "tests/gui/gui_shell_workflow_evidence_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[hermes-design-workflow]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          }
+        ]
+      },
+      {
+        "capability": "shared-property-workflow",
+        "owner": 145,
+        "disposition": "planned",
+        "contract": "docs/user-interface.md",
+        "planned_commands": [
+          "Property groups",
+          "Active selectors",
+          "Sketch breadcrumb",
+          "Create Another"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "feature-history",
+        "owner": 146,
+        "disposition": "planned",
+        "contract": "docs/gui-feature-edit-mvp9.md",
+        "planned_commands": [
+          "Suppress Feature",
+          "Reorder",
+          "End of Part"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "materials",
+        "owner": 149,
+        "disposition": "planned",
+        "contract": "docs/engineering-modules.md",
+        "planned_commands": [
+          "Material",
+          "Physical Properties"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "semantic-holes",
+        "owner": 152,
+        "disposition": "planned",
+        "contract": "docs/hole-wizard.md",
+        "planned_commands": [
+          "Hole Wizard"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "threads",
+        "owner": 155,
+        "disposition": "planned",
+        "contract": "docs/hole-wizard.md",
+        "planned_commands": [
+          "Thread"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "planar-g2",
+        "owner": 159,
+        "disposition": "planned",
+        "contract": "docs/sketch-planar-constraint-solver-mvp8.md",
+        "planned_commands": [
+          "Smooth G2"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "equation-curves",
+        "owner": 160,
+        "disposition": "planned",
+        "contract": "docs/inventor-like-sketcher-and-feature-roadmap.md",
+        "planned_commands": [
+          "Equation Curve"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "spatial-constraints",
+        "owner": 163,
+        "disposition": "planned",
+        "contract": "docs/gui-sketch3d-interaction-mvp8.md",
+        "planned_commands": [
+          "3D Constraints"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "curve-preserving-paths",
+        "owner": 166,
+        "disposition": "planned",
+        "contract": "docs/part-sweep-3d-geometry-mvp6.md",
+        "planned_commands": [
+          "Sweep path precision"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "g2-loft",
+        "owner": 168,
+        "disposition": "planned",
+        "contract": "docs/part-guided-loft-geometry-mvp6.md",
+        "planned_commands": [
+          "Loft G2"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "offset-thicken",
+        "owner": 170,
+        "disposition": "planned",
+        "contract": "docs/part-surface-feature-intent-mvp6.md",
+        "planned_commands": [
+          "Offset Surface",
+          "Thicken"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "curved-surface-edit",
+        "owner": 172,
+        "disposition": "planned",
+        "contract": "docs/part-trim-extend-surface-geometry-mvp6.md",
+        "planned_commands": [
+          "Curved Trim",
+          "Curved Extend"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "advanced-fillet",
+        "owner": 175,
+        "disposition": "planned",
+        "contract": "docs/fillet-chamfer-features.md",
+        "planned_commands": [
+          "Variable Fillet",
+          "Face Fillet",
+          "Full Round"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "rib-web",
+        "owner": 180,
+        "disposition": "planned",
+        "contract": "docs/feature-system.md",
+        "planned_commands": [
+          "Rib",
+          "Web"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "emboss-engrave",
+        "owner": 182,
+        "disposition": "planned",
+        "contract": "docs/feature-system.md",
+        "planned_commands": [
+          "Emboss",
+          "Engrave"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "direct-edit",
+        "owner": 185,
+        "disposition": "planned",
+        "contract": "docs/step-import-sequence-mvp10.md",
+        "planned_commands": [
+          "Direct Edit"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "model-states",
+        "owner": 189,
+        "disposition": "planned",
+        "contract": "docs/parameter-model.md",
+        "planned_commands": [
+          "Model States",
+          "Variants"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "flexible-occurrences",
+        "owner": 192,
+        "disposition": "planned",
+        "contract": "docs/assembly-flexible-subassembly-solving-mvp5.md",
+        "planned_commands": [
+          "Flexible Occurrence"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "adaptive-design",
+        "owner": 194,
+        "disposition": "planned",
+        "contract": "docs/assembly-system.md",
+        "planned_commands": [
+          "Edit Part in Context",
+          "Adaptive Reference"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "assembly-holes",
+        "owner": 196,
+        "disposition": "planned",
+        "contract": "docs/hole-wizard.md",
+        "planned_commands": [
+          "Assembly Hole"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "motion-analysis",
+        "owner": 199,
+        "disposition": "planned",
+        "contract": "docs/assembly-contact-swept-motion-mvp5.md",
+        "planned_commands": [
+          "Motion Analysis"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "finite-measure",
+        "owner": 200,
+        "disposition": "planned",
+        "contract": "docs/gui-measure-mvp9.md",
+        "planned_commands": [
+          "Finite Measure"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      },
+      {
+        "capability": "surface-analysis",
+        "owner": 201,
+        "disposition": "planned",
+        "contract": "docs/gui-analysis-step-export-workbench-mvp7.md",
+        "planned_commands": [
+          "Zebra",
+          "Curvature",
+          "Thickness"
+        ],
+        "commands": [],
+        "apis": [],
+        "proofs": []
+      }
+    ]
+  }
 }
