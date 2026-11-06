@@ -1,6 +1,7 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
+#include "blcad/gui/shell/shell_property_controls.hpp"
 
 #include "blcad/core/body.hpp"
 #include "blcad/core/datum_axis.hpp"
@@ -345,6 +346,25 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
       report(applied.error());
   });
   connect(cancel_button_, &QPushButton::clicked, this, [this] { cancel(); });
+  action_apply_ = new QAction(this);
+  action_apply_->setObjectName(QStringLiteral("blcad.action.apply_feature"));
+  action_apply_->setShortcuts(
+      {QKeySequence(Qt::CTRL | Qt::Key_Return), QKeySequence(Qt::CTRL | Qt::Key_Enter)});
+  action_apply_->setShortcutContext(Qt::WindowShortcut);
+  action_apply_->setEnabled(false);
+  window_.addAction(action_apply_);
+  connect(action_apply_, &QAction::triggered, this, [this] {
+    if (numeric_editor_->isVisible()) {
+      const auto preview = set_numeric_text(numeric_editor_->text());
+      if (!preview) {
+        report(preview.error());
+        return;
+      }
+    }
+    const auto result = apply();
+    if (!result)
+      report(result.error());
+  });
 
   (void)update_mapping();
   refresh_enablement();
@@ -623,6 +643,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_text(const QString&
   const auto value = parse_numeric(text, unit);
   if (!value.has_value()) {
     synchronize_numeric_editor(current_value());
+    if (command_ == Command::Extrude)
+      extrude_behavior_group_->set_diagnostic(QStringLiteral("Enter a finite length in mm."));
     return Result<GuiPartFeaturePreview>::failure(
         Error::validation("gui.shell.feature", "numeric value or unit is invalid"));
   }
@@ -867,6 +889,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   if (preview.has_error()) {
     viewport_.clear_feature_preview();
     task_summary_->setText(QString::fromStdString(preview.error().message()));
+    if (command_ == Command::Extrude)
+      extrude_behavior_group_->set_diagnostic(QString::fromStdString(preview.error().message()));
     refresh_enablement();
     synchronize_overlay();
     return preview;
@@ -1118,6 +1142,10 @@ void ShellFeatureTools::refresh_enablement() {
   const bool task_ready = session_.task().stage() == GuiTaskStage::Preview &&
                           session_.task().command_id() == expected_command;
   apply_button_->setEnabled(active() && preview_valid_ && task_ready);
+  if (action_apply_)
+    // A corrected field can be validated even when its previous candidate
+    // disabled Apply. apply() still validates the complete candidate.
+    action_apply_->setEnabled(active() && command_ == Command::Extrude);
   cancel_button_->setEnabled(active());
   window_.refresh_context_toolbar();
 }
@@ -1397,6 +1425,12 @@ bool ShellFeatureTools::eventFilter(QObject* watched, QEvent* event) {
     const auto* key = static_cast<QKeyEvent*>(event);
     if (key->key() == Qt::Key_Escape) {
       handle_escape();
+      return true;
+    }
+    if (command_ == Command::Extrude &&
+        (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) &&
+        key->modifiers() == Qt::ControlModifier) {
+      action_apply_->trigger();
       return true;
     }
   } else if (event->type() == QEvent::WindowDeactivate && !layer_.active_handle_id().empty()) {

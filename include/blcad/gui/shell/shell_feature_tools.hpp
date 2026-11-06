@@ -31,6 +31,8 @@ namespace blcad::gui {
 class OcctViewport;
 class ShellRibbon;
 class ShellWindow;
+class ShellPropertyGroup;
+class ShellPropertySelector;
 
 // GUI Shell Reset MVP-9R Blocks 135/136: explicit, shell-owned integration of
 // Extrude/Revolve, finishing and shell/draft controllers with the candidate-only
@@ -322,6 +324,7 @@ private:
   void refresh_revolve_preview();
   [[nodiscard]] Result<std::size_t> configure_revolve_candidate();
   void build_extrude_controls(QWidget* panel);
+  void clear_extrude_diagnostics();
   void reset_extrude_controls(GuiFeatureManipulatorFrame frame);
   void update_extrude_controls();
   void update_extrude_pick_mode();
@@ -417,9 +420,16 @@ private:
   QWidget* overlay_{nullptr};
   QDockWidget* task_dock_{nullptr};
   QLabel* task_summary_{nullptr};
+  QAction* action_apply_{nullptr};
   QLabel* value_label_{nullptr};
   QLineEdit* numeric_editor_{nullptr};
   QWidget* extrude_controls_{nullptr};
+  ShellPropertyGroup* extrude_geometry_group_{nullptr};
+  ShellPropertyGroup* extrude_behavior_group_{nullptr};
+  ShellPropertyGroup* extrude_advanced_group_{nullptr};
+  ShellPropertySelector* extrude_first_selector_{nullptr};
+  ShellPropertySelector* extrude_second_selector_{nullptr};
+  QLabel* extrude_profile_summary_{nullptr};
   QComboBox* extrude_extent_{nullptr};
   QComboBox* extrude_operation_{nullptr};
   QComboBox* extrude_target_{nullptr};

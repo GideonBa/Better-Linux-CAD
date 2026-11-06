@@ -2,6 +2,7 @@
 
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/occt_viewport.hpp"
+#include "blcad/gui/shell/shell_property_controls.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <QComboBox>
@@ -35,11 +36,32 @@ bool distance_extent(ExtrudeExtentMode mode) {
 }
 } // namespace
 
+void ShellFeatureTools::clear_extrude_diagnostics() {
+  for (auto* group : {extrude_geometry_group_, extrude_behavior_group_, extrude_advanced_group_})
+    group->set_diagnostic({});
+  extrude_first_selector_->set_diagnostic({});
+  extrude_second_selector_->set_diagnostic({});
+}
+
 void ShellFeatureTools::build_extrude_controls(QWidget* panel) {
   extrude_controls_ = new QWidget(panel);
   extrude_controls_->setObjectName(QStringLiteral("blcad.extrude.inputs"));
   auto* column = new QVBoxLayout(extrude_controls_);
   column->setContentsMargins(0, 0, 0, 0);
+  extrude_geometry_group_ = new ShellPropertyGroup(
+      "blcad.extrude.geometry_group", QStringLiteral("Input Geometry"), extrude_controls_);
+  extrude_behavior_group_ = new ShellPropertyGroup("blcad.extrude.behavior_group",
+                                                   QStringLiteral("Behavior"), extrude_controls_);
+  extrude_advanced_group_ = new ShellPropertyGroup("blcad.extrude.advanced_group",
+                                                   QStringLiteral("Advanced"), extrude_controls_);
+  for (auto* group : {extrude_geometry_group_, extrude_behavior_group_, extrude_advanced_group_})
+    column->addWidget(group);
+  extrude_profile_summary_ = new QLabel(&extrude_geometry_group_->content());
+  extrude_profile_summary_->setObjectName("blcad.extrude.profile_summary");
+  extrude_profile_summary_->setTextFormat(Qt::PlainText);
+  extrude_profile_summary_->setWordWrap(true);
+  extrude_geometry_group_->content_layout().addWidget(extrude_profile_summary_);
+  auto* rows = &extrude_behavior_group_->content_layout();
   const auto row = [&](const QString& text, QWidget* field) {
     auto* container = new QWidget(extrude_controls_);
     auto* form = new QFormLayout(container);
@@ -49,7 +71,7 @@ void ShellFeatureTools::build_extrude_controls(QWidget* panel) {
     label->setMinimumWidth(126);
     label->setBuddy(field);
     form->addRow(label, field);
-    column->addWidget(container);
+    rows->addWidget(container);
   };
   const auto combo = [&](const char* id, const QString& label) {
     auto* field = new QComboBox(extrude_controls_);
@@ -83,11 +105,33 @@ void ShellFeatureTools::build_extrude_controls(QWidget* panel) {
   extrude_second_distance_ = new QLineEdit(QStringLiteral("5"), extrude_controls_);
   extrude_second_distance_->setObjectName(QStringLiteral("blcad.extrude.second_distance"));
   row(QStringLiteral("Second Depth (mm)"), extrude_second_distance_);
-  extrude_first_face_ = combo("blcad.extrude.first_face", QStringLiteral("First Face"));
-  extrude_second_face_ = combo("blcad.extrude.second_face", QStringLiteral("Second Face"));
+  const auto face_selector = [&](const char* id, const QString& title, int role,
+                                 ShellPropertySelector*& selector) {
+    auto* field = new QComboBox(extrude_controls_);
+    field->setObjectName(QString::fromLatin1(id));
+    field->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    field->setMinimumContentsLength(15);
+    selector = new ShellPropertySelector(
+        QString::fromLatin1(id) + ".selector", title, *field, *this,
+        [this, role](bool active) {
+          if (active)
+            extrude_pick_role_->setCurrentIndex(role);
+          else if (extrude_pick_role_->currentIndex() == role)
+            extrude_pick_role_->setCurrentIndex(0);
+        },
+        &extrude_geometry_group_->content());
+    extrude_geometry_group_->content_layout().addWidget(selector);
+    return field;
+  };
+  extrude_first_face_ = face_selector("blcad.extrude.first_face", QStringLiteral("First Face"), 1,
+                                      extrude_first_selector_);
+  extrude_second_face_ = face_selector("blcad.extrude.second_face", QStringLiteral("Second Face"),
+                                       2, extrude_second_selector_);
+  rows = &extrude_geometry_group_->content_layout();
   extrude_pick_role_ = combo("blcad.extrude.pick_role", QStringLiteral("Viewport Selection"));
   extrude_pick_role_->addItem(QStringLiteral("Finish Selection"));
   extrude_pick_role_->addItem(QStringLiteral("First Face"));
+  rows = &extrude_advanced_group_->content_layout();
   extrude_taper_ = new QLineEdit(extrude_controls_);
   extrude_taper_->setObjectName(QStringLiteral("blcad.extrude.taper"));
   extrude_taper_->setPlaceholderText(QStringLiteral("Optional, -90 < Angle < 90"));
@@ -106,7 +150,7 @@ void ShellFeatureTools::build_extrude_controls(QWidget* panel) {
   extrude_hint_ = new QLabel(extrude_controls_);
   extrude_hint_->setObjectName(QStringLiteral("blcad.extrude.hint"));
   extrude_hint_->setWordWrap(true);
-  column->addWidget(extrude_hint_);
+  rows->addWidget(extrude_hint_);
   qobject_cast<QVBoxLayout*>(panel->layout())->addWidget(extrude_controls_);
   for (auto* field : {extrude_extent_, extrude_operation_, extrude_target_, extrude_direction_,
                       extrude_first_face_, extrude_second_face_, extrude_path_, extrude_thin_mode_})
@@ -125,6 +169,21 @@ void ShellFeatureTools::build_extrude_controls(QWidget* panel) {
 
 void ShellFeatureTools::reset_extrude_controls(GuiFeatureManipulatorFrame frame) {
   extrude_frame_ = frame;
+  clear_extrude_diagnostics();
+  for (auto* group : {extrude_geometry_group_, extrude_behavior_group_, extrude_advanced_group_})
+    group->set_expanded(true);
+  const auto profile = profile_from_selection();
+  const auto line = open_line_from_selection();
+  const bool open = coordinator_.extrude().uses_open_line();
+  const auto* sketch =
+      session_.part_document() && (open ? line.has_value() : bool(profile))
+          ? session_.part_document()->find_sketch(open ? *line : profile.value().first)
+          : nullptr;
+  extrude_profile_summary_->setText(
+      sketch ? QStringLiteral("%1 · %2").arg(QString::fromStdString(sketch->name()),
+                                             open ? QStringLiteral("Open thin profile")
+                                                  : QStringLiteral("1 profile"))
+             : QStringLiteral("Profile selected"));
   const QSignalBlocker b1(extrude_extent_), b2(extrude_operation_), b3(extrude_target_),
       b4(extrude_direction_), b5(extrude_first_face_), b6(extrude_second_face_), b7(extrude_path_),
       b8(extrude_thin_mode_);
@@ -265,6 +324,8 @@ void ShellFeatureTools::update_extrude_pick_mode() {
     return;
   const QScopedValueRollback guard(synchronizing_extrude_selection_, true);
   const bool picking = extrude_pick_role_->currentIndex() > 0;
+  extrude_first_selector_->set_active(extrude_pick_role_->currentIndex() == 1);
+  extrude_second_selector_->set_active(extrude_pick_role_->currentIndex() == 2);
   const bool changed = picking != extrude_reference_picking_;
   extrude_reference_picking_ = picking;
   if (picking) {
@@ -370,7 +431,9 @@ void ShellFeatureTools::refresh_extrude_preview() {
 }
 
 Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {
-  const auto fail = [](std::string message) {
+  clear_extrude_diagnostics();
+  const auto fail = [&](std::string message, ShellPropertyGroup* group = nullptr) {
+    (group ? group : extrude_behavior_group_)->set_diagnostic(QString::fromStdString(message));
     return Result<std::size_t>::failure(Error::validation("extrude", std::move(message)));
   };
   if (!layer_.active_handle_id().empty())
@@ -422,7 +485,7 @@ Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {
   if (!extrude_taper_->text().trimmed().isEmpty()) {
     taper = scalar(extrude_taper_->text(), "deg");
     if (!taper || *taper <= -90 || *taper >= 90)
-      return fail("Draft must be between -90 and 90 degrees.");
+      return fail("Draft must be between -90 and 90 degrees.", extrude_advanced_group_);
   }
   controller.set_taper(taper);
   if (controller.uses_open_line()) {
@@ -438,13 +501,17 @@ Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {
           controller.feature_id().value() + label, Quantity::length_mm(*value).value());
     };
     auto first = thickness(extrude_thickness_, ".wall", " Wall Thickness");
-    if (!first)
+    if (!first) {
+      extrude_advanced_group_->set_diagnostic(QString::fromStdString(first.error().message()));
       return Result<std::size_t>::failure(first.error());
+    }
     std::optional<Parameter> second;
     if (thin_mode == ExtrudeThinMode::TwoSided) {
       auto value = thickness(extrude_second_thickness_, ".wall.second", " Second Wall Thickness");
-      if (!value)
+      if (!value) {
+        extrude_advanced_group_->set_diagnostic(QString::fromStdString(value.error().message()));
         return Result<std::size_t>::failure(value.error());
+      }
       second = std::move(value.value());
     }
     controller.set_thin_new_inputs(thin_mode, std::move(first.value()), std::move(second));
@@ -453,13 +520,19 @@ Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {
   }
   std::optional<FaceReference> first, second;
   if (mode == ExtrudeExtentMode::ToFace || mode == ExtrudeExtentMode::Between) {
-    if (extrude_first_face_->currentIndex() < 0)
-      return fail("Select the first planar limit face.");
+    if (extrude_first_face_->currentIndex() < 0) {
+      extrude_first_selector_->set_diagnostic(
+          QStringLiteral("Select the first planar limit face."));
+      return fail("Select the first planar limit face.", extrude_geometry_group_);
+    }
     first = extrude_faces_.at(static_cast<std::size_t>(extrude_first_face_->currentIndex()));
   }
   if (mode == ExtrudeExtentMode::Between) {
-    if (extrude_second_face_->currentIndex() < 0)
-      return fail("Select the second planar limit face.");
+    if (extrude_second_face_->currentIndex() < 0) {
+      extrude_second_selector_->set_diagnostic(
+          QStringLiteral("Select the second planar limit face."));
+      return fail("Select the second planar limit face.", extrude_geometry_group_);
+    }
     second = extrude_faces_.at(static_cast<std::size_t>(extrude_second_face_->currentIndex()));
   }
   controller.set_limit_faces(std::move(first), std::move(second));

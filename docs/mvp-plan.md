@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 144
 current_block: 145
-current_boundary: Block 145A capability evidence and baseline implementation
+current_boundary: Block 145B verified; protected delivery before slice C
 current_tag: "[parity-b145]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -34,9 +34,9 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 144
-current block        Block 145 (in progress; slice A)
+current block        Block 145 (in progress; slice B)
 current phase        Shared workflow contract and evidence inventory
-current boundary     Capability evidence and measured baseline
+current boundary     Shared controls verified; deliver before breadcrumb lifecycle
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1825,8 +1825,8 @@ for the next slice/branch.
 
 | Slice | Deliverable | Status |
 | --- | --- | --- |
-| 145A | Extend existing capability inventory with explicit planned/implemented API/command/proof mappings, reject invalid evidence, capture reproducible unchanged-intent/geometry and timing baseline | Implemented and verified; PR #139 |
-| 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Not started |
+| 145A | Extend existing capability inventory with explicit planned/implemented API/command/proof mappings, reject invalid evidence, capture reproducible unchanged-intent/geometry and timing baseline | Merged via PR #139 |
+| 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Verified; protected delivery pending |
 | 145C | Existing-owner Sketch/feature breadcrumb transition, complete candidate restoration and Create Another lifecycle; native integration and closure | Not started |
 
 145A starts on `feat/advanced-workflow-evidence` from clean `dbff649`, after verified merged
@@ -1851,6 +1851,20 @@ claimed by this slice. 145B/C remain required before completing Block 145.
 Delivery: [PR #139](https://github.com/GideonBa/Better-Linux-CAD/pull/139), implementation `40bcd79`.
 The documentation-only delivery record preserves the 943 runtime fingerprints. Merge normally,
 refresh main and verify the reviewed tree before creating the 145B branch.
+
+145B starts on `feat/shared-property-controls` from verified main `ff39198` after PR #139 merged;
+the reviewed 145A tree matches main. The design in `user-interface.md` scopes the reusable widgets,
+existing Extrude adoption, candidate-only selection, diagnostics and Ctrl+Enter validation.
+
+145B implements those widgets and controls without a Core or persistence change. Three new widget/
+workflow cases and the extended native face-pick case verify collapsed diagnostics, command-owner
+lifetime, cleared/reselected inputs, blocked-signal synchronization, invalid/corrected typed values,
+compact completion controls and the physical 1600 mm³ Ctrl+Enter outcome. GUI/application build and
+format/diff checks pass. Focused offscreen: **27 passed, 1 native-only skip / 3,682 assertions**;
+full GUI: **626 passed, 33 native-only skips / 85,853**. Native 100%: **57 / 23,719**; native 150%:
+**12 / 1,862**, no skips. The first scaled run's existing search-navigation focus failure and full
+repeat are documented in `development-setup.md`. Captures are reviewed, startup reaches timeout
+124, and runtime fingerprints remain unchanged. Numbered completion remains at 144.
 
 ## Later phases
 

@@ -12,11 +12,14 @@
 #include <QDir>
 #include <QEventLoop>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QTemporaryDir>
 #include <QTimer>
+#include <QToolButton>
 #include <catch2/catch_approx.hpp>
 
 using namespace blcad;
@@ -564,7 +567,8 @@ TEST_CASE("Extrude limit picker is unavailable without eligible source geometry"
 }
 
 TEST_CASE("Native Extrude face clicks reject transverse limits and collect both source roles",
-          "[gui][block136-extrude-limit-picking][native-extrude-limit-picking]") {
+          "[gui][block136-extrude-limit-picking][native-extrude-limit-picking]"
+          "[parity-b145][property-controls][property-controls-native]") {
   if (QApplication::platformName() != "xcb")
     SKIP("Requires native Qt/OCCT face detection");
   ShellWindow window;
@@ -572,7 +576,25 @@ TEST_CASE("Native Extrude face clicks reject transverse limits and collect both 
   REQUIRE(window.viewport().native_viewer_available());
   const auto before = snapshot(window);
   choose(window, "blcad.extrude.extent", 6);
-  choose(window, "blcad.extrude.pick_role", 1);
+  const auto button_click = [&](const char* name) {
+    auto& button = field<QToolButton>(window, name);
+    for (auto* parent = button.parentWidget(); parent; parent = parent->parentWidget())
+      if (auto* scroll = qobject_cast<QScrollArea*>(parent))
+        scroll->ensureWidgetVisible(&button);
+    qApp->processEvents();
+    REQUIRE(button.isVisible());
+    const QPointF point = button.rect().center();
+    REQUIRE(window.childAt(button.mapTo(&window, point.toPoint())) == &button);
+    for (auto type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
+      QMouseEvent event(type, point, button.mapToGlobal(point.toPoint()), Qt::LeftButton,
+                        type == QEvent::MouseButtonRelease ? Qt::NoButton : Qt::LeftButton,
+                        Qt::NoModifier);
+      QApplication::sendEvent(&button, &event);
+    }
+    qApp->processEvents();
+  };
+  button_click("blcad.extrude.first_face.selector.pick");
+  CHECK(field<QComboBox>(window, "blcad.extrude.pick_role").currentIndex() == 1);
   const auto click = [&](SemanticFace face, GuiStandardView view) {
     window.viewport().set_standard_view(view);
     window.viewport().fit_all();
@@ -603,7 +625,17 @@ TEST_CASE("Native Extrude face clicks reject transverse limits and collect both 
   CHECK_FALSE(window.feature_tools().apply());
   CHECK(window.feature_tools().manipulators().active_handle_id().empty());
   click(SemanticFace::Top, GuiStandardView::Top);
-  choose(window, "blcad.extrude.pick_role", 2);
+  button_click("blcad.extrude.first_face.selector.clear");
+  CHECK(field<QComboBox>(window, "blcad.extrude.first_face").currentIndex() == -1);
+  CHECK(field<QLabel>(window, "blcad.extrude.first_face.selector.count").text() == "0 selected");
+  CHECK_FALSE(field<QPushButton>(window, "blcad.feature.apply").isEnabled());
+  CHECK(snapshot(window) == before);
+  click(SemanticFace::Top, GuiStandardView::Top);
+  CHECK(field<QLabel>(window, "blcad.extrude.first_face.selector.count").text() == "1 selected");
+  CHECK(field<QToolButton>(window, "blcad.extrude.first_face.selector.clear").isEnabled());
+  button_click("blcad.extrude.second_face.selector.pick");
+  CHECK(field<QComboBox>(window, "blcad.extrude.pick_role").currentIndex() == 2);
+  CHECK_FALSE(field<QToolButton>(window, "blcad.extrude.first_face.selector.pick").isChecked());
   click(SemanticFace::Top, GuiStandardView::Top);
   CHECK_FALSE(window.feature_tools().apply());
   click(SemanticFace::Bottom, GuiStandardView::Bottom);
