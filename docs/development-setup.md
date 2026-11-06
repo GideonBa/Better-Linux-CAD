@@ -2901,3 +2901,6 @@ Final source formatting and `git diff --check` pass. The 797 code/test/CMake fin
 `/tmp/blcad145b-runtime-freeze.json` are unchanged through focused/full/native checks (digest
 `f45229c2857acd480651763b952f23fb369b2f9eec1e0d2476fbcd8ce31ec7fd`). Documentation is outside
 that freeze. Source and staged review precede protected PR delivery. Block 145 remains open for C.
+
+Delivery: [PR #140](https://github.com/GideonBa/Better-Linux-CAD/pull/140), implementation `84fd6e1`.
+The final delivery record changes documentation only; runtime fingerprints remain unchanged.

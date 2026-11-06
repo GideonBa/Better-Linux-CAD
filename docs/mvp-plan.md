@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 144
 current_block: 145
-current_boundary: Block 145B verified; protected delivery before slice C
+current_boundary: Block 145B verified in PR #140; merge before slice C
 current_tag: "[parity-b145]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -1826,7 +1826,7 @@ for the next slice/branch.
 | Slice | Deliverable | Status |
 | --- | --- | --- |
 | 145A | Extend existing capability inventory with explicit planned/implemented API/command/proof mappings, reject invalid evidence, capture reproducible unchanged-intent/geometry and timing baseline | Merged via PR #139 |
-| 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Verified; protected delivery pending |
+| 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Verified; delivery PR #140 |
 | 145C | Existing-owner Sketch/feature breadcrumb transition, complete candidate restoration and Create Another lifecycle; native integration and closure | Not started |
 
 145A starts on `feat/advanced-workflow-evidence` from clean `dbff649`, after verified merged
@@ -1865,6 +1865,9 @@ full GUI: **626 passed, 33 native-only skips / 85,853**. Native 100%: **57 / 23,
 **12 / 1,862**, no skips. The first scaled run's existing search-navigation focus failure and full
 repeat are documented in `development-setup.md`. Captures are reviewed, startup reaches timeout
 124, and runtime fingerprints remain unchanged. Numbered completion remains at 144.
+
+Delivery: [PR #140](https://github.com/GideonBa/Better-Linux-CAD/pull/140), implementation `84fd6e1`.
+Merge normally, verify the merged tree and refresh main before starting 145C.
 
 ## Later phases
 
