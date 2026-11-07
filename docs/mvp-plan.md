@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 145
 current_block: 146
-current_boundary: Block 146 planned; Block 145 accepted for regular PR delivery
+current_boundary: Block 146 planned; Block 145 delivery PR 143
 current_tag: "[parity-b146]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -36,7 +36,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 implemented through  Block 145
 current block        Block 146 (planned; not started)
 current phase        Authored history and suppression intent
-current boundary     Block 145 accepted; Block 146 awaits preceding PR delivery
+current boundary     Block 145 accepted; Block 146 awaits PR 143 merge
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1829,7 +1829,7 @@ for the next slice/branch.
 | 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Merged via PR #140 |
 | 145C1 | Extend existing GuiDocumentSession with a complete transient Part-workflow checkpoint, committed-only Save and one-history publication; headless failure/history/sidecar tests | Merged via PR #141 |
 | 145C2 | Existing-owner Extrude/source Sketch breadcrumbs using C1, revalidation, complete Cancel, committed-only Save and guarded consumers; native integration | Merged via PR #142 |
-| 145C3 | Explicit profile-selector command-first/Create Another lifecycle, retained compatible settings without hidden targets; whole-Block-145 native/compact/scaled closure | Implemented and accepted; PR delivery pending |
+| 145C3 | Explicit profile-selector command-first/Create Another lifecycle, retained compatible settings without hidden targets; whole-Block-145 native/compact/scaled closure | Verified; delivery PR #143 |
 
 145A starts on `feat/advanced-workflow-evidence` from clean `dbff649`, after verified merged
 PR #138 and refreshed main. `user-interface.md` owns the slice design and baseline boundaries.
@@ -1932,6 +1932,10 @@ Together A/B/C1/C2/C3 meet Block 145 UI01 and bounded P01 baseline criteria. Onl
 capability advances to implemented coverage; 22 future extensions remain planned. Implemented-through
 advances to **145**, and Blocks 146–204 remain unstarted. The next implementation branch may begin
 only after C3's normal protected PR is merged and refreshed main matches the reviewed tree.
+
+Delivery: [PR #143](https://github.com/GideonBa/Better-Linux-CAD/pull/143), implementation `7f50220`.
+The delivery-record change is documentation only. Merge normally, refresh main and compare its
+tree with the reviewed branch before starting Block 146.
 
 ## Later phases
 

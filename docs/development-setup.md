@@ -3188,3 +3188,6 @@ separately validates that promotion, exact API declarations, proof registration 
 Both runtime inventories remain unchanged. Scoped C++ formatting, new-file formatting and diff
 checks pass. Block 145 is accepted; subsequent feature blocks remain planned. Delivery uses a normal
 protected PR and requires refreshed main/tree comparison before the next implementation branch.
+
+Delivery: [PR #143](https://github.com/GideonBa/Better-Linux-CAD/pull/143), implementation `7f50220`.
+The delivery-record commit changes documentation only and preserves the final runtime freeze.
