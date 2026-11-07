@@ -77,6 +77,18 @@ public:
   [[nodiscard]] Result<std::size_t> publish_part_workflow(std::string label);
   void cancel_part_workflow();
   [[nodiscard]] bool part_workflow_active() const noexcept;
+  // End of Part retains complete intent inside the existing disposable workflow.
+  // Its evaluated prefix is never a complete fresh model. Publishing the workflow
+  // validates the full suffix and restores the ordinary end-of-history policy.
+  [[nodiscard]] Result<std::size_t> begin_part_history_context(std::size_t prefix_count);
+  [[nodiscard]] Result<std::size_t> move_part_history_marker(std::size_t prefix_count);
+  [[nodiscard]] std::optional<std::size_t> history_prefix_count() const noexcept;
+  [[nodiscard]] bool history_prefix_ready() const;
+  // Inserts newly authored executable rows at the marker using Core replay.
+  // The candidate retains all suffix definitions; the session is unchanged.
+  [[nodiscard]] Result<std::size_t> prepare_part_history_candidate(PartDocument& candidate) const;
+  [[nodiscard]] Result<geometry::ShapeCache>
+  preview_part_history_candidate(PartDocument& candidate) const;
   [[nodiscard]] Result<std::size_t> undo();
   [[nodiscard]] Result<std::size_t> redo();
 
@@ -137,6 +149,7 @@ private:
     std::vector<SketchDimensionCatalog> sketch_dimensions;
     std::string label;
     bool allow_failed_recompute{false};
+    std::optional<std::size_t> history_prefix;
   };
 
   struct ProjectPartCache {
@@ -154,7 +167,8 @@ private:
   [[nodiscard]] Result<std::string> serialize_current() const;
   [[nodiscard]] Result<std::size_t>
   recompute_part(PartDocument& document, geometry::ShapeCache& cache,
-                 const std::filesystem::path& asset_root = {}) const;
+                 const std::filesystem::path& asset_root = {},
+                 std::optional<std::size_t> prefix_count = std::nullopt) const;
   [[nodiscard]] Result<std::vector<ProjectPartCache>>
   recompute_project(Project& project, const std::filesystem::path& asset_root = {},
                     std::optional<Error>* import_failure = nullptr) const;
@@ -182,6 +196,7 @@ private:
 
   Document document_;
   std::shared_ptr<const GuiDocumentSession> part_workflow_base_;
+  std::optional<std::size_t> history_prefix_count_;
   std::string display_name_;
   std::filesystem::path file_path_;
   GuiWorkspace workspace_{GuiWorkspace::Part};

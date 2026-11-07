@@ -272,6 +272,36 @@ the earlier rejected incomplete Apply while the task shows the corrected valid c
 status, inclusion control, affected list and fixed footer remain accessible at compact scale;
 the remaining explanatory hint can scroll. Exact commands/results live in `development-setup.md`.
 
+### End of Part integration — remaining Block 148B work
+
+The session foundation alone exposes no marker command. Its subsequent native integration uses
+the same Model browser: an End of Part marker sits between executable feature rows and supports
+dragging plus an equivalent context/keyboard command. Rows after it remain visible with an explicit
+outside-prefix status distinct from authored suppression. The marker counts executable rows;
+shared Sketch/support availability follows its actual producer dependencies, not an invented second
+resource history. Reference Parts remain immutable.
+
+A fixed context row above the viewport identifies Part / End of Part / marker position and keeps
+root Apply/Cancel visible while the existing feature property task is open. Ordinary full-model
+commands remain guarded; qualified prefix scene/input APIs check exact cache source and scope.
+Selection roles and target lists offer available prefix producers/Bodies, including effective
+modifier predecessors. Full export/analysis stays disabled with a reason; Save retains complete
+committed intent. No partial cache is presented as a complete fresh model.
+
+Existing feature editors and authoring tools operate as child commands inside the prefix workflow.
+Their Apply stages the child change and returns to the same marker context; their Cancel restores
+the child entry state. Extrude/source Sketch and Create Another retain their existing gesture and
+source validation behavior. Child source edits/Undo remain within that child's checkpoint. The
+parent workflow is published only by root Apply, after complete suffix validation; an invalid suffix
+keeps the draft and marker correctable. Root Apply is unavailable while a child/Sketch gesture owns
+input. Escape backs out the current gesture/child before cancelling the idle root context.
+
+Root Cancel restores the complete scene, marker policy, selection/filter and camera. Successful
+root publication creates one complete Undo entry and returns the marker to end-of-history policy;
+ordinary Undo/Redo restores complete intent. H02/H03/UI01 acceptance must exercise actual marker
+input, upstream edits, inserted features, invalid/corrected suffixes, child cancellation, Save during
+preview, import/independent Body scopes and camera restoration at 100% and compact 150% scale.
+
 ### Planned command placement and workflows
 
 | Ribbon/context | Planned commands | Required workflow |

@@ -3556,3 +3556,71 @@ capability is promoted by this bounded delivery.
 Delivery: [PR #148](https://github.com/GideonBa/Better-Linux-CAD/pull/148), implementation `8d802d3`.
 This delivery-record update changes documentation only and preserves all 975 runtime fingerprints.
 Normal merge and refreshed-main/reviewed-tree comparison precede slice B's implementation branch.
+
+## Block 148B session foundation — 2026-11-07
+
+Starts from verified merged main `1179001` (PR #148), with an exact reviewed-tree comparison before
+`feat/end-of-part-context`. This first serial part of B extends the existing Part workflow; it does
+not expose a native End of Part marker or complete B. Complete intent remains in the session while
+the evaluated cache is explicitly partial. New rows are inserted at the transient marker through
+Core replay; complete suffix publication is one existing workflow transaction. Prefix readiness
+and full-result freshness remain distinct, including at the final authored row.
+
+```bash
+cmake --build build/dev-gui --target blcad_gui_tests blcad -j8
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[history-prefix-session],[part-workflow],[document-session],[history-controller],[history-shell],[history-evaluation-boundary],[shell-combined-revolve-controls],[shell-coverage]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests --durations yes
+```
+
+Build/test/native/startup processes run serially; runtime edits stop during checks. GUI commands
+use regular filesystem access for atomic project/STEP publication, including offscreen runs.
+The initial 134-object consumer build passes (`/tmp/blcad148b1-initial-build.log`). Review expands
+coverage with actual imported suppliers, sidecars and suppressed rows; an optional/pointer mistake
+in the new test is corrected before final compilation. The transient history entry initializer is
+explicit, introducing no compiler warnings. Existing unrelated Sketch annotation warnings remain.
+Final builds pass (`blcad148b1-final-build.log`, `blcad148b1-final-entry-build.log`).
+
+Final focused regression passes **55 cases / 3,694 assertions**, no skips or failures
+(`/tmp/blcad148b1-final-focused-regression.log`). The new ten session scenarios cover every marker
+boundary; retained suffix definitions; rejected complete scene/inspection/STEP access; failed suffix
+and failed marker movement; correction and independent full volume/bounds; exact Body predecessor
+replay; future-creator rejection; insertion among suppressed rows; local Undo/Redo and one complete
+publication; committed Save/Save As and byte-exact Sketch sidecars; original redo restoration;
+immutable Reference bases; supplier reobservation even for marker-only visits; copied-session
+independence; executable ID/lifetime reuse; and partial cache loss/recompute. Existing document,
+Part workflow and browser/combined-Revolve regressions run in the same focused process.
+
+Core and Geometry implementation/tests are unchanged from accepted main. Their prior full results
+(Core **627 / 23,727** from 147B; Geometry **574 / 51,745** from 148A) are retained, not rerun or
+claimed as new checks of this GUI-session change. New session tests execute the actual Geometry
+prefix/full evaluator and real STEP reader/writer, with independent fresh full comparisons.
+Native marker placement, child-command UI integration and new layout captures remain the next
+serial part of 148B; no new marker/UI capability is promoted by this foundation.
+
+Runtime freeze `/tmp/blcad148b1-runtime-freeze.json`: **976** source/test/asset/build-script files,
+compact sorted-key UTF-8 JSON; SHA-256
+`8b6107e0e50596bbf2a3e1db15c5896083e8657c8d59a7253727cad8950bbf1a`.
+Full GUI/native/startup checks and final unchanged-fingerprint confirmation follow below.
+
+Final full offscreen GUI passes **707 cases: 673 passed, 34 expected native-only skips /
+89,135 assertions**, no failures (`/tmp/blcad148b1-gui-full.log`). Native 100% session/browser/source
+Sketch combinations pass **36 / 2,241**, no skips or failures (`blcad148b1-native-100.log`):
+
+```bash
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[history-prefix-session],[part-workflow],[source-sketch-workflow],[history-shell],[history-evaluation-boundary]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+These native runs combine the new headless session API with existing actual browser/source-Sketch
+interaction; they do not claim interaction with an unimplemented native marker. No new layout or
+150% capture is claimed by the foundation. The accepted 148A layout evidence is retained.
+
+Separate native startup reaches expected timeout **124** after six seconds
+(`/tmp/blcad148b1-startup.log`). The known Medium incomplete depth/stencil Visual warning remains;
+no High-severity/BadDrawable/BadWindow failure appears in native/startup logs. Source/format/diff
+review passes and all 976 runtime fingerprints remain unchanged after final checks. The session
+foundation is verified; B and whole 148 remain open for native integration and combined acceptance.
+
+After documentation-only status updates, `[shell-coverage]` passes **5 / 494**
+(`/tmp/blcad148b1-final-inventory.log`), with no failures or skips. All 976 runtime fingerprints
+remain unchanged; no whole-block capability is promoted. Protected PR delivery follows.

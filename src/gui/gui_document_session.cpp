@@ -1040,7 +1040,7 @@ Result<std::size_t> GuiDocumentSession::recompute() {
       record_error(cache.error());
       return Result<std::size_t>::failure(cache.error());
     }
-    const auto result = recompute_part(*part, cache.value());
+    const auto result = recompute_part(*part, cache.value(), {}, history_prefix_count_);
     if (result.has_error()) {
       part_shape_cache_.reset();
       recompute_status_ = GuiRecomputeStatus::Failed;
@@ -1049,9 +1049,11 @@ Result<std::size_t> GuiDocumentSession::recompute() {
     }
     part_shape_cache_ = std::move(cache.value());
     project_part_caches_.clear();
-    recompute_status_ = GuiRecomputeStatus::Fresh;
+    recompute_status_ =
+        history_prefix_count_ ? GuiRecomputeStatus::Stale : GuiRecomputeStatus::Fresh;
     reference_repair_mode_ = false;
-    part->mark_all_clean();
+    if (!history_prefix_count_)
+      part->mark_all_clean();
     ++presentation_revision_;
     return result;
   }
@@ -1273,6 +1275,9 @@ Result<std::size_t> GuiDocumentSession::publish_part_workflow(std::string label)
       workspace_ != GuiWorkspace::Part ||
       part_document()->id() != part_workflow_base_->part_document()->id())
     return Result<std::size_t>::failure(session_error("invalid Part workflow publication"));
+  if (history_prefix_count_ && (task_.active() || !history_prefix_ready()))
+    return Result<std::size_t>::failure(
+        session_error("Finish the prefix command and recompute its current inputs before Apply"));
 
   auto json = serialize_current();
   if (!json)
@@ -1295,6 +1300,14 @@ Result<std::size_t> GuiDocumentSession::publish_part_workflow(std::string label)
       record_error(published.error());
       return published;
     }
+  } else if (history_prefix_count_) {
+    // Even a marker-only visit revalidates imported suppliers before restoring a
+    // complete result. A partial cache must never become the accepted full cache.
+    const auto computed = accepted.recompute();
+    if (!computed) {
+      record_error(computed.error());
+      return computed;
+    }
   }
   accepted.task_ = task_;
   accepted.workspace_ = workspace_;
@@ -1315,6 +1328,115 @@ void GuiDocumentSession::cancel_part_workflow() {
 
 bool GuiDocumentSession::part_workflow_active() const noexcept {
   return bool(part_workflow_base_);
+}
+
+Result<std::size_t> GuiDocumentSession::begin_part_history_context(std::size_t prefix_count) {
+  const auto* part = part_document();
+  if (!part || part->is_reference_part() || part_workflow_base_ || task_.active() ||
+      workspace_ != GuiWorkspace::Part || reference_repair_mode_ || !part_shape_cache_ ||
+      !derived_results_fresh() || !part_shape_cache_->validate_complete_history_result(*part))
+    return Result<std::size_t>::failure(
+        session_error("End of Part requires an idle, complete fresh editable Part"));
+  auto candidate = *part;
+  auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.part.history.prefix"));
+  if (!cache)
+    return Result<std::size_t>::failure(cache.error());
+  const auto computed = recompute_part(candidate, cache.value(), {}, prefix_count);
+  if (!computed)
+    return computed;
+  const auto begun = begin_part_workflow();
+  if (!begun)
+    return begun;
+  history_prefix_count_ = prefix_count;
+  history_[history_index_].history_prefix = prefix_count;
+  part_shape_cache_ = std::move(cache.value());
+  recompute_status_ = GuiRecomputeStatus::Stale;
+  selection_.clear();
+  ++presentation_revision_;
+  return computed;
+}
+
+Result<std::size_t> GuiDocumentSession::move_part_history_marker(std::size_t prefix_count) {
+  if (!history_prefix_count_ || task_.active() || workspace_ != GuiWorkspace::Part ||
+      !history_prefix_ready())
+    return Result<std::size_t>::failure(
+        session_error("End of Part marker movement requires an idle current prefix context"));
+  auto candidate = *part_document();
+  auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.part.history.prefix"));
+  if (!cache)
+    return Result<std::size_t>::failure(cache.error());
+  const auto computed = recompute_part(candidate, cache.value(), {}, prefix_count);
+  if (!computed)
+    return computed;
+  history_prefix_count_ = prefix_count;
+  history_[history_index_].history_prefix = prefix_count;
+  part_shape_cache_ = std::move(cache.value());
+  recompute_status_ = GuiRecomputeStatus::Stale;
+  selection_.clear();
+  ++presentation_revision_;
+  return computed;
+}
+
+std::optional<std::size_t> GuiDocumentSession::history_prefix_count() const noexcept {
+  return history_prefix_count_;
+}
+
+bool GuiDocumentSession::history_prefix_ready() const {
+  if (!history_prefix_count_ || !part_workflow_base_ || !part_document() || !part_shape_cache_)
+    return false;
+  const auto* plan = part_shape_cache_->history_plan();
+  return plan && plan->prefix_count == history_prefix_count_ &&
+         bool(part_shape_cache_->validate_history_input(*part_document()));
+}
+
+Result<std::size_t>
+GuiDocumentSession::prepare_part_history_candidate(PartDocument& candidate) const {
+  if (!history_prefix_ready() || candidate.id() != part_document()->id())
+    return Result<std::size_t>::failure(
+        session_error("The End of Part source is no longer current"));
+  const auto before = part_document()->executable_history();
+  const auto after = candidate.executable_history();
+  if (!before)
+    return Result<std::size_t>::failure(before.error());
+  if (!after)
+    return Result<std::size_t>::failure(after.error());
+  std::vector<std::string> existing, added, suppressed, retained;
+  for (const auto& row : before.value())
+    existing.push_back(row.node_id);
+  for (const auto& row : after.value()) {
+    if (std::find(existing.begin(), existing.end(), row.node_id) == existing.end())
+      added.push_back(row.node_id);
+    else
+      retained.push_back(row.node_id);
+    if (row.state == PartFeatureState::Suppressed)
+      suppressed.push_back(row.node_id);
+  }
+  if (retained != existing)
+    return Result<std::size_t>::failure(
+        session_error("Remove or reorder existing features outside the End of Part context"));
+  if (added.empty())
+    return Result<std::size_t>::success(*history_prefix_count_);
+  existing.insert(existing.begin() + static_cast<std::ptrdiff_t>(*history_prefix_count_),
+                  added.begin(), added.end());
+  const auto ordered = candidate.with_history_intent({std::move(existing), std::move(suppressed)});
+  if (!ordered)
+    return Result<std::size_t>::failure(ordered.error());
+  candidate = ordered.value();
+  return Result<std::size_t>::success(*history_prefix_count_ + added.size());
+}
+
+Result<geometry::ShapeCache>
+GuiDocumentSession::preview_part_history_candidate(PartDocument& candidate) const {
+  const auto prepared = prepare_part_history_candidate(candidate);
+  if (!prepared)
+    return Result<geometry::ShapeCache>::failure(prepared.error());
+  auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.part.history.preview"));
+  if (!cache)
+    return cache;
+  const auto computed = recompute_part(candidate, cache.value(), {}, prepared.value());
+  if (!computed)
+    return Result<geometry::ShapeCache>::failure(computed.error());
+  return cache;
 }
 
 Result<std::size_t> GuiDocumentSession::undo() {
@@ -1346,7 +1468,8 @@ bool GuiDocumentSession::set_workspace(GuiWorkspace workspace) noexcept {
 void GuiDocumentSession::set_derived_results_fresh(bool fresh) noexcept {
   if (reference_repair_mode_)
     return;
-  recompute_status_ = fresh ? GuiRecomputeStatus::Fresh : GuiRecomputeStatus::Stale;
+  recompute_status_ =
+      fresh && !history_prefix_count_ ? GuiRecomputeStatus::Fresh : GuiRecomputeStatus::Stale;
 }
 
 void GuiDocumentSession::report_error(const Error& error) {
@@ -1400,7 +1523,7 @@ bool GuiDocumentSession::reference_repair_mode() const noexcept {
 }
 
 bool GuiDocumentSession::derived_results_fresh() const noexcept {
-  return recompute_status_ == GuiRecomputeStatus::Fresh;
+  return !history_prefix_count_ && recompute_status_ == GuiRecomputeStatus::Fresh;
 }
 
 GuiRecomputeStatus GuiDocumentSession::recompute_status() const noexcept {
@@ -1531,7 +1654,8 @@ Result<std::string> GuiDocumentSession::serialize_current() const {
 
 Result<std::size_t>
 GuiDocumentSession::recompute_part(PartDocument& document, geometry::ShapeCache& cache,
-                                   const std::filesystem::path& asset_root) const {
+                                   const std::filesystem::path& asset_root,
+                                   std::optional<std::size_t> prefix_count) const {
   const auto root = !asset_root.empty() ? asset_root
                     : file_path_.empty()
                         ? std::filesystem::path{}
@@ -1539,9 +1663,10 @@ GuiDocumentSession::recompute_part(PartDocument& document, geometry::ShapeCache&
   std::optional<geometry::StepImportTopologyContext> context;
   if (!root.empty())
     context.emplace(root);
-  const auto summary =
-      geometry::GeometryRecomputeExecutor{context ? &*context : nullptr}.execute_document(document,
-                                                                                          cache);
+  const geometry::GeometryRecomputeExecutor executor{context ? &*context : nullptr};
+  const auto summary = prefix_count
+                           ? executor.execute_history_prefix(document, *prefix_count, cache)
+                           : executor.execute_document(document, cache);
   if (summary.has_error())
     return Result<std::size_t>::failure(summary.error());
   return Result<std::size_t>::success(summary.value().executed_feature_count);
@@ -1626,7 +1751,8 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
     const auto retained =
         std::find_if(part_history_geometry_.begin(), part_history_geometry_.end(),
                      [&](const auto& item) { return item.history_index == index; });
-    const bool reuse = !entry.allow_failed_recompute && part->step_import_sources().empty() &&
+    const bool reuse = !history_prefix_count_ && !entry.allow_failed_recompute &&
+                       part->step_import_sources().empty() &&
                        retained != part_history_geometry_.end() &&
                        retained->cache.validate_complete_history_result(*part).has_value();
     auto cache = reuse
@@ -1634,8 +1760,17 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
                      : geometry::ShapeCache::create(ShapeCacheId("gui.part." + part->id().value()));
     if (!cache)
       return Result<std::size_t>::failure(cache.error());
-    auto computed = reuse ? Result<std::size_t>::success(0) : recompute_part(*part, cache.value());
+    if (history_prefix_count_ && !entry.history_prefix)
+      return Result<std::size_t>::failure(session_error("History entry has no prefix context"));
+    auto computed =
+        reuse ? Result<std::size_t>::success(0)
+              : recompute_part(*part, cache.value(), {},
+                               history_prefix_count_ ? entry.history_prefix : std::nullopt);
     if (!computed) {
+      if (history_prefix_count_) {
+        record_error(computed.error());
+        return computed;
+      }
       import_failure = imported_result_failure(*part, asset_root);
       if (!same_error(computed.error(), import_failure))
         import_failure = imported_part_consumer_failure(*part, asset_root, computed.error())
@@ -1649,7 +1784,8 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
         repair_failure = computed.error();
       part->mark_all_clean();
     } else {
-      part->mark_all_clean();
+      if (!history_prefix_count_)
+        part->mark_all_clean();
       restored_cache = std::move(cache.value());
     }
   } else {
@@ -1668,8 +1804,11 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
   part_shape_cache_ = std::move(restored_cache);
   project_part_caches_ = std::move(restored_project_caches);
   reference_repair_mode_ = repair_failure.has_value();
-  recompute_status_ =
-      repair_failure || import_failure ? GuiRecomputeStatus::Failed : GuiRecomputeStatus::Fresh;
+  if (history_prefix_count_)
+    history_prefix_count_ = entry.history_prefix;
+  recompute_status_ = repair_failure || import_failure ? GuiRecomputeStatus::Failed
+                      : history_prefix_count_          ? GuiRecomputeStatus::Stale
+                                                       : GuiRecomputeStatus::Fresh;
   ++presentation_revision_;
   if (repair_failure)
     record_error(*repair_failure);
@@ -1780,6 +1919,13 @@ Result<std::size_t> GuiDocumentSession::publish_part_state(
     if (!valid)
       return valid;
   }
+  std::optional<std::size_t> candidate_prefix;
+  if (history_prefix_count_) {
+    const auto prepared = prepare_part_history_candidate(document);
+    if (!prepared)
+      return Result<std::size_t>::failure(prepared.error());
+    candidate_prefix = prepared.value();
+  }
   sort_catalogs(constraints);
   sort_catalogs(dimensions);
   auto valid_constraints = validate_constraint_catalogs(document, constraints);
@@ -1795,19 +1941,31 @@ Result<std::size_t> GuiDocumentSession::publish_part_state(
   auto json = serialize_part_document_to_json(document);
   if (json.has_error())
     return Result<std::size_t>::failure(json.error());
-  auto cache = recompute_part_candidate(document, json.value());
+  const auto evaluate_prefix = [&]() -> Result<geometry::ShapeCache> {
+    auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.part.history.prefix"));
+    if (!cache)
+      return cache;
+    const auto computed = recompute_part(document, cache.value(), {}, candidate_prefix);
+    if (!computed)
+      return Result<geometry::ShapeCache>::failure(computed.error());
+    return cache;
+  };
+  auto cache =
+      candidate_prefix ? evaluate_prefix() : recompute_part_candidate(document, json.value());
   if (!cache) {
     record_error(cache.error());
     return Result<std::size_t>::failure(cache.error());
   }
-  document.mark_all_clean();
+  if (!candidate_prefix)
+    document.mark_all_clean();
 
   document_ = std::move(document);
   sketch_constraint_catalogs_ = std::move(constraints);
   sketch_dimension_catalogs_ = std::move(dimensions);
   part_shape_cache_ = std::move(cache.value());
   project_part_caches_.clear();
-  recompute_status_ = GuiRecomputeStatus::Fresh;
+  history_prefix_count_ = candidate_prefix;
+  recompute_status_ = candidate_prefix ? GuiRecomputeStatus::Stale : GuiRecomputeStatus::Fresh;
   reference_repair_mode_ = false;
   ++presentation_revision_;
   append_history(std::move(json.value()), std::move(label));
@@ -1866,7 +2024,7 @@ void GuiDocumentSession::remember_part_history_geometry() {
 void GuiDocumentSession::initialize_history(std::string json, std::string label, bool saved) {
   hidden_presentations_.clear();
   history_ = {{document_kind(), std::move(json), sketch_constraint_catalogs_,
-               sketch_dimension_catalogs_, std::move(label), reference_repair_mode_}};
+               sketch_dimension_catalogs_, std::move(label), reference_repair_mode_, std::nullopt}};
   history_index_ = 0U;
   part_history_geometry_.clear();
   remember_part_history_geometry();
@@ -1885,7 +2043,7 @@ void GuiDocumentSession::append_history(std::string json, std::string label) {
   history_.erase(history_.begin() + static_cast<std::ptrdiff_t>(history_index_ + 1U),
                  history_.end());
   history_.push_back({document_kind(), std::move(json), sketch_constraint_catalogs_,
-                      sketch_dimension_catalogs_, std::move(label)});
+                      sketch_dimension_catalogs_, std::move(label), false, history_prefix_count_});
   history_index_ = history_.size() - 1U;
   remember_part_history_geometry();
 }
@@ -1905,6 +2063,7 @@ void GuiDocumentSession::record_information(std::string object_id, std::string m
 void GuiDocumentSession::reset_document() noexcept {
   ++presentation_revision_;
   document_ = std::monostate{};
+  history_prefix_count_.reset();
   reference_repair_mode_ = false;
   display_name_.clear();
   file_path_.clear();
