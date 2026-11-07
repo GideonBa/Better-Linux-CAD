@@ -3851,3 +3851,8 @@ QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_
 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_COMPACT=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad148c-final-150 ./build/dev-gui/blcad_gui_tests "[history-shell],[history-marker-shell],[history-combined-acceptance]"
 QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
 ```
+
+
+Delivery: [PR #151](https://github.com/GideonBa/Better-Linux-CAD/pull/151), implementation `59eeab1`.
+The delivery-record commit changes documentation only; all 976 runtime fingerprints remain
+unchanged. Normal merge and refreshed-main/reviewed-tree comparison precede Block 149.

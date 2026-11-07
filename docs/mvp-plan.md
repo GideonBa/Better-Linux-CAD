@@ -2071,7 +2071,7 @@ The shared UI contract stays in `user-interface.md`; effective state/cache owner
 | --- | --- | --- |
 | 148A | Existing browser follows executable order and shows authored/effective status; staged suppression/restore with explicit dependent closure; validated reorder/drag/drop; context Edit uses the existing editor; full-source preview/Apply/Cancel, persistence and native interaction tests | Merged via PR #148 |
 | 148B | Visibly labelled transient End of Part prefix, edit/insert at marker, complete suffix validation before one Apply, committed-only Save, disabled incomplete export/analysis and Cancel/camera/selection restoration | Verified; native integration delivered via PR #150 |
-| 148C | H01–H03/UI01 combined native acceptance at 100%/150%, compact layout/captures, failure recovery and complete capability evidence | Verified; delivery pending |
+| 148C | H01–H03/UI01 combined native acceptance at 100%/150%, compact layout/captures, failure recovery and complete capability evidence | Delivered via PR #151 |
 
 Only the whole completed/verified block advances numbered status or planned history UI capabilities.
 A preview leaves source intent/history/files intact. Dependents are listed and included only by an
@@ -2166,6 +2166,11 @@ delivery, confirm merge, refresh main and compare the reviewed tree before start
 Post-promotion inventory passes **5 / 568**, without skips or failures, and all 976 runtime
 fingerprints remain unchanged after final contract/capture updates. Exact validation is recorded in
 `development-setup.md`. Whole-148 acceptance is complete; delivery is pending the normal protected PR.
+
+
+148C delivery: [PR #151](https://github.com/GideonBa/Better-Linux-CAD/pull/151), implementation
+`59eeab1`. The delivery-record update changes documentation only and preserves all 976 runtime
+fingerprints. Confirm normal merge and compare refreshed main with the reviewed tree before 149.
 
 ## Later phases
 
