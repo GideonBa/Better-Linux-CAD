@@ -1,0 +1,766 @@
+{
+  "bodies": [
+    {
+      "id": "body.base",
+      "kind": "solid",
+      "name": "base",
+      "visibility": "visible"
+    },
+    {
+      "id": "body.circular",
+      "kind": "solid",
+      "name": "circular",
+      "visibility": "visible"
+    },
+    {
+      "id": "body.linear",
+      "kind": "solid",
+      "name": "linear",
+      "visibility": "visible"
+    },
+    {
+      "id": "body.loft",
+      "kind": "solid",
+      "name": "loft",
+      "visibility": "visible"
+    },
+    {
+      "id": "body.mirror",
+      "kind": "solid",
+      "name": "mirror",
+      "visibility": "visible"
+    },
+    {
+      "id": "body.revolve",
+      "kind": "solid",
+      "name": "revolve",
+      "visibility": "visible"
+    },
+    {
+      "id": "body.surface",
+      "kind": "surface",
+      "name": "surface",
+      "visibility": "visible"
+    },
+    {
+      "id": "body.sweep",
+      "kind": "solid",
+      "name": "sweep",
+      "visibility": "visible"
+    },
+    {
+      "id": "imported.body",
+      "kind": "solid",
+      "name": "imported.body",
+      "visibility": "visible"
+    }
+  ],
+  "body_booleans": [
+    {
+      "id": "boolean",
+      "keep_tool_bodies": false,
+      "operation": "add",
+      "result_mode": "modify_target",
+      "target_body": "body.base",
+      "tool_bodies": [
+        "body.mirror"
+      ]
+    }
+  ],
+  "body_transforms": [
+    {
+      "apply_to_owned_construction_geometry": false,
+      "apply_to_owned_sketches": false,
+      "body": "body.base",
+      "coordinate_space": "world",
+      "id": "translate",
+      "kind": "translate",
+      "translation_mm": {
+        "x": 10.0,
+        "y": 0.0,
+        "z": 0.0
+      }
+    }
+  ],
+  "construction_lines": [],
+  "construction_planes": [],
+  "construction_points": [],
+  "datum_axes": [
+    {
+      "direction": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 1.0
+      },
+      "id": "axis",
+      "kind": "explicit",
+      "name": "Axis",
+      "origin": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameter_dependencies": []
+    }
+  ],
+  "datum_planes": [
+    {
+      "id": "datum.xy",
+      "kind": "xy",
+      "name": "XY",
+      "normal": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 1.0
+      },
+      "origin": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "x_axis": {
+        "x": 1.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "y_axis": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      }
+    },
+    {
+      "id": "datum.xz",
+      "kind": "xz",
+      "name": "XZ",
+      "normal": {
+        "x": 0.0,
+        "y": -1.0,
+        "z": 0.0
+      },
+      "origin": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "x_axis": {
+        "x": 1.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "y_axis": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 1.0
+      }
+    },
+    {
+      "id": "datum.yz",
+      "kind": "yz",
+      "name": "YZ",
+      "normal": {
+        "x": 1.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "origin": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "x_axis": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "y_axis": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 1.0
+      }
+    }
+  ],
+  "derived_workplanes": [],
+  "document": {
+    "id": "history",
+    "name": "History"
+  },
+  "draft_features": [
+    {
+      "angle_parameter": "angle",
+      "faces": [
+        {
+          "capability": "face",
+          "face": "top",
+          "role": "draft_face",
+          "source_feature": "base",
+          "source_kind": "semantic_planar_face"
+        }
+      ],
+      "id": "draft",
+      "name": "Draft",
+      "neutral_plane": {
+        "capability": "plane",
+        "datum_plane": "datum.xy",
+        "role": "draft_neutral_plane",
+        "source_kind": "datum_plane"
+      },
+      "pull_direction": {
+        "capability": "axis",
+        "datum_axis": "axis",
+        "role": "draft_pull_direction",
+        "source_kind": "datum_axis"
+      },
+      "target_body": "body.base"
+    }
+  ],
+  "edge_treatments": [
+    {
+      "edges": [
+        {
+          "edge": "top_front",
+          "source_feature": "base",
+          "source_kind": "semantic_linear_edge"
+        }
+      ],
+      "id": "fillet",
+      "name": "Fillet",
+      "radius_parameter": "radius",
+      "target_body": "body.base",
+      "type": "fillet"
+    },
+    {
+      "edges": [
+        {
+          "edge": "top_front",
+          "source_feature": "base",
+          "source_kind": "semantic_linear_edge"
+        }
+      ],
+      "first_parameter": "radius",
+      "id": "chamfer",
+      "mode": "equal_distance",
+      "name": "Chamfer",
+      "target_body": "body.base",
+      "type": "chamfer"
+    }
+  ],
+  "feature_order": [
+    "imported",
+    "base",
+    "revolve",
+    "loft",
+    "sweep",
+    "surface",
+    "translate",
+    "linear",
+    "circular",
+    "mirror",
+    "fillet",
+    "chamfer",
+    "shell",
+    "draft",
+    "boolean"
+  ],
+  "features": [
+    {
+      "direction": "+Z",
+      "id": "base",
+      "input_sketch": "profile",
+      "length_parameter": "depth",
+      "name": "Base",
+      "operation_mode": "new_body",
+      "produced_body": "body.base",
+      "type": "additive_extrude"
+    }
+  ],
+  "imported_body_features": [
+    {
+      "definition": {
+        "catalog": "catalog",
+        "outputs": [
+          {
+            "body": "imported.body",
+            "imported_body": "solid",
+            "kind": "solid"
+          }
+        ],
+        "source": "supplier"
+      },
+      "id": "imported",
+      "name": "Imported"
+    }
+  ],
+  "imported_topology_catalogs": [
+    {
+      "captured_sha256_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "descriptor_version": 1,
+      "entries": [
+        {
+          "descriptor": {
+            "body_kind": "solid",
+            "boundary_keys": [],
+            "bounds_mm": [
+              0.0,
+              0.0,
+              0.0,
+              10.0,
+              10.0,
+              10.0
+            ],
+            "centroid": {
+              "x": 5.0,
+              "y": 5.0,
+              "z": 5.0
+            },
+            "direction": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "geometry": "opaque",
+            "geometry_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "body",
+            "measure": 1000.0,
+            "origin": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "radius_mm": 0.0,
+            "samples": []
+          },
+          "id": "solid",
+          "parent_body": null
+        }
+      ],
+      "id": "catalog",
+      "product_key": "2222222222222222222222222222222222222222222222222222222222222222",
+      "source": "supplier"
+    }
+  ],
+  "loft_features": [
+    {
+      "continuity": "c0",
+      "guide_curves": [],
+      "id": "loft",
+      "name": "Loft",
+      "operation_mode": "new_body",
+      "path_curve": null,
+      "produced_body": "body.loft",
+      "sections": [
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "profile.profile",
+          "rotation_offset": null,
+          "sketch": "profile"
+        },
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "section.profile",
+          "rotation_offset": null,
+          "sketch": "section"
+        }
+      ],
+      "type": "loft"
+    }
+  ],
+  "mirror_features": [
+    {
+      "id": "mirror",
+      "mirror_plane": {
+        "datum_plane": "datum.xy",
+        "source_kind": "datum_plane"
+      },
+      "name": "Mirror",
+      "operation_mode": "new_body",
+      "produced_body": "body.mirror",
+      "sources": [
+        {
+          "feature": "base",
+          "kind": "feature"
+        }
+      ],
+      "type": "mirror"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "width",
+      "name": "width",
+      "scope": "part",
+      "type": "length",
+      "unit": "mm",
+      "value": 20.0
+    },
+    {
+      "id": "height",
+      "name": "height",
+      "scope": "part",
+      "type": "length",
+      "unit": "mm",
+      "value": 10.0
+    },
+    {
+      "id": "depth",
+      "name": "depth",
+      "scope": "part",
+      "type": "length",
+      "unit": "mm",
+      "value": 8.0
+    },
+    {
+      "id": "radius",
+      "name": "radius",
+      "scope": "part",
+      "type": "length",
+      "unit": "mm",
+      "value": 1.0
+    },
+    {
+      "id": "count",
+      "name": "Count",
+      "scope": "part",
+      "type": "count",
+      "unit": "1",
+      "value": 3.0
+    },
+    {
+      "id": "angle",
+      "name": "Angle",
+      "scope": "part",
+      "type": "angle",
+      "unit": "deg",
+      "value": 2.0
+    }
+  ],
+  "part_patterns": [
+    {
+      "count_parameter": "count",
+      "direction": {
+        "datum_axis": "axis",
+        "source_kind": "datum_axis"
+      },
+      "extent": {
+        "direction": "positive",
+        "mode": "spacing",
+        "parameter": "depth"
+      },
+      "id": "linear",
+      "name": "Linear",
+      "operation_mode": "new_body",
+      "produced_body": "body.linear",
+      "sources": [
+        {
+          "feature": "base",
+          "kind": "feature"
+        }
+      ],
+      "type": "linear_pattern"
+    },
+    {
+      "axis": {
+        "datum_axis": "axis",
+        "source_kind": "datum_axis"
+      },
+      "count_parameter": "count",
+      "equal_spacing": true,
+      "id": "circular",
+      "name": "Circular",
+      "operation_mode": "new_body",
+      "produced_body": "body.circular",
+      "sources": [
+        {
+          "feature": "base",
+          "kind": "feature"
+        }
+      ],
+      "total_angle_deg": 360.0,
+      "type": "circular_pattern"
+    }
+  ],
+  "path_curves": [
+    {
+      "closure": "open",
+      "connection_tolerance_mm": 1e-07,
+      "continuity_hint": null,
+      "fixed_up_vector": null,
+      "id": "path.one",
+      "name": "path.one",
+      "orientation_rule": "minimum_twist",
+      "segments": [
+        {
+          "curve_kind": "line",
+          "entity": "line",
+          "reversed": false,
+          "sketch": "path.one.sketch",
+          "source": "planar_sketch_curve"
+        }
+      ]
+    },
+    {
+      "closure": "open",
+      "connection_tolerance_mm": 1e-07,
+      "continuity_hint": null,
+      "fixed_up_vector": null,
+      "id": "path.two",
+      "name": "path.two",
+      "orientation_rule": "minimum_twist",
+      "segments": [
+        {
+          "curve_kind": "line",
+          "entity": "line",
+          "reversed": false,
+          "sketch": "path.two.sketch",
+          "source": "planar_sketch_curve"
+        }
+      ]
+    }
+  ],
+  "reference_remaps": [],
+  "reference_statuses": [],
+  "revolve_features": [
+    {
+      "axis": {
+        "datum_axis": "axis",
+        "source_kind": "datum_axis"
+      },
+      "extent": {
+        "mode": "full"
+      },
+      "id": "revolve",
+      "name": "Revolve",
+      "operation_mode": "new_body",
+      "produced_body": "body.revolve",
+      "profile": {
+        "profile": "profile.profile",
+        "sketch": "profile"
+      },
+      "type": "revolve"
+    }
+  ],
+  "schema": "blcad.part_document.mvp1",
+  "shell_features": [
+    {
+      "direction": "inward",
+      "id": "shell",
+      "name": "Shell",
+      "removed_faces": [
+        {
+          "capability": "face",
+          "face": "top",
+          "role": "shell_removal_face",
+          "source_feature": "base",
+          "source_kind": "semantic_planar_face"
+        }
+      ],
+      "target_body": "body.base",
+      "thickness_parameter": "radius"
+    }
+  ],
+  "sketch_origin_overrides": [],
+  "sketch_ownerships": [],
+  "sketches": [
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "profile",
+      "line_segments": [],
+      "name": "profile",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [
+        {
+          "center": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "height_parameter": "height",
+          "id": "profile.profile",
+          "width_parameter": "width"
+        }
+      ],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "datum.xy"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "path.one.sketch",
+      "line_segments": [
+        {
+          "end": {
+            "x": 10.0,
+            "y": 0.0
+          },
+          "id": "line",
+          "role": "geometry",
+          "start": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      ],
+      "name": "path.one",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "datum.xy"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "path.two.sketch",
+      "line_segments": [
+        {
+          "end": {
+            "x": 10.0,
+            "y": 10.0
+          },
+          "id": "line",
+          "role": "geometry",
+          "start": {
+            "x": 0.0,
+            "y": 10.0
+          }
+        }
+      ],
+      "name": "path.two",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "datum.xy"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "section",
+      "line_segments": [],
+      "name": "section",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [
+        {
+          "center": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "height_parameter": "height",
+          "id": "section.profile",
+          "width_parameter": "width"
+        }
+      ],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "datum.xz"
+    }
+  ],
+  "sketches_3d": [],
+  "step_import_sources": [
+    {
+      "id": "supplier",
+      "mode": "editable_body",
+      "name": "Supplier",
+      "project_relative_asset_path": "assets/history-supplier.step",
+      "sha256_digest": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "surface_features": [
+    {
+      "boundaries": [
+        {
+          "path_curve": "path.one",
+          "semantic_edge": null,
+          "source_kind": "path_curve"
+        },
+        {
+          "path_curve": "path.two",
+          "semantic_edge": null,
+          "source_kind": "path_curve"
+        }
+      ],
+      "boundary": null,
+      "distance_parameter": null,
+      "id": "surface",
+      "name": "Fill",
+      "result_body": "body.surface",
+      "shell": null,
+      "surfaces": [],
+      "target": null,
+      "tolerance_parameter": null,
+      "trimming": null,
+      "type": "fill_surface"
+    }
+  ],
+  "sweep_features": [
+    {
+      "fixed_up_vector_override": null,
+      "guide_path": null,
+      "id": "sweep",
+      "name": "Sweep",
+      "operation_mode": "new_body",
+      "orientation_override": null,
+      "path": "path.one",
+      "produced_body": "body.sweep",
+      "profile": {
+        "kind": "closed_region",
+        "profile": "profile.profile",
+        "sketch": "profile"
+      },
+      "twist_parameter": null,
+      "type": "sweep"
+    }
+  ],
+  "version": 1
+}

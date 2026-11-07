@@ -1,0 +1,186 @@
+{
+  "bodies": [
+    {
+      "id": "imported.body",
+      "kind": "solid",
+      "name": "imported.body",
+      "visibility": "visible"
+    }
+  ],
+  "body_booleans": [],
+  "body_transforms": [],
+  "construction_lines": [],
+  "construction_planes": [],
+  "construction_points": [],
+  "datum_axes": [],
+  "datum_planes": [
+    {
+      "id": "datum.xy",
+      "kind": "xy",
+      "name": "XY",
+      "normal": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 1.0
+      },
+      "origin": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "x_axis": {
+        "x": 1.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "y_axis": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      }
+    },
+    {
+      "id": "datum.xz",
+      "kind": "xz",
+      "name": "XZ",
+      "normal": {
+        "x": 0.0,
+        "y": -1.0,
+        "z": 0.0
+      },
+      "origin": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "x_axis": {
+        "x": 1.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "y_axis": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 1.0
+      }
+    },
+    {
+      "id": "datum.yz",
+      "kind": "yz",
+      "name": "YZ",
+      "normal": {
+        "x": 1.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "origin": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "x_axis": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "y_axis": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 1.0
+      }
+    }
+  ],
+  "derived_workplanes": [],
+  "document": {
+    "id": "history.reference",
+    "name": "Reference"
+  },
+  "draft_features": [],
+  "edge_treatments": [],
+  "features": [],
+  "imported_topology_catalogs": [
+    {
+      "captured_sha256_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "descriptor_version": 1,
+      "entries": [
+        {
+          "descriptor": {
+            "body_kind": "solid",
+            "boundary_keys": [],
+            "bounds_mm": [
+              0.0,
+              0.0,
+              0.0,
+              10.0,
+              10.0,
+              10.0
+            ],
+            "centroid": {
+              "x": 5.0,
+              "y": 5.0,
+              "z": 5.0
+            },
+            "direction": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "geometry": "opaque",
+            "geometry_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "body",
+            "measure": 1000.0,
+            "origin": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "radius_mm": 0.0,
+            "samples": []
+          },
+          "id": "solid",
+          "parent_body": null
+        }
+      ],
+      "id": "catalog",
+      "product_key": "2222222222222222222222222222222222222222222222222222222222222222",
+      "source": "supplier"
+    }
+  ],
+  "loft_features": [],
+  "mirror_features": [],
+  "parameters": [],
+  "part_patterns": [],
+  "path_curves": [],
+  "reference_part": {
+    "catalog": "catalog",
+    "outputs": [
+      {
+        "body": "imported.body",
+        "imported_body": "solid",
+        "kind": "solid"
+      }
+    ],
+    "source": "supplier"
+  },
+  "reference_remaps": [],
+  "reference_statuses": [],
+  "revolve_features": [],
+  "schema": "blcad.part_document.mvp1",
+  "shell_features": [],
+  "sketch_origin_overrides": [],
+  "sketch_ownerships": [],
+  "sketches": [],
+  "sketches_3d": [],
+  "step_import_sources": [
+    {
+      "id": "supplier",
+      "mode": "reference",
+      "name": "Supplier",
+      "project_relative_asset_path": "assets/history-supplier.step",
+      "sha256_digest": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "surface_features": [],
+  "sweep_features": [],
+  "version": 1
+}

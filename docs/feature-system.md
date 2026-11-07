@@ -10,6 +10,23 @@ feature families/result contexts are extended; no generic feature-base rewrite i
 
 Features are the parametric operations a part is built from. Each feature has inputs, parameters, references, and a computed geometry output. The central rule is that a feature stores the *rule* for computing geometry, not only the finished body. The OCCT shape is a cache.
 
+## Executable history foundation — Block 146A, 2026-11-07
+
+`PartDocument::executable_history()` returns a read-only, typed projection of existing executable
+records in dependency order. Each `PartFeatureHistoryEntry` carries the exact graph `node_id` and
+`PartFeatureFamily`; it owns no copied feature intent or second tree. Fifteen current typed families
+include imported Body bases, scalar/path Extrude, Revolve, Sweep, Loft, Surface variants, patterns,
+Mirror, Fillet, Chamfer, Shell, Draft, Body Boolean and BodyTransform. Non-executable resources,
+Sketches, PathCurves and Body aliases do not become feature rows.
+
+One private typed-family visitor supplies query and replay registration. Existing `feature_order`
+loading replays on a disposable complete Part candidate through the current validated adders,
+restores non-feature consumers and original collection order, rejects incomplete/duplicate/unknown
+orders and cycles, and publishes only after success. No JSON marker/field/default changes in A;
+querying cannot author state. Canonical JSON validation retains its existing diagnostic category and
+object identity. Authored ordering/suppression intent remains 146B, effective execution
+147 and browser/End of Part workflows 148. This bounded foundation does not claim their completion.
+
 ## Feature intent, not baked geometry
 
 ```text

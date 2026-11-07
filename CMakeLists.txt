@@ -66,6 +66,7 @@ add_library(
   src/core/mirror_feature.cpp
   src/core/part_pattern_feature.cpp
   src/core/part_document.cpp
+  src/core/part_feature_history.cpp
   src/core/part_document_json.cpp
   src/core/part_feature_input_reference.cpp
   src/core/parameter.cpp
@@ -419,6 +420,7 @@ if(BLCAD_BUILD_TESTS)
 
   add_executable(
     blcad_core_tests
+    tests/core/part_feature_history_tests.cpp
     tests/core/feature_update_command_tests.cpp
     tests/core/step_import_source_tests.cpp
     tests/core/imported_topology_tests.cpp
@@ -523,6 +525,8 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sweep_feature_tests.cpp
   )
 
+  set_source_files_properties(tests/core/part_feature_history_tests.cpp PROPERTIES
+    COMPILE_DEFINITIONS "BLCAD_HISTORY_FIXTURES=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/history\"")
   target_link_libraries(blcad_core_tests PRIVATE BLCAD::core Catch2::Catch2WithMain)
 
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

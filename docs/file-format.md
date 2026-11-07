@@ -46,6 +46,14 @@ Scale and curved Fillet → Chamfer → Union survive preview cloning, subsequen
 history, save/open and incremental recompute with the authored geometry intact. `[core][feature-order]` and `[geometry][feature-order]`
 cover exact graph/JSON restoration, malformed metadata, legacy compatibility and bounds/volumes.
 
+Block 146A (2026-11-07): the writer obtains its executable ID inventory from
+`PartDocument::executable_history()`. Generic post-load `feature_order` replay is centralized in the
+same Core authority, with atomic candidate publication and the existing typed validation. The
+result-face support loader retains its dependency-aware metadata staging. Existing schema markers,
+optional-field emission rules, family-array order and canonical historical bytes remain unchanged.
+No `active`, `suppressed` or additional history field is introduced by this slice. New history
+persistence belongs to 146B and must be specified here before its writer is added.
+
 ## Project structure
 
 ```text
