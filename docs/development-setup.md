@@ -4452,3 +4452,8 @@ failures/skips (`blcad150c-final-inventory.log`). Full new-file formatting, fina
 formatting and working/staged whitespace/source review pass. All 1,005 runtime fingerprints remain
 unchanged through documentation updates. Whole 150 is accepted at its numerical/cache/session gate;
 Phase A remains open for 151's new UI, units, centroid presentation and clipboard acceptance.
+
+Delivery: [PR #158](https://github.com/GideonBa/Better-Linux-CAD/pull/158), implementation `6fd158e`.
+The delivery-record commit changes documentation only; all 1,005 verified runtime fingerprints
+remain unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main
+before 151 begins.

@@ -2288,7 +2288,7 @@ contracts are extended in `engineering-modules.md` and `gui-measure-mvp9.md`, no
 | --- | --- | --- |
 | 150A | Analytic shape measures, stable central/principal tensors, density-aware complete Part query with immutable freshness, surface/empty/missing-density semantics and focused analytic/combination tests | Delivered via PR #156 |
 | 150B | Explicit physical assembly participation, hidden active/repeated nested occurrences, posed centroid/tensor aggregation and independent analytic oracles | Delivered via PR #157 |
-| 150C | Authoritative material-only reuse through existing cache/session owners, result invalidation and complete R02/combined acceptance | Implemented and verified; delivery pending |
+| 150C | Authoritative material-only reuse through existing cache/session owners, result invalidation and complete R02/combined acceptance | Implemented and verified; PR #158 |
 
 No borrowed legacy cache is accepted as an A freshness certificate; its complete private evaluation
 precedes later reuse. Whole 150 advances only after all slices and R02 acceptance. Native Material/
@@ -2365,6 +2365,11 @@ their GUI capability remains planned. Phase A remains open until 151 is accepted
 
 Final inventory passes **5 / 568**, without failures/skips. Working/staged source review, formatting
 and whitespace checks complete delivery verification; all 1,005 runtime fingerprints remain unchanged.
+
+150C/whole-150 delivery: [PR #158](https://github.com/GideonBa/Better-Linux-CAD/pull/158),
+implementation `6fd158e`. The delivery-record update changes documentation only and preserves
+all 1,005 runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on
+refreshed main before starting 151.
 
 ## Later phases
 
