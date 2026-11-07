@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 147
 current_block: 148
-current_boundary: Block 148A verified; End of Part prefix editing remains 148B/C
+current_boundary: Block 148A merged; 148B session foundation verified; native marker integration next
 current_tag: "[parity-b148]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -34,7 +34,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 147
-current block        Block 148 (in progress; slice A verified)
+current block        Block 148 (in progress; slice B)
 current phase        History browser and End of Part workflow
 current boundary     Native history commands and transient prefix editing
 ```
@@ -2069,8 +2069,8 @@ The shared UI contract stays in `user-interface.md`; effective state/cache owner
 
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
-| 148A | Existing browser follows executable order and shows authored/effective status; staged suppression/restore with explicit dependent closure; validated reorder/drag/drop; context Edit uses the existing editor; full-source preview/Apply/Cancel, persistence and native interaction tests | Implemented and verified; delivery PR #148 |
-| 148B | Visibly labelled transient End of Part prefix, edit/insert at marker, complete suffix validation before one Apply, committed-only Save, disabled incomplete export/analysis and Cancel/camera/selection restoration | Planned; not started |
+| 148A | Existing browser follows executable order and shows authored/effective status; staged suppression/restore with explicit dependent closure; validated reorder/drag/drop; context Edit uses the existing editor; full-source preview/Apply/Cancel, persistence and native interaction tests | Merged via PR #148 |
+| 148B | Visibly labelled transient End of Part prefix, edit/insert at marker, complete suffix validation before one Apply, committed-only Save, disabled incomplete export/analysis and Cancel/camera/selection restoration | In progress; session foundation verified; native integration pending |
 | 148C | H01–H03/UI01 combined native acceptance at 100%/150%, compact layout/captures, failure recovery and complete capability evidence | Planned; not started |
 
 Only the whole completed/verified block advances numbered status or planned history UI capabilities.
@@ -2090,6 +2090,27 @@ remain open for B/C. Normal PR merge and refreshed-main/tree comparison precede 
 
 Delivery: [PR #148](https://github.com/GideonBa/Better-Linux-CAD/pull/148), implementation `8d802d3`.
 The delivery-record commit changes documentation only and preserves all 975 runtime fingerprints.
+
+148B starts on `feat/end-of-part-context` after PR #148 is confirmed merged as `1179001` and
+refreshed main matches the reviewed tree. Its session foundation extends the existing Part workflow
+with transient prefix ownership, insertion at the marker, complete suffix publication, committed
+Save and local draft Undo/Redo. It first has headless/API acceptance; native marker placement,
+child-command coordination and shared existing-editor/creation integration follow serially before
+B is accepted. This subdivision retains B's existing scope and does not promote a partial UI.
+
+The 148B session foundation is implemented and verified: focused GUI/session regression **55 /
+3,694**; full offscreen GUI **707 cases: 673 passed, 34 expected native-only skips / 89,135
+assertions**; native session/existing-browser/source-Sketch combinations **36 / 2,241**, no native
+skips or failures; separate startup expected timeout 124. All 976 runtime fingerprints remain
+unchanged. Core/Geometry sources/tests are unchanged and their prior full results are retained,
+not newly claimed. Exact scope/commands are in `development-setup.md`; native marker/child-command
+work remains specified in `user-interface.md`. This accepts the session foundation only, not B or
+whole 148. Protected PR delivery and verified refreshed main precede its native integration branch.
+
+Session-foundation delivery: [PR #149](https://github.com/GideonBa/Better-Linux-CAD/pull/149),
+implementation `9ec2bc2`. The delivery-record update changes documentation only and preserves all
+976 runtime fingerprints. Normal merge/confirmed state and reviewed-tree comparison remain
+required before native marker integration starts.
 
 ## Later phases
 

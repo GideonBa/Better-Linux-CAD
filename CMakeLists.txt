@@ -674,6 +674,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_document_session_tests.cpp
       tests/gui/gui_history_intent_boundary_tests.cpp
       tests/gui/gui_part_history_tests.cpp
+      tests/gui/gui_part_history_context_tests.cpp
       tests/gui/gui_shell_history_tests.cpp
       tests/gui/gui_part_workflow_transaction_tests.cpp
       tests/gui/gui_feature_source_workflow_tests.cpp

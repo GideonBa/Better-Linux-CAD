@@ -140,6 +140,14 @@ execution cannot resurrect an operation outside executor orchestration. Scoped r
 uses producer availability and the validated input context; authored analytical queries alone never
 certify a fresh model. Undo/Redo validates retained cache ownership and recomputes when it differs.
 
+The 148B session foundation stores the executor's partial cache inside the existing transient Part
+workflow. Session full freshness remains false while `history_prefix_ready()` validates its exact
+source/generation and matching prefix count. Marker moves and draft Undo/Redo rebuild disposable
+prefix results; publication recomputes the complete accepted candidate rather than promoting the
+partial cache. A marker after the final row follows the same partial-result rule. Complete scene,
+inspection and STEP APIs retain their strict guards; native prefix scene/input qualification is
+the subsequent 148B integration, not an exception inferred from Core logical completeness.
+
 ## Validation
 
 Current rules:

@@ -138,6 +138,36 @@ committed source. Native layout/error handling is specified in `user-interface.m
 Whole 148 remains open. The End of Part prefix/edit/insert lifecycle and whole-block capability
 promotion belong to 148B/C in `mvp-plan.md`; A's full-history preview is not a prefix editing context.
 
+## End of Part session foundation — verified; Block 148B native integration pending
+
+`GuiDocumentSession::begin_part_history_context()` starts the existing disposable Part workflow
+with an explicitly partial evaluated cache. The document retains every suffix definition, graph
+edge and authored flag. `history_prefix_count()` is transient and counts authored rows, including
+suppressed rows; even a marker after the last row remains a partial editing scope. Full freshness,
+ordinary complete scene/analysis and export stay unavailable. `history_prefix_ready()` checks the
+exact source/lifetime and sealed prefix ownership independently of full-result freshness.
+
+Idle marker moves compute into a disposable cache before replacing the previous marker/result.
+Prefix transactions use the existing Part/Sketch mutation and sidecar paths. Newly added executable
+rows are replayed at the marker using the single Core inventory and order validator; existing rows
+cannot be removed or reordered by this insertion helper. Explicit future inputs reject insertion.
+Successful insertion advances the marker past the inserted rows. Candidate preview prepares the
+same complete intent without changing session state. A failed prefix leaves the prior draft intact;
+an invalid unexecuted suffix remains defined and correctable.
+
+Local draft Undo/Redo stores the transient marker with its in-memory history entry and recomputes
+that prefix. It cannot traverse the committed workflow boundary. Save/Save As continue to publish
+the complete entry checkpoint, including its Sketch sidecars. Cancel restores that checkpoint and
+the original redo branch while preserving actual Save As metadata. Copied sessions share only the
+immutable checkpoint; candidate documents, markers and caches remain independent.
+
+`publish_part_workflow()` validates the complete suffix on a separate accepted session before
+publishing one complete history entry and resetting the marker to ordinary end-of-history policy.
+Failure retains the prefix draft. Marker-only visits add no history or persistence fields and still
+revalidate complete geometry/imported suppliers. An active child task or lost prefix ownership
+cannot publish. This foundation has no native marker control yet; existing feature owners are
+integrated in the next serial part of 148B before native acceptance or capability promotion.
+
 ## Feature intent, not baked geometry
 
 ```text
