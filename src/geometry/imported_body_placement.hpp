@@ -38,6 +38,30 @@ inline Result<std::size_t> validate_imported_feature_inputs(const PartDocument& 
 inline Result<const CachedBodyTransformState*>
 body_transform_before(const PartDocument& document, const ShapeCache& cache, const BodyId& body,
                       const std::string& consumer, bool include_consumer = false) {
+  if (const auto* plan = cache.history_plan()) {
+    const auto valid = cache.validate_history_input(document, {}, consumer);
+    if (!valid)
+      return Result<const CachedBodyTransformState*>::failure(valid.error());
+    const CachedBodyTransformState* result = nullptr;
+    for (const auto& row : plan->entries) {
+      if (row.feature.node_id == consumer && !include_consumer)
+        break;
+      if (row.state == PartHistoryExecutionState::Active &&
+          row.feature.family == PartFeatureFamily::BodyTransform) {
+        const auto* transform = document.find_body_transform(BodyTransformId(row.feature.node_id));
+        if (transform && transform->body() == body) {
+          result = cache.find_body_transform_state(transform->id());
+          if (!result)
+            return Result<const CachedBodyTransformState*>::failure(Error::geometry(
+                row.feature.node_id,
+                "Active preceding Body transform requires its computed placement state."));
+        }
+      }
+      if (row.feature.node_id == consumer)
+        break;
+    }
+    return Result<const CachedBodyTransformState*>::success(result);
+  }
   std::set<std::string> ancestors;
   if (include_consumer)
     ancestors.insert(consumer);

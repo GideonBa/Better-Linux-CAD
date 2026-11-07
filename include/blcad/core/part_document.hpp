@@ -35,6 +35,7 @@
 #include "blcad/core/sweep_feature.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -192,6 +193,10 @@ public:
                                                                        std::string formula);
   [[nodiscard]] Result<RecomputePlan> create_recompute_plan() const;
   void mark_all_clean() noexcept;
+  // Transient identity lifetime, retained by checkpoints and never persisted.
+  [[nodiscard]] std::uint64_t executable_generation() const noexcept {
+    return executable_generation_;
+  }
 
   [[nodiscard]] const std::vector<StepImportSource>& step_import_sources() const noexcept {
     return step_import_sources_.sources();
@@ -468,6 +473,7 @@ private:
   DependencyGraph dependency_graph_;
   InvalidationState invalidation_state_;
   std::optional<PartFeatureHistoryIntent> history_intent_;
+  std::uint64_t executable_generation_ = 0;
 };
 
 } // namespace blcad

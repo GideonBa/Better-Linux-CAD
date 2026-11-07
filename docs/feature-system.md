@@ -45,12 +45,12 @@ before an ID can be reused. Family collection positions remain separate. Importe
 source/catalog ownership and cannot be suppressed; Reference Parts remain immutable.
 
 Flags never remove typed definitions or silently cascade to dependents. Effective modifier bypass,
-creator-output availability and blocked dependent diagnostics remain 147, followed by visible
-browser commands in 148. Until that evaluator exists, a shared Geometry boundary rejects explicit
-history at model execution, scene/reference selection, result inspection and export entry points.
-It also rejects analytical/cache shortcuts: an earlier full cache is not a result for the new
+creator-output availability and blocked diagnostics belong to 147 below; visible browser commands
+remain 148. At the 146B delivery, Geometry conservatively rejected explicit history at execution,
+selection, inspection and export boundaries. The 147B evaluator below replaces that temporary
+boundary with validated results. An earlier full cache is never a result for changed explicit
 intent. Normal GUI transactions/opening retain the old valid document on failure; repair opening
-may retain the new complete intent with Failed status and an empty cache. Versioned persistence
+may retain failed complete intent with Failed status and an empty cache. Versioned persistence
 and strict migration rules are owned by `file-format.md`.
 
 ## Effective availability plan — Block 147A, 2026-11-07
@@ -76,6 +76,36 @@ A resource ID with the same textual prefix remains a resource. Existing typed fi
 sections, topology references and Body results for every registered family. This is a disposable
 projection, not an effective Geometry result, alternate persistent model, or completed H01/H02 gate.
 147B remains responsible for physical execution and all cache/scope/freshness protections.
+
+## Scoped Geometry evaluation — Block 147B, 2026-11-07
+
+Full explicit-history and explicit prefix execution use the Core availability plan,
+with its exact per-row Body predecessors, while retaining the complete original Part intent.
+A fresh disposable cache removes suppressed/deleted/outside-prefix producers and stale transform
+states. Active blocked inputs fail before publication; a failed kernel/source check leaves the
+caller cache intact. Initial explicit-history incremental execution uses a complete fresh fallback
+for correctness; later performance work may optimize verified clean producers.
+
+Only the executor may seal a history result against exact canonical source intent, executable
+lifetime generation, logical plan and scope after successful evaluation. Adding/removing executable
+identities advances the transient generation, including identical ID/JSON reuse. Checkpoints retain
+it; marking invalidation clean does not advance it. No lifetime/scope/cache field is persisted.
+Any public cache mutation invalidates completion, and clearing retains its prior scope restriction. Complete
+model consumers require a matching full result; even a prefix through the final row remains partial.
+Direct single-feature calls cannot resurrect suppressed outputs outside orchestrated evaluation.
+Body inspection/selection exclude unavailable creator outputs and consumed tools. Analytical local
+reference queries check logical producer availability; world/picking/model consumers use validated
+cache overloads. No query of authored local data certifies Geometry freshness.
+
+Physical proof uses independent legacy geometry for all fourteen native families, exact volume and
+bounds comparisons, suppression/restore and every prefix boundary. Additional cases cover independent
+reorder, explicit dependent closure, identical ID/JSON lifetime reuse, a suppressed modifier before
+transforms, invalid suffix publication, an imported base/boss/cut/Hole/Fillet/transform chain and its
+STEP readback, immutable Reference Parts, assembly overlap/posed export and changed supplier bytes.
+GUI proof combines scene selection, Measure, empty-result STEP preflight, Save/reopen, one-entry
+Undo/Redo, failed transactions and explicit repair. Full/native results and final acceptance live in
+`development-setup.md` and `mvp-plan.md`. Source intent stays unchanged by evaluation. Legacy caches
+without history scopes retain their previous contract. Native browser/marker editing stays in 148.
 
 ## Feature intent, not baked geometry
 

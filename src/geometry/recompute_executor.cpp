@@ -1,4 +1,5 @@
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/core/part_document_json.hpp"
 #include "blcad/core/sketch_contour.hpp"
 #include "blcad/core/sketch_profile_roles.hpp"
 #include "blcad/geometry/result_face_support.hpp"
@@ -108,6 +109,21 @@ struct TransformInput {
 [[nodiscard]] Result<TransformInput> resolve_transform_input(const PartDocument& document,
                                                              const ShapeCache& shape_cache,
                                                              const BodyTransform& transform) {
+  if (shape_cache.has_history_scope()) {
+    const auto* input = shape_cache.history_body_input(transform.id().value(), transform.body());
+    const auto* shape = input && input->available && input->producer_id
+                            ? cached_producer_body_shape(document, shape_cache, *input->producer_id,
+                                                         transform.body())
+                            : nullptr;
+    if (!shape)
+      return Result<TransformInput>::failure(
+          geometry_error(transform.id().value(), "Effective Body predecessor is unavailable."));
+    const auto* previous = shape_cache.find_latest_body_transform_state(transform.body());
+    return Result<TransformInput>::success(
+        {*shape, previous ? std::optional<BodyTransformId>(previous->transform_id) : std::nullopt,
+         previous ? previous->cumulative_transform : GeometryAffineTransform::identity()});
+  }
+
   for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
     if (dependent != transform.id().value())
       continue;
@@ -215,6 +231,9 @@ resolve_rotation_axis(const PartDocument& document, const BodyTransform& transfo
   if (const GeometryShape* shape = shape_cache.find_body_shape(body_id))
     return Result<GeometryShape>::success(*shape);
 
+  if (shape_cache.has_history_scope())
+    return Result<GeometryShape>::failure(
+        geometry_error(body_id.value(), "Effective input Body has no current shape."));
   const std::string body_node = "body:" + body_id.value();
   for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
     if (dependent != body_node)
@@ -231,6 +250,17 @@ resolve_rotation_axis(const PartDocument& document, const BodyTransform& transfo
 [[nodiscard]] Result<GeometryShape>
 resolve_boolean_target_input(const PartDocument& document, const ShapeCache& shape_cache,
                              const BodyBooleanFeature& feature) {
+  if (shape_cache.has_history_scope()) {
+    const auto* input = shape_cache.history_body_input(feature.id().value(), feature.target_body());
+    const auto* shape = input && input->available && input->producer_id
+                            ? cached_producer_body_shape(document, shape_cache, *input->producer_id,
+                                                         feature.target_body())
+                            : nullptr;
+    return shape ? Result<GeometryShape>::success(*shape)
+                 : Result<GeometryShape>::failure(geometry_error(
+                       feature.id().value(), "Effective Boolean predecessor is unavailable."));
+  }
+
   if (feature.result_mode() == BodyBooleanResultMode::ModifyTarget) {
     for (const auto& [producer, dependent] : document.dependency_graph().dependencies()) {
       if (dependent != feature.id().value() || producer.starts_with("body:"))
@@ -448,6 +478,17 @@ store_verified_feature_result(const PartDocument& document, const Feature& featu
 [[nodiscard]] Result<const GeometryShape*>
 resolve_in_place_body_target(const PartDocument& document, const FeatureId& feature_id,
                              const BodyId& target_body, const ShapeCache& shape_cache) {
+  if (shape_cache.has_history_scope()) {
+    const auto* input = shape_cache.history_body_input(feature_id.value(), target_body);
+    const auto* shape =
+        input && input->available && input->producer_id
+            ? cached_producer_body_shape(document, shape_cache, *input->producer_id, target_body)
+            : nullptr;
+    return shape ? Result<const GeometryShape*>::success(shape)
+                 : Result<const GeometryShape*>::failure(geometry_error(
+                       feature_id.value(), "Effective Body predecessor is unavailable."));
+  }
+
   auto order = document.dependency_graph().topological_order();
   if (order.has_error())
     return Result<const GeometryShape*>::failure(order.error());
@@ -570,6 +611,21 @@ template <typename PatternFeature>
 [[nodiscard]] Result<const GeometryShape*> resolve_pattern_target(const PartDocument& document,
                                                                   const PatternFeature& feature,
                                                                   const ShapeCache& shape_cache) {
+  if (shape_cache.has_history_scope()) {
+    if (!feature.body_result_context().target_body())
+      return Result<const GeometryShape*>::success(nullptr);
+    const auto* input = shape_cache.history_body_input(
+        feature.id().value(), *feature.body_result_context().target_body());
+    const auto* shape =
+        input && input->available && input->producer_id
+            ? cached_producer_body_shape(document, shape_cache, *input->producer_id,
+                                         *feature.body_result_context().target_body())
+            : nullptr;
+    return shape ? Result<const GeometryShape*>::success(shape)
+                 : Result<const GeometryShape*>::failure(geometry_error(
+                       feature.id().value(), "Effective pattern predecessor is unavailable."));
+  }
+
   const auto& context = feature.body_result_context();
   if (!context.target_body().has_value())
     return Result<const GeometryShape*>::success(nullptr);
@@ -2349,7 +2405,7 @@ Result<std::vector<ClosedProfileCurveSegment>> detail::resolve_loft_alignment_se
 
 Result<std::pair<Point3, Vector3>> GeometryRecomputeExecutor::resolve_feature_axis(
     const PartDocument& document, const AxisReference& reference, const ShapeCache& cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, cache);
   if (!history)
     return Result<std::pair<Point3, Vector3>>::failure(history.error());
   return resolve_axis_reference(document, reference, cache, workplane_resolver_, import_context_);
@@ -2358,7 +2414,7 @@ Result<std::pair<Point3, Vector3>> GeometryRecomputeExecutor::resolve_feature_ax
 Result<std::vector<SweepPathSegment>>
 GeometryRecomputeExecutor::resolve_path_segments(const PartDocument& document, PathCurveId id,
                                                  const ShapeCache& cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, cache);
   if (!history)
     return Result<std::vector<SweepPathSegment>>::failure(history.error());
   const auto* path = document.find_path_curve(id);
@@ -2372,7 +2428,7 @@ GeometryRecomputeExecutor::resolve_path_segments(const PartDocument& document, P
 Result<GeometryShape> GeometryRecomputeExecutor::preview_path_curve(const PartDocument& document,
                                                                     PathCurveId id,
                                                                     const ShapeCache& cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, cache);
   if (!history)
     return Result<GeometryShape>::failure(history.error());
   auto segments = resolve_path_segments(document, id, cache);
@@ -2671,7 +2727,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_richer_extrude(
 Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocument& document,
                                                                FeatureId feature_id,
                                                                ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -2810,7 +2866,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
 Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument& document,
                                                              FeatureId feature_id,
                                                              ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -2978,7 +3034,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
 Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& document,
                                                             FeatureId feature_id,
                                                             ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -3145,7 +3201,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
 Result<SurfaceExtensionFrame> GeometryRecomputeExecutor::surface_extension_frame(
     const PartDocument& document, const SurfaceReference& target,
     const BoundaryCurveReference& boundary, const ShapeCache& cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, cache);
   if (!history)
     return Result<SurfaceExtensionFrame>::failure(history.error());
   const FeatureId preview_id("surface.extension.frame");
@@ -3160,7 +3216,7 @@ Result<SurfaceExtensionFrame> GeometryRecomputeExecutor::surface_extension_frame
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -3268,7 +3324,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -3376,7 +3432,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_circular_pattern(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -3478,7 +3534,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_circular_pattern(
 Result<std::size_t> GeometryRecomputeExecutor::execute_mirror(const PartDocument& document,
                                                               FeatureId feature_id,
                                                               ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -3548,7 +3604,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_mirror(const PartDocument
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -3774,7 +3830,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -3986,7 +4042,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
 Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument& document,
                                                               FeatureId feature_id,
                                                               ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -4028,7 +4084,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument
 Result<std::size_t> GeometryRecomputeExecutor::execute_chamfer(const PartDocument& document,
                                                                FeatureId feature_id,
                                                                ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -4087,7 +4143,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_chamfer(const PartDocumen
 Result<std::size_t> GeometryRecomputeExecutor::execute_shell(const PartDocument& document,
                                                              FeatureId feature_id,
                                                              ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -4130,7 +4186,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_shell(const PartDocument&
 Result<std::size_t> GeometryRecomputeExecutor::execute_draft(const PartDocument& document,
                                                              FeatureId feature_id,
                                                              ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -4183,7 +4239,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_draft(const PartDocument&
 Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(const PartDocument& document,
                                                                     FeatureId feature_id,
                                                                     ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -4244,7 +4300,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(const PartDo
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_body_transform(
     const PartDocument& document, BodyTransformId transform_id, ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, transform_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
@@ -4386,7 +4442,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_feature(const PartDocumen
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_imported_body_feature(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
   if (!history)
     return Result<std::size_t>::failure(history.error());
   const auto* feature = imported_body_feature(document, feature_id.value());
@@ -4401,7 +4457,19 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_imported_body_feature(
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const RecomputePlan& plan,
                                         ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  if (document.authored_history_intent())
+    return execute_history(document, std::nullopt, shape_cache);
+  if (shape_cache.has_history_scope()) {
+    auto fresh_cache = ShapeCache::create(shape_cache.id());
+    if (!fresh_cache)
+      return Result<GeometryRecomputeSummary>::failure(fresh_cache.error());
+    auto full = execute_document(document, fresh_cache.value());
+    if (full)
+      shape_cache = std::move(fresh_cache.value());
+    return full;
+  }
+
+  const auto history = detail::validate_history_evaluation(document, &shape_cache);
   if (!history)
     return Result<GeometryRecomputeSummary>::failure(history.error());
   if (document.is_reference_part()) {
@@ -4530,7 +4598,19 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_document(const PartDocument& document,
                                             ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  if (document.authored_history_intent())
+    return execute_history(document, std::nullopt, shape_cache);
+  if (shape_cache.has_history_scope()) {
+    auto fresh_cache = ShapeCache::create(shape_cache.id());
+    if (!fresh_cache)
+      return Result<GeometryRecomputeSummary>::failure(fresh_cache.error());
+    auto full = execute_document(document, fresh_cache.value());
+    if (full)
+      shape_cache = std::move(fresh_cache.value());
+    return full;
+  }
+
+  const auto history = detail::validate_history_evaluation(document, &shape_cache);
   if (!history)
     return Result<GeometryRecomputeSummary>::failure(history.error());
   const auto references = document.validate_reference_sources();
@@ -4656,6 +4736,143 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     return Result<GeometryRecomputeSummary>::failure(fresh.error());
   if (transactional_cache)
     shape_cache = std::move(working_cache);
+  return Result<GeometryRecomputeSummary>::success(summary);
+}
+
+Result<GeometryRecomputeSummary> GeometryRecomputeExecutor::execute_history_prefix(
+    const PartDocument& document, std::size_t prefix_count, ShapeCache& shape_cache) const {
+  return execute_history(document, prefix_count, shape_cache);
+}
+
+Result<GeometryRecomputeSummary>
+GeometryRecomputeExecutor::execute_history(const PartDocument& document,
+                                           std::optional<std::size_t> prefix_count,
+                                           ShapeCache& shape_cache) const {
+  auto plan = document.create_history_evaluation_plan(prefix_count);
+  if (!plan)
+    return Result<GeometryRecomputeSummary>::failure(plan.error());
+  for (const auto& entry : plan.value().entries)
+    if (entry.state == PartHistoryExecutionState::Blocked) {
+      const auto message =
+          entry.issues.empty() ? "History input is unavailable." : entry.issues.front().message;
+      return Result<GeometryRecomputeSummary>::failure(
+          Error::dependency(entry.feature.node_id, message));
+    }
+  const auto source = serialize_part_document_to_json(document);
+  if (!source)
+    return Result<GeometryRecomputeSummary>::failure(source.error());
+  auto created = ShapeCache::create(shape_cache.id());
+  if (!created)
+    return Result<GeometryRecomputeSummary>::failure(created.error());
+  auto working = std::move(created.value());
+  working.history_result_ = ShapeCache::HistoryResult{
+      source.value(), document.executable_generation(), std::move(plan.value()), true, false, {}};
+  GeometryRecomputeSummary summary;
+  if (document.is_reference_part()) {
+    if (!import_context_)
+      return Result<GeometryRecomputeSummary>::failure(validation_error(
+          document.id().value(), "Reference Part recompute requires explicit asset-root context."));
+    const auto seeded = ReferencePartGeometry{}.seed_reference(document, *import_context_, working);
+    if (!seeded)
+      return Result<GeometryRecomputeSummary>::failure(seeded.error());
+  }
+  // The owned plan never changes during execution; working-cache copies retain it.
+  const auto active = working.history_result_->plan.entries;
+  for (const auto& entry : active) {
+    if (entry.state != PartHistoryExecutionState::Active)
+      continue;
+    const auto& id = entry.feature.node_id;
+    working.history_result_->current_feature = id;
+    const auto executed = [&]() -> Result<std::size_t> {
+      const FeatureId feature(id);
+      switch (entry.feature.family) {
+      case PartFeatureFamily::ImportedBody:
+        return execute_imported_body_feature(document, feature, working);
+      case PartFeatureFamily::Extrude: {
+        const auto* record = document.find_feature(feature);
+        return record ? execute_feature(document, *record, working)
+                      : Result<std::size_t>::failure(
+                            validation_error(id, "History feature is missing."));
+      }
+      case PartFeatureFamily::Revolve:
+        return execute_revolve(document, feature, working);
+      case PartFeatureFamily::Sweep:
+        return execute_sweep(document, feature, working);
+      case PartFeatureFamily::Loft:
+        return execute_loft(document, feature, working);
+      case PartFeatureFamily::Surface:
+        return execute_surface_feature(document, feature, working);
+      case PartFeatureFamily::LinearPattern:
+        return execute_linear_pattern(document, feature, working);
+      case PartFeatureFamily::CircularPattern:
+        return execute_circular_pattern(document, feature, working);
+      case PartFeatureFamily::Mirror:
+        return execute_mirror(document, feature, working);
+      case PartFeatureFamily::Fillet:
+        return execute_fillet(document, feature, working);
+      case PartFeatureFamily::Chamfer:
+        return execute_chamfer(document, feature, working);
+      case PartFeatureFamily::Shell:
+        return execute_shell(document, feature, working);
+      case PartFeatureFamily::Draft:
+        return execute_draft(document, feature, working);
+      case PartFeatureFamily::BodyBoolean:
+        return execute_body_boolean(document, feature, working);
+      case PartFeatureFamily::BodyTransform:
+        return execute_body_transform(document, BodyTransformId(id), working);
+      }
+      return Result<std::size_t>::failure(validation_error(id, "Unknown history family."));
+    }();
+    if (!executed)
+      return Result<GeometryRecomputeSummary>::failure(executed.error());
+    ++summary.executed_feature_count;
+  }
+  const auto fresh = validate_import_sources();
+  if (!fresh)
+    return Result<GeometryRecomputeSummary>::failure(fresh.error());
+  const auto& evaluated = working.history_result_->plan;
+  for (const auto& availability : evaluated.bodies) {
+    const auto* actual = working.find_body_result(availability.body);
+    const auto* actual_shape = working.find_body_shape(availability.body);
+    if (availability.available != (actual_shape != nullptr))
+      return Result<GeometryRecomputeSummary>::failure(geometry_error(
+          availability.body.value(), "Evaluated Body availability does not match history."));
+    if (actual && availability.producer_id &&
+        actual->source_feature_id.value() != *availability.producer_id)
+      return Result<GeometryRecomputeSummary>::failure(geometry_error(
+          availability.body.value(), "Evaluated Body has the wrong history producer."));
+  }
+  const auto ids = evaluated.active_ids();
+  if (working.feature_shape_count() != ids.size())
+    return Result<GeometryRecomputeSummary>::failure(geometry_error(
+        document.id().value(), "Evaluated feature ownership does not match history."));
+  for (const auto& id : ids)
+    if (!working.find_feature_shape(FeatureId(id)))
+      return Result<GeometryRecomputeSummary>::failure(
+          geometry_error(id, "Active history output is missing."));
+  if (!document.bodies().empty() && !document.is_reference_part()) {
+    const CachedBodyShape* single = nullptr;
+    for (const auto& body : document.bodies()) {
+      if (!working.history_body_available(body.id()))
+        continue;
+      if (single || body.kind() != BodyKind::Solid) {
+        single = nullptr;
+        break;
+      }
+      single = working.find_body_result(body.id());
+    }
+    working.clear_final_shape();
+    if (single) {
+      // Do not overwrite a multi-output feature's immutable prototype shape.
+      working.has_final_shape_ = true;
+      working.final_feature_id_ = single->source_feature_id;
+      working.final_shape_ = single->shape;
+    }
+  }
+  working.history_result_->current_feature.clear();
+  working.history_result_->evaluating = false;
+  working.history_result_->sealed = true;
+  shape_cache = std::move(working);
   return Result<GeometryRecomputeSummary>::success(summary);
 }
 

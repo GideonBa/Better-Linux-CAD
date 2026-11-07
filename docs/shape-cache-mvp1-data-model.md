@@ -114,6 +114,32 @@ This matters for validation failures:
 
 If an earlier dirty feature such as `feature.base_extrude` was recomputed successfully, its shape can remain as the final valid shape.
 
+## Scoped history evaluation — Block 147B
+
+Explicit authored history and `execute_history_prefix()` use the Core evaluation plan and fresh
+working caches. Per-row Body-input snapshots select the effective predecessor. Suppressed modifiers
+leave the preceding Body result; suppressed creators supply no Body. An active consumer of an
+unavailable producer fails with its input diagnostic. Only a completely successful evaluation
+replaces the caller cache. Explicit-history `execute_plan()` currently performs a full fresh
+fallback, including for empty plans; it does not claim incremental reuse or performance gains.
+Legacy execution without a history scope retains its existing incremental behavior.
+
+The executor alone seals a private result against canonical source JSON, the Part's transient
+executable generation and the evaluated scope. Adding/removing executable identities increments
+that generation, including delete/recreate with identical IDs and identical serialized intent.
+Checkpoints retain it; loading derives its own generation; marking invalidation clean does not change
+it. No generation, scope, completion stamp or BRep is persisted. Any public cache mutation invalidates
+a sealed result. Full execution from a previous prefix starts with an empty disposable cache.
+
+`validate_complete_history_result()` requires an exact matching sealed full result for explicit
+history or an existing history scope. Unscoped legacy caches retain their prior contract. Prefixes remain
+partial even at the last row; Core logical completeness alone is insufficient. Complete Body
+inspection, scene/picking, finishing/result-face selection and STEP consumers validate this boundary.
+Available Body inspection excludes suppressed creators and consumed Boolean tools. Direct typed
+execution cannot resurrect an operation outside executor orchestration. Scoped reference resolution
+uses producer availability and the validated input context; authored analytical queries alone never
+certify a fresh model. Undo/Redo validates retained cache ownership and recomputes when it differs.
+
 ## Validation
 
 Current rules:

@@ -3,12 +3,14 @@
 #include "blcad/core/id.hpp"
 #include "blcad/core/imported_part.hpp"
 #include "blcad/core/imported_topology.hpp"
+#include "blcad/core/part_feature_history.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/step_import_source.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -128,7 +130,30 @@ public:
   [[nodiscard]] const FeatureId& final_feature_id() const noexcept;
   [[nodiscard]] const GeometryShape* final_shape() const noexcept;
 
+  // Exact source/scope validation. A Core plan alone is never a fresh result.
+  [[nodiscard]] Result<std::size_t>
+  validate_complete_history_result(const PartDocument& document) const;
+  [[nodiscard]] Result<std::size_t>
+  validate_history_input(const PartDocument& document, std::string_view executing_feature = {},
+                         std::string_view source_feature = {}) const;
+  [[nodiscard]] bool has_history_scope() const noexcept;
+  [[nodiscard]] const PartHistoryEvaluationPlan* history_plan() const noexcept;
+  [[nodiscard]] bool history_body_available(const BodyId& body) const noexcept;
+  [[nodiscard]] const PartHistoryBodyAvailability*
+  history_body_input(std::string_view feature, const BodyId& body) const noexcept;
+
 private:
+  friend class GeometryRecomputeExecutor;
+  struct HistoryResult {
+    std::string source_json;
+    std::uint64_t executable_generation;
+    PartHistoryEvaluationPlan plan;
+    bool evaluating = true;
+    bool sealed = false;
+    std::string current_feature;
+  };
+  void invalidate_history_result() noexcept;
+  [[nodiscard]] Result<std::size_t> match_history_source(const PartDocument& document) const;
   explicit ShapeCache(ShapeCacheId id);
 
   [[nodiscard]] Result<std::size_t> validate_cache_input(const FeatureId& feature_id,
@@ -144,6 +169,7 @@ private:
   bool has_final_shape_ = false;
   FeatureId final_feature_id_;
   GeometryShape final_shape_;
+  std::optional<HistoryResult> history_result_;
 };
 
 } // namespace blcad::geometry

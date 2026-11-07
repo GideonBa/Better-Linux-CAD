@@ -4,6 +4,7 @@
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include "geometry_shape_internal.hpp"
 #include "imported_body_placement.hpp"
+#include "part_history_evaluation.hpp"
 #include "semantic_edge_resolution.hpp"
 #include "semantic_face_resolution.hpp"
 
@@ -24,6 +25,9 @@ Result<std::vector<FinishingSelectionTarget>>
 FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache& cache,
                                  const BodyId& body, PartFeatureInputRole role,
                                  StepImportTopologyContext* import_context) {
+  const auto history = detail::validate_history_evaluation(document, &cache);
+  if (!history)
+    return Result<std::vector<FinishingSelectionTarget>>::failure(history.error());
   const bool edge =
       role == PartFeatureInputRole::FilletEdge || role == PartFeatureInputRole::ChamferEdge;
   if (!edge && role != PartFeatureInputRole::ShellRemovalFace &&

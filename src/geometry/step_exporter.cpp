@@ -145,7 +145,7 @@ Result<PartStepExportSummary>
 StepExporter::write_part_step(const PartDocument& document,
                               const ShapeCache& shape_cache,
                               const std::string& path) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_evaluation(document, &shape_cache);
   if (!history)
     return Result<PartStepExportSummary>::failure(history.error());
   if (path.empty()) {
@@ -179,7 +179,8 @@ StepExporter::write_part_step(const PartDocument& document,
 
   std::vector<const Body*> visible_bodies;
   for (const Body& body : document.bodies()) {
-    if (body.visibility() == BodyVisibility::Visible) {
+    if (body.visibility() == BodyVisibility::Visible &&
+        export_cache->history_body_available(body.id())) {
       visible_bodies.push_back(&body);
     }
   }
@@ -276,7 +277,7 @@ StepExporter::write_part_step(const PartDocument& document,
 Result<std::size_t> StepExporter::write_document_step(const PartDocument& document,
                                                       const ShapeCache& shape_cache,
                                                       const std::string& path) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_evaluation(document, &shape_cache);
   if (!history)
     return Result<std::size_t>::failure(history.error());
   if (!document.bodies().empty()) {

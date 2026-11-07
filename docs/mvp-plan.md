@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 146
-current_block: 147
-current_boundary: Block 147A Core projection verified; Geometry evaluation 147B remains planned
-current_tag: "[parity-b147]"
+implemented_through: Block 147
+current_block: 148
+current_boundary: Block 148 history browser and End of Part workflows planned
+current_tag: "[parity-b148]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–146 accepted; Block 147 in progress; Blocks 148–204 planned"
+  advanced_modeling_workflows: "Blocks 145–147 accepted; Blocks 148–204 planned"
 ---
 
 # MVP Plan
@@ -33,10 +33,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 146
-current block        Block 147 (in progress; slice A)
-current phase        Effective history evaluation and cache correctness
-current boundary     Core availability projection verified; Geometry evaluation 147B planned
+implemented through  Block 147
+current block        Block 148 (planned; not started)
+current phase        History browser and End of Part workflow
+current boundary     Native history commands and transient prefix editing
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1776,7 +1776,7 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–146 are **Implemented and accepted**; Block 147 is **In progress**;
+Status authority: Blocks 145–147 are **Implemented and accepted**;
 Blocks 148–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -1786,7 +1786,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
-| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–146 accepted; 147 in progress; 148–151 not started |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–147 accepted; 148–151 not started |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
@@ -2004,8 +2004,8 @@ PR #145 is confirmed merged as `a659016`. Refreshed main matches the reviewed br
 
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
-| 147A | Read-only effective availability/prefix plan from existing typed records: active/suppressed/blocked/outside-prefix entries, semantic/resource versus Body input reasons, creator/modifier and consumed-Body rules; complete Core combination proof | Verified; delivery PR #146 |
-| 147B | Actual disposable full/prefix Geometry evaluation and complete-source cache freshness; independent fresh/incremental checks, old-cache/picking/analysis/export rejection and native integration | Planned; not started |
+| 147A | Read-only effective availability/prefix plan from existing typed records: active/suppressed/blocked/outside-prefix entries, semantic/resource versus Body input reasons, creator/modifier and consumed-Body rules; complete Core combination proof | Merged via PR #146 |
+| 147B | Actual disposable full/prefix Geometry evaluation and complete-source cache freshness; independent fresh/incremental checks, old-cache/picking/analysis/export rejection and native integration | Verified; normal PR delivery pending |
 
 A owns no second feature tree, new persistent field or Geometry capability claim. B replaces the
 conservative 146B guard with verified execution. Existing `feature-system.md` owns these contracts;
@@ -2025,6 +2025,35 @@ Implemented-through remains 146; source/staged review passes.
 Delivery: [PR #146](https://github.com/GideonBa/Better-Linux-CAD/pull/146), implementation `90a836d`.
 The delivery record is documentation only. Verify merged state, refresh main and compare the
 reviewed tree before starting 147B.
+
+PR #146 is confirmed merged as `f1b8c61`; refreshed main matches its reviewed tree.
+`feat/history-geometry-evaluation` starts from that verified state. B uses the existing Core plan
+and per-row Body input predecessors. Geometry records source-bound complete/prefix scope in its
+transient cache; no persistent field or alternate Part is introduced. Whole 147 remains open.
+
+147B acceptance: all fifteen registered families execute from the existing effective plan on
+fresh disposable caches. Suppressed modifiers restore their per-row Body predecessor; suppressed
+creators expose no Body; blocked inputs and failed kernel/source checks never publish a partial
+replacement. Complete/prefix scopes, canonical source and transient executable lifetime bind derived
+results. Identical ID/JSON reuse and public cache mutation/clear cannot reauthorize prior outputs.
+Full consumers validate scope; Undo/Redo validates retained cache ownership, and STEP preflight
+requires an available visible result. Explicit-history incremental calls use a documented full
+fresh fallback. Unscoped legacy execution and both JSON migration contracts stay intact.
+
+Final proof: focused Geometry **9 / 1,923**, GUI **3 / 142**; full Core **627 / 23,727**, Geometry
+**573 / 51,710**, GUI **685 cases: 651 passed, 34 native-only skips / 88,037 assertions**. Native
+100% combinations pass **39 / 2,851**, without skips; separate startup reaches expected timeout
+**124**. Independent legacy volume/bounds comparisons cover every native family, every prefix and
+suppression/restore. Mixed proof covers reorder/closures, unaffected Bodies, failed suffixes,
+imported boss/cut/Hole/Fillet/transform plus STEP readback, immutable Reference scopes, assembly
+analysis/posed export, changed supplier bytes, scene ownership/Measure, Save/reopen and repair.
+All **969** runtime fingerprints remain unchanged through final tests. Formatting/diff/source
+review passes. Exact commands/logs/freeze digest live in `development-setup.md`.
+
+Whole Block 147 is **Implemented and accepted**. Block 148 remains **Planned; not started** and owns
+native suppression/reorder/End of Part browser interaction, prefix editing/insertion, Save during
+marker preview and camera restoration. No planned UI capability is promoted by evaluator proof.
+Complete normal PR delivery, confirm merge, refresh main and compare the reviewed tree before 148.
 
 ## Later phases
 

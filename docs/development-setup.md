@@ -3395,3 +3395,84 @@ merged/refreshed main are required before the next branch.
 
 Delivery: [PR #146](https://github.com/GideonBa/Better-Linux-CAD/pull/146), implementation `90a836d`.
 The delivery-record commit changes documentation only and preserves all 969 runtime fingerprints.
+
+
+## Block 147B scoped Geometry and cache ownership — 2026-11-07
+
+Starts from verified main `f1b8c61` after normal merge of PR #146 and reviewed-tree comparison.
+The Core availability plan drives all fifteen existing families on fresh disposable caches.
+Per-row Body predecessors supply modifier bypass; only successful full/prefix evaluation publishes.
+Private source/scope/lifetime stamps distinguish complete Geometry from logical Core completeness.
+Explicit-history incremental entry points deliberately use a fresh full fallback; unscoped legacy
+incremental behavior is retained. Browser/marker UI remains 148.
+
+Initial box proof found that fixed datum planes are intentionally absent from the dependency graph;
+owned datum geometry now follows that contract. Initial physical matrix covered twelve native
+families; two fixture ID collisions (Sketch/feature and Sketch/PathCurve) were corrected without
+relaxing assertions. All fourteen native families then passed independent legacy volume/bounds,
+suppression/restore and every prefix boundary. Review added retained partial scope after public
+cache clear, finishing selection validation, transient executable-lifetime invalidation including
+identical ID/JSON reuse, and ownership validation before Undo/Redo cache reuse. The first GUI pass
+found successful STEP preflight with zero output Bodies; preflight now validates complete available
+visible results and rejects zero. Invalid suffix transactions retain the previous complete cache;
+repair opening/explicit suppression/Undo/Redo are covered separately.
+
+```bash
+cmake --build build/dev-gui --target blcad_geometry_tests blcad_gui_tests blcad_core_tests blcad -j8
+./build/dev-gui/blcad_geometry_tests "[history-evaluation-boundary],[history-physical]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[history-evaluation-boundary]"
+./build/dev-gui/blcad_core_tests
+./build/dev-gui/blcad_geometry_tests
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests --durations yes
+```
+
+Build/test/native/startup processes run serially. GUI commands use regular filesystem access for
+atomic project/STEP publication, including offscreen runs. Final linked candidate builds pass
+(`/tmp/blcad147b-final-build.log`, `blcad147b-final-include-build.log`); earlier broad integration build
+`blcad147b-integration-build.log` also passes. Existing unrelated compiler warnings are unchanged.
+Final focused Geometry passes **9 cases / 1,923 assertions** (`blcad147b-final-focused-geometry.log`),
+GUI **3 / 142** (`blcad147b-final-focused-gui.log`), full Core **627 / 23,727**
+(`blcad147b-core-full.log`) and full Geometry **573 / 51,710** (`blcad147b-geometry-full.log`).
+
+Proof covers independent and consumed Bodies, legal independent reorder/rejected dependent order,
+explicit dependent closure, suppressed creator output absence versus modifier bypass, every native
+family, imported base/boss/cut/Hole/Fillet/transform and STEP readback, immutable Reference prefix
+basis, assembly overlap/posed export, changed supplier bytes, failed suffixes, no direct-operation
+resurrection, public cache mutation/clear and stale/partial/full consumers. GUI combines native-capable
+scene ownership, Measure, STEP preflight, Save/reopen, one-entry Undo/Redo and repair. Source canonical
+JSON and authored intent remain intact; the four historical JSON oracles pass with full Core.
+
+Final runtime freeze `/tmp/blcad147b-runtime-freeze.json`: **969** source/test/asset/build-script files,
+compact sorted-key UTF-8 JSON; SHA-256
+`1d10348199ccfb406fa86cb96f28a44ad74b7b7f19f3dbc5556d4c8aba632a0c`.
+Full GUI/native/startup results and final unchanged-fingerprint confirmation follow below.
+
+
+Final checks on the same freeze:
+
+| Check | Result | Log under `/tmp/` |
+| --- | --- | --- |
+| Full offscreen GUI | 685 cases: 651 passed, 34 expected native-only skips / 88,037 assertions | `blcad147b-gui-full.log` |
+| Native 100% combinations | 39 / 2,851; no skips | `blcad147b-native-100.log` |
+| Separate native startup | Expected timeout 124 after 6 seconds | `blcad147b-startup.log` |
+
+```bash
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[document-session],[part-workflow],[source-sketch-workflow],[create-another],[create-another-workflow],[imported-body-preview],[history-evaluation-boundary]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+No failed full/native cases or native skips. The known Medium incomplete depth/stencil Visual
+warning remains, without High-severity/BadDrawable/BadWindow failures. No layout feature changes
+or new 150% captures are claimed; native marker/browser layout acceptance remains 148. All 969
+runtime fingerprints remain unchanged after broad/native tests and documentation updates. Whole
+147 is accepted; a final documentation inventory, protected PR delivery and refreshed-main/tree
+comparison precede the next implementation branch. GitHub's effective main rules require PRs,
+prohibit deletion/non-fast-forward updates and require no approving reviews/status checks; normal
+merge methods remain allowed. The classic branch-protection endpoint reports 404 because these
+requirements are delivered through repository rulesets, verified via the effective branch rules API.
+
+
+After documentation-only status promotion, the final capability/status inventory passes **5 cases /
+494 assertions** (`blcad147b-final-inventory.log`). The full GUI result precedes that promotion;
+this separate check validates implemented-through 147/current block 148 while history browser
+capabilities remain planned. Runtime fingerprints remain unchanged.

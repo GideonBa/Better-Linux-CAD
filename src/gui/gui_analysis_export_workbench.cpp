@@ -5,7 +5,10 @@
 #include "blcad/core/assembly_constraint_graph.hpp"
 #include "blcad/geometry/assembly_step_exporter.hpp"
 #include "blcad/geometry/assembly_structured_step_exporter.hpp"
+#include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/step_exporter.hpp"
+
+#include <algorithm>
 
 namespace blcad::gui {
 namespace {
@@ -73,17 +76,26 @@ Result<std::size_t> GuiAnalysisExportWorkbench::preflight_step_export(
     return Result<std::size_t>::failure(Error::export_error("gui.step_export", "recompute must be fresh before export"));
   return query_with_step_import_context(session, [&](auto* context) -> Result<std::size_t> {
     switch (request.mode) {
-    case GuiStepExportMode::PartMultiBody:
+    case GuiStepExportMode::PartMultiBody: {
       if (!session.part_document() || !session.part_shape_cache())
         return Result<std::size_t>::failure(Error::export_error(
             "gui.step_export", "Part multi-body export requires an active recomputed Part"));
       if (auto valid = geometry::observe_imported_part_sources(*session.part_document(), context);
           !valid)
         return valid;
-      return Result<std::size_t>::success(
-          session.part_document()->is_reference_part()
-              ? session.part_document()->reference_part_definition()->outputs().size()
-              : session.part_shape_cache()->body_shape_count());
+      const auto inspection = geometry::BodyResultInspector{}.inspect(*session.part_document(),
+                                                                      *session.part_shape_cache());
+      if (!inspection)
+        return Result<std::size_t>::failure(inspection.error());
+      const auto visible = std::count_if(
+          inspection.value().bodies.begin(), inspection.value().bodies.end(), [](const auto& body) {
+            return body.visibility == BodyVisibility::Visible && body.shape_summary.has_value();
+          });
+      if (visible == 0)
+        return Result<std::size_t>::failure(Error::export_error(
+            "gui.step_export", "STEP export requires an available visible Body result"));
+      return Result<std::size_t>::success(static_cast<std::size_t>(visible));
+    }
     case GuiStepExportMode::AssemblyFlattened:
     case GuiStepExportMode::AssemblyStructured:
       if (!session.project())

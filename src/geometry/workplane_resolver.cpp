@@ -237,7 +237,7 @@ resolve_construction_plane(const PartDocument& document, const WorkplaneResolver
 
 Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& document,
                                                      DatumPlaneId workplane_id) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_source(document, workplane_id.value());
   if (!history)
     return Result<ResolvedWorkplane>::failure(history.error());
   if (workplane_id.empty())
@@ -259,7 +259,7 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& documen
 
 Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& document, DatumPlaneId id,
                                                      const ShapeCache& cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_source(document, id.value(), &cache);
   if (!history)
     return Result<ResolvedWorkplane>::failure(history.error());
   if (const auto* support = document.find_result_face_workplane(id))
@@ -273,7 +273,8 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& documen
 Result<ResolvedWorkplane>
 WorkplaneResolver::resolve_generated_face(const PartDocument& document,
                                           const SemanticFaceReference& face_reference) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history =
+      detail::validate_history_source(document, face_reference.source_feature().value());
   if (!history)
     return Result<ResolvedWorkplane>::failure(history.error());
   const DatumPlaneId resolved_id(face_reference.source_feature().value() + "." +
@@ -283,7 +284,7 @@ WorkplaneResolver::resolve_generated_face(const PartDocument& document,
 
 Result<ResolvedWorkplane> WorkplaneResolver::resolve_for_sketch(const PartDocument& document,
                                                                 const Sketch& sketch) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_source(document, sketch.id().value());
   if (!history)
     return Result<ResolvedWorkplane>::failure(history.error());
   auto workplane = resolve(document, sketch.workplane());
@@ -305,7 +306,7 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve_for_sketch(const PartDocume
 Result<ResolvedWorkplane>
 WorkplaneResolver::resolve_for_sketch(const PartDocument& document, const Sketch& sketch,
                                       const ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_source(document, sketch.id().value(), &shape_cache);
   if (!history)
     return Result<ResolvedWorkplane>::failure(history.error());
   auto workplane = resolve(document, sketch.workplane(), shape_cache);
