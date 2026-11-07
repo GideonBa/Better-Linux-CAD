@@ -3480,3 +3480,75 @@ capabilities remain planned. Runtime fingerprints remain unchanged.
 
 Delivery: [PR #147](https://github.com/GideonBa/Better-Linux-CAD/pull/147), implementation `9de9dd9`.
 The delivery-record commit changes documentation only and preserves all 969 runtime fingerprints.
+
+## Block 148A ordered browser and staged history commands — 2026-11-07
+
+Starts from verified merged main `6d8179d` (PR #147) on `feat/history-browser-commands`.
+This slice uses the existing browser, feature editor, task controls and complete-history evaluator.
+Suppression/restore and dependency-checked reorder stage disposable complete candidates; Apply
+publishes one existing session transaction. Explicit dependent inclusion is reversible before Apply.
+Context commands and Ctrl+K share registered actions. Browser folding and semantic selection survive
+refresh; clicking an already-current Sketch explicitly reselects the next command's input.
+Unavailable supporting resources are omitted from the evaluated scene while their intent remains.
+End of Part insertion/editing and whole-block capability promotion remain 148B/C.
+
+```bash
+cmake --build build/dev-gui --target blcad_gui_tests blcad -j8
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[shell-combined-revolve-controls],[history-controller],[history-shell],[model-browser],[shell-coverage],[block136-feature-edit]"
+./build/dev-gui/blcad_geometry_tests
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests --durations yes
+```
+
+Run builds, CAD tests, native processes and startup serially. Full GUI commands need regular
+filesystem access for the existing atomic project/STEP publication tests even with offscreen Qt.
+Final incremental build passes (`/tmp/blcad148a-reclick-build.log`). Focused GUI regression passes
+**31 cases: 30 passed, one expected native-only skip / 2,767 assertions**
+(`blcad148a-reclick-focused.log`). Full Geometry passes **574 / 51,745**
+(`blcad148a-geometry-full.log`), including the new **1 / 35** supporting-resource suppression/restore
+case. The later browser click correction changes GUI files only; Geometry sources stay identical.
+Core implementation and tests are unchanged from accepted 147B, whose **627 / 23,727** result is
+retained; a new full Core run is not claimed for this GUI/scene slice.
+
+Controller/browser proof covers explicit dependent closure and unchecking, independent legal order,
+dependent/malformed rejection, source/lifetime changes, all fifteen authored families, immutable
+Reference/imported bases, actual context menus and browser drag/drop, foreign/stale payloads,
+keyboard correction, no-op Apply, invalid restore followed by existing-editor repair, committed Save,
+one-entry Undo/Redo, source/fold/camera/selection restoration and command discovery. The all-family
+catalog is an intent fixture; physical execution evidence remains the Geometry tests from 147B.
+
+The initial full GUI run found one existing combined Revolve workflow failure after retaining the
+browser's current Sketch. A repeated click now reactivates its consumed profile input without
+duplicating selection handling when the row changes. The existing combined test passes unchanged
+in the focused result above. Final broad/native checks use the corrected build.
+
+Runtime freeze `/tmp/blcad148a-runtime-freeze.json`: **975** source/test/asset/build-script files,
+compact sorted-key UTF-8 JSON; SHA-256
+`4634e7df4c8cc5fc70b854fe7e57fe441305bb8cb9a710cd64de19cb3fd03ba5`.
+Final full GUI/native/startup results and unchanged-fingerprint confirmation follow below.
+
+Final full offscreen GUI passes **697 cases: 663 passed, 34 expected native-only skips /
+88,526 assertions**, with no failed cases (`/tmp/blcad148a-gui-full-final.log`).
+
+| Final native check | Result | Log under `/tmp/` |
+| --- | --- | --- |
+| Native 100% history/edit/source Sketch/imported Body combinations | 52 / 4,401; no skips or failures | `blcad148a-native-100-final.log` |
+| Native compact 150% history commands | 7 / 299; no skips or failures | `blcad148a-native-150-final.log` |
+| Separate native startup | Expected timeout 124 after six seconds | `blcad148a-startup.log` |
+
+```bash
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad148a-accepted-100 ./build/dev-gui/blcad_gui_tests "[history-controller],[history-shell],[model-browser],[history-evaluation-boundary],[block136-feature-edit],[source-sketch-workflow],[create-another],[create-another-workflow],[part-workflow],[imported-body-preview],[shell-combined-revolve-controls]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_COMPACT=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad148a-accepted-150 ./build/dev-gui/blcad_gui_tests "[history-shell]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+Representative raw captures are inspected and retained in `docs/images/`, linked from the existing
+UI contract. Compact sizing respects the actual available desktop height instead of triggering
+window-manager maximization. No High-severity/BadDrawable/BadWindow failures appear; the known
+Medium incomplete depth/stencil Visual warning remains. All 975 runtime fingerprints stay unchanged
+after broad/native/startup checks. This accepts slice A only; full 148 remains open. Final
+documentation inventory and protected PR delivery follow before starting the marker lifecycle.
+
+After documentation-only slice status updates, `[shell-coverage]` passes **5 / 494**
+(`/tmp/blcad148a-final-inventory.log`). Diff checks, new-file formatting and modified-line formatting
+pass. The final fingerprint audit confirms all 975 runtime files unchanged; no whole-block history
+capability is promoted by this bounded delivery.

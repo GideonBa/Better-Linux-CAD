@@ -107,6 +107,37 @@ Undo/Redo, failed transactions and explicit repair. Full/native results and fina
 `development-setup.md` and `mvp-plan.md`. Source intent stays unchanged by evaluation. Legacy caches
 without history scopes retain their previous contract. Native browser/marker editing stays in 148.
 
+## Staged browser history — Block 148A verified
+
+`GuiPartHistoryController` owns a disposable proposal over the complete committed Part. Begin
+captures canonical source and executable generation; stale sources, another task, immutable
+Reference Parts or an unvalidated cache cannot authorize Apply. Suppression changes one requested
+flag. The optional dependent closure is computed from effective blocked rows only after an explicit
+choice. Unchecking recomputes from committed flags; restoring never silently restores other flags.
+Sparse flags are normalized in authored order. A no-op proposal neither authors version 2 nor adds
+history. Order proposals use the existing Core candidate validator, not Qt model order as authority.
+
+Preview executes the complete candidate through the 147 evaluator. Apply revalidates source and
+Geometry and publishes one existing Part/repair transaction; Cancel discards the proposal. No new
+persistent field, feature registry or evaluator is introduced. The existing browser follows
+`executable_history()` and exposes authored state separately from logical input availability.
+Suppressed feature definitions and unavailable Body definitions remain inspectable; absent Body
+outputs have no viewport selection identity. Scene publication omits unavailable derived supports,
+Sketches and paths while retaining their intent and the fixed origin basis. Source availability
+recognizes Body aliases by actual ownership and current evaluated Body shapes, including bypass.
+
+`ShellHistoryTools` owns the task, shared property groups, context/ribbon/search actions and fixed
+Apply/Cancel. Reorder offers list drag/drop and Up/Down; browser drops propose transactions without
+mutating the committed tree. Widget ownership and presentation revision reject foreign or stale
+drag data, and Core order validation rejects illegal positions before publication. The existing
+feature editor supplies context Edit with its supported-family/immutable-source reasons; this slice
+does not extend that editor's family catalog. Browser folding, scroll position, semantic selection,
+filter and camera are retained where their owner still exists. Saving during preview writes
+committed source. Native layout/error handling is specified in `user-interface.md`.
+
+Whole 148 remains open. The End of Part prefix/edit/insert lifecycle and whole-block capability
+promotion belong to 148B/C in `mvp-plan.md`; A's full-history preview is not a prefix editing context.
+
 ## Feature intent, not baked geometry
 
 ```text

@@ -35,6 +35,7 @@ class ShellMeasureTools;
 class ShellInspectTools;
 class ShellAssemblyTools;
 class ShellFeatureEditTools;
+class ShellHistoryTools;
 class ShellConstructionTools;
 class ShellReferenceRepairTools;
 class ShellSketchDiagnosticsTools;
@@ -76,6 +77,9 @@ public:
   }
   [[nodiscard]] ShellFeatureEditTools& feature_edit_tools() noexcept {
     return *feature_edit_tools_;
+  }
+  [[nodiscard]] ShellHistoryTools& history_tools() noexcept {
+    return *history_tools_;
   }
 
   [[nodiscard]] ShellInspectTools& inspect_tools() noexcept {
@@ -179,6 +183,7 @@ private:
   std::unique_ptr<ShellInspectTools> inspect_tools_;
   std::unique_ptr<ShellAssemblyTools> assembly_tools_;
   std::unique_ptr<ShellFeatureEditTools> feature_edit_tools_;
+  std::unique_ptr<ShellHistoryTools> history_tools_;
   std::unique_ptr<ShellConstructionTools> construction_tools_;
   std::unique_ptr<ShellReferenceRepairTools> reference_repair_tools_;
   std::unique_ptr<ShellSketchDiagnosticsTools> sketch_diagnostics_tools_;

@@ -52,6 +52,17 @@ validate_history_source(const PartDocument& document, std::string source,
     if (std::find(visited.begin(), visited.end(), node) != visited.end())
       continue;
     visited.push_back(node);
+    if (node.starts_with("body:") && document.find_body(BodyId(node.substr(5)))) {
+      const BodyId body(node.substr(5));
+      const auto found = std::find_if(plan->bodies.begin(), plan->bodies.end(),
+                                      [&](const auto& row) { return row.body == body; });
+      const bool available = cache ? cache->find_body_shape(body) != nullptr
+                                   : found != plan->bodies.end() && found->available;
+      if (!available)
+        return Result<std::size_t>::failure(
+            Error::dependency(node, "Reference Body is unavailable."));
+      continue;
+    }
     const auto& entries = plan->entries;
     const auto entry = std::find_if(entries.begin(), entries.end(),
                                     [&](const auto& row) { return row.feature.node_id == node; });

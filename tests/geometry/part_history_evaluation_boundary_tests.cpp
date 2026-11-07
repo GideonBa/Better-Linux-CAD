@@ -487,3 +487,46 @@ TEST_CASE("Assembly analysis and posed export rebuild effective Part history",
   CHECK_FALSE(AssemblyInterferenceAnalyzer{}.analyze(project));
   CHECK_FALSE(AssemblyStepExporter{}.build_posed_shape(project));
 }
+
+TEST_CASE(
+    "Suppressed producers hide unused derived support Sketches and paths without stale scene items",
+    "[geometry][parity-b148][history-physical][history-resource-scene]") {
+  auto part = fixture::native_base();
+  REQUIRE(part.add_derived_workplane(checked(DerivedWorkplane::create_on_feature_face(
+      DatumPlaneId("support"), "Support",
+      checked(SemanticFaceReference::create(FeatureId("base"), SemanticFace::Top))))));
+  auto sketch =
+      checked(Sketch::create(SketchId("dependent.sketch"), "Dependent", DatumPlaneId("support")));
+  REQUIRE(sketch.add_entity(checked(LineSegment::create(SketchEntityId("line"), {0, 0}, {5, 0}))));
+  REQUIRE(part.add_sketch(sketch));
+  REQUIRE(part.add_path_curve(checked(
+      PathCurve::create(PathCurveId("dependent.path"), "Dependent path",
+                        {checked(PathSegmentReference::create_planar(
+                            sketch.id(), SketchEntityId("line"), PlanarPathCurveKind::Line))},
+                        PathClosure::Open, PathOrientationRule::MinimumTwist))));
+  auto shapes = evaluate(part);
+  const auto has = [](const auto& scene, const std::string& id) {
+    return std::any_of(scene.begin(), scene.end(),
+                       [&](const auto& item) { return item.semantic_id == id; });
+  };
+  auto scene = checked(ViewportSceneBuilder{}.build_part(part, shapes));
+  CHECK(has(scene, "derived-workplane/support"));
+  CHECK(has(scene, "sketch/dependent.sketch/entity/line"));
+  CHECK(has(scene, "path/dependent.path"));
+  REQUIRE(part.apply_history_intent({{"base"}, {"base"}}));
+  shapes = evaluate(part);
+  const auto source = checked(serialize_part_document_to_json(part));
+  scene = checked(ViewportSceneBuilder{}.build_part(part, shapes));
+  CHECK_FALSE(has(scene, "body/body.base"));
+  CHECK_FALSE(has(scene, "derived-workplane/support"));
+  CHECK_FALSE(has(scene, "sketch/dependent.sketch/entity/line"));
+  CHECK_FALSE(has(scene, "path/dependent.path"));
+  CHECK(has(scene, "datum-plane/datum.xy"));
+  CHECK(checked(serialize_part_document_to_json(part)) == source);
+  REQUIRE(part.apply_history_intent({{"base"}, {}}));
+  shapes = evaluate(part);
+  scene = checked(ViewportSceneBuilder{}.build_part(part, shapes));
+  CHECK(has(scene, "derived-workplane/support"));
+  CHECK(has(scene, "sketch/dependent.sketch/entity/line"));
+  CHECK(has(scene, "path/dependent.path"));
+}

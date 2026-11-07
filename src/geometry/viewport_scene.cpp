@@ -388,11 +388,17 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
     const auto wrap = [](TopoDS_Shape shape) {
       return GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape)));
     };
+    const auto available = [&](const std::string& source) {
+      return !shape_cache.has_history_scope() ||
+             bool(detail::validate_history_source(document, source, &shape_cache));
+    };
     for (const DatumPlane& plane : document.datum_planes()) {
       items.push_back({ViewportSceneKind::Datum, "datum-plane/" + plane.id().value(),
                        wrap(make_plane_shape(plane.origin(), plane.x_axis(), plane.y_axis()))});
     }
     for (const DatumAxis& axis : document.datum_axes()) {
+      if (!available(axis.id().value()))
+        continue;
       Point3 origin = axis.origin();
       Vector3 direction = axis.direction();
       if (axis.kind() == DatumAxisKind::FromConstructionLine) {
@@ -406,6 +412,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
                        wrap(make_axis_shape(origin, direction))});
     }
     for (const ConstructionPoint& point : document.construction_points()) {
+      if (!available(point.id().value()))
+        continue;
       auto resolved = ConstructionPointResolver{}.resolve(document, point.id());
       if (!resolved)
         return Result<std::vector<ViewportSceneItem>>::failure(resolved.error());
@@ -413,6 +421,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
                        wrap(BRepBuilderAPI_MakeVertex(to_point(resolved.value().position)).Shape())});
     }
     for (const ConstructionLine& line : document.construction_lines()) {
+      if (!available(line.id().value()))
+        continue;
       auto resolved = ConstructionLineResolver{}.resolve(document, line.id());
       if (!resolved)
         return Result<std::vector<ViewportSceneItem>>::failure(resolved.error());
@@ -421,6 +431,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
     }
     const WorkplaneResolver workplane_resolver;
     for (const ConstructionPlane& plane : document.construction_planes()) {
+      if (!available(plane.id().value()))
+        continue;
       auto resolved = workplane_resolver.resolve(document, plane.workplane_id(), shape_cache);
       if (!resolved)
         return Result<std::vector<ViewportSceneItem>>::failure(resolved.error());
@@ -429,6 +441,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
                                              resolved.value().y_axis))});
     }
     for (const DerivedWorkplane& plane : document.derived_workplanes()) {
+      if (!available(plane.id().value()))
+        continue;
       auto resolved = workplane_resolver.resolve(document, plane.id());
       if (!resolved)
         return Result<std::vector<ViewportSceneItem>>::failure(resolved.error());
@@ -438,6 +452,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
     }
 
     for (const auto& plane : document.result_face_workplanes()) {
+      if (!available(plane.id().value()))
+        continue;
       auto resolved = workplane_resolver.resolve(document, plane.id(), shape_cache);
       if (!resolved)
         return Result<std::vector<ViewportSceneItem>>::failure(resolved.error());
@@ -447,6 +463,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
     }
 
     for (const Sketch& sketch : document.sketches()) {
+      if (!available(sketch.id().value()))
+        continue;
       auto workplane = workplane_resolver.resolve_for_sketch(document, sketch, shape_cache);
       if (workplane.has_error())
         return Result<std::vector<ViewportSceneItem>>::failure(workplane.error());
@@ -820,6 +838,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
 
     const Sketch3DGeometryAdapter sketch_3d_adapter;
     for (const Sketch3D& sketch : document.sketches_3d()) {
+      if (!available(sketch.id().value()))
+        continue;
       auto converted = sketch_3d_adapter.convert(document, sketch.id());
       if (converted.has_error())
         return Result<std::vector<ViewportSceneItem>>::failure(converted.error());
@@ -832,6 +852,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document,
     }
 
     for (const PathCurve& path : document.path_curves()) {
+      if (!available(path.id().value()))
+        continue;
       auto preview =
           GeometryRecomputeExecutor{}.preview_path_curve(document, path.id(), shape_cache);
       if (preview) {

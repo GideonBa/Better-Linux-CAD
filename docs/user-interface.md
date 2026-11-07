@@ -241,6 +241,37 @@ BLCAD palette/fonts are deliberate presentation choices within the Inventor-like
    Quick Access. Status/diagnostics name the feature and correction; error text alone does not replace
    input highlighting. Use text/icon as well as color for errors, selection roles and result status.
 
+### History browser implementation — Block 148A verified
+
+Use the existing left Model browser and right task dock. Feature rows follow the single executable
+history projection, including interleaved families and Body transforms. Suppressed rows carry an
+explicit text status and reduced emphasis; authored suppression and derived unavailable/blocked
+state are separate read-only properties. Visibility checkboxes continue to control presentation.
+Unavailable Body outputs remain inspectable as intent but cannot select absent viewport geometry.
+
+Browser context Suppress/Unsuppress, Reorder and Edit use registered actions also discoverable by
+Ctrl+K. Edit routes through the existing feature editor with its existing supported-family and
+immutable-source reasons. History changes open a task with the selected feature and affected-dependent list for suppression,
+or an ordered feature list for reorder. The status/diagnostic and fixed Apply/Cancel remain outside
+scrolling content. Dependent inclusion appears before the dependent list and fits compact layout. A blocked suppression lists
+its producer/consumer failure; including dependent operations requires an explicit checkbox. Restore
+changes only the selected flag. Reorder supports drag/drop and keyboard-accessible Up/Down controls.
+An illegal proposal leaves committed tree order intact and shows the reason in the task.
+
+Full candidate Geometry is disposable and selection is suspended during preview. Apply revalidates
+complete intent/source and commits once with a distinct suppression/restore/reorder Undo label.
+Cancel restores the scene, selection, filter and camera; Save during this task writes committed
+intent. Stale document replacement cancels the task. Browser folding and semantic selection survive
+ordinary refreshes. The End of Part marker/edit lifecycle belongs to 148B and is not claimed here.
+
+Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
+[compact suppression at 150%](images/history-suppression-compact.png) and
+[explicit dependent inclusion at 150%](images/history-dependent-compact.png). These are unchanged
+Qt/OCCT window captures from the final tested source. In the dependent case, Diagnostics retains
+the earlier rejected incomplete Apply while the task shows the corrected valid candidate. The
+status, inclusion control, affected list and fixed footer remain accessible at compact scale;
+the remaining explanatory hint can scroll. Exact commands/results live in `development-setup.md`.
+
 ### Planned command placement and workflows
 
 | Ribbon/context | Planned commands | Required workflow |
