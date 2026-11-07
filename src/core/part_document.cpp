@@ -935,16 +935,6 @@ add_projected_reference_dependencies(DependencyGraph& graph, const Sketch& sketc
   return Result<std::size_t>::success(graph.dependency_count());
 }
 
-[[nodiscard]] Result<std::size_t> sync_graph(DependencyGraph graph,
-                                             InvalidationState& invalidation_state,
-                                             DependencyGraph& dependency_graph) {
-  auto synced_state = invalidation_state.sync_from_graph(graph);
-  if (synced_state.has_error())
-    return Result<std::size_t>::failure(synced_state.error());
-  dependency_graph = std::move(graph);
-  return Result<std::size_t>::success(dependency_graph.node_count());
-}
-
 Result<std::size_t> validate_path_curve(const PartDocument& document, const PathCurve& path_curve) {
   std::vector<std::pair<PathEndpoint, PathEndpoint>> endpoints;
   endpoints.reserve(path_curve.segments().size());
@@ -1637,6 +1627,9 @@ Result<std::size_t> PartDocument::update_sketch(Sketch sketch) {
     return Result<std::size_t>::failure(
         Error::dependency(candidate.sketches_[index].id().value(),
                           "sketch update must not create a dependency cycle"));
+  auto history_valid = candidate.validate_history_graph(candidate.dependency_graph_);
+  if (!history_valid)
+    return Result<std::size_t>::failure(history_valid.error());
   auto synced = candidate.invalidation_state_.sync_from_graph(candidate.dependency_graph_);
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
@@ -1955,11 +1948,13 @@ Result<std::size_t> PartDocument::add_feature(Feature feature) {
           feature.id().value(), "feature body operation must not create a dependency cycle"));
   }
   auto invalidation_state = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  auto synced =
+      sync_graph(std::move(graph), invalidation_state, dependency_graph_, feature.id().value());
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
   features_.push_back(std::move(feature));
+  append_history_executable(features_.back().id().value());
   return Result<std::size_t>::success(features_.size() - 1U);
 }
 
@@ -2025,11 +2020,13 @@ Result<std::size_t> PartDocument::add_revolve_feature(RevolveFeature feature) {
         feature.id().value(), "revolve body operation must not create a dependency cycle"));
 
   auto invalidation_state = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  auto synced =
+      sync_graph(std::move(graph), invalidation_state, dependency_graph_, feature.id().value());
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
   revolve_features_.push_back(std::move(feature));
+  append_history_executable(revolve_features_.back().id().value());
   return Result<std::size_t>::success(revolve_features_.size() - 1U);
 }
 
@@ -2145,11 +2142,13 @@ Result<std::size_t> PartDocument::add_sweep_feature(SweepFeature feature) {
     return Result<std::size_t>::failure(
         Error::dependency(feature.id().value(), "sweep must not create a dependency cycle"));
   auto invalidation_state = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  auto synced =
+      sync_graph(std::move(graph), invalidation_state, dependency_graph_, feature.id().value());
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
   sweep_features_.push_back(std::move(feature));
+  append_history_executable(sweep_features_.back().id().value());
   return Result<std::size_t>::success(sweep_features_.size() - 1U);
 }
 
@@ -2296,11 +2295,13 @@ Result<std::size_t> PartDocument::add_loft_feature(LoftFeature feature) {
     return Result<std::size_t>::failure(
         Error::dependency(feature.id().value(), "loft must not create a dependency cycle"));
   auto invalidation_state = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  auto synced =
+      sync_graph(std::move(graph), invalidation_state, dependency_graph_, feature.id().value());
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
   loft_features_.push_back(std::move(feature));
+  append_history_executable(loft_features_.back().id().value());
   return Result<std::size_t>::success(loft_features_.size() - 1U);
 }
 
@@ -2424,10 +2425,11 @@ Result<std::size_t> PartDocument::add_surface_feature(SurfaceFeature feature) {
     return Result<std::size_t>::failure(
         Error::dependency(id.value(), "surface feature must not create a dependency cycle"));
   auto invalidation = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation, dependency_graph_);
+  auto synced = sync_graph(std::move(graph), invalidation, dependency_graph_, id.value());
   if (synced.has_error()) return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation);
   surface_features_.push_back(std::move(feature));
+  append_history_executable(surface_feature_id(surface_features_.back()).value());
   return Result<std::size_t>::success(surface_features_.size() - 1U);
 }
 
@@ -2461,6 +2463,7 @@ Result<std::size_t> PartDocument::remove_surface_feature(FeatureId id) {
   dependency_graph_ = std::move(graph);
   invalidation_state_ = std::move(invalidation);
   surface_features_.erase(found);
+  erase_history_executable(id.value());
   return Result<std::size_t>::success(1U);
 }
 
@@ -2549,11 +2552,13 @@ Result<std::size_t> PartDocument::add_linear_pattern_feature(LinearPatternFeatur
     return Result<std::size_t>::failure(Error::dependency(
         feature.id().value(), "linear pattern must not create a dependency cycle"));
   auto invalidation_state = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  auto synced =
+      sync_graph(std::move(graph), invalidation_state, dependency_graph_, feature.id().value());
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
   linear_pattern_features_.push_back(std::move(feature));
+  append_history_executable(linear_pattern_features_.back().id().value());
   return Result<std::size_t>::success(linear_pattern_features_.size() - 1U);
 }
 
@@ -2637,11 +2642,13 @@ Result<std::size_t> PartDocument::add_circular_pattern_feature(CircularPatternFe
     return Result<std::size_t>::failure(Error::dependency(
         feature.id().value(), "circular pattern must not create a dependency cycle"));
   auto invalidation_state = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  auto synced =
+      sync_graph(std::move(graph), invalidation_state, dependency_graph_, feature.id().value());
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
   circular_pattern_features_.push_back(std::move(feature));
+  append_history_executable(circular_pattern_features_.back().id().value());
   return Result<std::size_t>::success(circular_pattern_features_.size() - 1U);
 }
 
@@ -2718,11 +2725,13 @@ Result<std::size_t> PartDocument::add_mirror_feature(MirrorFeature feature) {
     return Result<std::size_t>::failure(
         Error::dependency(feature.id().value(), "mirror must not create a dependency cycle"));
   auto invalidation_state = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  auto synced =
+      sync_graph(std::move(graph), invalidation_state, dependency_graph_, feature.id().value());
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
   mirror_features_.push_back(std::move(feature));
+  append_history_executable(mirror_features_.back().id().value());
   return Result<std::size_t>::success(mirror_features_.size() - 1U);
 }
 
@@ -2768,7 +2777,7 @@ PartDocument::add_edge_treatment_dependencies(const FeatureId& id, const BodyId&
     return Result<std::size_t>::failure(
         Error::dependency(id.value(), "edge treatment must not create a dependency cycle"));
   auto invalidation_state = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_, id.value());
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
@@ -2798,6 +2807,7 @@ Result<std::size_t> PartDocument::add_fillet_feature(FilletFeature feature) {
   if (dependencies.has_error())
     return dependencies;
   fillet_features_.push_back(std::move(feature));
+  append_history_executable(fillet_features_.back().id().value());
   return Result<std::size_t>::success(fillet_features_.size() - 1U);
 }
 
@@ -2841,6 +2851,7 @@ Result<std::size_t> PartDocument::add_chamfer_feature(ChamferFeature feature) {
   if (dependencies.has_error())
     return dependencies;
   chamfer_features_.push_back(std::move(feature));
+  append_history_executable(chamfer_features_.back().id().value());
   return Result<std::size_t>::success(chamfer_features_.size() - 1U);
 }
 
@@ -2876,7 +2887,8 @@ Result<std::size_t> PartDocument::add_shell_dependencies(const ShellFeature& fea
     return Result<std::size_t>::failure(
         Error::dependency(feature.id().value(), "shell must not create a dependency cycle"));
   auto invalidation_state = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  auto synced =
+      sync_graph(std::move(graph), invalidation_state, dependency_graph_, feature.id().value());
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
@@ -2906,6 +2918,7 @@ Result<std::size_t> PartDocument::add_shell_feature(ShellFeature feature) {
   if (dependencies.has_error())
     return dependencies;
   shell_features_.push_back(std::move(feature));
+  append_history_executable(shell_features_.back().id().value());
   return Result<std::size_t>::success(shell_features_.size() - 1U);
 }
 
@@ -2944,7 +2957,8 @@ Result<std::size_t> PartDocument::add_draft_dependencies(const DraftFeature& fea
     return Result<std::size_t>::failure(
         Error::dependency(feature.id().value(), "draft must not create a dependency cycle"));
   auto invalidation_state = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  auto synced =
+      sync_graph(std::move(graph), invalidation_state, dependency_graph_, feature.id().value());
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
@@ -2982,6 +2996,7 @@ Result<std::size_t> PartDocument::add_draft_feature(DraftFeature feature) {
   if (dependencies.has_error())
     return dependencies;
   draft_features_.push_back(std::move(feature));
+  append_history_executable(draft_features_.back().id().value());
   return Result<std::size_t>::success(draft_features_.size() - 1U);
 }
 
@@ -3040,11 +3055,13 @@ Result<std::size_t> PartDocument::add_body_boolean_feature(BodyBooleanFeature fe
         feature.id().value(), "body boolean feature must not create a dependency cycle"));
 
   auto invalidation_state = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  auto synced =
+      sync_graph(std::move(graph), invalidation_state, dependency_graph_, feature.id().value());
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
   body_boolean_features_.push_back(std::move(feature));
+  append_history_executable(body_boolean_features_.back().id().value());
   return Result<std::size_t>::success(body_boolean_features_.size() - 1U);
 }
 
@@ -3198,11 +3215,13 @@ Result<std::size_t> PartDocument::add_body_transform(BodyTransform transform) {
         transform.id().value(), "body transform must not create a dependency cycle"));
 
   auto invalidation_state = invalidation_state_;
-  auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
+  auto synced =
+      sync_graph(std::move(graph), invalidation_state, dependency_graph_, transform.id().value());
   if (synced.has_error())
     return Result<std::size_t>::failure(synced.error());
   invalidation_state_ = std::move(invalidation_state);
   body_transforms_.push_back(std::move(transform));
+  append_history_executable(body_transforms_.back().id().value());
   return Result<std::size_t>::success(body_transforms_.size() - 1U);
 }
 
@@ -4276,6 +4295,9 @@ PartDocument::update_feature_record(std::vector<FeatureT> PartDocument::*member,
             add_dependency_if_missing(candidate.dependency_graph_, producer, result_node);
         if (restored.has_error()) return Result<PartDocument>::failure(restored.error());
       }
+    auto history_valid = candidate.validate_history_graph(candidate.dependency_graph_);
+    if (!history_valid)
+      return Result<PartDocument>::failure(history_valid.error());
     auto synced = candidate.invalidation_state_.sync_from_graph(candidate.dependency_graph_);
     if (synced.has_error()) return Result<PartDocument>::failure(synced.error());
     auto changed = candidate.invalidation_state_.mark_changed(candidate.dependency_graph_, node_id);
@@ -4343,6 +4365,7 @@ Result<std::size_t> PartDocument::remove_feature_record(std::vector<FeatureT> Pa
   dependency_graph_ = std::move(graph);
   invalidation_state_ = std::move(invalidation);
   records.erase(found);
+  erase_history_executable(id.value());
   return Result<std::size_t>::success(1U);
 }
 

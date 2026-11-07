@@ -71,8 +71,10 @@ inline FaceReference face(PartFeatureInputRole role) {
   return checked(FaceReference::create_planar(
       role, checked(SemanticFaceReference::create(FeatureId("base"), SemanticFace::Top))));
 }
-inline PartDocument base() {
+inline PartDocument base(bool authored = false) {
   auto part = imported();
+  if (authored)
+    accept(part.apply_history_intent({{"imported"}, {}}));
   for (const auto& [id, value] :
        {std::pair{"width", 20.0}, {"height", 10.0}, {"depth", 8.0}, {"radius", 1.0}})
     accept(part.add_parameter(checked(
@@ -90,6 +92,14 @@ inline PartDocument base() {
   accept(part.add_feature(checked(feature.with_body_result_context(context))));
   return part;
 }
+inline PartDocument native_base() {
+  auto part = base();
+  accept(part.remove_imported_body_feature(FeatureId("imported")));
+  accept(part.remove_body(BodyId("imported.body")));
+  accept(part.remove_imported_topology_catalog(ImportedTopologyCatalogId("catalog")));
+  accept(part.remove_step_import_source(StepImportSourceId("supplier")));
+  return part;
+}
 inline void path(PartDocument& part, const char* id, double y) {
   auto sketch =
       checked(Sketch::create(SketchId(std::string(id) + ".sketch"), id, DatumPlaneId("datum.xy")));
@@ -102,8 +112,8 @@ inline void path(PartDocument& part, const char* id, double y) {
 }
 // Core intent coverage only: geometric feasibility of this synthetic all-family
 // catalog is not asserted. Existing Geometry fixtures supply physical replay proof.
-inline PartDocument all_families() {
-  auto part = base();
+inline PartDocument all_families(bool authored = false) {
+  auto part = base(authored);
   accept(part.add_body_transform(checked(BodyTransform::create_translate(
       BodyTransformId("translate"), BodyId("body.base"), BodyTransformCoordinateSpace::World,
       std::nullopt, {10, 0, 0}, false, false))));

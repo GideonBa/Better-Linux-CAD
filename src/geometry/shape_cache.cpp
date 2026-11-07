@@ -1,4 +1,5 @@
 #include "blcad/geometry/shape_cache.hpp"
+#include "part_history_evaluation.hpp"
 
 #include "blcad/core/part_document.hpp"
 
@@ -163,6 +164,9 @@ const CachedReferencePartResult* ShapeCache::reference_result() const noexcept {
 
 Result<const CachedReferencePartResult*>
 ShapeCache::validated_reference_result(const PartDocument& document) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<const CachedReferencePartResult*>::failure(history.error());
   const auto invalid = [&document](std::string message) {
     return Result<const CachedReferencePartResult*>::failure(
         Error::geometry(document.id().value(), std::move(message)));
@@ -245,6 +249,9 @@ const GeometryShape* ShapeCache::find_imported_body_shape(const FeatureId& featu
 Result<const CachedImportedBodyFeatureResult*>
 ShapeCache::validated_imported_body_result(const PartDocument& document,
                                            const ImportedBodyFeature& feature) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<const CachedImportedBodyFeatureResult*>::failure(history.error());
   const auto invalid = [&document](std::string message) {
     return Result<const CachedImportedBodyFeatureResult*>::failure(
         Error::geometry(document.id().value(), std::move(message)));

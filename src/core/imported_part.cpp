@@ -266,7 +266,12 @@ Result<std::size_t> PartDocument::add_imported_body_feature(ImportedBodyFeature 
   auto synced = candidate.invalidation_state_.sync_from_graph(candidate.dependency_graph_);
   if (!synced)
     return synced;
+  const auto history_valid =
+      candidate.validate_history_graph(candidate.dependency_graph_, feature.id().value());
+  if (!history_valid)
+    return history_valid;
   candidate.imported_body_features_.push_back(std::move(feature));
+  candidate.append_history_executable(candidate.imported_body_features_.back().id().value());
   const auto index = candidate.imported_body_features_.size() - 1;
   *this = std::move(candidate);
   return Result<std::size_t>::success(index);
@@ -303,6 +308,7 @@ Result<std::size_t> PartDocument::remove_imported_body_feature(FeatureId id) {
   candidate.invalidation_state_.untrack_node(id.value());
   std::erase_if(candidate.imported_body_features_,
                 [&](const auto& value) { return value.id() == id; });
+  candidate.erase_history_executable(id.value());
   *this = std::move(candidate);
   return Result<std::size_t>::success(1);
 }

@@ -421,6 +421,7 @@ if(BLCAD_BUILD_TESTS)
   add_executable(
     blcad_core_tests
     tests/core/part_feature_history_tests.cpp
+    tests/core/part_history_intent_tests.cpp
     tests/core/feature_update_command_tests.cpp
     tests/core/step_import_source_tests.cpp
     tests/core/imported_topology_tests.cpp
@@ -538,6 +539,7 @@ if(BLCAD_BUILD_TESTS)
   if(BLCAD_BUILD_GEOMETRY)
     add_executable(
       blcad_geometry_tests
+      tests/geometry/part_history_evaluation_boundary_tests.cpp
       tests/geometry/arc_closed_profile_pipeline_tests.cpp
       tests/geometry/assembly_angle_numeric_solver_tests.cpp
       tests/geometry/assembly_concentric_constraint_equation_builder_tests.cpp
@@ -667,6 +669,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_analysis_export_workbench_tests.cpp
       tests/gui/gui_command_state_tests.cpp
       tests/gui/gui_document_session_tests.cpp
+      tests/gui/gui_history_intent_boundary_tests.cpp
       tests/gui/gui_part_workflow_transaction_tests.cpp
       tests/gui/gui_feature_source_workflow_tests.cpp
       tests/gui/gui_step_import_workbench_tests.cpp

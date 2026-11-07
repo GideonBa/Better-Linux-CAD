@@ -1,4 +1,5 @@
 #include "blcad/geometry/body_result_inspector.hpp"
+#include "part_history_evaluation.hpp"
 
 #include <utility>
 
@@ -6,6 +7,9 @@ namespace blcad::geometry {
 
 Result<PartBodyInspection> BodyResultInspector::inspect(const PartDocument& document,
                                                         const ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<PartBodyInspection>::failure(history.error());
   if (shape_cache.reference_result() != nullptr) {
     auto valid = shape_cache.validated_reference_result(document);
     if (!valid)
@@ -49,6 +53,9 @@ Result<PartBodyInspection> BodyResultInspector::inspect(const PartDocument& docu
 Result<GeometryShape>
 BodyResultInspector::resolve_compatible_final_shape(const PartDocument& document,
                                                     const ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<GeometryShape>::failure(history.error());
   if (document.is_reference_part() || shape_cache.reference_result() != nullptr) {
     auto result = shape_cache.validated_reference_result(document);
     if (!result)

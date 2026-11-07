@@ -3266,3 +3266,89 @@ normal protected PR, followed by merged-state verification, refreshed main and t
 
 Delivery: [PR #144](https://github.com/GideonBa/Better-Linux-CAD/pull/144), implementation `af40935`.
 The delivery-record commit changes documentation only; all 964 runtime fingerprints remain intact.
+
+
+## Block 146B explicit history intent and execution boundary — 2026-11-07
+
+Starts from verified main `7367faa` after normal merge of PR #144 and exact tree comparison.
+`feature-system.md` owns candidate/mutation behavior; `file-format.md` owns version-1/2 migration.
+New history UI stays assigned to 148. This delivery stores complete intent, never a second tree.
+Effective bypass, unavailable creator outputs, prefix recompute and fresh/incremental execution
+remain 147; current model consumers reject explicit intent until that evaluator exists.
+
+Focused proof covers all fifteen families, active/suppressed queries and preserved definitions,
+independent cross-family positions, rebuilt same-Body predecessors, hard creator dependencies,
+resource-mediated order, complete failure rollback, appending while explicit history exists,
+removal/ID reuse including specialized Surface/import paths, strict malformed versioned metadata,
+immutable imports and result-face prelude/Project embedding. Distinct output Body identities from
+Join/Cut/Intersect are creators as well. Four accepted historical byte fixtures remain unchanged.
+
+The temporary load graph initially caused a focused regression: creator prevalidation interpreted
+historical family-loading predecessors as authored dependencies. Versioned loading now establishes
+`feature_order` through the existing typed replay before validating persistent intent. The three
+failed cases/seven assertions are retained in `blcad146b-core-review-focused.log`; the corrected
+full focus passes without relaxing assertions (`blcad146b-core-order-corrected.log`). The first
+expanded build also catches incorrect accessors in the new GUI test; tests now use the actual
+`part_document()`/`part_shape_cache()` APIs and the established absent-cache repair contract.
+The corrected all-consumer build passes; these are development attempts, not final acceptance.
+
+Final candidate freeze: `/tmp/blcad146b-runtime-freeze.json`, **968** source/test/asset/build-script
+files, compact UTF-8 JSON sorted by path. SHA-256:
+`dad6e820e6de3e811894f68a27e09b847cf9620367d3eadc3cdd31cbe14c7eba`.
+No runtime edits follow that freeze. Final candidate focused checks pass:
+
+- Core inventory/order/update/intent: **27 cases / 1,116 assertions** (`blcad146b-core-focused.log`).
+- Geometry boundary: **2 / 286** (`blcad146b-geometry-focused.log`). Both all-active explicit order
+  and suppressed intent reject full/empty-incremental/direct execution, analytical/cache shortcuts,
+  scene selection, inspection and STEP export. Existing 1600 mm³ cache and export bytes are intact.
+- GUI boundary: **2 / 40** (`blcad146b-gui-focused.log`): rejected transaction/normal open preserve
+  old intent/history/cache; repair open retains exact new intent with Failed status and no cache.
+
+```bash
+cmake --build build/dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad_app -j8
+./build/dev-gui/blcad_core_tests "[history-intent],[feature-history-inventory],[feature-order],[feature-update-command]"
+./build/dev-gui/blcad_geometry_tests "[history-evaluation-boundary]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[history-evaluation-boundary]"
+./build/dev-gui/blcad_core_tests
+./build/dev-gui/blcad_geometry_tests
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests --durations yes
+```
+
+The full GUI command requires regular filesystem access for atomic STEP/project publication as
+documented above. Build/test/native processes run serially. Final broad/native results follow below.
+
+
+Final broad/native checks on the unchanged freeze:
+
+| Check | Result | Log under `/tmp/` |
+| --- | --- | --- |
+| Final all-consumer build | Pass | `blcad146b-build-final-candidate.log` |
+| Full Core | 616 cases / 23,189 assertions | `blcad146b-core-full.log` |
+| Full Geometry | 566 / 50,073 | `blcad146b-geometry-full.log` |
+| Full offscreen GUI | 684 cases: 650 passed, 34 native-only skips / 87,935 assertions | `blcad146b-gui-full.log` |
+| Native 100% combinations | 38 / 2,748; no skips | `blcad146b-native-100.log` |
+| Separate native startup | Expected timeout 124 after 6 seconds | `blcad146b-startup.log` |
+
+```bash
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 ./build/dev-gui/blcad_gui_tests "[document-session],[part-workflow],[source-sketch-workflow],[create-another],[create-another-workflow],[imported-body-preview],[history-evaluation-boundary]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+No failed full/native cases or native skips. The known Medium incomplete depth/stencil Visual
+warning remains, without High-severity/BadDrawable/BadWindow failures. This change adds no layout
+or rendering feature; new 150% captures are not claimed. Formatting/diff checks pass; all 968
+runtime fingerprints remain intact through tests and documentation-only status promotion.
+Block 146 intent/Core/JSON acceptance is complete; 147 remains planned and owns actual effective
+suppression/prefix/freshness behavior, replacing the tested unsupported-evaluator boundary. Native
+browser/End of Part workflows remain 148. Normal protected PR delivery and refreshed-main/tree
+comparison are required before that next implementation branch.
+
+
+After documentation-only status promotion, the final capability/status inventory passes **5 cases /
+495 assertions** (`blcad146b-final-inventory.log`). The full GUI count precedes that promotion;
+this separate focused check validates implemented-through 146/current block 147 without advancing
+planned history UI capabilities. All runtime fingerprints remain unchanged.
+
+
+Delivery: [PR #145](https://github.com/GideonBa/Better-Linux-CAD/pull/145), implementation `9329de2`.
+The delivery-record commit is documentation only and preserves all 968 runtime fingerprints.

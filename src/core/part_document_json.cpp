@@ -27,6 +27,7 @@ namespace {
 using json = nlohmann::json;
 constexpr std::string_view k_schema = "blcad.part_document.mvp1";
 constexpr int k_version = 1;
+constexpr int k_history_version = 2;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -3867,7 +3868,7 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
 Result<std::string> serialize_part_document_to_json(const PartDocument& document) {
   json root;
   root["schema"] = k_schema;
-  root["version"] = k_version;
+  root["version"] = document.authored_history_intent() ? k_history_version : k_version;
   root["document"] = json{{"id", document.id().value()}, {"name", document.name()}};
   if (!document.step_import_sources().empty())
     root["step_import_sources"] =
@@ -4241,8 +4242,11 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     latest_ancestor_position[node] = latest;
   }
-  if (interleaved || !document.result_face_workplanes().empty())
+  if (interleaved || !document.result_face_workplanes().empty() ||
+      document.authored_history_intent())
     root["feature_order"] = std::move(feature_order);
+  if (document.authored_history_intent())
+    root["suppressed_features"] = document.authored_history_intent()->suppressed;
   root["reference_statuses"] = json::array();
   for (const auto& status : document.reference_statuses())
     root["reference_statuses"].push_back(reference_status_to_json(status));
@@ -4267,8 +4271,41 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       return Result<PartDocument>::failure(json_error("part document json root must be an object"));
     if (root.at("schema").get<std::string>() != k_schema)
       return Result<PartDocument>::failure(json_error("unsupported part document json schema"));
-    if (root.at("version").get<int>() != k_version)
+    const auto version = root.at("version").get<int>();
+    if (version != k_version && version != k_history_version)
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
+    std::optional<PartFeatureHistoryIntent> authored_history;
+    if (version == k_history_version) {
+      if (!root.at("version").is_number_integer() || !root.contains("feature_order") ||
+          !root.at("feature_order").is_array() || !root.contains("suppressed_features") ||
+          !root.at("suppressed_features").is_array())
+        return Result<PartDocument>::failure(
+            json_error("version 2 requires complete feature_order and suppressed_features arrays"));
+      if (root.contains("reference_part"))
+        return Result<PartDocument>::failure(json_error("Reference Part history is read-only"));
+      authored_history.emplace();
+      for (const auto& id : root.at("feature_order")) {
+        if (!id.is_string())
+          return Result<PartDocument>::failure(json_error("feature_order entries must be strings"));
+        authored_history->order.push_back(id.get<std::string>());
+      }
+      for (const auto& id : root.at("suppressed_features")) {
+        if (!id.is_string())
+          return Result<PartDocument>::failure(
+              json_error("suppressed_features entries must be strings"));
+        authored_history->suppressed.push_back(id.get<std::string>());
+      }
+    } else if (root.contains("suppressed_features"))
+      return Result<PartDocument>::failure(
+          json_error("suppressed_features requires Part document version 2"));
+    const auto finish_history = [&](Result<PartDocument> document) -> Result<PartDocument> {
+      if (!document || !authored_history)
+        return document;
+      const auto applied = document.value().apply_history_intent(*authored_history);
+      if (!applied)
+        return Result<PartDocument>::failure(applied.error());
+      return document;
+    };
     if (root.contains("imported_body_features") && !root.at("imported_body_features").is_array())
       return Result<PartDocument>::failure(json_error("imported_body_features must be an array"));
     if (root.contains("reference_part")) {
@@ -4345,6 +4382,8 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       auto prelude = root;
       prelude.erase("result_face_workplanes");
       prelude.erase("feature_order");
+      prelude.erase("suppressed_features");
+      prelude["version"] = k_version;
       for (const auto& key : dependent_arrays) {
         if (root.contains(key) && !root.at(key).is_array())
           return Result<PartDocument>::failure(json_error(key + " must be an array"));
@@ -4600,7 +4639,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         if (!valid)
           return Result<PartDocument>::failure(valid.error());
       }
-      return document;
+      return finish_history(std::move(document));
     }
     // A record that is present later in the file must still resolve normally.
     // IDs belonging to another record kind are never treated as absent sources.
@@ -5178,6 +5217,8 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     restore_order(document.value().derived_workplanes_, derived_workplane_array);
     restore_order(document.value().sketches_, sketch_array);
     restore_order(document.value().features_, feature_array);
+    // Establish requested predecessor semantics before validating persistent
+    // intent. Historical family loading may have temporary Body chain edges.
     if (root.contains("feature_order")) {
       const auto& order = root.at("feature_order");
       if (!order.is_array())
@@ -5201,7 +5242,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (!sealed)
         return Result<PartDocument>::failure(sealed.error());
     }
-    return document;
+    return finish_history(std::move(document));
   } catch (const json::exception& exception) {
     return Result<PartDocument>::failure(
         json_error(std::string("invalid part document json: ") + exception.what()));

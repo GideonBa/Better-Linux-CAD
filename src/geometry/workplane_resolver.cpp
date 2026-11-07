@@ -1,8 +1,9 @@
 #include "blcad/geometry/workplane_resolver.hpp"
 #include "blcad/core/rectangular_extrude_profile.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
-#include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/result_face_support.hpp"
+#include "blcad/geometry/shape_cache.hpp"
+#include "part_history_evaluation.hpp"
 
 #include <cmath>
 #include <algorithm>
@@ -236,6 +237,9 @@ resolve_construction_plane(const PartDocument& document, const WorkplaneResolver
 
 Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& document,
                                                      DatumPlaneId workplane_id) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<ResolvedWorkplane>::failure(history.error());
   if (workplane_id.empty())
     return Result<ResolvedWorkplane>::failure(
         validation_error("workplane", "workplane id must not be empty"));
@@ -255,6 +259,9 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& documen
 
 Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& document, DatumPlaneId id,
                                                      const ShapeCache& cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<ResolvedWorkplane>::failure(history.error());
   if (const auto* support = document.find_result_face_workplane(id))
     return ResultFaceSupportGeometry::resolve(document, *support, cache);
   if (const auto* construction = document.find_construction_plane(ConstructionPlaneId(id.value()));
@@ -266,6 +273,9 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve(const PartDocument& documen
 Result<ResolvedWorkplane>
 WorkplaneResolver::resolve_generated_face(const PartDocument& document,
                                           const SemanticFaceReference& face_reference) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<ResolvedWorkplane>::failure(history.error());
   const DatumPlaneId resolved_id(face_reference.source_feature().value() + "." +
                                  std::string(to_string(face_reference.face())));
   return resolve_additive_extrude_face(document, face_reference, resolved_id, "generated face");
@@ -273,6 +283,9 @@ WorkplaneResolver::resolve_generated_face(const PartDocument& document,
 
 Result<ResolvedWorkplane> WorkplaneResolver::resolve_for_sketch(const PartDocument& document,
                                                                 const Sketch& sketch) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<ResolvedWorkplane>::failure(history.error());
   auto workplane = resolve(document, sketch.workplane());
   if (workplane.has_error())
     return workplane;
@@ -292,6 +305,9 @@ Result<ResolvedWorkplane> WorkplaneResolver::resolve_for_sketch(const PartDocume
 Result<ResolvedWorkplane>
 WorkplaneResolver::resolve_for_sketch(const PartDocument& document, const Sketch& sketch,
                                       const ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<ResolvedWorkplane>::failure(history.error());
   auto workplane = resolve(document, sketch.workplane(), shape_cache);
   if (workplane && document.find_sketch_origin_override(sketch.id())) {
     const auto offset = document.find_sketch_origin_override(sketch.id())->local_origin();

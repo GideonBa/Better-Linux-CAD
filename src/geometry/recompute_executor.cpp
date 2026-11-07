@@ -3,6 +3,7 @@
 #include "blcad/core/sketch_profile_roles.hpp"
 #include "blcad/geometry/result_face_support.hpp"
 #include "imported_body_placement.hpp"
+#include "part_history_evaluation.hpp"
 
 #include "blcad/geometry/body_rotation_axis_resolver.hpp"
 #include "blcad/geometry/construction_line_resolver.hpp"
@@ -2348,12 +2349,18 @@ Result<std::vector<ClosedProfileCurveSegment>> detail::resolve_loft_alignment_se
 
 Result<std::pair<Point3, Vector3>> GeometryRecomputeExecutor::resolve_feature_axis(
     const PartDocument& document, const AxisReference& reference, const ShapeCache& cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::pair<Point3, Vector3>>::failure(history.error());
   return resolve_axis_reference(document, reference, cache, workplane_resolver_, import_context_);
 }
 
 Result<std::vector<SweepPathSegment>>
 GeometryRecomputeExecutor::resolve_path_segments(const PartDocument& document, PathCurveId id,
                                                  const ShapeCache& cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::vector<SweepPathSegment>>::failure(history.error());
   const auto* path = document.find_path_curve(id);
   if (!path)
     return Result<std::vector<SweepPathSegment>>::failure(
@@ -2365,6 +2372,9 @@ GeometryRecomputeExecutor::resolve_path_segments(const PartDocument& document, P
 Result<GeometryShape> GeometryRecomputeExecutor::preview_path_curve(const PartDocument& document,
                                                                     PathCurveId id,
                                                                     const ShapeCache& cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<GeometryShape>::failure(history.error());
   auto segments = resolve_path_segments(document, id, cache);
   if (!segments)
     return Result<GeometryShape>::failure(segments.error());
@@ -2661,6 +2671,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_richer_extrude(
 Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocument& document,
                                                                FeatureId feature_id,
                                                                ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -2797,6 +2810,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
 Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument& document,
                                                              FeatureId feature_id,
                                                              ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -2962,6 +2978,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
 Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& document,
                                                             FeatureId feature_id,
                                                             ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -3126,6 +3145,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
 Result<SurfaceExtensionFrame> GeometryRecomputeExecutor::surface_extension_frame(
     const PartDocument& document, const SurfaceReference& target,
     const BoundaryCurveReference& boundary, const ShapeCache& cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<SurfaceExtensionFrame>::failure(history.error());
   const FeatureId preview_id("surface.extension.frame");
   auto shape = resolve_surface_target(document, target, cache, surface_adapter_, preview_id);
   if (!shape)
@@ -3138,6 +3160,9 @@ Result<SurfaceExtensionFrame> GeometryRecomputeExecutor::surface_extension_frame
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -3243,6 +3268,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -3348,6 +3376,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_circular_pattern(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -3447,6 +3478,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_circular_pattern(
 Result<std::size_t> GeometryRecomputeExecutor::execute_mirror(const PartDocument& document,
                                                               FeatureId feature_id,
                                                               ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -3514,6 +3548,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_mirror(const PartDocument
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -3737,6 +3774,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -3946,6 +3986,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
 Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument& document,
                                                               FeatureId feature_id,
                                                               ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -3985,6 +4028,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument
 Result<std::size_t> GeometryRecomputeExecutor::execute_chamfer(const PartDocument& document,
                                                                FeatureId feature_id,
                                                                ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -4041,6 +4087,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_chamfer(const PartDocumen
 Result<std::size_t> GeometryRecomputeExecutor::execute_shell(const PartDocument& document,
                                                              FeatureId feature_id,
                                                              ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -4081,6 +4130,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_shell(const PartDocument&
 Result<std::size_t> GeometryRecomputeExecutor::execute_draft(const PartDocument& document,
                                                              FeatureId feature_id,
                                                              ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -4131,6 +4183,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_draft(const PartDocument&
 Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(const PartDocument& document,
                                                                     FeatureId feature_id,
                                                                     ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imported_inputs)
@@ -4189,6 +4244,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_body_boolean(const PartDo
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_body_transform(
     const PartDocument& document, BodyTransformId transform_id, ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   auto imported_inputs =
       validate_feature_imports(document, shape_cache, transform_id.value(), import_context_);
   if (!imported_inputs)
@@ -4328,6 +4386,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_feature(const PartDocumen
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_imported_body_feature(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   const auto* feature = imported_body_feature(document, feature_id.value());
   if (feature == nullptr || import_context_ == nullptr)
     return Result<std::size_t>::failure(validation_error(
@@ -4340,6 +4401,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_imported_body_feature(
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const RecomputePlan& plan,
                                         ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<GeometryRecomputeSummary>::failure(history.error());
   if (document.is_reference_part()) {
     if (import_context_ == nullptr)
       return Result<GeometryRecomputeSummary>::failure(validation_error(
@@ -4466,6 +4530,9 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_document(const PartDocument& document,
                                             ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<GeometryRecomputeSummary>::failure(history.error());
   const auto references = document.validate_reference_sources();
   if (!references)
     return Result<GeometryRecomputeSummary>::failure(references.error());

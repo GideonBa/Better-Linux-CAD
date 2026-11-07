@@ -327,14 +327,32 @@ public:
   find_sketch_origin_override(SketchId id) const noexcept;
   [[nodiscard]] bool has_workplane_id(const DatumPlaneId& id) const noexcept;
 
-  // Read-only projection of all executable families in current dependency order.
-  // Does not author order/suppression state or include Sketch/Body alias nodes.
+  // Read-only projection of existing records in explicit authored order when set,
+  // otherwise dependency order. Does not include Sketch/Body alias nodes.
   [[nodiscard]] Result<std::vector<PartFeatureHistoryEntry>> executable_history() const;
+  [[nodiscard]] const std::optional<PartFeatureHistoryIntent>&
+  authored_history_intent() const noexcept;
+  [[nodiscard]] std::vector<PartHistoryDiagnostic>
+  diagnose_history_intent(const PartFeatureHistoryIntent& intent) const;
+  // A complete disposable candidate; session owners retain revision/history control.
+  [[nodiscard]] Result<PartDocument> with_history_intent(PartFeatureHistoryIntent intent) const;
+  [[nodiscard]] Result<std::size_t> apply_history_intent(PartFeatureHistoryIntent intent);
 
 private:
   template <typename Visitor> void visit_executable_families(Visitor&& visitor) const;
   // Shared canonical loading/replay authority. Never partially changes this Part.
   [[nodiscard]] Result<std::size_t> replay_feature_order(const std::vector<std::string>& order);
+  [[nodiscard]] Result<PartDocument>
+  build_history_candidate(PartFeatureHistoryIntent intent,
+                          std::vector<PartHistoryDiagnostic>& diagnostics) const;
+  [[nodiscard]] Result<std::size_t> validate_history_graph(const DependencyGraph& graph,
+                                                           std::string_view appended = {}) const;
+  [[nodiscard]] Result<std::size_t> sync_graph(DependencyGraph graph,
+                                               InvalidationState& invalidation,
+                                               DependencyGraph& destination,
+                                               std::string_view appended = {}) const;
+  void append_history_executable(const std::string& id);
+  void erase_history_executable(const std::string& id);
   // Loading validates records in dependency order, then restores their authored
   // collection order without exposing mutable collections to other clients.
   friend Result<PartDocument> deserialize_part_document_from_json(std::string_view content,
@@ -447,6 +465,7 @@ private:
   std::vector<SketchOriginOverrideRecord> sketch_origin_overrides_;
   DependencyGraph dependency_graph_;
   InvalidationState invalidation_state_;
+  std::optional<PartFeatureHistoryIntent> history_intent_;
 };
 
 } // namespace blcad

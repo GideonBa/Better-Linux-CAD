@@ -1,6 +1,7 @@
 # Project and Save File Format
 
-Planned evolution (2026-11-06): [Blocks 145–204](inventor-parity-sequence.md) assign history state,
+History intent now has the explicit version-2 contract below. Planned evolution (2026-11-06):
+[Blocks 145–204](inventor-parity-sequence.md) additionally assign
 revision-pinned resources, new feature families, equation/spatial constraints, model states,
 occurrence poses and cross-document references. These are not current JSON fields. Each owning
 block must specify exact spellings, schema/version/defaults, strict unknown-intent behavior and
@@ -53,6 +54,32 @@ result-face support loader retains its dependency-aware metadata staging. Existi
 optional-field emission rules, family-array order and canonical historical bytes remain unchanged.
 No `active`, `suppressed` or additional history field is introduced by this slice. New history
 persistence belongs to 146B and must be specified here before its writer is added.
+
+## Authored Part history intent — Block 146B, 2026-11-07
+
+This is the migration contract for explicit intent. Effective execution and native history UI
+remain assigned to 147–148; the conservative consumer boundary does not claim their completion.
+Legacy Parts retain `blcad.part_document.mvp1`, version **1**, their existing optional `feature_order`
+and exact canonical bytes. New explicit history intent uses the same schema with version **2**.
+Version 2 always requires complete `feature_order` and a `suppressed_features` array of executable
+IDs. Missing suppression means active only in version 1; version 2 requires the array even when
+empty. The writer emits version 2 only after explicitly authoring history intent. Older readers
+reject version 2 instead of silently executing suppressed features.
+
+`feature_order` names every executable exactly once and preserves independent authored positions.
+`suppressed_features` is sparse: unique known executable IDs, emitted in authored order; every other
+record is active. No feature definition, reference, parameter or ID is removed by suppression.
+Non-array/non-string, unknown/duplicate/missing executable entries fail loading. Version 1 rejects
+`suppressed_features`; immutable Reference Parts reject explicit history intent. Imported Body bases
+own indispensable source/catalog outputs and cannot be suppressed. Their moves retain all producer
+constraints; native creators remain separate ordinary history records.
+
+Version 2 applies the same candidate validation after generic loading and result-face staging.
+Prelude recursion strips new intent and uses version 1; final publication reinstates the complete
+validated intent. Family arrays retain their independent historical collection-order contract.
+No derived dependency edge, blocked state, shape or cache is persisted. Effective bypass/output
+availability belongs to 147; all consumers must fail closed while that evaluator is unavailable.
+The history browser and its visible state/diagnostics remain assigned to 148.
 
 ## Project structure
 

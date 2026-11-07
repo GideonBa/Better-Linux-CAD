@@ -1,4 +1,5 @@
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
+#include "part_history_evaluation.hpp"
 
 #include "blcad/core/rectangular_extrude_profile.hpp"
 #include "blcad/geometry/shape_cache.hpp"
@@ -164,6 +165,9 @@ source_transform(const PartDocument& document, const ShapeCache& cache,
 Result<ResolvedSemanticEdge>
 SemanticReferenceEvaluator::resolve_edge(const PartDocument& document,
                                          SemanticEdgeReference reference) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<ResolvedSemanticEdge>::failure(history.error());
   auto corners = resolve_rectangular_additive_extrude_corners(document, reference.source_feature());
   if (corners.has_error()) {
     return Result<ResolvedSemanticEdge>::failure(corners.error());
@@ -176,6 +180,9 @@ Result<ResolvedSemanticEdge>
 SemanticReferenceEvaluator::resolve_edge(const PartDocument& document,
                                          SemanticEdgeReference reference,
                                          const ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<ResolvedSemanticEdge>::failure(history.error());
   const FeatureId source = reference.source_feature();
   auto resolved = resolve_edge(document, std::move(reference));
   if (resolved.has_error())
@@ -190,6 +197,9 @@ SemanticReferenceEvaluator::resolve_edge(const PartDocument& document,
 Result<ResolvedSemanticVertex>
 SemanticReferenceEvaluator::resolve_vertex(const PartDocument& document,
                                            SemanticVertexReference reference) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<ResolvedSemanticVertex>::failure(history.error());
   auto corners = resolve_rectangular_additive_extrude_corners(document, reference.source_feature());
   if (corners.has_error()) {
     return Result<ResolvedSemanticVertex>::failure(corners.error());
@@ -203,6 +213,9 @@ Result<ResolvedSemanticVertex>
 SemanticReferenceEvaluator::resolve_vertex(const PartDocument& document,
                                            SemanticVertexReference reference,
                                            const ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<ResolvedSemanticVertex>::failure(history.error());
   const FeatureId source = reference.source_feature();
   auto resolved = resolve_vertex(document, std::move(reference));
   if (resolved.has_error())
