@@ -309,6 +309,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_analysis_export_workbench.cpp
     src/gui/gui_step_import_workbench.cpp
     src/gui/gui_document_browser.cpp
+    src/gui/gui_part_history.cpp
     src/gui/gui_appearance.cpp
     src/gui/gui_icons.cpp
     src/gui/gui_document_session.cpp
@@ -347,6 +348,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_assembly_context.cpp
     src/gui/shell/shell_assembly_advanced.cpp
     src/gui/shell/shell_feature_edit_tools.cpp
+    src/gui/shell/shell_history_tools.cpp
     src/gui/shell/shell_manipulator_overlay.cpp
     src/gui/shell/shell_origin.cpp
     src/gui/shell/shell_navigation_tools.cpp
@@ -671,6 +673,8 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_command_state_tests.cpp
       tests/gui/gui_document_session_tests.cpp
       tests/gui/gui_history_intent_boundary_tests.cpp
+      tests/gui/gui_part_history_tests.cpp
+      tests/gui/gui_shell_history_tests.cpp
       tests/gui/gui_part_workflow_transaction_tests.cpp
       tests/gui/gui_feature_source_workflow_tests.cpp
       tests/gui/gui_step_import_workbench_tests.cpp

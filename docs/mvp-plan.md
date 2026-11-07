@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 147
 current_block: 148
-current_boundary: Block 148 history browser and End of Part workflows planned
+current_boundary: Block 148A verified; End of Part prefix editing remains 148B/C
 current_tag: "[parity-b148]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–147 accepted; Blocks 148–204 planned"
+  advanced_modeling_workflows: "Blocks 145–147 accepted; Block 148 in progress; Blocks 149–204 planned"
 ---
 
 # MVP Plan
@@ -34,7 +34,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 147
-current block        Block 148 (planned; not started)
+current block        Block 148 (in progress; slice A verified)
 current phase        History browser and End of Part workflow
 current boundary     Native history commands and transient prefix editing
 ```
@@ -1776,8 +1776,8 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–147 are **Implemented and accepted**;
-Blocks 148–204 are **Planned; not started**.
+Status authority: Blocks 145–147 are **Implemented and accepted**; Block 148 is **In progress**;
+Blocks 149–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1786,7 +1786,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
-| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–147 accepted; 148–151 not started |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–147 accepted; 148 in progress; 149–151 not started |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
@@ -2059,6 +2059,37 @@ Delivery: [PR #147](https://github.com/GideonBa/Better-Linux-CAD/pull/147), impl
 The delivery-record commit changes documentation only and preserves all 969 runtime fingerprints.
 Normal merge, confirmed merged state and refreshed-main/reviewed-tree comparison are required before
 starting Block 148.
+
+### Block 148 serial implementation — 2026-11-07
+
+PR #147 is confirmed merged as `6d8179d`. Refreshed main matches the exact reviewed branch tree;
+`feat/history-browser-commands` starts from that verified state. Implemented-through remains 147.
+The shared UI contract stays in `user-interface.md`; effective state/cache ownership stays in
+`feature-system.md`/`shape-cache-mvp1-data-model.md`, with no second persistence plan.
+
+| Slice | Bounded deliverable | Status |
+| --- | --- | --- |
+| 148A | Existing browser follows executable order and shows authored/effective status; staged suppression/restore with explicit dependent closure; validated reorder/drag/drop; context Edit uses the existing editor; full-source preview/Apply/Cancel, persistence and native interaction tests | Implemented and verified; delivery PR #148 |
+| 148B | Visibly labelled transient End of Part prefix, edit/insert at marker, complete suffix validation before one Apply, committed-only Save, disabled incomplete export/analysis and Cancel/camera/selection restoration | Planned; not started |
+| 148C | H01–H03/UI01 combined native acceptance at 100%/150%, compact layout/captures, failure recovery and complete capability evidence | Planned; not started |
+
+Only the whole completed/verified block advances numbered status or planned history UI capabilities.
+A preview leaves source intent/history/files intact. Dependents are listed and included only by an
+explicit choice; restore does not silently restore other flags. Illegal order or failed Geometry
+leaves the original browser/model unchanged and the candidate correctable. Visibility controls
+remain distinct from suppression. End of Part behavior is not supplied by A.
+
+148A acceptance: full Geometry **574 / 51,745**; full offscreen GUI **697 cases: 663 passed,
+34 expected native-only skips / 88,526 assertions**; native 100% combined commands **52 / 4,401**;
+compact native 150% **7 / 299**, no native skips or failures. Separate startup reaches expected
+timeout 124. A retained-Sketch selection regression is corrected and the existing combined Revolve
+test passes unchanged. Core sources/tests remain unchanged from accepted 147B. All 975 runtime
+fingerprints remain unchanged through final checks; exact evidence/commands and native captures
+are recorded in `development-setup.md`/`user-interface.md`. Whole 148 and its capability promotion
+remain open for B/C. Normal PR merge and refreshed-main/tree comparison precede B's branch.
+
+Delivery: [PR #148](https://github.com/GideonBa/Better-Linux-CAD/pull/148), implementation `8d802d3`.
+The delivery-record commit changes documentation only and preserves all 975 runtime fingerprints.
 
 ## Later phases
 

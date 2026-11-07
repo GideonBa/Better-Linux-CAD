@@ -5,14 +5,15 @@
 
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
-#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/gui_interactive_profile_materialization.hpp"
 #include "blcad/gui/gui_sketch_intent_remap.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_construction_tools.hpp"
 #include "blcad/gui/shell/shell_context_tools.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/shell/shell_history_tools.hpp"
 #include "blcad/gui/shell/shell_hole_tools.hpp"
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
@@ -40,6 +41,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QScrollBar>
 #include <QSignalBlocker>
 #include <QStatusBar>
 #include <QTableWidget>
@@ -48,6 +50,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -82,21 +85,51 @@ QString diagnostic_line(const Error& error) {
 }
 
 QTreeWidgetItem* append_browser_item(QTreeWidgetItem* parent, QTreeWidget* tree,
-                                     const GuiBrowserNode& node) {
+                                     const GuiBrowserNode& node, const QString& parent_path = {}) {
   auto* item = parent != nullptr ? new QTreeWidgetItem(parent) : new QTreeWidgetItem(tree);
   item->setText(0, QString::fromStdString(node.label));
   item->setIcon(0, gui_icon_for_browser_node(node));
   item->setData(0, kSemanticIdRole, QString::fromStdString(node.semantic_id));
   item->setData(0, kViewportIdRole, QString::fromStdString(node.viewport_semantic_id));
+  const QString key =
+      QString::fromStdString(node.semantic_id.empty() ? node.label : node.semantic_id);
+  const QString path = parent_path + QString::number(key.size()) + ':' + key;
+  item->setData(0, ShellHistoryBrowser::path_role, path);
+  item->setData(0, ShellHistoryBrowser::owner_role, QString::fromStdString(node.owner_document_id));
+  const bool feature = node.kind == GuiBrowserNodeKind::Feature;
+  item->setData(0, ShellHistoryBrowser::feature_role, feature);
+  item->setFlags(item->flags() & ~(Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled));
+  if (feature)
+    item->setFlags(item->flags() | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled);
   if (!node.visibility_semantic_id.empty()) {
     item->setData(0, kVisibilityIdRole, QString::fromStdString(node.visibility_semantic_id));
     item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
     item->setCheckState(0, node.presentation_visible ? Qt::Checked : Qt::Unchecked);
     item->setToolTip(0, QStringLiteral("Toggle visibility"));
   }
+  for (const auto& property : node.properties)
+    if (property.key == "feature_state" && property.value == "suppressed") {
+      auto font = item->font(0);
+      font.setItalic(true);
+      item->setFont(0, font);
+      item->setToolTip(0, "Suppressed feature. Visibility is controlled separately.");
+    }
   for (const auto& child : node.children)
-    append_browser_item(item, tree, child);
+    append_browser_item(item, tree, child, path);
   return item;
+}
+
+void remember_browser_folding(QTreeWidgetItem* item, std::map<QString, bool>& states) {
+  states[item->data(0, ShellHistoryBrowser::path_role).toString()] = item->isExpanded();
+  for (int i = 0; i < item->childCount(); ++i)
+    remember_browser_folding(item->child(i), states);
+}
+void restore_browser_folding(QTreeWidgetItem* item, const std::map<QString, bool>& states,
+                             int depth = 0) {
+  const auto found = states.find(item->data(0, ShellHistoryBrowser::path_role).toString());
+  item->setExpanded(found != states.end() ? found->second : depth < 2);
+  for (int i = 0; i < item->childCount(); ++i)
+    restore_browser_folding(item->child(i), states, depth + 1);
 }
 
 QTreeWidgetItem* find_item_by_viewport_id(QTreeWidgetItem* item, const QString& id) {
@@ -298,6 +331,7 @@ ShellWindow::ShellWindow() {
   assembly_tools_ =
       std::make_unique<ShellAssemblyTools>(*this, session_, *viewport_, *ribbon_, tab_assembly_);
   feature_edit_tools_ = std::make_unique<ShellFeatureEditTools>(*this);
+  history_tools_ = std::make_unique<ShellHistoryTools>(*this, *ribbon_, tab_model_);
   inspect_tools_ = std::make_unique<ShellInspectTools>(*this, *ribbon_, tab_manage_, tab_inspect_);
   construction_tools_ = std::make_unique<ShellConstructionTools>(*this, *ribbon_, tab_model_);
   reference_repair_tools_ =
@@ -330,6 +364,7 @@ ShellWindow::~ShellWindow() {
   reference_repair_tools_.reset();
   construction_tools_.reset();
   inspect_tools_.reset();
+  history_tools_.reset();
   feature_edit_tools_.reset();
   assembly_tools_.reset();
   measure_tools_.reset();
@@ -498,7 +533,7 @@ void ShellWindow::build_docks() {
   auto* browser_dock = browser_dock_ = new QDockWidget(QStringLiteral("Model"), this);
   browser_dock->setObjectName(QStringLiteral("blcad.shell.model_dock"));
   browser_dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
-  browser_tree_ = new QTreeWidget(browser_dock);
+  browser_tree_ = new ShellHistoryBrowser(browser_dock);
   browser_tree_->setObjectName("blcad.shell.browser");
   browser_tree_->setHeaderLabel(QStringLiteral("No Document"));
   browser_tree_->setUniformRowHeights(true);
@@ -511,6 +546,13 @@ void ShellWindow::build_docks() {
   resizeDocks({browser_dock}, {300}, Qt::Horizontal);
   connect(browser_tree_, &QTreeWidget::currentItemChanged, this,
           [this](QTreeWidgetItem* current, QTreeWidgetItem*) { handle_tree_selection(current); });
+  connect(browser_tree_, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem* item, int) {
+    // A completed command consumes its profile selection while the browser keeps
+    // its current row. Clicking that row again explicitly selects the input for
+    // the next command; changed rows already use currentItemChanged above.
+    if (static_cast<ShellHistoryBrowser*>(browser_tree_)->pressed_current_item())
+      handle_tree_selection(item);
+  });
   connect(browser_tree_, &QTreeWidget::itemDoubleClicked, this,
           [this](QTreeWidgetItem* item, int) { handle_tree_activation(item); });
   connect(browser_tree_, &QTreeWidget::itemChanged, this,
@@ -547,6 +589,10 @@ void ShellWindow::build_docks() {
   connect(browser_tree_, &QTreeWidget::customContextMenuRequested, this,
           [this](const QPoint& point) {
             auto* item = browser_tree_->itemAt(point);
+            if (item) {
+              browser_tree_->setCurrentItem(item);
+              item = browser_tree_->currentItem();
+            }
             const std::string id =
                 item ? item->data(0, kVisibilityIdRole).toString().toStdString() : std::string{};
             const auto* source =
@@ -554,6 +600,15 @@ void ShellWindow::build_docks() {
                      : nullptr;
             const GuiBrowserNode node = source ? *source : GuiBrowserNode{};
             QMenu menu(browser_tree_);
+            menu.setToolTipsVisible(true);
+            if (source && source->kind == GuiBrowserNodeKind::Feature && history_tools_) {
+              history_tools_->refresh();
+              menu.addAction(&history_tools_->edit_action());
+              menu.addAction(&history_tools_->suppress_action());
+              menu.addAction(&history_tools_->restore_action());
+              menu.addAction(&history_tools_->reorder_action());
+              menu.addSeparator();
+            }
             QAction* toggle = nullptr;
             const bool visible = source && source->presentation_visible;
             if (!id.empty())
@@ -565,6 +620,11 @@ void ShellWindow::build_docks() {
             show_all->setEnabled(!session_.hidden_presentations().empty());
             const auto* chosen = menu.exec(browser_tree_->viewport()->mapToGlobal(point));
             if (chosen == nullptr)
+              return;
+            if (history_tools_ && (chosen == &history_tools_->edit_action() ||
+                                   chosen == &history_tools_->suppress_action() ||
+                                   chosen == &history_tools_->restore_action() ||
+                                   chosen == &history_tools_->reorder_action()))
               return;
             if (chosen == show_all)
               (void)session_.show_all_presentations();
@@ -829,6 +889,8 @@ bool ShellWindow::confirm_document_replacement() {
 }
 
 void ShellWindow::reset_document_interaction() {
+  if (history_tools_)
+    history_tools_->cancel();
   if (step_import_tools_)
     step_import_tools_->cancel();
   if (hole_tools_)
@@ -1227,6 +1289,8 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
+  if (history_tools_)
+    history_tools_->cancel();
   if (feature_tools_ && feature_tools_->editing_source_sketch()) {
     sketch_tools_->cancel_tool();
     while (session_.task().active() && sketch_workspace_.escape(session_)) {
@@ -1281,6 +1345,8 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
+  if (history_tools_)
+    history_tools_->cancel();
   if (feature_tools_ && feature_tools_->editing_source_sketch()) {
     sketch_tools_->cancel_tool();
     while (session_.task().active() && sketch_workspace_.escape(session_)) {
@@ -1602,6 +1668,8 @@ void ShellWindow::refresh() {
     assembly_tools_->refresh();
   if (feature_edit_tools_)
     feature_edit_tools_->refresh();
+  if (history_tools_)
+    history_tools_->refresh();
   refresh_viewport_scene();
   if (sketch_tools_)
     sketch_tools_->refresh_enablement();
@@ -1637,6 +1705,10 @@ void ShellWindow::refresh_browser() {
     return;
   browser_revision_ = session_.presentation_revision();
   const std::string retained = selected_semantic_id_;
+  const int scroll_position = browser_tree_->verticalScrollBar()->value();
+  std::map<QString, bool> folding;
+  for (int i = 0; i < browser_tree_->topLevelItemCount(); ++i)
+    remember_browser_folding(browser_tree_->topLevelItem(i), folding);
   browser_model_ = GuiDocumentBrowser::build(session_);
   {
     const QSignalBlocker blocker(browser_tree_);
@@ -1646,9 +1718,7 @@ void ShellWindow::refresh_browser() {
                                       : QStringLiteral("No Document"));
     for (const auto& root : browser_model_.roots()) {
       auto* item = append_browser_item(nullptr, browser_tree_, root);
-      item->setExpanded(true);
-      for (int child = 0; child < item->childCount(); ++child)
-        item->child(child)->setExpanded(true);
+      restore_browser_folding(item, folding);
     }
   }
   if (!retained.empty()) {
@@ -1663,6 +1733,18 @@ void ShellWindow::refresh_browser() {
       found = find_item_by_semantic_id(browser_tree_->topLevelItem(index), id);
     browser_tree_->setCurrentItem(found);
     synchronizing_selection_ = false;
+  }
+  browser_tree_->verticalScrollBar()->setValue(scroll_position);
+  // Setting the current row may expand its ancestors. Preserve the user's fold
+  // choice when an ordinary refresh republishes that same semantic selection.
+  for (int i = 0; i < browser_tree_->topLevelItemCount(); ++i)
+    restore_browser_folding(browser_tree_->topLevelItem(i), folding);
+  if (auto* current = browser_tree_->currentItem()) {
+    bool visible = true;
+    for (auto* parent = current->parent(); parent; parent = parent->parent())
+      visible = visible && parent->isExpanded();
+    if (visible)
+      browser_tree_->scrollToItem(current, QAbstractItemView::EnsureVisible);
   }
 }
 
@@ -1736,7 +1818,12 @@ void ShellWindow::refresh_viewport_scene() {
     scene.value().insert(scene.value().end(), targets.begin(), targets.end());
   }
   filter_presentation_visibility(session_, scene.value());
+  const bool previous_selection_guard = synchronizing_selection_;
+  if ((history_tools_ && history_tools_->active()) ||
+      (!property_semantic_id_.empty() && selected_semantic_id_.empty()))
+    synchronizing_selection_ = true;
   const auto published = viewport_->set_scene(std::move(scene.value()));
+  synchronizing_selection_ = previous_selection_guard;
   if (published.has_error())
     append_diagnostic(published.error());
 }

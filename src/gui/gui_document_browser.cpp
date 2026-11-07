@@ -9,6 +9,7 @@
 #include <concepts>
 #include <sstream>
 #include <type_traits>
+#include <unordered_map>
 
 namespace blcad::gui {
 namespace {
@@ -211,6 +212,46 @@ void append_surface_nodes(GuiBrowserNode& parent, const PartDocument& part) {
     }, feature);
 }
 
+void order_history_nodes(GuiBrowserNode& features, const PartDocument& part) {
+  const auto history = part.executable_history();
+  if (!history)
+    return;
+  const auto plan = part.create_history_evaluation_plan();
+  std::unordered_map<std::string, std::size_t> positions;
+  for (std::size_t index = 0; index < history.value().size(); ++index)
+    positions.emplace(history.value()[index].node_id, index);
+  std::stable_sort(features.children.begin(), features.children.end(),
+                   [&](const auto& a, const auto& b) {
+                     return positions.at(a.semantic_id) < positions.at(b.semantic_id);
+                   });
+  for (auto& node : features.children) {
+    const auto index = positions.at(node.semantic_id);
+    const bool suppressed = history.value()[index].state == PartFeatureState::Suppressed;
+    std::string availability = suppressed ? "suppressed" : "available";
+    std::string diagnostic;
+    if (plan && plan.value().entries[index].state == PartHistoryExecutionState::Blocked) {
+      availability = "blocked";
+      for (const auto& issue : plan.value().entries[index].issues) {
+        if (!diagnostic.empty())
+          diagnostic += "\n";
+        diagnostic += issue.message;
+      }
+    }
+    node.properties.push_back(property("history_position", "History position",
+                                       std::to_string(index + 1), GuiPropertyKind::Status));
+    node.properties.push_back(property(
+        "feature_state", "Feature state", suppressed ? "suppressed" : "active",
+        GuiPropertyKind::Status, false, {}, "Use Suppress/Unsuppress to change this operation"));
+    node.properties.push_back(property("history_availability", "History availability", availability,
+                                       GuiPropertyKind::Status));
+    if (!diagnostic.empty())
+      node.properties.push_back(property("history_diagnostic", "History diagnostic", diagnostic,
+                                         GuiPropertyKind::Status));
+    if (availability != "available")
+      node.label += " [" + availability + "]";
+  }
+}
+
 template <typename T>
 void append_sketch_records(GuiBrowserNode& parent, const PartDocument& part, const Sketch& sketch,
                            const std::vector<T>& records, std::string_view family,
@@ -406,12 +447,30 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
   append_part_nodes(features, part, part.draft_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.body_boolean_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.body_transforms(), GuiBrowserNodeKind::Feature);
+  order_history_nodes(features, part);
   root.children.push_back(std::move(features));
 
   auto bodies = group("Bodies");
+  const auto history_plan = part.authored_history_intent()
+                                ? part.create_history_evaluation_plan()
+                                : Result<PartHistoryEvaluationPlan>::success({});
   for (const auto& body : part.bodies()) {
     auto node = part_node(part, body, GuiBrowserNodeKind::Body, GuiSelectionKind::Body);
     node.viewport_semantic_id = "body/" + body.id().value();
+    if (part.authored_history_intent() && history_plan) {
+      const auto& entries = history_plan.value().bodies;
+      const auto found = std::find_if(entries.begin(), entries.end(),
+                                      [&](const auto& entry) { return entry.body == body.id(); });
+      const bool available = found != entries.end() && found->available;
+      node.properties.push_back(property("history_availability", "History availability",
+                                         available ? "available" : "unavailable",
+                                         GuiPropertyKind::Status));
+      if (!available) {
+        node.label += " [unavailable]";
+        node.selection_kind.reset();
+        node.viewport_semantic_id.clear();
+      }
+    }
     node.properties.push_back(property("kind", "Kind", std::string(to_string(body.kind())),
                                        GuiPropertyKind::Enumeration));
     node.properties.push_back(property(
