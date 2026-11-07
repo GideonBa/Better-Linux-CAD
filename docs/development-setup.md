@@ -3391,3 +3391,7 @@ new unused read-only Core method; their previous execution paths and conservativ
 unchanged. B must build/link all consumers and run full physical/freshness/native acceptance when
 it replaces that boundary. Whole Block 147 remains open. Normal protected PR delivery and verified
 merged/refreshed main are required before the next branch.
+
+
+Delivery: [PR #146](https://github.com/GideonBa/Better-Linux-CAD/pull/146), implementation `90a836d`.
+The delivery-record commit changes documentation only and preserves all 969 runtime fingerprints.

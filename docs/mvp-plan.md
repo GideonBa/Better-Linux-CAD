@@ -2004,7 +2004,7 @@ PR #145 is confirmed merged as `a659016`. Refreshed main matches the reviewed br
 
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
-| 147A | Read-only effective availability/prefix plan from existing typed records: active/suppressed/blocked/outside-prefix entries, semantic/resource versus Body input reasons, creator/modifier and consumed-Body rules; complete Core combination proof | Verified; delivery pending |
+| 147A | Read-only effective availability/prefix plan from existing typed records: active/suppressed/blocked/outside-prefix entries, semantic/resource versus Body input reasons, creator/modifier and consumed-Body rules; complete Core combination proof | Verified; delivery PR #146 |
 | 147B | Actual disposable full/prefix Geometry evaluation and complete-source cache freshness; independent fresh/incremental checks, old-cache/picking/analysis/export rejection and native integration | Planned; not started |
 
 A owns no second feature tree, new persistent field or Geometry capability claim. B replaces the
@@ -2021,7 +2021,10 @@ are covered. Resource IDs resembling `body:` aliases remain resources unless a B
 The 969-file runtime freeze is unchanged; formatting/source/diff review passes. Geometry/GUI/native
 suites are not rerun for this unused Core-only query. Their 146B execution guard is unchanged; full
 physical and native acceptance remains mandatory in B. No schema or executable capability advances.
-Implemented-through remains 146; source/staged review precedes normal protected PR delivery.
+Implemented-through remains 146; source/staged review passes.
+Delivery: [PR #146](https://github.com/GideonBa/Better-Linux-CAD/pull/146), implementation `90a836d`.
+The delivery record is documentation only. Verify merged state, refresh main and compare the
+reviewed tree before starting 147B.
 
 ## Later phases
 
