@@ -101,6 +101,14 @@ families, historical byte oracles, interleaved predecessors, non-feature consume
 orders. Fixture provenance and exact checks live in `development-setup.md`. This prerequisite
 does not satisfy suppression/reorder or Geometry/native H01 acceptance; those gates stay above.
 
+146B adds `[core][history-intent]` for complete disposable candidates, sparse states, explicit
+independent order, typed producer/resource dependency rejection, same-Body predecessor replacement,
+append/remove/ID reuse across every current family, result-face/Project embedding and strict
+version-1/2 migration. `[history-evaluation-boundary]` currently proves that unsupported explicit
+intent cannot consume old Geometry or publish a falsely fresh GUI result. That conservative
+boundary is replaced by physical effective/prefix/freshness proof in 147; it does not satisfy H01's
+effective-evaluation gate or the native browser gate in 148.
+
 ### H02 End of Part and suffix validation
 
 - **First gate:** 148.

@@ -1,4 +1,5 @@
 #include "blcad/geometry/step_exporter.hpp"
+#include "part_history_evaluation.hpp"
 
 #include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
@@ -144,6 +145,9 @@ Result<PartStepExportSummary>
 StepExporter::write_part_step(const PartDocument& document,
                               const ShapeCache& shape_cache,
                               const std::string& path) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<PartStepExportSummary>::failure(history.error());
   if (path.empty()) {
     return Result<PartStepExportSummary>::failure(
         make_export_error("part step export path must not be empty"));
@@ -272,6 +276,9 @@ StepExporter::write_part_step(const PartDocument& document,
 Result<std::size_t> StepExporter::write_document_step(const PartDocument& document,
                                                       const ShapeCache& shape_cache,
                                                       const std::string& path) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
   if (!document.bodies().empty()) {
     auto exported = write_part_step(document, shape_cache, path);
     return exported ? Result<std::size_t>::success(exported.value().written_bytes)

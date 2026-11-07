@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 145
-current_block: 146
-current_boundary: Block 146A verified; authored history and suppression intent 146B remains planned
-current_tag: "[parity-b146]"
+implemented_through: Block 146
+current_block: 147
+current_boundary: Block 147 planned; Block 146 delivery pending
+current_tag: "[parity-b147]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Block 145 accepted; Block 146 in progress; Blocks 147–204 planned"
+  advanced_modeling_workflows: "Blocks 145–146 implemented and accepted; Blocks 147–204 planned"
 ---
 
 # MVP Plan
@@ -33,10 +33,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 145
-current block        Block 146 (in progress; slice A)
-current phase        Authored history and suppression intent
-current boundary     Block 146A verified; authored history/suppression 146B planned
+implemented through  Block 146
+current block        Block 147 (planned; not started)
+current phase        Effective history evaluation and cache correctness
+current boundary     Block 146 accepted; delivery pending
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1776,7 +1776,7 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Block 145 is **Implemented and accepted**; Block 146 is **In progress**;
+Status authority: Blocks 145–146 are **Implemented and accepted**;
 Blocks 147–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -1786,7 +1786,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
-| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145 accepted; 146 in progress; 147–151 not started |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–146 accepted; 147–151 not started |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
@@ -1947,15 +1947,16 @@ Block 147 owns effective suppressed execution/cache semantics; Block 148 owns vi
 
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
-| 146A | Read-only typed inventory of every executable family; shared atomic replay for existing `feature_order`; unchanged historical JSON and mixed-family/consumer regression proof | Verified; delivery PR #144 |
-| 146B | Persistent authored order and sparse active/suppressed intent, validated candidates, typed dependency diagnostics and complete strict/legacy Core/JSON proof | Planned; not started |
+| 146A | Read-only typed inventory of every executable family; shared atomic replay for existing `feature_order`; unchanged historical JSON and mixed-family/consumer regression proof | Merged via PR #144 |
+| 146B | Persistent authored order and sparse active/suppressed intent, validated candidates, typed dependency diagnostics and complete strict/legacy Core/JSON proof | Verified; delivery pending |
 
 A supplies the existing-authority foundation; it introduces no suppression state, new JSON field,
 reorder command or UI completion claim. Its public query follows the current dependency order and
 includes BodyTransform/imported bases while excluding parameters, Sketches, paths and Body aliases.
 The existing generic JSON replay moves into PartDocument and continues using typed adders, preserving
 collection order and non-feature consumers. Every future history mutation must reuse that authority.
-Full Block 146 acceptance remains contingent on B and the H01 criteria in the consolidated sequence.
+A alone did not complete 146; B supplies the remaining intent/Core/JSON proof below. Effective
+H01 execution remains the first gate in 147, followed by native browser acceptance in 148.
 
 146A is verified against the frozen runtime inventory in `development-setup.md`: focused Core
 **12 / 627**, full Core **601 / 22,700**, full Geometry **564 / 49,787**, full GUI **682 cases:
@@ -1969,6 +1970,29 @@ Implemented-through remains 145. Source/staged review and runtime-fingerprint ve
 Delivery: [PR #144](https://github.com/GideonBa/Better-Linux-CAD/pull/144), implementation
 `af40935`. The delivery-record commit is documentation only. Merge normally, refresh main and
 compare the reviewed tree before starting 146B.
+
+PR #144 is confirmed merged as `7367faa`. Refreshed main matches its reviewed tree;
+`feat/part-history-intent` begins from that clean state. B first freezes the versioned persistence
+contract in `file-format.md`, extends the existing family inventory/replay authority and keeps
+all new history UI/effective-evaluation claims reserved for 147–148.
+
+B completes the assigned 146 intent/Core/JSON contract: every current executable family retains
+identity/parameters with sparse states, explicit independent order survives copies/loading, typed
+candidates rebuild modifier predecessors and reject unavailable creators/resource dependencies.
+All families append under existing explicit history; terminal removals clear both order and state
+before ID reuse. Imported bases cannot be suppressed; immutable Reference Parts cannot author
+history. Version 2 protects new intent from older readers; four historical byte fixtures stay exact.
+
+Whole Block 146 is accepted with focused Core **27 / 1,116**, full Core **616 / 23,189**, full
+Geometry **566 / 50,073**, full GUI **684 cases: 650 passed, 34 native-only skips / 87,935 assertions**,
+native combinations **38 / 2,748** without skips, and native startup timeout **124**. All **968**
+frozen runtime files remain unchanged. Exact logs, development failures and correction evidence live
+in `development-setup.md`. Existing assertions are not weakened; new geometric/GUI guards prevent
+unsupported explicit history from consuming old full-model caches or being published as fresh.
+Effective suppression/prefix evaluation is **not implemented** by this proof: 147 replaces that
+conservative boundary with physical fresh/incremental proof; history browser/End of Part remains
+148. Implemented-through advances to 146 only. The post-promotion inventory passes **5 / 495**;
+all runtime fingerprints remain unchanged. Source/staged review precedes normal PR delivery.
 
 ## Later phases
 

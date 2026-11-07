@@ -13,7 +13,8 @@ Features are the parametric operations a part is built from. Each feature has in
 ## Executable history foundation — Block 146A, 2026-11-07
 
 `PartDocument::executable_history()` returns a read-only, typed projection of existing executable
-records in dependency order. Each `PartFeatureHistoryEntry` carries the exact graph `node_id` and
+records in dependency order for legacy Parts, or the explicit authored order described below.
+Each `PartFeatureHistoryEntry` carries the exact graph `node_id` and
 `PartFeatureFamily`; it owns no copied feature intent or second tree. Fifteen current typed families
 include imported Body bases, scalar/path Extrude, Revolve, Sweep, Loft, Surface variants, patterns,
 Mirror, Fillet, Chamfer, Shell, Draft, Body Boolean and BodyTransform. Non-executable resources,
@@ -26,6 +27,31 @@ orders and cycles, and publishes only after success. No JSON marker/field/defaul
 querying cannot author state. Canonical JSON validation retains its existing diagnostic category and
 object identity. Authored ordering/suppression intent remains 146B, effective execution
 147 and browser/End of Part workflows 148. This bounded foundation does not claim their completion.
+
+## Authored history candidates — Block 146B, 2026-11-07
+
+`PartFeatureHistoryIntent` extends the existing executable inventory
+with complete ordered IDs and sparse suppressed IDs. `with_history_intent()` builds a disposable
+complete Part; `apply_history_intent()` publishes only that validated result. `diagnose_history_intent()`
+returns typed malformed-input, indispensable-base, dependency-order and typed-replay rejection
+reasons. Queries expose `PartFeatureState::Active/Suppressed` without authoring anything.
+
+Explicit order keeps independent positions. Output creators include modifying operations whose
+result Body differs from their target. Same-Body predecessors are rebuilt through typed
+adders rather than preserving the old sequence edges. Final validation follows dependencies through
+non-executable resources; acyclicity alone is insufficient. Existing graph publications validate the
+stored sequence, fresh executables append as active, and removals erase both position and suppression
+before an ID can be reused. Family collection positions remain separate. Imported bases retain
+source/catalog ownership and cannot be suppressed; Reference Parts remain immutable.
+
+Flags never remove typed definitions or silently cascade to dependents. Effective modifier bypass,
+creator-output availability and blocked dependent diagnostics remain 147, followed by visible
+browser commands in 148. Until that evaluator exists, a shared Geometry boundary rejects explicit
+history at model execution, scene/reference selection, result inspection and export entry points.
+It also rejects analytical/cache shortcuts: an earlier full cache is not a result for the new
+intent. Normal GUI transactions/opening retain the old valid document on failure; repair opening
+may retain the new complete intent with Failed status and an empty cache. Versioned persistence
+and strict migration rules are owned by `file-format.md`.
 
 ## Feature intent, not baked geometry
 

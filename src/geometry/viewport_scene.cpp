@@ -1,5 +1,6 @@
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/core/sketch_contour.hpp"
+#include "part_history_evaluation.hpp"
 
 #include "assembly_posed_leaf_shapes.hpp"
 #include "geometry_shape_internal.hpp"
@@ -213,6 +214,9 @@ Result<TopoDS_Shape> make_profile_face(const PointRange& points, PointMapper map
 Result<std::vector<ConstructionSelectionTarget>>
 ViewportSceneBuilder::build_body_rotation_sources(const PartDocument& document,
                                                   const ShapeCache& cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::vector<ConstructionSelectionTarget>>::failure(history.error());
   std::vector<ConstructionSelectionTarget> targets;
   try {
     for (const auto& feature : document.features()) {
@@ -253,6 +257,9 @@ ViewportSceneBuilder::build_body_rotation_sources(const PartDocument& document,
 Result<std::vector<ConstructionSelectionTarget>>
 ViewportSceneBuilder::build_construction_sources(const PartDocument& document,
                                                  const ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::vector<ConstructionSelectionTarget>>::failure(history.error());
   std::vector<ConstructionSelectionTarget> targets;
   const SemanticReferenceEvaluator evaluator;
   try {
@@ -337,6 +344,9 @@ ViewportSceneBuilder::build_construction_sources(const PartDocument& document,
 Result<std::vector<ViewportSceneItem>>
 ViewportSceneBuilder::build_part(const PartDocument& document,
                                  const ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::vector<ViewportSceneItem>>::failure(history.error());
   try {
     std::vector<ViewportSceneItem> items;
     items.reserve(shape_cache.body_shape_count() + document.datum_plane_count() +

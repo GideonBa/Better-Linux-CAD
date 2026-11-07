@@ -2,6 +2,7 @@
 #include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include "geometry_shape_internal.hpp"
+#include "part_history_evaluation.hpp"
 
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepGProp.hxx>
@@ -133,6 +134,9 @@ Result<ResolvedWorkplane>
 ResultFaceSupportGeometry::resolve(const PartDocument& document, const ResultFaceWorkplane& plane,
                                    const ShapeCache& cache,
                                    StepImportTopologyContext* import_context) {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<ResolvedWorkplane>::failure(history.error());
   auto valid = validate_result_face_workplane_reference(document, plane);
   if (!valid)
     return Result<ResolvedWorkplane>::failure(valid.error());
@@ -180,6 +184,9 @@ Result<std::vector<ResultFaceSelectionTarget>>
 ResultFaceSupportGeometry::selectable_faces(const PartDocument& document, const ShapeCache& cache,
                                             const BodyId& body,
                                             StepImportTopologyContext* import_context) {
+  const auto history = detail::validate_history_evaluation(document);
+  if (!history)
+    return Result<std::vector<ResultFaceSelectionTarget>>::failure(history.error());
   const auto* model_body = document.find_body(body);
   const auto* result = cache.find_body_result(body);
   if (!model_body || model_body->kind() != BodyKind::Solid ||
