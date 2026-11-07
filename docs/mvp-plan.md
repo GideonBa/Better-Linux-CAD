@@ -1947,7 +1947,7 @@ Block 147 owns effective suppressed execution/cache semantics; Block 148 owns vi
 
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
-| 146A | Read-only typed inventory of every executable family; shared atomic replay for existing `feature_order`; unchanged historical JSON and mixed-family/consumer regression proof | Verified; delivery pending |
+| 146A | Read-only typed inventory of every executable family; shared atomic replay for existing `feature_order`; unchanged historical JSON and mixed-family/consumer regression proof | Verified; delivery PR #144 |
 | 146B | Persistent authored order and sparse active/suppressed intent, validated candidates, typed dependency diagnostics and complete strict/legacy Core/JSON proof | Planned; not started |
 
 A supplies the existing-authority foundation; it introduces no suppression state, new JSON field,
@@ -1965,7 +1965,10 @@ Four checked-in legacy fixtures come from accepted Core `27256d7`, before rebuil
 Invalid metadata retains historical JSON diagnostics; no existing validation is relaxed. The first
 sandboxed GUI attempt is interrupted after protected atomic-publication failures; the identical
 final run with required filesystem access passes. Exact logs/provenance live in the setup guide.
-Implemented-through remains 145. Source/staged review precedes the normal protected PR delivery.
+Implemented-through remains 145. Source/staged review and runtime-fingerprint verification pass.
+Delivery: [PR #144](https://github.com/GideonBa/Better-Linux-CAD/pull/144), implementation
+`af40935`. The delivery-record commit is documentation only. Merge normally, refresh main and
+compare the reviewed tree before starting 146B.
 
 ## Later phases
 

@@ -3262,3 +3262,7 @@ This slice changes no rendering or interaction; fresh 150% layout captures are n
 Block-145 UI acceptance is retained, and future history-browser acceptance stays assigned to 148.
 Scoped tracked-C++ formatting, complete new-file formatting and diff checks pass. Delivery uses a
 normal protected PR, followed by merged-state verification, refreshed main and tree comparison.
+
+
+Delivery: [PR #144](https://github.com/GideonBa/Better-Linux-CAD/pull/144), implementation `af40935`.
+The delivery-record commit changes documentation only; all 964 runtime fingerprints remain intact.
