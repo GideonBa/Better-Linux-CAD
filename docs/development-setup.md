@@ -3476,3 +3476,7 @@ After documentation-only status promotion, the final capability/status inventory
 494 assertions** (`blcad147b-final-inventory.log`). The full GUI result precedes that promotion;
 this separate check validates implemented-through 147/current block 148 while history browser
 capabilities remain planned. Runtime fingerprints remain unchanged.
+
+
+Delivery: [PR #147](https://github.com/GideonBa/Better-Linux-CAD/pull/147), implementation `9de9dd9`.
+The delivery-record commit changes documentation only and preserves all 969 runtime fingerprints.

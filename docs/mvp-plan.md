@@ -2005,7 +2005,7 @@ PR #145 is confirmed merged as `a659016`. Refreshed main matches the reviewed br
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 147A | Read-only effective availability/prefix plan from existing typed records: active/suppressed/blocked/outside-prefix entries, semantic/resource versus Body input reasons, creator/modifier and consumed-Body rules; complete Core combination proof | Merged via PR #146 |
-| 147B | Actual disposable full/prefix Geometry evaluation and complete-source cache freshness; independent fresh/incremental checks, old-cache/picking/analysis/export rejection and native integration | Verified; normal PR delivery pending |
+| 147B | Actual disposable full/prefix Geometry evaluation and complete-source cache freshness; independent fresh/incremental checks, old-cache/picking/analysis/export rejection and native integration | Verified; delivery PR #147 |
 
 A owns no second feature tree, new persistent field or Geometry capability claim. B replaces the
 conservative 146B guard with verified execution. Existing `feature-system.md` owns these contracts;
@@ -2054,6 +2054,11 @@ Whole Block 147 is **Implemented and accepted**. Block 148 remains **Planned; no
 native suppression/reorder/End of Part browser interaction, prefix editing/insertion, Save during
 marker preview and camera restoration. No planned UI capability is promoted by evaluator proof.
 Complete normal PR delivery, confirm merge, refresh main and compare the reviewed tree before 148.
+
+Delivery: [PR #147](https://github.com/GideonBa/Better-Linux-CAD/pull/147), implementation `9de9dd9`.
+The delivery-record commit changes documentation only and preserves all 969 runtime fingerprints.
+Normal merge, confirmed merged state and refreshed-main/reviewed-tree comparison are required before
+starting Block 148.
 
 ## Later phases
 
