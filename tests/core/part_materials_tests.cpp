@@ -167,14 +167,13 @@ TEST_CASE("Legacy resource-free bytes and normalized empty version 3 retain thei
   CHECK_FALSE(ref.set_default_material(fixture::key()));
   CHECK(text(ref) == before);
 }
-TEST_CASE(
-    "Project version 1 rejects resource-bearing Part snapshots until Project ownership exists",
-    "[core][parity-b149][part-materials]") {
+TEST_CASE("Legacy Project version 1 rejects scoped resources while the writer uses version 2",
+          "[core][parity-b149][part-materials]") {
   auto assembly = checked(AssemblyDocument::create(DocumentId("assembly"), "Assembly"));
   auto project = checked(Project::create(DocumentId("project"), "Project", assembly));
-  SECTION("writer rejects resource-bearing members") {
+  SECTION("writer selects the owned resource format") {
     REQUIRE(project.add_part_document(part()));
-    CHECK_FALSE(serialize_project_to_json(project));
+    CHECK(json::parse(checked(serialize_project_to_json(project))).at("version") == 2);
   }
   SECTION("reader rejects a reserved Project resource catalog") {
     auto data = json::parse(checked(serialize_project_to_json(project)));

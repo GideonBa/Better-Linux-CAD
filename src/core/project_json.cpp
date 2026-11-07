@@ -3,8 +3,10 @@
 #include "assembly_joint_json.hpp"
 #include "blcad/core/assembly_document_json.hpp"
 #include "blcad/core/part_document_json.hpp"
-#include "step_import_json.hpp"
+#include "engineering_resource_json.hpp"
 #include "imported_topology_json.hpp"
+#include "project_engineering_resource_json.hpp"
+#include "step_import_json.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -25,6 +27,7 @@ namespace {
 using json = nlohmann::json;
 constexpr std::string_view k_schema = "blcad.project.mvp4";
 constexpr int k_version = 1;
+constexpr int k_resource_version = 2;
 
 [[nodiscard]] Error json_error(std::string message) {
   return Error::validation("project_json", std::move(message));
@@ -54,10 +57,12 @@ constexpr int k_version = 1;
   return parsed;
 }
 
-[[nodiscard]] Result<json> part_to_json(const PartDocument& part) {
+[[nodiscard]] Result<json> part_to_json(const PartDocument& part,
+                                        const EngineeringResourceCatalog* resources) {
+  if (resources)
+    return detail::resource_part_to_project_json(part, *resources);
   if (!part.engineering_resources().entries().empty())
-    return Result<json>::failure(json_error("Project version 1 cannot embed engineering resources; "
-                                            "Project resource ownership is pending"));
+    return Result<json>::failure(json_error("Engineering resources require Project version 2"));
   auto serialized = serialize_part_document_to_json(part);
   if (serialized.has_error())
     return Result<json>::failure(serialized.error());
@@ -71,12 +76,14 @@ constexpr int k_version = 1;
   return deserialize_assembly_document_from_json(assembly_json.dump());
 }
 
-[[nodiscard]] Result<PartDocument> part_from_json(const json& part_json) {
+[[nodiscard]] Result<PartDocument> part_from_json(const json& part_json,
+                                                  const EngineeringResourceCatalog* resources) {
+  if (resources)
+    return detail::resource_part_from_project_json(part_json, *resources);
   auto part = deserialize_part_document_from_json(part_json.dump());
   if (part && !part.value().engineering_resources().entries().empty())
     return Result<PartDocument>::failure(
-        json_error("Project version 1 cannot embed engineering resources; Project resource "
-                   "ownership is pending"));
+        json_error("Engineering resources require Project version 2"));
   return part;
 }
 
@@ -345,6 +352,10 @@ cross_hierarchy_joint_from_json(const json& joint_json) {
 } // namespace
 
 Result<std::string> serialize_project_to_json(const Project& project) {
+  const auto valid_resources = project.validate_engineering_resources();
+  if (!valid_resources)
+    return Result<std::string>::failure(valid_resources.error());
+  const bool has_resources = !project.engineering_resources().entries().empty();
   auto root_assembly_json = assembly_to_json(project.assembly());
   if (root_assembly_json.has_error())
     return Result<std::string>::failure(root_assembly_json.error());
@@ -369,20 +380,23 @@ Result<std::string> serialize_project_to_json(const Project& project) {
 
   json parts = json::array();
   for (const PartDocument& part : project.part_documents()) {
-    auto part_json = part_to_json(part);
+    auto part_json = part_to_json(part, has_resources ? &project.engineering_resources() : nullptr);
     if (part_json.has_error())
       return Result<std::string>::failure(part_json.error());
     parts.push_back(std::move(part_json.value()));
   }
 
   json root{{"schema", k_schema},
-            {"version", k_version},
+            {"version", has_resources ? k_resource_version : k_version},
             {"project", json{{"id", project.id().value()}, {"name", project.name()}}},
             {"assembly", std::move(root_assembly_json.value())},
             {"assemblies", std::move(assemblies)},
             {"cross_hierarchy_constraints", std::move(cross_hierarchy_constraints)},
             {"cross_hierarchy_joints", std::move(cross_hierarchy_joints)},
             {"parts", std::move(parts)}};
+  if (has_resources)
+    root["engineering_resources"] =
+        detail::engineering_resources_to_json(project.engineering_resources());
   if (!project.step_import_sources().empty())
     root["step_import_sources"] =
         detail::step_import_sources_to_json(project.step_import_sources());
@@ -402,10 +416,12 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
     if (root.at("schema").get<std::string>() != k_schema) {
       return Result<Project>::failure(json_error("unsupported project schema"));
     }
-    if (root.at("version").get<int>() != k_version) {
+    if (!root.at("version").is_number_integer() ||
+        (root.at("version") != k_version && root.at("version") != k_resource_version)) {
       return Result<Project>::failure(json_error("unsupported project version"));
     }
-    if (root.contains("engineering_resources"))
+    const bool has_resources = root.at("version") == k_resource_version;
+    if (!has_resources && root.contains("engineering_resources"))
       return Result<Project>::failure(
           json_error("Project engineering resources require a newer Project version"));
 
@@ -418,6 +434,17 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
                                    std::move(assembly.value()));
     if (project.has_error())
       return project;
+    if (has_resources) {
+      const auto resources =
+          detail::engineering_resources_from_json(root.at("engineering_resources"));
+      if (!resources)
+        return Result<Project>::failure(resources.error());
+      for (const auto& entry : resources.value().entries()) {
+        const auto added = project.value().add_engineering_resource(entry);
+        if (!added)
+          return Result<Project>::failure(added.error());
+      }
+    }
     auto sources = detail::load_step_import_sources(root, project.value());
     if (!sources)
       return Result<Project>::failure(sources.error());
@@ -435,7 +462,8 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
     }
 
     for (const auto& part_json : root.value("parts", json::array())) {
-      auto part = part_from_json(part_json);
+      auto part = part_from_json(part_json, has_resources ? &project.value().engineering_resources()
+                                                          : nullptr);
       if (part.has_error())
         return Result<Project>::failure(part.error());
       auto added = project.value().add_part_document(std::move(part.value()));

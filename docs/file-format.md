@@ -1,12 +1,13 @@
 # Project and Save File Format
 
-History intent now has the explicit version-2 contract below. Planned evolution (2026-11-06):
-[Blocks 145–204](inventor-parity-sequence.md) additionally assign
-revision-pinned resources, new feature families, equation/spatial constraints, model states,
-occurrence poses and cross-document references. These are not current JSON fields. Each owning
-block must specify exact spellings, schema/version/defaults, strict unknown-intent behavior and
-legacy migration here before its first writer change. Preserve current `feature_order`, imported
-source/catalog identities and sidecar ownership; do not implement the plan as a parallel save format.
+History intent has the explicit Part-version-2 contract below. Revision-pinned resources use
+Part version 3 and Project version 2 as specified in the owning 149B sections. Planned evolution
+in [Blocks 145–204](inventor-parity-sequence.md) additionally assigns new feature families,
+equation/spatial constraints, model states, occurrence poses and cross-document references.
+Their future intent is not implied by the current JSON fields. Each owning block must specify
+exact spellings, schema/version/defaults, strict unknown-intent behavior and legacy migration here
+before its first writer change. Preserve current `feature_order`, imported source/catalog
+identities and sidecar ownership; do not implement the plan as a parallel save format.
 
 Status: implemented save-format seeds exist for single-part model intent including persistent Solid/Surface Body records, Feature Body-result operations, Body Booleans, BodyTransform stacks, and SketchOwnership records; assembly parameters, embedded Project JSON, part component occurrences, rigid child assembly occurrences, local Mate/Concentric/Distance/Insert/Angle intent, Project-level cross-hierarchy geometric intent, local and occurrence-qualified Revolute joint intent with typed `coordinates[]` plus historical scalar compatibility, semantic generated feature/axis/seat targets, `ref:` reference-geometry targets, canonical `topo:` generated-topology semantic targets, and authored transform/state records.
 
@@ -153,6 +154,39 @@ all supported version numbers are integers. Older readers reject version 3 befor
 reader. B1's Project-v1 read/write rejects resource-bearing Parts explicitly; B2 replaces that
 boundary with deduplicated Project resource ownership and its migration contract. Project-v1
 also rejects the reserved root `engineering_resources` field rather than silently discarding it.
+
+## Project-owned engineering resources — Block 149B2
+
+This replaces B1's temporary Project boundary. Resource-free Projects retain existing schema
+`blcad.project.mvp4`, integer version **1**, exact canonical bytes and no resource field. A Project
+with a nonempty owned catalog uses the same schema, integer version **2**, and mandatory root
+`engineering_resources` containing the complete shared catalog object defined above. Unassigned
+and unused revisions are retained. V1 rejects that reserved field and resource-bearing members;
+both versions reject non-integer/unknown/overflowing version values. Empty V2 catalogs normalize
+to V1 when no resource intent remains. Older readers reject V2 before losing resources.
+
+In V2, each resource-bearing embedded Part retains Part version **3**, `history_version` and
+`material_assignments`, but replaces its local `engineering_resources` field with required
+`engineering_resource_refs`: an ordered array of exact `{id, revision}` keys into the Project root.
+These keys preserve that Part's complete local catalog subset/order, including unassigned revisions.
+Duplicate/missing keys, wrong primitive types, mixed inline catalogs/references and unsupported
+member versions reject the entire Project. Resource-free member Parts keep their V1/V2 format.
+An empty V3 reference list may normalize to a legacy member when it has no assignments.
+
+Root resources load before Parts. The Project reader resolves each member's references into a
+complete local snapshot before calling the existing standalone Part reader, including history
+replay/result-face staging. A standalone writer always writes that complete snapshot, making an
+extracted Part usable offline without the Project or an external material library. Unresolved
+Project references remain invalid standalone input. No URI is fetched to fill missing data.
+
+`Project::add_part_document` atomically merges the incoming snapshot into the owned catalog;
+identical keys/contents deduplicate, conflicts reject both insertion and catalog changes. Explicit
+catalog synchronization collects resources authored through existing mutable member access on a
+candidate and fails atomically on conflicts. Serialization validates root/member consistency and
+requires synchronization rather than silently fixing it. Existing GUI Project transactions perform
+that synchronization on their disposable candidate before recompute/publication. This changes no
+geometry, source-sidecar ownership or assembly occurrence identity. Coordinated revision switching
+and referenced-resource removal remain 149C; materials/physical-properties UI remains 151.
 
 ## Project structure
 

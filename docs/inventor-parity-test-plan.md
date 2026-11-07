@@ -214,6 +214,15 @@ Apply with committed Save, inherited defaults and retained overrides. Project-ow
 and offline member portability remain B2; coordinated revision updates remain C. These tests use
 synthetic resources and the existing history UI; they do not claim the material UI assigned to 151.
 
+149B2 adds `[project-engineering-resources]`: deduplication with distinct Part defaults, copied
+snapshots, late insertion/synchronization conflicts, explicit writer consistency, versioned shared
+values/ordered member subsets, mixed legacy members, authored history/result-face staging, strict
+malformed root/reference cases and exact empty/legacy normalization. `[project-resource-integration]`
+uses real document-session transactions for Save/Open, Undo/Redo, automatic candidate reconciliation,
+late-conflict and malformed-Open rollback, and standalone file extraction/reopening after removing
+the Project file. These proofs retain pinned values without fetching an external library; explicit
+multi-document revision switching/removal and material-only geometry reuse remain C/150.
+
 ### R02 Physical properties in transformed assemblies
 
 - **First gate:** 150; native completion 151; extend 193.

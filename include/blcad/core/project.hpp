@@ -52,6 +52,12 @@ public:
                                               AssemblyDocument assembly);
 
   [[nodiscard]] Result<std::size_t> add_part_document(PartDocument part_document);
+  [[nodiscard]] const EngineeringResourceCatalog& engineering_resources() const noexcept {
+    return engineering_resources_;
+  }
+  [[nodiscard]] Result<std::size_t> add_engineering_resource(EngineeringResource resource);
+  [[nodiscard]] Result<std::size_t> synchronize_engineering_resources();
+  [[nodiscard]] Result<std::size_t> validate_engineering_resources() const;
   [[nodiscard]] Result<std::size_t> add_child_assembly_document(AssemblyDocument assembly_document);
   [[nodiscard]] Result<std::size_t>
   add_cross_hierarchy_constraint(AssemblyHierarchyConstraint constraint);
@@ -142,6 +148,7 @@ private:
   [[nodiscard]] bool has_part_document_id(const DocumentId& id) const noexcept;
 
   StepImportSourceRegistry step_import_sources_;
+  EngineeringResourceCatalog engineering_resources_;
   std::vector<ImportedTopologyCatalog> imported_topology_catalogs_;
   DocumentId id_;
   std::string name_;

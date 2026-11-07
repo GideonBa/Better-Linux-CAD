@@ -166,6 +166,13 @@ retain the authored catalog/pins. Geometry fixtures compare physical volume/boun
 scene identities before/after assignment; this does not yet supply mass or material-aware result
 reuse, which belong to the subsequent physical-properties work.
 
+149B2 validates Project/root ownership before serialization and synchronizes mutable member edits
+on the GUI transaction candidate before recompute. Scoped embedded resource references resolve to
+the same complete Part-v3 snapshots used by ordinary Part cache freshness. Project undo/reopen
+therefore uses the existing candidate/recompute pipeline, preserving pinned metadata and rebuilding
+disposable member caches. No Project-specific alternative geometry cache, partial certification or
+material-only BRep reuse is introduced by this persistence slice.
+
 ## Validation
 
 Current rules:

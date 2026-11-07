@@ -121,7 +121,12 @@ Result<std::size_t> Project::add_part_document(PartDocument part_document) {
     return Result<std::size_t>::failure(Error::validation(
         part_document.id().value(), "part document id must be unique within project"));
   }
+  auto resources = engineering_resources_;
+  const auto merged = resources.merge_from(part_document.engineering_resources());
+  if (!merged)
+    return Result<std::size_t>::failure(merged.error());
   part_documents_.push_back(std::move(part_document));
+  engineering_resources_ = std::move(resources);
   return Result<std::size_t>::success(part_documents_.size() - 1U);
 }
 
