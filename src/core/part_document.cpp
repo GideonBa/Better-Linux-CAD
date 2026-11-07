@@ -3381,6 +3381,7 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
   dependency_graph_ = std::move(graph);
   invalidation_state_ = std::move(invalidation_state);
   bodies_.erase(found);
+  std::erase_if(body_materials_, [&](const auto& entry) { return entry.body == id; });
   return Result<std::size_t>::success(1U);
 }
 

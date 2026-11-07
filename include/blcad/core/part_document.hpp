@@ -34,6 +34,8 @@
 #include "blcad/core/surface_feature.hpp"
 #include "blcad/core/sweep_feature.hpp"
 
+#include "blcad/core/engineering_resource.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -44,6 +46,12 @@
 namespace blcad {
 
 enum class PartDocumentReadMode;
+
+struct PartBodyMaterial {
+  BodyId body;
+  EngineeringResourceKey material;
+  friend bool operator==(const PartBodyMaterial&, const PartBodyMaterial&) = default;
+};
 
 class PartDocument {
 public:
@@ -169,6 +177,20 @@ public:
   [[nodiscard]] Result<std::size_t> add_sketch_ownership(SketchOwnership ownership);
   [[nodiscard]] Result<std::size_t> add_body_transform(BodyTransform transform);
   [[nodiscard]] Result<std::size_t> add_body(Body body);
+  [[nodiscard]] const EngineeringResourceCatalog& engineering_resources() const noexcept {
+    return engineering_resources_;
+  }
+  [[nodiscard]] Result<std::size_t> add_engineering_resource(EngineeringResource resource);
+  [[nodiscard]] const std::optional<EngineeringResourceKey>& default_material() const noexcept {
+    return default_material_;
+  }
+  [[nodiscard]] const std::vector<PartBodyMaterial>& body_materials() const noexcept {
+    return body_materials_;
+  }
+  [[nodiscard]] Result<std::size_t> set_default_material(std::optional<EngineeringResourceKey> key);
+  [[nodiscard]] Result<std::size_t> set_body_material(BodyId body,
+                                                      std::optional<EngineeringResourceKey> key);
+  [[nodiscard]] const EngineeringMaterial* effective_material_for_body(BodyId body) const noexcept;
   [[nodiscard]] Result<std::size_t> remove_body(BodyId id);
   [[nodiscard]] Result<std::size_t> set_body_visibility(BodyId id, BodyVisibility visibility);
   [[nodiscard]] Result<std::size_t> add_reference_status(ReferenceStatusRecord status);
@@ -435,6 +457,9 @@ private:
   remove_feature_record(std::vector<FeatureT> PartDocument::*member, const FeatureId& id);
 
   StepImportSourceRegistry step_import_sources_;
+  EngineeringResourceCatalog engineering_resources_;
+  std::optional<EngineeringResourceKey> default_material_;
+  std::vector<PartBodyMaterial> body_materials_;
   std::vector<ImportedTopologyCatalog> imported_topology_catalogs_;
   std::optional<ImportedPartDefinition> reference_part_definition_;
   std::vector<ImportedBodyFeature> imported_body_features_;

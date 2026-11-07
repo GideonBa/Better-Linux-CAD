@@ -55,6 +55,9 @@ constexpr int k_version = 1;
 }
 
 [[nodiscard]] Result<json> part_to_json(const PartDocument& part) {
+  if (!part.engineering_resources().entries().empty())
+    return Result<json>::failure(json_error("Project version 1 cannot embed engineering resources; "
+                                            "Project resource ownership is pending"));
   auto serialized = serialize_part_document_to_json(part);
   if (serialized.has_error())
     return Result<json>::failure(serialized.error());
@@ -69,7 +72,12 @@ constexpr int k_version = 1;
 }
 
 [[nodiscard]] Result<PartDocument> part_from_json(const json& part_json) {
-  return deserialize_part_document_from_json(part_json.dump());
+  auto part = deserialize_part_document_from_json(part_json.dump());
+  if (part && !part.value().engineering_resources().entries().empty())
+    return Result<PartDocument>::failure(
+        json_error("Project version 1 cannot embed engineering resources; Project resource "
+                   "ownership is pending"));
+  return part;
 }
 
 [[nodiscard]] Result<AssemblyConstraintType> constraint_type_from_json(const json& value) {
@@ -397,6 +405,9 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
     if (root.at("version").get<int>() != k_version) {
       return Result<Project>::failure(json_error("unsupported project version"));
     }
+    if (root.contains("engineering_resources"))
+      return Result<Project>::failure(
+          json_error("Project engineering resources require a newer Project version"));
 
     auto assembly = assembly_from_json(root.at("assembly"));
     if (assembly.has_error())

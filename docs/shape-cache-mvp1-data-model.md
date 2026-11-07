@@ -157,6 +157,15 @@ STEP and complete Body inspection retain their strict boundaries. The shared aut
 prepares a mutable complete candidate before evaluating its inserted prefix, keeping the cache
 stamp paired with the actual prepared intent. Legacy constant complete previews remain unchanged.
 
+149B1 includes pinned resource snapshots and material assignments in canonical Part version-3
+source JSON. Material edits leave executable generation and geometric dependencies unchanged, but
+an explicit-history cache sealed against the preceding JSON is not fresh for the new document.
+The existing session pipeline validates/rebuilds it; no metadata-only cache certification shortcut
+is introduced here. Core copies, prefix preparation, suppression, full execution and Save/reopen
+retain the authored catalog/pins. Geometry fixtures compare physical volume/bounds and semantic
+scene identities before/after assignment; this does not yet supply mass or material-aware result
+reuse, which belong to the subsequent physical-properties work.
+
 ## Validation
 
 Current rules:

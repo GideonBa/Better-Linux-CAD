@@ -203,6 +203,17 @@ The count boundary is validated before integer conversion. These synthetic Core 
 supply document assignment, JSON/offline portability, coordinated multi-document updates or native
 material UI; those remain 149B/C and 151. Exact execution/status stays in the setup/MVP docs.
 
+149B1 adds `[engineering-resource-json]` / `[part-materials]`: all nine table value kinds and
+four material properties, canonical units/provenance, malformed field/type/version/count boundaries,
+Part defaults/Body overrides, removal/ID reuse, both history modes and result-face loading, exact
+legacy bytes and explicit temporary Project-v1 rejection. `[resource-history-geometry]` checks
+physical volume/bounds and scene identities independently of material pins, stale complete-cache
+rejection, reopening and suppressed creator metadata. `[engineering-resource-integration]` exercises
+session assignment/Undo/Redo/save, failed-open rollback, and real shell prefix edit/Cancel/insert/
+Apply with committed Save, inherited defaults and retained overrides. Project-owned deduplication
+and offline member portability remain B2; coordinated revision updates remain C. These tests use
+synthetic resources and the existing history UI; they do not claim the material UI assigned to 151.
+
 ### R02 Physical properties in transformed assemblies
 
 - **First gate:** 150; native completion 151; extend 193.

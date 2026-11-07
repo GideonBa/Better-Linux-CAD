@@ -1,7 +1,9 @@
 #include "blcad/core/part_document_json.hpp"
-#include "step_import_json.hpp"
-#include "imported_topology_json.hpp"
+#include "engineering_resource_json.hpp"
 #include "imported_part_json.hpp"
+#include "imported_topology_json.hpp"
+#include "part_material_json.hpp"
+#include "step_import_json.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -28,6 +30,7 @@ using json = nlohmann::json;
 constexpr std::string_view k_schema = "blcad.part_document.mvp1";
 constexpr int k_version = 1;
 constexpr int k_history_version = 2;
+constexpr int k_resource_version = 3;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -3869,6 +3872,13 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   json root;
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
+  if (!document.engineering_resources().entries().empty()) {
+    root["version"] = k_resource_version;
+    root["history_version"] = document.authored_history_intent() ? k_history_version : k_version;
+    root["engineering_resources"] =
+        detail::engineering_resources_to_json(document.engineering_resources());
+    root["material_assignments"] = detail::part_material_assignments_to_json(document);
+  }
   root["document"] = json{{"id", document.id().value()}, {"name", document.name()}};
   if (!document.step_import_sources().empty())
     root["step_import_sources"] =
@@ -4271,11 +4281,33 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       return Result<PartDocument>::failure(json_error("part document json root must be an object"));
     if (root.at("schema").get<std::string>() != k_schema)
       return Result<PartDocument>::failure(json_error("unsupported part document json schema"));
-    const auto version = root.at("version").get<int>();
-    if (version != k_version && version != k_history_version)
+    if (!root.at("version").is_number_integer() ||
+        (root.at("version") != k_version && root.at("version") != k_history_version &&
+         root.at("version") != k_resource_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
+    const auto version = root.at("version").get<int>();
+    int history_version = version;
+    if (root.contains("engineering_resource_refs"))
+      return Result<PartDocument>::failure(
+          json_error("Standalone Part cannot resolve Project resource references"));
+    if (version == k_resource_version) {
+      if (!root.contains("history_version") || !root.at("history_version").is_number_integer() ||
+          (root.at("history_version") != k_version &&
+           root.at("history_version") != k_history_version) ||
+          !root.contains("engineering_resources") || !root.contains("material_assignments"))
+        return Result<PartDocument>::failure(
+            json_error("Part version 3 requires history_version, engineering_resources and "
+                       "material_assignments"));
+      if (root.contains("reference_part"))
+        return Result<PartDocument>::failure(
+            json_error("Reference Part engineering resources are read-only"));
+      history_version = root.at("history_version").get<int>();
+    } else if (root.contains("engineering_resources") || root.contains("material_assignments") ||
+               root.contains("history_version"))
+      return Result<PartDocument>::failure(
+          json_error("Engineering resources require Part version 3"));
     std::optional<PartFeatureHistoryIntent> authored_history;
-    if (version == k_history_version) {
+    if (history_version == k_history_version) {
       if (!root.at("version").is_number_integer() || !root.contains("feature_order") ||
           !root.at("feature_order").is_array() || !root.contains("suppressed_features") ||
           !root.at("suppressed_features").is_array())
@@ -4383,7 +4415,9 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       prelude.erase("result_face_workplanes");
       prelude.erase("feature_order");
       prelude.erase("suppressed_features");
-      prelude["version"] = k_version;
+      prelude["version"] = version == k_resource_version ? k_resource_version : k_version;
+      if (version == k_resource_version)
+        prelude["history_version"] = k_version;
       for (const auto& key : dependent_arrays) {
         if (root.contains(key) && !root.at(key).is_array())
           return Result<PartDocument>::failure(json_error(key + " must be an array"));
@@ -4657,6 +4691,11 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
                                          document_json.at("name").get<std::string>());
     if (document.has_error())
       return document;
+    if (version == k_resource_version) {
+      const auto resources = detail::load_part_engineering_resources(root, document.value());
+      if (!resources)
+        return Result<PartDocument>::failure(resources.error());
+    }
     auto sources = detail::load_step_import_sources(root, document.value());
     if (!sources)
       return Result<PartDocument>::failure(sources.error());
@@ -4674,6 +4713,11 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       auto added = document.value().add_body(std::move(body.value()));
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
+    }
+    if (version == k_resource_version) {
+      const auto assignments = detail::load_part_material_assignments(root, document.value());
+      if (!assignments)
+        return Result<PartDocument>::failure(assignments.error());
     }
     for (const auto& feature_json : root.value("imported_body_features", json::array())) {
       auto feature = detail::imported_body_feature_from_json(feature_json);

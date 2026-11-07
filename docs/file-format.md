@@ -104,6 +104,56 @@ contract here before introducing its first writer. Standalone Parts retain their
 offline; embedded Project resources use the same catalog authority. Typed quantities/provenance and
 immutable revision collision rules are owned by `engineering-modules.md`, not a second format.
 
+
+## Engineering resource JSON and standalone Part pins — Block 149B1
+
+The shared catalog codec uses exactly `schema: "blcad.engineering_resources.mvp1"`, integer
+`version: 1`, and ordered `entries`. Every entry requires `kind`, `id`, `revision`, `name`,
+`provenance`; Material adds `properties`, StandardTable adds `columns`/`rows`. Kinds are exactly
+`material`/`standard_table`. Unknown fields/kinds/versions, duplicate keys even with identical data,
+wrong primitive types, non-finite/range errors and invalid references reject the whole catalog.
+Catalog merge deduplicates independent snapshots; duplicate entries inside one serialized catalog
+are malformed. Entry order and authored table row order are retained; cells normalize to column order.
+
+Provenance requires `origin` (`user_defined`, `manufacturer`, `normative`) and `source`; optional
+`reference`, `uri`, `license` are nonempty strings when supplied. Normative origin requires a
+reference/edition. Material `properties` is an object with optional `density`, `young_modulus`,
+`yield_strength`, `tensile_strength`. Each present property has exactly `value`, `unit`, `provenance`.
+Density uses canonical `kg/m3`; pressure uses `Pa`. Missing density is unavailable, and null or
+wrong-unit values are invalid. No appearance or computed mass is stored.
+
+Table columns require `key`, `name`, `kind`, boolean `required`; numeric columns also require the
+exact canonical `unit`. Kinds/units are `length`/`mm`, `linear_displacement`/`mm`, `angle`/`deg`,
+`count`/`1`, `density`/`kg/m3`, `pressure`/`Pa`, `scalar`/`1`, `text`/no unit, `boolean`/no unit.
+Rows require `key`, `name`, `cells`; each cell has exactly `column`, `value`, `provenance`. Value
+type/unit follows the declared column. Counts must be positive JSON integers exactly representable
+by the current count API before conversion; booleans cannot pass as numbers. Required cells and
+all key/type rules use the existing Core table factory. Empty row arrays are valid schema snapshots.
+
+Standalone Parts with a nonempty catalog use existing schema `blcad.part_document.mvp1`, integer
+version **3**, with required `history_version` (integer **1** or **2**), `engineering_resources`
+(the complete catalog object above), and `material_assignments`. The assignment object requires
+`body_overrides` (array); optional `default` is a Material key `{id, revision}`. Every override is
+exactly `{body, material: {id, revision}}`. Duplicate/unknown Bodies or non-Material/missing revision
+keys reject loading. Missing default means unassigned, missing Body override inherits it; null
+is invalid. Resources may remain unassigned. V3 Reference Parts reject these authored resources.
+
+`history_version` preserves the existing v1/v2 history contract independently of resource presence:
+1 rejects `suppressed_features`, 2 requires complete `feature_order` and `suppressed_features` arrays.
+The writer derives it from actual authored history. Resources load before executable features;
+Body pins load after Body declarations. Result-face preludes retain resources/pins while resetting
+only their effective history mode to 1; final typed replay restores the complete authored history.
+No derived geometry, effective assignment, cache/result stamp or dependency edge is persisted.
+
+Resource-free documents retain exact v1/v2 canonical bytes and omit all three new fields. Clearing
+all resources/pins returns that writer selection. V3 can read an empty catalog and normalize to the
+appropriate legacy version when no resource intent remains. V1/v2 reject the new reserved fields;
+all supported version numbers are integers. Older readers reject version 3 before dropping intent.
+`engineering_resource_refs` is reserved for later Project ownership and rejected by this standalone
+reader. B1's Project-v1 read/write rejects resource-bearing Parts explicitly; B2 replaces that
+boundary with deduplicated Project resource ownership and its migration contract. Project-v1
+also rejects the reserved root `engineering_resources` field rather than silently discarding it.
+
 ## Project structure
 
 ```text
