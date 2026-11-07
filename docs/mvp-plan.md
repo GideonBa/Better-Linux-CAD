@@ -2185,7 +2185,7 @@ one common resource store for later Hole/Thread tables, not independent per-modu
 | --- | --- | --- |
 | 149A | Typed density/engineering pressure, per-value provenance, immutable Material and typed standards-table revisions, duplicate/conflict rules and atomic catalog merge; synthetic Core tests | Delivered via PR #152 |
 | 149B | Standalone Part snapshots, Part default/Body overrides, Project resource deduplication, strict versioned JSON and offline/legacy compatibility | In progress; B1/B2 below |
-| 149B1 | Shared strict resource JSON and standalone Part version 3 with material pins; preserve history/result-face loading; conservative Project-v1 serialization boundary | Implemented and verified; delivery pending |
+| 149B1 | Shared strict resource JSON and standalone Part version 3 with material pins; preserve history/result-face loading; conservative Project-v1 serialization boundary | Implemented and verified; PR #153 |
 | 149B2 | Project resource ownership/deduplication, versioned Project persistence and offline member portability; replace B1's temporary project boundary | Planned; not started |
 | 149C | Explicit coordinated revision updates, referenced-resource removal guards and atomic multi-document rollback/freshness evidence through existing mutation authorities | Planned; not started |
 
@@ -2227,6 +2227,10 @@ Part-v3 pins and history retention are accepted for this slice only. Project-v1 
 rejects these members until B2 supplies shared ownership; C still owns coordinated updates.
 Implemented-through stays 148, whole 149 remains in progress and material UI stays planned for 151.
 Complete normal PR delivery/confirmed merge and refreshed-main/tree comparison before B2.
+
+149B1 delivery: [PR #153](https://github.com/GideonBa/Better-Linux-CAD/pull/153), implementation
+`4ff157f`. The delivery-record update changes documentation only and preserves all 990 runtime
+fingerprints. Confirm normal merge and compare refreshed main with the reviewed tree before B2.
 
 ## Later phases
 

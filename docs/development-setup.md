@@ -3978,3 +3978,7 @@ Final GUI inventory passes **5 / 568**, without failures/skips
 native checks and documentation updates. Working/staged whitespace and complete source review
 pass before delivery. B1 is accepted only within the documented Part boundary; whole 149 and
 materials/physical-properties UI remain incomplete.
+
+Delivery: [PR #153](https://github.com/GideonBa/Better-Linux-CAD/pull/153), implementation `4ff157f`.
+The delivery-record commit changes documentation only and preserves all 990 runtime fingerprints.
+Normal merge and verified refreshed-main/reviewed-tree comparison precede 149B2.
