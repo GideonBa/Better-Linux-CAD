@@ -1275,7 +1275,7 @@ Result<std::size_t> GuiDocumentSession::publish_part_workflow(std::string label)
       workspace_ != GuiWorkspace::Part ||
       part_document()->id() != part_workflow_base_->part_document()->id())
     return Result<std::size_t>::failure(session_error("invalid Part workflow publication"));
-  if (history_prefix_count_ && (task_.active() || !history_prefix_ready()))
+  if (history_prefix_count_ && (task_.active() || history_command_base_ || !history_prefix_ready()))
     return Result<std::size_t>::failure(
         session_error("Finish the prefix command and recompute its current inputs before Apply"));
 
@@ -1357,8 +1357,8 @@ Result<std::size_t> GuiDocumentSession::begin_part_history_context(std::size_t p
 }
 
 Result<std::size_t> GuiDocumentSession::move_part_history_marker(std::size_t prefix_count) {
-  if (!history_prefix_count_ || task_.active() || workspace_ != GuiWorkspace::Part ||
-      !history_prefix_ready())
+  if (!history_prefix_count_ || task_.active() || history_command_base_ ||
+      workspace_ != GuiWorkspace::Part || !history_prefix_ready())
     return Result<std::size_t>::failure(
         session_error("End of Part marker movement requires an idle current prefix context"));
   auto candidate = *part_document();
@@ -1387,6 +1387,72 @@ bool GuiDocumentSession::history_prefix_ready() const {
   const auto* plan = part_shape_cache_->history_plan();
   return plan && plan->prefix_count == history_prefix_count_ &&
          bool(part_shape_cache_->validate_history_input(*part_document()));
+}
+
+bool GuiDocumentSession::part_modeling_ready() const {
+  return part_document() && (derived_results_fresh() || history_prefix_ready());
+}
+
+Result<std::size_t> GuiDocumentSession::begin_part_history_command(std::string command_id) {
+  if (!history_prefix_ready() || history_command_base_ || task_.active() ||
+      workspace_ != GuiWorkspace::Part || command_id.empty())
+    return Result<std::size_t>::failure(
+        session_error("A prefix child command requires an idle current End of Part context"));
+  const auto source = serialize_current();
+  if (!source || history_.empty() || source.value() != history_[history_index_].json)
+    return Result<std::size_t>::failure(
+        session_error("A prefix child command requires a staged history entry"));
+  history_command_base_ = std::make_shared<const GuiDocumentSession>(*this);
+  history_command_id_ = std::move(command_id);
+  history_.erase(history_.begin() + static_cast<std::ptrdiff_t>(history_index_ + 1U),
+                 history_.end());
+  return Result<std::size_t>::success(1);
+}
+
+Result<std::size_t> GuiDocumentSession::publish_part_history_command(std::string label) {
+  if (!history_command_base_ || !history_prefix_ready() || workspace_ != GuiWorkspace::Part ||
+      label.empty() || (task_.active() && task_.command_id() != history_command_id_))
+    return Result<std::size_t>::failure(
+        session_error("The prefix child command cannot be applied"));
+  const auto source = serialize_current();
+  if (!source)
+    return Result<std::size_t>::failure(source.error());
+  auto accepted = *history_command_base_;
+  accepted.file_path_ = file_path_;
+  accepted.saved_json_ = saved_json_;
+  accepted.saved_sketch_constraint_catalogs_ = saved_sketch_constraint_catalogs_;
+  accepted.saved_sketch_dimension_catalogs_ = saved_sketch_dimension_catalogs_;
+  const auto& entry = accepted.history_[accepted.history_index_];
+  const bool changed = source.value() != entry.json ||
+                       sketch_constraint_catalogs_ != entry.sketch_constraints ||
+                       sketch_dimension_catalogs_ != entry.sketch_dimensions;
+  if (changed) {
+    const auto published =
+        accepted.publish_part_state(*part_document(), sketch_constraint_catalogs_,
+                                    sketch_dimension_catalogs_, std::move(label), 1);
+    if (!published) {
+      record_error(published.error());
+      return published;
+    }
+  }
+  accepted.task_ = task_;
+  accepted.hidden_presentations_ = hidden_presentations_;
+  const auto next_revision = std::max(model_revision(), accepted.model_revision()) + 1U;
+  accepted.visibility_revision_ = std::max(visibility_revision_, accepted.visibility_revision_);
+  accepted.presentation_revision_ = accepted.visibility_revision_ + next_revision;
+  *this = std::move(accepted);
+  return Result<std::size_t>::success(changed ? 1 : 0);
+}
+
+void GuiDocumentSession::cancel_part_history_command() {
+  if (!history_command_base_)
+    return;
+  auto checkpoint = *history_command_base_;
+  restore_creation_checkpoint(std::move(checkpoint));
+}
+
+bool GuiDocumentSession::part_history_command_active() const noexcept {
+  return bool(history_command_base_);
 }
 
 Result<std::size_t>
@@ -1531,7 +1597,9 @@ GuiRecomputeStatus GuiDocumentSession::recompute_status() const noexcept {
 }
 
 bool GuiDocumentSession::can_undo() const noexcept {
-  const auto boundary = part_workflow_base_ ? part_workflow_base_->history_index_ : 0U;
+  const auto boundary = history_command_base_ ? history_command_base_->history_index_
+                        : part_workflow_base_ ? part_workflow_base_->history_index_
+                                              : 0U;
   return history_index_ > boundary && !task_.active();
 }
 
@@ -2063,6 +2131,8 @@ void GuiDocumentSession::record_information(std::string object_id, std::string m
 void GuiDocumentSession::reset_document() noexcept {
   ++presentation_revision_;
   document_ = std::monostate{};
+  history_command_base_.reset();
+  history_command_id_.clear();
   history_prefix_count_.reset();
   reference_repair_mode_ = false;
   display_name_.clear();

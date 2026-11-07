@@ -245,7 +245,8 @@ void ShellFeatureTools::refresh_extrude_reference_choices(bool preserve) {
           cache->find_body_shape(body.id()))
         extrude_target_->addItem(QString::fromStdString(body.name()),
                                  QString::fromStdString(body.id().value()));
-    auto sources = geometry::ViewportSceneBuilder{}.build_construction_sources(part, *cache);
+    auto sources = geometry::ViewportSceneBuilder{}.build_construction_sources(
+        part, *cache, session_.history_prefix_count());
     if (sources)
       for (const auto& source : sources.value())
         if (const auto* face = std::get_if<SemanticFaceReference>(&source.reference)) {
@@ -415,7 +416,7 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::extrude_selection_it
       session_.part_shape_cache()) {
     std::vector<geometry::ViewportSceneItem> items;
     auto sources = geometry::ViewportSceneBuilder{}.build_body_rotation_sources(
-        *session_.part_document(), *session_.part_shape_cache());
+        *session_.part_document(), *session_.part_shape_cache(), session_.history_prefix_count());
     if (sources)
       for (const auto& source : sources.value())
         if (std::any_of(body_axes_.begin(), body_axes_.end(), [&](const auto& axis) {

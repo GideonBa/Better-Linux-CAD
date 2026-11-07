@@ -602,12 +602,27 @@ void ShellInspectTools::cancel() {
 void ShellInspectTools::refresh() {
   const bool idle = idle_and_fresh();
   analysis_action_->setEnabled(idle && window_.session().project());
-  for (auto [mode, action] : export_actions_)
+  analysis_action_->setToolTip(
+      window_.session().history_prefix_count()
+          ? "Apply or cancel End of Part before analyzing the complete model."
+          : "Open a complete Assembly and finish the current command to analyze it.");
+  for (auto [mode, action] : export_actions_) {
     action->setEnabled(
         idle && (mode == GuiStepExportMode::PartMultiBody
                      ? window_.session().part_document() && window_.session().part_shape_cache() &&
                            window_.session().part_shape_cache()->body_shape_count() > 0
                      : window_.session().project() != nullptr));
+    action->setToolTip(window_.session().history_prefix_count()
+                           ? "Apply or cancel End of Part before exporting the complete model."
+                       : window_.session().part_workflow_active() ||
+                               window_.session().task().active() || window_.active_sketch()
+                           ? "Apply or cancel the current command before exporting."
+                       : !window_.session().derived_results_fresh()
+                           ? "Recompute the complete model before exporting."
+                       : action->isEnabled()
+                           ? "Export the complete model."
+                           : "Open the matching Part or Assembly with computed Body results.");
+  }
   if (active_ && (!window_.session().project() || !window_.session().derived_results_fresh() ||
                   !source_unchanged() || window_.session().task().command_id() != task_id))
     cancel();

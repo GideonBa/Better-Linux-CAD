@@ -51,6 +51,10 @@ recompute_preview_geometry_with_context(const GuiDocumentSession& session,
                                         const PartDocument& candidate,
                                         const std::vector<std::string>& changed_features,
                                         geometry::StepImportTopologyContext* context) {
+  if (session.history_prefix_count())
+    return Result<geometry::ShapeCache>::failure(Error::dependency(
+        candidate.id().value(),
+        "The feature preview must be prepared for the current End of Part position."));
   const auto* committed = session.part_document();
   const auto* existing = session.part_shape_cache();
   const auto backings_match = [](const PartDocument& part, const geometry::ShapeCache& cache) {
@@ -131,8 +135,16 @@ recompute_preview_geometry(const GuiDocumentSession& session, const PartDocument
     return recompute_preview_geometry_with_context(session, candidate, changed_features, context);
   });
 }
+inline Result<geometry::ShapeCache>
+recompute_preview_geometry(const GuiDocumentSession& session, PartDocument& candidate,
+                           const std::vector<std::string>& changed_features) {
+  if (session.history_prefix_count())
+    return session.preview_part_history_candidate(candidate);
+  return recompute_preview_geometry(session, static_cast<const PartDocument&>(candidate),
+                                    changed_features);
+}
 inline Result<geometry::GeometryShape> preview_feature_body(const GuiDocumentSession& session,
-                                                            const PartDocument& candidate,
+                                                            PartDocument& candidate,
                                                             const FeatureId& feature,
                                                             const BodyId& body) {
   auto cache = recompute_preview_geometry(session, candidate, {feature.value()});

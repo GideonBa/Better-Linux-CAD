@@ -176,6 +176,15 @@ public:
       return Result<geometry::GeometryShape>::failure(added.error());
     if (mode_ == GuiPathSweepMode::Sweep)
       return detail::preview_feature_body(session, candidate, feature_, result_body_);
+    if (session.history_prefix_count()) {
+      auto cache = session.preview_part_history_candidate(candidate);
+      if (!cache)
+        return Result<geometry::GeometryShape>::failure(cache.error());
+      return query_with_step_import_context(session, [&](auto* context) {
+        return geometry::GeometryRecomputeExecutor{context}.preview_path_curve(candidate, path_id_,
+                                                                               cache.value());
+      });
+    }
     return query_with_step_import_context(session, [&](auto* context) {
       auto cache = geometry::ShapeCache::create(ShapeCacheId(path_id_.value() + ".preview"));
       if (!cache)

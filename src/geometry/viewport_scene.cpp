@@ -213,8 +213,9 @@ Result<TopoDS_Shape> make_profile_face(const PointRange& points, PointMapper map
 
 Result<std::vector<ConstructionSelectionTarget>>
 ViewportSceneBuilder::build_body_rotation_sources(const PartDocument& document,
-                                                  const ShapeCache& cache) const {
-  const auto history = detail::validate_history_evaluation(document, &cache);
+                                                  const ShapeCache& cache,
+                                                  std::optional<std::size_t> history_prefix) const {
+  const auto history = detail::validate_history_modeling_scope(document, cache, history_prefix);
   if (!history)
     return Result<std::vector<ConstructionSelectionTarget>>::failure(history.error());
   std::vector<ConstructionSelectionTarget> targets;
@@ -256,8 +257,10 @@ ViewportSceneBuilder::build_body_rotation_sources(const PartDocument& document,
 
 Result<std::vector<ConstructionSelectionTarget>>
 ViewportSceneBuilder::build_construction_sources(const PartDocument& document,
-                                                 const ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document, &shape_cache);
+                                                 const ShapeCache& shape_cache,
+                                                 std::optional<std::size_t> history_prefix) const {
+  const auto history =
+      detail::validate_history_modeling_scope(document, shape_cache, history_prefix);
   if (!history)
     return Result<std::vector<ConstructionSelectionTarget>>::failure(history.error());
   std::vector<ConstructionSelectionTarget> targets;
@@ -342,9 +345,10 @@ ViewportSceneBuilder::build_construction_sources(const PartDocument& document,
 }
 
 Result<std::vector<ViewportSceneItem>>
-ViewportSceneBuilder::build_part(const PartDocument& document,
-                                 const ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document, &shape_cache);
+ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache& shape_cache,
+                                 std::optional<std::size_t> history_prefix) const {
+  const auto history =
+      detail::validate_history_modeling_scope(document, shape_cache, history_prefix);
   if (!history)
     return Result<std::vector<ViewportSceneItem>>::failure(history.error());
   try {

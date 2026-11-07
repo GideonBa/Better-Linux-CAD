@@ -24,8 +24,9 @@ namespace blcad::geometry {
 Result<std::vector<FinishingSelectionTarget>>
 FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache& cache,
                                  const BodyId& body, PartFeatureInputRole role,
-                                 StepImportTopologyContext* import_context) {
-  const auto history = detail::validate_history_evaluation(document, &cache);
+                                 StepImportTopologyContext* import_context,
+                                 std::optional<std::size_t> history_prefix) {
+  const auto history = detail::validate_history_modeling_scope(document, cache, history_prefix);
   if (!history)
     return Result<std::vector<FinishingSelectionTarget>>::failure(history.error());
   const bool edge =
@@ -46,6 +47,8 @@ FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache&
     if (!observed)
       return Result<std::vector<FinishingSelectionTarget>>::failure(observed.error());
     for (const auto& base : document.imported_body_features()) {
+      if (!detail::validate_history_source(document, base.id().value(), &cache))
+        continue;
       auto owned = cache.validated_imported_body_result(document, base);
       if (!owned)
         return Result<std::vector<FinishingSelectionTarget>>::failure(owned.error());
@@ -68,6 +71,8 @@ FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache&
                        {(xmin + xmax) / 2, (ymin + ymax) / 2, (zmin + zmax) / 2}});
   };
   for (const auto& base : document.imported_body_features()) {
+    if (!detail::validate_history_source(document, base.id().value(), &cache))
+      continue;
     const auto& definition = base.definition();
     const auto output = std::find_if(definition.outputs().begin(), definition.outputs().end(),
                                      [&](const auto& value) { return value.body == body; });

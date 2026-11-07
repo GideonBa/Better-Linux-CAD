@@ -145,8 +145,17 @@ workflow. Session full freshness remains false while `history_prefix_ready()` va
 source/generation and matching prefix count. Marker moves and draft Undo/Redo rebuild disposable
 prefix results; publication recomputes the complete accepted candidate rather than promoting the
 partial cache. A marker after the final row follows the same partial-result rule. Complete scene,
-inspection and STEP APIs retain their strict guards; native prefix scene/input qualification is
-the subsequent 148B integration, not an exception inferred from Core logical completeness.
+inspection and STEP APIs retain their strict guards. Native prefix scene/input qualification below
+is explicit, never an exception inferred from Core logical completeness.
+
+148B's native integration adds an explicit optional `history_prefix` to scene, construction/rotation,
+finishing and result-face presentations. An omitted scope still requires a complete result. An
+explicit scope must match the sealed cache's prefix count and exact source/generation; a full cache,
+another prefix, changed intent or a publicly modified cache cannot satisfy that request. These
+presentations expose current available producers/Bodies; they do not certify full model freshness.
+STEP and complete Body inspection retain their strict boundaries. The shared authoring preview
+prepares a mutable complete candidate before evaluating its inserted prefix, keeping the cache
+stamp paired with the actual prepared intent. Legacy constant complete previews remain unchanged.
 
 ## Validation
 

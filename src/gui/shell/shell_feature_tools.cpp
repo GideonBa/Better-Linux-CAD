@@ -581,6 +581,8 @@ ShellFeatureTools::extrude_profile_choices(bool first_only) const {
   if (!part || part->is_reference_part())
     return result;
   for (const auto& sketch : part->sketches()) {
+    if (session_.history_prefix_count() && !GuiSketchWorkbench{}.plane_view(session_, sketch.id()))
+      continue;
     const auto append = [&](const auto& profiles) {
       for (const auto& profile : profiles) {
         if (first_only && !result.empty())
@@ -629,7 +631,9 @@ ShellFeatureTools::begin_extrude_workflow(std::optional<ExtrudeSettings> setting
     else if (selected)
       preselection = ProfileContext{selected.value().first, selected.value().second};
   }
-  const auto workflow = session_.begin_part_workflow();
+  const auto workflow = session_.history_prefix_count()
+                            ? session_.begin_part_history_command("part.extrude")
+                            : session_.begin_part_workflow();
   if (!workflow)
     return workflow;
   command_ = Command::Extrude;
@@ -1141,7 +1145,9 @@ Result<std::size_t> ShellFeatureTools::apply() {
       return changed;
     const auto label =
         extrude_direction_->currentIndex() == 2 ? "Apply Path Extrude" : "Apply Extrude";
-    auto published = accepted.publish_part_workflow(label);
+    auto published = accepted.part_history_command_active()
+                         ? accepted.publish_part_history_command(label)
+                         : accepted.publish_part_workflow(label);
     if (!published)
       return published;
     session_ = std::move(accepted);
@@ -1225,7 +1231,10 @@ void ShellFeatureTools::cancel() noexcept {
   const bool restore_scope = finishing() || pattern() || body_operation() || spatial() || surface();
   command_ = Command::None;
   if (was_extrude) {
-    session_.cancel_part_workflow();
+    if (session_.part_history_command_active())
+      session_.cancel_part_history_command();
+    else
+      session_.cancel_part_workflow();
     extrude_source_.reset();
     extrude_profile_picking_ = false;
   }
@@ -1286,7 +1295,8 @@ void ShellFeatureTools::refresh_enablement() {
                                                         : PartFeatureInputRole::DraftFace;
         auto targets = query_with_step_import_context(session_, [&](auto* context) {
           return geometry::FinishingSelectionBuilder::build(
-              *session_.part_document(), *session_.part_shape_cache(), body.id(), role, context);
+              *session_.part_document(), *session_.part_shape_cache(), body.id(), role, context,
+              session_.history_prefix_count());
         });
         if (targets && !targets.value().empty()) {
           available = true;

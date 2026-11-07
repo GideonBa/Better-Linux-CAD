@@ -4,6 +4,7 @@
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -36,7 +37,8 @@ public:
                                                 std::string instance);
   [[nodiscard]] static Result<std::vector<ResultFaceSelectionTarget>>
   selectable_faces(const PartDocument& document, const ShapeCache& cache, const BodyId& body,
-                   StepImportTopologyContext* import_context = nullptr);
+                   StepImportTopologyContext* import_context = nullptr,
+                   std::optional<std::size_t> history_prefix = std::nullopt);
   [[nodiscard]] static Result<ResolvedWorkplane>
   resolve(const PartDocument& document, const ResultFaceWorkplane& plane, const ShapeCache& cache,
           StepImportTopologyContext* import_context = nullptr);

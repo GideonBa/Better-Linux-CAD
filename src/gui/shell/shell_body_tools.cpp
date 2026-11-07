@@ -176,7 +176,7 @@ bool ShellFeatureTools::body_context_available(const BodyContext& context) const
   if (!body_action(context.command) || session_.document_kind() != GuiDocumentKind::Part ||
       session_.workspace() != GuiWorkspace::Part || !session_.part_document() ||
       session_.part_document()->is_reference_part() || !session_.part_shape_cache() ||
-      !session_.derived_results_fresh())
+      !session_.part_modeling_ready())
     return false;
   const auto* body = session_.part_document()->find_body(context.body);
   const auto* shape = session_.part_shape_cache()->find_body_shape(context.body);
@@ -305,7 +305,7 @@ Result<std::size_t> ShellFeatureTools::begin_body_operation(Command command) {
                reference.value().identity());
       }
     auto generated = geometry::ViewportSceneBuilder{}.build_body_rotation_sources(
-        *part, *session_.part_shape_cache());
+        *part, *session_.part_shape_cache(), session_.history_prefix_count());
     if (generated) {
       for (const auto& source : generated.value())
         if (const auto* edge = std::get_if<SemanticEdgeReference>(&source.reference)) {

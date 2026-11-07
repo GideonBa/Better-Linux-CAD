@@ -78,12 +78,12 @@ struct ShellSketchDiagnosticsTools::Impl {
   bool available() const {
     const auto& session = window.session();
     return session.part_document() && !session.part_document()->sketches().empty() &&
-           session.derived_results_fresh() && !session.reference_repair_mode() &&
+           session.part_modeling_ready() && !session.reference_repair_mode() &&
            !session.task().active();
   }
   bool current() const {
     const auto& session = window.session();
-    return active && session.part_document() && session.derived_results_fresh() &&
+    return active && session.part_document() && session.part_modeling_ready() &&
            session.task().command_id() == task_id && session.model_revision() == revision &&
            editing_sketch == window.active_sketch() &&
            (!editing_sketch || sketch_id() == *editing_sketch);
@@ -313,8 +313,8 @@ Result<std::size_t> ShellSketchDiagnosticsTools::preview() {
   auto applied = GuiSketchWorkbench{}.apply_repair(candidate, ui.sketch_id(), *suggestion);
   if (!applied)
     return applied;
-  auto scene = geometry::ViewportSceneBuilder{}.build_part(*candidate.part_document(),
-                                                           *candidate.part_shape_cache());
+  auto scene = geometry::ViewportSceneBuilder{}.build_part(
+      *candidate.part_document(), *candidate.part_shape_cache(), candidate.history_prefix_count());
   if (!scene)
     return Result<std::size_t>::failure(scene.error());
   std::vector<geometry::GeometryShape> shapes;

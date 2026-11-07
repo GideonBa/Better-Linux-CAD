@@ -530,3 +530,61 @@ TEST_CASE(
   CHECK(has(scene, "sketch/dependent.sketch/entity/line"));
   CHECK(has(scene, "path/dependent.path"));
 }
+
+TEST_CASE("Modeling presentations require an explicitly matching prefix and keep complete "
+          "consumers guarded",
+          "[geometry][parity-b148][history-prefix-scope]") {
+  auto part = fixture::native_base();
+  add_fillet(part);
+  const auto source = checked(serialize_part_document_to_json(part));
+  auto full = evaluate(part);
+  unavailable(ViewportSceneBuilder{}.build_part(part, full, 1));
+  for (std::size_t count : {0U, 1U, 2U}) {
+    CAPTURE(count);
+    auto cache = checked(ShapeCache::create(ShapeCacheId("qualified.prefix")));
+    REQUIRE(GeometryRecomputeExecutor{}.execute_history_prefix(part, count, cache));
+    unavailable(ViewportSceneBuilder{}.build_part(part, cache));
+    unavailable(ViewportSceneBuilder{}.build_construction_sources(part, cache));
+    unavailable(ViewportSceneBuilder{}.build_body_rotation_sources(part, cache));
+    unavailable(FinishingSelectionBuilder::build(part, cache, BodyId("body.base"),
+                                                 PartFeatureInputRole::FilletEdge));
+    unavailable(ResultFaceSupportGeometry::selectable_faces(part, cache, BodyId("body.base")));
+    unavailable(BodyResultInspector{}.inspect(part, cache));
+    const auto scene = checked(ViewportSceneBuilder{}.build_part(part, cache, count));
+    const auto body = std::find_if(scene.begin(), scene.end(), [](const auto& item) {
+      return item.semantic_id == "body/body.base";
+    });
+    CHECK((body != scene.end()) == (count > 0));
+    REQUIRE(ViewportSceneBuilder{}.build_construction_sources(part, cache, count));
+    REQUIRE(ViewportSceneBuilder{}.build_body_rotation_sources(part, cache, count));
+    auto edges = FinishingSelectionBuilder::build(part, cache, BodyId("body.base"),
+                                                  PartFeatureInputRole::FilletEdge, nullptr, count);
+    auto faces = ResultFaceSupportGeometry::selectable_faces(part, cache, BodyId("body.base"),
+                                                             nullptr, count);
+    if (count > 0) {
+      REQUIRE(edges);
+      REQUIRE(faces);
+      CHECK_FALSE(edges.value().empty());
+      CHECK_FALSE(faces.value().empty());
+      if (count == 1)
+        CHECK(RectangleExtrusionAdapter{}.summarize(body->shape).volume_mm3 == Catch::Approx(1600));
+    } else {
+      CHECK_FALSE(edges);
+      CHECK_FALSE(faces);
+    }
+    const auto wrong_count = (count + 1) % 3;
+    unavailable(ViewportSceneBuilder{}.build_part(part, cache, wrong_count));
+    unavailable(ViewportSceneBuilder{}.build_construction_sources(part, cache, wrong_count));
+    unavailable(ViewportSceneBuilder{}.build_body_rotation_sources(part, cache, wrong_count));
+    unavailable(FinishingSelectionBuilder::build(
+        part, cache, BodyId("body.base"), PartFeatureInputRole::FilletEdge, nullptr, wrong_count));
+    unavailable(ResultFaceSupportGeometry::selectable_faces(part, cache, BodyId("body.base"),
+                                                            nullptr, wrong_count));
+    auto changed = part;
+    REQUIRE(changed.set_parameter_value(ParameterId("width"), checked(Quantity::length_mm(24))));
+    unavailable(ViewportSceneBuilder{}.build_part(changed, cache, count));
+    cache.clear();
+    unavailable(ViewportSceneBuilder{}.build_part(part, cache, count));
+    CHECK(checked(serialize_part_document_to_json(part)) == source);
+  }
+}

@@ -81,6 +81,7 @@ public:
   [[nodiscard]] ShellHistoryTools& history_tools() noexcept {
     return *history_tools_;
   }
+  void cancel_history_children();
 
   [[nodiscard]] ShellInspectTools& inspect_tools() noexcept {
     return *inspect_tools_;
@@ -152,7 +153,7 @@ private:
   void change_selection_filter();
   void reset_selection_filter();
   [[nodiscard]] bool confirm_document_replacement();
-  void reset_document_interaction();
+  void reset_document_interaction(bool cancel_history = true);
   void reconcile_active_sketch();
   [[nodiscard]] bool enter_sketch(SketchId sketch);
   void leave_sketch_view();

@@ -3628,3 +3628,101 @@ remain unchanged; no whole-block capability is promoted. Protected PR delivery f
 Session-foundation delivery: [PR #149](https://github.com/GideonBa/Better-Linux-CAD/pull/149),
 implementation `9ec2bc2`. This documentation-only record preserves all 976 runtime fingerprints.
 Normal merge and verified refreshed main/reviewed-tree comparison precede native integration.
+
+
+## Block 148B native marker and child integration — 2026-11-07
+
+Starts from verified merged main `ec1e42e` (PR #149), with an exact reviewed-tree comparison before
+`feat/end-of-part-browser`. The existing Qt browser now includes a transient End of Part marker;
+context/search actions, drag/drop and double-click share the session prefix authority. A fixed root
+context remains above the viewport while existing child property tasks run. Prefix-qualified scene,
+construction, finishing and result-face queries require exact evaluated scope/source; their default
+calls and complete inspection/export retain the complete-result boundary. Mutable authoring previews
+prepare new rows at the marker before evaluation. The existing const complete-preview overload is
+retained for its performance/other callers. Extrude source Sketch/Create Another uses a separate
+child checkpoint inside the existing outer complete Part checkpoint, with local Undo/Redo and Save.
+No new Core/JSON schema or executable inventory is introduced.
+
+Review adds regression coverage for explicit/default/wrong/stale/cleared prefix scope, child Undo
+boundaries, redo restoration, Save As metadata, foreign task rejection and the existing Extrude
+controller before an invalid suffix. Native cases cover marker gestures, failed/corrected suffixes,
+committed Save, local/global Undo, source Sketch backout/Cancel/Create Another, inserted finishing,
+independent Body material results and imported marker availability. Browser rows retain authored
+suppression separately from “after End of Part”. Complete-only disabled actions explain their reason.
+Marker activation is queued until Qt finishes emitting item activation; source revision/owner is
+rechecked. Inline editors/active gestures retain their own Escape/completion handling.
+
+An initial const-preview compile failure was corrected by preserving the existing overload. Native
+fixture corrections use the actual `length_parameter` field, profile combo without a placeholder and
+existing window-level gesture backout. Compact testing exposed root diagnostics forcing window
+height growth: the prefix context temporarily permits a smaller viewport minimum, restores it on
+exit and bounds scrollable diagnostics to three lines. Tests now assert unchanged window size and
+visible marker after suffix failure, including at 150% scale.
+
+Builds pass (`blcad148b2-scope-compatible-build.log`, `blcad148b2-native-ui-build.log`, final
+`blcad148b2-shortcuts-build.log`). Focused Geometry passes **4 / 317**
+(`blcad148b2-scope-geometry.log`). Final focused GUI passes **52 cases: 48 passed, four expected
+native-only skips / 4,113 assertions** (`blcad148b2-final-focused.log`). Native compact 150% marker /
+import cases pass **6 / 424**, with no failures or skips (`blcad148b2-reviewed-150.log`).
+
+```sh
+cmake --build build/dev-gui --target blcad_geometry_tests blcad_gui_tests blcad -j8
+./build/dev-gui/blcad_geometry_tests "[history-prefix-scope],[history-evaluation-boundary],[history-resource-scene]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[history-prefix-session],[history-marker-shell],[history-shell],[model-browser],[block136-feature-edit],[shell-coverage],[source-sketch-workflow],[create-another-workflow],[shell-combined-revolve-controls]"
+./build/dev-gui/blcad_geometry_tests --durations yes
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests --durations yes
+```
+
+Builds, CAD tests, native checks and startup run serially. GUI checks require regular filesystem
+access for atomic project/STEP publication. No runtime mutations occur during these processes.
+Core source/tests are unchanged; the last full Core **627 / 23,727** is retained, not rerun or newly
+claimed. Full Geometry/GUI/native acceptance of this integration follows below.
+
+Runtime freeze `/tmp/blcad148b2-runtime-freeze.json`: **976** source/test/asset/build-script files,
+SHA-256 `2b52ee76f708cbee5bf86f1793a76787dea94481483a103c32f665ad838f5cce`.
+All subsequent changes in this delivery are documentation/capture evidence only. B acceptance does
+not advance implemented-through 147 or complete whole Block 148; 148C owns combined promotion.
+
+
+Final full Geometry passes **575 / 51,871** (`/tmp/blcad148b2-geometry-full.log`). Final full
+offscreen GUI passes **716 cases: 680 passed, 36 expected native-only skips / 89,560 assertions**,
+no failures (`/tmp/blcad148b2-gui-full.log`). The two additional expected skips are the new prefix
+source-Sketch and finishing cases; both run on native xcb below. Final native/startup results follow.
+
+
+Native 100% combined history/prefix/edit/source-Sketch/imported Body checks pass **67 / 5,441**,
+without skips or failures (`/tmp/blcad148b2-native-100.log`). Final compact-scale and startup checks
+follow on the same runtime freeze.
+
+```sh
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad148b2-accepted-100 ./build/dev-gui/blcad_gui_tests "[history-prefix-session],[history-marker-shell],[history-shell],[model-browser],[history-evaluation-boundary],[block136-feature-edit],[source-sketch-workflow],[create-another],[create-another-workflow],[part-workflow],[imported-body-preview],[shell-combined-revolve-controls]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_COMPACT=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad148b2-accepted-150 ./build/dev-gui/blcad_gui_tests "[history-marker-shell],[history-shell],[history-import]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+
+Final compact native 150% history/prefix acceptance passes **12 / 673**, without failures or skips
+(`/tmp/blcad148b2-native-150.log`). Raw captures under `/tmp/blcad148b2-accepted-100` and
+`/tmp/blcad148b2-accepted-150` were visually reviewed; four unmodified views are retained in
+`docs/images/` and linked from `user-interface.md`. Their SHA-256 values are:
+
+| Retained image | SHA-256 |
+| --- | --- |
+| `history-end-of-part-prefix.png` | `fcde4c271cb8800c7cd13ab66cfca2b29da201540104963df9afc57e9ea33b39` |
+| `history-end-of-part-invalid-suffix.png` | `bbbdb58736301e3f2ab8696879f27555cfc5cacbf51c388e4829ddf67b2187c2` |
+| `history-end-of-part-child.png` | `597f6ad1edf8684e4c7e35460a9d078715adf3bfa1e9668873f10ac985085175` |
+| `history-end-of-part-complete.png` | `474b8166187d9be49b5421d02df128951f7cea2087e19615b0fe103b0b6d3672` |
+
+
+Separate native startup reaches expected timeout **124** after six seconds
+(`/tmp/blcad148b2-startup.log`). Native/startup logs retain the known Medium incomplete-depth/stencil
+Visual warning; no High-severity, BadDrawable, BadWindow or fatal lifecycle failures appear. Final
+coverage inventory passes **5 / 494** (`blcad148b2-final-inventory.log`), without skips or failures.
+Source/diff review and modified-line formatting pass. All 976 runtime fingerprints remain unchanged
+through broad/native/startup checks and documentation/capture updates. 148B is verified; whole 148
+and its capability promotion remain open for C. Normal protected PR delivery follows.
+
+
+Delivery: [PR #150](https://github.com/GideonBa/Better-Linux-CAD/pull/150), implementation `92b8c38`.
+The delivery-record commit updates documentation only; all 976 runtime fingerprints stay unchanged.
+Normal merge and verified refreshed-main/reviewed-tree comparison precede the 148C branch.

@@ -100,12 +100,12 @@ struct ShellParameterTools::Impl {
   bool available() const {
     const auto& session = window.session();
     return session.part_document() && !session.part_document()->is_reference_part() &&
-           session.derived_results_fresh() && !session.reference_repair_mode() &&
+           session.part_modeling_ready() && !session.reference_repair_mode() &&
            !session.task().active() && !window.active_sketch();
   }
   bool current() const {
     const auto& session = window.session();
-    return active && session.part_document() && session.derived_results_fresh() &&
+    return active && session.part_document() && session.part_modeling_ready() &&
            !session.reference_repair_mode() && !window.active_sketch() &&
            session.task().command_id() == task_id && session.model_revision() == revision;
   }
@@ -448,9 +448,11 @@ Result<std::size_t> ShellParameterTools::preview() {
     return Result<std::size_t>::failure(import_context.error());
   auto* context = import_context.value().get();
   const geometry::ViewportSceneBuilder builder{context};
-  auto scene = builder.build_part(*candidate.part_document(), *candidate.part_shape_cache());
+  auto scene = builder.build_part(*candidate.part_document(), *candidate.part_shape_cache(),
+                                  candidate.history_prefix_count());
   auto original = builder.build_part(*ui.window.session().part_document(),
-                                     *ui.window.session().part_shape_cache());
+                                     *ui.window.session().part_shape_cache(),
+                                     ui.window.session().history_prefix_count());
   if (!scene || !original)
     return Result<std::size_t>::failure(!scene ? scene.error() : original.error());
   std::vector<geometry::GeometryShape> shapes;

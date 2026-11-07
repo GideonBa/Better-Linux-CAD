@@ -272,10 +272,10 @@ the earlier rejected incomplete Apply while the task shows the corrected valid c
 status, inclusion control, affected list and fixed footer remain accessible at compact scale;
 the remaining explanatory hint can scroll. Exact commands/results live in `development-setup.md`.
 
-### End of Part integration — remaining Block 148B work
+### End of Part integration — Block 148B verified
 
-The session foundation alone exposes no marker command. Its subsequent native integration uses
-the same Model browser: an End of Part marker sits between executable feature rows and supports
+The native integration extends the session foundation in the same Model browser: an End of Part
+marker sits between executable feature rows and supports
 dragging plus an equivalent context/keyboard command. Rows after it remain visible with an explicit
 outside-prefix status distinct from authored suppression. The marker counts executable rows;
 shared Sketch/support availability follows its actual producer dependencies, not an invented second
@@ -298,9 +298,19 @@ input. Escape backs out the current gesture/child before cancelling the idle roo
 
 Root Cancel restores the complete scene, marker policy, selection/filter and camera. Successful
 root publication creates one complete Undo entry and returns the marker to end-of-history policy;
-ordinary Undo/Redo restores complete intent. H02/H03/UI01 acceptance must exercise actual marker
+ordinary Undo/Redo restores complete intent. `[history-marker-shell]` exercises actual marker
 input, upstream edits, inserted features, invalid/corrected suffixes, child cancellation, Save during
-preview, import/independent Body scopes and camera restoration at 100% and compact 150% scale.
+preview, independent Body scopes and camera restoration. `[history-import]` adds EditableBody and
+immutable Reference Part marker availability. Final commands/results and retained raw captures are
+recorded below and in `development-setup.md`; 148C owns whole-block H01–H03/UI01 promotion.
+
+Retained raw native views: [prefix at 100%](images/history-end-of-part-prefix.png),
+[invalid suffix at compact 150%](images/history-end-of-part-invalid-suffix.png),
+[Extrude child and parent controls at compact 150%](images/history-end-of-part-child.png), and
+[complete model after inserted finishing at 100%](images/history-end-of-part-complete.png).
+The root context and child footer stay accessible, and the failed suffix retains its visible
+marker and correction message without growing the window. Lower child inputs scroll inside the
+existing task. These captures are unmodified Qt/OCCT output from the recorded frozen source.
 
 ### Planned command placement and workflows
 

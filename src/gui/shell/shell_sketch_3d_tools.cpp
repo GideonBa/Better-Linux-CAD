@@ -153,12 +153,12 @@ struct ShellSketch3DTools::Impl {
   bool available() const {
     const auto& session = window.session();
     return session.part_document() && !session.part_document()->is_reference_part() &&
-           session.derived_results_fresh() && !session.reference_repair_mode() &&
+           session.part_modeling_ready() && !session.reference_repair_mode() &&
            !window.active_sketch() && !session.task().active();
   }
   bool current() const {
     const auto& session = window.session();
-    return draft && session.part_document() && session.derived_results_fresh() &&
+    return draft && session.part_document() && session.part_modeling_ready() &&
            !session.reference_repair_mode() && !window.active_sketch() &&
            session.task().command_id() == task_id && session.model_revision() == revision;
   }
@@ -1228,8 +1228,8 @@ Result<std::size_t> ShellSketch3DTools::preview() {
   auto checked = ui.commit(candidate);
   if (!checked)
     return checked;
-  auto scene = geometry::ViewportSceneBuilder{}.build_part(*candidate.part_document(),
-                                                           *candidate.part_shape_cache());
+  auto scene = geometry::ViewportSceneBuilder{}.build_part(
+      *candidate.part_document(), *candidate.part_shape_cache(), candidate.history_prefix_count());
   if (!scene)
     return Result<std::size_t>::failure(scene.error());
   std::vector<geometry::GeometryShape> shapes;

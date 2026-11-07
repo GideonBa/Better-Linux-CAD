@@ -212,11 +212,12 @@ void append_surface_nodes(GuiBrowserNode& parent, const PartDocument& part) {
     }, feature);
 }
 
-void order_history_nodes(GuiBrowserNode& features, const PartDocument& part) {
+void order_history_nodes(GuiBrowserNode& features, const PartDocument& part,
+                         std::optional<std::size_t> prefix = std::nullopt) {
   const auto history = part.executable_history();
   if (!history)
     return;
-  const auto plan = part.create_history_evaluation_plan();
+  const auto plan = part.create_history_evaluation_plan(prefix);
   std::unordered_map<std::string, std::size_t> positions;
   for (std::size_t index = 0; index < history.value().size(); ++index)
     positions.emplace(history.value()[index].node_id, index);
@@ -237,18 +238,25 @@ void order_history_nodes(GuiBrowserNode& features, const PartDocument& part) {
         diagnostic += issue.message;
       }
     }
+    if (plan && plan.value().entries[index].state == PartHistoryExecutionState::OutsidePrefix)
+      availability = "outside_prefix";
     node.properties.push_back(property("history_position", "History position",
                                        std::to_string(index + 1), GuiPropertyKind::Status));
     node.properties.push_back(property(
         "feature_state", "Feature state", suppressed ? "suppressed" : "active",
         GuiPropertyKind::Status, false, {}, "Use Suppress/Unsuppress to change this operation"));
-    node.properties.push_back(property("history_availability", "History availability", availability,
-                                       GuiPropertyKind::Status));
+    node.properties.push_back(
+        property("history_availability", "History availability",
+                 availability == "outside_prefix" ? "after End of Part" : availability,
+                 GuiPropertyKind::Status));
     if (!diagnostic.empty())
       node.properties.push_back(property("history_diagnostic", "History diagnostic", diagnostic,
                                          GuiPropertyKind::Status));
-    if (availability != "available")
-      node.label += " [" + availability + "]";
+    if (availability == "outside_prefix" && suppressed)
+      node.label += " [suppressed; after End of Part]";
+    else if (availability != "available")
+      node.label +=
+          availability == "outside_prefix" ? " [after End of Part]" : " [" + availability + "]";
   }
 }
 
@@ -447,17 +455,20 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
   append_part_nodes(features, part, part.draft_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.body_boolean_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.body_transforms(), GuiBrowserNodeKind::Feature);
-  order_history_nodes(features, part);
+  const auto prefix = session.part_document() && session.part_document()->id() == part.id()
+                          ? session.history_prefix_count()
+                          : std::nullopt;
+  order_history_nodes(features, part, prefix);
   root.children.push_back(std::move(features));
 
   auto bodies = group("Bodies");
-  const auto history_plan = part.authored_history_intent()
-                                ? part.create_history_evaluation_plan()
+  const auto history_plan = part.authored_history_intent() || prefix
+                                ? part.create_history_evaluation_plan(prefix)
                                 : Result<PartHistoryEvaluationPlan>::success({});
   for (const auto& body : part.bodies()) {
     auto node = part_node(part, body, GuiBrowserNodeKind::Body, GuiSelectionKind::Body);
     node.viewport_semantic_id = "body/" + body.id().value();
-    if (part.authored_history_intent() && history_plan) {
+    if ((part.authored_history_intent() || prefix) && history_plan) {
       const auto& entries = history_plan.value().bodies;
       const auto found = std::find_if(entries.begin(), entries.end(),
                                       [&](const auto& entry) { return entry.body == body.id(); });

@@ -97,7 +97,8 @@ ShellFeatureTools::revolve_axis_choices(const GuiSketchPlaneView& plane) const {
         append(AxisReference::create_imported(PartFeatureInputRole::RevolveAxis, reference.value()),
                "Imported axis / " + entry.id.value(), "imported-axis/" + spelling.value());
     }
-  auto sources = geometry::ViewportSceneBuilder{context}.build_construction_sources(*part, *cache);
+  auto sources = geometry::ViewportSceneBuilder{context}.build_construction_sources(
+      *part, *cache, session_.history_prefix_count());
   if (sources)
     for (const auto& source : sources.value())
       if (const auto* edge = std::get_if<SemanticEdgeReference>(&source.reference)) {

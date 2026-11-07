@@ -84,6 +84,13 @@ public:
   [[nodiscard]] Result<std::size_t> move_part_history_marker(std::size_t prefix_count);
   [[nodiscard]] std::optional<std::size_t> history_prefix_count() const noexcept;
   [[nodiscard]] bool history_prefix_ready() const;
+  // A child command keeps its own local Undo boundary inside the prefix. Save
+  // still writes the outer complete checkpoint; child publication stays partial.
+  [[nodiscard]] Result<std::size_t> begin_part_history_command(std::string command_id);
+  [[nodiscard]] Result<std::size_t> publish_part_history_command(std::string label);
+  void cancel_part_history_command();
+  [[nodiscard]] bool part_history_command_active() const noexcept;
+  [[nodiscard]] bool part_modeling_ready() const;
   // Inserts newly authored executable rows at the marker using Core replay.
   // The candidate retains all suffix definitions; the session is unchanged.
   [[nodiscard]] Result<std::size_t> prepare_part_history_candidate(PartDocument& candidate) const;
@@ -196,6 +203,8 @@ private:
 
   Document document_;
   std::shared_ptr<const GuiDocumentSession> part_workflow_base_;
+  std::shared_ptr<const GuiDocumentSession> history_command_base_;
+  std::string history_command_id_;
   std::optional<std::size_t> history_prefix_count_;
   std::string display_name_;
   std::filesystem::path file_path_;

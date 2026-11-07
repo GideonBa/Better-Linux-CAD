@@ -601,12 +601,21 @@ void ShellWindow::build_docks() {
             const GuiBrowserNode node = source ? *source : GuiBrowserNode{};
             QMenu menu(browser_tree_);
             menu.setToolTipsVisible(true);
+            if (item && item->data(0, ShellHistoryBrowser::marker_role).toBool() &&
+                history_tools_) {
+              history_tools_->refresh();
+              menu.addAction(&history_tools_->marker_action());
+              menu.addAction(&history_tools_->marker_end_action());
+              menu.addSeparator();
+            }
             if (source && source->kind == GuiBrowserNodeKind::Feature && history_tools_) {
               history_tools_->refresh();
               menu.addAction(&history_tools_->edit_action());
               menu.addAction(&history_tools_->suppress_action());
               menu.addAction(&history_tools_->restore_action());
               menu.addAction(&history_tools_->reorder_action());
+              menu.addAction(&history_tools_->marker_before_action());
+              menu.addAction(&history_tools_->marker_after_action());
               menu.addSeparator();
             }
             QAction* toggle = nullptr;
@@ -621,10 +630,7 @@ void ShellWindow::build_docks() {
             const auto* chosen = menu.exec(browser_tree_->viewport()->mapToGlobal(point));
             if (chosen == nullptr)
               return;
-            if (history_tools_ && (chosen == &history_tools_->edit_action() ||
-                                   chosen == &history_tools_->suppress_action() ||
-                                   chosen == &history_tools_->restore_action() ||
-                                   chosen == &history_tools_->reorder_action()))
+            if (history_tools_ && history_tools_->owns_action(chosen))
               return;
             if (chosen == show_all)
               (void)session_.show_all_presentations();
@@ -888,8 +894,13 @@ bool ShellWindow::confirm_document_replacement() {
   return answer == QMessageBox::Discard;
 }
 
-void ShellWindow::reset_document_interaction() {
-  if (history_tools_)
+void ShellWindow::cancel_history_children() {
+  if (session_.history_prefix_count())
+    reset_document_interaction(false);
+}
+
+void ShellWindow::reset_document_interaction(bool cancel_history) {
+  if (cancel_history && history_tools_)
     history_tools_->cancel();
   if (step_import_tools_)
     step_import_tools_->cancel();
@@ -1002,15 +1013,15 @@ std::optional<DatumPlaneId> ShellWindow::selected_datum_plane() const {
 std::optional<ResultFaceReference> ShellWindow::selected_result_face() const {
   const auto* part = session_.part_document();
   const auto* cache = session_.part_shape_cache();
-  if (!part || !cache || !session_.derived_results_fresh() ||
+  if (!part || !cache || !session_.part_modeling_ready() ||
       (!selected_semantic_id_.starts_with("finishing/face/") &&
        !selected_semantic_id_.starts_with("finishing/imported:") &&
        !selected_semantic_id_.starts_with("support/result-face/")))
     return std::nullopt;
   for (const auto& body : part->bodies()) {
     auto targets = query_with_step_import_context(session_, [&](auto* context) {
-      return geometry::ResultFaceSupportGeometry::selectable_faces(*part, *cache, body.id(),
-                                                                   context);
+      return geometry::ResultFaceSupportGeometry::selectable_faces(
+          *part, *cache, body.id(), context, session_.history_prefix_count());
     });
     if (targets)
       for (const auto& target : targets.value())
@@ -1289,7 +1300,7 @@ bool ShellWindow::finish_active_sketch() {
 }
 
 bool ShellWindow::undo() {
-  if (history_tools_)
+  if (history_tools_ && !history_tools_->prefix_active())
     history_tools_->cancel();
   if (feature_tools_ && feature_tools_->editing_source_sketch()) {
     sketch_tools_->cancel_tool();
@@ -1345,7 +1356,7 @@ bool ShellWindow::undo() {
 }
 
 bool ShellWindow::redo() {
-  if (history_tools_)
+  if (history_tools_ && !history_tools_->prefix_active())
     history_tools_->cancel();
   if (feature_tools_ && feature_tools_->editing_source_sketch()) {
     sketch_tools_->cancel_tool();
@@ -1509,6 +1520,25 @@ void ShellWindow::handle_tree_activation(QTreeWidgetItem* item) {
   if (item == nullptr || active_sketch_ || session_.task().active() ||
       session_.part_document() == nullptr)
     return;
+  if (item->data(0, ShellHistoryBrowser::marker_role).toBool()) {
+    const auto count = item->data(0, ShellHistoryBrowser::marker_position_role).toULongLong();
+    const auto revision = session_.presentation_revision();
+    const auto owner = session_.part_document()->id();
+    // Return from Qt's item activation before a prefix refresh replaces that
+    // item. A queued activation cannot act on a subsequently replaced source.
+    QMetaObject::invokeMethod(
+        history_tools_.get(),
+        [this, count, revision, owner] {
+          if (!session_.part_document() || session_.part_document()->id() != owner ||
+              session_.presentation_revision() != revision)
+            return;
+          const auto begun = history_tools_->begin_prefix(count);
+          if (!begun)
+            show_error(begun.error());
+        },
+        Qt::QueuedConnection);
+    return;
+  }
   const std::string semantic_id = item->data(0, kSemanticIdRole).toString().toStdString();
   if (semantic_id.empty())
     return;
@@ -1634,6 +1664,8 @@ void ShellWindow::refresh() {
     setWindowTitle(windowTitle() + QStringLiteral(" [Repair]"));
   if (session_.part_workflow_active())
     setWindowTitle(windowTitle() + QStringLiteral(" [Draft]"));
+  if (const auto count = session_.history_prefix_count())
+    setWindowTitle(windowTitle() + QStringLiteral(" [End of Part %1]").arg(qulonglong(*count)));
 
   QStringList lines;
   for (const auto& diagnostic : session_.diagnostics())
@@ -1720,6 +1752,8 @@ void ShellWindow::refresh_browser() {
       auto* item = append_browser_item(nullptr, browser_tree_, root);
       restore_browser_folding(item, folding);
     }
+    if (history_tools_)
+      history_tools_->append_browser_marker();
   }
   if (!retained.empty()) {
     synchronize_tree_selection(retained);
@@ -1790,7 +1824,8 @@ void ShellWindow::refresh_viewport_scene() {
       query_with_step_import_context(session_, [&](geometry::StepImportTopologyContext* context) {
         const geometry::ViewportSceneBuilder builder{context};
         return session_.part_document() && session_.part_shape_cache()
-                   ? builder.build_part(*session_.part_document(), *session_.part_shape_cache())
+                   ? builder.build_part(*session_.part_document(), *session_.part_shape_cache(),
+                                        session_.history_prefix_count())
                : session_.project() ? builder.build_project(*session_.project())
                                     : Result<std::vector<geometry::ViewportSceneItem>>::success({});
       });

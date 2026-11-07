@@ -17,6 +17,19 @@ validate_history_evaluation(const PartDocument& document, const ShapeCache* cach
         document.id().value(), "Feature history requires a matching evaluated cache."));
   return Result<std::size_t>::success(0);
 }
+// Modeling presentations may explicitly qualify a prefix. Omitting the scope
+// retains the complete-result contract used by ordinary scene/inspection APIs.
+[[nodiscard]] inline Result<std::size_t>
+validate_history_modeling_scope(const PartDocument& document, const ShapeCache& cache,
+                                std::optional<std::size_t> prefix_count) {
+  if (!prefix_count)
+    return validate_history_evaluation(document, &cache);
+  const auto* plan = cache.history_plan();
+  if (!plan || plan->prefix_count != prefix_count)
+    return Result<std::size_t>::failure(Error::dependency(
+        document.id().value(), "The requested history prefix does not match the evaluated scope."));
+  return cache.validate_history_input(document);
+}
 [[nodiscard]] inline Result<std::size_t> validate_history_input(const PartDocument& document,
                                                                 const ShapeCache& cache,
                                                                 std::string_view executing = {},
