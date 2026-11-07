@@ -140,10 +140,19 @@ insertion and Save during marker preview are 148 acceptance, not supplied by the
 every partial marker boundary, insertion/predecessor replay, invalid suffix correction, local and
 complete Undo/Redo, committed main/Sketch-sidecar bytes, original redo restoration, copied sessions,
 suppressed rows, imported suppliers and lost cache/lifetime ownership. Complete consumers reject
-the partial cache even after the last row. This supplies headless lifecycle evidence only. Actual
-native marker gestures, qualified prefix scene/input picking, child command/source Sketch behavior
-and camera/layout acceptance remain the subsequent 148B integration and whole 148C gate; foundation
-proof does not complete H02/H03/UI01. Exact results and status stay in the existing setup/MVP docs.
+the partial cache even after the last row. That foundation supplies headless lifecycle evidence.
+
+Native integration adds `[history-prefix-child]` session/controller checkpoint scenarios and
+`[geometry][history-prefix-scope]` for explicitly qualified scenes, construction/rotation sources,
+finishing and result-face inputs: default/wrong/stale/cleared scopes reject, while independent prefix
+Body volume is checked. `[history-marker-shell]` drives actual Qt context, marker double-click,
+private drag/drop, keyboard, Quick Access Save/Undo/Redo and existing property controls. It combines
+upstream edits with invalid/corrected suffixes, prefix Extrude/source Sketch/gesture backout/Create
+Another and inserted finishing, with independent Body checks and complete fresh replay. The source
+Sketch and finishing cases require native xcb; their offscreen skips are not passes. Existing
+`[history-import]` adds native EditableBody/reference marker availability. B integration results and
+raw 100%/compact-150% captures are recorded in the existing setup/UI docs. Whole 148C separately
+reconciles H01–H03/UI01 and capability promotion; the foundation alone does not complete them.
 
 ### H03 Native browser history workflow
 

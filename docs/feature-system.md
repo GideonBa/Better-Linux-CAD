@@ -138,7 +138,7 @@ committed source. Native layout/error handling is specified in `user-interface.m
 Whole 148 remains open. The End of Part prefix/edit/insert lifecycle and whole-block capability
 promotion belong to 148B/C in `mvp-plan.md`; A's full-history preview is not a prefix editing context.
 
-## End of Part session foundation — verified; Block 148B native integration pending
+## End of Part session foundation — verified
 
 `GuiDocumentSession::begin_part_history_context()` starts the existing disposable Part workflow
 with an explicitly partial evaluated cache. The document retains every suffix definition, graph
@@ -165,8 +165,36 @@ immutable checkpoint; candidate documents, markers and caches remain independent
 publishing one complete history entry and resetting the marker to ordinary end-of-history policy.
 Failure retains the prefix draft. Marker-only visits add no history or persistence fields and still
 revalidate complete geometry/imported suppliers. An active child task or lost prefix ownership
-cannot publish. This foundation has no native marker control yet; existing feature owners are
-integrated in the next serial part of 148B before native acceptance or capability promotion.
+cannot publish. The native integration below extends this foundation without changing its
+complete-checkpoint or persistence authority.
+
+### Native prefix integration — verified
+
+The existing workflow now has a prefix child checkpoint, separate from the outer complete
+checkpoint. `begin_part_history_command()` records the child's task identity and local Undo boundary.
+Child Apply compacts its source/feature transactions into one partial draft operation; child Cancel
+restores its entry state and local redo branch while retaining actual Save As metadata. Save still
+uses the outer complete checkpoint. Root publication and marker movement reject an unfinished
+child even while that child temporarily has no active gesture. Child copies share immutable
+checkpoints, not mutable intent. No nested persistent document or schema field is introduced.
+
+`part_modeling_ready()` distinguishes matching Part prefix inputs from full freshness. Modeling
+owners explicitly request matching prefix scene, construction/rotation, finishing and result-face
+targets. Their default API calls retain the complete-result boundary. The shared mutable candidate
+preview helper inserts pending executable rows at the marker before prefix evaluation; its existing
+constant-document complete-preview overload remains compatible. Path/resource previews use the
+same complete retained intent and qualified input cache. Inspection/export remain complete-only.
+
+The native owner uses a transient Qt marker in the existing Features group; it is not a Core feature
+or a second executable inventory. Context/search actions, marker drag/drop and double-click feed
+the same session context. Core `OutsidePrefix` rows display “after End of Part” separately from
+authored suppression; a suppressed suffix row displays both states.
+A fixed root context above the viewport retains Apply/Cancel while an existing feature task owns
+input. Existing Extrude uses the child checkpoint for source Sketch/Create Another; the existing
+feature editor stages only rows before the marker. Root Apply also checks the complete scene and
+imported suppliers on a copy before replacing the session. Failed suffixes leave the prefix draft
+correctable. Exact native evidence lives in `development-setup.md`; whole-block combined acceptance
+and capability promotion remain separately owned by 148C in `mvp-plan.md`.
 
 ## Feature intent, not baked geometry
 

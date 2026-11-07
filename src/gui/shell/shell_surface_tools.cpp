@@ -74,7 +74,7 @@ std::optional<ShellFeatureTools::SurfaceContext>
 ShellFeatureTools::surface_context_for(Command command, const GuiSelection& selection) const {
   if (!surface_action(command) || session_.document_kind() != GuiDocumentKind::Part ||
       session_.workspace() != GuiWorkspace::Part || !session_.part_document() ||
-      !session_.part_shape_cache() || !session_.derived_results_fresh())
+      !session_.part_shape_cache() || !session_.part_modeling_ready())
     return std::nullopt;
   const bool curves = command == Command::BoundarySurface || command == Command::FillSurface;
   if (curves ? selection.kind != GuiSelectionKind::SketchEntity &&
@@ -212,8 +212,8 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
     if (body.kind() != BodyKind::Solid)
       continue;
     for (auto role : {PartFeatureInputRole::FilletEdge, PartFeatureInputRole::ShellRemovalFace}) {
-      auto resolved =
-          geometry::FinishingSelectionBuilder::build(*part, *cache, body.id(), role, context);
+      auto resolved = geometry::FinishingSelectionBuilder::build(
+          *part, *cache, body.id(), role, context, session_.history_prefix_count());
       if (!resolved)
         continue;
       for (const auto& target : resolved.value()) {
@@ -643,7 +643,7 @@ void ShellFeatureTools::refresh_surface_enablement(bool idle_part) {
           else if (body.kind() == BodyKind::Solid) {
             auto faces = geometry::FinishingSelectionBuilder::build(
                 *part, *cache, body.id(), PartFeatureInputRole::ShellRemovalFace,
-                import_context.value().get());
+                import_context.value().get(), session_.history_prefix_count());
             if (faces)
               surface_count +=
                   std::count_if(faces.value().begin(), faces.value().end(), [](const auto& target) {
@@ -652,7 +652,7 @@ void ShellFeatureTools::refresh_surface_enablement(bool idle_part) {
                   });
             auto edges = geometry::FinishingSelectionBuilder::build(
                 *part, *cache, body.id(), PartFeatureInputRole::FilletEdge,
-                import_context.value().get());
+                import_context.value().get(), session_.history_prefix_count());
             curves |=
                 edges &&
                 std::any_of(edges.value().begin(), edges.value().end(), [](const auto& target) {

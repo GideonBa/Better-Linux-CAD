@@ -477,11 +477,19 @@ void ShellMeasureTools::refresh() {
   const bool part_shapes =
       session_.part_shape_cache() && (session_.part_shape_cache()->body_shape_count() ||
                                       session_.part_shape_cache()->has_final_shape());
-  for (const auto& [kind, action] : actions_)
+  for (const auto& [kind, action] : actions_) {
     action->setEnabled(available &&
                        (kind == GuiMeasureKind::BodySummary
                             ? part_shapes && session_.part_shape_cache()->body_shape_count() > 0
                             : part_shapes || session_.project()));
+    action->setToolTip(
+        session_.history_prefix_count()
+            ? "Apply or cancel End of Part before measuring the complete model."
+        : session_.part_workflow_active() || session_.task().active() || window_.active_sketch()
+            ? "Finish the current command before measuring the complete model."
+        : action->isEnabled() ? "Measure the complete model."
+                              : "Open and recompute a Part or Assembly with available geometry.");
+  }
   if (!active())
     return;
   if (!session_.has_document() || session_.task().command_id() != task_id ||

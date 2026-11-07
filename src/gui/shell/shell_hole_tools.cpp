@@ -116,7 +116,7 @@ struct ShellHoleTools::Impl {
   bool available() const {
     const auto& session = window.session();
     const auto* part = session.part_document();
-    return part && !part->is_reference_part() && session.derived_results_fresh() &&
+    return part && !part->is_reference_part() && session.part_modeling_ready() &&
            !session.reference_repair_mode() && !session.task().active() &&
            !window.active_sketch() &&
            std::any_of(part->bodies().begin(), part->bodies().end(),
@@ -124,7 +124,7 @@ struct ShellHoleTools::Impl {
   }
   bool current() const {
     const auto& session = window.session();
-    return active && session.part_document() && session.derived_results_fresh() &&
+    return active && session.part_document() && session.part_modeling_ready() &&
            !session.reference_repair_mode() && !window.active_sketch() &&
            session.task().command_id() == task_id && session.model_revision() == revision;
   }
@@ -491,9 +491,11 @@ Result<std::size_t> ShellHoleTools::preview() {
   if (!context)
     return Result<std::size_t>::failure(context.error());
   const geometry::ViewportSceneBuilder builder{context.value().get()};
-  auto scene = builder.build_part(*candidate.part_document(), *candidate.part_shape_cache());
+  auto scene = builder.build_part(*candidate.part_document(), *candidate.part_shape_cache(),
+                                  candidate.history_prefix_count());
   auto old_scene = builder.build_part(*ui.window.session().part_document(),
-                                      *ui.window.session().part_shape_cache());
+                                      *ui.window.session().part_shape_cache(),
+                                      ui.window.session().history_prefix_count());
   if (!scene || !old_scene)
     return Result<std::size_t>::failure(!scene ? scene.error() : old_scene.error());
   if (context.value()) {

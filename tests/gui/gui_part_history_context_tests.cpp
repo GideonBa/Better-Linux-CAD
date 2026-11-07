@@ -9,7 +9,9 @@
 #include "blcad/geometry/step_import_reader.hpp"
 #include "blcad/geometry/step_import_topology.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
+#include "blcad/gui/gui_document_browser.hpp"
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_interactive_extrude_revolve.hpp"
 
 #include <QTemporaryDir>
 #include <catch2/catch_approx.hpp>
@@ -521,6 +523,11 @@ TEST_CASE(
   REQUIRE(intent);
   CHECK((intent->order == std::vector<std::string>{"base", "inserted", "fillet"}));
   CHECK((intent->suppressed == std::vector<std::string>{"base", "fillet"}));
+  const auto browser = GuiDocumentBrowser::build(session);
+  const auto* suffix = browser.find("fillet");
+  REQUIRE(suffix);
+  CHECK(suffix->label.find("suppressed") != std::string::npos);
+  CHECK(suffix->label.find("after End of Part") != std::string::npos);
   CHECK_FALSE(session.part_shape_cache()->find_body_shape(BodyId("body.base")));
   REQUIRE(session.part_shape_cache()->find_body_shape(BodyId("body.inserted")));
   REQUIRE(session.publish_part_workflow("Insert before suppressed finishing"));
@@ -538,4 +545,142 @@ TEST_CASE(
   CHECK(session.part_shape_cache()->body_shape_count() == 0);
   REQUIRE(session.redo());
   CHECK(session.part_shape_cache()->body_shape_count() == 1);
+}
+
+TEST_CASE("Prefix child commands bound local Undo and collapse into one parent draft operation",
+          "[gui][parity-b148][history-prefix-session][history-prefix-child]") {
+  QTemporaryDir directory;
+  auto session = open(machining(), directory);
+  const auto original = snapshot(session);
+  REQUIRE(session.begin_part_history_context(1));
+  edit(session, "width", 22);
+  const auto parent = snapshot(session);
+  REQUIRE(session.begin_part_history_command("part.extrude"));
+  CHECK_FALSE(session.begin_part_history_command("nested"));
+  CHECK_FALSE(session.can_undo());
+  edit(session, "radius", 30);
+  CHECK_FALSE(session.publish_part_workflow("Premature root Apply"));
+  CHECK_FALSE(session.move_part_history_marker(2));
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == parent);
+  CHECK_FALSE(session.can_undo());
+  REQUIRE(session.redo());
+  REQUIRE(session.save());
+  CHECK(read(session.file_path()) == original);
+  session.cancel_part_history_command();
+  CHECK_FALSE(session.part_history_command_active());
+  CHECK(session.history_prefix_count() == 1);
+  CHECK(snapshot(session) == parent);
+  REQUIRE(session.can_undo());
+  REQUIRE(session.begin_part_history_command("part.extrude"));
+  edit(session, "width", 24);
+  edit(session, "radius", 0.5);
+  const auto after = snapshot(session);
+  REQUIRE(session.publish_part_history_command("Child edits"));
+  CHECK_FALSE(session.part_history_command_active());
+  CHECK(session.undo_label() == "Child edits");
+  CHECK(session.history_prefix_ready());
+  CHECK_FALSE(session.derived_results_fresh());
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == parent);
+  REQUIRE(session.redo());
+  CHECK(snapshot(session) == after);
+  REQUIRE(session.publish_part_workflow("Complete prefix edits"));
+  complete_matches_fresh(session);
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == original);
+  CHECK_FALSE(session.can_undo());
+}
+
+TEST_CASE("Cancelling a prefix child restores its parent redo branch and committed Save As path",
+          "[gui][parity-b148][history-prefix-session][history-prefix-child]") {
+  QTemporaryDir directory;
+  auto session = open(machining(), directory);
+  const auto original = snapshot(session);
+  REQUIRE(session.begin_part_history_context(1));
+  edit(session, "width", 22);
+  const auto redo = snapshot(session);
+  REQUIRE(session.undo());
+  REQUIRE(session.begin_part_history_command("part.extrude"));
+  CHECK_FALSE(session.can_redo());
+  edit(session, "width", 24);
+  const auto target =
+      std::filesystem::path(directory.filePath("child-save.blcad.json").toStdString());
+  REQUIRE(session.save_as(target));
+  CHECK(read(target) == original);
+  session.cancel_part_history_command();
+  CHECK(session.file_path() == target);
+  CHECK(snapshot(session) == original);
+  REQUIRE(session.can_redo());
+  REQUIRE(session.redo());
+  CHECK(snapshot(session) == redo);
+  CHECK(session.history_prefix_ready());
+  session.cancel_part_workflow();
+  CHECK(session.file_path() == target);
+  CHECK(snapshot(session) == original);
+  complete_matches_fresh(session);
+}
+
+TEST_CASE("Foreign tasks cannot publish prefix children or their parent",
+          "[gui][parity-b148][history-prefix-session][history-prefix-child]") {
+  QTemporaryDir directory;
+  auto session = open(machining(), directory);
+  const auto before = snapshot(session);
+  REQUIRE(session.begin_part_history_context(1));
+  REQUIRE(session.begin_part_history_command("part.extrude"));
+  REQUIRE(session.task().begin("foreign"));
+  edit(session, "radius", 0.5);
+  CHECK(session.part_modeling_ready());
+  CHECK_FALSE(session.derived_results_fresh());
+  CHECK_FALSE(session.publish_part_history_command("Foreign child"));
+  CHECK_FALSE(session.publish_part_workflow("Foreign root"));
+  session.cancel_part_history_command();
+  CHECK_FALSE(session.task().active());
+  CHECK_FALSE(session.part_history_command_active());
+  CHECK(session.part_workflow_active());
+  CHECK(session.history_prefix_ready());
+  CHECK(snapshot(session) == before);
+}
+
+TEST_CASE("The existing Extrude controller previews and stages a child before an invalid suffix",
+          "[gui][parity-b148][history-prefix-session][history-prefix-child]") {
+  QTemporaryDir directory;
+  auto session = open(machining(), directory);
+  const auto before = snapshot(session);
+  REQUIRE(session.begin_part_history_context(1));
+  edit(session, "radius", 30);
+  REQUIRE(session.begin_part_history_command("part.extrude"));
+  REQUIRE(session.task().begin("part.extrude"));
+  REQUIRE(session.task().begin_parameter_editing());
+  REQUIRE(session.task().show_preview());
+  GuiInteractiveExtrudeController controller;
+  REQUIRE(controller.begin_with_new_inputs(
+      session, SketchId("profile"), ProfileId("profile.profile"), FeatureId("child"), "Child",
+      checked(Parameter::create_length(ParameterId("child.depth"), "Child depth",
+                                       checked(Quantity::length_mm(3)))),
+      checked(Body::create(BodyId("body.child"), "Child", BodyKind::Solid))));
+  const auto preview = checked(controller.preview_shape(session));
+  CHECK(geometry::RectangleExtrusionAdapter{}.summarize(preview).volume_mm3 == Catch::Approx(600));
+  REQUIRE(controller.apply(session));
+  CHECK(session.history_prefix_count() == 2);
+  REQUIRE(session.publish_part_history_command("Extrude child"));
+  CHECK_FALSE(session.part_history_command_active());
+  CHECK_FALSE(session.publish_part_workflow("Still active child task"));
+  REQUIRE(session.task().apply());
+  CHECK_FALSE(session.publish_part_workflow("Invalid full suffix"));
+  CHECK(session.history_prefix_ready());
+  CHECK((session.part_document()->authored_history_intent()->order ==
+         std::vector<std::string>{"base", "child", "fillet"}));
+  edit(session, "radius", 0.5);
+  REQUIRE(session.publish_part_workflow("Extrude before finishing"));
+  REQUIRE(session.part_shape_cache()->validate_complete_history_result(*session.part_document()));
+  CHECK(session.part_shape_cache()->body_shape_count() == 2);
+  REQUIRE(session.part_shape_cache()->find_body_shape(BodyId("body.child")));
+  CHECK(geometry::RectangleExtrusionAdapter{}
+            .summarize(*session.part_shape_cache()->find_body_shape(BodyId("body.child")))
+            .volume_mm3 == Catch::Approx(600));
+  complete_matches_fresh(session);
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == before);
+  CHECK_FALSE(session.can_undo());
 }

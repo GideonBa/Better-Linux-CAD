@@ -30,6 +30,7 @@ struct ShellHistoryMove {
   std::optional<std::string> target;
   bool after = false;
   std::size_t revision = 0;
+  bool marker = false;
 };
 
 // Dragging proposes a history transaction. The Qt model is never moved before
@@ -39,9 +40,14 @@ public:
   static constexpr int feature_role = Qt::UserRole + 3;
   static constexpr int owner_role = Qt::UserRole + 4;
   static constexpr int path_role = Qt::UserRole + 5;
+  static constexpr int marker_role = Qt::UserRole + 6;
+  static constexpr int marker_position_role = Qt::UserRole + 7;
   explicit ShellHistoryBrowser(QWidget* parent = nullptr);
   [[nodiscard]] bool pressed_current_item() const noexcept {
     return pressed_current_item_;
+  }
+  [[nodiscard]] bool dragging() const noexcept {
+    return dragging_;
   }
   void set_history_callbacks(std::function<Result<std::size_t>(const ShellHistoryMove&)> check,
                              std::function<void(ShellHistoryMove)> propose,
@@ -58,6 +64,7 @@ protected:
   void paintEvent(QPaintEvent*) override;
   void resizeEvent(QResizeEvent*) override;
   void mousePressEvent(QMouseEvent*) override;
+  void startDrag(Qt::DropActions) override;
 
 private:
   [[nodiscard]] std::optional<ShellHistoryMove> decode(const QMimeData*, QPoint point) const;
@@ -67,6 +74,7 @@ private:
   QString nonce_;
   std::optional<int> drop_line_;
   bool pressed_current_item_ = false;
+  bool dragging_ = false;
 };
 
 class ShellHistoryTools final : public QObject {
@@ -77,7 +85,15 @@ public:
   [[nodiscard]] QAction& restore_action() noexcept;
   [[nodiscard]] QAction& reorder_action() noexcept;
   [[nodiscard]] QAction& edit_action() noexcept;
+  [[nodiscard]] QAction& marker_action() noexcept;
+  [[nodiscard]] QAction& marker_before_action() noexcept;
+  [[nodiscard]] QAction& marker_after_action() noexcept;
+  [[nodiscard]] QAction& marker_end_action() noexcept;
+  [[nodiscard]] bool owns_action(const QAction*) const noexcept;
   [[nodiscard]] bool active() const noexcept;
+  [[nodiscard]] bool prefix_active() const noexcept;
+  [[nodiscard]] Result<std::size_t> begin_prefix(std::size_t count);
+  void append_browser_marker();
   [[nodiscard]] Result<std::size_t> begin_suppression(std::string feature, bool suppressed);
   [[nodiscard]] Result<std::size_t> begin_reorder();
   [[nodiscard]] Result<std::size_t> apply();

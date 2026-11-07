@@ -180,11 +180,10 @@ ResultFaceSupportGeometry::resolve(const PartDocument& document, const ResultFac
   return frame_for(plane.id(), matches.front());
 }
 
-Result<std::vector<ResultFaceSelectionTarget>>
-ResultFaceSupportGeometry::selectable_faces(const PartDocument& document, const ShapeCache& cache,
-                                            const BodyId& body,
-                                            StepImportTopologyContext* import_context) {
-  const auto history = detail::validate_history_evaluation(document, &cache);
+Result<std::vector<ResultFaceSelectionTarget>> ResultFaceSupportGeometry::selectable_faces(
+    const PartDocument& document, const ShapeCache& cache, const BodyId& body,
+    StepImportTopologyContext* import_context, std::optional<std::size_t> history_prefix) {
+  const auto history = detail::validate_history_modeling_scope(document, cache, history_prefix);
   if (!history)
     return Result<std::vector<ResultFaceSelectionTarget>>::failure(history.error());
   const auto* model_body = document.find_body(body);
@@ -193,8 +192,9 @@ ResultFaceSupportGeometry::selectable_faces(const PartDocument& document, const 
       model_body->visibility() != BodyVisibility::Visible || !result || result->shape.empty())
     return Result<std::vector<ResultFaceSelectionTarget>>::failure(Error::validation(
         body.value(), "Face-supported sketches require a visible recomputed solid Body"));
-  auto aliases = FinishingSelectionBuilder::build(
-      document, cache, body, PartFeatureInputRole::ShellRemovalFace, import_context);
+  auto aliases = FinishingSelectionBuilder::build(document, cache, body,
+                                                  PartFeatureInputRole::ShellRemovalFace,
+                                                  import_context, history_prefix);
   std::vector<ResultFaceSelectionTarget> targets;
   for (TopExp_Explorer it(result->shape.impl_->shape, TopAbs_FACE); it.More(); it.Next()) {
     const auto face = TopoDS::Face(it.Current());

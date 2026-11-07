@@ -746,7 +746,7 @@ struct ShellFeatureEditTools::Impl {
     return deserialize_part_document_from_json(root.dump());
   }
   bool fresh() const {
-    if (!edit.active() || !session.part_document() || !session.derived_results_fresh() ||
+    if (!edit.active() || !session.part_document() || !session.part_modeling_ready() ||
         session.task().command_id() != task_id || session.task().stage() != GuiTaskStage::Preview)
       return false;
     auto current = serialize_part_document_to_json(*session.part_document());
@@ -782,15 +782,24 @@ struct ShellFeatureEditTools::Impl {
     auto cache = geometry::ShapeCache::create(ShapeCacheId("feature.edit.preview"));
     if (!cache)
       return reject(cache.error());
-    auto executed = geometry::GeometryRecomputeExecutor{context}.execute_document(candidate.value(),
-                                                                                  cache.value());
-    if (!executed)
-      return reject(executed.error());
+    if (session.history_prefix_count()) {
+      auto scoped = session.preview_part_history_candidate(candidate.value());
+      if (!scoped)
+        return reject(scoped.error());
+      cache = std::move(scoped);
+    } else {
+      auto executed = geometry::GeometryRecomputeExecutor{context}.execute_document(
+          candidate.value(), cache.value());
+      if (!executed)
+        return reject(executed.error());
+    }
     const geometry::ViewportSceneBuilder builder{context};
-    auto scene = builder.build_part(candidate.value(), cache.value());
+    auto scene =
+        builder.build_part(candidate.value(), cache.value(), session.history_prefix_count());
     if (!scene)
       return reject(scene.error());
-    auto original = builder.build_part(*session.part_document(), *session.part_shape_cache());
+    auto original = builder.build_part(*session.part_document(), *session.part_shape_cache(),
+                                       session.history_prefix_count());
     if (!original)
       return reject(original.error());
     std::vector<geometry::GeometryShape> shapes;
@@ -814,8 +823,11 @@ struct ShellFeatureEditTools::Impl {
       viewport.clear_feature_preview();
     valid = true;
     apply->setEnabled(layer.active_handle_id().empty());
-    status->setText("Preview valid, including downstream features. Commit changes with "
-                    "Apply.");
+    status->setText(
+        session.history_prefix_count()
+            ? "Prefix preview valid. Apply stages this edit; finish End of Part to validate the "
+              "complete model."
+            : "Preview valid, including downstream features. Commit changes with Apply.");
     if (layer.active_handle_id().empty())
       publish_handle();
     owner.refresh_presentation();
@@ -915,9 +927,19 @@ GuiViewportManipulatorLayer& ShellFeatureEditTools::manipulators() {
 Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   auto& p = *impl_;
   if (active() || p.window.active_sketch() || p.session.task().active() ||
-      !p.session.derived_results_fresh())
+      !p.session.part_modeling_ready())
     return Result<std::size_t>::failure(
         error("Feature editing requires a current part without an active command"));
+  if (const auto prefix = p.session.history_prefix_count()) {
+    const auto history = p.session.part_document()->executable_history();
+    if (!history)
+      return Result<std::size_t>::failure(history.error());
+    const auto found = std::find_if(history.value().begin(), history.value().end(),
+                                    [&](const auto& row) { return row.node_id == id.value(); });
+    if (found == history.value().end() || std::size_t(found - history.value().begin()) >= *prefix)
+      return Result<std::size_t>::failure(
+          error("Move End of Part after this feature before editing it."));
+  }
   auto begun = p.edit.begin(p.session, id);
   if (!begun)
     return begun;

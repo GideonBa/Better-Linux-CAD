@@ -5,6 +5,7 @@
 #include "blcad/core/result.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -46,14 +47,17 @@ public:
   ViewportSceneBuilder() = default;
   explicit ViewportSceneBuilder(StepImportTopologyContext* context) : import_context_(context) {}
   [[nodiscard]] Result<std::vector<ViewportSceneItem>>
-  build_part(const PartDocument& document, const ShapeCache& shape_cache) const;
+  build_part(const PartDocument& document, const ShapeCache& shape_cache,
+             std::optional<std::size_t> history_prefix = std::nullopt) const;
   // Disposable, typed presentations of supported construction sources. Never
   // infer persistent semantic references from kernel subshape ordinals.
   [[nodiscard]] Result<std::vector<ConstructionSelectionTarget>>
-  build_construction_sources(const PartDocument& document, const ShapeCache& shape_cache) const;
+  build_construction_sources(const PartDocument& document, const ShapeCache& shape_cache,
+                             std::optional<std::size_t> history_prefix = std::nullopt) const;
   // Supported semantic edge axes at the same cache-aware positions used by Body Rotate.
   [[nodiscard]] Result<std::vector<ConstructionSelectionTarget>>
-  build_body_rotation_sources(const PartDocument& document, const ShapeCache& shape_cache) const;
+  build_body_rotation_sources(const PartDocument& document, const ShapeCache& shape_cache,
+                              std::optional<std::size_t> history_prefix = std::nullopt) const;
   [[nodiscard]] Result<std::vector<ViewportSceneItem>> build_project(const Project& project) const;
 
 private:

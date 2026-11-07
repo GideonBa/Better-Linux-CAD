@@ -25,8 +25,9 @@ Result<std::vector<geometry::FinishingSelectionTarget>>
 finishing_targets(const GuiDocumentSession& session, const BodyId& body,
                   PartFeatureInputRole role) {
   return query_with_step_import_context(session, [&](auto* context) {
-    return geometry::FinishingSelectionBuilder::build(
-        *session.part_document(), *session.part_shape_cache(), body, role, context);
+    return geometry::FinishingSelectionBuilder::build(*session.part_document(),
+                                                      *session.part_shape_cache(), body, role,
+                                                      context, session.history_prefix_count());
   });
 }
 PartFeatureInputRole selection_role(ShellFeatureTools::Command command) {
@@ -105,7 +106,7 @@ std::uint32_t ShellFeatureTools::idle_finishing_selection_mask() const {
   if (active() || session_.task().active() || window_.active_sketch() ||
       session_.reference_repair_mode() || session_.document_kind() != GuiDocumentKind::Part ||
       session_.workspace() != GuiWorkspace::Part || !session_.part_shape_cache() ||
-      !session_.derived_results_fresh())
+      !session_.part_modeling_ready())
     return 0;
   const auto mask = viewport_.selection_filter_mask();
   return mask == selection_kind_bit(GuiSelectionKind::Edge) ||
@@ -590,7 +591,8 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::finishing_selection_
       if (!edges) {
         auto supports = query_with_step_import_context(session_, [&](auto* context) {
           return geometry::ResultFaceSupportGeometry::selectable_faces(
-              *session_.part_document(), *session_.part_shape_cache(), body.id(), context);
+              *session_.part_document(), *session_.part_shape_cache(), body.id(), context,
+              session_.history_prefix_count());
         });
         if (supports)
           for (const auto& target : supports.value()) {

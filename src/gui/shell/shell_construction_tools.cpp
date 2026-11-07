@@ -265,7 +265,7 @@ void ShellConstructionTools::fill_references() {
   selection_targets_.clear();
   auto targets = query_with_step_import_context(window_.session(), [&](auto* context) {
     return geometry::ViewportSceneBuilder{context}.build_construction_sources(
-        part, *window_.session().part_shape_cache());
+        part, *window_.session().part_shape_cache(), window_.session().history_prefix_count());
   });
   if (!targets) {
     window_.report_error(targets.error());
@@ -308,7 +308,7 @@ void ShellConstructionTools::fill_references() {
 Result<std::size_t> ShellConstructionTools::begin(Kind kind) {
   auto& session = window_.session();
   if (!session.part_document() || session.part_document()->is_reference_part() ||
-      !session.derived_results_fresh() || window_.active_sketch() || session.task().active())
+      !session.part_modeling_ready() || window_.active_sketch() || session.task().active())
     return Result<std::size_t>::failure(
         error("Construction requires a current part without an active command"));
   updating_ = true;
@@ -340,8 +340,7 @@ Result<std::size_t> ShellConstructionTools::begin(Kind kind) {
 Result<std::size_t> ShellConstructionTools::begin_edit(std::string_view object_id) {
   auto& session = window_.session();
   const auto* part = session.part_document();
-  if (!part || !session.derived_results_fresh() || window_.active_sketch() ||
-      session.task().active())
+  if (!part || !session.part_modeling_ready() || window_.active_sketch() || session.task().active())
     return Result<std::size_t>::failure(
         error("Editing requires a current part without an active command"));
   // Principal origin geometry stays fixed in the shell.
@@ -805,7 +804,7 @@ bool ShellConstructionTools::current() const {
   const auto& session = window_.session();
   return active_ && session.part_document() && session.part_shape_cache() &&
          session.task().command_id() == (editing_ ? edit_task_id : task_id) &&
-         session.derived_results_fresh() && session.model_revision() == revision_;
+         session.part_modeling_ready() && session.model_revision() == revision_;
 }
 Result<std::size_t> ShellConstructionTools::preview() {
   if (!current())
@@ -822,7 +821,12 @@ Result<std::size_t> ShellConstructionTools::preview() {
     return Result<std::size_t>::failure(import_context.error());
   auto* context = import_context.value().get();
   std::optional<geometry::ShapeCache> preview_cache;
-  if (editing_) {
+  if (window_.session().history_prefix_count()) {
+    auto cache = window_.session().preview_part_history_candidate(candidate);
+    if (!cache)
+      return Result<std::size_t>::failure(cache.error());
+    preview_cache = std::move(cache.value());
+  } else if (editing_) {
     auto cache = geometry::ShapeCache::create(ShapeCacheId("construction.edit.preview"));
     if (!cache)
       return Result<std::size_t>::failure(cache.error());
@@ -833,8 +837,9 @@ Result<std::size_t> ShellConstructionTools::preview() {
     preview_cache = std::move(cache.value());
   }
   const geometry::ViewportSceneBuilder builder{context};
-  auto scene = builder.build_part(candidate, preview_cache ? *preview_cache
-                                                           : *window_.session().part_shape_cache());
+  auto scene = builder.build_part(
+      candidate, preview_cache ? *preview_cache : *window_.session().part_shape_cache(),
+      window_.session().history_prefix_count());
   if (!scene)
     return Result<std::size_t>::failure(scene.error());
   const auto kind = static_cast<Kind>(kind_->currentIndex());
@@ -870,7 +875,8 @@ Result<std::size_t> ShellConstructionTools::preview() {
     return Result<std::size_t>::failure(error("Could not display construction geometry"));
   if (editing_) {
     auto original = builder.build_part(*window_.session().part_document(),
-                                       *window_.session().part_shape_cache());
+                                       *window_.session().part_shape_cache(),
+                                       window_.session().history_prefix_count());
     if (!original)
       return Result<std::size_t>::failure(original.error());
     for (const auto& item : original.value())
@@ -965,7 +971,7 @@ void ShellConstructionTools::refresh() {
   }
   const auto& session = window_.session();
   const bool enabled = session.part_document() && !session.part_document()->is_reference_part() &&
-                       session.derived_results_fresh() && !window_.active_sketch() &&
+                       session.part_modeling_ready() && !window_.active_sketch() &&
                        !session.task().active();
   construction_action_->setEnabled(enabled);
   workplane_action_->setEnabled(enabled);

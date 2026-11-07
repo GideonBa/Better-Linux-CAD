@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 147
 current_block: 148
-current_boundary: Block 148A merged; 148B session foundation verified; native marker integration next
+current_boundary: Block 148B verified; combined acceptance and capability promotion pending
 current_tag: "[parity-b148]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -2070,7 +2070,7 @@ The shared UI contract stays in `user-interface.md`; effective state/cache owner
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 148A | Existing browser follows executable order and shows authored/effective status; staged suppression/restore with explicit dependent closure; validated reorder/drag/drop; context Edit uses the existing editor; full-source preview/Apply/Cancel, persistence and native interaction tests | Merged via PR #148 |
-| 148B | Visibly labelled transient End of Part prefix, edit/insert at marker, complete suffix validation before one Apply, committed-only Save, disabled incomplete export/analysis and Cancel/camera/selection restoration | In progress; session foundation verified; native integration pending |
+| 148B | Visibly labelled transient End of Part prefix, edit/insert at marker, complete suffix validation before one Apply, committed-only Save, disabled incomplete export/analysis and Cancel/camera/selection restoration | Verified; native integration delivery pending |
 | 148C | H01–H03/UI01 combined native acceptance at 100%/150%, compact layout/captures, failure recovery and complete capability evidence | Planned; not started |
 
 Only the whole completed/verified block advances numbered status or planned history UI capabilities.
@@ -2111,6 +2111,21 @@ Session-foundation delivery: [PR #149](https://github.com/GideonBa/Better-Linux-
 implementation `9ec2bc2`. The delivery-record update changes documentation only and preserves all
 976 runtime fingerprints. Normal merge/confirmed state and reviewed-tree comparison remain
 required before native marker integration starts.
+
+Native integration starts on `feat/end-of-part-browser` from verified merged main `ec1e42e`
+(PR #149), after exact reviewed-tree comparison. It adds explicitly qualified prefix scene/input
+consumers, browser marker/context controls, a fixed visible root context and existing child editors/
+authoring tools. The existing outer Part checkpoint remains the complete Save/publication authority;
+child checkpoints bound local Undo and cannot publish the parent. Full suffix/native H02/H03/UI01
+acceptance is still required before B/C or the whole block is marked complete.
+
+148B native integration is implemented and verified: full Geometry **575 / 51,871**, full offscreen
+GUI **716 cases: 680 passed, 36 expected native-only skips / 89,560 assertions**, native 100%
+combinations **67 / 5,441**, compact native 150% history/prefix cases **12 / 673**, no native skips
+or failures. Focused checks and retained raw UI captures are recorded in the existing setup/UI docs.
+Core code/tests are unchanged; its previous full result is retained. Whole 148 remains in progress
+and implemented-through remains 147; combined H01–H03/UI01 acceptance and capability promotion
+remain 148C. Normal PR delivery, confirmed merge and refreshed-main/tree comparison precede C.
 
 ## Later phases
 

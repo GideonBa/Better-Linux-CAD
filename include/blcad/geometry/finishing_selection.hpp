@@ -3,6 +3,7 @@
 #include "blcad/core/part_feature_input_reference.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 
+#include <optional>
 #include <variant>
 #include <vector>
 
@@ -24,7 +25,8 @@ class FinishingSelectionBuilder {
 public:
   [[nodiscard]] static Result<std::vector<FinishingSelectionTarget>>
   build(const PartDocument& document, const ShapeCache& cache, const BodyId& body,
-        PartFeatureInputRole role, StepImportTopologyContext* import_context = nullptr);
+        PartFeatureInputRole role, StepImportTopologyContext* import_context = nullptr,
+        std::optional<std::size_t> history_prefix = std::nullopt);
 };
 
 } // namespace blcad::geometry
