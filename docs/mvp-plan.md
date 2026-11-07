@@ -2070,7 +2070,7 @@ The shared UI contract stays in `user-interface.md`; effective state/cache owner
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 148A | Existing browser follows executable order and shows authored/effective status; staged suppression/restore with explicit dependent closure; validated reorder/drag/drop; context Edit uses the existing editor; full-source preview/Apply/Cancel, persistence and native interaction tests | Merged via PR #148 |
-| 148B | Visibly labelled transient End of Part prefix, edit/insert at marker, complete suffix validation before one Apply, committed-only Save, disabled incomplete export/analysis and Cancel/camera/selection restoration | Verified; native integration delivery pending |
+| 148B | Visibly labelled transient End of Part prefix, edit/insert at marker, complete suffix validation before one Apply, committed-only Save, disabled incomplete export/analysis and Cancel/camera/selection restoration | Verified; native integration delivered via PR #150 |
 | 148C | H01–H03/UI01 combined native acceptance at 100%/150%, compact layout/captures, failure recovery and complete capability evidence | Planned; not started |
 
 Only the whole completed/verified block advances numbered status or planned history UI capabilities.
@@ -2126,6 +2126,12 @@ or failures. Focused checks and retained raw UI captures are recorded in the exi
 Core code/tests are unchanged; its previous full result is retained. Whole 148 remains in progress
 and implemented-through remains 147; combined H01–H03/UI01 acceptance and capability promotion
 remain 148C. Normal PR delivery, confirmed merge and refreshed-main/tree comparison precede C.
+
+
+148B native integration delivery: [PR #150](https://github.com/GideonBa/Better-Linux-CAD/pull/150),
+implementation `92b8c38`. The delivery-record update changes documentation only and preserves all
+976 runtime fingerprints. Confirm normal merge and compare refreshed main with the reviewed tree
+before starting the 148C acceptance branch.
 
 ## Later phases
 
