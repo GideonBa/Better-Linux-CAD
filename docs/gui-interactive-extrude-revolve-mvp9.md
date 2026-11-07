@@ -93,6 +93,38 @@ No schema or new geometric capability is added. Create Another and command-first
 remain slice 145C3. Source controller/widget/native proofs use `[source-sketch-workflow]` and its
 more specific tags; actual acceptance results belong in `development-setup.md`.
 
+## Profile collection and Create Another — Block 145C3, 2026-11-06
+
+Extrude's global ribbon/search command can enter the existing workflow without preselection when
+a supported 2D source exists. Input Geometry offers a Profile / Open Line selector with semantic
+Sketch/Profile identity, count and Pick/Clear. Compatible preselection still seeds it; browser
+context commands still require their corresponding compatible selection. During collection the
+root workflow is active and cancellable, while scalar/advanced inputs and Apply remain disabled.
+Clear discards the pending controller/preview without discarding earlier source edits in the same
+root draft. Incidental selection does not change an already chosen source unless primary Pick is
+active; primary and limit-face Pick roles are exclusive.
+
+Switching sources revalidates current field text and selected references. Invalid taper text remains
+visible and prevents Apply/Create Another. The existing primary HUD retains its explicit visible
+last-valid rollback behavior. Along Path cannot carry into an open thin line: direction becomes
+unselected until corrected. Thin-source discovery now excludes Construction/Centerline roles as
+well as degenerate or ambiguous linework, through the existing shared source helper.
+
+Create Another is a third fixed completion action beside Apply/Cancel. It commits the complete
+current workflow once, then opens a fresh collecting workflow. Only literal values and mode enums
+are retained; Profile, target Body, Path and both limit faces are unselected. Required references
+must be chosen again. A newly shown Extrude task scrolls to its beginning; the primary Pick/count
+row is fully visible even after editing fields near the bottom of the preceding task. Save in this state writes the preceding committed feature. Cancel/Escape
+removes only the fresh draft. Each accepted feature remains one independent Undo/Redo step,
+including source Sketch changes. Ordinary Repeat starts through the existing command entry point.
+No persistent settings/preset format or new geometric capability is introduced.
+
+Proofs: `[create-another]` covers keyboard source/scalar entry, clearing, exclusions, incompatible
+direction, Cut limits, independent history, Save/Open, Repeat and compact actions;
+`[create-another-workflow]` adds actual Sketch creation/editing and committed-only Save between
+two accepted features. The existing source dimension, browser edit, command search and combination
+proofs remain required at native ordinary and scaled sizes. Actual results are recorded separately.
+
 ## Replacement-shell extent editor — Block 136, 2026-10-24
 
 The existing Extrusion task now exposes all seven scalar/face termination modes, `NewBody`,

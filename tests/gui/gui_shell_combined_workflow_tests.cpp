@@ -3575,7 +3575,8 @@ TEST_CASE("Combined UI filters constrain model selection while finishing and hol
   ui.tree(sketch.value());
   REQUIRE(ui.action("extrude").isEnabled());
   ui.choose(filter, 5); // Bodies evicts the browser-only profile fallback.
-  CHECK_FALSE(ui.action("extrude").isEnabled());
+  CHECK(ui.action("extrude").isEnabled());
+  CHECK_FALSE(ui.window.feature_tools().selected_profile());
   ui.tree("datum.xy");
   CHECK_FALSE(ui.action("create_sketch").isEnabled());
   CHECK(ui.window.session().selection().empty());
@@ -3648,7 +3649,7 @@ TEST_CASE("Combined UI filters constrain model selection while finishing and hol
   CHECK_FALSE(filter.isEnabled());
   ui.command("finish_sketch");
   CHECK(filter.currentIndex() == 5);
-  CHECK_FALSE(ui.action("extrude").isEnabled());
+  CHECK(ui.action("extrude").isEnabled());
   CHECK(ui.snapshot() == states.back());
   ui.capture("selection-filter-after-history");
   ui.roundtrip(directory.filePath("filtered-machining.blcad"));
@@ -6249,4 +6250,54 @@ TEST_CASE(
   ui.roundtrip(directory.filePath("complete.blcad"));
   CHECK(ui.summary(body).volume_mm3 == Approx(6400).margin(1e-5));
   ui.capture("source-breadcrumb-model");
+}
+
+TEST_CASE(
+    "Create Another combines new profile selection with a source Sketch edit and one history step",
+    "[gui][integration][parity-b145][create-another-workflow][shell-combined-workflow]") {
+  WorkflowUi ui;
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ui.new_document("Create Another with Sketch edit");
+  const auto first = ui.rectangle("datum.xy", {20, 20}, {40, 30}, Point2{70, 70});
+  const auto second = ui.rectangle("datum.xy", {60, 20}, {72, 30}, Point2{90, 70});
+  ui.tree(first.value());
+  ui.command("extrude");
+  ui.scalar("8 mm");
+  ui.button("blcad.feature.create_another");
+  const auto accepted_first = ui.snapshot();
+  REQUIRE(ui.window.session().part_document()->features().size() == 1);
+  auto& sources = ui.widget<QComboBox>("blcad.extrude.profile");
+  CHECK(sources.currentIndex() == -1);
+  int row = -1;
+  for (int index = 0; index < sources.count(); ++index)
+    if (sources.itemData(index).toStringList().front() == QString::fromStdString(second.value()))
+      row = index;
+  ui.choose(sources, row);
+  ui.click(ui.widget<QToolButton>("blcad.feature.source_breadcrumb"));
+  REQUIRE(ui.window.active_sketch() == second);
+  ui.command("sketch.create.point");
+  ui.plane_pick({35, 15});
+  ui.key(ui.window, Qt::Key_Escape);
+  const auto draft = ui.snapshot();
+  CHECK(draft != accepted_first);
+  ui.file("save_as", directory.filePath("first.blcad"));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(directory.filePath("first.blcad").toStdString()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == accepted_first);
+  ui.click(ui.widget<QToolButton>("blcad.feature.breadcrumb"));
+  CHECK(ui.widget<QLineEdit>("blcad.manipulator_numeric_hud").text() == "8");
+  REQUIRE(ui.window.viewport().feature_preview_active());
+  ui.button("blcad.feature.apply");
+  const auto complete = ui.snapshot();
+  REQUIRE(ui.window.session().part_document()->features().size() == 2);
+  ui.command("undo");
+  CHECK(ui.snapshot() == accepted_first);
+  CHECK_FALSE(ui.window.session().dirty());
+  ui.command("redo");
+  CHECK(ui.snapshot() == complete);
+  ui.command("save");
+  REQUIRE(reopened.open_file(directory.filePath("first.blcad").toStdString()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == complete);
+  ui.capture("create-another-source-model");
 }

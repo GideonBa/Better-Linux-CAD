@@ -425,7 +425,7 @@ TEST_CASE("Finish Sketch cancels a re-armed Line step and exposes the closed pro
   auto& feature_tools = window.feature_tools();
   // Reproduce both user-facing selection routes after finishing without Esc.
   REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
-  CHECK_FALSE(feature_tools.extrude_action().isEnabled());
+  CHECK(feature_tools.extrude_action().isEnabled());
   auto* sketch_item =
       find_tree_item(window.model_browser(), QStringLiteral("sketch.skizze1"));
   REQUIRE(sketch_item != nullptr);
@@ -436,7 +436,7 @@ TEST_CASE("Finish Sketch cancels a re-armed Line step and exposes the closed pro
   feature_tools.cancel();
 
   REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
-  CHECK_FALSE(feature_tools.extrude_action().isEnabled());
+  CHECK(feature_tools.extrude_action().isEnabled());
   // Root cancellation restores a complete session checkpoint. Reacquire by
   // semantic identity instead of retaining a borrowed Sketch across replacement.
   const auto* restored = window.session().part_document()->find_sketch(SketchId("sketch.skizze1"));
@@ -470,7 +470,7 @@ TEST_CASE("Finish Sketch materializes every independent freehand contour",
   REQUIRE(sketch != nullptr);
   CHECK(sketch->closed_profiles().size() == 2U);
   CHECK_FALSE(window.feature_tools().selected_profile().has_value());
-  CHECK_FALSE(window.feature_tools().extrude_action().isEnabled());
+  CHECK(window.feature_tools().extrude_action().isEnabled());
 }
 
 TEST_CASE("An unrelated raw entity never falls back to the Sketch's unique profile",
@@ -489,7 +489,7 @@ TEST_CASE("An unrelated raw entity never falls back to the Sketch's unique profi
   REQUIRE(window.viewport().select_semantic(
       "sketch/sketch.skizze1/entity/line.unrelated"));
   CHECK_FALSE(window.feature_tools().selected_profile().has_value());
-  CHECK_FALSE(window.feature_tools().extrude_action().isEnabled());
+  CHECK(window.feature_tools().extrude_action().isEnabled());
   CHECK_FALSE(window.feature_tools().revolve_action().isEnabled());
 }
 
@@ -820,7 +820,7 @@ TEST_CASE("Block 135 profile handoff follows current semantic selection exactly"
 
   REQUIRE(window.viewport().select_semantic("datum-plane/datum.xy"));
   CHECK_FALSE(tools.selected_profile().has_value());
-  CHECK_FALSE(tools.extrude_action().isEnabled());
+  CHECK(tools.extrude_action().isEnabled());
   CHECK_FALSE(tools.revolve_action().isEnabled());
 
   const std::string semantic =
@@ -1014,7 +1014,7 @@ TEST_CASE("Extrusion starts through real tree and ribbon mouse clicks",
   REQUIRE_FALSE(datum_rect.isEmpty());
   click_widget(*tree.viewport(), datum_rect.center());
   CHECK_FALSE(window.feature_tools().selected_profile().has_value());
-  CHECK_FALSE(window.feature_tools().extrude_action().isEnabled());
+  CHECK(window.feature_tools().extrude_action().isEnabled());
 
   tree.scrollToItem(sketch_item);
   qApp->processEvents();
@@ -1324,7 +1324,7 @@ TEST_CASE("Extrusion starts from a native 3D sketch click",
 
   REQUIRE(viewport.select_semantic("datum-plane/datum.xy"));
   CHECK_FALSE(window.feature_tools().selected_profile().has_value());
-  CHECK_FALSE(window.feature_tools().extrude_action().isEnabled());
+  CHECK(window.feature_tools().extrude_action().isEnabled());
   CHECK(viewport.selection_filter_mask() == 0xFFFFFFFFU);
   viewport.set_projection(GuiViewportProjection::Orthographic);
   REQUIRE(viewport.set_plane_camera({15.0, 10.0, 0.0}, {0.0, 0.0, 1.0},

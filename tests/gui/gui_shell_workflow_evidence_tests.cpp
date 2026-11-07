@@ -315,19 +315,31 @@ TEST_CASE("Advanced workflow capability mapping separates planned work from exec
 TEST_CASE("Advanced workflow evidence rejects fabricated implementations and broken proof mappings",
           "[gui][shell-coverage][integration][gui-feature-coverage][parity-b145]") {
   const auto original = program();
-  const auto reject = [&](auto mutate, int index = 0) {
+  const auto reject = [&](auto mutate, bool planned = false) {
     auto candidate = original;
     auto entries = candidate["capabilities"].toArray();
-    auto entry = entries[index].toObject();
+    auto entry = entries[0].toObject();
+    if (planned) {
+      // Construct a valid planned entry independently of delivery order. A
+      // previously planned capability may become implemented in a later slice.
+      entry["owner"] = 204;
+      entry["disposition"] = "planned";
+      entry["planned_commands"] = QJsonArray{"Future command"};
+      for (const auto key : {"commands", "apis", "proofs"})
+        entry[key] = QJsonArray{};
+      entries[0] = entry;
+      candidate["capabilities"] = entries;
+      REQUIRE(audit(candidate).isEmpty());
+    }
     mutate(entry);
-    entries[index] = entry;
+    entries[0] = entry;
     candidate["capabilities"] = entries;
     CHECK_FALSE(audit(candidate).isEmpty());
   };
-  reject([](auto& entry) { entry["disposition"] = "implemented"; }, 1);
-  reject([](auto& entry) { entry["commands"] = QJsonArray{"blcad.action.fake"}; }, 1);
-  reject([](auto& entry) { entry["proofs"] = QJsonArray{QJsonObject{}}; }, 1);
-  reject([](auto& entry) { entry["planned_commands"] = QJsonArray{""}; }, 1);
+  reject([](auto& entry) { entry["disposition"] = "implemented"; }, true);
+  reject([](auto& entry) { entry["commands"] = QJsonArray{"blcad.action.fake"}; }, true);
+  reject([](auto& entry) { entry["proofs"] = QJsonArray{QJsonObject{}}; }, true);
+  reject([](auto& entry) { entry["planned_commands"] = QJsonArray{""}; }, true);
   reject([](auto& entry) { entry["owner"] = 149.5; });
   reject([](auto& entry) { entry["owner"] = 205; });
   reject([](auto& entry) {

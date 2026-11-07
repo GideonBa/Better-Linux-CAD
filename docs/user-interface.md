@@ -83,7 +83,8 @@ owned property/task panels. Keep task docking/floating recoverable, with the cur
 task location as the default. Do not replace the accepted shell or force a new window per feature.
 Use Autodesk's [property panels](https://help.autodesk.com/cloudhelp/2026/ENU/Inventor-Help/files/GUID-3E5505B9-9F60-43A0-BF32-97D183B91A70.htm)
 and [browser](https://help.autodesk.com/cloudhelp/2026/ENU/Inventor-Help/files/GUID-EDF6B951-C309-44A8-868C-B72D99F6D5A7.htm)
-as workflow references. The detailed behavior below is BLCAD's planned implementation contract.
+as workflow references. The shared Extrude behavior below is implemented and accepted in Block 145;
+later feature-family adoption remains assigned to its numbered block.
 
 ### Shared property panel behavior
 
@@ -167,6 +168,48 @@ No schema changes. Native views show the [source Sketch context](images/extrude-
 and [compact feature return](images/extrude-source-compact.png); completion controls remain fixed
 outside scrolling content. Existing feature-edit browser routing remains its accepted owner. Command-first
 profile collection and Create Another remain C3, so C2 alone cannot close Block 145.
+
+Block 145C3 design (2026-11-06): Extrude's Input Geometry group gains an explicit Profile/Open Line
+selector using the same Pick/Clear/count component. Choices are current supported 2D materialized
+or recoverable closed regions and validated single open lines, identified by Sketch/Profile IDs;
+labels use Sketch names and region ordinals. No 3D Sketch, construction-only or ambiguous region is
+accepted. A compatible preselection seeds it. Without preselection the global Extrude action can
+start when a supported source exists, opening the same workflow in selection stage; dimensions and
+advanced controls stay disabled until a source is chosen. Old assertions that the global command
+must be disabled after selecting a datum are intentionally superseded; context actions still require
+compatible preselection. Invalid/cleared primary input cannot apply a previous controller candidate.
+
+Primary Pick and limit-face Pick roles are mutually exclusive. Browser/viewport source selection
+is captured only by the explicit active primary role, never by incidental focus changes. Changing
+primary input rebuilds the disposable controller and revalidates the current authored settings and
+visible references; existing Sketch edits remain in the same root draft until Apply or Cancel.
+No implicit region substitution occurs. A single open line cannot inherit Along Path; an incompatible
+direction stays unselected and requires correction. C2's source return preserves the selected source
+and its settings while updating available choices, rather than starting another command.
+
+Create Another sits with Apply/Cancel outside scrolling content. It validates and commits the entire
+current candidate once, then opens a fresh selection-stage Extrude with no selected profile, Body,
+path or limit faces. It retains only compatible extent/operation/direction/wall modes and literal
+scalar/taper/thickness text; no document ID enters retained settings. Input groups expand and newly shown Extrude tasks scroll to the beginning so the primary Pick/count
+row is visible. All picks are explicit, and Apply stays disabled until the new candidate is complete. Cancelling that fresh
+task preserves the preceding accepted feature/history/files. It adds no hidden second Apply or
+repeat transaction. Existing Repeat continues through the ordinary command entry point. Save in
+selection stage still writes the committed entry snapshot. No schema changes. Native proof must
+cover two distinct sources, invalid/cleared input, source-Sketch editing, retained settings without
+stale targets, one-step history per feature, compact/scaled controls, reopening and existing feature
+editing before Block 145 can close.
+
+
+Block 145 acceptance (2026-11-07): all serial slices are implemented for the existing Extrude,
+including command-first entry, accordion/selector diagnostics, source Sketch editing, one root
+publication, Create Another and committed-only Save. Actual native proof includes keyboard/mouse
+input, browser edit, search/Repeat, history, ordinary/compact layouts and 100%/150% scales. See the
+[empty next candidate](images/extrude-create-another-empty.png),
+[compact populated candidate](images/extrude-create-another-compact.png) and
+[two accepted Bodies](images/extrude-create-another-model.png). `development-setup.md` records exact
+results and the limited shape/UI timing baselines. This does not close future feature blocks.
+The full-text Create Another action, scalar row above groups, initially expanded groups and retained
+BLCAD palette/fonts are deliberate presentation choices within the Inventor-like workflow.
 
 1. A compatible preselection starts the command with its first semantic input populated; command-first
    entry activates that selector. Input rows have labelled roles, selection counts, clear controls,

@@ -304,6 +304,7 @@ public:
   [[nodiscard]] Result<GuiPartFeaturePreview>
   accept_manipulator_candidate(const GuiViewportManipulatorCandidate& candidate);
   [[nodiscard]] Result<std::size_t> apply();
+  [[nodiscard]] Result<std::size_t> apply_create_another();
   void cancel() noexcept;
   void reset() noexcept;
 
@@ -315,6 +316,21 @@ protected:
   bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
+  struct ExtrudeSettings {
+    int extent{0};
+    int operation{0};
+    int direction{0};
+    int thin_mode{0};
+    QString depth, second_depth, taper, thickness, second_thickness;
+  };
+  [[nodiscard]] bool awaiting_extrude_source() const noexcept;
+  [[nodiscard]] std::vector<ProfileContext> extrude_profile_choices(bool first_only = false) const;
+  [[nodiscard]] Result<std::size_t> begin_extrude_workflow(std::optional<ExtrudeSettings> settings);
+  [[nodiscard]] Result<std::size_t> activate_extrude_source(ProfileContext source);
+  void refresh_extrude_profile_choices();
+  void change_extrude_profile();
+  void set_extrude_profile_picking(bool active);
+  void apply_extrude_settings(const ExtrudeSettings& settings);
   struct RevolveAxisChoice {
     AxisReference reference;
     GuiFeatureManipulatorFrame frame;
@@ -434,6 +450,11 @@ private:
   QToolButton* source_breadcrumb_{nullptr};
   std::optional<ProfileContext> extrude_source_;
   bool editing_source_sketch_{false};
+  bool synchronizing_extrude_source_{false};
+  bool extrude_profile_picking_{false};
+  QComboBox* extrude_profile_{nullptr};
+  ShellPropertySelector* extrude_profile_selector_{nullptr};
+  QPushButton* create_another_button_{nullptr};
   QLabel* task_summary_{nullptr};
   QAction* action_apply_{nullptr};
   QLabel* value_label_{nullptr};

@@ -168,7 +168,11 @@ TEST_CASE("Repeat uses the current profile and ordinary defaults instead of repl
   REQUIRE(window.feature_tools().apply());
   CHECK(repeat(window).text() == "Repeat: Extrude");
   tree(window, "body.base");
-  CHECK_FALSE(repeat(window).isEnabled());
+  REQUIRE(repeat(window).isEnabled());
+  invoke(window, "repeat_last_command");
+  CHECK(window.session().task().stage() == GuiTaskStage::CollectingSelection);
+  CHECK(control<QComboBox>(window, "blcad.extrude.profile").currentIndex() == -1);
+  window.feature_tools().cancel();
   // This explicit handoff occurs after normal refresh, as Finish Sketch does.
   REQUIRE(
       window.feature_tools().select_profile(SketchId("sketch.other"), ProfileId("profile.other")));

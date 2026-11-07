@@ -175,11 +175,12 @@ TEST_CASE(
   REQUIRE(action(window, "extrude").isEnabled());
   choose(window, 5);
   mask(window, selection_kind_bit(GuiSelectionKind::Body));
-  CHECK_FALSE(action(window, "extrude").isEnabled());
+  CHECK(action(window, "extrude").isEnabled());
+  CHECK_FALSE(window.feature_tools().selected_profile());
   CHECK_FALSE(
       window.feature_tools().select_profile(SketchId("sketch.base"), ProfileId("profile.base")));
   tree(window, "sketch.base");
-  CHECK_FALSE(action(window, "extrude").isEnabled());
+  CHECK(action(window, "extrude").isEnabled());
   CHECK(window.session().selection().empty());
   CHECK(window.property_inspector().rowCount() > 0);
   tree(window, "datum.xy");
@@ -195,7 +196,19 @@ TEST_CASE(
   CHECK(action(window, "extrude").isEnabled());
   choose(window, 0);
   tree(window, "body.base");
-  CHECK_FALSE(action(window, "extrude").isEnabled());
+  CHECK(action(window, "extrude").isEnabled());
+  REQUIRE(window.feature_tools().begin_extrude());
+  CHECK(window.session().task().stage() == GuiTaskStage::CollectingSelection);
+  CHECK(control<QComboBox>(window, "blcad.extrude.profile").currentIndex() == -1);
+  CHECK(window.viewport().selection_filter_mask() ==
+        selection_kind_bit(GuiSelectionKind::SketchEntity));
+  // As with the existing finishing tasks, the viewport owns the role mask;
+  // the session admits references delivered by that guarded task owner.
+  CHECK(window.session().selection().filter_mask() == 0xFFFFFFFFU);
+  window.feature_tools().cancel();
+  mask(window, 0xFFFFFFFFU);
+  REQUIRE(window.viewport().selected_semantic());
+  CHECK(window.viewport().selected_semantic()->semantic_id == "body/body.base");
 }
 
 TEST_CASE(
@@ -261,7 +274,7 @@ TEST_CASE("Shell Sketch focus and interaction capture protect the chosen model f
   REQUIRE(window.finish_active_sketch());
   mask(window, selection_kind_bit(GuiSelectionKind::Body));
   CHECK(filter(window).isEnabled());
-  CHECK_FALSE(action(window, "extrude").isEnabled());
+  CHECK(action(window, "extrude").isEnabled());
   CHECK(snapshot(window) == before);
   window.viewport().grab_interaction_mouse();
   CHECK_FALSE(filter(window).isEnabled());

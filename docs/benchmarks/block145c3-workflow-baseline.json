@@ -1,0 +1,4273 @@
+{
+  "architecture": "x86_64",
+  "build_type": "Debug",
+  "captured_utc": "2026-11-06T16:00:20Z",
+  "compiler": "13.3.0",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-1370P",
+  "device_pixel_ratio": 1,
+  "fresh_session_samples": [
+    {
+      "preview_ms": 1.135916,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    },
+    {
+      "preview_ms": 0.925404,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    },
+    {
+      "preview_ms": 0.743796,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    }
+  ],
+  "fresh_session_summary": {
+    "observed_max_ms": 1.135916,
+    "p50_ms": 0.925404,
+    "p95_ms": 1.135916,
+    "sample_count": 3
+  },
+  "kernel": "7.0.0-42-generic",
+  "measurement": "preview_shape only; fresh session is not cold process; no latency gate",
+  "occt": "7.6.3",
+  "os": "Ubuntu 24.04.5 LTS",
+  "platform": "offscreen",
+  "process_peak_rss_kib": 76176,
+  "qt": "6.4.2",
+  "reused_controller_samples": [
+    {
+      "preview_ms": 0.816714,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    },
+    {
+      "preview_ms": 0.943796,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    },
+    {
+      "preview_ms": 1.207467,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    },
+    {
+      "preview_ms": 0.734975,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    },
+    {
+      "preview_ms": 0.736376,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    },
+    {
+      "preview_ms": 0.903647,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    },
+    {
+      "preview_ms": 0.745969,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    },
+    {
+      "preview_ms": 0.747471,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    },
+    {
+      "preview_ms": 0.745498,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    },
+    {
+      "preview_ms": 0.717154,
+      "solid_count": 1,
+      "volume_mm3": 1599.9999999999995
+    }
+  ],
+  "reused_controller_summary": {
+    "observed_max_ms": 1.207467,
+    "p50_ms": 0.745969,
+    "p95_ms": 1.207467,
+    "sample_count": 10
+  },
+  "runtime_inventory": [
+    {
+      "path": "CMakeLists.txt",
+      "sha256": "407672642dffb3c40cc56369551a804f71eaa62a9398d67501faf6214a47c016"
+    },
+    {
+      "path": "CMakePresets.json",
+      "sha256": "f8ff4eec7dc161591d1c1be41956172e64b1da13bea3ae6e554511ae93fb7fc0"
+    },
+    {
+      "path": "assets/gui/README.md",
+      "sha256": "33c615f1e60b27ce31e89c341fbc9d3491964f15206face8deb3355593561b02"
+    },
+    {
+      "path": "assets/gui/archimedes-lever.gif",
+      "sha256": "c7b2f223eeb7c54ce4c402f34e6a0c1f55c6941aaa6e824c3e290ef098c21734"
+    },
+    {
+      "path": "assets/gui/arrow-down.xpm",
+      "sha256": "3dfba8bd473020b8896f3b974b790e4b0bce7a4ed25d7f781ef01d63cb2ad2e2"
+    },
+    {
+      "path": "assets/gui/arrow-left.xpm",
+      "sha256": "b290175f11c48f9c9d204f8f46ab1bb3608a2fe8a3429a3b271cb6a20ad2ece2"
+    },
+    {
+      "path": "assets/gui/arrow-right.xpm",
+      "sha256": "61e3b26d0a87aea741c7fd440bf6316e221a791f7626de420ce765e1dbbe75ff"
+    },
+    {
+      "path": "assets/gui/arrow-up.xpm",
+      "sha256": "f344f8e2b90bb9b63395a075cf01807d3fb8d580c380fee4e30e4ba9f758e8ed"
+    },
+    {
+      "path": "assets/gui/fonts/Barlow-Medium.ttf",
+      "sha256": "f8906f762cb73dca441da034bc363b2d8e2e68bc10d5c05e58717646c20cc4b4"
+    },
+    {
+      "path": "assets/gui/fonts/Barlow-OFL.txt",
+      "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f"
+    },
+    {
+      "path": "assets/gui/fonts/Barlow-Regular.ttf",
+      "sha256": "95aa02c7c43096e0dd44d787ba6216864a67157e402adab59b35572e0c1577ea"
+    },
+    {
+      "path": "assets/gui/fonts/BarlowCondensed-Medium.ttf",
+      "sha256": "262bd143292ce479ee0cd09a42b47ab173fca8e9c6eb5ed0b5c8a845bc371d17"
+    },
+    {
+      "path": "assets/gui/fonts/BarlowCondensed-OFL.txt",
+      "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f"
+    },
+    {
+      "path": "assets/gui/fonts/IBMPlexMono-OFL.txt",
+      "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
+    },
+    {
+      "path": "assets/gui/fonts/IBMPlexMono-Regular.ttf",
+      "sha256": "6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46"
+    },
+    {
+      "path": "assets/gui/fonts/README.md",
+      "sha256": "d5392af443640a1dc3f478f4220415e41e718deaa977edab1e58d03e00041d05"
+    },
+    {
+      "path": "assets/gui/fonts/source-manifest.json",
+      "sha256": "70b77ab2c2fd0f4aef94ba8ff00a291203417d830d8aeb07a91b3c55c8589cac"
+    },
+    {
+      "path": "assets/gui/pixelarticons/LICENSE",
+      "sha256": "eb113ac5006542496193a0641f8e90dcaf392e5025540ba45c2ee042af3ae51d"
+    },
+    {
+      "path": "assets/gui/pixelarticons/README.md",
+      "sha256": "d14978707ee25fff0b5722e1205e9edaa16c90cfe5b0e125510ac2dd31788a9a"
+    },
+    {
+      "path": "assets/gui/pixelarticons/catalog.json",
+      "sha256": "43a2e6d03dd0bbe8fd9bbd3f2795779941f05d83a22818d4d074a91ad7406db6"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/algorithm.xpm",
+      "sha256": "1c49f1fc97533a8e5662f5ff28954650fcf514ec756bc4a3ce2f7383057c2f4f"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/analytics.xpm",
+      "sha256": "ac3da844d37edee58732881a13f7916f0d1200bfb351aae7d34d59e0233151cb"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/arrow-down.xpm",
+      "sha256": "83f53adcf2499d3be4d870cf860da5798950496c8b9424477e2509adf84314fc"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/arrow-up.xpm",
+      "sha256": "6cf85395cfc7e8e11de119acc84bc6615617fa7f02d17f0be34927a7299185df"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/arrows-horizontal.xpm",
+      "sha256": "ebb3b87e5b50bc64b70a24a7c932e30a3a7a61448ca53e62a2355bed33c43677"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/arrows-vertical.xpm",
+      "sha256": "52f33d7e725efcd534931f64f019de77437cbe2babee3a5d790a17654548d634"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/aspect-ratio.xpm",
+      "sha256": "482dfa2674c9044f9304eca5992fd374d55809aa9f35aca10f41b2350bbaeafa"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/blocks.xpm",
+      "sha256": "c7902b6210caacf2cb776ebcb5bb9b06ee7c3390e2416dffde5456f4ff4d1a13"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/bookmark.xpm",
+      "sha256": "2864731fd5c1fd25016fa9ecb1d10da4b8300643c2518c11b018c26363a48270"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/box.xpm",
+      "sha256": "fb25851fd2e1193c21de41146a999b4e385ec9acc02331403c825b3bd482bfe6"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/calculator.xpm",
+      "sha256": "a2e164ff83c2f3e8d0cecbae8142ae07061a1f9e7949b791e54aed956e8fe3f5"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/check-double.xpm",
+      "sha256": "0f7bac452721706dedf7306bbc448820095623f8a9461372fd0a8d00ff0c72fc"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/check.xpm",
+      "sha256": "1308b56c333cac449f3377e7b2525d54ea646b52341717e153a166cabd46dc13"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/chevron-left.xpm",
+      "sha256": "1520b56cdd1f510463739c21ba64dc67e055414050f18691c9408955c6f4b836"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/chevron-right.xpm",
+      "sha256": "cb21fe6cd34100c43079f7b2d8a084da3b3dd563913b182de6029ef9a6285f7a"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/circle-info.xpm",
+      "sha256": "84cd1bd9cc94ed2bb79a2d7a8ccab0ce3836f3d4ae7b76e4c886469a7cf2e3c8"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/circle-square.xpm",
+      "sha256": "2a57fe6ab5a1c515d87fef95cb95a876a048328aebc2c9ea2749d384112f37d7"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/circle.xpm",
+      "sha256": "77e62269c03cf42fe5b4c02316087ba86ee11910750a4f1ee7b3f46dddf5ccf2"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/close.xpm",
+      "sha256": "b1e79510f27ae241fb92f65b3b4592c7381dd1da0319684e440d047ce5c1e18b"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/copy.xpm",
+      "sha256": "b7c0413e0b7960f680eafb692870da673ed77fa94e06ed301ca00f4c2a7a76ea"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/cursor-minimal.xpm",
+      "sha256": "1ed7d17028223733d88d281c403fd75880066a27395b7b492a823f70d3fed513"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/cut.xpm",
+      "sha256": "5c4ef826791bba33bc075a6adb61810620cb83bed996c525e730816514d61a3e"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/download.xpm",
+      "sha256": "ac08867ccfe913b80f6007c43dee5722406428de528dea8c4339f9c233b9df58"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/eye-off.xpm",
+      "sha256": "121e7699e30cd28df03022d678b00edbf3b519b536eb64c2b672c994974d522a"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/eye.xpm",
+      "sha256": "ff846349f78d569483a5bfa84041f366e9a29a1d5381a49b2bde4d3931bbbc34"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/file.xpm",
+      "sha256": "9212fb91894a84ea6e212c9da1c130ce72dc72395f75b0d89cea028c9aacaf06"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/files.xpm",
+      "sha256": "e298444d4703665f56e5b918857a7bd9528e8ba6c692fe6035659c1d0a8d1dcd"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/flip-horizontal-2.xpm",
+      "sha256": "e5fd63682db34791f72927db7b3518606b1808773fec7a5abbc3b75f1c8c0f4b"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/folder.xpm",
+      "sha256": "f91d21dda0e545c03fcbf81abc03e2c267b1b98fb44674ff929bb2c91fd9c511"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/git-branch.xpm",
+      "sha256": "ae28f9abee773ccd2c915c3107aa58b051e48c2e970fc33b9310bfff100ddb15"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/gps.xpm",
+      "sha256": "d7ad9e78c3f878b8e0c2a0eb2c92814d9358c8bf65f4c9ef191984d4b34a696c"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/grid-3x3.xpm",
+      "sha256": "c6fcc6f8e6a56d1129ca3bacca4b6410c22ee8eb17957fb0531b58cec5132476"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/hand.xpm",
+      "sha256": "b69c728f14c14d03f0b49da81665058efae69a0e7506130c3852d96a73693cbf"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/hash.xpm",
+      "sha256": "6eed60a3124de31ab2513268d2edbb9bbad9236d8a0b58eb76cf3f8a1ae52d9a"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/home.xpm",
+      "sha256": "2d79e780cbcf1e1b2190eb7de4eac6a3fa2c113dbd4d6c295e82288f2f4cbfcc"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/link.xpm",
+      "sha256": "5187c38e7bdd54633f3d0c732fc8edbcd589db9d56efa561f9e077937dd31c72"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/lock.xpm",
+      "sha256": "e52340cf4ce1cfdfbb18ccc1d8d5fcc41f2748d89b7b2fd38aecc636eb6a6ecd"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/minus.xpm",
+      "sha256": "6390230f2e40fc39bb899863dd30cb780f07676b526fa948851f6a919f47c471"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/move.xpm",
+      "sha256": "d115bdff9171aa9e0c7f570c5115080683f25e38d935a5ff8252078f7d176d1e"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/package.xpm",
+      "sha256": "fd11e07d7dce511d6d6694f5c9e4beb74c1b2821e7ceeab6752629cd2f41d514"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/pen-square.xpm",
+      "sha256": "7aceb95384c575f6b206f3105471c0481ba0f4f1d5588762aa73c29ee9f67f8f"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/pencil.xpm",
+      "sha256": "7c82168faba721cd9c191b598d67a4e6e4fa1c853e752f3c87a4fe15bc9a9905"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/play.xpm",
+      "sha256": "eccb9e481c0a1d3c3264681a5a12ef420b51b08b6021b5307a656e260b572738"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/plus.xpm",
+      "sha256": "00cf7abda26f1f5809864ddf43a8c5706b95bf7bfe414d5fac73651c8940f422"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/radius.xpm",
+      "sha256": "92d24b4276e862a6c585a9e627c1f1345fbcb411c895e5adb7e364853158dca7"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/redo.xpm",
+      "sha256": "8878e584f2e58ec9f44f0d32763b2165d755f5a9bb4fde9baf019ad99cd8926c"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/refresh.xpm",
+      "sha256": "964089ed6c5da9079fc47d33210dd6eaf12fab4d0713c3cc7117d2eb03bc0e0e"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/reload.xpm",
+      "sha256": "3b71670956043573560054c603c36dd5c184edb089fff2f0d07350f2276fe0bf"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/repeat.xpm",
+      "sha256": "4d343d32ad0eadb146977c7861f66aecf983b9b17d5ecf8a4be5e65fd1f9994a"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/save.xpm",
+      "sha256": "54b2cc1608e80fcbe00083356cfdf833228488426ac10c9272b6e3795a15ed5f"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/scale.xpm",
+      "sha256": "e0787ce4d411ff493558ad832a227793a4f096a7816f630ec81ff378dc9aec3f"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/search.xpm",
+      "sha256": "b4576d43211c0bcd7d509c04e5b84d057e1a621f3f257c657e64ff6bac5f8563"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/section-plus.xpm",
+      "sha256": "1f7e2825a6ee4b62a962564955a28965c70a895243ab7aaa0a490c09035f948e"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/section.xpm",
+      "sha256": "9ff1efd48d44c824fe228567ee03d9c0b209652c903b9466e62bd80786433812"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/shapes.xpm",
+      "sha256": "7fe0b050a1b119ac240670052d94d8b956836398c8ad1be9f4169092b5c1e451"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/spline-cursor.xpm",
+      "sha256": "932b842ddcc604f6d3c9ed64770179b9eee5ba4fdc229dcf17b0e5854fb24db4"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/square-alert.xpm",
+      "sha256": "bfbddfa436b208d34f90e64613105f7282bf6d6f9adc3a43a1e054825d4a28fe"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/square.xpm",
+      "sha256": "51f9faf9cf046b5cc55fbf67de429b584bc6ff6ec99a641c50858a113e4cf450"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/tangent.xpm",
+      "sha256": "5a63ca337e8f58458470a0ecc8692de593ebe776490bb2b9cf6a43d7ceb28275"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/target.xpm",
+      "sha256": "59f7811dd5a1576c683cd08ecf70f82f125d11437ce75075fa81a28a9b18226d"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/tools.xpm",
+      "sha256": "f3aae7defaddbf894a0cb504299453f15d893f14763e61831ce7aaae702ae793"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/trash.xpm",
+      "sha256": "388a51392210bf75ffcd555c1a2c506d87388c1f902aaf4c2ff74758b5fc5db7"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/undo.xpm",
+      "sha256": "df511e5b1de0961b910a2dff1f50591eb542a0361a387e34c1ee2d329a7028dc"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/unlink.xpm",
+      "sha256": "ab201c3521dcdeefcb2cc9222fb484cbec80c2714af317834bed92aa96c5df1e"
+    },
+    {
+      "path": "assets/gui/pixelarticons/masks/warning-diamond.xpm",
+      "sha256": "8718721257247c8ed7017f29606c2cd1e6db3be4de894cc3343a43cf5bdd9d17"
+    },
+    {
+      "path": "assets/gui/pixelarticons/resources.cmake",
+      "sha256": "1055deff5063f370055b1007a2d253dbb453398a0d566779fcf30870c601f17c"
+    },
+    {
+      "path": "assets/gui/pixelarticons/source-manifest.json",
+      "sha256": "49ee76cc8ee20215f7385ffea6c27c16079a590dd9e39ccee658858d389c6b15"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/algorithm.svg",
+      "sha256": "60fa5ca5053f583099fa5eafffaa86d32afe5c835e53a5589df0d1e6c0cc4d56"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/analytics.svg",
+      "sha256": "b0a3d945a4046caf8f78b0c2ed5b8fa36d822c026f9eeb0f2d9a339d73e73b16"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/arrow-down.svg",
+      "sha256": "9b1181e2c155f8817b646aba6439c0046b1f79d89425bb6f3f66ff12b8843f9a"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/arrow-up.svg",
+      "sha256": "b753a05c5fb59409bc59c0890f4afb516c96ad00136a5203d91885b5fc1d465f"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/arrows-horizontal.svg",
+      "sha256": "8fd2fefec1debd4c7c9d8233e1b2ac0e3d7d05808a7130ab11ddaa3e8689ee76"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/arrows-vertical.svg",
+      "sha256": "7df35156dd1fa41469e00bcaa48d38c4290b0cd6e40900cdba89337c543f8398"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/aspect-ratio.svg",
+      "sha256": "4b32cd568c124da9287ac2c425d23a021608df4e6d4ae7bc4103c04fd59d6889"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/blocks.svg",
+      "sha256": "ad9ef54f363bb48aae1e6489883400d7bbe1e13ff46934dd4237594280314fbf"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/bookmark.svg",
+      "sha256": "444956b195922980bc174394c7638ea63a1c14a4d0ca3e2a6efd54fbc936b314"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/box.svg",
+      "sha256": "bf7e43f06d3e4f38d7dabe8c45cde9fec23107781d5d98a2ea190f6dbcca561a"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/calculator.svg",
+      "sha256": "0347965fd36334c638b8af2c533b87d85ea815ab7362b4f2fc6f96e22d1043a1"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/check-double.svg",
+      "sha256": "ca93c9d100b7a88d8103b8fdbee43b9a080d263afc937175e2282ca88e42bb00"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/check.svg",
+      "sha256": "539e0df8b4519ae07a2d803d10b27be6343819a7912f0c038745cfa65fcd37db"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/chevron-left.svg",
+      "sha256": "264dbd0445ec38c10b97f8d7296bf1b0f9b5c68d96a99a140b64f04a509fd30c"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/chevron-right.svg",
+      "sha256": "b4f9b4e2317ac4ff07ac6291eaead2e6c553d3cea8e63163f520843561c3fe8c"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/circle-info.svg",
+      "sha256": "34deb9f8f2b23372e1fa34e256673d1ab8de1f6e3300af35b6092b7e7ced4acc"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/circle-square.svg",
+      "sha256": "07eefa1df2123c5ada78aab3a6fe74686f531eb0ed501a8fdba05a6337e2c208"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/circle.svg",
+      "sha256": "1e3dfd105946da90b169d0b7e0707d47e9ac4e75cbcadf125a7e0d913ee767d2"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/close.svg",
+      "sha256": "9944c7d86468bffbcabdf3e94e03736b58eb0f8a38dba7844201a048f2d2aa6e"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/copy.svg",
+      "sha256": "2a5f7c61a136f1c238049218fababee15733c0ca688ebcc57a6e4d78a0c3dec2"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/cursor-minimal.svg",
+      "sha256": "c68d10b2295895a217b2e171ab0d1545e825007c0c5e2e694e1088f92db5d7f6"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/cut.svg",
+      "sha256": "11e4f1fd8bb4be8632d361a52141361035ad2b29c46f4376ae271f4693bec74a"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/download.svg",
+      "sha256": "2a419389fa31eb2f2bab03e2c94f5129e5d5734e1ab54fe630e41eb1e0139374"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/eye-off.svg",
+      "sha256": "1740324e57a42ca37aab79364a8d78a0953d237acf6b5fc6b35b2a4633a42e50"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/eye.svg",
+      "sha256": "6c06b1ee38261313b90ccc80aa8cd70c41ffd691cd013cd698a51a1989903b2e"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/file.svg",
+      "sha256": "bbfcfc5ba78856a4df9d448e60c33f1da95bd5c1920f181e50c1d2ac42fef324"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/files.svg",
+      "sha256": "814393ff5d6d62669dc83c3744c9275050760975a9bf772f168a68b0ea3a6e7a"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/flip-horizontal-2.svg",
+      "sha256": "4bb1f5f97e435f29be9dfaf0e592a6520d831e42d1b5c1343eac1833b88ff7b1"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/folder.svg",
+      "sha256": "c35b6e0092c10a38c8f4b29d25a97d6e3615d71a2c7738663870ae9819e44aee"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/git-branch.svg",
+      "sha256": "8310e0fb90067a229ed919da7145c5aa7d827d6bad2d006a67daf70dcfd201ea"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/gps.svg",
+      "sha256": "5859baa27a0c72b946741cd1d01207c69897454a9665c0dc612a961bbb80cdd2"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/grid-3x3.svg",
+      "sha256": "3ce5fb56cfc53c76c4c7eaf3102bbe4817dd83fede741e4cf23e0af7580d9355"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/hand.svg",
+      "sha256": "689c868cf9a693cb4af4f238ad21dd6559e84edecc93ed11c5d85d5a3fbe42a2"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/hash.svg",
+      "sha256": "9d52011fb8314ce8c16296766b17ebd2f026bca7b3a30213dab681259ad8320e"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/home.svg",
+      "sha256": "da320202d53ae29fbdf803838b64e7980f946a1c3622c7b7b76c6a215a1ea7c3"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/link.svg",
+      "sha256": "50602cffe209b6b2b7a6fcc591a540683f3379eb2a14a84d776bfd4aaf188a73"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/lock.svg",
+      "sha256": "5c28ff6d67054b62536bfde533b11dd84827659cb059e5b6334029cc7a647438"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/minus.svg",
+      "sha256": "7e194bd76e06a6ff37035d445547833064c16f2f2e376b9e0cac8617ed033a08"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/move.svg",
+      "sha256": "9b30b88045c0db8f7d73fe2995afb4d5606dc30f849b11425d94cd21040dda1f"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/package.svg",
+      "sha256": "0eeb6ec3f2ed2d6991a39400ad40f3a92180b7675e5eff1c442cb7fbc6610444"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/pen-square.svg",
+      "sha256": "4f5c2c807e1b9ac8de996d296159a000c5578a7c1c59cead3cd0931a3525d824"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/pencil.svg",
+      "sha256": "de547af9cc67017b1c6228f65ab317f681558cdca67b0afeeb22709136de80a2"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/play.svg",
+      "sha256": "8eec58406f163768ae14decd69026746ec07baedfd90ab49e3832bf9b14aff65"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/plus.svg",
+      "sha256": "b7b6631409898550d823f06488c66c995f273e2eabdea5d06c8f3643e4f5a4de"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/radius.svg",
+      "sha256": "7fca848d5d59bdb10c337d44d409103c7413d213b21684f5dc3b79a090c3c822"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/redo.svg",
+      "sha256": "2bd6fb3c185c8ba085f9398e48afbe3162dce6afeff33fe8fc27266841479f3f"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/refresh.svg",
+      "sha256": "da6d70c9cd39a88e05c4ed516fb150e0c9d37b9b8af6228846ca53405eb85f15"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/reload.svg",
+      "sha256": "526f3918e7825d013cae51a17824f748f7e2b68656c860745ad260106360a40a"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/repeat.svg",
+      "sha256": "051c1aa14e672cd0b89e7733b5297ffab51f9ec1d2a8a867b0a1a15da8840c4d"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/save.svg",
+      "sha256": "8a2a2bec7634d7aabf33df56cbf48738c307f4bfece1ad6346f32a75552f11db"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/scale.svg",
+      "sha256": "b745d2d792860f86f2b56d7f44a97cd7510d91164209e4a54df7229070ff50d9"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/search.svg",
+      "sha256": "ed931ec3576a46cc2f10d53b4643a4f19f5e4cec8e7ae943c4f6db81d384b5e5"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/section-plus.svg",
+      "sha256": "e88598171d1f0807bc0548822a09c0aea973404d0f3419c9f00c683e421eeed3"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/section.svg",
+      "sha256": "f95fae1345db9d2d07ffa6270901368144a2eea63adb0ca29422e33bdc122dbb"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/shapes.svg",
+      "sha256": "83250e2c6d48d85bf63c4eea581acf4334cd730d24c75fba0acf6a6ccbee80fb"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/spline-cursor.svg",
+      "sha256": "a1bee8bdc3a95028122c0633439ea66be2523220e30cd0ac0d13a089ca5a23b7"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/square-alert.svg",
+      "sha256": "6d170dde637e4a7d57460d42d2ce6ba63a8d95b00b4a4f999654f23bec95e1ee"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/square.svg",
+      "sha256": "9cf9c572e331353cc64f505b366b5e94a8f820048c9e55286b838fef58a94b09"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/tangent.svg",
+      "sha256": "6799cb045be7137b639738fa20def3c3fa559383ad70fb59ac482d52d3943ff6"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/target.svg",
+      "sha256": "710a494e7ab59c68532f7f8c9f151163b50d3bab1fa48a167a223951906ee2ca"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/tools.svg",
+      "sha256": "2d8f03b0861a4127e31bcd9906a3746598711b8c9b32910edf1ca3780fbb15c0"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/trash.svg",
+      "sha256": "4aff6085c3617f4ce64cd44cef95f48115e563debd110b7d23ed2e7430871e53"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/undo.svg",
+      "sha256": "4cabb00bcd4e08af6b2e55289b5c339ff511e77e2ec38c52616261c9ca9de2a5"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/unlink.svg",
+      "sha256": "5db0d4db401d1453288c6100dbf80718fe7e17fb8483b9ca426daf70c04c1009"
+    },
+    {
+      "path": "assets/gui/pixelarticons/svg/warning-diamond.svg",
+      "sha256": "09e1318ac0798b7a85d77321900730d2652ad0cb5049881212c5eb021fffdfa3"
+    },
+    {
+      "path": "include/blcad/core/assembly_constraint.hpp",
+      "sha256": "fbbbad3af1eba7ac03016f4676a920e89a0b3e898eb8a19c412b194f094ca10a"
+    },
+    {
+      "path": "include/blcad/core/assembly_constraint_graph.hpp",
+      "sha256": "b7f35628e58b33d1210bd663ab8601b7d3efa00dc6507e3f177b3c04e7ae8f23"
+    },
+    {
+      "path": "include/blcad/core/assembly_cross_hierarchy_constraint_graph.hpp",
+      "sha256": "e1d9041d15f168af26e2b8d82d47da4e03c6aa9dcbcab379aab25583d9ac5106"
+    },
+    {
+      "path": "include/blcad/core/assembly_cross_hierarchy_motion_graph.hpp",
+      "sha256": "df99870fdc44e2ab782618f6b127be787a81fa033bd119eff53a9823a5cad5d5"
+    },
+    {
+      "path": "include/blcad/core/assembly_document.hpp",
+      "sha256": "88e68dbfb5e35a93db0e5f58b2a46f6a5145976514656755302165326e2e4031"
+    },
+    {
+      "path": "include/blcad/core/assembly_document_json.hpp",
+      "sha256": "205116fffcf873d5d4de02e00f7f1d9c516c76a68fd4b2bcf74b7b668560fb47"
+    },
+    {
+      "path": "include/blcad/core/assembly_exchange_graph.hpp",
+      "sha256": "582afa2457095d8da8ae564a7ea026e34a93182d7c50255152f1ebe857735a0f"
+    },
+    {
+      "path": "include/blcad/core/assembly_hierarchy.hpp",
+      "sha256": "2f89b5f375d2792f8cab5ebd512aadce12ef77fefa3b5692f8cc2c800c8e28d4"
+    },
+    {
+      "path": "include/blcad/core/assembly_joint.hpp",
+      "sha256": "2fd52a16ac099750dcbd277378b691c23f135e08223d048de840e9e976230c74"
+    },
+    {
+      "path": "include/blcad/core/assembly_joint_graph.hpp",
+      "sha256": "9d6afd4c72d8de3f47221c7630bf75c7bf55029bd88f4d0d28a3b86faafae506"
+    },
+    {
+      "path": "include/blcad/core/assembly_leaf_occurrence.hpp",
+      "sha256": "fbb77e5a42e7b8ae87a6b0ab7d1d630bb0a8156a642826e1bb790403c53fd99f"
+    },
+    {
+      "path": "include/blcad/core/assembly_reference_target.hpp",
+      "sha256": "9399f03edf73827ea46dad6af38de313acc789699802306f951808d2943019cc"
+    },
+    {
+      "path": "include/blcad/core/body.hpp",
+      "sha256": "b1e156f2f77881a3c334d476f103db9a83ba8a154b51e65112e68b630c20a868"
+    },
+    {
+      "path": "include/blcad/core/body_boolean_feature.hpp",
+      "sha256": "8ac3eff888a89f7505765525b2c0eff5e5c5ac4e7f6ef78015e65ebd9aa889e1"
+    },
+    {
+      "path": "include/blcad/core/body_transform.hpp",
+      "sha256": "808be6b26f48164d16e7099aadc1ed320b9672a94a3fa9e675e5724e19d608bf"
+    },
+    {
+      "path": "include/blcad/core/construction_geometry.hpp",
+      "sha256": "c59b04ca9291ab60d95a04d10474804ad02fc95c871a7fe900160385436892e5"
+    },
+    {
+      "path": "include/blcad/core/datum_axis.hpp",
+      "sha256": "a644848299e6f81ebe32679fbe8a7465fe2307fbd286cc382c4ba095ebb96b4e"
+    },
+    {
+      "path": "include/blcad/core/datum_plane.hpp",
+      "sha256": "e25161781ea053e35f3f61c9c504aff5129b856937ab857a750e40f42fdc1ef6"
+    },
+    {
+      "path": "include/blcad/core/dependency_graph.hpp",
+      "sha256": "a188ba01353e900c683cd4f62585df76911874225156c4c72415f364ff97af55"
+    },
+    {
+      "path": "include/blcad/core/draft_feature.hpp",
+      "sha256": "5429bdf32195168823cd529d1016a9f189afa16812748a443d882a8c879d4aae"
+    },
+    {
+      "path": "include/blcad/core/edge_treatment_feature.hpp",
+      "sha256": "ac5d7bff8b8af61d84df7fbd97a544c7534baba31fced711b6a7b233c2cf6298"
+    },
+    {
+      "path": "include/blcad/core/error.hpp",
+      "sha256": "fb48850afff66215435cd8da17dbdb0500219d62db135dd35b6f354a3e1b1be3"
+    },
+    {
+      "path": "include/blcad/core/feature.hpp",
+      "sha256": "af919b109d10728be511f340bdf876644118a1f9fad24d1b97cda7b6969c6e0f"
+    },
+    {
+      "path": "include/blcad/core/generated_topology_reference.hpp",
+      "sha256": "01a66cc62643c1a5d3ffcac0b2fcabd6205c4862209ff4e00ccce3355fd373ac"
+    },
+    {
+      "path": "include/blcad/core/id.hpp",
+      "sha256": "5f4744362564f79f8f76d7ac0162922998b119bf2ee959893c62bf404d0c38c7"
+    },
+    {
+      "path": "include/blcad/core/imported_part.hpp",
+      "sha256": "2513aa19f14c25f486b0647d0f602e8212c84012404c6af095be6ffc5d811995"
+    },
+    {
+      "path": "include/blcad/core/imported_topology.hpp",
+      "sha256": "b2b8f35888654ad6b34e84904c305bb441a23021594afeb77cc36cf453e72b60"
+    },
+    {
+      "path": "include/blcad/core/invalidation_state.hpp",
+      "sha256": "1b5e34b68b7d87a2f43131861ca53b56f447ee0b851a40d8195d75f98072c366"
+    },
+    {
+      "path": "include/blcad/core/loft_feature.hpp",
+      "sha256": "bc0fe5f6c0d31a439c30c1786948eaefb3067d6282e0fb64a7f77e9e1497e4b7"
+    },
+    {
+      "path": "include/blcad/core/mirror_feature.hpp",
+      "sha256": "e018b577c862afd607463963c1d88b1a5dd8073604b991b69f7828f6bbbf03a2"
+    },
+    {
+      "path": "include/blcad/core/parameter.hpp",
+      "sha256": "0bae1d0c0ec590160152b4579c59a8d9845536290bb1ae103c34e65f2def59c0"
+    },
+    {
+      "path": "include/blcad/core/parameter_expression.hpp",
+      "sha256": "86d1d6bc6b11a51bfdbd9695c36dab64b5d0b5e56d924c8135c03974baf2e650"
+    },
+    {
+      "path": "include/blcad/core/part_document.hpp",
+      "sha256": "ec172f27550d608a0eaff291f5654ebe2a587289197619e62977090e44183bf3"
+    },
+    {
+      "path": "include/blcad/core/part_document_json.hpp",
+      "sha256": "daf4598403f7a132e16e80e6f1490a5e821dcf3d7efb52ad35abd9ea9a6c827f"
+    },
+    {
+      "path": "include/blcad/core/part_feature_input_reference.hpp",
+      "sha256": "57e12740886725fb3f10f3d828f453a2077afbdaa5c8768ba455358a3195591b"
+    },
+    {
+      "path": "include/blcad/core/part_pattern_feature.hpp",
+      "sha256": "1bf655cb9c8e5bfef762bebaeb5c396703ceb611d89fa3a8fd14f8a405f0b86f"
+    },
+    {
+      "path": "include/blcad/core/path_curve.hpp",
+      "sha256": "418b18b04c7d605ee27f0cbae6bb5891858b5f3232058cb93876ce49082efbf7"
+    },
+    {
+      "path": "include/blcad/core/project.hpp",
+      "sha256": "5e518eb44a1f41a0143712218419c1fafa1d075837ae0e0fe660381ca6f59ea3"
+    },
+    {
+      "path": "include/blcad/core/project_json.hpp",
+      "sha256": "6b3e89603c3e245d489dd486e21b2aadb88e537160a1400db5dda7dfb5dfccfb"
+    },
+    {
+      "path": "include/blcad/core/quantity.hpp",
+      "sha256": "d907342c9c9d1c1bf0e3eaf18ee8fb8ce3510318addba9db2d5c823a051dd21a"
+    },
+    {
+      "path": "include/blcad/core/rational_bezier.hpp",
+      "sha256": "bbbe1e08cd1e1529e53581abd9153ad6946196d331a27653917926eea2c59fd9"
+    },
+    {
+      "path": "include/blcad/core/recompute_plan.hpp",
+      "sha256": "5ba9dad7e3f408ec23956a6823459f1b4638fe8d68187efaa485aed52bb20774"
+    },
+    {
+      "path": "include/blcad/core/rectangular_extrude_profile.hpp",
+      "sha256": "95370a97dc23140c980cb8bb1c0ca5ef47b9d95d3063042cfb4639a62eed5f15"
+    },
+    {
+      "path": "include/blcad/core/reference_recovery.hpp",
+      "sha256": "15266a70d00f5cc13730ce31efcf4c128eaa42b7d0c81fa27b366f5868b8c48a"
+    },
+    {
+      "path": "include/blcad/core/result.hpp",
+      "sha256": "78e0e6e8c9ebea93e6231c36d83325bafb624aa2be4bde5975c3fe35479cca8f"
+    },
+    {
+      "path": "include/blcad/core/result_face_workplane.hpp",
+      "sha256": "4ba2b03ca3f0ec387b82dcb70545d746012b0114d3f1d2dec76e4648d35e9f33"
+    },
+    {
+      "path": "include/blcad/core/revolve_feature.hpp",
+      "sha256": "e576691e3f29838e2a82a9e1a4fafde7a182246ea512f29e62ae1c1d541760b2"
+    },
+    {
+      "path": "include/blcad/core/shell_feature.hpp",
+      "sha256": "c1b586880797efe58311e0abbcf7ba2a6cddf49df9189f5e46dc783b22f545f7"
+    },
+    {
+      "path": "include/blcad/core/sketch.hpp",
+      "sha256": "e5619bc3cd610cb929a3d941b1b6d5eefb8e855ae150f99779336e206375adf8"
+    },
+    {
+      "path": "include/blcad/core/sketch_3d.hpp",
+      "sha256": "b45d760447c3b66b501e36888def03f9f0354fce85b63a484932d304bcf91a05"
+    },
+    {
+      "path": "include/blcad/core/sketch_3d_interaction.hpp",
+      "sha256": "f41ca49e341edd21865c7da2413371cb8583fec91f9c6d680c6d091d9b840714"
+    },
+    {
+      "path": "include/blcad/core/sketch_constraint_authoring.hpp",
+      "sha256": "011a2c973c46677edd17a40bff08fe048e2929b88bc1647db370b0391e70bed8"
+    },
+    {
+      "path": "include/blcad/core/sketch_constraint_authoring_json.hpp",
+      "sha256": "b9f32f43cef6013826f7a3858b49f7acadff118a8dcc8e9def261e1a0d73faae"
+    },
+    {
+      "path": "include/blcad/core/sketch_constraint_catalog_system.hpp",
+      "sha256": "97a9996217bed43fe717102e011e4955aad88d6e036f7317a6b0fe003b01421a"
+    },
+    {
+      "path": "include/blcad/core/sketch_constraint_solver.hpp",
+      "sha256": "e066eee6f13325aecfac4b39e390ee2f5cc3f5dc3e563ef6cf88a33fe8d07d2f"
+    },
+    {
+      "path": "include/blcad/core/sketch_contour.hpp",
+      "sha256": "cf1c361d1a90529cbc38e63aef75ef2348c50c7c5121373803e314bbc93565c9"
+    },
+    {
+      "path": "include/blcad/core/sketch_diagnostics.hpp",
+      "sha256": "19abb825f6d19ac841e65011c1bee3556cbeaf8e485b3e722918f616a4ba425a"
+    },
+    {
+      "path": "include/blcad/core/sketch_dimension_authoring.hpp",
+      "sha256": "3d5d3a98dee2077dc6e4498881acce0bf3ac97ec3fbd3acba74c534ba9ba5fd8"
+    },
+    {
+      "path": "include/blcad/core/sketch_dimension_authoring_json.hpp",
+      "sha256": "f20214834a4708c0ef1c0d4725399fbe64b19b8604eb2a92a9707a811424db53"
+    },
+    {
+      "path": "include/blcad/core/sketch_dimension_catalog_system.hpp",
+      "sha256": "78445a88e3ca1794fc0aa218abccbab00356d46050b9626dcbccff69775c865e"
+    },
+    {
+      "path": "include/blcad/core/sketch_edit_commands.hpp",
+      "sha256": "ac4b93ce4360e7da17c3b30b7031a5dc4ee9696fedda0ad97aa886246018073c"
+    },
+    {
+      "path": "include/blcad/core/sketch_line_reference.hpp",
+      "sha256": "38906f381f996d0b21e7fb54d3a476c9ccd96503d451c4f9b9d7c9a95c624c36"
+    },
+    {
+      "path": "include/blcad/core/sketch_modify.hpp",
+      "sha256": "367c9466458e1e01a510f988cdd096c0f82adbab2d714a3a1545da91e51b4c66"
+    },
+    {
+      "path": "include/blcad/core/sketch_offset_project.hpp",
+      "sha256": "677be52e7f747c148b8f9075f3e818971494aa0073f92b2b8d5d409137fc5a7c"
+    },
+    {
+      "path": "include/blcad/core/sketch_ownership.hpp",
+      "sha256": "2606dd256329225da3e99a7124f5b049fe5909ffae75e8a825be75bc31003842"
+    },
+    {
+      "path": "include/blcad/core/sketch_profile_roles.hpp",
+      "sha256": "45a92f9889c53d7c2ca466472631334355b5dbfa118b802cff6fadc676420265"
+    },
+    {
+      "path": "include/blcad/core/sketch_repair_command_labels.hpp",
+      "sha256": "e47c2136bb1dcf5965df2007edceb79cfd75b8f57244dc3f0f911b3c91ddae48"
+    },
+    {
+      "path": "include/blcad/core/sketch_repair_commands.hpp",
+      "sha256": "1404678219a3302f2477522bdd4767915d7abf664baf1decde515aa9c2fb608d"
+    },
+    {
+      "path": "include/blcad/core/sketch_repair_presentation_metadata.hpp",
+      "sha256": "762d84786a1745e68508762f66c35d810eee20918851c8eb5c1e847d60379b2b"
+    },
+    {
+      "path": "include/blcad/core/sketch_repair_presentation_snapshot.hpp",
+      "sha256": "65625354835016fcdac618e86e326e9767fb3ad79601dc0b5374cb8aabb0eace"
+    },
+    {
+      "path": "include/blcad/core/sketch_repair_presentation_snapshot_query.hpp",
+      "sha256": "87017d8e6b933b724a904718fa449ae579b632f02baddf5b6ec2315597cfddc2"
+    },
+    {
+      "path": "include/blcad/core/sketch_repair_suggestions.hpp",
+      "sha256": "2a12c58bb7c02ddf8c51c68e28918de41a49e9a147432151a15338a148e75de2"
+    },
+    {
+      "path": "include/blcad/core/sketch_repair_transactions.hpp",
+      "sha256": "fedaa9770af64627abb39fd31cd1c73abed7dc81106f09d3fe698f32fd903f7e"
+    },
+    {
+      "path": "include/blcad/core/sketch_repair_undo_stack.hpp",
+      "sha256": "b247384b960aa07e7caf6582e79b5b770151766967d76fa3c10b701a7f350952"
+    },
+    {
+      "path": "include/blcad/core/sketch_repair_undo_stack_summary.hpp",
+      "sha256": "10fafabd5b395ecb0ccef278addd1f3bf068da30f32bc4ead61781e6b29bcb08"
+    },
+    {
+      "path": "include/blcad/core/sketch_spline_edit.hpp",
+      "sha256": "d06a0a392443a1a7ab24b61ffe0df97c274a571aa6ace54376ae63c7c842efdb"
+    },
+    {
+      "path": "include/blcad/core/sketch_tangent_creation.hpp",
+      "sha256": "b17b5a870509a92806ad6435d6fe48ff9a3cbfb43e49c9076e77e7446068cd48"
+    },
+    {
+      "path": "include/blcad/core/sketch_text.hpp",
+      "sha256": "179c0a343fe00eb4ceb3069223f0422cbd5f8484f65457f77395edecda93d628"
+    },
+    {
+      "path": "include/blcad/core/sketch_text_json.hpp",
+      "sha256": "7ebbeae9958bd1730427a6837ca5d9c1e6dd419692833384ba7d9fcae8cdfd58"
+    },
+    {
+      "path": "include/blcad/core/sketch_topology.hpp",
+      "sha256": "2667e7af2ec165207f23bdc8c5c4bc389ffcffbb0af4f5cdaac7007355c12384"
+    },
+    {
+      "path": "include/blcad/core/sketch_topology_json.hpp",
+      "sha256": "c83cc8b13d38fcf664ab637c0a82858cbdca0e02e353a839cecd39f778a857a7"
+    },
+    {
+      "path": "include/blcad/core/sketch_topology_part_document.hpp",
+      "sha256": "e5a279cfd75b0be7752bfbff5fe91831524574b4b384c19c462d14f0612c5398"
+    },
+    {
+      "path": "include/blcad/core/sketch_transform_pattern.hpp",
+      "sha256": "8128995d0fafcee80a986c9f26fb901ec4170543754ccd28c8333e3c72e91404"
+    },
+    {
+      "path": "include/blcad/core/spatial.hpp",
+      "sha256": "01fb7f07578f0b4d752ebd0982c5fa3abeebd76f4bd896b835aec45d956bd678"
+    },
+    {
+      "path": "include/blcad/core/step_import_freshness.hpp",
+      "sha256": "1c20d724a7c0f704e71345b003b32684d1283746e420915ba6c336b29a72ae01"
+    },
+    {
+      "path": "include/blcad/core/step_import_source.hpp",
+      "sha256": "0616d49e9b3f8df263050443a57d7480844c09edde190836291dd318f001a763"
+    },
+    {
+      "path": "include/blcad/core/structured_step_import.hpp",
+      "sha256": "adefd583552ee3e21c4204e6182b9ef8344953b73b0c3d5f5d5f3bfeca1e7e8a"
+    },
+    {
+      "path": "include/blcad/core/surface_feature.hpp",
+      "sha256": "1d624ca703ae96d6698a953a87a9b44f19e1c2e0f204f5eacd986a3284354808"
+    },
+    {
+      "path": "include/blcad/core/sweep_feature.hpp",
+      "sha256": "c580044f6a9b94cf5f777b828bb36fb4e087b4b69b0bb4f873876289419c0e47"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_concentric_constraint_equation_builder.hpp",
+      "sha256": "074f9126b6ff1a8401136fe3f5f89586ebad8aee24a654ca32c32824377a5957"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_constraint_equation_builder.hpp",
+      "sha256": "dfbf6cb1de68753c3bd81e48b986af78906ec1414f865a6d8e31450d005b5572"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_constraint_target_resolver.hpp",
+      "sha256": "9243f22a61ebf525ef7f071268e5a07e290199ff9422708d87d65feb589a5ce0"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_contact_analyzer.hpp",
+      "sha256": "27bf14654044a07fd3d97113ab692efd7618a11be8708fe9b26d79bf9df407e7"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_cross_hierarchy_constraint_solver.hpp",
+      "sha256": "ad96b029980cbafdf2dcaf33defba0cf60364c0f26c0f58bd71412c70432d784"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_cross_hierarchy_joint_motion_solver.hpp",
+      "sha256": "3e0b214bb3178208e89385f46af61dcec9d2da2e574b963e9177d1bdff28546a"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_cylindrical_joint_equation_builder.hpp",
+      "sha256": "b4f95d8895273dfdb906444101f8cd8aafa2eed22efce745e1ca2c8aca10eb06"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_flexible_subassembly_solver.hpp",
+      "sha256": "45077fab34e663dd0a364c30f701541f336d29382b2283d8367a20a57be3c1dc"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_generic_relationship_equation_builder.hpp",
+      "sha256": "6f944f60b88bf1ad9c867159c7427ebf9cfb594407d8895f6b1ff9ef829cb4ca"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_geometric_target.hpp",
+      "sha256": "579573385a42910a745cb46a0bdda692167301d34de739eafe189ab4a65fcc70"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp",
+      "sha256": "811960e865ad819db42c9dd362ba20f312ff87a97d61d18498578ebf8795f1ae"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_hierarchy_cylindrical_joint_equation_builder.hpp",
+      "sha256": "e87c8f4879b46f158ae93cdbc4958b430cf8baaedc95d008cbdf19ebded43ab0"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_hierarchy_planar_joint_equation_builder.hpp",
+      "sha256": "dbe910cedebdaccd96db3bf4683aa11d742bc0cb206119977ac2777e0de82a87"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_hierarchy_prismatic_joint_equation_builder.hpp",
+      "sha256": "ad6650cb90c0b9845f9a2424279a318c35903b417acdb6a86dbdb8704e22ba77"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_hierarchy_revolute_joint_equation_builder.hpp",
+      "sha256": "29115675c68031e9328635629816c8809f8bca3b3c1f7225cdd76b6aa5ad03b1"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_hierarchy_spherical_joint_equation_builder.hpp",
+      "sha256": "d50e38c085f411e0656558ce842410af029559497ce1ccad4d275d8401f1741c"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_hierarchy_transform_evaluator.hpp",
+      "sha256": "45f97fca6f87850b6ed18913e8f7c5cbffab3885900c60d459f9f3799e204e34"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_import_validation.hpp",
+      "sha256": "c80ca01762ff5c5a2ecfa5d62b5cabdd4a03b2b06f4e83b327a4c6a9f48f0eaf"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_insert_constraint_equation_builder.hpp",
+      "sha256": "728f7361f60994bb4895c4854f2fa43dea8f705b02ffde277d9cca36fa1c04f1"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_interaction.hpp",
+      "sha256": "e1940d8ed9b3013408cd6580b3d524d1014bd2df12383cf3d0f0ce7cc6b2590f"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_interference_analyzer.hpp",
+      "sha256": "319da5fd0dc7f92071b5e809bbff465bb9f70bfd2acb4f837e2f59aa82a593e8"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_joint_drive.hpp",
+      "sha256": "cb8cc25304196c9747dc1095a4660cbcaeeb265d1a07d5f3218122e6191b77c6"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_joint_motion_solver.hpp",
+      "sha256": "6030a75b5ba6aceb62a01572a23747079d03e9bc01bbd19cfda8b9e60f744587"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_joint_target_compatibility.hpp",
+      "sha256": "037acdc83b62ce6367183a67307b0c2c16ceb2276062d9c4ed62d8e33e12da62"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_planar_joint_equation_builder.hpp",
+      "sha256": "fd437516ee02d41558011a4aaf3f72d2e6d6f56d37d881a8c79d2feaaa11e320"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_prismatic_joint_equation_builder.hpp",
+      "sha256": "dce8a5800eb65bf2d44f80d8432d0d5f36e3123be441867dc26e4ad63973e49f"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_revolute_joint_equation_builder.hpp",
+      "sha256": "8122fc383244d4dea0293053ae65e93180047b6d55eee6b3dd3e120752f2507a"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_revolute_sweep_analyzer.hpp",
+      "sha256": "e2e6a113f2c3c6d9b75b0f1fcea96cf33100a367af00c889f0b0a2f8800ad4f0"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_rigid_body_solver.hpp",
+      "sha256": "29e1d54481ac202ced567b24d09740ffc53e210d1130865a750a6ea25df81a36"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_solve_diagnostics.hpp",
+      "sha256": "1874078d2ebe4b51f6633d531c4f73ab43c72c588abdc393e4eebc470fddbf18"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_spherical_joint_equation_builder.hpp",
+      "sha256": "497abfae24f727ff2f147ace5486ffed9e42be7c7eb5e51f46dd0746e1e58434"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_step_exporter.hpp",
+      "sha256": "839555e756bfcc0a1fabf2a62a78da6c9938d975d831d522f4a9985f1a5b2a54"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_structured_step_exporter.hpp",
+      "sha256": "d24a9ca9b31bd1e60fa332b43c5b62698757ac4da6b93e1101ecea50f55a7d18"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_target_compatibility.hpp",
+      "sha256": "4ee5914928d426de60bd2951040750e4d7fe1da59cdcb882cc999f0896f867ae"
+    },
+    {
+      "path": "include/blcad/geometry/assembly_transform_evaluator.hpp",
+      "sha256": "a5eec8667860f8a8dbdf15129f451246cfc239627d2c119b30dc28cb85be037a"
+    },
+    {
+      "path": "include/blcad/geometry/body_boolean_adapter.hpp",
+      "sha256": "8845c9f282713c29234727705ff391ea67218f9afe64c2e43a2c4686b8faec22"
+    },
+    {
+      "path": "include/blcad/geometry/body_result_inspector.hpp",
+      "sha256": "df727ade2c619322f85f7f9df78a713cb30d62c6d1561cdb88ada437a0a45d1a"
+    },
+    {
+      "path": "include/blcad/geometry/body_rotation_axis_resolver.hpp",
+      "sha256": "ae80c4567d7ade6802d6e92a1532480db2b42882ef85eb527ea545bdd3c4903e"
+    },
+    {
+      "path": "include/blcad/geometry/body_transform_adapter.hpp",
+      "sha256": "159192204325edfe497fd86ce4d6181f19f77f21883146bc1a3c135342dfa619"
+    },
+    {
+      "path": "include/blcad/geometry/chamfer_adapter.hpp",
+      "sha256": "54786cacdbe867ce69516db3a12dbf97e78b384be0fe8c2eae5d7463668b34ca"
+    },
+    {
+      "path": "include/blcad/geometry/circular_cut_adapter.hpp",
+      "sha256": "e389d615ebf3135cf3956ae6fbbd2e6c8f62cce519f1664dc22cd8e4d70c36db"
+    },
+    {
+      "path": "include/blcad/geometry/circular_pattern_adapter.hpp",
+      "sha256": "908a7aed1b2b6128aa71d7a1dfaad5a160019cfe762a650952f0fa3419f861c7"
+    },
+    {
+      "path": "include/blcad/geometry/closed_profile_adapter.hpp",
+      "sha256": "1bb9c9edeba4533d577e39dc5ab6a27bd275d327ba0c6901c9a74f2dc2dbc290"
+    },
+    {
+      "path": "include/blcad/geometry/construction_line_resolver.hpp",
+      "sha256": "80879a5f22144ea56a1cd7284c89e111e923250059c0151f9f84e147a2006c61"
+    },
+    {
+      "path": "include/blcad/geometry/construction_point_resolver.hpp",
+      "sha256": "5a8d0222e5320a922e2df3dde93be2401b1185ba337088aa571ee09101186f03"
+    },
+    {
+      "path": "include/blcad/geometry/dimension_driven_profile_resolver.hpp",
+      "sha256": "67dfea9e35e32e5df94a27f50a345db881b07e5a9ffa82df3431794fea8d27c9"
+    },
+    {
+      "path": "include/blcad/geometry/draft_adapter.hpp",
+      "sha256": "a3c58ce65261fe43a78f04f30218239df2c84b09e4462fa31b3cfab5fc5ddbb4"
+    },
+    {
+      "path": "include/blcad/geometry/fillet_adapter.hpp",
+      "sha256": "c8652e6fa2f9925dc48469e17d366495b3bc2dd2ac6407f2738a50a031f808ec"
+    },
+    {
+      "path": "include/blcad/geometry/finishing_selection.hpp",
+      "sha256": "0b57db2a0b67936e8ac55f0fedcc4d8cfb3e224b6e2c89031c40b9724c9aaf93"
+    },
+    {
+      "path": "include/blcad/geometry/geometry_measure.hpp",
+      "sha256": "787afc977989015fbb8fc6e9cf0c6228c4d2e28d672021c84c9180df5784e071"
+    },
+    {
+      "path": "include/blcad/geometry/linear_pattern_adapter.hpp",
+      "sha256": "8fddc9f5c030cf43fd1979c3a0132cf98d2c0d76ba91359b1d97ce3a4266a490"
+    },
+    {
+      "path": "include/blcad/geometry/loft_adapter.hpp",
+      "sha256": "c631291e2242c5f639cf9f141066665694e76e6b748e120ed25ded865b1e0d3d"
+    },
+    {
+      "path": "include/blcad/geometry/loft_section_alignment.hpp",
+      "sha256": "88b801958d0f5c41409e8db3ac7d677ad49e7250ff7ac040c55aa7ae66387ed1"
+    },
+    {
+      "path": "include/blcad/geometry/loft_section_compatibility.hpp",
+      "sha256": "83f19e0ac984bd88c5a2befe3f7606bce07aa5151c79a234bef55e32e0fe09b8"
+    },
+    {
+      "path": "include/blcad/geometry/measure_selection.hpp",
+      "sha256": "3e3c72cd74c61421421f94165922c0470dfdab091fa9f3d7e256bc399b2bb43a"
+    },
+    {
+      "path": "include/blcad/geometry/mirror_adapter.hpp",
+      "sha256": "91f94f07af1f28bb8095293f3e18bffc84514995b50e18449bbdd442ec323e1a"
+    },
+    {
+      "path": "include/blcad/geometry/occt_shape_view.hpp",
+      "sha256": "27b0f41faa02bbe8d78c81bda51eb8147a7f92b805adf9cdb94f37aeefb306b4"
+    },
+    {
+      "path": "include/blcad/geometry/profile_region_classifier.hpp",
+      "sha256": "ba8333c7df9e644525f98b6aa78ad1de850d0fbccf7a162fa9da94d77284274f"
+    },
+    {
+      "path": "include/blcad/geometry/recompute_executor.hpp",
+      "sha256": "48a33abec9de89904ff891c2b1a84ae2fd9afa42a05e0dab085bd2487faafb74"
+    },
+    {
+      "path": "include/blcad/geometry/rectangle_extrusion_adapter.hpp",
+      "sha256": "a542bbf6ce47ae753f085d39d32976b1905845a9d001d193e78264a43d7b7bbd"
+    },
+    {
+      "path": "include/blcad/geometry/reference_driven_sketch_helper.hpp",
+      "sha256": "dcd2cf4421b6d9d07729dd31f6a8afb658b63a7d3db31b225763af7c46616ea0"
+    },
+    {
+      "path": "include/blcad/geometry/reference_generated_profile_resolver.hpp",
+      "sha256": "6b0ef1330a3e21db4b3dc7abf89a03978a32a3693d83a24c2c97a6723f201c6d"
+    },
+    {
+      "path": "include/blcad/geometry/reference_part_geometry.hpp",
+      "sha256": "c20d98eb38053e7a78906e0090f3abc41441720e573a07bea8db22b05fd37552"
+    },
+    {
+      "path": "include/blcad/geometry/result_face_support.hpp",
+      "sha256": "989e528e2902719f27bb59cc1bb974cb1adaca1e90c14283c7558cb7f8e366ff"
+    },
+    {
+      "path": "include/blcad/geometry/revolve_adapter.hpp",
+      "sha256": "a42bcfbcb132ee43b1cb6516cdc11549581d2a60c3a2338b5dd37a49160e3f1b"
+    },
+    {
+      "path": "include/blcad/geometry/semantic_reference_evaluator.hpp",
+      "sha256": "43f1ee1099e4c3ea42c8308a6718746bea66bde19fe74f9bf38d416af0740a23"
+    },
+    {
+      "path": "include/blcad/geometry/shape_cache.hpp",
+      "sha256": "4cf23cc9e6b197affd2032ff4fe9d0622ce3d358ac7d114785149f3873d7c2fa"
+    },
+    {
+      "path": "include/blcad/geometry/shell_adapter.hpp",
+      "sha256": "0c752d81bf7113454081f33f4ee1f846a983c856449fb548b90cc3725a627c6b"
+    },
+    {
+      "path": "include/blcad/geometry/sketch_3d_geometry_adapter.hpp",
+      "sha256": "be05b4bedc9b595336de9254cc055b317b08abcb416fa2ac23a45aea60ae51ca"
+    },
+    {
+      "path": "include/blcad/geometry/sketch_constraint_glyph.hpp",
+      "sha256": "b79a3b0cd13185c4077eff49bdac59c12a48d08c38bc9da761ae211a11be0a78"
+    },
+    {
+      "path": "include/blcad/geometry/sketch_dimension_glyph.hpp",
+      "sha256": "523895ad5266142161214f7350706e984e5b1a9a27b0dedebca127c3779a1dc3"
+    },
+    {
+      "path": "include/blcad/geometry/sketch_dimension_layout.hpp",
+      "sha256": "c9491d8d983c990426bdbdf2cebfaedaaf0b7fd932d83b72d3ebeb89f4fc5eac"
+    },
+    {
+      "path": "include/blcad/geometry/sketch_finish.hpp",
+      "sha256": "ff525ad6091b01adc2d123c7fbb2e2b5d6185c303797da074ce0ac1bc1599847"
+    },
+    {
+      "path": "include/blcad/geometry/sketch_line_axis_resolver.hpp",
+      "sha256": "b425b917397c3b97928301becf392276951ceaea5d9fd6f4e7accbd1feba382f"
+    },
+    {
+      "path": "include/blcad/geometry/sketch_reference_projector.hpp",
+      "sha256": "c5e3cb66737d2485199b6817d12d016cacc162ff0a053a263a3f230a8f26d6ee"
+    },
+    {
+      "path": "include/blcad/geometry/sketch_region_finder.hpp",
+      "sha256": "9211390a88ad8ec2b4979b6e93a73ecc1a49d5e5faea23267eeb22d88291a31e"
+    },
+    {
+      "path": "include/blcad/geometry/sketch_spline_geometry.hpp",
+      "sha256": "2c80e86f868c25d054b716e9b550af9b9b3e5c811ce31372fc933e032acd8a2a"
+    },
+    {
+      "path": "include/blcad/geometry/sketch_text_layout.hpp",
+      "sha256": "3d719d0ad16e06f547b0d62654afeb8c10cab21e1e0af3c41156f7910024f076"
+    },
+    {
+      "path": "include/blcad/geometry/step_editable_commands.hpp",
+      "sha256": "5e4ab096f4c3d20950fdf0ad11273e03902a5baf4061838cc286a55d27037b89"
+    },
+    {
+      "path": "include/blcad/geometry/step_exporter.hpp",
+      "sha256": "11c1d1e8220ed80e439fa102bf2ef77e38c14e59b0b7695c1a8d712b2ce0fb10"
+    },
+    {
+      "path": "include/blcad/geometry/step_import_reader.hpp",
+      "sha256": "24a0461f2d17e2c26b018a20a6d5c6db4453887d38b2a44995ec3c66c4aacf31"
+    },
+    {
+      "path": "include/blcad/geometry/step_import_topology.hpp",
+      "sha256": "45c7483341263f012fe27cd28d8cdce0159c705dbfe4f1809658232f76060602"
+    },
+    {
+      "path": "include/blcad/geometry/step_import_topology_context.hpp",
+      "sha256": "aad044d73263a0b7abf791e98fcea35c561250fed103def8929553b701861b17"
+    },
+    {
+      "path": "include/blcad/geometry/step_reference_commands.hpp",
+      "sha256": "58cdd97672d2ec66cc418d516d4434033c050f1a207d33e7773ce23a6584b541"
+    },
+    {
+      "path": "include/blcad/geometry/step_structured_import_commands.hpp",
+      "sha256": "26eddde0a56ddf40e2d7a50f99db5a42423cd0a41f5acfbd6498598bd8bcaccc"
+    },
+    {
+      "path": "include/blcad/geometry/surface_adapter.hpp",
+      "sha256": "d3d66ff66a4d3dd4f5dede5fbe5f8aee617cb76bc41fde05fbb5839a572eca93"
+    },
+    {
+      "path": "include/blcad/geometry/sweep_adapter.hpp",
+      "sha256": "e01d8cd6520ab0ef2f08219a5be86c62fe320525fffdc438d3f77cb4d73c0c7d"
+    },
+    {
+      "path": "include/blcad/geometry/viewport_scene.hpp",
+      "sha256": "29aa1c118b8146b1d68fcb7187e3522e6f63691b6fe5be74ec6e626245a47d41"
+    },
+    {
+      "path": "include/blcad/geometry/workplane_resolver.hpp",
+      "sha256": "ddbd1be095cdb1d39fb3998dd57a05fd7618cfc7f549c249240d894fbd35c498"
+    },
+    {
+      "path": "include/blcad/gui/gui_analysis_export_workbench.hpp",
+      "sha256": "634a4e329d5b35a2d772e991dc774e3f1624dd2a8dbbc0286895397622cbed61"
+    },
+    {
+      "path": "include/blcad/gui/gui_appearance.hpp",
+      "sha256": "e78dc770118de416a68ab51a85cb93dbb6672e2ba9f449e225a3e3e04608ca16"
+    },
+    {
+      "path": "include/blcad/gui/gui_assembly_workbench.hpp",
+      "sha256": "4aec156119487d4d901b21b0a619cc2da18ec97a68eb545403a817c048aa64bb"
+    },
+    {
+      "path": "include/blcad/gui/gui_command_registry.hpp",
+      "sha256": "16075d36f9077b2923796b9dd9300c33be2cdfd0215354d6991e27391689d5c4"
+    },
+    {
+      "path": "include/blcad/gui/gui_document_browser.hpp",
+      "sha256": "d47d8be422d8e74ad3d7332bd7ddf3ec3e00cf6cd73ad1e2526a16c88de880bd"
+    },
+    {
+      "path": "include/blcad/gui/gui_document_session.hpp",
+      "sha256": "0e2c7bc282e1dccbc7ace7ec2345aab29c5d1217580d734e5b23040ccfe200b7"
+    },
+    {
+      "path": "include/blcad/gui/gui_feature_edit.hpp",
+      "sha256": "1b5b34c228cedcb8342b978e65fc556231795992d64168634a3b3e2d616e2863"
+    },
+    {
+      "path": "include/blcad/gui/gui_icons.hpp",
+      "sha256": "378e8fa2d1db197a83cd34d9f810ba1b2b04ba890cfb6fcdee0db42f0dc2577b"
+    },
+    {
+      "path": "include/blcad/gui/gui_interactive_assembly.hpp",
+      "sha256": "e4a328e0d08e0d5a333d74208750755f3848096e9c31771f61455b5c2d039f8e"
+    },
+    {
+      "path": "include/blcad/gui/gui_interactive_extrude_revolve.hpp",
+      "sha256": "ee56810c0b4fa43fdfb441edc6998be0ffe3ee936a8fe3e3b6288ab85f0d0607"
+    },
+    {
+      "path": "include/blcad/gui/gui_interactive_feature_coordinator.hpp",
+      "sha256": "e88e50c46d653aa361c25453a70edf00319155e589376e15651faaeddbe2229c"
+    },
+    {
+      "path": "include/blcad/gui/gui_interactive_finishing.hpp",
+      "sha256": "ff8cf53821644a4f0f406ad39d0e715e25cbe269b8b7e513c89275d2c146df0a"
+    },
+    {
+      "path": "include/blcad/gui/gui_interactive_path_sweep_loft.hpp",
+      "sha256": "3c2710517eac947a16ec21aa11b05d921980b2553fd86a5bf2aa9174ab653ed2"
+    },
+    {
+      "path": "include/blcad/gui/gui_interactive_pattern_body.hpp",
+      "sha256": "646edfd965e74134ee63b412046ab1e1f02f43a635ecb15fe517332fd6d4c304"
+    },
+    {
+      "path": "include/blcad/gui/gui_interactive_profile_materialization.hpp",
+      "sha256": "955862e3ddd6e7a109285fffc848b7c0e0cfe18553ac3381273314a11d470e1c"
+    },
+    {
+      "path": "include/blcad/gui/gui_interactive_surface.hpp",
+      "sha256": "83dd596b5c0bca68a77467ecc1dfe8bbba3bdf37a5f3aff8afc28df8f7f25eb0"
+    },
+    {
+      "path": "include/blcad/gui/gui_measure.hpp",
+      "sha256": "b221468f921c3ecdd6fbaac7c9c7e482b07bbee7fdf0a517d6d7cf0db9e2f369"
+    },
+    {
+      "path": "include/blcad/gui/gui_modeling_workspace.hpp",
+      "sha256": "deb86796f27758e782aa44c5dce37511e950cfe0a40b2f26e9bcb574e68b4ae9"
+    },
+    {
+      "path": "include/blcad/gui/gui_part_foundation_workbench.hpp",
+      "sha256": "5139d0c752118d28a6084ad92ed885eeb1ebbe14b841fc74cde7173104aac2ed"
+    },
+    {
+      "path": "include/blcad/gui/gui_part_operations_workbench.hpp",
+      "sha256": "5e36899c1f4dbc81b050d18ade563f1d548491dfb9dbc781e5557260a0c5640f"
+    },
+    {
+      "path": "include/blcad/gui/gui_pending_feature_inputs.hpp",
+      "sha256": "8d9d83ac520a385c96976ba6c4105b9226fc3df6f2cc2ca78fe8d071d4f4fd2a"
+    },
+    {
+      "path": "include/blcad/gui/gui_presentation_visibility.hpp",
+      "sha256": "ec9360ee38c2efd3588d91e88e224e79edb0ad3f08c4910601c1b18c9d0b9011"
+    },
+    {
+      "path": "include/blcad/gui/gui_rapid_dimension.hpp",
+      "sha256": "f27084de4288796a7700526cf09eac603c12d85fd3bd58fdb02cccf63950096a"
+    },
+    {
+      "path": "include/blcad/gui/gui_selection_model.hpp",
+      "sha256": "b6be868de326422400fc2a9582330d98fec6787e422b9c1acccd67b8533f8357"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_annotation_layout.hpp",
+      "sha256": "c31a03c2f3b026152159e7654e050de7f82a66b430ebf2cc54abcbf72140e5ee"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_constraints.hpp",
+      "sha256": "30c020ed1a4e8995068f3288529d42cf89d80ef590d576de2f3f80c4b76dd558"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_corner_constraints.hpp",
+      "sha256": "a615782ff23b6c16d729b096cfec1af27d2709f8d9f8a4f923a330aa9aa0b7ad"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_create.hpp",
+      "sha256": "d87ab80404a93a91d48c3c6a953f5ad1232da3de16980bc3a0a55e9dbb01d939"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_dimension_layout.hpp",
+      "sha256": "ee32536320bbbc8dea13dc2fd5794489afc03d3af8764dbce9995b57ac87e585"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_dimensions.hpp",
+      "sha256": "014e3c8c146af019c0d27e80c0707163db3a2dc7add1b5ebf08f498b9f85ff2d"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_drag.hpp",
+      "sha256": "52dd91640c3fa85620ce68fb88ba35984c4ef401cbf7b24ca63095eb828ecbfd"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_intent_remap.hpp",
+      "sha256": "3d3768dead4c3fb59ae08a31ea089887a86b5a8195e311ae05ddf602b80aadf4"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_interaction.hpp",
+      "sha256": "d5b86b78177374d9901b9d3288d735e4b1fdde998665fe63dda7e3140e3aed7f"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_modify.hpp",
+      "sha256": "b84a7194daa404f66272e2545dd9f082bb73f2bd185df96c9bcd814345b92a57"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_operations.hpp",
+      "sha256": "3ff987bf85b007a538b44495f4347e55726ad7ef2e087788e6f333ff74306616"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_spline.hpp",
+      "sha256": "ee82fe0bb437f03b97159d01efe36093331e13d649896ef3731b6f481337139d"
+    },
+    {
+      "path": "include/blcad/gui/gui_sketch_workbench.hpp",
+      "sha256": "b3a00c87e8299862d3b45bc1c1d737b3dffec4d1df779b4046521621833978df"
+    },
+    {
+      "path": "include/blcad/gui/gui_spatial_surface_workbench.hpp",
+      "sha256": "d92a2c79046053c257b631975fae0b4ded976eb08be5c4b9b945bb1b74e4aaa8"
+    },
+    {
+      "path": "include/blcad/gui/gui_step_import_context.hpp",
+      "sha256": "fbdabb3bb528781c9fcdadc69e019c4d99d56eb4a30c3bb37c5f565eed4ed3d2"
+    },
+    {
+      "path": "include/blcad/gui/gui_step_import_workbench.hpp",
+      "sha256": "4ac8d2119096f865d79f18150403acb89bf5b89ec946f84c0427ed5597a8c892"
+    },
+    {
+      "path": "include/blcad/gui/gui_task_state.hpp",
+      "sha256": "16eb2500f0ebeeb9ac79341b781ca570ca6987105cf676ca66927cc504775c9d"
+    },
+    {
+      "path": "include/blcad/gui/gui_types.hpp",
+      "sha256": "89f5256da2bcd51e590a309c1e45efa4f0ad4bd2f9401ed1d01e7c4d6c6a5ba3"
+    },
+    {
+      "path": "include/blcad/gui/gui_viewport_manipulator.hpp",
+      "sha256": "67515177d215fc7783f8616955ac2203171a6e034d5f2bd94f6800ed164f57be"
+    },
+    {
+      "path": "include/blcad/gui/occt_viewport.hpp",
+      "sha256": "61e8badb9333730fa5df7d6953d1dd7972269051609c894112f43a6542fd27ab"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_assembly_tools.hpp",
+      "sha256": "795e40c3c4cc64cf6ce2482b6eb59ef5a3bf133b4df063e6bdfbfec8142b9b78"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_construction_tools.hpp",
+      "sha256": "5021e649cdd54ea10ddd52cb95c6658c915584fc14c26a760cfa7609b5860240"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_context_tools.hpp",
+      "sha256": "05163da0d56f677846389ecbe8a613d219e836921336d97558d14f43a0b19cf0"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_feature_edit_tools.hpp",
+      "sha256": "e2b05a5bb7137bfdaee4dd76e3a41116bc969d1627266bf1aa5fef738ca04a07"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_feature_tools.hpp",
+      "sha256": "808892815dd1cb61bebd97dee586641be0b2412663f02b79e82634baf3ad2165"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_hole_tools.hpp",
+      "sha256": "9a7a71bedd380171ca9e74a9f1922c20aaf4e7e5fdfc8a1c8ae12196b24418e9"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_inspect_tools.hpp",
+      "sha256": "3b04b62ce025b45126105ce230180f12c37b1a9c61942a61c8f1643ea22d1b34"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_manipulator_overlay.hpp",
+      "sha256": "8b6ac97e6cf8090fe9b6ae112005e87336e3564ef956841ff2d0eff00fb86ac9"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_measure_tools.hpp",
+      "sha256": "2d92fa5cc72e142863163a17e9635d0c54b8691cb2e60f9cd93c98f7c36d48e0"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_navigation_tools.hpp",
+      "sha256": "bde87b84d760965d652411d7c77d460fb3e862dcc5124fdf5b5fd5da198df32e"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_origin.hpp",
+      "sha256": "8aeb7675d8322decd4e4e5ac5f45e4254a199a05fe69e73acef4b289942ab7fc"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_parameter_tools.hpp",
+      "sha256": "ef5bb5b76cccbfae02f95fc46d636298fac1f6d66bcb4d9a311d7bcaa9b7fcd5"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_property_controls.hpp",
+      "sha256": "1af9aba6ea4d197b075be87b4cdc6af8b681f8b7feadc52db4c2ae58a58fba3e"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_reference_repair_tools.hpp",
+      "sha256": "890a5e34d0468a74792635d9460912e224b5cdd5ff74ecc1f215d618bf53bb37"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_repeat_tools.hpp",
+      "sha256": "96bb05d777de0084b34e9526f44c71ee1a89ac198ab8e06160fc3fa506e517cd"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_ribbon.hpp",
+      "sha256": "54cb80b74c8147efdea3c952191d683cc3e9e71e64ecfe86d94166a7c42422d4"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_sketch_3d_tools.hpp",
+      "sha256": "872aa39fdd6d31dd27e490e25f0794e64e29ba49fef13a6e795717d7da74a073"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_sketch_diagnostics_tools.hpp",
+      "sha256": "7b7db3e10bd7f505f87e159bef3ac7a99d00c73064016180fba3dcb4df96c720"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_sketch_tools.hpp",
+      "sha256": "b8cc2885a6ec7a7c4223956ca68b39cb6ea2cc0de61eb683d4bbd22da617cc74"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_step_import_tools.hpp",
+      "sha256": "33fae2e5eac67df294798eb7914abb1a8e9201e6f87c42d30161eb0cd73bcea8"
+    },
+    {
+      "path": "include/blcad/gui/shell/shell_window.hpp",
+      "sha256": "a99bffddd049cb540b6a947bec758f3bdbbfc0d01e35ff5371f345dea296b118"
+    },
+    {
+      "path": "include/blcad/gui/startup_splash.hpp",
+      "sha256": "bca2c9bd4362811e8e348ff8d12e1d1389d68c2a2f6dff38f2c2cfbd77b3e122"
+    },
+    {
+      "path": "scripts/vendor_pixelarticons.py",
+      "sha256": "f8b722cc4209bba2b7904f1df5b12c46077e3a95244bb6e413c65d0ca2afd0ae"
+    },
+    {
+      "path": "src/core/assembly_constraint.cpp",
+      "sha256": "378b95dd026a813215c68753287e6a84d0fcc31d2fa1d6bf0bdb0b5faf3415fc"
+    },
+    {
+      "path": "src/core/assembly_constraint_graph.cpp",
+      "sha256": "a9875a226d4008485ae4baa3f0be5e0de666edc877211173cfca65a944fe70c0"
+    },
+    {
+      "path": "src/core/assembly_constraint_graph_participation.hpp",
+      "sha256": "232b8a24d897ac24a79ba0f8f8a7d88641d9de18af2a1903e850250459d80574"
+    },
+    {
+      "path": "src/core/assembly_cross_hierarchy_constraint_graph.cpp",
+      "sha256": "6359d8c7e98fa6c1755b67c85684c082fe24e7af2bb47f1d471af7e36e9647d3"
+    },
+    {
+      "path": "src/core/assembly_cross_hierarchy_motion_graph.cpp",
+      "sha256": "5aec5c26931803e3427a79371dce9f210f49d138845df16b349cea63aa484610"
+    },
+    {
+      "path": "src/core/assembly_document.cpp",
+      "sha256": "8e690a2829b3b54d05d94b48d9907206af89f922445c967ea83b4983209ada86"
+    },
+    {
+      "path": "src/core/assembly_document_json.cpp",
+      "sha256": "8daf846b65f6ea7e990d54e0466869c3fa3b433d53d094ae466e0811d0d2a8b3"
+    },
+    {
+      "path": "src/core/assembly_exchange_graph.cpp",
+      "sha256": "07a9660be5065332788044f11bc300648db8e2c8445bc000d514fb4627a7b372"
+    },
+    {
+      "path": "src/core/assembly_hierarchy.cpp",
+      "sha256": "a6c70f05032427a37ac3fa0c1c3689321833296fbf17d95cfaf8964a64836f46"
+    },
+    {
+      "path": "src/core/assembly_joint.cpp",
+      "sha256": "011e307dc159446c01e6f17805859f8da130f74bbe28d1bfc437ff8533bab289"
+    },
+    {
+      "path": "src/core/assembly_joint_graph.cpp",
+      "sha256": "a691cbca3335e255705676e7cca616351014466812ff945d743cd73ad2ce5604"
+    },
+    {
+      "path": "src/core/assembly_joint_json.cpp",
+      "sha256": "427fc208a9746cf3825f36c4902608470b9c2990ce1d6a23f99bbb2fae267c31"
+    },
+    {
+      "path": "src/core/assembly_joint_json.hpp",
+      "sha256": "d00b9dc018abae24dbbc7fc17e90af0bf412d82f8bd52babedcf71c0f047f11f"
+    },
+    {
+      "path": "src/core/assembly_leaf_occurrence.cpp",
+      "sha256": "f485f133e245edc2bf97157a75dac67a5e852c83645fa6155b6fdbdf1d17879f"
+    },
+    {
+      "path": "src/core/assembly_reference_target.cpp",
+      "sha256": "49ae4dba9672b19afc5bc28dff79206a0a64a0d6125e15674e74f25078a0c7cc"
+    },
+    {
+      "path": "src/core/assembly_subassembly_instances.cpp",
+      "sha256": "a1442e175044b9734e60c3da24764433f59e0b2392c7b059b7ef2f2353dfe6e5"
+    },
+    {
+      "path": "src/core/body.cpp",
+      "sha256": "a8c5451157a580dfa9fd6289b4465fdaf1812bd7031a9ffe2addebbd3c729d64"
+    },
+    {
+      "path": "src/core/body_boolean_feature.cpp",
+      "sha256": "6bbda69df88a7370f04e4d371a55b1bbdeecae7c2d5708af3649fb192aab277a"
+    },
+    {
+      "path": "src/core/body_transform.cpp",
+      "sha256": "5a6601c83a9a05ae05ca768ae5795314120d6e7c078a093c8c0db294ad895b69"
+    },
+    {
+      "path": "src/core/composite_closed_profile.cpp",
+      "sha256": "5b53867f535f7b5064bcd2bca9720ba36612ba489fc5d1a684ab33455e253a6b"
+    },
+    {
+      "path": "src/core/construction_geometry.cpp",
+      "sha256": "9eed1afb38ed5f8f000461e592dfbea044371f686afd1a3169e46b350f7380ef"
+    },
+    {
+      "path": "src/core/datum_axis.cpp",
+      "sha256": "0cf83e436f72d4472ba9fe10e4c6ef4fc61afcc66a00d62733e2424af9772324"
+    },
+    {
+      "path": "src/core/datum_plane.cpp",
+      "sha256": "c0bdff4dabe25ba5de6ab27cad39ee7492a0facbcdb187a27c6b767f53e769bf"
+    },
+    {
+      "path": "src/core/dependency_graph.cpp",
+      "sha256": "fc1cba05314e87010f490d38d15c468314c6b3d6e5fdf5d14dc11709ede16287"
+    },
+    {
+      "path": "src/core/draft_feature.cpp",
+      "sha256": "c0f4e74bb985a5804942267a662d8f5bf2d0ee8ddc55d2d69fef798ff4e4a850"
+    },
+    {
+      "path": "src/core/edge_treatment_feature.cpp",
+      "sha256": "50e7057f28b5ddf8d0d7b0b0b7207239b0784a904201d0e380990608555549ae"
+    },
+    {
+      "path": "src/core/error.cpp",
+      "sha256": "3aba6c273e6e6857566d2da9aa254720d564b65181a41a5f7fdc7dafb7f63323"
+    },
+    {
+      "path": "src/core/feature.cpp",
+      "sha256": "0637ce63a5c9b55405b8ce5761e89bb92f16877ad32b95cee925fb638fedc8a2"
+    },
+    {
+      "path": "src/core/generated_topology_reference.cpp",
+      "sha256": "7b2d2560a021569deba4bd8e50942399bb25a533b8e5e44e7342401676694441"
+    },
+    {
+      "path": "src/core/imported_part.cpp",
+      "sha256": "dbcf2ca4ac432dc2639566d3552dd8db429cb006d0c0c6ef7b2212bab4522bd5"
+    },
+    {
+      "path": "src/core/imported_part_json.hpp",
+      "sha256": "64165208a2cca02c5099abfbe9f701eebffb205e4457c77ad318659eaae80d5a"
+    },
+    {
+      "path": "src/core/imported_topology.cpp",
+      "sha256": "8bf2bbf59fc5662a1dbf0b501566660ec4b45c6651e26f2842cd47e6035cf6eb"
+    },
+    {
+      "path": "src/core/imported_topology_json.hpp",
+      "sha256": "b79cdc86de0a50461fd4d6af1a5ecbc11202e9cc28d7859d61e258a56fa5117e"
+    },
+    {
+      "path": "src/core/invalidation_state.cpp",
+      "sha256": "5dbf2bdebd62fdd37f75165f8c9228faea4a4cd5f4fb70550c58a3f0fa32bbd3"
+    },
+    {
+      "path": "src/core/loft_feature.cpp",
+      "sha256": "578549fa6a35356f69e09868498afd96a505244d61e298dac0dc13a8b00804fd"
+    },
+    {
+      "path": "src/core/mirror_feature.cpp",
+      "sha256": "ec0152c74105fae996fed30deede263ec4e452d08a79224cd4323fbf8598fc4d"
+    },
+    {
+      "path": "src/core/parameter.cpp",
+      "sha256": "d472081756e176a8dd279ff11948398bf9eed3145bb767d1f63b28acdc9d8f16"
+    },
+    {
+      "path": "src/core/parameter_expression.cpp",
+      "sha256": "88000efdd684ddac761678936d8446c767950b795fcb03f69002393232fd9bbe"
+    },
+    {
+      "path": "src/core/part_document.cpp",
+      "sha256": "ef9a598af8ddf3bf3bce32a39fc4cf9f724fa7070812eecd673eeef893d2c146"
+    },
+    {
+      "path": "src/core/part_document_json.cpp",
+      "sha256": "86600c3cd51a46e2800230089b0906b9d48eaca51e547b5ace4a4390ee5b97ed"
+    },
+    {
+      "path": "src/core/part_feature_input_reference.cpp",
+      "sha256": "b28cf43757e81f5a09d68c7fe2c98b0008d5a2452af34f18d91f3d11debbfbf0"
+    },
+    {
+      "path": "src/core/part_pattern_feature.cpp",
+      "sha256": "005ff9cc4f0da9d31a7ae1ed5e6b796e6f068b9024051b21ddc28c444fdd5d21"
+    },
+    {
+      "path": "src/core/path_curve.cpp",
+      "sha256": "451f5e5edaea32d2bccfc39648072a59e57e31cdc1f8485b13433c7be85c56f9"
+    },
+    {
+      "path": "src/core/project.cpp",
+      "sha256": "fa1675681e0a3ac31310595d1094929cc63e37aa2d673b6b5e69e4ef6a8e5738"
+    },
+    {
+      "path": "src/core/project_cross_hierarchy_constraints.cpp",
+      "sha256": "d9dcdd538bdea4ca55c92103b3103833fe0be900fa0a7f1cf6785fa29cfa388c"
+    },
+    {
+      "path": "src/core/project_cross_hierarchy_joints.cpp",
+      "sha256": "033912afd502572607dd9c421c9d14e740c31d9622edf3826910c11b830e7323"
+    },
+    {
+      "path": "src/core/project_json.cpp",
+      "sha256": "678c8248b5ebecf246d74822bb4ea030dc4a741a89ce4a2b2962517f05753a30"
+    },
+    {
+      "path": "src/core/quantity.cpp",
+      "sha256": "bc870c9f11ede42cab463c08159d781e0872c5ee32dde6568ef9e9e4cbe71fc3"
+    },
+    {
+      "path": "src/core/recompute_plan.cpp",
+      "sha256": "2024022bc1383c6a918c8de122a8bdd8205c0e92ea2757b6d1859e28ff650bcf"
+    },
+    {
+      "path": "src/core/reference_generated_line.cpp",
+      "sha256": "e894bf51e0b93b9ac8b8a09cc0eeec2d8b5ebe41e44cffb60f2139c3aa2adcc6"
+    },
+    {
+      "path": "src/core/reference_recovery.cpp",
+      "sha256": "5ab37d6b852ded4ff8b271a1db0d468840834ad5d8971835ee9cbf6d3d2f1f95"
+    },
+    {
+      "path": "src/core/revolve_feature.cpp",
+      "sha256": "82424f4bea2ea274ae9d5e984763288c5c31f7f53aa704e013d0f366ba6741f0"
+    },
+    {
+      "path": "src/core/shell_feature.cpp",
+      "sha256": "ea38bd456797fd46726f4f64dac6dad06b89b0ca928cb362f070d64e2f05c7a7"
+    },
+    {
+      "path": "src/core/sketch.cpp",
+      "sha256": "a1757debaa2a7766a47923f3a6e9268f840061bedaa1c26d97149c93d23cc1bb"
+    },
+    {
+      "path": "src/core/sketch_3d.cpp",
+      "sha256": "afe9004a27480d03a2ab9e4640098b48793d132f6339ac138222b284440e3888"
+    },
+    {
+      "path": "src/core/sketch_arc_profile.cpp",
+      "sha256": "e9305a6941bc5da9b927b9036512249a54b3fb5eea16b8a3651a12392a465692"
+    },
+    {
+      "path": "src/core/sketch_constraint_solver.cpp",
+      "sha256": "64357b474285ab2047cd605afdd9795c7cb11aa83bf5f6c03506b9f938564cc4"
+    },
+    {
+      "path": "src/core/sketch_constraints.cpp",
+      "sha256": "12927ad41fc0b0de2cb0d82646df439175767e74508dece49ab6dcc822d9e1eb"
+    },
+    {
+      "path": "src/core/sketch_diagnostics.cpp",
+      "sha256": "ef97083f069ff3d4859821aa5069956c8df81f358168d8f91419df3f2f1809a3"
+    },
+    {
+      "path": "src/core/sketch_ownership.cpp",
+      "sha256": "26ae87739d134820bbe1faf7174415cb993af422e6443a8efb8bae885a0eb745"
+    },
+    {
+      "path": "src/core/sketch_repair_command_labels.cpp",
+      "sha256": "c104e8013400af1665ae6b11900a6202d948476de1ddc04d2e4264f5459db185"
+    },
+    {
+      "path": "src/core/sketch_repair_commands.cpp",
+      "sha256": "5ad14c57670791633abfec68089c39873ff76a6fc8ad8dbee573881947d59e0a"
+    },
+    {
+      "path": "src/core/sketch_repair_presentation_metadata.cpp",
+      "sha256": "29549da8fce4a8a8a03c306b9ababd18f8383e966a25232f0e389c721ac7569f"
+    },
+    {
+      "path": "src/core/sketch_repair_presentation_snapshot.cpp",
+      "sha256": "d69608f463c1c8df6cd0c2347b60ecf45217415a2438c88f7d7b7d95d117c99c"
+    },
+    {
+      "path": "src/core/sketch_repair_presentation_snapshot_query.cpp",
+      "sha256": "eaadf881351e28fb7ef15a9ad3abc657fb48978fcfd2fc625a9bc63002d60aed"
+    },
+    {
+      "path": "src/core/sketch_repair_suggestions.cpp",
+      "sha256": "d616c6d34b2e08a2dc073d24ff90fb21fa685be50d701ea74b6b00cb1f299ba3"
+    },
+    {
+      "path": "src/core/sketch_repair_transactions.cpp",
+      "sha256": "aa646fa98c8c6ca08ecc81123488655843716a7b8096990d201b56a091f607ae"
+    },
+    {
+      "path": "src/core/sketch_repair_undo_stack.cpp",
+      "sha256": "2a88ef81762ff93b8f06b9f8a405881a6681ff37f3686952116b88b0d8f6e2f7"
+    },
+    {
+      "path": "src/core/sketch_repair_undo_stack_summary.cpp",
+      "sha256": "8adec5937875d4d0f2030f3bb1cece823458ac32407c94b2a1f951388a4f09b8"
+    },
+    {
+      "path": "src/core/sketch_solver_legacy_adapter.cpp",
+      "sha256": "cff8a2297b6c48bc4ab74679330aba84e6bbd298daaee49de2cf5ceecb476b74"
+    },
+    {
+      "path": "src/core/step_import_freshness.cpp",
+      "sha256": "6b30e200f49dac249c5ed6df6eb73ecdc387f9cf587067db76594dc2e485da04"
+    },
+    {
+      "path": "src/core/step_import_json.hpp",
+      "sha256": "46475716a4f86991091213cb6f62e2358d8b6b25257667112164f1648c47fea7"
+    },
+    {
+      "path": "src/core/step_import_source.cpp",
+      "sha256": "3c9fad09e8d009393d5bcad3d3e8808074097031cafa7727e6d9e4d69557ac8f"
+    },
+    {
+      "path": "src/core/structured_step_import.cpp",
+      "sha256": "d69e08e8be932146f1dc2a5c806fdefdfe0f4bdca39b5a002ef349b0bfa92b91"
+    },
+    {
+      "path": "src/core/surface_feature.cpp",
+      "sha256": "5ca878cb32a892bccd5b21d8593a5817d7c1562a99b882d500fbd98443f71de8"
+    },
+    {
+      "path": "src/core/sweep_feature.cpp",
+      "sha256": "161d743da1d4115d32ea979c4e16b7e374ec886af3c89371ddee60f2f78b0393"
+    },
+    {
+      "path": "src/geometry/arc_closed_profile_adapter.cpp",
+      "sha256": "dc3823b3d54ff9e5f0fab83b646c529fd0642bcad660353f8fce1e77a2b29249"
+    },
+    {
+      "path": "src/geometry/assembly_concentric_constraint_equation_builder.cpp",
+      "sha256": "8e60084ffbee485fbaebaeb36395e58109095f740cf1f22127ac9769f1614ded"
+    },
+    {
+      "path": "src/geometry/assembly_constraint_equation_builder.cpp",
+      "sha256": "6a662d21eb53d1b7be721be8202356ca0d47f6dd4a8457fb1f4d8dae28627043"
+    },
+    {
+      "path": "src/geometry/assembly_constraint_numeric_system.cpp",
+      "sha256": "6515d573d88229c5efbdac6ce2b8435b01ab3781f19f6f7d01db7c7447596829"
+    },
+    {
+      "path": "src/geometry/assembly_constraint_numeric_system.hpp",
+      "sha256": "419508682479afbb1b6c7fa92c667054bf4fcd6f9ab75aadc324a27df4082ea3"
+    },
+    {
+      "path": "src/geometry/assembly_constraint_target_resolver.cpp",
+      "sha256": "9dd0b60d6e2860c9f7863b2983edfb98d13d09e80ac2576a3a7c7d578116e471"
+    },
+    {
+      "path": "src/geometry/assembly_contact_analyzer.cpp",
+      "sha256": "04f6aad40d0d71b0a6549dcb04d8239f7a2711f9856043a84119799e18bb8a8b"
+    },
+    {
+      "path": "src/geometry/assembly_cross_hierarchy_constraint_solver.cpp",
+      "sha256": "7aa34084e7408a42a11c3467b54c65ebf5c311bb2551a7de9a163c3357e50650"
+    },
+    {
+      "path": "src/geometry/assembly_cross_hierarchy_freshness.cpp",
+      "sha256": "a98ebe63ed4722f9d28419cb19f8845dc9f64b63a8abf3f764a45f58b12059d7"
+    },
+    {
+      "path": "src/geometry/assembly_cross_hierarchy_freshness.hpp",
+      "sha256": "57ca89178776c85d08eaa30194180c092f998c57a3e11023ee5eeb370dfeebb4"
+    },
+    {
+      "path": "src/geometry/assembly_cross_hierarchy_joint_motion_solver.cpp",
+      "sha256": "69f62d6d36edf482884bb55f2f90a8bbb4677b174adb08fbf3728ab90b86206d"
+    },
+    {
+      "path": "src/geometry/assembly_cross_hierarchy_motion_numeric_system.cpp",
+      "sha256": "504b32532d8776e9e04427d8eb117af969afb0f293b4ad6bd976eefa91e3b4ac"
+    },
+    {
+      "path": "src/geometry/assembly_cross_hierarchy_motion_numeric_system.hpp",
+      "sha256": "eb53381262b7d1d1fa2620007a4b498ab4fe7dea1704ef9b0abb507144038840"
+    },
+    {
+      "path": "src/geometry/assembly_cross_hierarchy_numeric_system.cpp",
+      "sha256": "54babe1e851a072d2f1615cdb4c80ea4e43e0553739f87e405d9a9103120fd22"
+    },
+    {
+      "path": "src/geometry/assembly_cross_hierarchy_numeric_system.hpp",
+      "sha256": "5b430c97265585f39d21355ece2b45c282eb1ad41a4dd18a0d1ffdf42772edb8"
+    },
+    {
+      "path": "src/geometry/assembly_cylindrical_joint_equation_builder.cpp",
+      "sha256": "e47de6fd0314d0747e97e70ef3d9bac0cdb01c6ffae12a920241eafcbf0bab11"
+    },
+    {
+      "path": "src/geometry/assembly_cylindrical_joint_residual.cpp",
+      "sha256": "1ba178e44ea80c826b40587247821f5751f22c8de5121a302f6692c525e13f8b"
+    },
+    {
+      "path": "src/geometry/assembly_cylindrical_joint_residual.hpp",
+      "sha256": "7ae6361bb7abafee9c80a370e67f63494e4077877e05e426bb14dfc3f5df1fbf"
+    },
+    {
+      "path": "src/geometry/assembly_generic_relationship_equation_builder.cpp",
+      "sha256": "772446ea30424650728add8fee9229468d60a77b776edf56c18a30f18cf3c031"
+    },
+    {
+      "path": "src/geometry/assembly_geometric_target.cpp",
+      "sha256": "cef417361a00866359eee502ea49a956e3012078b66d048ae4b87c08f8d354c4"
+    },
+    {
+      "path": "src/geometry/assembly_hierarchy_constraint_equation_builder.cpp",
+      "sha256": "b2a90df2ab313b1fb525af14642d9cf39304aa897c890fd8848653ce080dc663"
+    },
+    {
+      "path": "src/geometry/assembly_hierarchy_cylindrical_joint_equation_builder.cpp",
+      "sha256": "a9d21be99e3ec876f74f07d3721e00bcfe32e89dbe2d40c3f20dc5032b0fa48a"
+    },
+    {
+      "path": "src/geometry/assembly_hierarchy_planar_joint_equation_builder.cpp",
+      "sha256": "006b7426bbdbceeb5afcdd908a3c165082109b603971be2586afc372d09a7c81"
+    },
+    {
+      "path": "src/geometry/assembly_hierarchy_prismatic_joint_equation_builder.cpp",
+      "sha256": "4fd7ae5a1acbc82cf6fc6743bd4a52fa7b2dc001e8fa0488584fcd150863104b"
+    },
+    {
+      "path": "src/geometry/assembly_hierarchy_revolute_joint_equation_builder.cpp",
+      "sha256": "af5bade4544b06b18d2a5d8ae2511b1a323c9000a6c8efc23f720d325d909efc"
+    },
+    {
+      "path": "src/geometry/assembly_hierarchy_spherical_joint_equation_builder.cpp",
+      "sha256": "d7a11b0d6e5b0ab5df5b9f4920ab85d20318f32249cb2ed340cae7796709088a"
+    },
+    {
+      "path": "src/geometry/assembly_hierarchy_transform_evaluator.cpp",
+      "sha256": "820a494832df55f2aa09049e739eca29d6a32b421d9fb298046f6d532692575e"
+    },
+    {
+      "path": "src/geometry/assembly_import_validation.cpp",
+      "sha256": "b9d69eb9ed7df252e5a644b9785abc3174396702a91c6ac26137fb7535a6edd5"
+    },
+    {
+      "path": "src/geometry/assembly_insert_constraint_equation_builder.cpp",
+      "sha256": "dddaa7d47f254aa046f3f43b3f5efd5e7ebced65d317bcd844e542bd9dd0e575"
+    },
+    {
+      "path": "src/geometry/assembly_interaction.cpp",
+      "sha256": "23f43ef4e21c9a50479729fbfeb33aa62d927ad00ad034ab4efa8c1d738a43c5"
+    },
+    {
+      "path": "src/geometry/assembly_interference_analyzer.cpp",
+      "sha256": "2106f939b2bc97bf7cc089af3a7c8d9125529475886d7117d1a106b7421c21e8"
+    },
+    {
+      "path": "src/geometry/assembly_joint_drive_validation.cpp",
+      "sha256": "9a0a55fba3c946a9df5bbbd8824e42101df2c411c1f551cf6622cf23bc2c9237"
+    },
+    {
+      "path": "src/geometry/assembly_joint_drive_validation.hpp",
+      "sha256": "c4e2aa9203c42a98a2a230e90a230bf7776c3c0ed703b31675ea7979403936b3"
+    },
+    {
+      "path": "src/geometry/assembly_joint_motion_solver.cpp",
+      "sha256": "1dc911678cfa71c4f6215f4d6e62ce9c7d91fd8b8a0567d03573f829e31155c7"
+    },
+    {
+      "path": "src/geometry/assembly_joint_target_compatibility.cpp",
+      "sha256": "6b191cf0e183d2a352766ebb350c5b5563615db703aed5c3cf18fe5fd4bd3f82"
+    },
+    {
+      "path": "src/geometry/assembly_matrix_rank.cpp",
+      "sha256": "3ca45e593040e45fa89e80363f7c0ffdc71f5ae946236bf2c8b79c6690e8fabf"
+    },
+    {
+      "path": "src/geometry/assembly_matrix_rank.hpp",
+      "sha256": "ae6517b3cd81c2dbafb7f69511a56f21f0fc361f8ce76c42eab20aa0c76a75a4"
+    },
+    {
+      "path": "src/geometry/assembly_numeric_solve_engine.cpp",
+      "sha256": "6c9e54c4fc30eb62c12e5a532f9c4ea80d19e0d9961ef43a5c255caf2313926d"
+    },
+    {
+      "path": "src/geometry/assembly_numeric_solve_engine.hpp",
+      "sha256": "edf39b7541f4fb13256f293d6dc8dd5548c3efd6076c770bae03eaf76d136e16"
+    },
+    {
+      "path": "src/geometry/assembly_occt_rigid_transform.cpp",
+      "sha256": "84177434caf1300a1a5fada4d7386cbc8e0cbeddd4620acdfbf95f872934a7b4"
+    },
+    {
+      "path": "src/geometry/assembly_occt_rigid_transform.hpp",
+      "sha256": "67e0c1e8bd5e9d87c7fa4ae9c1d972d3d2eba9e4c710ccc6acbb3dcc413ce99a"
+    },
+    {
+      "path": "src/geometry/assembly_part_shape_definitions.cpp",
+      "sha256": "b4b6df0387d5ac29a997d1705c3199cfa448600105c5b4dc28a8100dd0f9b048"
+    },
+    {
+      "path": "src/geometry/assembly_part_shape_definitions.hpp",
+      "sha256": "b35c1084986f0e1ffa19cc48f19f2fb3d5004fb6b345d40c051e5a87196e0c97"
+    },
+    {
+      "path": "src/geometry/assembly_planar_joint_equation_builder.cpp",
+      "sha256": "6dbf42312f9309548f20c5cefc6262989d0c387e1911906303d2c67df6be4ce1"
+    },
+    {
+      "path": "src/geometry/assembly_planar_joint_residual.cpp",
+      "sha256": "0547fa85b9d779ac558f74a99cc3c7d7ee2cc4e8b2d34eeb9fdef41ba342e429"
+    },
+    {
+      "path": "src/geometry/assembly_planar_joint_residual.hpp",
+      "sha256": "b7352e02a6da96050297a0b13e92f5401555bd6aba52d901ea2a231ddec06d30"
+    },
+    {
+      "path": "src/geometry/assembly_posed_leaf_shapes.cpp",
+      "sha256": "56277a94f7738e0de45d081a29cec00e61fdb3c063b092e5847f6d0cdb9cb8f7"
+    },
+    {
+      "path": "src/geometry/assembly_posed_leaf_shapes.hpp",
+      "sha256": "7d2f160c63e0621fa989f2d5c6290c9eac2bb2a7db97b0921131a0a6bbb98b7c"
+    },
+    {
+      "path": "src/geometry/assembly_prismatic_joint_equation_builder.cpp",
+      "sha256": "134a1eb38402d460d5e8eee4937874d2c0794798ee2deef8f7c82e93f65c51f2"
+    },
+    {
+      "path": "src/geometry/assembly_prismatic_joint_residual.cpp",
+      "sha256": "b16f73991a067efda135c1b3241dd95060b11416ffaf2047b14f3e6b47b5b660"
+    },
+    {
+      "path": "src/geometry/assembly_prismatic_joint_residual.hpp",
+      "sha256": "ce07d860cb31515a095715a150c3e3e9fb33359527c81eb6c461a43c53f4f6b4"
+    },
+    {
+      "path": "src/geometry/assembly_revolute_joint_equation_builder.cpp",
+      "sha256": "f91858bd44e42a5853f3773ec17952095a3f0e8a507ae2f6e9992da3b7a59937"
+    },
+    {
+      "path": "src/geometry/assembly_revolute_joint_residual.cpp",
+      "sha256": "1759fbe165633823d35a7e72e1407e70cbe2f1863a45cea1fed39a1a41f73813"
+    },
+    {
+      "path": "src/geometry/assembly_revolute_joint_residual.hpp",
+      "sha256": "cb95d058ae606c5381df230358d70ba4c1bd8a82eeacded750b0519008ebdd19"
+    },
+    {
+      "path": "src/geometry/assembly_revolute_sweep_analyzer.cpp",
+      "sha256": "d687781ad92e48219afe2550571ba23d66a308d5938f23a6f5173753ed2fa865"
+    },
+    {
+      "path": "src/geometry/assembly_rigid_body_solver.cpp",
+      "sha256": "104c6beaef30d819254b6aab3218a91f546368a3b211c61d32a86e5f43fca5c5"
+    },
+    {
+      "path": "src/geometry/assembly_semantic_target_freshness.cpp",
+      "sha256": "9846dce9b7295262e3abd9c53b327e59a52ee5182c60b962f1d5e4b2baf57a8a"
+    },
+    {
+      "path": "src/geometry/assembly_semantic_target_freshness.hpp",
+      "sha256": "5b1129907d98306eb28f8d3fa0421f5437494a6288bce6196730e3096bef31b4"
+    },
+    {
+      "path": "src/geometry/assembly_solve_diagnostics.cpp",
+      "sha256": "7c93df496869a6c7363bde7241f3b49be0cae0c39a43ae50ed3f7686ea730733"
+    },
+    {
+      "path": "src/geometry/assembly_spherical_joint_equation_builder.cpp",
+      "sha256": "f4a050d8422217fee618f1f98c20bfa55ab86b1a6e2479c4f772224042ca5698"
+    },
+    {
+      "path": "src/geometry/assembly_step_exporter.cpp",
+      "sha256": "ea68133416e441c72fe700796fa49a9e66822d7c2c8d84c0ff001eed8230371b"
+    },
+    {
+      "path": "src/geometry/assembly_structured_step_exporter.cpp",
+      "sha256": "1337ee0a492eb10fcb13c9648a8a46b2baf0f9e06e8b4dc208b859a260899ca9"
+    },
+    {
+      "path": "src/geometry/assembly_target_compatibility.cpp",
+      "sha256": "8b6640df5480d9c22867167f6621a5c2654ca2d710a48259b9bec35edbccddf4"
+    },
+    {
+      "path": "src/geometry/assembly_transform_evaluator.cpp",
+      "sha256": "8cb2c2796b6410b634d76f7480cc80dde86279fd0971c6bca3697264e722f16d"
+    },
+    {
+      "path": "src/geometry/body_boolean_adapter.cpp",
+      "sha256": "ec60dd1b595c39e8ab95773ce44a2520dd93b2f4a3e1e7fa5186996df26f9757"
+    },
+    {
+      "path": "src/geometry/body_result_inspector.cpp",
+      "sha256": "4e30163738719bc21d352eae0b0519e1d5979ef7ad9e96e39b3ea6e161ec02dc"
+    },
+    {
+      "path": "src/geometry/body_transform_adapter.cpp",
+      "sha256": "b80b9fa0d702f7d8d07053ff4df06ff167b557967a2fc647de9387a70c9bdced"
+    },
+    {
+      "path": "src/geometry/chamfer_adapter.cpp",
+      "sha256": "68c8fdadf72bffd5d3d8ba19f7d497f45556862346dd7244f2ae38ecf3bfbf5a"
+    },
+    {
+      "path": "src/geometry/circular_cut_adapter.cpp",
+      "sha256": "7dbe28bae0065009cea6fbdd9beed1eda2a1f1060a14b8e3874637a75592dee3"
+    },
+    {
+      "path": "src/geometry/circular_pattern_adapter.cpp",
+      "sha256": "7477bf480f96fac76880b9523ab661d880add68aefcc0e028080fc3983b4f45e"
+    },
+    {
+      "path": "src/geometry/closed_profile_adapter.cpp",
+      "sha256": "6d8e9f2a192a2b4e8937262d718b8374a8d6f1506aae58d33fb242db3cc8fd98"
+    },
+    {
+      "path": "src/geometry/construction_line_resolver.cpp",
+      "sha256": "d4a9e0347d1b8a8ed7391dd41860f7dff6d81bd181512a19c85b93a69bf710fe"
+    },
+    {
+      "path": "src/geometry/construction_point_resolver.cpp",
+      "sha256": "f42ad094375dc2ab97b85f2d98715c7f7cb2985bb6f312aba358c3be2c513ac8"
+    },
+    {
+      "path": "src/geometry/dimension_driven_profile_resolver.cpp",
+      "sha256": "63cc1d2bb12a8d8bada579d43ad116170f74a4ce11d53554073b1cf75ccd4cec"
+    },
+    {
+      "path": "src/geometry/draft_adapter.cpp",
+      "sha256": "42005e1dbbaefcf4ac3395cd7208dc4168e90ac00ece0339f08ab4336e77d41e"
+    },
+    {
+      "path": "src/geometry/face_lineage.hpp",
+      "sha256": "ac5b2905f5ce370384ae461d104ddd4245647fc35380c3b1be25c4c185848ddf"
+    },
+    {
+      "path": "src/geometry/fillet_adapter.cpp",
+      "sha256": "4de2d52ff85e00a8e8bf8ccf0492b687629bddf9c9da90f7a33875845516a48a"
+    },
+    {
+      "path": "src/geometry/finishing_selection.cpp",
+      "sha256": "01810167b0ad41fcb14c827b83e86678d2fa0c48b1bfb32d93858b67da9ec364"
+    },
+    {
+      "path": "src/geometry/geometry_measure.cpp",
+      "sha256": "cd4757dd8c21e897513948a9d6ce7a664b63fa1c4d5bf4d7a6469dbe27dc0ed3"
+    },
+    {
+      "path": "src/geometry/geometry_shape_internal.hpp",
+      "sha256": "6dcc4b9f22947629026c82cb7c3e57e9f35362418871498ca2331ff50da0f44f"
+    },
+    {
+      "path": "src/geometry/imported_body_placement.hpp",
+      "sha256": "3d50ee246d3d1e5757e46236dbe1468a5f582633b5abdf39b29f0b9b81ae738a"
+    },
+    {
+      "path": "src/geometry/linear_pattern_adapter.cpp",
+      "sha256": "03cd6df1a1bdeee2ceee00a6f446ee2796472f05d4ff8e74316928a25245d6c0"
+    },
+    {
+      "path": "src/geometry/loft_adapter.cpp",
+      "sha256": "11817951a672c0bc39ef6c67e57dc43940dfc56809bf3709696257f03bfa612f"
+    },
+    {
+      "path": "src/geometry/loft_section_alignment.cpp",
+      "sha256": "8c08ce3d87b096b4c4a13c1a14a529a072e9cddc5f4eabf83122a32e399172d2"
+    },
+    {
+      "path": "src/geometry/loft_section_alignment_internal.hpp",
+      "sha256": "a591bcbc7499792fd232c24861a130b5e1eac9a5b98f5a6d950414547e1c5b18"
+    },
+    {
+      "path": "src/geometry/loft_section_compatibility.cpp",
+      "sha256": "8ede103df0f5d4f935f32303385cd45f4ae358445540956fa33c4d19578a202c"
+    },
+    {
+      "path": "src/geometry/measure_selection.cpp",
+      "sha256": "f18d6bc02a0bdce39cac5312a8a26f20fe46c1fe3b02085a4624fc21b90fdb52"
+    },
+    {
+      "path": "src/geometry/mirror_adapter.cpp",
+      "sha256": "57bcf7a30aebd171ff3cf061285bbf40e3eae10a0e7af4a1fb6d135bc486e2fd"
+    },
+    {
+      "path": "src/geometry/occt_failure_message.hpp",
+      "sha256": "aed2f54de79a9c4ad4df4bc836f96fff91402cf7f2e17c7892e04e7174f64bbd"
+    },
+    {
+      "path": "src/geometry/occt_shape_view.cpp",
+      "sha256": "b013002c42cf2bc2cb7f4fc9fbaa1122edb19cf9741c0bb3b3f14f886496bc75"
+    },
+    {
+      "path": "src/geometry/recompute_executor.cpp",
+      "sha256": "8b06ba81ea1f60b5a00fb9e44a9f6f5206ef622704b2795fdeb0c226d9fd6306"
+    },
+    {
+      "path": "src/geometry/rectangle_extrusion_adapter.cpp",
+      "sha256": "38b02a7790fa734a3ca85e9f51bf86b91639f91b5a08ab53dd2c1c3e66bb05f2"
+    },
+    {
+      "path": "src/geometry/reference_driven_sketch_helper.cpp",
+      "sha256": "1f16f633b7a5108e29945b65fad8a4fe1da0f2e4cda46a395a772b2613019dd6"
+    },
+    {
+      "path": "src/geometry/reference_generated_profile_resolver.cpp",
+      "sha256": "0725c99a149892f48715f3b5c5a010c127cea6b042ad507520b66ee424d34ab4"
+    },
+    {
+      "path": "src/geometry/reference_part_geometry.cpp",
+      "sha256": "73038ed58fffa28a6eafd70ed435212a6282a274c7941197b7e122be3e6d9baf"
+    },
+    {
+      "path": "src/geometry/result_face_support.cpp",
+      "sha256": "b5cc007c88be930e3d0dd9fffd7028386ccacd0a3193603ff24ceeffe4ff4c95"
+    },
+    {
+      "path": "src/geometry/revolve_adapter.cpp",
+      "sha256": "71a6c7903e0bcb77b80a4eeed09a13ad2f9450473becb6f6a19528bb39e2446f"
+    },
+    {
+      "path": "src/geometry/semantic_edge_resolution.cpp",
+      "sha256": "4f308736c4bb57fd4ad3bc603ee1e36db40e3069f49eb3c0f88adb3b4f1e2df0"
+    },
+    {
+      "path": "src/geometry/semantic_edge_resolution.hpp",
+      "sha256": "77155dc0bd3f7189b6d42acad04a421f125c1d1a5e9bacf1e259ca2c50c8330e"
+    },
+    {
+      "path": "src/geometry/semantic_face_resolution.cpp",
+      "sha256": "39d5814347edb6efbaf87e0ac3f5e0e99d3a976acce2f24643b8eab7c1994caa"
+    },
+    {
+      "path": "src/geometry/semantic_face_resolution.hpp",
+      "sha256": "65e06b61a94ec38fea285cf488bd18176fb18dfe9eb2e395254586dce4eb14be"
+    },
+    {
+      "path": "src/geometry/semantic_reference_evaluator.cpp",
+      "sha256": "fca4ebb2657c4d5d44e485dd2b556e54c6423ba25c492a771e17d8accc60d6e3"
+    },
+    {
+      "path": "src/geometry/shape_cache.cpp",
+      "sha256": "4db7f077781da61967a1dd50cd3450a56f58a3c862d878a3802be1bfc0417f9b"
+    },
+    {
+      "path": "src/geometry/shell_adapter.cpp",
+      "sha256": "f1d631e4dd2c83daf365b79cf005e12c6be74e10386bbea1147c51311912c5ae"
+    },
+    {
+      "path": "src/geometry/sketch_3d_geometry_adapter.cpp",
+      "sha256": "faa669eccedde04c9b70b6d468b589ec5b41f318096b57f6a6c0ce307fd36ed0"
+    },
+    {
+      "path": "src/geometry/sketch_curved_region_finder.cpp",
+      "sha256": "e0d32ad57c80583edca3ebccd0f40c793b57d123ebad2e352ccd3330f99c40fb"
+    },
+    {
+      "path": "src/geometry/sketch_reference_projector.cpp",
+      "sha256": "8890815ad28a88fb5687ff6450884b98b4605c90e29c40ca7a622927c95d551d"
+    },
+    {
+      "path": "src/geometry/sketch_region_finder.cpp",
+      "sha256": "76ef7319064d21d8b09b21eb66b8cbbc0d6d199272c82ef9cfaff7f567d7cd5d"
+    },
+    {
+      "path": "src/geometry/solid_volume_properties.hpp",
+      "sha256": "0ed4f6fe566dc846e58d8021db99ec9d1ebe560667941115ca0a87b99b77712f"
+    },
+    {
+      "path": "src/geometry/step_editable_commands.cpp",
+      "sha256": "5995d3c4e088f24ccc58c5b24fb3de71e979a32b326515802f8982fcc94b20a5"
+    },
+    {
+      "path": "src/geometry/step_export_transaction.cpp",
+      "sha256": "b88f0693109739dbdc1e9ed17a1bd8d821437190f9cc4844c59c79106aa943a4"
+    },
+    {
+      "path": "src/geometry/step_export_transaction.hpp",
+      "sha256": "21058c1d8eb12bc2df9ea1607826745a7f1dfbf25283709591d4081ed45b2863"
+    },
+    {
+      "path": "src/geometry/step_exporter.cpp",
+      "sha256": "e75dda80451731c8335cdab4eb57950a5abf63a157be1497cb9b66548fba8abc"
+    },
+    {
+      "path": "src/geometry/step_import_reader.cpp",
+      "sha256": "a79d2a8234f94dad1725df5cc63120464c3ea61cd03a85f127492744528c66df"
+    },
+    {
+      "path": "src/geometry/step_import_topology.cpp",
+      "sha256": "bbec505e007f4c882b65a8234f7a4068c0fa4893888362ffb984f4ea5a07786a"
+    },
+    {
+      "path": "src/geometry/step_import_topology_context.cpp",
+      "sha256": "39dc2f62e804ce968db283cc3972f945e6834b79e715022cef5e8f299475b308"
+    },
+    {
+      "path": "src/geometry/step_reference_commands.cpp",
+      "sha256": "d454281700fe35e7bffc5e39d3cd1398e75f69d0f3220657e8667b461b7c273b"
+    },
+    {
+      "path": "src/geometry/step_structured_import_commands.cpp",
+      "sha256": "65cc205e1818c57ae6c8d70cdfc32dba0f0eeb64ca36011cae4dde1e85b43f9c"
+    },
+    {
+      "path": "src/geometry/surface_adapter.cpp",
+      "sha256": "27039c2a2bb420a94aa72ecaefcf777db74afe93bcde7f4f5e66bf33d1d2306a"
+    },
+    {
+      "path": "src/geometry/sweep_adapter.cpp",
+      "sha256": "dd6bb8127192645d59b2e5207a451cd70ef7f9c36b5139ebb84dcc89a0975829"
+    },
+    {
+      "path": "src/geometry/viewport_scene.cpp",
+      "sha256": "932b5380d95abd25a78951c4d54cc3af0ed1835d7f2d886bc0e498d74f2f634b"
+    },
+    {
+      "path": "src/geometry/workplane_resolver.cpp",
+      "sha256": "496fdafdd4a563bf90dc0ee642b1e703dd7a9683e77ca22ddc8e77d2075b1cdd"
+    },
+    {
+      "path": "src/gui/gui_analysis_export_workbench.cpp",
+      "sha256": "82cdde587f4576ce8bea32f85760a86527bc4c092032c4da9b87525b5d7be35f"
+    },
+    {
+      "path": "src/gui/gui_appearance.cpp",
+      "sha256": "6bfc8cf9f7e1af58eef0cc08ce93e9ca0f960dfa73ad66146dd845e1ac1c99f8"
+    },
+    {
+      "path": "src/gui/gui_assembly_workbench.cpp",
+      "sha256": "a6b8dcc465b6e36d04f9f1f5321036d6ab8ca57a1b17fc3d6c5c638422ab423c"
+    },
+    {
+      "path": "src/gui/gui_command_registry.cpp",
+      "sha256": "46a02a51fb46aca2ec8788e04b169cb117f8c2b52b498441b4baa0caf382c4e0"
+    },
+    {
+      "path": "src/gui/gui_document_browser.cpp",
+      "sha256": "6034e47ed9e738d93e48840a1ed536190c27d8a2f84ea743a4c54d930b5531ad"
+    },
+    {
+      "path": "src/gui/gui_document_session.cpp",
+      "sha256": "a9fb728eb548f956c38f0f52bafb8ff374395cb3ff4e208d65f41a9851f942a1"
+    },
+    {
+      "path": "src/gui/gui_icons.cpp",
+      "sha256": "82d768ad6b31c275d8622eb3244106da64b34acbf5dafd044e32220178c5df20"
+    },
+    {
+      "path": "src/gui/gui_part_foundation_workbench.cpp",
+      "sha256": "055e941383bc2a27aae456423fd6942c5bb4cf02b2b5e316afc7fa348e00634f"
+    },
+    {
+      "path": "src/gui/gui_part_operations_workbench.cpp",
+      "sha256": "bdc2fca3db9d723f6bb778532c14ffad9a391aa1e220c93043107d46e6e31faa"
+    },
+    {
+      "path": "src/gui/gui_selection_model.cpp",
+      "sha256": "8bea531a9077f56272b46dead92c44a4d796f73ec41b18b8032c583cd818a583"
+    },
+    {
+      "path": "src/gui/gui_sketch_create.cpp",
+      "sha256": "58e106df80658c7344d87d9fefd38437bc8a1866ecf46b3e4f731d341ea32f45"
+    },
+    {
+      "path": "src/gui/gui_sketch_dimension_layout.cpp",
+      "sha256": "add121a23e0a3e9c3c714baf3791c40eb84ffa902f9ae4b64d6a77be0afb0f27"
+    },
+    {
+      "path": "src/gui/gui_sketch_drag.cpp",
+      "sha256": "d79347db0e3721eab6241f7f3c1ac0fe37be5dedbbcfd68258923436820c6bca"
+    },
+    {
+      "path": "src/gui/gui_sketch_interaction.cpp",
+      "sha256": "4d7abecfd031046462e4a7a233a8997ee9c390e8cdd7371730764ec6357ce091"
+    },
+    {
+      "path": "src/gui/gui_sketch_workbench.cpp",
+      "sha256": "0869a50190c1a2a28e824b8cbf1e31542a303e6191474563d73453421e2d2b4f"
+    },
+    {
+      "path": "src/gui/gui_spatial_surface_workbench.cpp",
+      "sha256": "515d034cba06dd493a8fe7f738012b135e04b003e6c765197f129ee002e2f9ca"
+    },
+    {
+      "path": "src/gui/gui_step_import_workbench.cpp",
+      "sha256": "f20a5823723f62c2602f4696888a7210483828fc937fd90ffc37871044dabb22"
+    },
+    {
+      "path": "src/gui/gui_task_state.cpp",
+      "sha256": "515cfab3a29ae8c6e0e3574de573f2a957f94ad4f2b9afe482da3a98eca9bd05"
+    },
+    {
+      "path": "src/gui/main.cpp",
+      "sha256": "910f18630b88eb75e8f4c0905fc82a75ce044ac887d4ce856729f8c7fb686cdb"
+    },
+    {
+      "path": "src/gui/occt_viewport.cpp",
+      "sha256": "c27d9a86bea4baa1fa3a3ecb8f54d32c66b8e1e669d13ab47570176ee6821117"
+    },
+    {
+      "path": "src/gui/shell/shell_assembly_advanced.cpp",
+      "sha256": "29ff7f03571a8428b31dd66d6c31e4a1f4facbb59396f53f7ff1b182facf80aa"
+    },
+    {
+      "path": "src/gui/shell/shell_assembly_context.cpp",
+      "sha256": "e86c9ce6f8eef8d480e2470e2d5685865ae437bfcf968a63432b24c1fc88e2f7"
+    },
+    {
+      "path": "src/gui/shell/shell_assembly_tools.cpp",
+      "sha256": "ccc2d99eeeee7f804aba3e23397e08d7b449b4ed4332c69043c77b25caa6132b"
+    },
+    {
+      "path": "src/gui/shell/shell_body_tools.cpp",
+      "sha256": "29bbae22d854fedd8f2dbc491ea8704649ce7dc157fa3f304abdb553e2107eba"
+    },
+    {
+      "path": "src/gui/shell/shell_construction_manipulators.cpp",
+      "sha256": "34a733b371d22ca67af501727fe1968cf1667206e28f7e47685fe0b9dc1fc70f"
+    },
+    {
+      "path": "src/gui/shell/shell_construction_tools.cpp",
+      "sha256": "01e92d9432c490c5d7a5a0e47c5d83c99852ff86bdd9cd77e65915adace3927b"
+    },
+    {
+      "path": "src/gui/shell/shell_context_tools.cpp",
+      "sha256": "e388c9ca85be740558dff7c47a3e32df8f6593856695a45b4cbdb156ba4bdbe9"
+    },
+    {
+      "path": "src/gui/shell/shell_extrude_tools.cpp",
+      "sha256": "b8c3f1e1188a94526df9494c6f9963350188306a82c478276292c4dc3bdf3b29"
+    },
+    {
+      "path": "src/gui/shell/shell_feature_edit_tools.cpp",
+      "sha256": "0c9b6302b6ea39df7e29f63bf0cd6424f8cc23c82807354727e210bbfe6db478"
+    },
+    {
+      "path": "src/gui/shell/shell_feature_tools.cpp",
+      "sha256": "8dfe41d0596d86c7c50a22264b344305939e648f0dfd2c4caeb98c12ac207753"
+    },
+    {
+      "path": "src/gui/shell/shell_feature_workflow.cpp",
+      "sha256": "961c917996e9663086707c555768636e3656531e81c06b653e8ebaf4d4cf526d"
+    },
+    {
+      "path": "src/gui/shell/shell_finishing_tools.cpp",
+      "sha256": "948886805f38ba817af62c4a4bdc7727f6e6ebcc57174758377b0e428b6ce1d5"
+    },
+    {
+      "path": "src/gui/shell/shell_hole_tools.cpp",
+      "sha256": "7708d3789d9793f4571495ed31f64554e910e6fc59465ef95674cdd628ccd35e"
+    },
+    {
+      "path": "src/gui/shell/shell_inspect_tools.cpp",
+      "sha256": "a5c073dcb578e8eab8b7ec131665c295d10e9af5a5ae4177f872157d835a55ab"
+    },
+    {
+      "path": "src/gui/shell/shell_manipulator_overlay.cpp",
+      "sha256": "4d8c210400eb4475d468467162745c8866ecedcdb84e88a53ff9bccbd4086720"
+    },
+    {
+      "path": "src/gui/shell/shell_measure_tools.cpp",
+      "sha256": "5d803d716fbf0667700ab34da7c459117d656301c27ba2a9fe586a009fdaf265"
+    },
+    {
+      "path": "src/gui/shell/shell_navigation_tools.cpp",
+      "sha256": "a4b4439e859319164b2b0bae8aa0dae5fb939114041aee5116323a51b41213d1"
+    },
+    {
+      "path": "src/gui/shell/shell_origin.cpp",
+      "sha256": "4c8244ee0b43da2f979f3b2ce8a5de064b571614c2ae1d3ecea3bfa9ccbc95fc"
+    },
+    {
+      "path": "src/gui/shell/shell_parameter_tools.cpp",
+      "sha256": "0e27f78c4855ece9494ece3397363a23cbc1f2b445cff043f3bf31d9b58a084b"
+    },
+    {
+      "path": "src/gui/shell/shell_pattern_tools.cpp",
+      "sha256": "25bc6f74e019dad2cf3b42a18cbc469044b7deeefe6042db7a8c3254c8f66ca5"
+    },
+    {
+      "path": "src/gui/shell/shell_property_controls.cpp",
+      "sha256": "8c6b782820fdedbd7dce7c72eae2daf4f7fce7f975336d29831b9c2810021797"
+    },
+    {
+      "path": "src/gui/shell/shell_reference_repair_tools.cpp",
+      "sha256": "7919ec51bbedc89ad5e653fbdd0c438a2bccf0e6f611d7c22fbb96699bb59f22"
+    },
+    {
+      "path": "src/gui/shell/shell_repeat_tools.cpp",
+      "sha256": "ae13d771cf63b28ed45ec8260bdf6b4372ec68c4daa466a74ba009f93922d4ef"
+    },
+    {
+      "path": "src/gui/shell/shell_revolve_tools.cpp",
+      "sha256": "31170d7e09973351719e5db09e08198935b86cfcd214d740e4fdb4e2de2451d4"
+    },
+    {
+      "path": "src/gui/shell/shell_ribbon.cpp",
+      "sha256": "bb02c72774ed613c8fea1977a296be91fae7cbd4c353bc2a73c525066f501772"
+    },
+    {
+      "path": "src/gui/shell/shell_sketch_3d_tools.cpp",
+      "sha256": "691f83c34571b3b60bcad2c1ad15f7eaefebfa65fc7b1a12540bd2b3749a4e8b"
+    },
+    {
+      "path": "src/gui/shell/shell_sketch_diagnostics_tools.cpp",
+      "sha256": "76d8807ac331dd6117be228a61d39983a43908ad97a1856507c45b5e15efa740"
+    },
+    {
+      "path": "src/gui/shell/shell_sketch_operations.cpp",
+      "sha256": "552e3397e25f120797cac7e830defa17d4541ee20f2648893abb230e61eec2f3"
+    },
+    {
+      "path": "src/gui/shell/shell_sketch_tools.cpp",
+      "sha256": "58cecda143dc24d1593be0746c9b6fc54657c168b0d0e8ecc2bf8f8bdf9f3450"
+    },
+    {
+      "path": "src/gui/shell/shell_spatial_tools.cpp",
+      "sha256": "23c615fc66e1c57c25c9767623bc7cf5278a59270941fb03aa0a0462f721403c"
+    },
+    {
+      "path": "src/gui/shell/shell_step_import_tools.cpp",
+      "sha256": "b00990a26a9397a99c75d28324f63fba8be597f04e30ab95c151c4315bbf337b"
+    },
+    {
+      "path": "src/gui/shell/shell_surface_tools.cpp",
+      "sha256": "9651f5a6cfe2952f25c87ca33de16408980328ffa1265ce56c9a4f59ce7db83f"
+    },
+    {
+      "path": "src/gui/shell/shell_window.cpp",
+      "sha256": "fb06a88a4c0340d13915874a23927e5aa79181d54b4d9e7ba216590d24d08115"
+    },
+    {
+      "path": "src/gui/startup_splash.cpp",
+      "sha256": "85429dd47a2d5d4afc5ea2582cc82bb6b257d870ff2062b7a713493005eaec0b"
+    },
+    {
+      "path": "tests/core/assembly_angle_constraint_tests.cpp",
+      "sha256": "64cce7f6aa866623fedff51505c9412bfd73152566813f5d882ee566fc716ea0"
+    },
+    {
+      "path": "tests/core/assembly_constraint_graph_tests.cpp",
+      "sha256": "a1d7ef314ff050ac5a64110e2cce560047c2d3dd8b069319fe39812520ff2631"
+    },
+    {
+      "path": "tests/core/assembly_constraint_tests.cpp",
+      "sha256": "631730c148f90a4ccefcc5fb96830ebf97890b2ea4defe4921e8bcee15a015d6"
+    },
+    {
+      "path": "tests/core/assembly_cross_hierarchy_constraint_graph_tests.cpp",
+      "sha256": "bb50abaca7a2ee89e6ab171a8460ee3ae6d869e1d854063be8b1a06e280b2c04"
+    },
+    {
+      "path": "tests/core/assembly_cross_hierarchy_constraint_tests.cpp",
+      "sha256": "c18b5dc4f5f2f77692fdfee5b2328c022e0f168105a2a35e181960a4f0eefe0b"
+    },
+    {
+      "path": "tests/core/assembly_cross_hierarchy_joint_tests.cpp",
+      "sha256": "4d0624dfe4749e18e692c78b0ad24872ac1bdfe97ac47f07ce932c28275c4481"
+    },
+    {
+      "path": "tests/core/assembly_document_tests.cpp",
+      "sha256": "67be960fb91facbd2ce3ddcec0fc07827ffb1c21d8a49ddd9374af0dc3db7b91"
+    },
+    {
+      "path": "tests/core/assembly_exchange_graph_tests.cpp",
+      "sha256": "48866826f25ce563f52fc31b67263d7d123fa05088a4d0fe87be2791a7384840"
+    },
+    {
+      "path": "tests/core/assembly_exchange_name_tests.cpp",
+      "sha256": "a901c9865d40385a3e495ab717a26502ea39b9dbbe9665250eecd9f9e21c4937"
+    },
+    {
+      "path": "tests/core/assembly_generic_relationship_tests.cpp",
+      "sha256": "0301196fd167dbefd4fce477b2d5a7b639bd31e27b66091e35a20510bee333c1"
+    },
+    {
+      "path": "tests/core/assembly_hierarchy_tests.cpp",
+      "sha256": "4f888326b6fb288858466473ed13ecc8a25005521f9ec154e38cfc092d9adb84"
+    },
+    {
+      "path": "tests/core/assembly_insert_constraint_tests.cpp",
+      "sha256": "3fff1f49887f9ca242ceb14108beb6bb191f139f1d9cecab68f2483fad483b26"
+    },
+    {
+      "path": "tests/core/assembly_joint_graph_tests.cpp",
+      "sha256": "c1ec7ec62b6c0fc3ae79c1545f8805b02b337bd390cb780024a5ba6a7ea895cc"
+    },
+    {
+      "path": "tests/core/assembly_joint_tests.cpp",
+      "sha256": "03d67c15d158e5d89ea096f1dd2f25404ae587d8fba2d1fbabbfc9fc2a302e70"
+    },
+    {
+      "path": "tests/core/assembly_leaf_occurrence_tests.cpp",
+      "sha256": "3f6200a92fc8494b5fa79b9d7f7244ba54c6ea3c9f5a6f1deaf5d929f5959fc2"
+    },
+    {
+      "path": "tests/core/assembly_reference_target_json_tests.cpp",
+      "sha256": "ef7c286d22bfb1d7642bf6d615217c31867dc95c0151073aa0755baf61cebfbf"
+    },
+    {
+      "path": "tests/core/assembly_reference_target_tests.cpp",
+      "sha256": "3952fe6b0a39a67249613e295e00c16097c293bce7105c57e3a47f9311f6158e"
+    },
+    {
+      "path": "tests/core/body_boolean_feature_tests.cpp",
+      "sha256": "d8997a7bc90052698a4e28e433ce05a7df7012633511a76679c986277857a18b"
+    },
+    {
+      "path": "tests/core/body_json_tests.cpp",
+      "sha256": "ae00ce6f00cd43844294d05f1512b5458a9f11edf0636f9ea0d4d661c5948e88"
+    },
+    {
+      "path": "tests/core/body_tests.cpp",
+      "sha256": "91215ba6e76cb365258e972b5c29b07c68883846c1e0a22a090dff2b64e713f4"
+    },
+    {
+      "path": "tests/core/body_transform_tests.cpp",
+      "sha256": "ce82f4dcc43ddf1106e4c732da8974a01607f4a5a59a79be361e062ad7d69753"
+    },
+    {
+      "path": "tests/core/chained_construction_relation_tests.cpp",
+      "sha256": "4856a60024f0dc2fc471d643dd75f40b3166ed8213b465bb1c9008f95fa968b9"
+    },
+    {
+      "path": "tests/core/circular_hole_pattern_tests.cpp",
+      "sha256": "1b30f9f7aab43494cc0bb7a77024971c131dcca5bcac0b0b4508a518dc40f4af"
+    },
+    {
+      "path": "tests/core/closed_profile_json_tests.cpp",
+      "sha256": "8d827dcb86f2adc195035a18967a2c6ba69bf5e853126dfcffbd7a99c303c0fd"
+    },
+    {
+      "path": "tests/core/component_instance_tests.cpp",
+      "sha256": "99133b5e5636234da0e53e526bb6493820bdeb273f98f7deb07979e08edb7106"
+    },
+    {
+      "path": "tests/core/composite_closed_profile_json_tests.cpp",
+      "sha256": "621a5578c9729efaa0359d8165a9198b54a7f7d4d295d2b3e5c496462f5ccd16"
+    },
+    {
+      "path": "tests/core/composite_closed_profile_tests.cpp",
+      "sha256": "5497fc6ce4ee06fe280c633387ef3fdf3364c91efd6ca78c9017f54277d2b698"
+    },
+    {
+      "path": "tests/core/construction_geometry_json_tests.cpp",
+      "sha256": "ca58f9461bd10dfd556e64d93171c8c43c9decd57f4d42cd55d212f8821e008c"
+    },
+    {
+      "path": "tests/core/construction_geometry_tests.cpp",
+      "sha256": "a5bb518af906ed34cc5d58d020f8d2a6931e2474372d25191d90d85fd21082aa"
+    },
+    {
+      "path": "tests/core/construction_update_tests.cpp",
+      "sha256": "18b8b0eded8790aafca67243210608a95a33f3ddd2fbad0706ca05453e9209c8"
+    },
+    {
+      "path": "tests/core/datum_axis_json_tests.cpp",
+      "sha256": "8802113c12e3fe440f71d60517b4a704e9816aa78c3ce35e21866265148177a1"
+    },
+    {
+      "path": "tests/core/datum_axis_tests.cpp",
+      "sha256": "bb62a05970cc23955c6671c214ac717c9214b47c1e662d831255cf18ae7ac999"
+    },
+    {
+      "path": "tests/core/datum_plane_tests.cpp",
+      "sha256": "f28187d1a9c8dc71e8dc8fb8facf94a0ca67ef5b2d38317c2203077dc92c19fe"
+    },
+    {
+      "path": "tests/core/dependency_graph_tests.cpp",
+      "sha256": "04878f8e5c698be7ae86ef2e3b9a7a942dc42449ce1e65531936514dee2c8ebc"
+    },
+    {
+      "path": "tests/core/derived_workplane_tests.cpp",
+      "sha256": "c60964940f53717e9857e2529c6b70bce40f1bc6604bdf0b849e0735a1ddd41a"
+    },
+    {
+      "path": "tests/core/draft_feature_tests.cpp",
+      "sha256": "ee0d5d106abfb7faae96258799cbc9323f1bbcd88d80bb294e7bf18ce6a5e320"
+    },
+    {
+      "path": "tests/core/edge_treatment_feature_tests.cpp",
+      "sha256": "9bc7853afb526d05d50f3013c40ce7f4ad3462eabd625c0c2a36758c20c1cb2b"
+    },
+    {
+      "path": "tests/core/error_result_tests.cpp",
+      "sha256": "92d8b8634cd684bab88abf25a33f0bb3e833c0c502db3ff3ef6642015467e712"
+    },
+    {
+      "path": "tests/core/extrude_extent_intent_tests.cpp",
+      "sha256": "b8097ed55156830e2feb4e528c3190e6e1fe2e8290c17627946b2b15d373f072"
+    },
+    {
+      "path": "tests/core/feature_body_operation_json_tests.cpp",
+      "sha256": "a2605e28ffdbcd2b27eb495ec17cb591360831fffb74f3431b90ec3b15f16bc4"
+    },
+    {
+      "path": "tests/core/feature_body_operation_tests.cpp",
+      "sha256": "86c82f7f779ab3c9a6c7dadce7e7876dbe40e32421eef7dc0cc5d7a3f2eb2741"
+    },
+    {
+      "path": "tests/core/feature_tests.cpp",
+      "sha256": "aaad0c3acca22675bd2bc20575d231cab2a89709ff778500b391f10a6b1eeb3d"
+    },
+    {
+      "path": "tests/core/feature_update_command_tests.cpp",
+      "sha256": "1afc67949640948a493ae31abd335be5ef6711197b1f026652631f6aea6588a8"
+    },
+    {
+      "path": "tests/core/generated_topology_reference_tests.cpp",
+      "sha256": "bc33e7072935d57ed7eb31f671cd0466d4d1a3047b4767f9d49970d09b78b4cf"
+    },
+    {
+      "path": "tests/core/imported_body_feature_tests.cpp",
+      "sha256": "2578e3545f93e2a38e65bf7cdceed175cf7e8db4789d05a4c7c8c533feda5b42"
+    },
+    {
+      "path": "tests/core/imported_topology_tests.cpp",
+      "sha256": "7bf6bd7017e0f574cd1bc00d0418069d24241855fdab4b82f60f2cfe8003f713"
+    },
+    {
+      "path": "tests/core/invalidation_state_tests.cpp",
+      "sha256": "c131a018550926dc644b51c3e7dfa1b823fb7462047440ebe32315ad053d00fc"
+    },
+    {
+      "path": "tests/core/loft_feature_tests.cpp",
+      "sha256": "459009876bdb419a9b60610c30cfa8c271ee2a7ccb7c8e8d742221b2cf882210"
+    },
+    {
+      "path": "tests/core/mirror_feature_tests.cpp",
+      "sha256": "c451cde8ca1c4ffb66d7ebf876092fb2563eae59b2956500436fba0597cf2fc9"
+    },
+    {
+      "path": "tests/core/parameter_expression_tests.cpp",
+      "sha256": "476d227543a364d578b3e973cc9465da82f005269ecf7efb38f9dbb135493d8f"
+    },
+    {
+      "path": "tests/core/parameter_tests.cpp",
+      "sha256": "df91a28baf3e22931f97a3ed5fc5e9c5c9a6516a5178ffbb84ac2fca48479c56"
+    },
+    {
+      "path": "tests/core/part_body_dependency_tests.cpp",
+      "sha256": "88a38faa23dfa07864db843a0ba988654501dee73c86728459233fc9cdbaebd1"
+    },
+    {
+      "path": "tests/core/part_document_json_tests.cpp",
+      "sha256": "0264a63f00cad288b24d680bed82844640e197b235ed42412771c06ee3ed37aa"
+    },
+    {
+      "path": "tests/core/part_document_json_workplane_tests.cpp",
+      "sha256": "224e9e7cd7dd72be460d826e884b1c4a0b7c3711cd060fb206ef6113593a25c6"
+    },
+    {
+      "path": "tests/core/part_document_tests.cpp",
+      "sha256": "8a1c47d857da6137b381f90c25aeab403a873f496f21ea34fa55afdfc6545a3a"
+    },
+    {
+      "path": "tests/core/part_feature_input_reference_tests.cpp",
+      "sha256": "0a7d197e7bded04425eb06862f672bbb9655f879decfd1ba097103e897e7d21e"
+    },
+    {
+      "path": "tests/core/part_pattern_feature_tests.cpp",
+      "sha256": "1b4f3b9f5bff912f047295b14f3fbd6e01908b796c2509c87fda70bf72dbab6e"
+    },
+    {
+      "path": "tests/core/path_curve_tests.cpp",
+      "sha256": "c52050e301357d3f2928bffd36f41b07f858c04346f623493718c269a3ef3911"
+    },
+    {
+      "path": "tests/core/path_extrude_feature_tests.cpp",
+      "sha256": "de1564a1d3b76b95cac1afca1671d6927c05a5a2956c98ea235340d831567cc2"
+    },
+    {
+      "path": "tests/core/project_tests.cpp",
+      "sha256": "d8f35e04f9758305b4eb0a37990377ecf7d6970f8cc86ec48102014e9327ce44"
+    },
+    {
+      "path": "tests/core/projected_reference_invalidation_tests.cpp",
+      "sha256": "6cb52259f03fd24bd8d639600731d0014661680909d144b353553c04f6ad17cd"
+    },
+    {
+      "path": "tests/core/projected_sketch_reference_json_tests.cpp",
+      "sha256": "c754b4a6ea0ba04f5a1a6c5c32a23dfddaf49a31f1e41f3f95f8cea73e2279b5"
+    },
+    {
+      "path": "tests/core/projected_sketch_reference_tests.cpp",
+      "sha256": "e2c056e0a17dfc601aa5d7765cca398cd1533293dcb9827e7d2934a0686860c0"
+    },
+    {
+      "path": "tests/core/quantity_tests.cpp",
+      "sha256": "674cbb6564690f4314a98d96c41d007280a598ee2209b63bf640708a204c1480"
+    },
+    {
+      "path": "tests/core/recompute_plan_tests.cpp",
+      "sha256": "235e32431ec894d860613842188e899e26a03b20fd7718a7bdffd145a446d9ed"
+    },
+    {
+      "path": "tests/core/reference_driven_sketch_constraint_tests.cpp",
+      "sha256": "8918a9db2d7fe70268392841356c9686c2fb9039f119e0de8a9173afde1be298"
+    },
+    {
+      "path": "tests/core/reference_generated_line_json_tests.cpp",
+      "sha256": "1ca33c29bfe35192cfef49fdf0bb4742bf7827c87cb66c9247c3dc70ab8112a9"
+    },
+    {
+      "path": "tests/core/reference_recovery_tests.cpp",
+      "sha256": "bd42a60702cbed42a7503c3acea3e56e554fd1995f5b1e23d17b7f06a54b0610"
+    },
+    {
+      "path": "tests/core/revolve_feature_tests.cpp",
+      "sha256": "ca70615f6d2669ab21902e74562642050cd0b9f562e0ff377bf08bf74154c477"
+    },
+    {
+      "path": "tests/core/semantic_reference_invalidation_tests.cpp",
+      "sha256": "7ec01cd714270eb644d0e453e1f88351c205567cf3957821841a24b635e57abb"
+    },
+    {
+      "path": "tests/core/semantic_reference_json_tests.cpp",
+      "sha256": "f07bceb1db9510de907daf738b06ecdc3b4c02958bc74daee40ec3863f4054cc"
+    },
+    {
+      "path": "tests/core/shell_feature_tests.cpp",
+      "sha256": "5ea9a529ae62a1016ad269384c99dd25b40fa194a0b589a5e94a0b1290e50c75"
+    },
+    {
+      "path": "tests/core/sketch_3d_curve_tests.cpp",
+      "sha256": "03996c8930ebde0f695d7df0e883d81e3f401efc7145d6bc651b0f1001c53708"
+    },
+    {
+      "path": "tests/core/sketch_3d_json_tests.cpp",
+      "sha256": "0bc299f6888378f01dd8bdd60b29ab866ec4627eaddd1ff7fccae452e633393c"
+    },
+    {
+      "path": "tests/core/sketch_3d_tests.cpp",
+      "sha256": "28e6ea451d01ea0a9d875f01652d57968efe7d3ad3ead835fe77bb0b273e6f0d"
+    },
+    {
+      "path": "tests/core/sketch_arc_profile_json_tests.cpp",
+      "sha256": "078b0f379933ac91e848be80e7fbd4df885de1b812bc7a260a68a3e157d69f2d"
+    },
+    {
+      "path": "tests/core/sketch_arc_profile_tests.cpp",
+      "sha256": "4d7582d2d6df157b7d51aa8ba612335370ead30f0fa0a29a6b34261d86acd815"
+    },
+    {
+      "path": "tests/core/sketch_conic_tests.cpp",
+      "sha256": "87e7189000c66b39bf25d97e1989c0fedd932501a8bbed48ac461e8593734e02"
+    },
+    {
+      "path": "tests/core/sketch_constraint_solver_tests.cpp",
+      "sha256": "109c113098d3636730605694fb25fb82e234640d95a487a300abd98aab9b6f28"
+    },
+    {
+      "path": "tests/core/sketch_diagnostics_tests.cpp",
+      "sha256": "f39a6079ccf121664c5bb56061a89b147400169478037a057a56f143d372837c"
+    },
+    {
+      "path": "tests/core/sketch_dimension_tests.cpp",
+      "sha256": "2bad3d4946db4024f2d730358d5692a1345d29a2e38de9012c4eb7d485b49597"
+    },
+    {
+      "path": "tests/core/sketch_modify_tests.cpp",
+      "sha256": "14bd0bdd1c9e7df75bd647627f3c73a94b00552226929b1183e23bb3518c2282"
+    },
+    {
+      "path": "tests/core/sketch_reference_repair_tests.cpp",
+      "sha256": "36eea16c6222d41127bac747242ad22c753c7da76f1371d851577b0340a0b0a5"
+    },
+    {
+      "path": "tests/core/sketch_repair_command_labels_tests.cpp",
+      "sha256": "3a2593275717428cb60c63e99c769939989b980ea27c8cfa11afd64ef4e12915"
+    },
+    {
+      "path": "tests/core/sketch_repair_commands_tests.cpp",
+      "sha256": "8d593321e9bf10bd4a6fbcc7a4844042fbd4d1e1603e5810be0b4ea22cfb9a36"
+    },
+    {
+      "path": "tests/core/sketch_repair_presentation_metadata_tests.cpp",
+      "sha256": "8feff3d481550c98ff93d165f4b44e8e7bf7e857a1b748f8c2b671ffacb39188"
+    },
+    {
+      "path": "tests/core/sketch_repair_presentation_snapshot_query_tests.cpp",
+      "sha256": "051c468dff51c8f4594a44690c241a12cd348d673f96c390a89fd0c5ac071554"
+    },
+    {
+      "path": "tests/core/sketch_repair_presentation_snapshot_tests.cpp",
+      "sha256": "e49ef8598ea465134f4aa05bd54a7b5d74515d02e41c11515646f563e9fc8782"
+    },
+    {
+      "path": "tests/core/sketch_repair_suggestions_tests.cpp",
+      "sha256": "c10894c496625f35b546f2640bab46458d37b1c6f7078aed8d63400386c8ac51"
+    },
+    {
+      "path": "tests/core/sketch_repair_transactions_tests.cpp",
+      "sha256": "52fafdfbb9707221eec628d36ab4b59ff079e417fe7023f103111dce1d8cecd1"
+    },
+    {
+      "path": "tests/core/sketch_repair_undo_stack_summary_tests.cpp",
+      "sha256": "1b878957889554c259978839075d42b17c17d4db3a460a33cd735c9835b78cc0"
+    },
+    {
+      "path": "tests/core/sketch_repair_undo_stack_tests.cpp",
+      "sha256": "8ba876bf1e9ad009bb65fa43e5ec718853b14f40b3cef570f24e5478a53aa34b"
+    },
+    {
+      "path": "tests/core/sketch_spline_profile_json_tests.cpp",
+      "sha256": "fb1d87561241fd5ee85db3ba6bb3a4df26f1af4f08d618cf720578b6d58316d1"
+    },
+    {
+      "path": "tests/core/sketch_tangent_creation_tests.cpp",
+      "sha256": "e7b9760b3d0b427475358c671c973e05d0082761722a6b32d7045102b7da489b"
+    },
+    {
+      "path": "tests/core/sketch_tests.cpp",
+      "sha256": "283e15e2ac095749f63daa3282ed2833d921e250ee284faab84ba9e8edc190ea"
+    },
+    {
+      "path": "tests/core/sketch_update_tests.cpp",
+      "sha256": "a2e3b9f90722c117556e49ae2cdddb26a2ed71337cc1d3f75e68b161ee7c38c0"
+    },
+    {
+      "path": "tests/core/step_import_source_tests.cpp",
+      "sha256": "9aa82b6760dea4677f59c7b08d615b2df0e7dd68c95a4a7e70633395fd6c5d99"
+    },
+    {
+      "path": "tests/core/step_reference_part_tests.cpp",
+      "sha256": "31f26132ad92e5d359a13c25ef70070dbf0543e19a6a6f99b48791e573872199"
+    },
+    {
+      "path": "tests/core/structured_step_import_tests.cpp",
+      "sha256": "15115b845698ca2ef53e4cf5cf56c6f6604880ee9e665322b9fe06f7ca11cf06"
+    },
+    {
+      "path": "tests/core/subassembly_instance_tests.cpp",
+      "sha256": "99938d8ec395558d937d771ded222438c8c8aa96c884130d3865760a48773cf9"
+    },
+    {
+      "path": "tests/core/surface_feature_tests.cpp",
+      "sha256": "be3dea08824771a2dc946f8f33b5659757aeddbfc87225beafe7bfbd450a038e"
+    },
+    {
+      "path": "tests/core/sweep_feature_tests.cpp",
+      "sha256": "1f1992b06b37442731a73e4596460eb3e098db7a0fdfc48f97ebbf87de2fe7fc"
+    },
+    {
+      "path": "tests/geometry/arc_closed_profile_pipeline_tests.cpp",
+      "sha256": "2fb9da6e3fba75fdd8773bdbac3adfd066677a8385afb1e53c2a14e8ed918ef6"
+    },
+    {
+      "path": "tests/geometry/assembly_angle_numeric_solver_tests.cpp",
+      "sha256": "3071d78dd42065d324941b747c24a2112285376a9e7f8103f3265fac11010183"
+    },
+    {
+      "path": "tests/geometry/assembly_concentric_constraint_equation_builder_tests.cpp",
+      "sha256": "2122824364f4987782a91fca5dc4615a1208d9222a41359478ee7e6fd1dfbcbe"
+    },
+    {
+      "path": "tests/geometry/assembly_concentric_numeric_solver_tests.cpp",
+      "sha256": "eed1a9d6ec3bf68dc6ab6a1b2b2aee871f5870e536f984ff0772c015b4466ab3"
+    },
+    {
+      "path": "tests/geometry/assembly_constraint_equation_builder_tests.cpp",
+      "sha256": "e61fe8f01c9695e84f230cdaa58f2f72703d27f833ea444292b82a782f3153fc"
+    },
+    {
+      "path": "tests/geometry/assembly_constraint_target_resolver_tests.cpp",
+      "sha256": "db8928e2fbd30bacbb44a44c9e76f6063d4b7875c723e111dc3cf7b94f6b4bb7"
+    },
+    {
+      "path": "tests/geometry/assembly_contact_analyzer_tests.cpp",
+      "sha256": "72777f6b4fcd4e9f2cb2aabc205832238517e4e0318149f5924d447445f1d0ac"
+    },
+    {
+      "path": "tests/geometry/assembly_cross_hierarchy_application_tests.cpp",
+      "sha256": "e09cc7926969f470b7b5c39746c3a5b79b732dd2062d9f445ba0871e9b515b0a"
+    },
+    {
+      "path": "tests/geometry/assembly_cross_hierarchy_constraint_solver_tests.cpp",
+      "sha256": "bb211bb3d932a25fbbf4601e40566e8eedd1095dc32bcca822760483ecd9796a"
+    },
+    {
+      "path": "tests/geometry/assembly_cross_hierarchy_diagnostics_tests.cpp",
+      "sha256": "bd110aa657fc28e822f7ef2dc5a58317e98015fb5a8beb422c461d35f3e6fbc5"
+    },
+    {
+      "path": "tests/geometry/assembly_cross_hierarchy_joint_motion_tests.cpp",
+      "sha256": "ce36e78945ed68e2fb0fd9ece565465e06fb482cb9da82d4e8fa0bb7d341754b"
+    },
+    {
+      "path": "tests/geometry/assembly_cross_hierarchy_test_support.hpp",
+      "sha256": "27cb8fe82eb50154b2d2813f096e1baa7623f29bef8aee69d9f87e6665b30c40"
+    },
+    {
+      "path": "tests/geometry/assembly_flexible_subassembly_solver_tests.inc",
+      "sha256": "e830c54dda914c6a566b87be40bc8a1e09ddeb5105bae14583a5897cd1750f4a"
+    },
+    {
+      "path": "tests/geometry/assembly_generated_topology_target_resolver_tests.cpp",
+      "sha256": "47e21e19fe86747c531bd9d592f90f4751cf875f8c20e79020863cd988c7936e"
+    },
+    {
+      "path": "tests/geometry/assembly_generic_relationship_equation_tests.cpp",
+      "sha256": "4f950fbffd2f4645a69834dd8ba218a6d80bb1293e77eca58da0c52b3cb0bdf9"
+    },
+    {
+      "path": "tests/geometry/assembly_geometric_target_taxonomy_tests.cpp",
+      "sha256": "0345a84e58a2f8a59783f32278ca67e97ce05d6fc3df64996b881a01f57cb01d"
+    },
+    {
+      "path": "tests/geometry/assembly_hierarchy_constraint_equation_builder_tests.cpp",
+      "sha256": "f4223248807a65a98027070b95308dd70df25c96b3142f46a2fed6381f0ed5b3"
+    },
+    {
+      "path": "tests/geometry/assembly_hierarchy_revolute_joint_equation_builder_tests.cpp",
+      "sha256": "cf61473d998c362adcd8e9b91db5343b6396972bef02fe19af8d21c3d41feceb"
+    },
+    {
+      "path": "tests/geometry/assembly_hierarchy_transform_evaluator_tests.cpp",
+      "sha256": "258c87b8c03fa37d2ad98df21ded437b7a65961e712d34810036ac79ef142d23"
+    },
+    {
+      "path": "tests/geometry/assembly_insert_constraint_equation_builder_tests.cpp",
+      "sha256": "123b997f2e7eb4067b37bedded931f8db107f4e37b3da796a8e21dc47f5522db"
+    },
+    {
+      "path": "tests/geometry/assembly_insert_numeric_solver_tests.cpp",
+      "sha256": "a778bd5a8187a5bfc8782d0bbf8a0c0da024c73ceb548769db135ca7f85add79"
+    },
+    {
+      "path": "tests/geometry/assembly_interaction_tests.cpp",
+      "sha256": "9ff671833a3966546ec89201f414e8e52f4ba32b08c738501533b8acde4c3df9"
+    },
+    {
+      "path": "tests/geometry/assembly_interference_analyzer_tests.cpp",
+      "sha256": "46e130877df6091dd7d4de09649f1fdc45f9a06bac5db414fdbb9300062a6ba7"
+    },
+    {
+      "path": "tests/geometry/assembly_joint_motion_snapshot_tests.cpp",
+      "sha256": "b96501880fbb4a3c4d56af504a70fd142c3c62b6e947e869fbde12bfba536d3f"
+    },
+    {
+      "path": "tests/geometry/assembly_joint_target_compatibility_tests.cpp",
+      "sha256": "a9e938cf1edb424cf30a367044c0bc42e9903dd40a68096268b78ea658437164"
+    },
+    {
+      "path": "tests/geometry/assembly_nested_step_exporter_tests.cpp",
+      "sha256": "d1ee8969ca9cd52807e588e6614ae59a7d5182e9474de6af603600cf1e5ebe05"
+    },
+    {
+      "path": "tests/geometry/assembly_parameter_pipeline_tests.cpp",
+      "sha256": "74e94f33bb9f52a74cef45215dac08ee3ad09fd366e39ace22d32ccf989102e7"
+    },
+    {
+      "path": "tests/geometry/assembly_revolute_joint_motion_tests.cpp",
+      "sha256": "193b95f787297585e92330448511103d03ca39b5bceaa11cab7d5da34d51d468"
+    },
+    {
+      "path": "tests/geometry/assembly_revolute_sweep_analyzer_tests.cpp",
+      "sha256": "3d4a1fef25adfca1cd75ea5e50f0858f11c34b9d996c471915ff6410429fc2db"
+    },
+    {
+      "path": "tests/geometry/assembly_rigid_body_solver_tests.cpp",
+      "sha256": "8491a69b3fc58fd6d7d2b832d3fdcf677d92f34c684ce7b9f7432ec00a93c8d2"
+    },
+    {
+      "path": "tests/geometry/assembly_solve_diagnostics_tests.cpp",
+      "sha256": "3c41225d578448656b94831706ee0160c1abc36adc44154af8002f77310d2a4b"
+    },
+    {
+      "path": "tests/geometry/assembly_step_exporter_tests.cpp",
+      "sha256": "389ff9ada0cdee386bf008512bc04c08f74a06d8ba09f3ae91774c136f76097f"
+    },
+    {
+      "path": "tests/geometry/assembly_step_reference_part_tests.cpp",
+      "sha256": "b0836707225fa20317f5e5623b8b20464fee85f9f4671bf6e24c951492767aae"
+    },
+    {
+      "path": "tests/geometry/assembly_structured_step_exporter_tests.cpp",
+      "sha256": "5014c5ef585c4cd50199efe4e119db7ed2514fcdc56e4e8607c81758aa0dac41"
+    },
+    {
+      "path": "tests/geometry/assembly_suppressed_component_solver_tests.cpp",
+      "sha256": "1c2a8a17c53a1e6aec12e77ef6d86f554e6540b7fb3693b7dc32ff13d48f925a"
+    },
+    {
+      "path": "tests/geometry/assembly_target_compatibility_tests.cpp",
+      "sha256": "b164d04060742cbdd56181a42ae58a2acae9540db0a82f11ad9acc0cfa66c556"
+    },
+    {
+      "path": "tests/geometry/assembly_transform_evaluator_tests.cpp",
+      "sha256": "502f873a23971da6088f48da7ee45897a37f0c3ba2d533a5c9c26909d0c6f315"
+    },
+    {
+      "path": "tests/geometry/back_workplane_pipeline_tests.cpp",
+      "sha256": "d08e4a1fd1e197cf0ffc6aef6816e633a69a0592baab0f3e36b18b22f73b3545"
+    },
+    {
+      "path": "tests/geometry/body_boolean_pipeline_tests.cpp",
+      "sha256": "8d593064a1d7d10b917056e47130305737629003ab54974f5afa7f2174d1731f"
+    },
+    {
+      "path": "tests/geometry/body_result_inspector_tests.cpp",
+      "sha256": "6c227b0cabfa2a1d0654b096783f6df2b578aee0fce3f9eed7b1372b13864134"
+    },
+    {
+      "path": "tests/geometry/body_transform_pipeline_tests.cpp",
+      "sha256": "c7c97910b90ed0f85213a4059a64ee516521d3950166bb86fc93330dec339867"
+    },
+    {
+      "path": "tests/geometry/bolt_circle_pattern_pipeline_tests.cpp",
+      "sha256": "eaa516f80fb55bae5b0dfb0a07a9aeadaeaea29d445dab0f043e1aaba67cdb5a"
+    },
+    {
+      "path": "tests/geometry/chained_construction_plane_resolver_tests.cpp",
+      "sha256": "259e5eeaee5144cf18deb61974ba4c1ad7b95e51f91e1286fee51bbb6ff4da63"
+    },
+    {
+      "path": "tests/geometry/chamfer_feature_pipeline_tests.cpp",
+      "sha256": "1637c78b692f7f36a35701d749e0dbeb43fa5ef31839d755f51c1d5d9f56f0b6"
+    },
+    {
+      "path": "tests/geometry/circular_cut_adapter_tests.cpp",
+      "sha256": "b32a1432e03491d6658820a55d942f559c3435a8b5496658fae9eb2e983e0751"
+    },
+    {
+      "path": "tests/geometry/circular_pattern_pipeline_tests.cpp",
+      "sha256": "e0a2f21223e8cff06eb5e8f8b7ebe34c77505cc32682b1c1fedadb7abac4907e"
+    },
+    {
+      "path": "tests/geometry/closed_profile_pipeline_tests.cpp",
+      "sha256": "fa3bc37de879d32b06c0cff1946be8f7306196588ea87c29a2fc8053b7a7c60d"
+    },
+    {
+      "path": "tests/geometry/composite_closed_profile_pipeline_tests.cpp",
+      "sha256": "561c6eb0c35288c57c46ca58688acc3a581089e77c3a31da80143d4594562b5e"
+    },
+    {
+      "path": "tests/geometry/construction_plane_pipeline_tests.cpp",
+      "sha256": "b0763fc41ec7d4470011831e240393669bc72b96ed98d5711e267d2c6e086d67"
+    },
+    {
+      "path": "tests/geometry/derived_workplane_pipeline_tests.cpp",
+      "sha256": "1eeb34a05ca039abc1733b47236e669e5a22d16805cba14c38fff9c1adefad1e"
+    },
+    {
+      "path": "tests/geometry/dimension_driven_profile_resolver_tests.cpp",
+      "sha256": "e62cc01ae493880db5d638c37952d059311cd9f22673c7d94dee53122ea05a7e"
+    },
+    {
+      "path": "tests/geometry/draft_feature_pipeline_tests.cpp",
+      "sha256": "99e4b8a9a86c667702c468a5e839182deb7849b1cbc50d1f3fd13f3ff8c54181"
+    },
+    {
+      "path": "tests/geometry/extrude_extent_pipeline_tests.cpp",
+      "sha256": "a5b446135876092315c5f1bfb5b26ef75f0adc2e798797a0da529a7c377d4836"
+    },
+    {
+      "path": "tests/geometry/fillet_feature_pipeline_tests.cpp",
+      "sha256": "35e59e099d423de9b1efd50cfc83f741c76d0d6be659eaa72fd5e506af0f0a7f"
+    },
+    {
+      "path": "tests/geometry/finishing_selection_tests.cpp",
+      "sha256": "7e814f37a511ce0d940fd7ded76812e90ddad04d6cc31bc15da11628845a3762"
+    },
+    {
+      "path": "tests/geometry/front_workplane_pipeline_tests.cpp",
+      "sha256": "29559048543d53d15e6b6863617abcbe931a9109150669f1750598ef75a03aef"
+    },
+    {
+      "path": "tests/geometry/guided_loft_pipeline_tests.cpp",
+      "sha256": "5482cd136a5201c957061f9dc11b35a0f1cd6709c31583c61986eefd41a7ae20"
+    },
+    {
+      "path": "tests/geometry/imported_body_downstream_feature_tests.cpp",
+      "sha256": "139475133f55994cfc13c8cbdea7dae8cfb5297d6315eb8ae2546b39aa8f9a9e"
+    },
+    {
+      "path": "tests/geometry/imported_body_recompute_tests.cpp",
+      "sha256": "fe7a2bef7f4ee894d9c5994ecb2ba016aa678d9bbe84efc39b25afa18d0fd192"
+    },
+    {
+      "path": "tests/geometry/imported_body_test_fixture.hpp",
+      "sha256": "670e390492aa718d3575d24ae1ad1a3b54f5b6a26320b8830d8746682256c373"
+    },
+    {
+      "path": "tests/geometry/left_workplane_pipeline_tests.cpp",
+      "sha256": "a239ef21b2702e0056085cf4289f62fb5c8912f18a5115be95a43b8e0251ec7d"
+    },
+    {
+      "path": "tests/geometry/linear_pattern_pipeline_tests.cpp",
+      "sha256": "226e245b6e08e6416657e749af7f0d9c887225eec001e904ef1a0488cfed4d70"
+    },
+    {
+      "path": "tests/geometry/loft_feature_pipeline_tests.cpp",
+      "sha256": "60bde9b207dc23ad163998bb34f3f0a24fa9c19039165933ad09ce7354617f7c"
+    },
+    {
+      "path": "tests/geometry/loft_section_compatibility_tests.cpp",
+      "sha256": "4d0dbbbcc1d8a0eeaf264819805682b74d4d201647a9582d0962ef573714501a"
+    },
+    {
+      "path": "tests/geometry/measure_selection_tests.cpp",
+      "sha256": "1865e1e46e6ed15442bc332b6d3c074f080c183ac4b487ea045fdbdcf299648f"
+    },
+    {
+      "path": "tests/geometry/mirror_feature_pipeline_tests.cpp",
+      "sha256": "88cceb8149ec80b4da794b4a482a49024c3253a6f1e13386a3815e62040b91cf"
+    },
+    {
+      "path": "tests/geometry/mixed_path_loft_tests.cpp",
+      "sha256": "f38ea38885813528544187238b73141ca0243fb5cc4bf530b425ca9ba27b785c"
+    },
+    {
+      "path": "tests/geometry/multi_section_loft_pipeline_tests.cpp",
+      "sha256": "5dfb3dd8a26f343169f9a569df0a77f123bd8499bd575a55c010838e1fbf044d"
+    },
+    {
+      "path": "tests/geometry/parameter_expression_pipeline_tests.cpp",
+      "sha256": "0aa44582038af48736c31b748171f844e38399b1caeb82f09c37e5291d38f411"
+    },
+    {
+      "path": "tests/geometry/part_construction_mvp_acceptance_tests.cpp",
+      "sha256": "39faf37f599b5f90efbd06bedb212b6489ac6b2272600afc4c97996422cf2971"
+    },
+    {
+      "path": "tests/geometry/path_extrude_pipeline_tests.cpp",
+      "sha256": "a5bfed6a2ccbc7ccc212ed72813c2208c8d233f15745a30a9dd6a09a89a87099"
+    },
+    {
+      "path": "tests/geometry/recompute_executor_tests.cpp",
+      "sha256": "0da51194c79b0a8e9123b0b0009b3a63c38d0ce78058875f7074907e3642c6bf"
+    },
+    {
+      "path": "tests/geometry/rectangle_extrusion_adapter_tests.cpp",
+      "sha256": "9370991a9663be668b53c8ed47a6b4685ca7893ab6c6bafe0500ec3bdeb43bab"
+    },
+    {
+      "path": "tests/geometry/reference_driven_sketch_helper_tests.cpp",
+      "sha256": "486eca78f20631bed42945d7eca8ff2b9fdcee9d80617b5298c8d467d276a807"
+    },
+    {
+      "path": "tests/geometry/reference_generated_profile_resolver_tests.cpp",
+      "sha256": "3717bbb59014b6786b46ad2bc18c5f19c2cd684645600ac4a50412425c8e1748"
+    },
+    {
+      "path": "tests/geometry/reference_part_export_tests.cpp",
+      "sha256": "2727ff5d30720b48a18be84d087d8c596205e1cd0c0a886d712392ae69704648"
+    },
+    {
+      "path": "tests/geometry/reference_part_geometry_tests.cpp",
+      "sha256": "7fa9e9374d144cfb9514aed949d6dec9feedda88bcec1f2c7cd38cc3a68b219d"
+    },
+    {
+      "path": "tests/geometry/reference_part_interaction_tests.cpp",
+      "sha256": "685f7a87d2c44b1644b348afc2d5792bcf1bb82713945c4751f5e2bd3cafe1ab"
+    },
+    {
+      "path": "tests/geometry/reference_part_pipeline_tests.cpp",
+      "sha256": "f6586d2304b1da43c0c355b441e0bc2dc83147892f17e18536c8860ff773a9c1"
+    },
+    {
+      "path": "tests/geometry/revolve_feature_pipeline_tests.cpp",
+      "sha256": "469f9709519ca9276661de7bb83296562f8de43d8ae39e5c98f23bb2d84bc02d"
+    },
+    {
+      "path": "tests/geometry/right_workplane_pipeline_tests.cpp",
+      "sha256": "317447d11b9c92ebaa19306b86a22650485cfc27f40e608ab19e1af161d63b7a"
+    },
+    {
+      "path": "tests/geometry/semantic_reference_evaluator_tests.cpp",
+      "sha256": "ba8ec9f6b51a70f84f21b0a6fa029758a65bdbb1fa5c6c66fd6d20748f718471"
+    },
+    {
+      "path": "tests/geometry/shape_cache_tests.cpp",
+      "sha256": "20c8d7e2a9d5588295ddbac2544f5755882cacfcc7994b3df87791ca6b2ac647"
+    },
+    {
+      "path": "tests/geometry/shell_feature_pipeline_tests.cpp",
+      "sha256": "df9966ab2c9e75ab4470ff2b89ade98450848ef5fa3188bfbc2a687b7686b09f"
+    },
+    {
+      "path": "tests/geometry/sketch_3d_geometry_adapter_tests.cpp",
+      "sha256": "7d6d3bdf2444e7e6074bf847e655908ea40a8a562a9ce3da00cd30f810c25fa5"
+    },
+    {
+      "path": "tests/geometry/sketch_reference_projector_tests.cpp",
+      "sha256": "be27b7346087a8050ba677d00e96cfabaa82c8b07a9b340f8e750634fccd808d"
+    },
+    {
+      "path": "tests/geometry/sketch_region_finder_tests.cpp",
+      "sha256": "3366d18a191521f6c69986b5625af21a97fe7395826c9f41170420b709a996d2"
+    },
+    {
+      "path": "tests/geometry/spline_profile_pipeline_tests.cpp",
+      "sha256": "f3d25bb96b31d9704c8b093780f3be997cc148cdde268de8aff1c4109236ddc6"
+    },
+    {
+      "path": "tests/geometry/step_editable_commands_tests.cpp",
+      "sha256": "50cc5362d7487dd1d9a2f8885cda1a502568604c9418284ec86d94783543cc12"
+    },
+    {
+      "path": "tests/geometry/step_exporter_tests.cpp",
+      "sha256": "fdffbe02380cc2390a82db180a3d2bed372905207c4626b03cbb035b1d811058"
+    },
+    {
+      "path": "tests/geometry/step_import_profile_tests.cpp",
+      "sha256": "6d124663c34d5d0ee5238c7785a4dadc68e4afb8f3442426406a7e93163707d5"
+    },
+    {
+      "path": "tests/geometry/step_import_reader_tests.cpp",
+      "sha256": "3a9e574521a01c6433e4cfaa37909ade3a1f7663a088c6bdf4220c784980dfbe"
+    },
+    {
+      "path": "tests/geometry/step_import_target_tests.cpp",
+      "sha256": "2f648053f6edafd8abe99e0d64c56216e3593b9a963de56175aeaba5273d93e7"
+    },
+    {
+      "path": "tests/geometry/step_import_topology_tests.cpp",
+      "sha256": "130c3c6fadb00d714862707b11ee86cc406b453d4dfd60e4035229d8f2df0ac2"
+    },
+    {
+      "path": "tests/geometry/step_reference_commands_tests.cpp",
+      "sha256": "67ab13d7cd0575954ec356cab9c8f61de8c3f0c8e7f558c1bb71f19727a61a71"
+    },
+    {
+      "path": "tests/geometry/structured_step_import_tests.cpp",
+      "sha256": "ee0da5d500afe5449387293e2bae5e6bf317c7de0e199d62b1b8d75d206d1841"
+    },
+    {
+      "path": "tests/geometry/surface_boundary_fill_pipeline_tests.cpp",
+      "sha256": "c631b451da49f176b6c434826e5c240582a950137ce41bc224cc55f758a0776c"
+    },
+    {
+      "path": "tests/geometry/surface_close_shell_pipeline_tests.cpp",
+      "sha256": "960b713c84b02b436fd013eb19a5dd2567a85c46e985bcd0f38cd9a8bbb162c7"
+    },
+    {
+      "path": "tests/geometry/surface_stitch_pipeline_tests.cpp",
+      "sha256": "c6ff9b01171eb6f12977da356a2c1b0fb68dfe95a716ad45b1f25dd263eeb7b2"
+    },
+    {
+      "path": "tests/geometry/surface_trim_extend_pipeline_tests.cpp",
+      "sha256": "c7e12249f306e9011a1ff882db1481c792cb441f2fdad7d671f99d089b032725"
+    },
+    {
+      "path": "tests/geometry/sweep_feature_pipeline_tests.cpp",
+      "sha256": "bc970ce16ffc0582e87972d2a443679d9c80aa68fe7be26c6e1c571410df8298"
+    },
+    {
+      "path": "tests/geometry/viewport_scene_tests.cpp",
+      "sha256": "539292f68eaa22c536cb9f997dd78b6aae91c213f062d1de14f364b12d96a1b6"
+    },
+    {
+      "path": "tests/geometry/workplane_resolver_recovery_tests.cpp",
+      "sha256": "3dd54ed19cc0959100ca4138da6bbf70e06d09773d4e3a3cdc280090b28a8762"
+    },
+    {
+      "path": "tests/geometry/workplane_resolver_tests.cpp",
+      "sha256": "31c4623a94f593100d555182152bae17bfc85c61450668a0f268e3fb26b80daf"
+    },
+    {
+      "path": "tests/gui/gui_analysis_export_workbench_tests.cpp",
+      "sha256": "fcd6c83447dda34acdec604b42255d300b6bfc18e637ae5a467c93be79972991"
+    },
+    {
+      "path": "tests/gui/gui_appearance_tests.cpp",
+      "sha256": "a9ec23aa9bc1e9f38b394bd3afe4262027bd01e29e7d7731ec4fc932f63dc395"
+    },
+    {
+      "path": "tests/gui/gui_assembly_workbench_tests.cpp",
+      "sha256": "482d46bde4432e4cfe7a3db52b68d50eb0465bcb4ee3c7090cc80978397cb389"
+    },
+    {
+      "path": "tests/gui/gui_coincident_closure_tests.cpp",
+      "sha256": "b5150aef0915322d153c7d551a1dbd1f63efe16dc72add5df054f4857cd49a12"
+    },
+    {
+      "path": "tests/gui/gui_command_state_tests.cpp",
+      "sha256": "2b67ead09d34e48c0989f67a9ef5681d2faf7f488bc187b6ede9a4e3e9f5c01d"
+    },
+    {
+      "path": "tests/gui/gui_complex_part_performance_tests.cpp",
+      "sha256": "9230ac163d0080a79ce82f6c008ec154d1e91dfe16f7a07752f03f45d88a23f0"
+    },
+    {
+      "path": "tests/gui/gui_dimension_layout_tests.cpp",
+      "sha256": "518c210c1707fff038cc6270fece447eb10f3cfe4df081a8d03ea2caf415334e"
+    },
+    {
+      "path": "tests/gui/gui_document_browser_tests.cpp",
+      "sha256": "4b0c4cadc1cf01808d4015623e8ab677b2e87703d7559efdfd74f0c5a106e38e"
+    },
+    {
+      "path": "tests/gui/gui_document_session_tests.cpp",
+      "sha256": "61603c045f77f8e46d1749a0a1f70c15000617ebb820045e6871f4586f935c32"
+    },
+    {
+      "path": "tests/gui/gui_feature_edit_tests.cpp",
+      "sha256": "905c3e6571487470fc77ca0f7ef983dfa939ba107c40fbe15b2a8a363d00c5b9"
+    },
+    {
+      "path": "tests/gui/gui_feature_source_workflow_tests.cpp",
+      "sha256": "255383c3a0d8215ff88c7892ccdf23cacec56049911cce97915e02a6a30513cd"
+    },
+    {
+      "path": "tests/gui/gui_icons_tests.cpp",
+      "sha256": "556c94eb5dd875d19ff9186103aefa38ad8d04c3b088643a30e4edc65f9bfc5b"
+    },
+    {
+      "path": "tests/gui/gui_imported_body_preview_tests.cpp",
+      "sha256": "6829f8af318fea5d1dc4cd72a7a31d0c7accc2298a19f964ebba060d10e32e4c"
+    },
+    {
+      "path": "tests/gui/gui_interactive_assembly_tests.cpp",
+      "sha256": "d5a45db40aa8ad831497dd108ae1b6c7f758dd76ffd90b44dc07f7a6ad7e6ce3"
+    },
+    {
+      "path": "tests/gui/gui_interactive_finishing_tests.cpp",
+      "sha256": "535e65d3b25c8102cb26f67cece813fdaf23f10f114da6fe45223c965a5e5303"
+    },
+    {
+      "path": "tests/gui/gui_interactive_modeling_mvp9_acceptance_tests.cpp",
+      "sha256": "a0abad98022c9b7a9128e382e09619e473e403978a6599f4d424286f326b258d"
+    },
+    {
+      "path": "tests/gui/gui_interactive_path_sweep_loft_tests.cpp",
+      "sha256": "0dd1846bc0a7be8b71d0776ba95928bed50745687631d614d33568e6f8bac888"
+    },
+    {
+      "path": "tests/gui/gui_interactive_pattern_body_tests.cpp",
+      "sha256": "2c19db4ea1f786ee0237a042d16a6e26b1727c4cf54f5bc775612ff36b141a55"
+    },
+    {
+      "path": "tests/gui/gui_interactive_sketcher_acceptance_tests.cpp",
+      "sha256": "db5329c30f92633e735acae172f39a17490bcda7fab500177f54477d537bbe1d"
+    },
+    {
+      "path": "tests/gui/gui_interactive_surface_tests.cpp",
+      "sha256": "36333c560d493f3207a3b153b501dc0d408f4a443e385e79b4e39810d86eee66"
+    },
+    {
+      "path": "tests/gui/gui_occt_viewport_tests.cpp",
+      "sha256": "a1a1b8d4005f32b997c27e077215aa7c88c592fd1c362446b6300e21174e5f2c"
+    },
+    {
+      "path": "tests/gui/gui_part_foundation_workbench_tests.cpp",
+      "sha256": "b34b042e2cff5da76cbbf4767711fa010fb6db2ddff86b4417e37305e722af19"
+    },
+    {
+      "path": "tests/gui/gui_part_operations_workbench_tests.cpp",
+      "sha256": "7c9ea3708829f43ffcb8d4367d33f9803321d5043fe2164301ad22e9ffac22b9"
+    },
+    {
+      "path": "tests/gui/gui_part_workflow_transaction_tests.cpp",
+      "sha256": "b784c781f53c9832fc9af83f26115593620377474b74e51f9aa862a3d3aace18"
+    },
+    {
+      "path": "tests/gui/gui_rapid_dimension_tests.cpp",
+      "sha256": "321752ff238af537313f49fcbde72a597875817399e57f860716072faf072dbf"
+    },
+    {
+      "path": "tests/gui/gui_raw_profile_transaction_tests.cpp",
+      "sha256": "c37746487e7a74eef78131303d65329dd68feb00da71b2697d78826519e63369"
+    },
+    {
+      "path": "tests/gui/gui_shell_assembly_advanced_tests.cpp",
+      "sha256": "243478436f679ba9299f827648a79404b068681a36164b1d12e4961523a812db"
+    },
+    {
+      "path": "tests/gui/gui_shell_assembly_analysis_tests.cpp",
+      "sha256": "71fcc2bff5b2a98da031f8d69154c2bf26ad3ae5b1d467b2074a968f841955a9"
+    },
+    {
+      "path": "tests/gui/gui_shell_assembly_context_tests.cpp",
+      "sha256": "4fca085d130c3e7cb905ed127f89c38fc9d1038ed6f48382c43424cedd17902f"
+    },
+    {
+      "path": "tests/gui/gui_shell_assembly_tools_tests.cpp",
+      "sha256": "d3f8f79cb474aa3d71a6925d312c8cea54835ad56deae4be939762c4088d3c5f"
+    },
+    {
+      "path": "tests/gui/gui_shell_body_context_tests.cpp",
+      "sha256": "3f8ab08d8af38790e1a1ce7387dd863880d24fe940906f401c13de334025a410"
+    },
+    {
+      "path": "tests/gui/gui_shell_body_tools_tests.cpp",
+      "sha256": "81885f81e99a6b5e3d6b39c1d01e2cf344771c99c7b94926b080c93b35953b0f"
+    },
+    {
+      "path": "tests/gui/gui_shell_combined_workflow_tests.cpp",
+      "sha256": "0be3326026df8450b0cd3e1a4908ca24077fa76c21af8803593a8407f9a3908c"
+    },
+    {
+      "path": "tests/gui/gui_shell_construction_tools_tests.cpp",
+      "sha256": "cb5d2512ce1555e10e5c7a7e3c1715a916298b8c17803c900c06f3b6620383a4"
+    },
+    {
+      "path": "tests/gui/gui_shell_coverage_tests.cpp",
+      "sha256": "f75d5f4798fe6835f7de479b8c382e204522a97ec7f0e5f31694211908a8212b"
+    },
+    {
+      "path": "tests/gui/gui_shell_create_another_tests.cpp",
+      "sha256": "b0258b1b96926edb51880d239b733296229c7d5af22cdcead660e08f2bad9925"
+    },
+    {
+      "path": "tests/gui/gui_shell_dimension_label_interaction_tests.cpp",
+      "sha256": "fcdfd030ba166489182e5e6fbbb1f78634e380a55f0638aa642b38342ecdbbc1"
+    },
+    {
+      "path": "tests/gui/gui_shell_dimension_workflow_tests.cpp",
+      "sha256": "93fb019c2088ba1c962647521803ca0ac91b7d4de3e55c87f0e78aac1e35eaeb"
+    },
+    {
+      "path": "tests/gui/gui_shell_extrude_extent_tests.cpp",
+      "sha256": "5594958ec62555ef1434acf774d28c65a99336231e2655fd8091ca8fdad5fe48"
+    },
+    {
+      "path": "tests/gui/gui_shell_feature_edit_tests.cpp",
+      "sha256": "5ce9cad1a6c392ac0c29711ec396fa6f3ffae081ae277a543e06b36060867733"
+    },
+    {
+      "path": "tests/gui/gui_shell_feature_tools_tests.cpp",
+      "sha256": "db89a05b9fbcc972a07239630c8fef25fd77e88ad6dbb73ed564c99c13642f9d"
+    },
+    {
+      "path": "tests/gui/gui_shell_finishing_context_tests.cpp",
+      "sha256": "2459f8debd0022a73f43d47e38dc56c1e3e4ec7ad9bd1a906399bbb32022a6cf"
+    },
+    {
+      "path": "tests/gui/gui_shell_finishing_tools_tests.cpp",
+      "sha256": "8ffa369d666a95d15fa1029c0d2b697d0600f7c3961b112e0bfc72d46bc3fcee"
+    },
+    {
+      "path": "tests/gui/gui_shell_hole_tests.cpp",
+      "sha256": "3237c6c47d34d0a74cb1f5990e58a3e8cbbf789aecf9a78ffbeb786365a456a0"
+    },
+    {
+      "path": "tests/gui/gui_shell_inspect_tools_tests.cpp",
+      "sha256": "238ccf787bba8b0c5363089fcfd9f1b43f67a0cae1b8e20fbc2cfda686f97a0b"
+    },
+    {
+      "path": "tests/gui/gui_shell_measure_tools_tests.cpp",
+      "sha256": "31eb1625ed6744f789e29d0296951b816f4a9ed9248a01bc3c2b31c76c94a717"
+    },
+    {
+      "path": "tests/gui/gui_shell_navigation_tests.cpp",
+      "sha256": "7e8042cdfdea7b564d7faf69e10e69be0a09268006f15ab60ca8b5584a3bea59"
+    },
+    {
+      "path": "tests/gui/gui_shell_parameter_tests.cpp",
+      "sha256": "0e5ba3cec02627673ec2615234b1f438ec135b8f4ff6c1bc6b0bed598912b1da"
+    },
+    {
+      "path": "tests/gui/gui_shell_path_extrude_tests.cpp",
+      "sha256": "88fbf517e8835e7460b28614b2793c0afb9eaf967504d5b32699690dbf664b23"
+    },
+    {
+      "path": "tests/gui/gui_shell_pattern_context_tests.cpp",
+      "sha256": "39e3d96b712809370019679368a1dae634cd039f2366602ae9c151f673898d01"
+    },
+    {
+      "path": "tests/gui/gui_shell_pattern_tools_tests.cpp",
+      "sha256": "19433292446ca981cf2acf9ff70b5dd9b23f72995770fcead7885de01337620f"
+    },
+    {
+      "path": "tests/gui/gui_shell_profile_context_tests.cpp",
+      "sha256": "5bf73656be134148461619869a770a7a493250044ab414ecf5f0b8a9497543f2"
+    },
+    {
+      "path": "tests/gui/gui_shell_property_controls_tests.cpp",
+      "sha256": "e7910d3858f9128edef15b5183cae31a04519ce7f6f451c8f54d66c065b106bb"
+    },
+    {
+      "path": "tests/gui/gui_shell_reference_repair_tests.cpp",
+      "sha256": "8ae0d17ec2f9e07ec6351912ff82d3e43350b96e8e7da9a8a114f114d972b772"
+    },
+    {
+      "path": "tests/gui/gui_shell_reference_visibility_workflow_tests.cpp",
+      "sha256": "c59abf9aac012aeb56540d9f2c9272cc21f009ef67a4c66dcdd7a5996ca2b77d"
+    },
+    {
+      "path": "tests/gui/gui_shell_repeat_tests.cpp",
+      "sha256": "d6f0caca0ec0d127177ed153f12359b32e3825bf653af6b3f1b76f56cc5f7fba"
+    },
+    {
+      "path": "tests/gui/gui_shell_revolve_tests.cpp",
+      "sha256": "f0c660a976bb3df985114bcd51c46c7c5799595f4be4ac1f8b48942b1824f235"
+    },
+    {
+      "path": "tests/gui/gui_shell_selection_filter_tests.cpp",
+      "sha256": "bfdeaa4510357a7da045d9953b42ee42c8865e50f094890bef84e545998897ae"
+    },
+    {
+      "path": "tests/gui/gui_shell_sketch_3d_tests.cpp",
+      "sha256": "709d7df5267572d220df9ee5962c48c8625ab497358234d49842f7059956dbd6"
+    },
+    {
+      "path": "tests/gui/gui_shell_sketch_diagnostics_tests.cpp",
+      "sha256": "786d458bd9cc0bea2578b2f8496071809037e1753fd7aa95d86322859699d56d"
+    },
+    {
+      "path": "tests/gui/gui_shell_sketch_interaction_tests.cpp",
+      "sha256": "8de7aacad90b006dea76ef82bb5a9e349962f097c6da8983d67febfac94a234f"
+    },
+    {
+      "path": "tests/gui/gui_shell_sketch_operations_tests.cpp",
+      "sha256": "819e362fdffe89f03bba4ccc30d3c18ed8cacce5fd67a75ebedfc15458302ac0"
+    },
+    {
+      "path": "tests/gui/gui_shell_sketch_tools_tests.cpp",
+      "sha256": "ed35694185b4bf0c0433800a39f90fa10015f923061e2dbd551517ea9d1686eb"
+    },
+    {
+      "path": "tests/gui/gui_shell_spatial_tools_tests.cpp",
+      "sha256": "95e9a776fa54911fc31423632fb4b81e5751f993907e2b434a78580867c344c4"
+    },
+    {
+      "path": "tests/gui/gui_shell_step_import_tests.cpp",
+      "sha256": "e5d4be5abd9c421deca5c423ddb646aba34c73b19b0d9772d4d119832980415b"
+    },
+    {
+      "path": "tests/gui/gui_shell_step_structured_import_tests.cpp",
+      "sha256": "2fc2eca01092ff6c7f423338e0efeb9839b9a4f5863ff1cc1a6437054f0f415f"
+    },
+    {
+      "path": "tests/gui/gui_shell_surface_context_tests.cpp",
+      "sha256": "e87e8cdd89038f124f39a68472459199915acbf1123dfa1aa45365a09239f68c"
+    },
+    {
+      "path": "tests/gui/gui_shell_surface_tools_tests.cpp",
+      "sha256": "c872559ea7cf308f5f5c282c30a46771891d1d2f6f37bb83ea898ce6b3cd85af"
+    },
+    {
+      "path": "tests/gui/gui_shell_thin_extrude_tests.cpp",
+      "sha256": "c74274e2acf3a2893a9332fb0e2db0c1c40b6efd437501f00c8c4a92e84d33af"
+    },
+    {
+      "path": "tests/gui/gui_shell_window_tests.cpp",
+      "sha256": "8ed280203bfbea63219ce568b6ea09e4a6a476db3952ddc9df1758a450ff02d1"
+    },
+    {
+      "path": "tests/gui/gui_shell_workflow_evidence_tests.cpp",
+      "sha256": "3302bc2f2d709a547ed294ffa4a0b465b7ccd902206e21ff242ee9528137bf72"
+    },
+    {
+      "path": "tests/gui/gui_shell_workflow_layout_tests.cpp",
+      "sha256": "5a080589eb118d745aa86b5f177dd86b836255ee6ffe9075c7504d9775e331a3"
+    },
+    {
+      "path": "tests/gui/gui_sketch_conic_workflow_tests.cpp",
+      "sha256": "f85afa47077219652dfbfa1700ce1d65a49ac5949b3fd427460d6ad436f548ee"
+    },
+    {
+      "path": "tests/gui/gui_sketch_constraint_family_tests.inc",
+      "sha256": "3cac19b269bdcc25926561ecc60b5538b9f5017127afd19dfbb8fd1cdb014b48"
+    },
+    {
+      "path": "tests/gui/gui_sketch_constraint_redundancy_tests.inc",
+      "sha256": "b141667cbefe4e35955ae2b33eca901546e2211c81b272121678b5b8443e4805"
+    },
+    {
+      "path": "tests/gui/gui_sketch_constraint_tests.inc",
+      "sha256": "9d6dcf16122b4ffaa2fb798957ff06896239bd137cbe185bf80a34c8d66598eb"
+    },
+    {
+      "path": "tests/gui/gui_sketch_dimension_selection_tests.inc",
+      "sha256": "3fbfec84b54623be9174fa84dc1c9a1eb783399d89ee338b7db7182da4d1b9fd"
+    },
+    {
+      "path": "tests/gui/gui_sketch_interaction_tests.cpp",
+      "sha256": "1a69af5c30cb38bed58f33f8b38d57ddedabbc0c604796fb85c437285230bfee"
+    },
+    {
+      "path": "tests/gui/gui_sketch_modify_tests.inc",
+      "sha256": "56351607b4db27a8f6bbadc35bd162baa22452ac0f6df95351129f8daafe028d"
+    },
+    {
+      "path": "tests/gui/gui_sketch_primitive_constraints_tests.cpp",
+      "sha256": "b1b17fe07b7403f26bdbf6ad3d438e8341d38f717c56d458dd9474e34f98878f"
+    },
+    {
+      "path": "tests/gui/gui_sketch_workbench_tests.cpp",
+      "sha256": "a4bc2a57188854bc2ef24b68b32bc097abe173cec6e474bb7cdf962cfa907165"
+    },
+    {
+      "path": "tests/gui/gui_spatial_surface_workbench_tests.cpp",
+      "sha256": "e4fe4069db9e5c73f3c2ceb92c7a3dc6a7460cad67c71285a21c99253a21e472"
+    },
+    {
+      "path": "tests/gui/gui_startup_splash_tests.cpp",
+      "sha256": "33fa809c3f48ed4ae8347bb13351c6b388e6e6742f94ddedfeed771cefae8393"
+    },
+    {
+      "path": "tests/gui/gui_step_import_workbench_tests.cpp",
+      "sha256": "a3a1de84dee8ac5a0809e93a8c0355ee60499f7c20e432eb97ac9a192ab33898"
+    },
+    {
+      "path": "tests/gui/gui_step_structured_import_fixture.hpp",
+      "sha256": "4297541c03608b828b7697c29101b17a62414c27bb0221858afb505f2c731dd1"
+    },
+    {
+      "path": "tests/gui/gui_test_main.cpp",
+      "sha256": "62f3ecba587d9033c60175e4eb07e5d95180304f06de1701733e0304d551f439"
+    },
+    {
+      "path": "tests/support/geometry_volume_oracle.cpp",
+      "sha256": "b66972badb549a1a5ab8763ade0bbd27c56948e4dc7c9f84980df2414ddb1ea6"
+    },
+    {
+      "path": "tests/support/geometry_volume_oracle.hpp",
+      "sha256": "cf07387bad9cc60aee141d5ae0e530db7b1fb147b73ab2425e58dceee7ea3369"
+    },
+    {
+      "path": "tests/support/loft_alignment_fixture.hpp",
+      "sha256": "079186c1a0cad90f3f21ddd901480f9f2ae55708e32463cd3085da4cb0ea0245"
+    },
+    {
+      "path": "tests/support/loft_section_refinement_fixture.hpp",
+      "sha256": "5d31b9d8e8b63831914ca3576760e102977a23852d96f096d3fe7c5966ea44e0"
+    },
+    {
+      "path": "tests/support/missing_reference_fixture.hpp",
+      "sha256": "88471f6bcf75e80717865448b7b8397c81107df4b081fd3f325ab58c6e0dbf0a"
+    },
+    {
+      "path": "tests/support/mixed_path_loft_fixture.hpp",
+      "sha256": "d5671f8a72d1bf9f3d90ef324024b22419dac6effec95909e9cb15d49e5dfa0f"
+    },
+    {
+      "path": "tests/support/reference_repair_fixture.hpp",
+      "sha256": "798409458ea5df1e8e1f4c891f0990447f8c83ef28766f409f7494f3b9cf2aa5"
+    },
+    {
+      "path": "tests/support/repair_open_fixture.hpp",
+      "sha256": "0dfeeac18b2fdbfb5bfd53e988216ea96252215b5c3bac9a244c460cee08b2a7"
+    },
+    {
+      "path": "tests/support/rotor_performance_fixture.hpp",
+      "sha256": "215e16587cebec0128edb7b830a1a294ceef4f63ee27a4a1bc650f0b1637d4ef"
+    }
+  ],
+  "runtime_inventory_sha256": "4192e5803b87b7ccf8c85bd06007b8c6e5b0ce5f91605151ea80051e615a5cba",
+  "schema": "blcad.workflow-baseline.v1",
+  "source_json": "{\n  \"bodies\": [],\n  \"body_booleans\": [],\n  \"body_transforms\": [],\n  \"construction_lines\": [],\n  \"construction_planes\": [],\n  \"construction_points\": [],\n  \"datum_axes\": [],\n  \"datum_planes\": [\n    {\n      \"id\": \"datum.xy\",\n      \"kind\": \"xy\",\n      \"name\": \"XY\",\n      \"normal\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      },\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"x_axis\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"y_axis\": {\n        \"x\": 0.0,\n        \"y\": 1.0,\n        \"z\": 0.0\n      }\n    }\n  ],\n  \"derived_workplanes\": [],\n  \"document\": {\n    \"id\": \"part.workflow-baseline\",\n    \"name\": \"Workflow baseline\"\n  },\n  \"draft_features\": [],\n  \"edge_treatments\": [],\n  \"features\": [],\n  \"loft_features\": [],\n  \"mirror_features\": [],\n  \"parameters\": [\n    {\n      \"id\": \"width\",\n      \"name\": \"width\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 20.0\n    },\n    {\n      \"id\": \"height\",\n      \"name\": \"height\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 10.0\n    }\n  ],\n  \"part_patterns\": [],\n  \"path_curves\": [],\n  \"reference_remaps\": [],\n  \"reference_statuses\": [],\n  \"revolve_features\": [],\n  \"schema\": \"blcad.part_document.mvp1\",\n  \"shell_features\": [],\n  \"sketch_origin_overrides\": [],\n  \"sketch_ownerships\": [],\n  \"sketches\": [\n    {\n      \"arc_closed_profiles\": [],\n      \"arc_segments\": [],\n      \"circle_profiles\": [],\n      \"circular_hole_patterns\": [],\n      \"closed_profiles\": [],\n      \"composite_closed_profiles\": [],\n      \"constraints\": [],\n      \"driving_dimensions\": [],\n      \"geometric_constraints\": [],\n      \"id\": \"sketch.baseline\",\n      \"line_segments\": [],\n      \"name\": \"Baseline\",\n      \"projected_lines\": [],\n      \"projected_points\": [],\n      \"rectangle_profiles\": [\n        {\n          \"center\": {\n            \"x\": 0.0,\n            \"y\": 0.0\n          },\n          \"height_parameter\": \"height\",\n          \"id\": \"profile.baseline\",\n          \"width_parameter\": \"width\"\n        }\n      ],\n      \"reference_generated_lines\": [],\n      \"sketch_points\": [],\n      \"spline_segments\": [],\n      \"tangent_continuities\": [],\n      \"trim_extend_operations\": [],\n      \"workplane\": \"datum.xy\"\n    }\n  ],\n  \"sketches_3d\": [],\n  \"surface_features\": [],\n  \"sweep_features\": [],\n  \"version\": 1\n}",
+  "source_json_sha256": "87b3b398d9921d77ddd8c5f88be61cf796600b6da9103757192b10cf84da4b27",
+  "ui_interaction_baseline": {
+    "schema": "blcad.workflow-interaction-summary.v1",
+    "fixture": "20 x 10 x 8 mm New Body; actual Qt profile/scalar input and Apply/Create Another, Cancel, Undo; every trial checks 1600 mm3 and canonical source JSON",
+    "execution": "Three separate processes, each running only [workflow-interaction-baseline]. Serial runs; no simultaneous build/test. Qt GUI input dispatch is serial; OCCT/kernel thread defaults are not overridden.",
+    "first_workflow_scope": "First measured workflow in each fresh process; fixture and native viewport initialization excluded. Application startup is not timed.",
+    "failure_count": 0,
+    "source_json_sha256": "3533f8a02f8a801dafc38f8375812e8b3375d48cbb7361c0742541d48d38cde1",
+    "first_workflow_summary": {
+      "begin_ms": {
+        "sample_count": 3,
+        "p50_ms": 11.916362,
+        "p95_ms": 12.114416,
+        "observed_max_ms": 12.114416
+      },
+      "cancel_ms": {
+        "sample_count": 3,
+        "p50_ms": 43.713023,
+        "p95_ms": 46.924543,
+        "observed_max_ms": 46.924543
+      },
+      "create_another_ms": {
+        "sample_count": 3,
+        "p50_ms": 60.005792,
+        "p95_ms": 61.98481,
+        "observed_max_ms": 61.98481
+      },
+      "numeric_keyboard_input_ms": {
+        "sample_count": 3,
+        "p50_ms": 23.221648,
+        "p95_ms": 23.488634,
+        "observed_max_ms": 23.488634
+      },
+      "profile_keyboard_pick_ms": {
+        "sample_count": 3,
+        "p50_ms": 88.746697,
+        "p95_ms": 96.393489,
+        "observed_max_ms": 96.393489
+      }
+    },
+    "reused_window_summary": {
+      "begin_ms": {
+        "sample_count": 30,
+        "p50_ms": 5.511688,
+        "p95_ms": 8.646088,
+        "observed_max_ms": 9.854288
+      },
+      "cancel_ms": {
+        "sample_count": 30,
+        "p50_ms": 42.167819,
+        "p95_ms": 47.672988,
+        "observed_max_ms": 60.60557
+      },
+      "create_another_ms": {
+        "sample_count": 30,
+        "p50_ms": 52.844596,
+        "p95_ms": 63.40176,
+        "observed_max_ms": 71.566579
+      },
+      "numeric_keyboard_input_ms": {
+        "sample_count": 30,
+        "p50_ms": 19.238589,
+        "p95_ms": 27.277389,
+        "observed_max_ms": 28.407626
+      },
+      "profile_keyboard_pick_ms": {
+        "sample_count": 30,
+        "p50_ms": 41.830312,
+        "p95_ms": 57.436741,
+        "observed_max_ms": 69.610829
+      }
+    },
+    "runs": [
+      {
+        "cache_state": "trial 0 is first measured workflow; trials 1-10 reuse the window after complete Apply/Cancel/Undo",
+        "device_pixel_ratio": 1,
+        "measurement": "synchronous Qt input dispatch, kernel work and UI event publication; fixture setup, startup and oracle checks excluded",
+        "platform": "xcb",
+        "process_peak_rss_kib": 225488,
+        "samples": [
+          {
+            "begin_ms": 11.541385,
+            "cancel_ms": 43.713023,
+            "create_another_ms": 60.005792,
+            "numeric_keyboard_input_ms": 23.488634,
+            "profile_keyboard_pick_ms": 96.393489,
+            "trial": 0
+          },
+          {
+            "begin_ms": 5.196849,
+            "cancel_ms": 42.659521,
+            "create_another_ms": 53.938178,
+            "numeric_keyboard_input_ms": 16.669705,
+            "profile_keyboard_pick_ms": 36.663704,
+            "trial": 1
+          },
+          {
+            "begin_ms": 4.35665,
+            "cancel_ms": 40.760233,
+            "create_another_ms": 53.584355,
+            "numeric_keyboard_input_ms": 19.744452,
+            "profile_keyboard_pick_ms": 49.944541,
+            "trial": 2
+          },
+          {
+            "begin_ms": 4.3482,
+            "cancel_ms": 47.672988,
+            "create_another_ms": 63.40176,
+            "numeric_keyboard_input_ms": 19.482465,
+            "profile_keyboard_pick_ms": 41.626304,
+            "trial": 3
+          },
+          {
+            "begin_ms": 5.953556,
+            "cancel_ms": 60.60557,
+            "create_another_ms": 71.566579,
+            "numeric_keyboard_input_ms": 28.407626,
+            "profile_keyboard_pick_ms": 56.01569,
+            "trial": 4
+          },
+          {
+            "begin_ms": 8.646088,
+            "cancel_ms": 45.303141,
+            "create_another_ms": 63.219988,
+            "numeric_keyboard_input_ms": 27.277389,
+            "profile_keyboard_pick_ms": 69.610829,
+            "trial": 5
+          },
+          {
+            "begin_ms": 8.523382,
+            "cancel_ms": 42.604125,
+            "create_another_ms": 49.815165,
+            "numeric_keyboard_input_ms": 25.087995,
+            "profile_keyboard_pick_ms": 50.636386,
+            "trial": 6
+          },
+          {
+            "begin_ms": 4.699091,
+            "cancel_ms": 39.485273,
+            "create_another_ms": 49.354261,
+            "numeric_keyboard_input_ms": 21.388156,
+            "profile_keyboard_pick_ms": 37.226209,
+            "trial": 7
+          },
+          {
+            "begin_ms": 5.590708,
+            "cancel_ms": 41.711147,
+            "create_another_ms": 54.226877,
+            "numeric_keyboard_input_ms": 19.178716,
+            "profile_keyboard_pick_ms": 39.885503,
+            "trial": 8
+          },
+          {
+            "begin_ms": 4.568468,
+            "cancel_ms": 43.747713,
+            "create_another_ms": 62.658768,
+            "numeric_keyboard_input_ms": 19.238589,
+            "profile_keyboard_pick_ms": 38.760338,
+            "trial": 9
+          },
+          {
+            "begin_ms": 5.511688,
+            "cancel_ms": 39.056296,
+            "create_another_ms": 53.708084,
+            "numeric_keyboard_input_ms": 18.733989,
+            "profile_keyboard_pick_ms": 37.628361,
+            "trial": 10
+          }
+        ],
+        "schema": "blcad.workflow-interaction-baseline.v1",
+        "source_json": "{\n  \"bodies\": [],\n  \"body_booleans\": [],\n  \"body_transforms\": [],\n  \"construction_lines\": [],\n  \"construction_planes\": [],\n  \"construction_points\": [],\n  \"datum_axes\": [\n    {\n      \"direction\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"id\": \"datum.axis.x\",\n      \"kind\": \"explicit\",\n      \"name\": \"X Axis\",\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"parameter_dependencies\": []\n    },\n    {\n      \"direction\": {\n        \"x\": 0.0,\n        \"y\": 1.0,\n        \"z\": 0.0\n      },\n      \"id\": \"datum.axis.y\",\n      \"kind\": \"explicit\",\n      \"name\": \"Y Axis\",\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"parameter_dependencies\": []\n    },\n    {\n      \"direction\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      },\n      \"id\": \"datum.axis.z\",\n      \"kind\": \"explicit\",\n      \"name\": \"Z Axis\",\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"parameter_dependencies\": []\n    }\n  ],\n  \"datum_planes\": [\n    {\n      \"id\": \"datum.xy\",\n      \"kind\": \"xy\",\n      \"name\": \"XY\",\n      \"normal\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      },\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"x_axis\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"y_axis\": {\n        \"x\": 0.0,\n        \"y\": 1.0,\n        \"z\": 0.0\n      }\n    },\n    {\n      \"id\": \"datum.xz\",\n      \"kind\": \"xz\",\n      \"name\": \"XZ\",\n      \"normal\": {\n        \"x\": 0.0,\n        \"y\": -1.0,\n        \"z\": 0.0\n      },\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"x_axis\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"y_axis\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      }\n    },\n    {\n      \"id\": \"datum.yz\",\n      \"kind\": \"yz\",\n      \"name\": \"YZ\",\n      \"normal\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"x_axis\": {\n        \"x\": 0.0,\n        \"y\": 1.0,\n        \"z\": 0.0\n      },\n      \"y_axis\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      }\n    }\n  ],\n  \"derived_workplanes\": [],\n  \"document\": {\n    \"id\": \"part.create.another\",\n    \"name\": \"Create Another\"\n  },\n  \"draft_features\": [],\n  \"edge_treatments\": [],\n  \"features\": [],\n  \"loft_features\": [],\n  \"mirror_features\": [],\n  \"parameters\": [\n    {\n      \"id\": \"first.width\",\n      \"name\": \"first.width\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 20.0\n    },\n    {\n      \"id\": \"second.width\",\n      \"name\": \"second.width\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 12.0\n    },\n    {\n      \"id\": \"height\",\n      \"name\": \"height\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 10.0\n    },\n    {\n      \"id\": \"base.width\",\n      \"name\": \"base.width\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 30.0\n    },\n    {\n      \"id\": \"base.height\",\n      \"name\": \"base.height\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 30.0\n    },\n    {\n      \"id\": \"base.depth\",\n      \"name\": \"base.depth\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 20.0\n    }\n  ],\n  \"part_patterns\": [],\n  \"path_curves\": [],\n  \"reference_remaps\": [],\n  \"reference_statuses\": [],\n  \"revolve_features\": [],\n  \"schema\": \"blcad.part_document.mvp1\",\n  \"shell_features\": [],\n  \"sketch_origin_overrides\": [],\n  \"sketch_ownerships\": [],\n  \"sketches\": [\n    {\n      \"arc_closed_profiles\": [],\n      \"arc_segments\": [],\n      \"circle_profiles\": [],\n      \"circular_hole_patterns\": [],\n      \"closed_profiles\": [],\n      \"composite_closed_profiles\": [],\n      \"constraints\": [],\n      \"driving_dimensions\": [],\n      \"geometric_constraints\": [],\n      \"id\": \"first\",\n      \"line_segments\": [],\n      \"name\": \"first\",\n      \"projected_lines\": [],\n      \"projected_points\": [],\n      \"rectangle_profiles\": [\n        {\n          \"center\": {\n            \"x\": 0.0,\n            \"y\": 0.0\n          },\n          \"height_parameter\": \"height\",\n          \"id\": \"first.profile\",\n          \"width_parameter\": \"first.width\"\n        }\n      ],\n      \"reference_generated_lines\": [],\n      \"sketch_points\": [],\n      \"spline_segments\": [],\n      \"tangent_continuities\": [],\n      \"trim_extend_operations\": [],\n      \"workplane\": \"datum.xy\"\n    },\n    {\n      \"arc_closed_profiles\": [],\n      \"arc_segments\": [],\n      \"circle_profiles\": [],\n      \"circular_hole_patterns\": [],\n      \"closed_profiles\": [],\n      \"composite_closed_profiles\": [],\n      \"constraints\": [],\n      \"driving_dimensions\": [],\n      \"geometric_constraints\": [],\n      \"id\": \"second\",\n      \"line_segments\": [],\n      \"name\": \"second\",\n      \"projected_lines\": [],\n      \"projected_points\": [],\n      \"rectangle_profiles\": [\n        {\n          \"center\": {\n            \"x\": 40.0,\n            \"y\": 0.0\n          },\n          \"height_parameter\": \"height\",\n          \"id\": \"second.profile\",\n          \"width_parameter\": \"second.width\"\n        }\n      ],\n      \"reference_generated_lines\": [],\n      \"sketch_points\": [],\n      \"spline_segments\": [],\n      \"tangent_continuities\": [],\n      \"trim_extend_operations\": [],\n      \"workplane\": \"datum.xy\"\n    }\n  ],\n  \"sketches_3d\": [],\n  \"surface_features\": [],\n  \"sweep_features\": [],\n  \"version\": 1\n}"
+      },
+      {
+        "cache_state": "trial 0 is first measured workflow; trials 1-10 reuse the window after complete Apply/Cancel/Undo",
+        "device_pixel_ratio": 1,
+        "measurement": "synchronous Qt input dispatch, kernel work and UI event publication; fixture setup, startup and oracle checks excluded",
+        "platform": "xcb",
+        "process_peak_rss_kib": 225588,
+        "samples": [
+          {
+            "begin_ms": 11.916362,
+            "cancel_ms": 46.924543,
+            "create_another_ms": 61.98481,
+            "numeric_keyboard_input_ms": 23.221648,
+            "profile_keyboard_pick_ms": 88.699061,
+            "trial": 0
+          },
+          {
+            "begin_ms": 9.854288,
+            "cancel_ms": 43.467715,
+            "create_another_ms": 58.255248,
+            "numeric_keyboard_input_ms": 18.340532,
+            "profile_keyboard_pick_ms": 57.436741,
+            "trial": 1
+          },
+          {
+            "begin_ms": 4.442564,
+            "cancel_ms": 41.50291,
+            "create_another_ms": 52.844596,
+            "numeric_keyboard_input_ms": 20.003563,
+            "profile_keyboard_pick_ms": 44.294609,
+            "trial": 2
+          },
+          {
+            "begin_ms": 5.93157,
+            "cancel_ms": 42.173011,
+            "create_another_ms": 57.819604,
+            "numeric_keyboard_input_ms": 24.5845,
+            "profile_keyboard_pick_ms": 43.637688,
+            "trial": 3
+          },
+          {
+            "begin_ms": 5.580035,
+            "cancel_ms": 37.573882,
+            "create_another_ms": 56.782839,
+            "numeric_keyboard_input_ms": 20.695577,
+            "profile_keyboard_pick_ms": 49.433209,
+            "trial": 4
+          },
+          {
+            "begin_ms": 4.538195,
+            "cancel_ms": 42.167819,
+            "create_another_ms": 48.439938,
+            "numeric_keyboard_input_ms": 18.021742,
+            "profile_keyboard_pick_ms": 34.675959,
+            "trial": 5
+          },
+          {
+            "begin_ms": 5.199636,
+            "cancel_ms": 45.636517,
+            "create_another_ms": 49.491789,
+            "numeric_keyboard_input_ms": 16.207431,
+            "profile_keyboard_pick_ms": 38.353454,
+            "trial": 6
+          },
+          {
+            "begin_ms": 4.948943,
+            "cancel_ms": 38.061837,
+            "create_another_ms": 48.234887,
+            "numeric_keyboard_input_ms": 16.513592,
+            "profile_keyboard_pick_ms": 37.066491,
+            "trial": 7
+          },
+          {
+            "begin_ms": 4.887372,
+            "cancel_ms": 40.574556,
+            "create_another_ms": 59.682956,
+            "numeric_keyboard_input_ms": 24.113683,
+            "profile_keyboard_pick_ms": 44.689453,
+            "trial": 8
+          },
+          {
+            "begin_ms": 6.445944,
+            "cancel_ms": 36.942692,
+            "create_another_ms": 48.324377,
+            "numeric_keyboard_input_ms": 24.580451,
+            "profile_keyboard_pick_ms": 37.781279,
+            "trial": 9
+          },
+          {
+            "begin_ms": 6.519623,
+            "cancel_ms": 37.550236,
+            "create_another_ms": 51.292558,
+            "numeric_keyboard_input_ms": 20.890777,
+            "profile_keyboard_pick_ms": 49.163857,
+            "trial": 10
+          }
+        ],
+        "schema": "blcad.workflow-interaction-baseline.v1",
+        "source_json": "{\n  \"bodies\": [],\n  \"body_booleans\": [],\n  \"body_transforms\": [],\n  \"construction_lines\": [],\n  \"construction_planes\": [],\n  \"construction_points\": [],\n  \"datum_axes\": [\n    {\n      \"direction\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"id\": \"datum.axis.x\",\n      \"kind\": \"explicit\",\n      \"name\": \"X Axis\",\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"parameter_dependencies\": []\n    },\n    {\n      \"direction\": {\n        \"x\": 0.0,\n        \"y\": 1.0,\n        \"z\": 0.0\n      },\n      \"id\": \"datum.axis.y\",\n      \"kind\": \"explicit\",\n      \"name\": \"Y Axis\",\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"parameter_dependencies\": []\n    },\n    {\n      \"direction\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      },\n      \"id\": \"datum.axis.z\",\n      \"kind\": \"explicit\",\n      \"name\": \"Z Axis\",\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"parameter_dependencies\": []\n    }\n  ],\n  \"datum_planes\": [\n    {\n      \"id\": \"datum.xy\",\n      \"kind\": \"xy\",\n      \"name\": \"XY\",\n      \"normal\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      },\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"x_axis\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"y_axis\": {\n        \"x\": 0.0,\n        \"y\": 1.0,\n        \"z\": 0.0\n      }\n    },\n    {\n      \"id\": \"datum.xz\",\n      \"kind\": \"xz\",\n      \"name\": \"XZ\",\n      \"normal\": {\n        \"x\": 0.0,\n        \"y\": -1.0,\n        \"z\": 0.0\n      },\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"x_axis\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"y_axis\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      }\n    },\n    {\n      \"id\": \"datum.yz\",\n      \"kind\": \"yz\",\n      \"name\": \"YZ\",\n      \"normal\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"x_axis\": {\n        \"x\": 0.0,\n        \"y\": 1.0,\n        \"z\": 0.0\n      },\n      \"y_axis\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      }\n    }\n  ],\n  \"derived_workplanes\": [],\n  \"document\": {\n    \"id\": \"part.create.another\",\n    \"name\": \"Create Another\"\n  },\n  \"draft_features\": [],\n  \"edge_treatments\": [],\n  \"features\": [],\n  \"loft_features\": [],\n  \"mirror_features\": [],\n  \"parameters\": [\n    {\n      \"id\": \"first.width\",\n      \"name\": \"first.width\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 20.0\n    },\n    {\n      \"id\": \"second.width\",\n      \"name\": \"second.width\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 12.0\n    },\n    {\n      \"id\": \"height\",\n      \"name\": \"height\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 10.0\n    },\n    {\n      \"id\": \"base.width\",\n      \"name\": \"base.width\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 30.0\n    },\n    {\n      \"id\": \"base.height\",\n      \"name\": \"base.height\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 30.0\n    },\n    {\n      \"id\": \"base.depth\",\n      \"name\": \"base.depth\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 20.0\n    }\n  ],\n  \"part_patterns\": [],\n  \"path_curves\": [],\n  \"reference_remaps\": [],\n  \"reference_statuses\": [],\n  \"revolve_features\": [],\n  \"schema\": \"blcad.part_document.mvp1\",\n  \"shell_features\": [],\n  \"sketch_origin_overrides\": [],\n  \"sketch_ownerships\": [],\n  \"sketches\": [\n    {\n      \"arc_closed_profiles\": [],\n      \"arc_segments\": [],\n      \"circle_profiles\": [],\n      \"circular_hole_patterns\": [],\n      \"closed_profiles\": [],\n      \"composite_closed_profiles\": [],\n      \"constraints\": [],\n      \"driving_dimensions\": [],\n      \"geometric_constraints\": [],\n      \"id\": \"first\",\n      \"line_segments\": [],\n      \"name\": \"first\",\n      \"projected_lines\": [],\n      \"projected_points\": [],\n      \"rectangle_profiles\": [\n        {\n          \"center\": {\n            \"x\": 0.0,\n            \"y\": 0.0\n          },\n          \"height_parameter\": \"height\",\n          \"id\": \"first.profile\",\n          \"width_parameter\": \"first.width\"\n        }\n      ],\n      \"reference_generated_lines\": [],\n      \"sketch_points\": [],\n      \"spline_segments\": [],\n      \"tangent_continuities\": [],\n      \"trim_extend_operations\": [],\n      \"workplane\": \"datum.xy\"\n    },\n    {\n      \"arc_closed_profiles\": [],\n      \"arc_segments\": [],\n      \"circle_profiles\": [],\n      \"circular_hole_patterns\": [],\n      \"closed_profiles\": [],\n      \"composite_closed_profiles\": [],\n      \"constraints\": [],\n      \"driving_dimensions\": [],\n      \"geometric_constraints\": [],\n      \"id\": \"second\",\n      \"line_segments\": [],\n      \"name\": \"second\",\n      \"projected_lines\": [],\n      \"projected_points\": [],\n      \"rectangle_profiles\": [\n        {\n          \"center\": {\n            \"x\": 40.0,\n            \"y\": 0.0\n          },\n          \"height_parameter\": \"height\",\n          \"id\": \"second.profile\",\n          \"width_parameter\": \"second.width\"\n        }\n      ],\n      \"reference_generated_lines\": [],\n      \"sketch_points\": [],\n      \"spline_segments\": [],\n      \"tangent_continuities\": [],\n      \"trim_extend_operations\": [],\n      \"workplane\": \"datum.xy\"\n    }\n  ],\n  \"sketches_3d\": [],\n  \"surface_features\": [],\n  \"sweep_features\": [],\n  \"version\": 1\n}"
+      },
+      {
+        "cache_state": "trial 0 is first measured workflow; trials 1-10 reuse the window after complete Apply/Cancel/Undo",
+        "device_pixel_ratio": 1,
+        "measurement": "synchronous Qt input dispatch, kernel work and UI event publication; fixture setup, startup and oracle checks excluded",
+        "platform": "xcb",
+        "process_peak_rss_kib": 226596,
+        "samples": [
+          {
+            "begin_ms": 12.114416,
+            "cancel_ms": 42.431751,
+            "create_another_ms": 58.06,
+            "numeric_keyboard_input_ms": 18.941117,
+            "profile_keyboard_pick_ms": 88.746697,
+            "trial": 0
+          },
+          {
+            "begin_ms": 5.965335,
+            "cancel_ms": 42.231006,
+            "create_another_ms": 47.327196,
+            "numeric_keyboard_input_ms": 16.746742,
+            "profile_keyboard_pick_ms": 42.822034,
+            "trial": 1
+          },
+          {
+            "begin_ms": 4.812007,
+            "cancel_ms": 45.493065,
+            "create_another_ms": 56.886234,
+            "numeric_keyboard_input_ms": 18.627958,
+            "profile_keyboard_pick_ms": 43.055247,
+            "trial": 2
+          },
+          {
+            "begin_ms": 5.389602,
+            "cancel_ms": 43.213992,
+            "create_another_ms": 53.413789,
+            "numeric_keyboard_input_ms": 16.972367,
+            "profile_keyboard_pick_ms": 44.676406,
+            "trial": 3
+          },
+          {
+            "begin_ms": 5.769915,
+            "cancel_ms": 43.587926,
+            "create_another_ms": 50.802102,
+            "numeric_keyboard_input_ms": 17.462502,
+            "profile_keyboard_pick_ms": 41.830312,
+            "trial": 4
+          },
+          {
+            "begin_ms": 6.547432,
+            "cancel_ms": 43.312609,
+            "create_another_ms": 50.627954,
+            "numeric_keyboard_input_ms": 17.677707,
+            "profile_keyboard_pick_ms": 38.316078,
+            "trial": 5
+          },
+          {
+            "begin_ms": 4.483298,
+            "cancel_ms": 41.572778,
+            "create_another_ms": 53.83207,
+            "numeric_keyboard_input_ms": 19.480631,
+            "profile_keyboard_pick_ms": 38.404238,
+            "trial": 6
+          },
+          {
+            "begin_ms": 4.676322,
+            "cancel_ms": 40.041535,
+            "create_another_ms": 50.880553,
+            "numeric_keyboard_input_ms": 17.976134,
+            "profile_keyboard_pick_ms": 42.067013,
+            "trial": 7
+          },
+          {
+            "begin_ms": 5.887677,
+            "cancel_ms": 39.661615,
+            "create_another_ms": 49.394901,
+            "numeric_keyboard_input_ms": 17.059691,
+            "profile_keyboard_pick_ms": 44.609906,
+            "trial": 8
+          },
+          {
+            "begin_ms": 5.864161,
+            "cancel_ms": 42.038166,
+            "create_another_ms": 52.085751,
+            "numeric_keyboard_input_ms": 19.978129,
+            "profile_keyboard_pick_ms": 36.889709,
+            "trial": 9
+          },
+          {
+            "begin_ms": 5.671464,
+            "cancel_ms": 42.19416,
+            "create_another_ms": 52.257414,
+            "numeric_keyboard_input_ms": 20.220371,
+            "profile_keyboard_pick_ms": 38.469345,
+            "trial": 10
+          }
+        ],
+        "schema": "blcad.workflow-interaction-baseline.v1",
+        "source_json": "{\n  \"bodies\": [],\n  \"body_booleans\": [],\n  \"body_transforms\": [],\n  \"construction_lines\": [],\n  \"construction_planes\": [],\n  \"construction_points\": [],\n  \"datum_axes\": [\n    {\n      \"direction\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"id\": \"datum.axis.x\",\n      \"kind\": \"explicit\",\n      \"name\": \"X Axis\",\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"parameter_dependencies\": []\n    },\n    {\n      \"direction\": {\n        \"x\": 0.0,\n        \"y\": 1.0,\n        \"z\": 0.0\n      },\n      \"id\": \"datum.axis.y\",\n      \"kind\": \"explicit\",\n      \"name\": \"Y Axis\",\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"parameter_dependencies\": []\n    },\n    {\n      \"direction\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      },\n      \"id\": \"datum.axis.z\",\n      \"kind\": \"explicit\",\n      \"name\": \"Z Axis\",\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"parameter_dependencies\": []\n    }\n  ],\n  \"datum_planes\": [\n    {\n      \"id\": \"datum.xy\",\n      \"kind\": \"xy\",\n      \"name\": \"XY\",\n      \"normal\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      },\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"x_axis\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"y_axis\": {\n        \"x\": 0.0,\n        \"y\": 1.0,\n        \"z\": 0.0\n      }\n    },\n    {\n      \"id\": \"datum.xz\",\n      \"kind\": \"xz\",\n      \"name\": \"XZ\",\n      \"normal\": {\n        \"x\": 0.0,\n        \"y\": -1.0,\n        \"z\": 0.0\n      },\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"x_axis\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"y_axis\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      }\n    },\n    {\n      \"id\": \"datum.yz\",\n      \"kind\": \"yz\",\n      \"name\": \"YZ\",\n      \"normal\": {\n        \"x\": 1.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"origin\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 0.0\n      },\n      \"x_axis\": {\n        \"x\": 0.0,\n        \"y\": 1.0,\n        \"z\": 0.0\n      },\n      \"y_axis\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"z\": 1.0\n      }\n    }\n  ],\n  \"derived_workplanes\": [],\n  \"document\": {\n    \"id\": \"part.create.another\",\n    \"name\": \"Create Another\"\n  },\n  \"draft_features\": [],\n  \"edge_treatments\": [],\n  \"features\": [],\n  \"loft_features\": [],\n  \"mirror_features\": [],\n  \"parameters\": [\n    {\n      \"id\": \"first.width\",\n      \"name\": \"first.width\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 20.0\n    },\n    {\n      \"id\": \"second.width\",\n      \"name\": \"second.width\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 12.0\n    },\n    {\n      \"id\": \"height\",\n      \"name\": \"height\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 10.0\n    },\n    {\n      \"id\": \"base.width\",\n      \"name\": \"base.width\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 30.0\n    },\n    {\n      \"id\": \"base.height\",\n      \"name\": \"base.height\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 30.0\n    },\n    {\n      \"id\": \"base.depth\",\n      \"name\": \"base.depth\",\n      \"scope\": \"part\",\n      \"type\": \"length\",\n      \"unit\": \"mm\",\n      \"value\": 20.0\n    }\n  ],\n  \"part_patterns\": [],\n  \"path_curves\": [],\n  \"reference_remaps\": [],\n  \"reference_statuses\": [],\n  \"revolve_features\": [],\n  \"schema\": \"blcad.part_document.mvp1\",\n  \"shell_features\": [],\n  \"sketch_origin_overrides\": [],\n  \"sketch_ownerships\": [],\n  \"sketches\": [\n    {\n      \"arc_closed_profiles\": [],\n      \"arc_segments\": [],\n      \"circle_profiles\": [],\n      \"circular_hole_patterns\": [],\n      \"closed_profiles\": [],\n      \"composite_closed_profiles\": [],\n      \"constraints\": [],\n      \"driving_dimensions\": [],\n      \"geometric_constraints\": [],\n      \"id\": \"first\",\n      \"line_segments\": [],\n      \"name\": \"first\",\n      \"projected_lines\": [],\n      \"projected_points\": [],\n      \"rectangle_profiles\": [\n        {\n          \"center\": {\n            \"x\": 0.0,\n            \"y\": 0.0\n          },\n          \"height_parameter\": \"height\",\n          \"id\": \"first.profile\",\n          \"width_parameter\": \"first.width\"\n        }\n      ],\n      \"reference_generated_lines\": [],\n      \"sketch_points\": [],\n      \"spline_segments\": [],\n      \"tangent_continuities\": [],\n      \"trim_extend_operations\": [],\n      \"workplane\": \"datum.xy\"\n    },\n    {\n      \"arc_closed_profiles\": [],\n      \"arc_segments\": [],\n      \"circle_profiles\": [],\n      \"circular_hole_patterns\": [],\n      \"closed_profiles\": [],\n      \"composite_closed_profiles\": [],\n      \"constraints\": [],\n      \"driving_dimensions\": [],\n      \"geometric_constraints\": [],\n      \"id\": \"second\",\n      \"line_segments\": [],\n      \"name\": \"second\",\n      \"projected_lines\": [],\n      \"projected_points\": [],\n      \"rectangle_profiles\": [\n        {\n          \"center\": {\n            \"x\": 40.0,\n            \"y\": 0.0\n          },\n          \"height_parameter\": \"height\",\n          \"id\": \"second.profile\",\n          \"width_parameter\": \"second.width\"\n        }\n      ],\n      \"reference_generated_lines\": [],\n      \"sketch_points\": [],\n      \"spline_segments\": [],\n      \"tangent_continuities\": [],\n      \"trim_extend_operations\": [],\n      \"workplane\": \"datum.xy\"\n    }\n  ],\n  \"sketches_3d\": [],\n  \"surface_features\": [],\n  \"sweep_features\": [],\n  \"version\": 1\n}"
+      }
+    ]
+  }
+}

@@ -40,6 +40,7 @@ bool distance_extent(ExtrudeExtentMode mode) {
 void ShellFeatureTools::clear_extrude_diagnostics() {
   for (auto* group : {extrude_geometry_group_, extrude_behavior_group_, extrude_advanced_group_})
     group->set_diagnostic({});
+  extrude_profile_selector_->set_diagnostic({});
   extrude_first_selector_->set_diagnostic({});
   extrude_second_selector_->set_diagnostic({});
 }
@@ -57,6 +58,17 @@ void ShellFeatureTools::build_extrude_controls(QWidget* panel) {
                                                    QStringLiteral("Advanced"), extrude_controls_);
   for (auto* group : {extrude_geometry_group_, extrude_behavior_group_, extrude_advanced_group_})
     column->addWidget(group);
+  extrude_profile_ = new QComboBox(&extrude_geometry_group_->content());
+  extrude_profile_->setObjectName("blcad.extrude.profile");
+  extrude_profile_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+  extrude_profile_->setMinimumContentsLength(15);
+  extrude_profile_selector_ = new ShellPropertySelector(
+      "blcad.extrude.profile.selector", QStringLiteral("Profile / Open Line"), *extrude_profile_,
+      *this, [this](bool active) { set_extrude_profile_picking(active); },
+      &extrude_geometry_group_->content());
+  extrude_geometry_group_->content_layout().addWidget(extrude_profile_selector_);
+  connect(extrude_profile_, &QComboBox::currentIndexChanged, this,
+          [this] { change_extrude_profile(); });
   extrude_profile_summary_ = new QLabel(&extrude_geometry_group_->content());
   extrude_profile_summary_->setObjectName("blcad.extrude.profile_summary");
   extrude_profile_summary_->setTextFormat(Qt::PlainText);
@@ -191,7 +203,7 @@ void ShellFeatureTools::reset_extrude_controls(GuiFeatureManipulatorFrame frame)
   extrude_extent_->setCurrentIndex(0);
   extrude_operation_->setCurrentIndex(0);
   extrude_direction_->setCurrentIndex(0);
-  if (coordinator_.extrude().uses_open_line())
+  if (!awaiting_extrude_source() && coordinator_.extrude().uses_open_line())
     extrude_direction_->removeItem(2);
   else if (extrude_direction_->count() < 3)
     extrude_direction_->addItem(QStringLiteral("Along Path"));
@@ -343,17 +355,27 @@ void ShellFeatureTools::update_extrude_pick_mode() {
     return;
   const QScopedValueRollback guard(synchronizing_extrude_selection_, true);
   const bool picking = extrude_pick_role_->currentIndex() > 0;
+  if (picking)
+    extrude_profile_picking_ = false;
+  extrude_profile_selector_->set_active(extrude_profile_picking_);
   extrude_first_selector_->set_active(extrude_pick_role_->currentIndex() == 1);
   extrude_second_selector_->set_active(extrude_pick_role_->currentIndex() == 2);
   const bool changed = picking != extrude_reference_picking_;
   extrude_reference_picking_ = picking;
+  if (extrude_profile_picking_) {
+    viewport_.set_selection_semantic_scope(std::nullopt);
+    viewport_.set_selection_filter_mask(selection_kind_bit(GuiSelectionKind::SketchEntity));
+    if (changed)
+      window_.refresh_feature_selection_scene();
+    return;
+  }
   if (picking) {
     std::vector<std::string> scope;
     for (const auto& item : extrude_face_items_)
       scope.push_back(item.semantic_id);
     viewport_.set_selection_filter_mask(selection_kind_bit(GuiSelectionKind::Face));
     viewport_.set_selection_semantic_scope(std::move(scope));
-  } else if (changed) {
+  } else {
     viewport_.set_selection_semantic_scope(previous_semantic_scope_);
     viewport_.set_selection_filter_mask(previous_selection_mask_);
   }
@@ -441,7 +463,7 @@ void ShellFeatureTools::invalidate_extrude_preview() {
 }
 
 void ShellFeatureTools::refresh_extrude_preview() {
-  if (editing_source_sketch_)
+  if (editing_source_sketch_ || awaiting_extrude_source())
     return;
   if (command_ != Command::Extrude)
     return;
@@ -461,6 +483,10 @@ Result<std::size_t> ShellFeatureTools::configure_extrude_candidate() {
   };
   if (editing_source_sketch_)
     return fail("Finish the source Sketch before applying Extrude.", extrude_geometry_group_);
+  if (awaiting_extrude_source())
+    return fail("Select a profile or single open line.", extrude_geometry_group_);
+  if (extrude_direction_->currentIndex() < 0)
+    return fail("Choose a compatible extrusion direction.");
   if (extrude_source_) {
     const auto plane = sketch_workbench_.plane_view(session_, extrude_source_->sketch);
     if (!plane)
