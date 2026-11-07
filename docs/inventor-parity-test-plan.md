@@ -237,6 +237,14 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
 ### R02 Physical properties in transformed assemblies
 
 - **First gate:** 150; native completion 151; extend 193.
+- 150B `[assembly-physical-properties]` checks repeated and nested occurrences against independent
+  root-frame centroid/tensor oracles, including hidden active parents/components, suppression,
+  unused definitions and one integration per participating Part definition. Core
+  `[assembly-physical-participation]` verifies unchanged default presentation filtering and stable
+  physical ordering. Missing-density contributions retain a separate known-subset centroid.
+  Pose/material/lifetime changes invalidate immutable snapshots; duplicate ownership, unsynchronized
+  resources and active broken imports fail without publishing partial totals. Real STEP-source
+  changes invalidate both Part and repeated hidden-occurrence Project results.
 - 150A `[physical-properties]` supplies independently checked Part/shape oracles: boxes/cylinder,
   central and reconstructed principal tensors, large coordinates, rotation/scale/reflection,
   asymmetric differently weighted hidden Bodies, unavailable/partial/missing-density mass,

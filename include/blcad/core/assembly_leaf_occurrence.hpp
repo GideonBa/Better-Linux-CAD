@@ -22,12 +22,15 @@ struct AssemblyLeafOccurrenceDescriptor {
                          const AssemblyLeafOccurrenceDescriptor&) = default;
 };
 
-// Flattens visible active component leaves from the deterministic root hierarchy.
-// Hidden/suppressed subassembly paths and hidden/suppressed components are absent.
+enum class AssemblyLeafParticipation { VisibleActive, PhysicalActive };
+
+// The default preserves visible-active presentation/export. PhysicalActive also
+// includes hidden active paths/components; suppression always excludes a leaf.
 class AssemblyLeafOccurrenceResolver {
 public:
   [[nodiscard]] Result<std::vector<AssemblyLeafOccurrenceDescriptor>>
-  resolve(const Project& project) const;
+  resolve(const Project& project,
+          AssemblyLeafParticipation participation = AssemblyLeafParticipation::VisibleActive) const;
 };
 
 } // namespace blcad

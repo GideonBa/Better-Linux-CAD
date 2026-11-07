@@ -1,5 +1,6 @@
 #include "blcad/core/assembly_leaf_occurrence.hpp"
 
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 
 using namespace blcad;
@@ -152,4 +153,36 @@ TEST_CASE("Assembly leaf occurrence resolver filters root and nested hidden or s
   CHECK(leaves.value().front().subassembly_path.empty());
   CHECK(leaves.value().front().component_instance.value() == "component.root.visible");
   REQUIRE(leaves.value().front().transforms_inner_to_outer.size() == 1U);
+}
+
+TEST_CASE("Physical leaf participation includes hidden active paths and components without "
+          "changing presentation",
+          "[core][parity-b150][assembly-physical-participation]") {
+  const auto p = make_project(false);
+  const auto visible = AssemblyLeafOccurrenceResolver{}.resolve(p);
+  const auto physical =
+      AssemblyLeafOccurrenceResolver{}.resolve(p, AssemblyLeafParticipation::PhysicalActive);
+  REQUIRE(visible);
+  REQUIRE(physical);
+  CHECK(visible.value().size() == 4);
+  CHECK(physical.value().size() == 9);
+  for (const auto& leaf : physical.value()) {
+    REQUIRE(leaf.subassembly_path.size() == 1);
+    CHECK(leaf.subassembly_path.front().value() != "subassembly.suppressed");
+    CHECK(leaf.component_instance.value() != "component.suppressed");
+  }
+  CHECK(std::any_of(physical.value().begin(), physical.value().end(), [](const auto& leaf) {
+    return leaf.subassembly_path.front() == SubassemblyInstanceId("subassembly.hidden") &&
+           leaf.component_instance == ComponentInstanceId("component.hidden");
+  }));
+  const auto reverse = AssemblyLeafOccurrenceResolver{}.resolve(
+      make_project(true), AssemblyLeafParticipation::PhysicalActive);
+  REQUIRE(reverse);
+  CHECK(reverse.value() == physical.value());
+}
+
+TEST_CASE("Assembly physical participation rejects unknown policies",
+          "[core][parity-b150][assembly-physical-participation]") {
+  CHECK_FALSE(AssemblyLeafOccurrenceResolver{}.resolve(make_project(false),
+                                                       static_cast<AssemblyLeafParticipation>(99)));
 }

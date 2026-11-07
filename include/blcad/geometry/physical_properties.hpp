@@ -1,5 +1,6 @@
 #pragma once
 
+#include "blcad/core/assembly_leaf_occurrence.hpp"
 #include "blcad/core/body.hpp"
 #include "blcad/core/engineering_resource.hpp"
 #include "blcad/core/result.hpp"
@@ -13,6 +14,7 @@
 
 namespace blcad {
 class PartDocument;
+class Project;
 }
 namespace blcad::geometry {
 class GeometryShape;
@@ -55,8 +57,7 @@ struct BodyPhysicalProperties {
   BodyPhysicalMassStatus mass_status = BodyPhysicalMassStatus::NotSolid;
   std::optional<PhysicalMassProperties> mass;
 };
-struct PartPhysicalPropertiesData {
-  std::vector<BodyPhysicalProperties> bodies;
+struct PhysicalPropertiesTotals {
   double area_mm2 = 0;
   double volume_mm3 = 0;
   std::optional<Point3> volume_centroid_mm;
@@ -70,6 +71,18 @@ struct PartPhysicalPropertiesData {
   [[nodiscard]] const PhysicalMassProperties* complete_mass() const noexcept {
     return mass_status == PhysicalMassStatus::Complete && known_mass ? &*known_mass : nullptr;
   }
+};
+struct PartPhysicalPropertiesData : PhysicalPropertiesTotals {
+  std::vector<BodyPhysicalProperties> bodies;
+};
+struct PhysicalOccurrenceProperties {
+  AssemblyLeafOccurrenceDescriptor occurrence;
+  std::string name;
+  std::vector<BodyPhysicalProperties> bodies;
+};
+struct ProjectPhysicalPropertiesData : PhysicalPropertiesTotals {
+  std::vector<PhysicalOccurrenceProperties> occurrences;
+  std::size_t computed_part_count = 0;
 };
 
 // Raw shape integration makes no document freshness claim.
@@ -92,5 +105,25 @@ private:
   PartPhysicalPropertiesData data_;
   std::string source_;
   std::uint64_t generation_;
+};
+class ProjectPhysicalProperties {
+public:
+  [[nodiscard]] const ProjectPhysicalPropertiesData& data() const noexcept {
+    return data_;
+  }
+  [[nodiscard]] Result<std::size_t>
+  validate_current(const Project& project, StepImportTopologyContext* imports = nullptr) const;
+
+private:
+  friend class BodyResultInspector;
+  struct PartSnapshot {
+    DocumentId document;
+    PartPhysicalProperties properties;
+  };
+  ProjectPhysicalProperties(ProjectPhysicalPropertiesData data, std::string source,
+                            std::vector<PartSnapshot> parts);
+  ProjectPhysicalPropertiesData data_;
+  std::string source_;
+  std::vector<PartSnapshot> parts_;
 };
 } // namespace blcad::geometry
