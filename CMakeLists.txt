@@ -58,6 +58,7 @@ add_library(
   src/core/edge_treatment_feature.cpp
   src/core/engineering_quantity.cpp
   src/core/engineering_resource.cpp
+  src/core/engineering_resource_json.cpp
   src/core/dependency_graph.cpp
   src/core/error.cpp
   src/core/feature.cpp
@@ -70,6 +71,8 @@ add_library(
   src/core/part_document.cpp
   src/core/part_feature_history.cpp
   src/core/part_document_json.cpp
+  src/core/part_materials.cpp
+  src/core/part_material_json.cpp
   src/core/part_feature_input_reference.cpp
   src/core/parameter.cpp
   src/core/parameter_expression.cpp
@@ -494,6 +497,8 @@ if(BLCAD_BUILD_TESTS)
     tests/core/projected_sketch_reference_tests.cpp
     tests/core/quantity_tests.cpp
     tests/core/engineering_resource_tests.cpp
+    tests/core/engineering_resource_json_tests.cpp
+    tests/core/part_materials_tests.cpp
     tests/core/shell_feature_tests.cpp
     tests/core/part_feature_input_reference_tests.cpp
     tests/core/part_pattern_feature_tests.cpp

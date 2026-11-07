@@ -1,3 +1,4 @@
+#include "../support/engineering_resource_fixture.hpp"
 #include "../support/part_history_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/assembly_interference_analyzer.hpp"
@@ -587,4 +588,36 @@ TEST_CASE("Modeling presentations require an explicitly matching prefix and keep
     unavailable(ViewportSceneBuilder{}.build_part(part, cache, count));
     CHECK(checked(serialize_part_document_to_json(part)) == source);
   }
+}
+
+TEST_CASE("Material snapshots retain physical geometry while complete history caches require "
+          "current source",
+          "[geometry][parity-b149][resource-history-geometry]") {
+  auto part = fixture::native_base();
+  REQUIRE(part.apply_history_intent({{"base"}, {}}));
+  auto original = evaluate(part);
+  const auto before = checked(ViewportSceneBuilder{}.build_part(part, original));
+  blcad::test::engineering_fixture::annotate(part);
+  CHECK_FALSE(original.validate_complete_history_result(part));
+  auto current = evaluate(part);
+  same_bodies(part, original, part, current);
+  CHECK(RectangleExtrusionAdapter{}
+            .summarize(*current.find_body_shape(BodyId("body.base")))
+            .volume_mm3 == Catch::Approx(1600));
+  const auto scene = checked(ViewportSceneBuilder{}.build_part(part, current));
+  REQUIRE(scene.size() == before.size());
+  for (std::size_t i = 0; i < scene.size(); ++i)
+    CHECK(scene[i].semantic_id == before[i].semantic_id);
+  const auto source = checked(serialize_part_document_to_json(part));
+  const auto reopened = checked(deserialize_part_document_from_json(source));
+  auto replay = evaluate(reopened);
+  same_bodies(part, current, reopened, replay);
+  REQUIRE(reopened.effective_material_for_body(BodyId("body.base")));
+  CHECK(reopened.effective_material_for_body(BodyId("body.base"))->key() ==
+        blcad::test::engineering_fixture::key());
+  auto suppressed = checked(reopened.with_history_intent({{"base"}, {"base"}}));
+  auto absent = evaluate(suppressed);
+  CHECK(absent.body_shape_count() == 0);
+  CHECK(suppressed.default_material() == part.default_material());
+  CHECK(suppressed.engineering_resources() == part.engineering_resources());
 }

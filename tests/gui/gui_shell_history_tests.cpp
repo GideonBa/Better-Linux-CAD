@@ -1,3 +1,4 @@
+#include "../support/engineering_resource_fixture.hpp"
 #include "../support/part_history_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/step_import_freshness.hpp"
@@ -1246,4 +1247,57 @@ TEST_CASE(
   CHECK(volume("body.base") == Catch::Approx(original_volume).margin(1e-6));
   CHECK(volume("body.unrelated") == Catch::Approx(1600));
   capture(w, "history-mixed-chain-complete");
+}
+
+TEST_CASE("Resource-bearing Part prefix creation preserves pins Save Undo and default inheritance",
+          "[gui][parity-b149][resource-history-shell][engineering-resource-integration]") {
+  QTemporaryDir directory;
+  auto part = prefix_part();
+  blcad::test::engineering_fixture::annotate(part);
+  ShellWindow w;
+  open(w, directory, std::move(part));
+  const auto before = snapshot(w);
+  CHECK(nlohmann::json::parse(before).at("version") == 3);
+  context(w, "fillet", w.history_tools().marker_before_action());
+  edit_prefix_depth(w, 4);
+  quick(w, "save");
+  CHECK(checked(serialize_part_document_to_json(
+            checked(read_part_document_json_file(w.session().file_path().string())))) == before);
+  click(control<QPushButton>(w, "blcad.history.prefix_cancel"));
+  CHECK(snapshot(w) == before);
+  context(w, "fillet", w.history_tools().marker_before_action());
+  quick(w, "extrude");
+  auto& profiles = control<QComboBox>(w, "blcad.extrude.profile");
+  profiles.setFocus();
+  key(profiles, Qt::Key_Home);
+  REQUIRE(control<QPushButton>(w, "blcad.feature.apply").isEnabled());
+  click(control<QPushButton>(w, "blcad.feature.apply"));
+  REQUIRE(w.history_tools().prefix_active());
+  quick(w, "save");
+  CHECK(checked(serialize_part_document_to_json(
+            checked(read_part_document_json_file(w.session().file_path().string())))) == before);
+  click(control<QPushButton>(w, "blcad.history.prefix_apply"));
+  REQUIRE(w.session().derived_results_fresh());
+  const auto& result = *w.session().part_document();
+  REQUIRE(result.bodies().size() == 3);
+  CHECK(result.effective_material_for_body(BodyId("body.tool"))->key() ==
+        blcad::test::engineering_fixture::key("synthetic.material", "r2"));
+  for (const auto& body : result.bodies())
+    if (body.id() != BodyId("body.tool")) {
+      REQUIRE(result.effective_material_for_body(body.id()));
+      CHECK(result.effective_material_for_body(body.id())->key() ==
+            blcad::test::engineering_fixture::key());
+    }
+  const auto after = snapshot(w);
+  capture(w, "resource-prefix-inheritance");
+  quick(w, "undo");
+  CHECK(snapshot(w) == before);
+  CHECK_FALSE(w.session().can_undo());
+  quick(w, "redo");
+  CHECK(snapshot(w) == after);
+  quick(w, "save");
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(w.session().file_path()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == after);
+  CHECK(reopened.derived_results_fresh());
 }

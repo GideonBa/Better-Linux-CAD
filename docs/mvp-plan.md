@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 148
 current_block: 149
-current_boundary: Block 149A verified; document resource pins and persistence next
+current_boundary: Block 149B1 verified; Project resource ownership and coordinated updates remain
 current_tag: "[parity-b149]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -34,7 +34,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 148
-current block        Block 149 (in progress; slice A)
+current block        Block 149 (in progress; slice B1)
 current phase        Engineering resources and material assignment
 current boundary     Revision-pinned material and standards resources
 ```
@@ -2184,7 +2184,9 @@ one common resource store for later Hole/Thread tables, not independent per-modu
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 149A | Typed density/engineering pressure, per-value provenance, immutable Material and typed standards-table revisions, duplicate/conflict rules and atomic catalog merge; synthetic Core tests | Delivered via PR #152 |
-| 149B | Standalone Part snapshots, Part default/Body overrides, Project resource deduplication, strict versioned JSON and offline/legacy compatibility | Planned; not started |
+| 149B | Standalone Part snapshots, Part default/Body overrides, Project resource deduplication, strict versioned JSON and offline/legacy compatibility | In progress; B1/B2 below |
+| 149B1 | Shared strict resource JSON and standalone Part version 3 with material pins; preserve history/result-face loading; conservative Project-v1 serialization boundary | Implemented and verified; PR #153 |
+| 149B2 | Project resource ownership/deduplication, versioned Project persistence and offline member portability; replace B1's temporary project boundary | Planned; not started |
 | 149C | Explicit coordinated revision updates, referenced-resource removal guards and atomic multi-document rollback/freshness evidence through existing mutation authorities | Planned; not started |
 
 149A adds no document assignment, writer/schema, material UI, mass query or capability promotion.
@@ -2206,6 +2208,29 @@ normal delivery/confirmed merge and refreshed-main/tree comparison precede 149B.
 149A delivery: [PR #152](https://github.com/GideonBa/Better-Linux-CAD/pull/152), implementation
 `830e449`. The delivery-record update changes documentation only and preserves all 981 runtime
 fingerprints. Confirm normal merge and compare refreshed main with the reviewed tree before 149B.
+
+
+149B1 starts on `feat/part-engineering-resources` from verified merged main `21bb116` (PR #152),
+after exact reviewed-tree comparison. B is split serially because standalone Part and Project
+resource ownership introduce separate persistence contracts. B1 adds Part pins and the shared
+strict catalog codec, retaining resources through typed history replay and advanced support loading.
+Project-v1 read/write explicitly rejects resource-bearing Parts until B2 supplies deduplicated
+Project ownership/versioning; legacy resource-free Projects remain supported. Whole B/149 remain
+open. `file-format.md` specifies version 3 before the writer; GUI/mass capability remains pending.
+
+149B1 is implemented and verified: full Core **643 / 25,070**, Geometry **576 / 51,923**,
+offscreen GUI **684 passed / 37 native-only skips / 90,001 assertions**, native 100%
+**81 / 6,615** and compact native 150% **16 / 1,131**, without failures. Both native runs have no
+skips; raw resource/history captures are visually reviewed. Exact commands, final runtime freeze
+and startup/inventory evidence remain in `development-setup.md`. Shared typed resource JSON,
+Part-v3 pins and history retention are accepted for this slice only. Project-v1 explicitly
+rejects these members until B2 supplies shared ownership; C still owns coordinated updates.
+Implemented-through stays 148, whole 149 remains in progress and material UI stays planned for 151.
+Complete normal PR delivery/confirmed merge and refreshed-main/tree comparison before B2.
+
+149B1 delivery: [PR #153](https://github.com/GideonBa/Better-Linux-CAD/pull/153), implementation
+`4ff157f`. The delivery-record update changes documentation only and preserves all 990 runtime
+fingerprints. Confirm normal merge and compare refreshed main with the reviewed tree before B2.
 
 ## Later phases
 

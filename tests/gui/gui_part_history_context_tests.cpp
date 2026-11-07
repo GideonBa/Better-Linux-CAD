@@ -1,3 +1,4 @@
+#include "../support/engineering_resource_fixture.hpp"
 #include "../support/part_history_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/step_import_freshness.hpp"
@@ -683,4 +684,37 @@ TEST_CASE("The existing Extrude controller previews and stages a child before an
   REQUIRE(session.undo());
   CHECK(snapshot(session) == before);
   CHECK_FALSE(session.can_undo());
+}
+
+TEST_CASE("Part resource assignments survive session history and malformed resource Open is atomic",
+          "[gui][parity-b149][engineering-resource-integration]") {
+  QTemporaryDir directory;
+  auto part = machining();
+  blcad::test::engineering_fixture::annotate(part);
+  auto session = open(part, directory);
+  const auto before = snapshot(session);
+  REQUIRE(session.commit_part_transaction("Change default material", [](PartDocument& p) {
+    return p.set_default_material(
+        blcad::test::engineering_fixture::key("synthetic.material", "r2"));
+  }));
+  const auto after = snapshot(session);
+  CHECK(after != before);
+  CHECK(session.derived_results_fresh());
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == before);
+  REQUIRE(session.redo());
+  CHECK(snapshot(session) == after);
+  REQUIRE(session.save());
+  const auto path = session.file_path();
+  const auto bad = directory.filePath("bad-resource.blcad.json").toStdString();
+  {
+    std::ofstream output(bad);
+    output << "{\"schema\":\"blcad.part_document.mvp1\",\"version\":3,\"history_version\":1}";
+  }
+  CHECK_FALSE(session.open_file(bad, true));
+  CHECK(snapshot(session) == after);
+  CHECK(session.file_path() == path);
+  CHECK(session.derived_results_fresh());
+  REQUIRE(session.undo());
+  CHECK(snapshot(session) == before);
 }

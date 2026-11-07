@@ -60,6 +60,29 @@ identical-key deduplication, conflicting immutable revisions, kind collisions, c
 and late-conflict atomic merge. Legacy document bytes are covered by the unchanged full Core suite.
 No Part/Project resource field is written by 149A; whole-block status stays in `mvp-plan.md`.
 
+
+## Part material pins — Block 149B1 contract
+
+An editable Part owns a snapshot of the same `EngineeringResourceCatalog`. `add_engineering_resource`
+uses its collision rules; default and Body pins explicitly reference a Material key. Table keys,
+unknown keys and unknown Bodies reject mutation. Effective assignment is Body override → Part
+default → unassigned. Clearing an override restores default inheritance. Material without density
+is assignable but still has no available mass. Names/appearance do not select a material.
+
+Pins and unused immutable revisions survive copies, history reorder/suppression, JSON preview
+cloning, Save/Open and result-face support staging. Removing an otherwise removable Body clears
+that Body's override after all dependency checks pass; reusing the ID cannot resurrect the pin.
+Reference Parts reject engineering-resource authoring; an Editable copy is the supported target.
+Resource/pin edits do not change executable lifetime generation or geometric dependency edges.
+Geometry recompute/source freshness still follows the existing session pipeline; B1 adds no mass
+cache or metadata-only cache-certification shortcut.
+
+Part default/Body setters publish a complete validated value or fail without mutation. Catalog
+removal and coordinated Project updates remain 149C. B2 supplies Project-owned deduplication and
+portable member snapshots; B1's Project-v1 serialization rejects resource-bearing members rather
+than dropping or ambiguously duplicating their revision ownership. The exact codec/migration is
+owned by `file-format.md`.
+
 ## Planned modules
 
 | Module | Function |
