@@ -254,4 +254,12 @@ EngineeringResourceCatalog::merge_from(const EngineeringResourceCatalog& source)
   *this = std::move(candidate);
   return Result<std::size_t>::success(added);
 }
+Result<std::size_t> EngineeringResourceCatalog::remove(const EngineeringResourceKey& key) {
+  const auto valid = EngineeringResourceKey::create(key.id(), key.revision());
+  if (!valid)
+    return Result<std::size_t>::failure(valid.error());
+  const auto owned_key = valid.value();
+  return Result<std::size_t>::success(std::erase_if(
+      entries_, [&](const auto& entry) { return engineering_resource_key(entry) == owned_key; }));
+}
 } // namespace blcad

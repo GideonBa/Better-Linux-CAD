@@ -173,6 +173,14 @@ therefore uses the existing candidate/recompute pipeline, preserving pinned meta
 disposable member caches. No Project-specific alternative geometry cache, partial certification or
 material-only BRep reuse is introduced by this persistence slice.
 
+149C revision adoption/removal preserves executable generation and geometric dependency edges.
+An adopted resource or removed unused revision still changes canonical source JSON, invalidating
+an older explicit-history seal. Failed adoption/removal leaves that seal valid for the unchanged
+document; copied prior snapshots retain their own valid results. Geometry checks compare physical
+volume/bounds and semantic scene identities across adoption, removal and reopening. Session batch
+publication/Undo/Redo use existing full candidate recompute; this does not claim material-only
+BRep reuse before 150.
+
 ## Validation
 
 Current rules:

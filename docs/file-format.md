@@ -188,6 +188,12 @@ that synchronization on their disposable candidate before recompute/publication.
 geometry, source-sidecar ownership or assembly occurrence identity. Coordinated revision switching
 and referenced-resource removal remain 149C; materials/physical-properties UI remains 151.
 
+149C revision adoption/removal adds no field or version. Only final immutable catalog snapshots,
+ordered member reference lists and explicit material pins are persisted. Old revisions are retained
+on adoption; removing the final unused resources/pins returns the existing legacy writer selection.
+No update command, external-library lookup, tombstone, derived mass or cache stamp is serialized.
+Exact remap/removal/atomicity rules remain in `engineering-modules.md`.
+
 ## Project structure
 
 ```text

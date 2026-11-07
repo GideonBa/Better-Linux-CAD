@@ -181,6 +181,10 @@ public:
     return engineering_resources_;
   }
   [[nodiscard]] Result<std::size_t> add_engineering_resource(EngineeringResource resource);
+  [[nodiscard]] Result<std::size_t>
+  adopt_engineering_resource_revision(const EngineeringResourceKey& source,
+                                      EngineeringResource replacement);
+  [[nodiscard]] Result<std::size_t> remove_engineering_resource(const EngineeringResourceKey& key);
   [[nodiscard]] const std::optional<EngineeringResourceKey>& default_material() const noexcept {
     return default_material_;
   }

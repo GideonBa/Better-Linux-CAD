@@ -1,9 +1,9 @@
 # Engineering Modules
 
-Engineering assistants remain target architecture. Block 149A supplies the shared typed resource
-foundation; 149B adds document pins and Part/Project persistence below. Coordinated updates and
-material UI retain their assigned C/151 gates. Exact implementation status stays in `mvp-plan.md`;
-this foundation does not claim an assistant or the complete material workflow.
+Engineering assistants remain target architecture. Block 149 supplies the shared typed resource
+foundation, document pins, Part/Project persistence, explicit revision adoption and removal rules
+below. Physical properties and material UI retain their assigned 150/151 gates. Exact implementation
+status stays in `mvp-plan.md`; this foundation does not claim an assistant or the complete material UI.
 
 The material/catalog foundation is now assigned to [Blocks 149–151](inventor-parity-sequence.md),
 shared with semantic Hole/Thread standards in 152–157. This allocation supersedes the relative
@@ -99,6 +99,32 @@ before geometry work, preserving committed documents/caches/history if a conflic
 Persistence stores shared values once and each Part's ordered resource keys; standalone extraction
 restores complete snapshots offline through the existing Part codec. Exact fields/migration stay
 in `file-format.md`; C owns explicit revision switching and referenced-resource removal.
+
+## Explicit revision adoption and removal — Block 149C contract
+
+`adopt_engineering_resource_revision` requires an existing source revision and a validated
+replacement with the same logical resource ID/kind. It inserts an immutable revision and retains
+the old one. Material adoption remaps the Part default and every Body override pinned to that
+exact old revision; other revision pins stay unchanged. Same-key identical adoption is a no-op,
+conflicting contents fail. A table adoption makes the replacement available locally; there are no
+authored table consumers before 152. That block must extend the consumer remap/removal checks
+when it introduces such references, using this same catalog.
+The Part result counts inserted revisions plus remapped pins; an identical adoption returns zero.
+
+Project adoption takes an explicit nonempty list of unique owned Part IDs. It validates existing
+ownership and operates on a complete candidate, including the root catalog and every selected
+member. Unknown/duplicate/Reference Parts, absent local source revisions and immutable conflicts
+reject the whole update. Unselected Parts keep their pins; a later failing member cannot publish
+earlier changes. Existing session transactions provide one Undo/Redo/save boundary for the batch.
+The Project result counts changed selected members, rather than individual pins or stored copies.
+
+Catalog removal removes one exact key (missing is a no-op). Part removal rejects revisions used
+by its default or Body overrides; Reference Parts remain read-only. Project removal rejects any
+member's local snapshot reference, even if unassigned, because that key is persisted in the member
+reference list. Remove an unused local snapshot first, then remove its unreferenced root revision.
+Retained Undo snapshots stay immutable. Resource edits do not change executable generation or
+geometric dependency edges; ordinary session freshness/recompute still applies. Material-only
+BRep reuse and mass invalidation remain 150, and visible management remains 151.
 
 ## Planned modules
 
