@@ -195,6 +195,14 @@ is checked separately from the executed native scenarios and never substitutes f
   override later in 190 and failed multi-document resource update. Appearance changes cannot alter mass.
 - Oracle: dimensionally converted pinned values, resource hashes and unchanged geometry fingerprints.
 
+
+149A `[core][engineering-resource]` supplies the typed foundation: normalized density/pressure,
+per-value provenance, absent density, schema/row/cell validation, immutable key collisions,
+kind stability, explicit coexistence of revisions, copied snapshots and atomic late-conflict merge.
+The count boundary is validated before integer conversion. These synthetic Core fixtures do not
+supply document assignment, JSON/offline portability, coordinated multi-document updates or native
+material UI; those remain 149B/C and 151. Exact execution/status stays in the setup/MVP docs.
+
 ### R02 Physical properties in transformed assemblies
 
 - **First gate:** 150; native completion 151; extend 193.

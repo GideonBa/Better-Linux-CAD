@@ -56,6 +56,8 @@ add_library(
   src/core/datum_plane.cpp
   src/core/draft_feature.cpp
   src/core/edge_treatment_feature.cpp
+  src/core/engineering_quantity.cpp
+  src/core/engineering_resource.cpp
   src/core/dependency_graph.cpp
   src/core/error.cpp
   src/core/feature.cpp
@@ -491,6 +493,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/projected_sketch_reference_json_tests.cpp
     tests/core/projected_sketch_reference_tests.cpp
     tests/core/quantity_tests.cpp
+    tests/core/engineering_resource_tests.cpp
     tests/core/shell_feature_tests.cpp
     tests/core/part_feature_input_reference_tests.cpp
     tests/core/part_pattern_feature_tests.cpp

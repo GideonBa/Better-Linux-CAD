@@ -13,6 +13,17 @@ evaluator or implicit global-parameter scope is introduced by the new plan.
 Parameters are first-class objects. Features reference them by identity, and the graphical table
 uses the same validated model and dependency graph as recompute and persistence.
 
+
+## Engineering resource quantities — Block 149A boundary
+
+Shared material/catalog intent uses positive finite `MassDensity` (canonical kg/m³) and
+`EngineeringPressure` (canonical Pa), with explicit named conversion factories. Density × mm³
+volume will produce mass through the physical-properties authority in 150; density is never stored
+as a Length parameter or an unlabelled scalar. Typed standards-table geometry cells reuse the
+existing Length/LinearDisplacement/Angle/Count quantities. This resource foundation does not extend
+the supported Part/Assembly parameter-expression kinds or create another expression evaluator.
+See `engineering-modules.md` for the single resource/provenance authority.
+
 ## Parameter object
 
 A parameter is a named value with type, unit, scope, and an optional formula.

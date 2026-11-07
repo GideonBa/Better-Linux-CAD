@@ -1,6 +1,8 @@
 # Engineering Modules
 
-Status: target architecture. Not implemented yet. These are a long-term differentiator, built after the parametric core, features, and assemblies.
+Status: engineering assistants remain target architecture. Block 149A verifies the shared typed
+resource foundation below; document assignment, persistence and UI follow their assigned
+serial blocks. No assistant or complete material workflow is claimed by that foundation.
 
 The material/catalog foundation is now assigned to [Blocks 149–151](inventor-parity-sequence.md),
 shared with semantic Hole/Thread standards in 152–157. This allocation supersedes the relative
@@ -10,6 +12,53 @@ automatic fastener placement and the full parts library remain outside Blocks 14
 already implemented bolt-circle/Assembly-binding seed is not reimplemented by this catalog.
 
 Engineering modules combine calculation, standards logic, and geometry generation. They are the main distinction from FreeCAD or simple modelers: the user should not have to assemble every detail by hand from tables, standards, and catalogs. Each module produces a normal parametric feature in the feature tree and can use parameters.
+
+
+## Shared engineering resources — Block 149A contract
+
+Core owns one `EngineeringResourceCatalog` containing immutable `EngineeringMaterial` or
+`EngineeringStandardTable` revisions. `EngineeringResourceKey` is a validated stable resource ID
+plus a nonempty revision string; names, row positions and numerical equality never identify a
+resource. The resource kind stays fixed for one ID across revisions. Inserting the same key and
+identical canonical typed contents deduplicates; changed contents under that key fail. Different
+revisions coexist, and catalog merge validates a disposable copy before replacing the target. No
+in-place revision replacement or automatic revision selection is exposed.
+
+`MassDensity` stores positive finite kg/m³ and converts explicitly from g/cm³ or kg/mm³; its kg/mm³
+conversion uses 10⁻⁹. Values must remain positive/finite in both canonical and Geometry-facing
+representations. `EngineeringPressure` stores positive finite Pa with explicit MPa/GPa conversions.
+Conversion overflow/underflow fails validation. Density is optional: absent density remains absent,
+never a guessed value or zero mass. Material properties can additionally carry Young's modulus,
+yield strength and tensile strength as typed pressures. Physical mass/tensors remain Block 150.
+
+Every present material property and table cell has `EngineeringProvenance`: UserDefined,
+Manufacturer or Normative, explicit source label and optional reference, URI and license metadata.
+Normative origin requires an explicit reference/edition. Resource-level provenance also describes
+the assembled revision. URI is descriptive metadata, never an automatic fetch. Repository fixtures
+use explicitly synthetic user-defined values; no normative values or assistants are shipped here.
+
+Standards tables own stable column/row keys and labels. Columns declare required/optional cells
+and one exact kind: length mm, signed displacement mm, angle degrees, positive integer count,
+density, pressure, dimensionless scalar, text or boolean. Geometric cells reuse existing `Quantity`;
+other kinds retain their typed values. Missing required cells, duplicate/unknown keys, wrong kinds,
+invalid enums and non-finite scalars reject the whole table. Counts must be representable by the
+existing count API before conversion. Cells normalize to declared column order; row display order
+is retained. Per-row identity survives display reorder, while immutable revision content includes
+the authored row order. The factory exposes only const contents.
+
+A's public API lives in `engineering_quantity.hpp` and `engineering_resource.hpp`; factories enforce
+invariants before a resource enters the catalog. Existing Part parameter/expression kinds remain
+under their current authority. Part default → Body override assignment and explicit revision update
+are B/C contracts, with Body override taking precedence and unassigned remaining unavailable.
+Standalone/project persistence must use this catalog and preserve pinned values offline; its exact
+schema is specified in `file-format.md` before B's writer. Material assignment does not author
+appearance, and installing another library revision does not change an existing pin.
+
+Focused Core proof is `[engineering-resource]` / `[parity-b149]`: conversions/extreme values,
+provenance and optional density, every table kind/required cell, malformed/duplicate references,
+identical-key deduplication, conflicting immutable revisions, kind collisions, copied snapshots
+and late-conflict atomic merge. Legacy document bytes are covered by the unchanged full Core suite.
+No Part/Project resource field is written by 149A; whole-block status stays in `mvp-plan.md`.
 
 ## Planned modules
 
