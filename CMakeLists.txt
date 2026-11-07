@@ -78,6 +78,8 @@ add_library(
   src/core/parameter_expression.cpp
   src/core/path_curve.cpp
   src/core/project.cpp
+  src/core/project_engineering_resources.cpp
+  src/core/project_engineering_resource_json.cpp
   src/core/project_cross_hierarchy_constraints.cpp
   src/core/project_cross_hierarchy_joints.cpp
   src/core/project_json.cpp
@@ -499,6 +501,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/engineering_resource_tests.cpp
     tests/core/engineering_resource_json_tests.cpp
     tests/core/part_materials_tests.cpp
+    tests/core/project_engineering_resources_tests.cpp
     tests/core/shell_feature_tests.cpp
     tests/core/part_feature_input_reference_tests.cpp
     tests/core/part_pattern_feature_tests.cpp

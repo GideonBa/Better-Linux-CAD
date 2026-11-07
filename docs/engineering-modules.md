@@ -1,8 +1,9 @@
 # Engineering Modules
 
-Status: engineering assistants remain target architecture. Block 149A verifies the shared typed
-resource foundation below; document assignment, persistence and UI follow their assigned
-serial blocks. No assistant or complete material workflow is claimed by that foundation.
+Engineering assistants remain target architecture. Block 149A supplies the shared typed resource
+foundation; 149B adds document pins and Part/Project persistence below. Coordinated updates and
+material UI retain their assigned C/151 gates. Exact implementation status stays in `mvp-plan.md`;
+this foundation does not claim an assistant or the complete material workflow.
 
 The material/catalog foundation is now assigned to [Blocks 149–151](inventor-parity-sequence.md),
 shared with semantic Hole/Thread standards in 152–157. This allocation supersedes the relative
@@ -82,6 +83,22 @@ removal and coordinated Project updates remain 149C. B2 supplies Project-owned d
 portable member snapshots; B1's Project-v1 serialization rejects resource-bearing members rather
 than dropping or ambiguously duplicating their revision ownership. The exact codec/migration is
 owned by `file-format.md`.
+
+## Project resource ownership — Block 149B2 contract
+
+A Project owns the same immutable catalog authority. Inserting a standalone Part merges its
+snapshot atomically, deduplicating identical keys and rejecting conflicting contents even if a
+later entry conflicts after earlier new entries. Each member retains its portable local subset;
+its pins retain exact revisions and are not silently updated to another member's default.
+Project resources may also be unassigned or retained after member removal.
+
+`synchronize_engineering_resources` reconciles existing mutable member edits into a candidate
+catalog atomically. `validate_engineering_resources` rejects missing/conflicting ownership without
+mutation; the writer uses it. GUI Project transactions synchronize their disposable candidate
+before geometry work, preserving committed documents/caches/history if a conflict occurs.
+Persistence stores shared values once and each Part's ordered resource keys; standalone extraction
+restores complete snapshots offline through the existing Part codec. Exact fields/migration stay
+in `file-format.md`; C owns explicit revision switching and referenced-resource removal.
 
 ## Planned modules
 

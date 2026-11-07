@@ -1197,6 +1197,11 @@ GuiDocumentSession::commit_project_transaction(std::string label,
     record_error(changed.error());
     return changed;
   }
+  const auto resources = cloned.value().synchronize_engineering_resources();
+  if (!resources) {
+    record_error(resources.error());
+    return resources;
+  }
   if (const auto* current = project())
     for (const auto& part : current->part_documents()) {
       if (!part.is_reference_part())

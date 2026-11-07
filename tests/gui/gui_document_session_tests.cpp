@@ -1,14 +1,18 @@
+#include "../support/engineering_resource_fixture.hpp"
 #include "../support/missing_reference_fixture.hpp"
+#include "../support/part_history_fixture.hpp"
 #include "blcad/gui/gui_document_session.hpp"
 
 #include "../support/repair_open_fixture.hpp"
 #include "blcad/core/datum_plane.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/project_json.hpp"
 #include "blcad/core/sketch_constraint_authoring_json.hpp"
 #include "blcad/core/sketch_dimension_authoring_json.hpp"
 #include <QTemporaryDir>
 
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <fstream>
@@ -634,4 +638,120 @@ TEST_CASE("Repair opening preserves strict validation and blocks ordinary transa
   CHECK_FALSE(session.open_file(directory.filePath("missing.blcad.project.json").toStdString(),
                                 false, GuiDocumentOpenMode::ReferenceRepair));
   CHECK(part_snapshot(session) == before);
+}
+
+namespace {
+namespace resources = blcad::test::engineering_fixture;
+PartDocument resource_member(std::string id) {
+  auto data = nlohmann::json::parse(migration_checked(
+      serialize_part_document_to_json(blcad::test::history_fixture::native_base())));
+  data["document"]["id"] = id;
+  auto part = migration_checked(deserialize_part_document_from_json(data.dump()));
+  resources::annotate(part);
+  return part;
+}
+std::string project_snapshot(const GuiDocumentSession& session) {
+  REQUIRE(session.project());
+  return migration_checked(serialize_project_to_json(*session.project()));
+}
+} // namespace
+
+TEST_CASE("Resource-bearing Projects preserve shared ownership history and offline Part extraction",
+          "[gui][document-session][parity-b149][project-resource-integration]") {
+  QTemporaryDir project_directory;
+  QTemporaryDir standalone_directory;
+  GuiDocumentSession session;
+  REQUIRE(session.create_project(DocumentId("project.resources"), "Resources"));
+  const auto empty = project_snapshot(session);
+  REQUIRE(session.commit_project_transaction("Insert portable Parts", [](Project& project) {
+    auto added = project.add_part_document(resource_member("first"));
+    if (!added)
+      return added;
+    auto second = resource_member("second");
+    const auto assigned = second.set_default_material(resources::key("synthetic.material", "r2"));
+    if (!assigned)
+      return assigned;
+    return project.add_part_document(std::move(second));
+  }));
+  const auto populated = project_snapshot(session);
+  CHECK(session.project()->engineering_resources().entries().size() == 3);
+  CHECK(session.derived_results_fresh());
+  REQUIRE(session.undo());
+  CHECK(project_snapshot(session) == empty);
+  REQUIRE(session.redo());
+  CHECK(project_snapshot(session) == populated);
+  const auto path = project_directory.filePath("project.blcad.project.json").toStdString();
+  REQUIRE(session.save_as(path));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(path));
+  CHECK(project_snapshot(reopened) == populated);
+  CHECK(reopened.derived_results_fresh());
+  const auto* member = reopened.project()->find_part_document(DocumentId("second"));
+  REQUIRE(member);
+  const auto portable = standalone_directory.filePath("member.blcad.json").toStdString();
+  REQUIRE(write_part_document_json_file(*member, portable));
+  const auto member_json = migration_checked(serialize_part_document_to_json(*member));
+  REQUIRE(reopened.close());
+  REQUIRE(std::filesystem::remove(path));
+  GuiDocumentSession extracted;
+  REQUIRE(extracted.open_file(portable));
+  CHECK(migration_checked(serialize_part_document_to_json(*extracted.part_document())) ==
+        member_json);
+  CHECK(extracted.part_document()->default_material() ==
+        resources::key("synthetic.material", "r2"));
+  CHECK(extracted.derived_results_fresh());
+  REQUIRE(extracted.part_shape_cache());
+  CHECK(extracted.part_shape_cache()->body_shape_count() == 1);
+}
+
+TEST_CASE("Project candidate synchronization and malformed resource Open preserve committed state",
+          "[gui][document-session][parity-b149][project-resource-integration]") {
+  QTemporaryDir directory;
+  GuiDocumentSession session;
+  REQUIRE(session.create_project(DocumentId("project.resources"), "Resources"));
+  REQUIRE(session.commit_project_transaction("Seed resources", [](Project& project) {
+    auto added = project.add_part_document(resource_member("first"));
+    if (!added)
+      return added;
+    return project.add_part_document(
+        resources::checked(PartDocument::create(DocumentId("last"), "Last")));
+  }));
+  REQUIRE(session.save_as(directory.filePath("project.blcad.project.json").toStdString()));
+  const auto before = project_snapshot(session);
+  REQUIRE(session.commit_project_transaction("Add member revision", [](Project& project) {
+    return project.find_part_document(DocumentId("first"))
+        ->add_engineering_resource(resources::material("r3", 7000));
+  }));
+  const auto after = project_snapshot(session);
+  CHECK(session.project()->engineering_resources().entries().size() == 4);
+  REQUIRE(session.undo());
+  CHECK(project_snapshot(session) == before);
+  REQUIRE(session.redo());
+  CHECK(project_snapshot(session) == after);
+  const auto path = session.file_path();
+  CHECK_FALSE(session.commit_project_transaction("Conflicting batch", [](Project& project) {
+    auto added = project.find_part_document(DocumentId("first"))
+                     ->add_engineering_resource(resources::material("r4", 8000));
+    if (!added)
+      return added;
+    return project.find_part_document(DocumentId("last"))
+        ->add_engineering_resource(resources::material("r1", 9000));
+  }));
+  CHECK(project_snapshot(session) == after);
+  CHECK(session.file_path() == path);
+  CHECK(session.derived_results_fresh());
+  CHECK(session.undo_label() == "Add member revision");
+  auto malformed = nlohmann::json::parse(after);
+  malformed["parts"][0]["engineering_resource_refs"][0]["revision"] = "missing";
+  const auto bad = directory.filePath("bad.blcad.project.json").toStdString();
+  {
+    std::ofstream output(bad);
+    output << malformed.dump();
+  }
+  CHECK_FALSE(session.open_file(bad, true));
+  CHECK(project_snapshot(session) == after);
+  CHECK(session.file_path() == path);
+  CHECK(session.derived_results_fresh());
+  REQUIRE(session.undo());
+  CHECK(project_snapshot(session) == before);
 }
