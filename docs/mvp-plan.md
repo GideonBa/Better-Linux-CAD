@@ -2107,6 +2107,11 @@ not newly claimed. Exact scope/commands are in `development-setup.md`; native ma
 work remains specified in `user-interface.md`. This accepts the session foundation only, not B or
 whole 148. Protected PR delivery and verified refreshed main precede its native integration branch.
 
+Session-foundation delivery: [PR #149](https://github.com/GideonBa/Better-Linux-CAD/pull/149),
+implementation `9ec2bc2`. The delivery-record update changes documentation only and preserves all
+976 runtime fingerprints. Normal merge/confirmed state and reviewed-tree comparison remain
+required before native marker integration starts.
+
 ## Later phases
 
 Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R

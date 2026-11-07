@@ -3624,3 +3624,7 @@ foundation is verified; B and whole 148 remain open for native integration and c
 After documentation-only status updates, `[shell-coverage]` passes **5 / 494**
 (`/tmp/blcad148b1-final-inventory.log`), with no failures or skips. All 976 runtime fingerprints
 remain unchanged; no whole-block capability is promoted. Protected PR delivery follows.
+
+Session-foundation delivery: [PR #149](https://github.com/GideonBa/Better-Linux-CAD/pull/149),
+implementation `9ec2bc2`. This documentation-only record preserves all 976 runtime fingerprints.
+Normal merge and verified refreshed main/reviewed-tree comparison precede native integration.
