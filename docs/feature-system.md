@@ -53,6 +53,30 @@ intent. Normal GUI transactions/opening retain the old valid document on failure
 may retain the new complete intent with Failed status and an empty cache. Versioned persistence
 and strict migration rules are owned by `file-format.md`.
 
+## Effective availability plan — Block 147A, 2026-11-07
+
+The read-only `create_history_evaluation_plan()` derives execution entries and Body availability
+from the existing typed records and authored/dependency order. An optional prefix counts authored
+rows, including suppressed rows; any explicit prefix remains a partial scope even at the last row.
+It never edits source definitions, authored flags, graph, invalidation or canonical bytes.
+
+Active entries require both their typed semantic/resource sources and their currently available
+Body inputs. Suppressed modifiers preserve the previous Body producer but supply no semantic
+feature output. Suppressed creators supply no new Body identity. An unavailable input derives a
+Blocked entry with producer/input/consumer identities; it never changes that consumer's authored
+Active flag or silently suppresses a closure. Independent Bodies remain available. Boolean tool
+consumption follows the existing keep-tool contract. Imported bases cannot be suppressed by the
+146 command; prefix exclusion still removes their output availability. Immutable Reference Part
+outputs retain their existing source-owned basis.
+
+Resource dependency traversal stops at the nearest executable producer: it does not mistake an
+old sequential Body-predecessor edge for a semantic requirement. Body aliases are resolved against
+availability at the current authored position and only when an actual Body owns that node.
+A resource ID with the same textual prefix remains a resource. Existing typed fields supply profiles, axes, paths,
+sections, topology references and Body results for every registered family. This is a disposable
+projection, not an effective Geometry result, alternate persistent model, or completed H01/H02 gate.
+147B remains responsible for physical execution and all cache/scope/freshness protections.
+
 ## Feature intent, not baked geometry
 
 ```text

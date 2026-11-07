@@ -109,6 +109,13 @@ intent cannot consume old Geometry or publish a falsely fresh GUI result. That c
 boundary is replaced by physical effective/prefix/freshness proof in 147; it does not satisfy H01's
 effective-evaluation gate or the native browser gate in 148.
 
+147A `[core][history-evaluation-plan]` proves logical availability across all families and every
+prefix boundary, exact Body-input predecessors, suppressed creators/modifiers, resource-mediated
+semantic output loss, blocked active chains, explicit dependent closures, independent Bodies,
+consumed tools, imported/reference ownership, missing creators and misleading resource ID prefixes.
+Canonical JSON, source graph and invalidation remain unchanged. This remains a Core projection;
+147B must supply physical H01/H02, complete-source cache and native consumer evidence.
+
 ### H02 End of Part and suffix validation
 
 - **First gate:** 148.

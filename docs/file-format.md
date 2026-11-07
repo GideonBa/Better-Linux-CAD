@@ -81,6 +81,12 @@ No derived dependency edge, blocked state, shape or cache is persisted. Effectiv
 availability belongs to 147; all consumers must fail closed while that evaluator is unavailable.
 The history browser and its visible state/diagnostics remain assigned to 148.
 
+Block 147A derives a read-only availability/prefix plan from those records. Its Active, Suppressed,
+Blocked and OutsidePrefix execution states, Body input snapshots, availability and dependency
+issues are transient results. They add no JSON field/version/default and never replace stored
+active/suppressed intent. A complete Core plan is not a fresh Geometry result. Effective evaluation,
+cache manifests and prefix publication protections remain assigned to 147B.
+
 ## Project structure
 
 ```text

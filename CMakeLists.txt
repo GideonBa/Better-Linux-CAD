@@ -422,6 +422,7 @@ if(BLCAD_BUILD_TESTS)
     blcad_core_tests
     tests/core/part_feature_history_tests.cpp
     tests/core/part_history_intent_tests.cpp
+    tests/core/part_history_evaluation_plan_tests.cpp
     tests/core/feature_update_command_tests.cpp
     tests/core/step_import_source_tests.cpp
     tests/core/imported_topology_tests.cpp

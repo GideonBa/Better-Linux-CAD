@@ -3352,3 +3352,42 @@ planned history UI capabilities. All runtime fingerprints remain unchanged.
 
 Delivery: [PR #145](https://github.com/GideonBa/Better-Linux-CAD/pull/145), implementation `9329de2`.
 The delivery-record commit is documentation only and preserves all 968 runtime fingerprints.
+
+
+## Block 147A read-only effective availability plan — 2026-11-07
+
+Starts from verified main `a659016` after normal merge of PR #145 and exact reviewed-tree comparison.
+The query derives execution states and Body availability from existing typed records, never source
+mutation or a second persistent model. All Geometry guards and execution paths from 146B remain
+unchanged. Effective Geometry/prefix/cache/native acceptance is assigned to 147B, not this slice.
+
+```bash
+cmake --build build/dev-gui --target blcad_core_tests -j8
+./build/dev-gui/blcad_core_tests "[history-evaluation-plan],[history-intent],[feature-history-inventory],[feature-order],[feature-update-command]"
+./build/dev-gui/blcad_core_tests
+```
+
+Initial focused projection passes **9 cases / 507 assertions**. Review then identifies that resource
+IDs can legally resemble Body aliases; ownership now uses actual Body records, with a regression
+for Sketch/parameter IDs using `body:`. A separate negative case covers declared Bodies without
+creators. No existing assertion is relaxed. Final Core build passes without new warnings
+(`/tmp/blcad147a-core-build-review.log`). The new projection cases pass **11 / 538**, combined history
+focus **38 / 1,654** (`/tmp/blcad147a-core-focused.log`), full Core **627 / 23,727**
+(`/tmp/blcad147a-core-full.log`).
+
+Proof includes all fifteen families and every prefix boundary, modifier predecessor snapshots,
+semantic/resource output loss versus Body bypass, blocked active chains without silent cascading,
+explicit dependent closure, independent and imported Bodies, Boolean tool consumption, immutable
+reference ownership, missing creators and source JSON/graph/invalidation immutability. A complete
+Core scope is not a fresh Geometry result. No JSON field/version/default changes. Existing four
+historical byte oracles remain exact through the full Core suite.
+
+Runtime freeze `/tmp/blcad147a-runtime-freeze.json`: **969** source/test/asset/build-script files,
+compact UTF-8 JSON sorted by path; SHA-256
+`0a5751712bd050d6807cfcfba81b1e6dd59dde72ef5e32071112e1ad068c458e`.
+All fingerprints remain unchanged through final tests and documentation updates. Scoped/new-file
+formatting and diff checks pass. Geometry, GUI, native and startup checks are not rerun for this
+new unused read-only Core method; their previous execution paths and conservative boundary are
+unchanged. B must build/link all consumers and run full physical/freshness/native acceptance when
+it replaces that boundary. Whole Block 147 remains open. Normal protected PR delivery and verified
+merged/refreshed main are required before the next branch.

@@ -1,5 +1,9 @@
 #pragma once
 
+#include "blcad/core/id.hpp"
+
+#include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -60,6 +64,46 @@ struct PartFeatureHistoryEntry {
   PartFeatureState state = PartFeatureState::Active;
 
   bool operator==(const PartFeatureHistoryEntry&) const = default;
+};
+
+enum class PartHistoryExecutionState { Active, Suppressed, Blocked, OutsidePrefix };
+enum class PartHistoryInputIssueCode {
+  SuppressedProducer,
+  ProducerOutsidePrefix,
+  BlockedProducer,
+  MissingResource,
+  MissingBodyCreator,
+  ConsumedBody,
+};
+struct PartHistoryInputIssue {
+  PartHistoryInputIssueCode code;
+  std::string producer_id;
+  std::string input_node_id;
+  std::string consumer_id;
+  std::string message;
+};
+struct PartHistoryBodyAvailability {
+  BodyId body;
+  bool available = false;
+  std::optional<std::string> producer_id;
+  std::optional<std::string> unavailable_due_to;
+};
+struct PartHistoryExecutionEntry {
+  PartFeatureHistoryEntry feature;
+  PartHistoryExecutionState state = PartHistoryExecutionState::Active;
+  std::vector<PartHistoryInputIssue> issues;
+  // Availability immediately before this row, not the terminal Body producer.
+  std::vector<PartHistoryBodyAvailability> body_inputs;
+};
+struct PartHistoryEvaluationPlan {
+  // A prefix is explicitly partial, even when it includes the final row.
+  std::optional<std::size_t> prefix_count;
+  std::vector<PartHistoryExecutionEntry> entries;
+  std::vector<PartHistoryBodyAvailability> bodies;
+  [[nodiscard]] bool has_blocked_entries() const noexcept;
+  // Complete Core scope with available inputs; this is not Geometry freshness.
+  [[nodiscard]] bool complete() const noexcept;
+  [[nodiscard]] std::vector<std::string> active_ids() const;
 };
 
 } // namespace blcad

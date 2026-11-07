@@ -35,6 +35,119 @@ template <typename Record> bool creates_output(const Record& record) {
   else
     return false;
 }
+
+struct ExecutionContract {
+  std::vector<std::string> inputs;
+  std::vector<BodyId> body_inputs;
+  std::vector<BodyId> outputs;
+  std::vector<BodyId> created;
+  std::vector<BodyId> consumed;
+};
+void add_input(ExecutionContract& contract, std::string node) {
+  if (!node.empty())
+    contract.inputs.push_back(std::move(node));
+}
+void add_context(ExecutionContract& contract, const FeatureBodyResultContext& context) {
+  if (context.target_body())
+    contract.body_inputs.push_back(*context.target_body());
+  contract.outputs.push_back(context.effective_produced_body());
+  if (creates_body_identity(context))
+    contract.created.push_back(context.effective_produced_body());
+}
+template <typename Record> ExecutionContract execution_contract(const Record& record) {
+  ExecutionContract contract;
+  if constexpr (std::is_same_v<Record, Feature>) {
+    add_input(contract, record.input_sketch().value());
+    if (record.path_curve())
+      add_input(contract, record.path_curve()->value());
+    if (record.type() == FeatureType::SubtractiveExtrude)
+      add_input(contract, record.target_feature().value());
+    const auto& extent = record.extrude_intent().extent();
+    for (const auto* face : {&extent.first_face(), &extent.second_face()})
+      if (*face)
+        add_input(contract, (**face).source_node_id());
+    if (record.body_result_context())
+      add_context(contract, *record.body_result_context());
+  } else if constexpr (std::is_same_v<Record, ImportedBodyFeature>) {
+    for (const auto& output : record.definition().outputs()) {
+      contract.outputs.push_back(output.body);
+      contract.created.push_back(output.body);
+    }
+  } else if constexpr (std::is_same_v<Record, SurfaceFeature>) {
+    for (auto node : surface_feature_input_nodes(record))
+      add_input(contract, std::move(node));
+    contract.outputs.push_back(surface_feature_result_body(record));
+    contract.created = contract.outputs;
+  } else if constexpr (std::is_same_v<Record, BodyTransform>) {
+    contract.body_inputs.push_back(record.body());
+    contract.outputs.push_back(record.body());
+    if (record.coordinate_reference())
+      add_input(contract, *record.coordinate_reference());
+    if (record.rotation_axis()) {
+      const auto& axis = *record.rotation_axis();
+      if (axis.semantic_edge())
+        add_input(contract, axis.semantic_edge()->source_feature().value());
+      if (axis.sketch_line())
+        add_input(contract, axis.sketch_line()->sketch().value());
+    }
+  } else if constexpr (std::is_same_v<Record, BodyBooleanFeature>) {
+    contract.body_inputs.push_back(record.target_body());
+    for (const auto& tool : record.tool_bodies())
+      contract.body_inputs.push_back(tool);
+    contract.outputs.push_back(record.effective_result_body());
+    if (record.result_mode() == BodyBooleanResultMode::NewBody)
+      contract.created = contract.outputs;
+    if (!record.keep_tool_bodies())
+      contract.consumed = record.tool_bodies();
+  } else {
+    if constexpr (requires { record.body_result_context(); })
+      add_context(contract, record.body_result_context());
+    if constexpr (requires { record.target_body(); }) {
+      contract.body_inputs.push_back(record.target_body());
+      contract.outputs.push_back(record.target_body());
+    }
+    if constexpr (requires { record.profile().source_node_id(); })
+      add_input(contract, record.profile().source_node_id());
+    if constexpr (requires { record.axis().source_node_id(); })
+      add_input(contract, record.axis().source_node_id());
+    if constexpr (requires { record.direction().source_node_id(); })
+      add_input(contract, record.direction().source_node_id());
+    if constexpr (requires { record.path(); })
+      add_input(contract, record.path().value());
+    if constexpr (requires { record.guide_path(); })
+      if (record.guide_path())
+        add_input(contract, record.guide_path()->value());
+    if constexpr (requires { record.sections(); })
+      for (const auto& section : record.sections())
+        add_input(contract, section.source_node_id());
+    if constexpr (requires { record.path_curve(); })
+      if (record.path_curve())
+        add_input(contract, record.path_curve()->value());
+    if constexpr (requires { record.guide_curves(); })
+      for (const auto& guide : record.guide_curves())
+        add_input(contract, guide.value());
+    if constexpr (requires { record.sources(); })
+      for (const auto& source : record.sources())
+        add_input(contract, source.source_node_id());
+    if constexpr (requires { record.mirror_plane(); })
+      add_input(contract, record.mirror_plane().source_node_id());
+    if constexpr (requires { record.edges(); })
+      for (const auto& edge : record.edges())
+        add_input(contract, edge.source_node_id());
+    if constexpr (requires { record.faces(); })
+      for (const auto& face : record.faces())
+        add_input(contract, face.source_node_id());
+    if constexpr (requires { record.removed_faces(); })
+      for (const auto& face : record.removed_faces())
+        add_input(contract, face.source_node_id());
+    if constexpr (requires { record.pull_direction(); })
+      add_input(contract, record.pull_direction().source_node_id());
+    if constexpr (requires { record.neutral_plane(); })
+      add_input(contract, record.neutral_plane().source_node_id());
+  }
+  return contract;
+}
+
 } // namespace
 
 template <typename Visitor> void PartDocument::visit_executable_families(Visitor&& visitor) const {
@@ -294,6 +407,199 @@ Result<std::size_t> PartDocument::apply_history_intent(PartFeatureHistoryIntent 
   const auto count = candidate.value().history_intent_->order.size();
   *this = std::move(candidate.value());
   return Result<std::size_t>::success(count);
+}
+
+bool PartHistoryEvaluationPlan::has_blocked_entries() const noexcept {
+  return std::any_of(entries.begin(), entries.end(), [](const auto& entry) {
+    return entry.state == PartHistoryExecutionState::Blocked;
+  });
+}
+bool PartHistoryEvaluationPlan::complete() const noexcept {
+  return !prefix_count && !has_blocked_entries();
+}
+std::vector<std::string> PartHistoryEvaluationPlan::active_ids() const {
+  std::vector<std::string> ids;
+  for (const auto& entry : entries)
+    if (entry.state == PartHistoryExecutionState::Active)
+      ids.push_back(entry.feature.node_id);
+  return ids;
+}
+
+Result<PartHistoryEvaluationPlan>
+PartDocument::create_history_evaluation_plan(std::optional<std::size_t> prefix_count) const {
+  const auto history = executable_history();
+  if (!history)
+    return Result<PartHistoryEvaluationPlan>::failure(history.error());
+  if (prefix_count && *prefix_count > history.value().size())
+    return Result<PartHistoryEvaluationPlan>::failure(
+        Error::validation("part.history.prefix", "History prefix exceeds the authored row count."));
+  PartHistoryEvaluationPlan plan;
+  plan.prefix_count = prefix_count;
+  std::unordered_map<std::string, std::size_t> rows;
+  std::unordered_map<std::string, ExecutionContract> contracts;
+  for (const auto& row : history.value()) {
+    const auto index = plan.entries.size();
+    rows.emplace(row.node_id, index);
+    const auto state =
+        prefix_count && index >= *prefix_count      ? PartHistoryExecutionState::OutsidePrefix
+        : row.state == PartFeatureState::Suppressed ? PartHistoryExecutionState::Suppressed
+                                                    : PartHistoryExecutionState::Active;
+    plan.entries.push_back({row, state, {}, {}});
+  }
+  visit_executable_families([&](auto member, auto, PartFeatureFamily) {
+    for (const auto& record : this->*member)
+      contracts.emplace(executable_id(record), execution_contract(record));
+  });
+  std::unordered_map<std::string, std::size_t> body_rows;
+  for (const auto& body : bodies_) {
+    body_rows.emplace(body.id().value(), plan.bodies.size());
+    plan.bodies.push_back({body.id(), is_reference_part(), std::nullopt, std::nullopt});
+  }
+  std::unordered_map<std::string, std::string> creators;
+  for (const auto& row : history.value())
+    for (const auto& body : contracts.at(row.node_id).created)
+      creators.emplace(body.value(), row.node_id);
+  std::unordered_map<std::string, std::vector<std::string>> predecessors;
+  for (const auto& [source, dependent] : dependency_graph_.dependencies()) {
+    predecessors[dependent].push_back(source);
+    // Resource/parameter/ownership inputs are authoritative graph edges. Do not
+    // copy implicit executable predecessor edges; typed semantic inputs above
+    // are the immutable references that remain required after suppression.
+    if (contracts.contains(dependent) && !rows.contains(source))
+      add_input(contracts.at(dependent), source);
+  }
+  for (auto& [id, contract] : contracts) {
+    // Ordinary resource IDs may use the same textual prefix. A Body alias is
+    // owned by an actual Body record, not inferred from spelling alone.
+    std::erase_if(contract.inputs, [&](const std::string& node) {
+      if (!node.starts_with("body:") || !body_rows.contains(node.substr(5)))
+        return false;
+      contract.body_inputs.emplace_back(node.substr(5));
+      return true;
+    });
+    std::unordered_set<std::string> unique;
+    std::erase_if(contract.body_inputs,
+                  [&](const BodyId& body) { return !unique.insert(body.value()).second; });
+  }
+  std::unordered_map<std::string, std::string> consumed;
+  for (std::size_t index = 0; index < plan.entries.size(); ++index) {
+    auto& entry = plan.entries[index];
+    const auto& id = entry.feature.node_id;
+    const auto& contract = contracts.at(id);
+    const auto body_issue = [&](const BodyId& body,
+                                const std::string& input) -> std::optional<PartHistoryInputIssue> {
+      const auto found = body_rows.find(body.value());
+      if (found != body_rows.end() && plan.bodies[found->second].available)
+        return std::nullopt;
+      std::string source;
+      auto code = PartHistoryInputIssueCode::MissingBodyCreator;
+      if (const auto owner = consumed.find(body.value()); owner != consumed.end()) {
+        source = owner->second;
+        code = PartHistoryInputIssueCode::ConsumedBody;
+      } else {
+        if (found != body_rows.end() && plan.bodies[found->second].unavailable_due_to)
+          source = *plan.bodies[found->second].unavailable_due_to;
+        else if (const auto creator = creators.find(body.value()); creator != creators.end())
+          source = creator->second;
+        if (const auto row = rows.find(source); row != rows.end()) {
+          const auto state = plan.entries[row->second].state;
+          if (state == PartHistoryExecutionState::Suppressed)
+            code = PartHistoryInputIssueCode::SuppressedProducer;
+          else if (state == PartHistoryExecutionState::OutsidePrefix)
+            code = PartHistoryInputIssueCode::ProducerOutsidePrefix;
+          else
+            code = PartHistoryInputIssueCode::BlockedProducer;
+        }
+      }
+      return PartHistoryInputIssue{code, source, input, id,
+                                   "Body " + body.value() + " is unavailable to " + id + "."};
+    };
+    // Input snapshots are useful even for explicitly skipped rows.
+    std::unordered_set<std::string> input_bodies;
+    for (const auto& body : contract.body_inputs)
+      if (input_bodies.insert(body.value()).second) {
+        const auto found = body_rows.find(body.value());
+        entry.body_inputs.push_back(
+            found == body_rows.end()
+                ? PartHistoryBodyAvailability{body, false, std::nullopt, std::nullopt}
+                : plan.bodies[found->second]);
+      }
+    if (entry.state == PartHistoryExecutionState::Suppressed ||
+        entry.state == PartHistoryExecutionState::OutsidePrefix) {
+      for (const auto& body : contract.created)
+        if (const auto found = body_rows.find(body.value()); found != body_rows.end())
+          plan.bodies[found->second].unavailable_due_to = id;
+      continue;
+    }
+    for (const auto& body : contract.body_inputs)
+      if (const auto issue = body_issue(body, "body:" + body.value()))
+        entry.issues.push_back(*issue);
+    std::vector<std::string> inputs = contract.inputs;
+    std::sort(inputs.begin(), inputs.end());
+    inputs.erase(std::unique(inputs.begin(), inputs.end()), inputs.end());
+    for (const auto& input : inputs) {
+      std::vector<std::string> pending{input};
+      std::unordered_set<std::string> visited;
+      while (!pending.empty()) {
+        auto node = std::move(pending.back());
+        pending.pop_back();
+        if (!visited.insert(node).second)
+          continue;
+        if (node.starts_with("body:") && body_rows.contains(node.substr(5))) {
+          if (const auto issue = body_issue(BodyId(node.substr(5)), input))
+            entry.issues.push_back(*issue);
+          continue;
+        }
+        if (const auto source = rows.find(node); source != rows.end()) {
+          const auto state = plan.entries[source->second].state;
+          if (state != PartHistoryExecutionState::Active || source->second >= index) {
+            const auto code = state == PartHistoryExecutionState::Suppressed
+                                  ? PartHistoryInputIssueCode::SuppressedProducer
+                              : state == PartHistoryExecutionState::OutsidePrefix
+                                  ? PartHistoryInputIssueCode::ProducerOutsidePrefix
+                                  : PartHistoryInputIssueCode::BlockedProducer;
+            entry.issues.push_back(
+                {code, node, input, id,
+                 "Input " + input + " requires unavailable producer " + node + "."});
+          }
+          continue;
+        }
+        if (!dependency_graph_.has_node(node)) {
+          entry.issues.push_back({PartHistoryInputIssueCode::MissingResource,
+                                  {},
+                                  input,
+                                  id,
+                                  "Input resource " + node + " is missing."});
+          continue;
+        }
+        if (const auto source = predecessors.find(node); source != predecessors.end())
+          for (const auto& parent : source->second)
+            pending.push_back(parent);
+      }
+    }
+    if (!entry.issues.empty())
+      entry.state = PartHistoryExecutionState::Blocked;
+    for (const auto& body : contract.outputs)
+      if (const auto found = body_rows.find(body.value()); found != body_rows.end()) {
+        auto& availability = plan.bodies[found->second];
+        availability.available = entry.state == PartHistoryExecutionState::Active;
+        availability.producer_id =
+            availability.available ? std::optional<std::string>(id) : std::nullopt;
+        availability.unavailable_due_to =
+            availability.available ? std::nullopt : std::optional<std::string>(id);
+        consumed.erase(body.value());
+      }
+    if (entry.state == PartHistoryExecutionState::Active)
+      for (const auto& body : contract.consumed)
+        if (const auto found = body_rows.find(body.value()); found != body_rows.end()) {
+          auto& availability = plan.bodies[found->second];
+          availability.available = false;
+          availability.producer_id.reset();
+          availability.unavailable_due_to = id;
+          consumed[body.value()] = id;
+        }
+  }
+  return Result<PartHistoryEvaluationPlan>::success(std::move(plan));
 }
 
 Result<std::size_t> PartDocument::replay_feature_order(const std::vector<std::string>& order) {
