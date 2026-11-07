@@ -4,6 +4,13 @@ Planned extension: [Blocks 149–151 and 200–202](inventor-parity-sequence.md)
 physical properties, finite-domain measurement and quality inspection. Preserve the explicitly
 labelled supporting-geometry conventions below; new queries do not silently change old measurements.
 
+Block 150's physical-property result contract is owned by `engineering-modules.md`: hidden active
+physical participation, complete/partial/unavailable/not-applicable mass, pinned density, local/root
+coordinate frames, central/principal tensors and explicit freshness. It extends the read-only
+`BodyResultInspector` authority without changing the current Body Summary command or its volume-only
+readout. Part/assembly physical queries are introduced serially before 151 adds controls, units,
+clipboard and centroid presentation. No material or physical result is saved as authored intent.
+
 Status: headless authority introduced in Block 131; replacement-shell integration accepted in
 Block 136. Block 144 places its commands on Inspect. Numbered status is owned by `mvp-plan.md`.
 

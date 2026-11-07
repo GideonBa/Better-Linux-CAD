@@ -4131,3 +4131,92 @@ remain incomplete. Normal PR delivery/confirmed merge and refreshed-main/tree co
 Delivery: [PR #155](https://github.com/GideonBa/Better-Linux-CAD/pull/155), implementation `a3321bc`.
 The delivery-record commit changes documentation only and preserves all 994 runtime fingerprints.
 Normal merge and verified refreshed-main/reviewed-tree comparison precede 150.
+
+## Block 150A — shape and complete Part physical properties, 2026-11-07
+
+PR #155 is confirmed merged as `3cbca99`; refreshed main matches the reviewed tree before
+`feat/part-physical-properties` starts. Existing resource/Measure contracts specify physical
+participation, units/frames, mass availability, precision and immutable source freshness before
+implementation. `BodyResultInspector` exposes the new complete Part query, using its own fresh
+private cache; raw shape integration does not certify document freshness. No persistence, Core
+parameter kind or visible Physical Properties command is introduced. Assemblies/reuse remain B/C.
+
+```sh
+cmake --build build/dev-gui --target blcad_geometry_tests blcad_gui_tests blcad -j8
+./build/dev-gui/blcad_geometry_tests "[physical-properties]"
+./build/dev-gui/blcad_geometry_tests --durations yes
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-measure],[resource-revision-integration],[source-sketch-workflow],[history-evaluation-boundary],[shell-coverage]"
+```
+
+The initial build finds a test using a nonexistent specialized Surface adder; it is corrected to
+the existing shared `add_surface_feature` API (`blcad150a-initial-build.log`, `blcad150a-fixture-build.log`).
+The initial six-case run then exposes colliding Sketch/Feature/Path IDs in fixtures and, independently,
+catastrophic central-moment cancellation at 10⁸-mm coordinates despite a GProps reference point
+(`blcad150a-focused.log`: six failing cases / 14 assertions). Fixtures receive distinct Sketch IDs.
+Solid integration is corrected to use a disposable shape translated near the origin; only centroids
+are translated back. No production tolerance is relaxed. Rebuilt initial proof passes **6 / 402**
+(`blcad150a-local-frame-build.log`, `blcad150a-local-frame-focused.log`).
+
+Added Boolean/suppression, numeric-range, legacy and actual STEP-source cases pass **10 / 632**
+(`blcad150a-expanded-build.log`, `blcad150a-expanded-focused.log`). Review retains the Part's name
+for anonymous historical scope and tightens explicit scalar/tensor/large-coordinate comparison
+budgets; final rebuilt focused proof passes **10 / 634** (`blcad150a-final-build.log`,
+`blcad150a-tolerance-build.log`, `blcad150a-final-focused.log`). Full new-file clang-format and
+modified-line legacy formatting pass; `blcad150a-format.diff` is empty and whitespace checks pass.
+Runtime freeze `/tmp/blcad150a-runtime-freeze.json`: **1,000** source/test/asset/build-script files,
+SHA-256 `695d42ee1ed78d5cec462089c04d7a3540ebe6aa8d79fcdfea837cb6f3613bbd`.
+
+Full Geometry passes **587 / 52,625**, without failures/skips (`blcad150a-geometry-full.log`).
+Core implementation is unchanged and its preceding **655 / 25,599** result is retained, not rerun.
+The new API is not wired to GUI controls until 151; a full GUI rerun is not claimed for A. Focused
+existing Measure/history/resource regression and native results follow after execution. These do
+not substitute for 151's new physical-property interaction/clipboard/layout acceptance.
+
+Focused offscreen GUI passes **22 total / 20 passed / 2 native-only skips / 1,503 assertions**,
+without failures (`/tmp/blcad150a-gui-focused.log`). Existing native regression follows:
+
+```sh
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad150a-native-100 ./build/dev-gui/blcad_gui_tests "[block136-measure],[resource-revision-integration],[source-sketch-workflow],[history-evaluation-boundary],[shell-coverage]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad150a-native-150 ./build/dev-gui/blcad_gui_tests "[block136-measure]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+These are existing Measure/source-workflow regression controls, not new physical-properties UI or
+a new compact-layout acceptance claim. Numeric results are covered by the actual Geometry API;
+full GUI/material/physical UI integration remains in the later assigned slices.
+
+The first native 100% run has **21 passed / 1 failed / 1,781 passed assertions / 1 failed**
+(`blcad150a-native-100.log`). Its existing native Measure fixture tries the hidden Distance button
+without navigating from the default Model page to Inspect. Isolated reproduction fails at the same
+visibility assertion (**1 case / 35 passed assertions / 1 failed**, `blcad150a-native-measure-before.log`).
+The fixture now selects the existing enabled Inspect tab by title before requiring a visible button;
+visibility and real model-pick assertions are retained, with no production Measure change. Rebuild
+passes (`blcad150a-native-fixture-build.log`); isolated native proof passes **1 / 66**
+(`blcad150a-native-measure-after.log`).
+
+Only `tests/gui/gui_shell_measure_tools_tests.cpp` changes after the initial numeric freeze; every
+Geometry runtime/test fingerprint remains identical to the full Geometry run. The original 1,000-file
+freeze is retained at `/tmp/blcad150a-pre-native-runtime-freeze.json` (digest `695d42ee…613bbd`).
+Final `/tmp/blcad150a-runtime-freeze.json`: **1,000** files, SHA-256
+`4bd5e30c69fa1d79a2ae07842c1e46d4564cfeba648011112197ff81631e8c94`.
+Final modified-line formatting is empty (`blcad150a-final-format.diff`).
+
+Final native 100% passes **22 / 1,816**, without skips/failures
+(`blcad150a-native-100-final.log`, using `BLCAD_UI_CAPTURE_DIR=/tmp/blcad150a-native-100-final`).
+Native 150% passes **7 / 477**, without skips/failures (`blcad150a-native-150.log`). Reviewed raw
+`native-measure-distance.png` hashes: 100%
+`ff25f7bec3e2a538a2edd928e6626e1babf1f076a3a3865a42fd29c663a7f4b1`, 150%
+`3abc82767cb9f62284fd7598204f74d0e18de970d474c88594074713b0aac8fe`.
+Separate startup reaches intentional timeout **124** after six seconds (`blcad150a-startup.log`).
+Existing OCCT Visual depth/stencil diagnostics remain in this environment; they mask no unavailable
+native viewer or test failure. Final focused GUI/inventory/source review follow before delivery.
+
+Final focused offscreen GUI again passes **20 / 2 native-only skips / 1,503 assertions** across
+22 cases (`blcad150a-gui-focused-final.log`). Final inventory passes **5 / 568**, without skips/failures
+(`blcad150a-final-inventory.log`). All 1,000 final runtime fingerprints remain unchanged. Working/
+staged whitespace and complete source review pass before delivery. This accepts A only; whole 150,
+posed assembly properties, material-only reuse and new material/physical UI remain open.
+
+Delivery: [PR #156](https://github.com/GideonBa/Better-Linux-CAD/pull/156), implementation `ab57d37`.
+The delivery-record commit changes documentation only and preserves all 1,000 final runtime
+fingerprints. Normal merge and verified refreshed-main/reviewed-tree comparison precede 150B.

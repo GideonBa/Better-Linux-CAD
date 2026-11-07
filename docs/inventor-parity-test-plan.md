@@ -237,6 +237,15 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
 ### R02 Physical properties in transformed assemblies
 
 - **First gate:** 150; native completion 151; extend 193.
+- 150A `[physical-properties]` supplies independently checked Part/shape oracles: boxes/cylinder,
+  central and reconstructed principal tensors, large coordinates, rotation/scale/reflection,
+  asymmetric differently weighted hidden Bodies, unavailable/partial/missing-density mass,
+  empty/surface-only scope, legacy anonymous aggregate, consumed tools/suppression, near symmetry,
+  numeric overflow/underflow and exact source/lifetime freshness. `[physical-imports]` uses a real
+  STEP file for editable/Reference queries, missing context, changed supplier bytes and recovery.
+  Owned complete recompute is the A boundary; posed assemblies and material-only reuse remain B/C.
+  Exact scalar/tensor tolerance budgets are recorded in `engineering-modules.md`. These headless
+  numerical tests do not claim the Physical Properties controls assigned to 151.
 - Use analytic box/cylinder fixtures with asymmetric material assignment, a translated/rotated
   repeated child, uniform scale and reflected geometry. Sum the tensor with parallel-axis theorem.
 - Compare whole Assembly mass against a hand-computed reference; hidden-but-active members remain,
