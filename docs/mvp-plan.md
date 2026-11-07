@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 146
 current_block: 147
-current_boundary: Block 147 planned; Block 146 delivery PR 145
+current_boundary: Block 147A Core projection verified; Geometry evaluation 147B remains planned
 current_tag: "[parity-b147]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–146 implemented and accepted; Blocks 147–204 planned"
+  advanced_modeling_workflows: "Blocks 145–146 accepted; Block 147 in progress; Blocks 148–204 planned"
 ---
 
 # MVP Plan
@@ -34,9 +34,9 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 146
-current block        Block 147 (planned; not started)
+current block        Block 147 (in progress; slice A)
 current phase        Effective history evaluation and cache correctness
-current boundary     Block 146 accepted; delivery PR 145
+current boundary     Core availability projection verified; Geometry evaluation 147B planned
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1776,8 +1776,8 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–146 are **Implemented and accepted**;
-Blocks 147–204 are **Planned; not started**.
+Status authority: Blocks 145–146 are **Implemented and accepted**; Block 147 is **In progress**;
+Blocks 148–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1786,7 +1786,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
-| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–146 accepted; 147–151 not started |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–146 accepted; 147 in progress; 148–151 not started |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
@@ -1948,7 +1948,7 @@ Block 147 owns effective suppressed execution/cache semantics; Block 148 owns vi
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 146A | Read-only typed inventory of every executable family; shared atomic replay for existing `feature_order`; unchanged historical JSON and mixed-family/consumer regression proof | Merged via PR #144 |
-| 146B | Persistent authored order and sparse active/suppressed intent, validated candidates, typed dependency diagnostics and complete strict/legacy Core/JSON proof | Verified; delivery PR #145 |
+| 146B | Persistent authored order and sparse active/suppressed intent, validated candidates, typed dependency diagnostics and complete strict/legacy Core/JSON proof | Merged via PR #145 |
 
 A supplies the existing-authority foundation; it introduces no suppression state, new JSON field,
 reorder command or UI completion claim. Its public query follows the current dependency order and
@@ -1996,6 +1996,35 @@ all runtime fingerprints remain unchanged. Source/staged review passes.
 Delivery: [PR #145](https://github.com/GideonBa/Better-Linux-CAD/pull/145), implementation
 `9329de2`. The delivery record changes documentation only. Merge normally and verify/refetch main
 with tree comparison before starting 147.
+
+### Block 147 serial implementation — 2026-11-07
+
+PR #145 is confirmed merged as `a659016`. Refreshed main matches the reviewed branch;
+`feat/effective-part-history` starts from that verified state. Implemented-through remains 146.
+
+| Slice | Bounded deliverable | Status |
+| --- | --- | --- |
+| 147A | Read-only effective availability/prefix plan from existing typed records: active/suppressed/blocked/outside-prefix entries, semantic/resource versus Body input reasons, creator/modifier and consumed-Body rules; complete Core combination proof | Verified; delivery PR #146 |
+| 147B | Actual disposable full/prefix Geometry evaluation and complete-source cache freshness; independent fresh/incremental checks, old-cache/picking/analysis/export rejection and native integration | Planned; not started |
+
+A owns no second feature tree, new persistent field or Geometry capability claim. B replaces the
+conservative 146B guard with verified execution. Existing `feature-system.md` owns these contracts;
+`file-format.md` continues to prohibit persisting derived scope, availability and cache state.
+Whole 147 acceptance requires both slices and the assigned H01/H02 physical evidence. Native
+browser/End of Part editing remains 148.
+
+147A passes **11 new cases / 538 assertions**, combined history focus **38 / 1,654** and full Core
+**627 / 23,727**. The read-only method leaves source JSON/graph/invalidation unchanged and preserves
+authored flags while deriving blocked chains. Prefix counts, all families, modifier bypass versus
+semantic output loss, explicit closures, imported bases, consumed tools and actual Body ownership
+are covered. Resource IDs resembling `body:` aliases remain resources unless a Body owns the node.
+The 969-file runtime freeze is unchanged; formatting/source/diff review passes. Geometry/GUI/native
+suites are not rerun for this unused Core-only query. Their 146B execution guard is unchanged; full
+physical and native acceptance remains mandatory in B. No schema or executable capability advances.
+Implemented-through remains 146; source/staged review passes.
+Delivery: [PR #146](https://github.com/GideonBa/Better-Linux-CAD/pull/146), implementation `90a836d`.
+The delivery record is documentation only. Verify merged state, refresh main and compare the
+reviewed tree before starting 147B.
 
 ## Later phases
 

@@ -337,6 +337,8 @@ public:
   // A complete disposable candidate; session owners retain revision/history control.
   [[nodiscard]] Result<PartDocument> with_history_intent(PartFeatureHistoryIntent intent) const;
   [[nodiscard]] Result<std::size_t> apply_history_intent(PartFeatureHistoryIntent intent);
+  [[nodiscard]] Result<PartHistoryEvaluationPlan>
+  create_history_evaluation_plan(std::optional<std::size_t> prefix_count = std::nullopt) const;
 
 private:
   template <typename Visitor> void visit_executable_families(Visitor&& visitor) const;
