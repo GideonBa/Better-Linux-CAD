@@ -4291,3 +4291,169 @@ only; material-only reuse and whole-150 combination acceptance remain C, visible
 Delivery: [PR #157](https://github.com/GideonBa/Better-Linux-CAD/pull/157), implementation `fd88b4e`.
 The delivery-record commit changes documentation only; all 1,002 runtime fingerprints remain
 unchanged. Normal merge and exact reviewed-tree comparison on refreshed main precede 150C.
+
+## Block 150C — material-only physical/cache reuse and combined acceptance, 2026-11-07
+
+PR #157 is confirmed merged as `8a492df`; refreshed main matches reviewed tree
+`dbf9c8f25876e2abddc666089e4b366ed5b2ff5d` before `feat/material-only-physical-reuse` starts.
+Existing physical/cache contracts now describe immutable integrated-result reweighting and a
+separate executor-owned complete geometry certificate. Public cache mutation, prefixes, geometry/
+table/lifetime changes and stale actual supplier bytes cannot authorize material-only refresh.
+Part/Project transactions try strict reuse and otherwise keep existing recomputation behavior;
+zero mutation counts do not become implicit no-op transactions. No persistence/UI controls change.
+
+```sh
+cmake --build build/dev-gui --target blcad_geometry_tests blcad_gui_tests blcad -j8
+./build/dev-gui/blcad_geometry_tests "[physical-reuse],[physical-properties],[assembly-physical-properties]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[physical-reuse-session],[resource-revision-integration],[history-evaluation-boundary],[history-resource-scene]"
+./build/dev-gui/blcad_geometry_tests --durations yes
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests --durations yes
+```
+
+New proof checks zero executed features and identical underlying OCCT shapes, reweighted independent
+mass/tensor oracles, unavailable/missing-density/Body override transitions, resource-free/v3
+round trips, strict source/lifetime/table/cache-scope rejection, repeated hidden occurrence/pose
+reuse and real STEP bytes. Session cases combine exact history/save/reopen, selected/untouched
+Project members, late failure and End-of-Part outer Save/cancel/full acceptance.
+New files receive full formatting; legacy edits receive modified-line formatting. Initial
+`blcad150c-format.diff` is empty and whitespace checks pass. Initial runtime freeze
+`/tmp/blcad150c-runtime-freeze.json`: **1,005** source/test/asset/build-script files, SHA-256
+`33966df20a96c06dbb7b621ff724739d5fc2447bc995b505f79812500f9f6628`.
+Actual build/test results and any necessary corrections follow after execution.
+
+The initial build stops because the new GUI test directly includes the intentionally unavailable
+OCCT implementation header (`blcad150c-initial-build.log`). The test now keeps an owning
+`GeometryShape` copy and compares the existing read-only bridge's backing address; no OCCT include
+path is added to the GUI test target. Geometry tests retain direct `TopoDS_Shape::IsSame` checks.
+Review also adds independent asymmetric multi-Body reweighting/partial-centroid oracles before
+any numerical proof is run. Only the two affected test files change after the initial freeze;
+production fingerprints remain identical. The initial manifest is retained at
+`/tmp/blcad150c-initial-runtime-freeze.json`; rebuilt/final runtime evidence follows.
+
+The first fixture rebuild exposes a second new-test API mismatch: parameter updates return a
+changed-node vector, whereas the session mutation callback returns a count. The callback now
+converts success to the changed-node count and propagates failure (`blcad150c-fixture-build.log`,
+`blcad150c-callback-build.log`). No production source changes or weakened assertions are needed.
+
+After the corrected Geometry target links, focused numerical proof runs while only independent
+GUI compilation remains active; runtime inputs stay frozen. It passes **21 / 1,053**, without
+failures/skips (`/tmp/blcad150c-geometry-focused.log`). This includes the multi-Body equal-density
+tensor and known-subset centroid checks, actual imported-source refresh rejection and explicit
+zero-feature/same-OCCT-shape reuse checks. Full suites wait for the complete affected-target build.
+
+The corrected full affected-target build passes (`blcad150c-callback-build.log`). Existing
+warnings in unchanged sketch/viewport fixtures remain; no build errors remain. Final runtime
+freeze `/tmp/blcad150c-runtime-freeze.json`: **1,005** files, SHA-256
+`865329bb55398d3e95886ed69db412520a945a2dcdea4e6ccda38c56f7953599`.
+No Core implementation/tests change; the preceding **657 / 25,706** full-Core result is retained,
+not rerun. Full Geometry and full offscreen GUI are required for the changed execution/session owners.
+
+Full Geometry passes **598 / 53,044**, without failures/skips (`blcad150c-geometry-full.log`).
+Initial focused GUI has **7 passed / 1 failed case, 337 passed / 2 failed assertions**
+(`blcad150c-gui-focused.log`): selected and untouched Project Parts are rebuilt. The unmatched
+`[history-resource-scene]` filter is a Geometry-only tag and is removed from subsequent GUI commands.
+An isolated probe confirms the committed executable generation is **2**, whereas JSON history
+reconstruction produces **3** (`blcad150c-project-probe-build.log`, `blcad150c-project-probe.log`:
+one failed case / two failed backing-identity assertions). Strict provenance correctly rejects that
+transition; weakening the generation guard would also admit actual removed/re-added features.
+
+Part/Project transaction candidates now retain strict JSON read validation, then copy the owned
+committed value so transient executable lifetimes survive the disposable edit. Reference-repair
+cloning keeps its existing repair-read behavior. No public generation setter or relaxed reuse
+guard is introduced. Tests retain backing-identity checks and explicitly preserve generations;
+Part fixtures now also author in memory before Save to cover this normalization difference.
+Only session source/tests change after the full Geometry run; every Geometry runtime/test
+fingerprint remains identical. Rebuilt focused/full GUI proof and final freeze follow.
+
+The lifetime-corrected build passes (`blcad150c-lifetime-build.log`). Focused GUI now passes
+**22 / 1,153** without failures/skips (`blcad150c-gui-focused-final.log`), using
+`[physical-reuse-session],[resource-revision-integration],[history-evaluation-boundary],[history-prefix-session]`.
+The numeric proof's 1,005-file manifest is retained at `/tmp/blcad150c-numeric-runtime-freeze.json`;
+only `src/gui/gui_document_session.cpp` and its test differ. All Geometry files remain identical,
+so the complete **598 / 53,044** Geometry result is retained without redundant rerun. Final runtime
+freeze `/tmp/blcad150c-runtime-freeze.json`: **1,005** files, SHA-256
+`84d989a8522c17fdd257222f226c778230b4fea109a4a7e34056b241f873147d`.
+Final modified-line formatting produces an empty diff (`blcad150c-final-format.diff`).
+
+Native verification after the complete offscreen GUI run uses existing assembly, resource,
+End-of-Part, combined history and Measure workflows:
+
+```sh
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad150c-native-100 ./build/dev-gui/blcad_gui_tests "[physical-reuse-session],[resource-revision-integration],[history-prefix-session],[block136-assembly],[block136-assembly-context],[block136-measure],[history-shell],[history-marker-shell],[history-combined-acceptance],[shell-coverage]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_COMPACT=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad150c-native-150 ./build/dev-gui/blcad_gui_tests "[physical-reuse-session],[resource-history-shell],[history-shell],[history-marker-shell],[history-combined-acceptance],[block136-measure]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+These are native regressions for changed session ownership and existing controls, not acceptance
+of the Material/Physical Properties controls assigned to 151. Ordinary/compact capture results
+and final inventory are recorded after execution.
+
+The first complete offscreen GUI run finishes with **728 total / 690 passed / 1 failed / 37
+native-only skips; 90,276 passed / 3 failed assertions** (`blcad150c-gui-full.log`). The existing
+expression-driven feature editor exposes a normalization regression: unconditional owned-value
+copying discards an expression value reconstructed by the strict reader. Candidate copying is
+therefore limited to equivalent canonical intent, evaluated parameter values and Part dependency
+graphs; Root/child assembly parameter values are checked too. Otherwise the validated reconstructed
+candidate is retained, preserving all previous normalization behavior. Assertions stay unchanged.
+
+Review also identifies a distinct certificate-origin gap: legacy full execution may intentionally
+consume a prefilled reference-transform cache. A new regression injects a foreign Sketch transform
+and checks both retained legacy geometry behavior and refusal to bless it for material reuse.
+Isolated pre-fix proof and final rebuilt verification follow.
+
+The expression-driven editor passes its unchanged isolated proof **1 / 108** after the equivalent-
+state guard (`blcad150c-normalization-build.log`, `blcad150c-normalization-focused.log`). The new
+origin regression first fails **1 case / 2 assertions, 12 assertions passed**
+(`blcad150c-origin-before.log`), proving the injected 1,000-mm Sketch pose reaches legacy geometry
+and is incorrectly certified. Legacy full execution now records provenance only from an empty
+cache including all transient transform state, or an existing complete matching certificate.
+Untrusted prefilled legacy behavior remains available and receives no certificate. Complete
+history execution already starts from a disposable empty cache. Rebuild/final proof follow.
+
+The origin-corrected build passes (`blcad150c-origin-build.log`). Final focused Geometry passes
+**22 / 1,067**, without failures/skips (`blcad150c-geometry-final-focused.log`). Final focused GUI,
+extended with existing `[block136-feature-edit]`, passes **30 total / 29 passed / 1 native-only skip /
+2,411 assertions**, without failures (`blcad150c-gui-normalized-focused.log`). The previous full-run
+manifest is retained at `/tmp/blcad150c-pre-normalization-runtime-freeze.json`. Exactly the executor,
+session source and new origin-test file change, requiring renewed complete Geometry/GUI suites.
+Final runtime freeze `/tmp/blcad150c-runtime-freeze.json`: **1,005** files, SHA-256
+`a82faa248dcab2180f1af4e33a116132a68a763f2a779fe6665a4705a59be29a`.
+
+Renewed full Geometry passes **599 / 53,058**, without failures/skips
+(`blcad150c-geometry-final-full.log`). Every final runtime fingerprint remains unchanged while the
+renewed full GUI run proceeds. Native checks begin only after that run completes.
+
+Renewed complete offscreen GUI passes **728 total / 691 passed / 37 expected native-only skips /
+90,279 assertions**, without failures (`blcad150c-gui-final-full.log`). The earlier expression/editor
+failure is corrected with its original assertions retained. All 1,005 final runtime fingerprints
+remain unchanged. Native 100%/compact-150% results follow after execution.
+
+Native 100% passes **61 / 4,483**, without skips/failures (`blcad150c-native-100.log`). Reviewed raw
+ordinary 1280×800 `history-mixed-chain-complete.png` retains the complete mixed chain, independent
+Body selection, model browser and expected geometry. SHA-256
+`784397c37066f84846382babafc3947d030d14388fda68e08e8afbb11ca741f5`;
+`history-parent-child-long-name.png` SHA-256
+`31fabd46c3073d2ed122b8707a50e77baa1a45aa353cc68e497010c2b3a38572`.
+Existing OCCT Visual depth/stencil diagnostics remain without a viewer/test failure. Compact
+150% history/Measure/session results follow after execution.
+
+Native compact 150% passes **26 / 1,737**, without skips/failures (`blcad150c-native-150.log`).
+Reviewed raw `history-parent-child-long-name.png` is 1536×960 physical pixels (1024×640 logical),
+with visible root/child task controls, bounded long labels, usable viewport and Apply/Create Another/
+Cancel footer. SHA-256 `6c93b4f641c9561c16fe4831f16ee96ae6bf03dfa9516f78d52f7a534d7a8ad1`;
+`history-mixed-chain-complete.png` SHA-256
+`ea542f6e633d8b2b632c4d3c216451427dba7dbc80e519c41eb6a190d4338dc0`.
+Separate native startup reaches intentional six-second timeout **124** (`blcad150c-startup.log`).
+All **1,005** final runtime fingerprints remain unchanged. Native checks accept existing workflow
+regressions; the new Material/Physical Properties controls remain 151. Final inventory/review follow.
+
+After the numbered status advances to 150 only, final inventory passes **5 / 568**, without
+failures/skips (`blcad150c-final-inventory.log`). Full new-file formatting, final modified-line
+formatting and working/staged whitespace/source review pass. All 1,005 runtime fingerprints remain
+unchanged through documentation updates. Whole 150 is accepted at its numerical/cache/session gate;
+Phase A remains open for 151's new UI, units, centroid presentation and clipboard acceptance.
+
+Delivery: [PR #158](https://github.com/GideonBa/Better-Linux-CAD/pull/158), implementation `6fd158e`.
+The delivery-record commit changes documentation only; all 1,005 verified runtime fingerprints
+remain unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main
+before 151 begins.

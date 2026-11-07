@@ -197,6 +197,27 @@ TEST_CASE(
   tensor(m.central_inertia_kg_mm2, {2.138666666666667, -2.304, -1.152, -2.304, 4.458666666666667,
                                     -.768, -1.152, -.768, 5.658666666666667});
   principal_reconstructs(m);
+  REQUIRE(p.set_default_material(resources::key("synthetic.material", "r2")));
+  const auto reweighted = checked(BodyResultInspector{}.inspect_physical_properties(p, result));
+  CHECK(reweighted.data().geometry_reused);
+  REQUIRE(reweighted.data().complete_mass());
+  const auto& equal = *reweighted.data().complete_mass();
+  CHECK(equal.mass_kg == approximately(.0192));
+  CHECK(equal.centroid_mm.x == approximately(15));
+  CHECK(equal.centroid_mm.y == approximately(10));
+  CHECK(equal.centroid_mm.z == approximately(9));
+  tensor(equal.central_inertia_kg_mm2,
+         {2.6624, -2.88, -1.44, -2.88, 5.5424, -.96, -1.44, -.96, 7.04});
+  REQUIRE(p.set_default_material(std::nullopt));
+  const auto partial = checked(BodyResultInspector{}.inspect_physical_properties(p, reweighted));
+  CHECK(partial.data().mass_status == PhysicalMassStatus::Partial);
+  CHECK_FALSE(partial.data().complete_mass());
+  REQUIRE(partial.data().known_mass);
+  CHECK(partial.data().known_mass->mass_kg == approximately(.0096));
+  CHECK(partial.data().known_mass->centroid_mm.x == approximately(30));
+  CHECK(partial.data().known_mass->centroid_mm.y == approximately(20));
+  CHECK(partial.data().known_mass->centroid_mm.z == approximately(14));
+  CHECK(partial.data().volume_centroid_mm->x == approximately(15));
 }
 
 TEST_CASE("Missing density distinguishes a known subset from undefined and complete mass",
@@ -442,6 +463,21 @@ TEST_CASE("Physical source freshness observes real editable and Reference STEP i
   CHECK(assembly_result.data().complete_mass()->mass_kg == approximately(.0128));
   REQUIRE(assembly_result.validate_current(project, &context));
   CHECK_FALSE(assembly_result.validate_current(project));
+  auto reweighted_part = editable;
+  REQUIRE(reweighted_part.set_default_material(resources::key("synthetic.material", "r2")));
+  const auto reweighted =
+      checked(BodyResultInspector{}.inspect_physical_properties(reweighted_part, result, &context));
+  CHECK(reweighted.data().geometry_reused);
+  CHECK(reweighted.data().complete_mass()->mass_kg == approximately(.0096));
+  const auto repeated = checked(
+      BodyResultInspector{}.inspect_physical_properties(project, assembly_result, &context));
+  CHECK(repeated.data().computed_part_count == 0);
+  CHECK(repeated.data().reused_part_count == 1);
+  auto import_cache = checked(ShapeCache::create(ShapeCacheId("physical.import.reuse")));
+  REQUIRE(GeometryRecomputeExecutor{&context}.execute_document(editable, import_cache));
+  REQUIRE(import_cache.validate_complete_geometry_result(editable));
+  REQUIRE(GeometryRecomputeExecutor{&context}.refresh_material_metadata(editable, reweighted_part,
+                                                                        import_cache));
   const auto before = source(editable);
   {
     std::ofstream changed(path, std::ios::binary | std::ios::app);
@@ -449,6 +485,11 @@ TEST_CASE("Physical source freshness observes real editable and Reference STEP i
   }
   CHECK_FALSE(result.validate_current(editable, &context));
   CHECK_FALSE(assembly_result.validate_current(project, &context));
+  CHECK_FALSE(BodyResultInspector{}.inspect_physical_properties(reweighted_part, result, &context));
+  CHECK_FALSE(
+      BodyResultInspector{}.inspect_physical_properties(project, assembly_result, &context));
+  CHECK_FALSE(GeometryRecomputeExecutor{&context}.refresh_material_metadata(
+      reweighted_part, reweighted_part, import_cache));
   StepImportTopologyContext changed_context(directory.root);
   CHECK_FALSE(BodyResultInspector{}.inspect_physical_properties(editable, &changed_context));
   CHECK_FALSE(BodyResultInspector{}.inspect_physical_properties(project, &changed_context));

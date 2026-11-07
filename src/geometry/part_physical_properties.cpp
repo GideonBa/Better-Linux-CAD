@@ -2,6 +2,7 @@
 #include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
+#include "material_geometry_source.hpp"
 #include "physical_property_math.hpp"
 
 #include <algorithm>
@@ -13,6 +14,25 @@ namespace blcad::geometry {
 namespace {
 Error error(std::string id, std::string message) {
   return Error::geometry(std::move(id), std::move(message));
+}
+Result<BodyPhysicalProperties> assign_mass(BodyPhysicalProperties result,
+                                           const EngineeringMaterial* material) {
+  result.material = material ? std::optional(material->key()) : std::nullopt;
+  result.mass.reset();
+  result.mass_status = BodyPhysicalMassStatus::NotSolid;
+  if (result.kind == BodyKind::Surface)
+    return Result<BodyPhysicalProperties>::success(std::move(result));
+  result.mass_status = material ? BodyPhysicalMassStatus::MissingDensity
+                                : BodyPhysicalMassStatus::UnassignedMaterial;
+  if (material && material->properties().density) {
+    auto mass = detail::physical_mass_properties(*result.geometry.volume,
+                                                 material->properties().density->value);
+    if (!mass)
+      return Result<BodyPhysicalProperties>::failure(mass.error());
+    result.mass = std::move(mass.value());
+    result.mass_status = BodyPhysicalMassStatus::Known;
+  }
+  return Result<BodyPhysicalProperties>::success(std::move(result));
 }
 Result<BodyPhysicalProperties> body_properties(const GeometryShape& shape, const Body* body,
                                                const EngineeringMaterial* material) {
@@ -27,28 +47,16 @@ Result<BodyPhysicalProperties> body_properties(const GeometryShape& shape, const
     result.body = body->id();
     result.visibility = body->visibility();
   }
-  if (material)
-    result.material = material->key();
   if (result.kind == BodyKind::Surface) {
     if (result.geometry.volume || result.geometry.area_mm2 <= 0)
       return Result<BodyPhysicalProperties>::failure(
           error(result.name, "Surface Body requires surface geometry without solid volume"));
-    return Result<BodyPhysicalProperties>::success(std::move(result));
+    return assign_mass(std::move(result), material);
   }
   if (!result.geometry.volume || result.geometry.free_face_count != 0)
     return Result<BodyPhysicalProperties>::failure(
         error(result.name, "Solid Body requires closed solids without free faces"));
-  result.mass_status = material ? BodyPhysicalMassStatus::MissingDensity
-                                : BodyPhysicalMassStatus::UnassignedMaterial;
-  if (material && material->properties().density) {
-    auto mass = detail::physical_mass_properties(*result.geometry.volume,
-                                                 material->properties().density->value);
-    if (!mass)
-      return Result<BodyPhysicalProperties>::failure(mass.error());
-    result.mass = std::move(mass.value());
-    result.mass_status = BodyPhysicalMassStatus::Known;
-  }
-  return Result<BodyPhysicalProperties>::success(std::move(result));
+  return assign_mass(std::move(result), material);
 }
 
 } // namespace
@@ -73,6 +81,44 @@ PartPhysicalProperties::validate_current(const PartDocument& document,
   if (imports)
     return imports->validate_sources();
   return Result<std::size_t>::success(0);
+}
+
+Result<PartPhysicalProperties>
+BodyResultInspector::inspect_physical_properties(const PartDocument& document,
+                                                 const PartPhysicalProperties& previous,
+                                                 StepImportTopologyContext* imports) const {
+  const auto source = serialize_part_document_to_json(document);
+  if (!source)
+    return Result<PartPhysicalProperties>::failure(source.error());
+  const auto before = detail::material_independent_geometry_source(previous.source_);
+  const auto after = detail::material_independent_geometry_source(source.value());
+  if (!before || !after || before.value() != after.value() ||
+      document.executable_generation() != previous.generation_)
+    return Result<PartPhysicalProperties>::failure(Error::dependency(
+        document.id().value(),
+        "Physical reuse requires identical geometry inputs and executable lifetime"));
+  std::vector<BodyPhysicalProperties> bodies;
+  for (const auto& old : previous.data_.bodies) {
+    const auto* material =
+        old.body ? document.effective_material_for_body(*old.body)
+        : document.default_material()
+            ? document.engineering_resources().find_material(*document.default_material())
+            : nullptr;
+    auto row = assign_mass(old, material);
+    if (!row)
+      return Result<PartPhysicalProperties>::failure(row.error());
+    bodies.push_back(std::move(row.value()));
+  }
+  auto data = detail::aggregate_physical_bodies(std::move(bodies));
+  if (!data)
+    return Result<PartPhysicalProperties>::failure(data.error());
+  data.value().geometry_reused = true;
+  PartPhysicalProperties result(std::move(data.value()), source.value(),
+                                document.executable_generation());
+  const auto fresh = result.validate_current(document, imports);
+  if (!fresh)
+    return Result<PartPhysicalProperties>::failure(fresh.error());
+  return Result<PartPhysicalProperties>::success(std::move(result));
 }
 
 Result<PartPhysicalProperties>

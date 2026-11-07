@@ -33,6 +33,7 @@ class StepImportTopologyContext;
 
 struct GeometryRecomputeSummary {
   std::size_t executed_feature_count = 0;
+  bool reused_complete_geometry = false;
 };
 
 class GeometryRecomputeExecutor {
@@ -121,8 +122,12 @@ public:
   [[nodiscard]] Result<GeometryRecomputeSummary>
   execute_history_prefix(const PartDocument& document, std::size_t prefix_count,
                          ShapeCache& shape_cache) const;
+  [[nodiscard]] Result<GeometryRecomputeSummary>
+  refresh_material_metadata(const PartDocument& before, const PartDocument& after,
+                            ShapeCache& cache) const;
 
 private:
+  void record_complete_geometry_source(const PartDocument& document, ShapeCache& cache) const;
   [[nodiscard]] Result<GeometryRecomputeSummary>
   execute_history(const PartDocument& document, std::optional<std::size_t> prefix_count,
                   ShapeCache& shape_cache) const;

@@ -34,6 +34,52 @@ Error session_error(std::string message) {
   return Error::validation("gui.document_session", std::move(message));
 }
 
+template <typename Document>
+bool same_parameter_values(const Document& before, const Document& reconstructed) {
+  if (before.parameters().size() != reconstructed.parameters().size())
+    return false;
+  for (const auto& parameter : before.parameters()) {
+    const auto* other = reconstructed.find_parameter(parameter.id());
+    if (!other || parameter.value() != other->value())
+      return false;
+  }
+  return true;
+}
+bool equivalent_part_state(const PartDocument& before, const PartDocument& reconstructed) {
+  const auto first = serialize_part_document_to_json(before);
+  const auto second = serialize_part_document_to_json(reconstructed);
+  if (!first || !second || first.value() != second.value() ||
+      !same_parameter_values(before, reconstructed))
+    return false;
+  auto nodes = before.dependency_graph().nodes(),
+       other_nodes = reconstructed.dependency_graph().nodes();
+  auto edges = before.dependency_graph().dependencies(),
+       other_edges = reconstructed.dependency_graph().dependencies();
+  std::sort(nodes.begin(), nodes.end());
+  std::sort(other_nodes.begin(), other_nodes.end());
+  std::sort(edges.begin(), edges.end());
+  std::sort(other_edges.begin(), other_edges.end());
+  return nodes == other_nodes && edges == other_edges;
+}
+bool equivalent_project_state(const Project& before, const Project& reconstructed) {
+  const auto first = serialize_project_to_json(before);
+  const auto second = serialize_project_to_json(reconstructed);
+  if (!first || !second || first.value() != second.value() ||
+      !same_parameter_values(before.assembly(), reconstructed.assembly()))
+    return false;
+  for (const auto& assembly : before.child_assembly_documents()) {
+    const auto* other = reconstructed.find_assembly_document(assembly.id());
+    if (!other || !same_parameter_values(assembly, *other))
+      return false;
+  }
+  for (const auto& part : before.part_documents()) {
+    const auto* other = reconstructed.find_part_document(part.id());
+    if (!other || !equivalent_part_state(part, *other))
+      return false;
+  }
+  return true;
+}
+
 std::optional<Error> imported_result_failure(const PartDocument& part,
                                              const std::filesystem::path& root) {
   if (!part.is_reference_part() && part.imported_body_features().empty())
@@ -1102,6 +1148,10 @@ GuiDocumentSession::commit_part_repair_transaction(std::string label,
                                                  : PartDocumentReadMode::Strict);
   if (cloned.has_error())
     return Result<std::size_t>::failure(cloned.error());
+  // Keep strict persistence validation, then copy owned transient lifetimes.
+  // JSON reconstruction can replay history and change executable generation.
+  if (!reference_repair_mode_ && equivalent_part_state(*part_document(), cloned.value()))
+    cloned.value() = *part_document();
   auto changed = mutation(cloned.value());
   if (changed.has_error()) {
     record_error(changed.error());
@@ -1192,6 +1242,10 @@ GuiDocumentSession::commit_project_transaction(std::string label,
   auto cloned = deserialize_project_from_json(serialized.value());
   if (cloned.has_error())
     return Result<std::size_t>::failure(cloned.error());
+  // A disposable edit preserves the committed executable lifetimes. The
+  // preceding read still validates persistence; no generation setter is exposed.
+  if (equivalent_project_state(*project(), cloned.value()))
+    cloned.value() = *project();
   auto changed = mutation(cloned.value());
   if (changed.has_error()) {
     record_error(changed.error());
@@ -1759,7 +1813,26 @@ GuiDocumentSession::recompute_project(Project& active_project,
     auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.project." + part.id().value()));
     if (cache.has_error())
       return Result<std::vector<ProjectPartCache>>::failure(cache.error());
-    const auto result = recompute_part(part, cache.value(), root);
+    const auto result = [&]() -> Result<std::size_t> {
+      if (!import_failure && derived_results_fresh() && project()) {
+        const auto* previous = project()->find_part_document(part.id());
+        const auto old = std::find_if(project_part_caches_.begin(), project_part_caches_.end(),
+                                      [&](const auto& item) { return item.part_id == part.id(); });
+        if (previous && old != project_part_caches_.end()) {
+          auto reused = old->cache;
+          std::optional<geometry::StepImportTopologyContext> context;
+          if (!root.empty())
+            context.emplace(root);
+          const auto refreshed = geometry::GeometryRecomputeExecutor{context ? &*context : nullptr}
+                                     .refresh_material_metadata(*previous, part, reused);
+          if (refreshed) {
+            cache.value() = std::move(reused);
+            return Result<std::size_t>::success(0);
+          }
+        }
+      }
+      return recompute_part(part, cache.value(), root);
+    }();
     if (result.has_error()) {
       auto failure = import_failure ? imported_result_failure(part, root) : std::nullopt;
       if (import_failure && !same_error(result.error(), failure) &&
@@ -1788,6 +1861,13 @@ GuiDocumentSession::recompute_project(Project& active_project,
     }
   }
   return Result<std::vector<ProjectPartCache>>::success(std::move(caches));
+}
+
+const geometry::ShapeCache*
+GuiDocumentSession::project_part_shape_cache(DocumentId part) const noexcept {
+  const auto found = std::find_if(project_part_caches_.begin(), project_part_caches_.end(),
+                                  [&](const auto& item) { return item.part_id == part; });
+  return found == project_part_caches_.end() ? nullptr : &found->cache;
 }
 
 Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
@@ -2063,6 +2143,24 @@ GuiDocumentSession::recompute_part_candidate(PartDocument& document,
     return std::any_of(part.features().begin(), part.features().end(),
                        [](const auto& feature) { return !feature.body_result_context(); });
   };
+  if (current && part_shape_cache_ && derived_results_fresh() && !reference_repair_mode_ &&
+      !history_.empty()) {
+    const auto baseline = serialize_current();
+    if (baseline && baseline.value() == history_[history_index_].json) {
+      auto reused =
+          query_with_step_import_context(*this, [&](auto* context) -> Result<geometry::ShapeCache> {
+            auto cache = *part_shape_cache_;
+            const auto refreshed =
+                geometry::GeometryRecomputeExecutor{context}.refresh_material_metadata(
+                    *current, document, cache);
+            if (!refreshed)
+              return Result<geometry::ShapeCache>::failure(refreshed.error());
+            return Result<geometry::ShapeCache>::success(std::move(cache));
+          });
+      if (reused)
+        return reused;
+    }
+  }
   if (!current || history_.empty() || reference_repair_mode_ ||
       recompute_status_ != GuiRecomputeStatus::Fresh || !part_shape_cache_ ||
       current->id() != document.id() || current->bodies().empty() || document.bodies().empty() ||

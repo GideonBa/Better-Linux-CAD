@@ -131,6 +131,8 @@ public:
   [[nodiscard]] Project* project() noexcept;
   [[nodiscard]] const Project* project() const noexcept;
   [[nodiscard]] const geometry::ShapeCache* part_shape_cache() const noexcept;
+  [[nodiscard]] const geometry::ShapeCache*
+  project_part_shape_cache(DocumentId part) const noexcept;
   [[nodiscard]] const std::vector<GuiDiagnostic>& diagnostics() const noexcept;
   [[nodiscard]] std::size_t presentation_revision() const noexcept;
   // Excludes transient presentation visibility changes while preserving all

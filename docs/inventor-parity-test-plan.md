@@ -237,6 +237,12 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
 ### R02 Physical properties in transformed assemblies
 
 - **First gate:** 150; native completion 151; extend 193.
+- 150C `[physical-reuse]` verifies zero feature execution and identical OCCT shapes for material-only
+  refresh, immutable density reweighting, resource-free/v3 round trips, standard-table and lifetime
+  invalidation, public mutation/uncertified/prefix rejection and repeated hidden-occurrence pose
+  reuse. `[physical-reuse-session]` combines Part/Project material transactions with exact Undo/Redo,
+  Save/reopen, atomic late failure and End-of-Part partial scope/outer Save. Real STEP-source
+  byte changes reject both material-only result reuse and cache refresh.
 - 150B `[assembly-physical-properties]` checks repeated and nested occurrences against independent
   root-frame centroid/tensor oracles, including hidden active parents/components, suppression,
   unused definitions and one integration per participating Part definition. Core

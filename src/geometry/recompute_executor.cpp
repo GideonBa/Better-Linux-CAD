@@ -4,6 +4,7 @@
 #include "blcad/core/sketch_profile_roles.hpp"
 #include "blcad/geometry/result_face_support.hpp"
 #include "imported_body_placement.hpp"
+#include "material_geometry_source.hpp"
 #include "part_history_evaluation.hpp"
 
 #include "blcad/geometry/body_rotation_axis_resolver.hpp"
@@ -4616,11 +4617,25 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
   const auto references = document.validate_reference_sources();
   if (!references)
     return Result<GeometryRecomputeSummary>::failure(references.error());
+  // Legacy full execution can consume prefilled transient reference poses.
+  // It stays compatible, but those inputs cannot mint a trusted certificate.
+  const bool trusted_complete_origin =
+      (shape_cache.feature_shapes_.empty() && shape_cache.body_shapes_.empty() &&
+       shape_cache.body_transform_states_.empty() && shape_cache.reference_transforms_.empty() &&
+       shape_cache.imported_body_results_.empty() && !shape_cache.reference_result_ &&
+       !shape_cache.has_final_shape_) ||
+      static_cast<bool>(shape_cache.validate_complete_geometry_result(document));
   if (document.is_reference_part()) {
     if (import_context_ == nullptr)
       return Result<GeometryRecomputeSummary>::failure(validation_error(
           document.id().value(), "Reference Part recompute requires explicit asset-root context"));
     auto seeded = ReferencePartGeometry{}.seed_reference(document, *import_context_, shape_cache);
+    if (seeded) {
+      if (trusted_complete_origin)
+        record_complete_geometry_source(document, shape_cache);
+      else
+        shape_cache.complete_geometry_source_.reset();
+    }
     return seeded ? Result<GeometryRecomputeSummary>::success({})
                   : Result<GeometryRecomputeSummary>::failure(seeded.error());
   }
@@ -4736,12 +4751,84 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     return Result<GeometryRecomputeSummary>::failure(fresh.error());
   if (transactional_cache)
     shape_cache = std::move(working_cache);
+  if (trusted_complete_origin)
+    record_complete_geometry_source(document, shape_cache);
+  else
+    shape_cache.complete_geometry_source_.reset();
   return Result<GeometryRecomputeSummary>::success(summary);
 }
 
 Result<GeometryRecomputeSummary> GeometryRecomputeExecutor::execute_history_prefix(
     const PartDocument& document, std::size_t prefix_count, ShapeCache& shape_cache) const {
   return execute_history(document, prefix_count, shape_cache);
+}
+
+void GeometryRecomputeExecutor::record_complete_geometry_source(const PartDocument& document,
+                                                                ShapeCache& cache) const {
+  cache.complete_geometry_source_.reset();
+  const auto plan = document.create_history_evaluation_plan();
+  if (!plan || !plan.value().complete())
+    return;
+  if (cache.history_result_ &&
+      (!cache.history_result_->sealed || cache.history_result_->evaluating ||
+       !cache.history_result_->plan.complete()))
+    return;
+  const auto ids = plan.value().active_ids();
+  if (cache.feature_shape_count() != ids.size())
+    return;
+  for (const auto& id : ids)
+    if (!cache.find_feature_shape(FeatureId(id)))
+      return;
+  std::size_t available_count = 0;
+  for (const auto& body : plan.value().bodies) {
+    const auto* actual = cache.find_body_result(body.body);
+    if (body.available != (actual != nullptr))
+      return;
+    if (actual) {
+      ++available_count;
+      if (body.producer_id && actual->source_feature_id.value() != *body.producer_id)
+        return;
+    }
+  }
+  if (cache.body_shape_count() != available_count)
+    return;
+  const auto source = serialize_part_document_to_json(document);
+  if (source)
+    cache.complete_geometry_source_ =
+        ShapeCache::CompleteGeometrySource{source.value(), document.executable_generation()};
+}
+
+Result<GeometryRecomputeSummary> GeometryRecomputeExecutor::refresh_material_metadata(
+    const PartDocument& before, const PartDocument& after, ShapeCache& cache) const {
+  const auto provenance = cache.validate_complete_geometry_result(before);
+  if (!provenance)
+    return Result<GeometryRecomputeSummary>::failure(provenance.error());
+  const auto source = serialize_part_document_to_json(after);
+  if (!source)
+    return Result<GeometryRecomputeSummary>::failure(source.error());
+  const auto old_inputs =
+      detail::material_independent_geometry_source(cache.complete_geometry_source_->source_json);
+  const auto new_inputs = detail::material_independent_geometry_source(source.value());
+  if (!old_inputs || !new_inputs || old_inputs.value() != new_inputs.value() ||
+      before.executable_generation() != after.executable_generation())
+    return Result<GeometryRecomputeSummary>::failure(Error::dependency(
+        after.id().value(),
+        "Material-only refresh requires identical geometry inputs and executable lifetime"));
+  const auto observed = observe_imported_part_sources(after, import_context_);
+  if (!observed)
+    return Result<GeometryRecomputeSummary>::failure(observed.error());
+  const auto fresh = validate_import_sources();
+  if (!fresh)
+    return Result<GeometryRecomputeSummary>::failure(fresh.error());
+  auto updated = cache;
+  updated.complete_geometry_source_ =
+      ShapeCache::CompleteGeometrySource{source.value(), after.executable_generation()};
+  if (updated.history_result_) {
+    updated.history_result_->source_json = source.value();
+    updated.history_result_->executable_generation = after.executable_generation();
+  }
+  cache = std::move(updated);
+  return Result<GeometryRecomputeSummary>::success({0, true});
 }
 
 Result<GeometryRecomputeSummary>
@@ -4872,6 +4959,8 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
   working.history_result_->current_feature.clear();
   working.history_result_->evaluating = false;
   working.history_result_->sealed = true;
+  if (!prefix_count)
+    record_complete_geometry_source(document, working);
   shape_cache = std::move(working);
   return Result<GeometryRecomputeSummary>::success(summary);
 }

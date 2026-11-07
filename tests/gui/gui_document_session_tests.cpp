@@ -9,7 +9,10 @@
 #include "blcad/core/project_json.hpp"
 #include "blcad/core/sketch_constraint_authoring_json.hpp"
 #include "blcad/core/sketch_dimension_authoring_json.hpp"
+#include "blcad/geometry/body_result_inspector.hpp"
+#include "blcad/geometry/occt_shape_view.hpp"
 #include <QTemporaryDir>
+#include <catch2/catch_approx.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
@@ -855,4 +858,181 @@ TEST_CASE("Session resource removal guards rollback and restore cleared snapshot
   REQUIRE(reopened.open_file(session.file_path()));
   CHECK(project_snapshot(reopened) == cleared);
   CHECK(reopened.derived_results_fresh());
+}
+
+TEST_CASE(
+    "Material-only Part transactions retain BRep ownership and exact history while updating mass",
+    "[gui][document-session][parity-b150][physical-reuse-session]") {
+  for (bool authored : {false, true}) {
+    DYNAMIC_SECTION("authored history " << authored) {
+      QTemporaryDir directory;
+      auto part = resource_member("physical.part");
+      if (authored)
+        REQUIRE(part.apply_history_intent({{"base"}, {}}));
+      const auto path = directory.filePath("physical.blcad.json").toStdString();
+      GuiDocumentSession session;
+      REQUIRE(session.create_part(part.id(), part.name()));
+      REQUIRE(session.commit_part_transaction("Seed physical input", [&](PartDocument& candidate) {
+        candidate = part;
+        return Result<std::size_t>::success(1);
+      }));
+      REQUIRE(session.save_as(path));
+      REQUIRE(session.part_shape_cache());
+      REQUIRE(
+          session.part_shape_cache()->validate_complete_geometry_result(*session.part_document()));
+      const auto shape = *session.part_shape_cache()->find_body_shape(BodyId("body.base"));
+      const auto integrated = migration_checked(
+          geometry::BodyResultInspector{}.inspect_physical_properties(*session.part_document()));
+      const auto before = part_snapshot(session);
+      REQUIRE(session.commit_part_transaction("Assign denser material", [](PartDocument& p) {
+        return p.set_default_material(resources::key("synthetic.material", "r2"));
+      }));
+      const auto after = part_snapshot(session);
+      CHECK(session.derived_results_fresh());
+      CHECK(session.dirty());
+      CHECK(session.undo_label() == "Assign denser material");
+      REQUIRE(
+          session.part_shape_cache()->validate_complete_geometry_result(*session.part_document()));
+      CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_body_shape(
+                BodyId("body.base"))) == geometry::OcctShapeView::get(shape));
+      const auto reweighted =
+          migration_checked(geometry::BodyResultInspector{}.inspect_physical_properties(
+              *session.part_document(), integrated));
+      CHECK(reweighted.data().geometry_reused);
+      CHECK(reweighted.data().complete_mass()->mass_kg == Catch::Approx(.0096));
+      REQUIRE(session.undo());
+      CHECK(part_snapshot(session) == before);
+      CHECK_FALSE(session.dirty());
+      REQUIRE(session.redo());
+      CHECK(part_snapshot(session) == after);
+      REQUIRE(session.save());
+      GuiDocumentSession reopened;
+      REQUIRE(reopened.open_file(path));
+      CHECK(part_snapshot(reopened) == after);
+      CHECK(reopened.derived_results_fresh());
+      REQUIRE(session.commit_part_transaction("Change depth", [](PartDocument& p) {
+        const auto changed = p.set_parameter_value(ParameterId("depth"),
+                                                   resources::checked(Quantity::length_mm(10)));
+        return changed ? Result<std::size_t>::success(changed.value().size())
+                       : Result<std::size_t>::failure(changed.error());
+      }));
+      CHECK_FALSE(geometry::OcctShapeView::get(*session.part_shape_cache()->find_body_shape(
+                      BodyId("body.base"))) == geometry::OcctShapeView::get(shape));
+      CHECK_FALSE(reweighted.validate_current(*session.part_document()));
+    }
+  }
+}
+
+TEST_CASE("Material-only Project transactions reuse selected and untouched Part caches atomically",
+          "[gui][document-session][parity-b150][physical-reuse-session]") {
+  QTemporaryDir directory;
+  GuiDocumentSession session;
+  REQUIRE(session.create_project(DocumentId("physical.project"), "Physical"));
+  REQUIRE(session.commit_project_transaction("Seed members", [](Project& p) {
+    for (const auto& id : {"first", "second"}) {
+      auto member = resource_member(id);
+      auto authored = member.apply_history_intent({{"base"}, {}});
+      if (!authored)
+        return authored;
+      auto added = p.add_part_document(std::move(member));
+      if (!added)
+        return added;
+    }
+    return Result<std::size_t>::success(2);
+  }));
+  REQUIRE(session.save_as(directory.filePath("physical.blcad.project.json").toStdString()));
+  const auto before = project_snapshot(session);
+  REQUIRE(session.project_part_shape_cache(DocumentId("first")));
+  REQUIRE(session.project_part_shape_cache(DocumentId("second")));
+  REQUIRE(session.derived_results_fresh());
+  for (const auto& id : {"first", "second"}) {
+    const auto* old = session.project()->find_part_document(DocumentId(id));
+    REQUIRE(
+        session.project_part_shape_cache(DocumentId(id))->validate_complete_geometry_result(*old));
+  }
+  const auto generation =
+      session.project()->find_part_document(DocumentId("first"))->executable_generation();
+  const auto first =
+      *session.project_part_shape_cache(DocumentId("first"))->find_body_shape(BodyId("body.base"));
+  const auto second =
+      *session.project_part_shape_cache(DocumentId("second"))->find_body_shape(BodyId("body.base"));
+  REQUIRE(session.commit_project_transaction("Adopt material", [](Project& p) {
+    return p.adopt_engineering_resource_revision(resources::key(), resources::material("r3", 7000),
+                                                 {DocumentId("first")});
+  }));
+  const auto after = project_snapshot(session);
+  CHECK(session.derived_results_fresh());
+  CHECK(session.project()->find_part_document(DocumentId("first"))->executable_generation() ==
+        generation);
+  CHECK(session.project()->find_part_document(DocumentId("second"))->executable_generation() ==
+        generation);
+  CHECK(geometry::OcctShapeView::get(*session.project_part_shape_cache(DocumentId("first"))
+                                          ->find_body_shape(BodyId("body.base"))) ==
+        geometry::OcctShapeView::get(first));
+  CHECK(geometry::OcctShapeView::get(*session.project_part_shape_cache(DocumentId("second"))
+                                          ->find_body_shape(BodyId("body.base"))) ==
+        geometry::OcctShapeView::get(second));
+  for (const auto& id : {"first", "second"})
+    REQUIRE(session.project_part_shape_cache(DocumentId(id))
+                ->validate_complete_geometry_result(
+                    *session.project()->find_part_document(DocumentId(id))));
+  CHECK_FALSE(session.commit_project_transaction("Late failed adoption", [](Project& p) {
+    return p.adopt_engineering_resource_revision(resources::key("synthetic.material", "r3"),
+                                                 resources::material("r4", 8000),
+                                                 {DocumentId("first"), DocumentId("missing")});
+  }));
+  CHECK(project_snapshot(session) == after);
+  CHECK(session.derived_results_fresh());
+  CHECK(session.undo_label() == "Adopt material");
+  REQUIRE(session.undo());
+  CHECK(project_snapshot(session) == before);
+  REQUIRE(session.redo());
+  CHECK(project_snapshot(session) == after);
+  REQUIRE(session.save());
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(session.file_path()));
+  CHECK(project_snapshot(reopened) == after);
+  CHECK(reopened.derived_results_fresh());
+}
+
+TEST_CASE(
+    "Material changes inside End of Part retain partial scope outer Save and one accepted Undo",
+    "[gui][document-session][parity-b150][physical-reuse-session]") {
+  QTemporaryDir directory;
+  auto part = resource_member("physical.prefix");
+  REQUIRE(part.apply_history_intent({{"base"}, {}}));
+  const auto path = directory.filePath("physical.blcad.json").toStdString();
+  REQUIRE(write_part_document_json_file(part, path));
+  GuiDocumentSession session;
+  REQUIRE(session.open_file(path));
+  const auto original = part_snapshot(session);
+  const auto saved = read_file(path);
+  const auto assign = [](PartDocument& p) {
+    return p.set_default_material(resources::key("synthetic.material", "r2"));
+  };
+  REQUIRE(session.begin_part_history_context(1));
+  REQUIRE(session.commit_part_transaction("Local material", assign));
+  CHECK_FALSE(session.derived_results_fresh());
+  CHECK(session.history_prefix_ready());
+  CHECK_FALSE(
+      session.part_shape_cache()->validate_complete_geometry_result(*session.part_document()));
+  REQUIRE(session.save());
+  CHECK(read_file(path) == saved);
+  session.cancel_part_workflow();
+  CHECK(part_snapshot(session) == original);
+  REQUIRE(session.part_shape_cache()->validate_complete_geometry_result(*session.part_document()));
+  REQUIRE(session.begin_part_history_context(1));
+  REQUIRE(session.commit_part_transaction("Local material", assign));
+  REQUIRE(session.publish_part_workflow("Apply material at End of Part"));
+  CHECK(session.derived_results_fresh());
+  REQUIRE(session.part_shape_cache()->validate_complete_geometry_result(*session.part_document()));
+  CHECK(session.undo_label() == "Apply material at End of Part");
+  const auto accepted = part_snapshot(session);
+  const auto physical = migration_checked(
+      geometry::BodyResultInspector{}.inspect_physical_properties(*session.part_document()));
+  CHECK(physical.data().complete_mass()->mass_kg == Catch::Approx(.0096));
+  REQUIRE(session.undo());
+  CHECK(part_snapshot(session) == original);
+  REQUIRE(session.redo());
+  CHECK(part_snapshot(session) == accepted);
 }

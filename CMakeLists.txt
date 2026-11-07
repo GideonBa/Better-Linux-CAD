@@ -191,6 +191,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/body_result_inspector.cpp
     src/geometry/shape_physical_properties.cpp
     src/geometry/physical_property_math.cpp
+    src/geometry/material_geometry_source.cpp
     src/geometry/part_physical_properties.cpp
     src/geometry/project_physical_properties.cpp
     src/geometry/body_transform_adapter.cpp
@@ -595,6 +596,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/body_result_inspector_tests.cpp
       tests/geometry/physical_properties_tests.cpp
       tests/geometry/assembly_physical_properties_tests.cpp
+      tests/geometry/physical_properties_reuse_tests.cpp
       tests/geometry/body_transform_pipeline_tests.cpp
       tests/geometry/body_boolean_pipeline_tests.cpp
       tests/geometry/bolt_circle_pattern_pipeline_tests.cpp

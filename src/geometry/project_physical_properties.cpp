@@ -95,6 +95,18 @@ ProjectPhysicalProperties::validate_current(const Project& project,
 Result<ProjectPhysicalProperties>
 BodyResultInspector::inspect_physical_properties(const Project& project,
                                                  StepImportTopologyContext* imports) const {
+  return inspect_project_physical_properties(project, nullptr, imports);
+}
+Result<ProjectPhysicalProperties>
+BodyResultInspector::inspect_physical_properties(const Project& project,
+                                                 const ProjectPhysicalProperties& previous,
+                                                 StepImportTopologyContext* imports) const {
+  return inspect_project_physical_properties(project, &previous, imports);
+}
+Result<ProjectPhysicalProperties>
+BodyResultInspector::inspect_project_physical_properties(const Project& project,
+                                                         const ProjectPhysicalProperties* previous,
+                                                         StepImportTopologyContext* imports) const {
   try {
     const auto structure = project.validate_assembly_structure();
     if (!structure)
@@ -122,7 +134,18 @@ BodyResultInspector::inspect_physical_properties(const Project& project,
         if (!part)
           return Result<ProjectPhysicalProperties>::failure(
               error(leaf.referenced_part_document.value(), "Physical Part definition is missing"));
-        auto properties = inspect_physical_properties(*part, imports);
+        const auto* old = previous ? [&]() -> const PartPhysicalProperties* {
+          for (const auto& snapshot : previous->parts_)
+            if (snapshot.document == part->id())
+              return &snapshot.properties;
+          return nullptr;
+        }()
+            : nullptr;
+        if (previous && !old)
+          return Result<ProjectPhysicalProperties>::failure(Error::dependency(
+              part->id().value(), "Physical reuse requires a matching integrated Part snapshot"));
+        auto properties = old ? inspect_physical_properties(*part, *old, imports)
+                              : inspect_physical_properties(*part, imports);
         if (!properties)
           return Result<ProjectPhysicalProperties>::failure(properties.error());
         found = by_id.emplace(part->id().value(), parts.size()).first;
@@ -152,7 +175,8 @@ BodyResultInspector::inspect_physical_properties(const Project& project,
       return Result<ProjectPhysicalProperties>::failure(totals.error());
     static_cast<PhysicalPropertiesTotals&>(data) =
         static_cast<const PhysicalPropertiesTotals&>(totals.value());
-    data.computed_part_count = parts.size();
+    data.computed_part_count = previous ? 0 : parts.size();
+    data.reused_part_count = previous ? parts.size() : 0;
     ProjectPhysicalProperties result(std::move(data), source.value(), std::move(parts));
     const auto current = result.validate_current(project, imports);
     if (!current)

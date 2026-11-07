@@ -54,6 +54,38 @@ Current types:
 
 ## Behavior
 
+Block 150 keeps legacy unscoped inspection/incremental execution compatible and adds a separate
+private complete-execution provenance record for material-only reuse. The executor records exact
+canonical Part intent and executable generation only after complete execution and exact feature/
+Body ownership checks. `validate_complete_geometry_result` checks that strict provenance in
+addition to existing complete-history scope. Public cache mutations invalidate provenance; even
+an identical replacement cannot preserve it. A prefix never receives a complete certificate.
+
+`refresh_material_metadata(before, after, cache)` validates the original certificate, identical
+material-independent geometry inputs/generation and actual imported files before atomically
+updating source metadata. It executes zero features and retains the same OCCT shapes. Material
+resources/pins may differ; standard tables remain geometry inputs. Missing/partial/foreign/modified
+provenance or changed inputs cannot take this path. Existing session transaction owners attempt
+reuse and otherwise retain their established recomputation and failure behavior. No public stamp
+setter, persisted geometry or new source-of-truth owner is introduced. Read-only Project member
+cache access follows the existing read-only Part-cache access contract.
+
+For legacy full execution, provenance also requires an initially empty cache (including transient
+reference/Body-transform state) or a previously verified complete cache for the same exact source.
+Existing legacy execution may consume prefilled reference poses; recomputing its outputs does not
+make those untrusted inputs authoritative. Complete history execution uses a disposable fresh cache.
+The extra provenance check preserves legacy behavior without permitting it to certify material reuse.
+
+Normal Part/Project transaction candidates retain the owned committed executable generation after
+strict JSON read validation, using a disposable value copy. JSON history reconstruction can replay
+features and produce a different transient counter; it is not a new authored feature lifetime for
+a material edit. Copying requires equivalent canonical intent, evaluated parameter values and Part
+dependency graphs, including Root/child assembly parameter values. If reconstruction normalizes
+model state, the validated reconstructed candidate retains that behavior. Actual feature removal/re-addition still changes the candidate generation and
+rejects reuse. Reference-repair reads keep their existing reconstruction policy. Unscoped
+incremental results without complete provenance keep their established compatibility contract;
+material refresh falls back to recomputation until a complete execution establishes provenance.
+
 A cache is created with a non-empty `ShapeCacheId`:
 
 ```text
