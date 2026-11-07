@@ -4127,3 +4127,7 @@ material commands remain planned. All 994 runtime fingerprints remain unchanged 
 verification and documentation updates. Working/staged whitespace and complete source review pass.
 Whole 149's R01 backend gate is accepted; 150's physical properties/reuse and 151's material UI
 remain incomplete. Normal PR delivery/confirmed merge and refreshed-main/tree comparison precede 150.
+
+Delivery: [PR #155](https://github.com/GideonBa/Better-Linux-CAD/pull/155), implementation `a3321bc`.
+The delivery-record commit changes documentation only and preserves all 994 runtime fingerprints.
+Normal merge and verified refreshed-main/reviewed-tree comparison precede 150.

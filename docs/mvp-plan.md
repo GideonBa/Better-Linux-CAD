@@ -2187,7 +2187,7 @@ one common resource store for later Hole/Thread tables, not independent per-modu
 | 149B | Standalone Part snapshots, Part default/Body overrides, Project resource deduplication, strict versioned JSON and offline/legacy compatibility | Delivered via PR #153/#154 |
 | 149B1 | Shared strict resource JSON and standalone Part version 3 with material pins; preserve history/result-face loading; conservative Project-v1 serialization boundary | Delivered via PR #153 |
 | 149B2 | Project resource ownership/deduplication, versioned Project persistence and offline member portability; replace B1's temporary project boundary | Delivered via PR #154 |
-| 149C | Explicit coordinated revision updates, referenced-resource removal guards and atomic multi-document rollback/freshness evidence through existing mutation authorities | Implemented and verified; delivery pending |
+| 149C | Explicit coordinated revision updates, referenced-resource removal guards and atomic multi-document rollback/freshness evidence through existing mutation authorities | Implemented and verified; PR #155 |
 
 149A adds no document assignment, writer/schema, material UI, mass query or capability promotion.
 B specifies exact migration/JSON fields before its writer; C verifies whole-149 integration. The
@@ -2272,6 +2272,11 @@ material-only BRep reuse remain 150; visible Material/Physical Properties comman
 assignment UI remain 151. Their GUI capability stays planned. Phase A remains open while 150/151
 are incomplete. Complete normal PR delivery/confirmed merge and refreshed-main/tree comparison
 before starting 150; it remains **Planned; not started** here.
+
+149C/whole-149 delivery: [PR #155](https://github.com/GideonBa/Better-Linux-CAD/pull/155),
+implementation `a3321bc`. The delivery-record update changes documentation only and preserves
+all 994 runtime fingerprints. Confirm normal merge and compare refreshed main with the reviewed
+tree before 150.
 
 ## Later phases
 
