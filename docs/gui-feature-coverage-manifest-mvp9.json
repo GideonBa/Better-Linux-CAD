@@ -1461,17 +1461,73 @@
       },
       {
         "capability": "feature-history",
-        "owner": 146,
-        "disposition": "planned",
-        "contract": "docs/gui-feature-edit-mvp9.md",
-        "planned_commands": [
-          "Suppress Feature",
-          "Reorder",
-          "End of Part"
+        "owner": 148,
+        "disposition": "implemented",
+        "contract": "docs/feature-system.md",
+        "commands": [
+          "blcad.action.history_suppress",
+          "blcad.action.history_restore",
+          "blcad.action.history_reorder",
+          "blcad.action.history_edit",
+          "blcad.action.history_end_of_part",
+          "blcad.action.history_end_of_part_before",
+          "blcad.action.history_end_of_part_after",
+          "blcad.action.history_end_of_part_end"
         ],
-        "commands": [],
-        "apis": [],
-        "proofs": []
+        "apis": [
+          {
+            "source": "include/blcad/gui/gui_part_history.hpp",
+            "type": "GuiPartHistoryController",
+            "methods": [
+              "begin",
+              "stage_order",
+              "stage_suppression",
+              "preview",
+              "apply",
+              "cancel"
+            ]
+          },
+          {
+            "source": "include/blcad/gui/gui_document_session.hpp",
+            "type": "GuiDocumentSession",
+            "methods": [
+              "begin_part_history_context",
+              "move_part_history_marker",
+              "preview_part_history_candidate",
+              "publish_part_workflow",
+              "cancel_part_workflow"
+            ]
+          },
+          {
+            "source": "include/blcad/gui/shell/shell_history_tools.hpp",
+            "type": "ShellHistoryTools",
+            "methods": [
+              "begin_prefix",
+              "apply",
+              "cancel"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[gui][history-shell]",
+            "source": "tests/gui/gui_shell_history_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][history-marker-shell]",
+            "source": "tests/gui/gui_shell_history_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][history-combined-acceptance]",
+            "source": "tests/gui/gui_shell_history_tests.cpp"
+          }
+        ]
       },
       {
         "capability": "materials",

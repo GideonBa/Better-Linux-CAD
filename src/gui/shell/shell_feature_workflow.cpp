@@ -51,6 +51,7 @@ void ShellFeatureTools::refresh_extrude_breadcrumbs() {
                                         layer_.active_handle_id().empty());
   feature_context_->setText(QString::fromStdString(std::string(session_.display_name())) +
                             QStringLiteral(" · Draft"));
+  feature_context_->setToolTip(feature_context_->text());
   const auto* part = session_.part_document();
   const auto* sketch =
       part && extrude_source_ ? part->find_sketch(extrude_source_->sketch) : nullptr;
