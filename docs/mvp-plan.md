@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 149
 current_block: 150
-current_boundary: Block 150A verified; posed assemblies and material-only reuse remain
+current_boundary: Block 150B verified; material-only reuse and combined acceptance remain
 current_tag: "[parity-b150]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -34,7 +34,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 149
-current block        Block 150 (in progress; slice A)
+current block        Block 150 (in progress; slice B)
 current phase        Physical properties for Parts and posed assemblies
 current boundary     Analytic properties, physical participation and material freshness
 ```
@@ -2286,8 +2286,8 @@ contracts are extended in `engineering-modules.md` and `gui-measure-mvp9.md`, no
 
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
-| 150A | Analytic shape measures, stable central/principal tensors, density-aware complete Part query with immutable freshness, surface/empty/missing-density semantics and focused analytic/combination tests | Implemented and verified; PR #156 |
-| 150B | Explicit physical assembly participation, hidden active/repeated nested occurrences, posed centroid/tensor aggregation and independent analytic oracles | Planned; not started |
+| 150A | Analytic shape measures, stable central/principal tensors, density-aware complete Part query with immutable freshness, surface/empty/missing-density semantics and focused analytic/combination tests | Delivered via PR #156 |
+| 150B | Explicit physical assembly participation, hidden active/repeated nested occurrences, posed centroid/tensor aggregation and independent analytic oracles | Implemented and verified; PR #157 |
 | 150C | Authoritative material-only reuse through existing cache/session owners, result invalidation and complete R02/combined acceptance | Planned; not started |
 
 No borrowed legacy cache is accepted as an A freshness certificate; its complete private evaluation
@@ -2310,6 +2310,30 @@ comparison before B.
 `ab57d37`. The delivery-record update changes documentation only and preserves all 1,000 final
 runtime fingerprints. Confirm normal merge and compare refreshed main with the reviewed tree
 before B.
+
+150B starts on `feat/assembly-physical-properties` from verified merged main `25e2163`
+(PR #156), after exact reviewed-tree comparison. Existing physical contracts specify explicit
+participation, per-definition evaluation, root-frame pose math and immutable qualified results
+before implementation. Whole 150 remains in progress, implemented-through 149; material-only
+reuse and new UI remain C/151.
+
+150B verifies the explicit physical leaf policy and immutable Project query with one complete
+integration per participating Part definition. Hidden active paths participate; suppression and
+unused definitions contribute nothing. Root-frame R·I·Rᵀ and parallel-axis totals match independent
+repeated/nested box oracles. Pose/material/executable-lifetime changes and actual supplier-byte
+changes invalidate results; broken active geometry, ambiguous ownership and unsynchronized
+resources fail without partial publication. Partial mass retains its known-subset centroid.
+Focused Core **4 / 201**, focused Geometry **16 / 843**, full Core **657 / 25,706** and full Geometry
+**593 / 52,834** pass. Focused offscreen GUI **31 passed / 4 native-only skips / 2,510 assertions**,
+native 100% **27 / 2,445**, native 150% **7 / 477**, final inventory **5 / 568** and intentional
+startup timeout **124** pass. Runtime freeze **1,002** files, SHA-256
+`ebdd82493f4a156d9b4ba4e0a46bbc475a1195d664aec67e2255147d9394fdc6` stays unchanged.
+Commands, raw captures and validation scope are recorded in `development-setup.md`. Whole 150
+and new Physical Properties UI remain unaccepted pending C/151.
+
+Delivery: [PR #157](https://github.com/GideonBa/Better-Linux-CAD/pull/157), implementation `fd88b4e`.
+The delivery-record commit changes documentation only; all 1,002 runtime fingerprints remain
+unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main before C.
 
 ## Later phases
 

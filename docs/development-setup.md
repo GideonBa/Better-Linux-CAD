@@ -4220,3 +4220,74 @@ posed assembly properties, material-only reuse and new material/physical UI rema
 Delivery: [PR #156](https://github.com/GideonBa/Better-Linux-CAD/pull/156), implementation `ab57d37`.
 The delivery-record commit changes documentation only and preserves all 1,000 final runtime
 fingerprints. Normal merge and verified refreshed-main/reviewed-tree comparison precede 150B.
+
+## Block 150B — physical assembly participation and posed totals, 2026-11-07
+
+PR #156 is confirmed merged as `25e2163`; refreshed main exactly matches its reviewed tree
+before `feat/assembly-physical-properties` starts. The existing leaf resolver gains an explicit
+physical policy while retaining visible-active presentation by default. The Project query owns
+complete Part snapshots, evaluates each participating definition once and transforms its derived
+centroids/central tensors through the existing authored rigid-pose chain. Common aggregation
+retains the Part rules for empty, surface-only, unavailable and partial results. No GUI command
+or persistence schema changes; material-only reuse remains 150C and visible controls remain 151.
+
+```sh
+cmake --build build/dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad -j8
+./build/dev-gui/blcad_core_tests "[assembly-physical-participation],[assembly-leaf-occurrence]"
+./build/dev-gui/blcad_geometry_tests "[assembly-physical-properties],[physical-properties]"
+./build/dev-gui/blcad_core_tests --durations yes
+./build/dev-gui/blcad_geometry_tests --durations yes
+```
+
+Focused checks cover analytic repeated/nested pose math, hidden/suppressed participation,
+remote missing-density centroids, immutable source/lifetime checks, unused/broken definitions,
+duplicate ownership, synchronized resources and actual STEP-source freshness. Build/test results,
+regression scope and runtime fingerprints are recorded below after execution.
+
+The initial complete affected-target build passes (`/tmp/blcad150b-initial-build.log`). An existing
+signedness diagnostic remains in the unchanged `gui_shell_pattern_context_tests.cpp`; there are
+no build errors. Focused Core passes **4 / 201** (`blcad150b-core-focused.log`); focused Geometry
+passes **16 / 843** (`blcad150b-geometry-focused.log`), without failures/skips. Full formatting of
+new C++ files, modified-line legacy formatting and whitespace checks pass; `blcad150b-format.diff`
+is empty. Runtime freeze `/tmp/blcad150b-runtime-freeze.json`: **1,002** source/test/asset/build-script
+files, SHA-256 `ebdd82493f4a156d9b4ba4e0a46bbc475a1195d664aec67e2255147d9394fdc6`.
+
+Full Core passes **657 / 25,706** (`blcad150b-core-full.log`); full Geometry passes
+**593 / 52,834** (`blcad150b-geometry-full.log`), both without failures/skips. Runtime fingerprints
+remain unchanged. Existing assembly/Measure/resource/history GUI regression follows:
+
+```sh
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[block136-assembly],[block136-assembly-context],[assembly-authoring],[block136-measure],[resource-revision-integration],[history-evaluation-boundary],[shell-coverage]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad150b-native-100 ./build/dev-gui/blcad_gui_tests "[block136-assembly],[block136-assembly-context],[block136-measure],[shell-coverage]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad150b-native-150 ./build/dev-gui/blcad_gui_tests "[block136-measure]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+These retain existing presentation/selection/pose/export behavior; B does not introduce native
+Physical Properties controls or claim their 151 layout/clipboard acceptance. No full GUI rerun
+is claimed for this unwired derived-data API.
+
+Focused offscreen GUI passes **35 total / 31 passed / 4 native-only skips / 2,510 assertions**
+without failures (`/tmp/blcad150b-gui-focused.log`). Native results follow after execution.
+
+Native 100% passes **27 / 2,445**, without skips/failures (`blcad150b-native-100.log`). The reviewed
+raw `native-assembly-placement.png` retains the visible Model browser, authored preview gizmo,
+occurrence pose controls and Apply/Cancel task footer. It verifies existing presentation behavior;
+physical participation does not force hidden occurrences into the viewport. Existing OCCT Visual
+depth/stencil diagnostics remain in this environment without a viewer/test failure.
+
+Native 150% passes **7 / 477**, without skips/failures (`blcad150b-native-150.log`); reviewed raw
+`native-measure-distance.png` retains real selection, measurement and Copy/Close controls. Capture
+SHA-256: 100% `native-assembly-placement.png`
+`05a6f11580d0f19999fc6fd1630675365cb355efbb7dc4261a2efa06794dd61f`; 100% Measure
+`ff25f7bec3e2a538a2edd928e6626e1babf1f076a3a3865a42fd29c663a7f4b1`; 150% Measure
+`3abc82767cb9f62284fd7598204f74d0e18de970d474c88594074713b0aac8fe`.
+Separate native startup reaches intentional six-second timeout **124** (`blcad150b-startup.log`).
+Final inventory passes **5 / 568** without skips/failures (`blcad150b-final-inventory.log`).
+All **1,002** runtime fingerprints remain unchanged after verification. Complete working/staged
+source review, modified-line formatting and whitespace checks precede delivery. This accepts B
+only; material-only reuse and whole-150 combination acceptance remain C, visible controls 151.
+
+Delivery: [PR #157](https://github.com/GideonBa/Better-Linux-CAD/pull/157), implementation `fd88b4e`.
+The delivery-record commit changes documentation only; all 1,002 runtime fingerprints remain
+unchanged. Normal merge and exact reviewed-tree comparison on refreshed main precede 150C.

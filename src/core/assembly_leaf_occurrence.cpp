@@ -28,7 +28,13 @@ ordered_components(const AssemblyDocument& assembly) {
 } // namespace
 
 Result<std::vector<AssemblyLeafOccurrenceDescriptor>>
-AssemblyLeafOccurrenceResolver::resolve(const Project& project) const {
+AssemblyLeafOccurrenceResolver::resolve(const Project& project,
+                                        AssemblyLeafParticipation participation) const {
+  if (participation != AssemblyLeafParticipation::VisibleActive &&
+      participation != AssemblyLeafParticipation::PhysicalActive)
+    return Result<std::vector<AssemblyLeafOccurrenceDescriptor>>::failure(
+        Error::validation(project.id().value(), "Unknown assembly leaf participation policy"));
+  const bool physical = participation == AssemblyLeafParticipation::PhysicalActive;
   auto hierarchy = AssemblyHierarchyTraversal::build(project);
   if (hierarchy.has_error()) {
     return Result<std::vector<AssemblyLeafOccurrenceDescriptor>>::failure(hierarchy.error());
@@ -36,7 +42,7 @@ AssemblyLeafOccurrenceResolver::resolve(const Project& project) const {
 
   std::vector<AssemblyLeafOccurrenceDescriptor> leaves;
   for (const auto& assembly_occurrence : hierarchy.value().occurrences()) {
-    if (!assembly_occurrence.visible_path || !assembly_occurrence.active_path) {
+    if (!assembly_occurrence.active_path || (!physical && !assembly_occurrence.visible_path)) {
       continue;
     }
 
@@ -49,7 +55,8 @@ AssemblyLeafOccurrenceResolver::resolve(const Project& project) const {
     }
 
     for (const ComponentInstance* component : ordered_components(*assembly)) {
-      if (!is_visible_active(*component)) {
+      if (component->suppression_state() != ComponentSuppressionState::Active ||
+          (!physical && !is_visible_active(*component))) {
         continue;
       }
 

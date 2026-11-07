@@ -425,20 +425,40 @@ TEST_CASE("Physical source freshness observes real editable and Reference STEP i
   CHECK(result.data().complete_mass()->mass_kg == approximately(.0064));
   REQUIRE(result.validate_current(editable, &context));
   CHECK_FALSE(result.validate_current(editable));
+  auto assembly = checked(AssemblyDocument::create(DocumentId("physical.root"), "Physical root"));
+  REQUIRE(assembly.add_member_part(editable.id()));
+  for (const auto& id : {"first", "second"})
+    REQUIRE(assembly.add_component_instance(checked(ComponentInstance::create(
+        ComponentInstanceId(id), id, editable.id(), ComponentVisibility::Hidden))));
+  auto project =
+      checked(Project::create(DocumentId("physical.project"), "Physical Project", assembly));
+  REQUIRE(project.add_part_document(editable));
+  CHECK_FALSE(BodyResultInspector{}.inspect_physical_properties(project));
+  const auto assembly_result =
+      checked(BodyResultInspector{}.inspect_physical_properties(project, &context));
+  CHECK(assembly_result.data().computed_part_count == 1);
+  CHECK(assembly_result.data().occurrences.size() == 2);
+  CHECK(assembly_result.data().volume_mm3 == approximately(3200));
+  CHECK(assembly_result.data().complete_mass()->mass_kg == approximately(.0128));
+  REQUIRE(assembly_result.validate_current(project, &context));
+  CHECK_FALSE(assembly_result.validate_current(project));
   const auto before = source(editable);
   {
     std::ofstream changed(path, std::ios::binary | std::ios::app);
     changed << '\n';
   }
   CHECK_FALSE(result.validate_current(editable, &context));
+  CHECK_FALSE(assembly_result.validate_current(project, &context));
   StepImportTopologyContext changed_context(directory.root);
   CHECK_FALSE(BodyResultInspector{}.inspect_physical_properties(editable, &changed_context));
+  CHECK_FALSE(BodyResultInspector{}.inspect_physical_properties(project, &changed_context));
   CHECK(source(editable) == before);
   {
     std::ofstream restored(path, std::ios::binary | std::ios::trunc);
     restored << bytes;
   }
   REQUIRE(result.validate_current(editable, &context));
+  REQUIRE(assembly_result.validate_current(project, &context));
   const auto reference_source = checked(StepImportSource::create(
       supplier.id(), supplier.name(), "supplier.step", digest, StepImportMode::Reference));
   const auto reference = checked(PartDocument::create_reference(

@@ -33,6 +33,9 @@ public:
   [[nodiscard]] Result<PartPhysicalProperties>
   inspect_physical_properties(const PartDocument& document,
                               StepImportTopologyContext* imports = nullptr) const;
+  [[nodiscard]] Result<ProjectPhysicalProperties>
+  inspect_physical_properties(const Project& project,
+                              StepImportTopologyContext* imports = nullptr) const;
   [[nodiscard]] Result<PartBodyInspection> inspect(const PartDocument& document,
                                                    const ShapeCache& shape_cache) const;
 

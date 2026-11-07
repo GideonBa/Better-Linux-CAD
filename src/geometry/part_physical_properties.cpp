@@ -14,12 +14,6 @@ namespace {
 Error error(std::string id, std::string message) {
   return Error::geometry(std::move(id), std::move(message));
 }
-double number(long double value) {
-  const auto result = static_cast<double>(value);
-  if (!std::isfinite(value) || !std::isfinite(result) || (value != 0 && result == 0))
-    throw std::runtime_error("Physical total exceeds the representable numeric range");
-  return result;
-}
 Result<BodyPhysicalProperties> body_properties(const GeometryShape& shape, const Body* body,
                                                const EngineeringMaterial* material) {
   auto measured = inspect_shape_physical_properties(shape);
@@ -56,56 +50,7 @@ Result<BodyPhysicalProperties> body_properties(const GeometryShape& shape, const
   }
   return Result<BodyPhysicalProperties>::success(std::move(result));
 }
-Result<PartPhysicalPropertiesData> aggregate(std::vector<BodyPhysicalProperties> bodies) {
-  try {
-    PartPhysicalPropertiesData result;
-    result.bodies = std::move(bodies);
-    long double area = 0;
-    std::vector<detail::WeightedPhysicalProperties> volumes, masses;
-    for (const auto& body : result.bodies) {
-      area += body.geometry.area_mm2;
-      result.estimated_relative_area_error = std::max(result.estimated_relative_area_error,
-                                                      body.geometry.estimated_relative_area_error);
-      result.estimated_relative_volume_error = std::max(
-          result.estimated_relative_volume_error, body.geometry.estimated_relative_volume_error);
-      if (body.kind == BodyKind::Surface) {
-        ++result.surface_body_count;
-        continue;
-      }
-      ++result.solid_body_count;
-      const auto& v = *body.geometry.volume;
-      volumes.push_back({v.volume_mm3, v.centroid_mm, v.central_inertia_mm5});
-      if (body.mass) {
-        const auto& m = *body.mass;
-        masses.push_back({m.mass_kg, m.centroid_mm, m.central_inertia_kg_mm2});
-      } else
-        ++result.missing_density_body_count;
-    }
-    result.area_mm2 = number(area);
-    if (!volumes.empty()) {
-      const auto total = detail::sum_physical_properties(volumes);
-      if (!total)
-        return Result<PartPhysicalPropertiesData>::failure(total.error());
-      result.volume_mm3 = total.value().weight;
-      result.volume_centroid_mm = total.value().centroid;
-      result.mass_status = PhysicalMassStatus::Unavailable;
-    }
-    if (!masses.empty()) {
-      const auto summed = detail::sum_physical_properties(masses);
-      if (!summed)
-        return Result<PartPhysicalPropertiesData>::failure(summed.error());
-      auto mass = detail::physical_mass_properties(summed.value());
-      if (!mass)
-        return Result<PartPhysicalPropertiesData>::failure(mass.error());
-      result.known_mass = std::move(mass.value());
-      result.mass_status = result.missing_density_body_count ? PhysicalMassStatus::Partial
-                                                             : PhysicalMassStatus::Complete;
-    }
-    return Result<PartPhysicalPropertiesData>::success(std::move(result));
-  } catch (const std::exception& e) {
-    return Result<PartPhysicalPropertiesData>::failure(error("physical.part", e.what()));
-  }
-}
+
 } // namespace
 
 PartPhysicalProperties::PartPhysicalProperties(PartPhysicalPropertiesData data, std::string source,
@@ -180,7 +125,7 @@ BodyResultInspector::inspect_physical_properties(const PartDocument& document,
         bodies.push_back(std::move(row.value()));
       }
     }
-    auto data = aggregate(std::move(bodies));
+    auto data = detail::aggregate_physical_bodies(std::move(bodies));
     if (!data)
       return Result<PartPhysicalProperties>::failure(data.error());
     PartPhysicalProperties result(std::move(data.value()), source.value(),

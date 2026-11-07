@@ -172,6 +172,21 @@ Tensor/reconstruction checks use 10⁻⁸ relative plus 10⁻¹⁰ absolute; the
 budgets, not extra guaranteed precision in a published result. Principal directions are marked
 non-unique when adjacent moments differ by at most 10⁻⁸ of the largest moment.
 
+150B adds an explicit `PhysicalActive` participation policy to the existing leaf resolver;
+its default remains `VisibleActive`. Hidden parent paths and hidden active components participate
+physically; suppressed paths/components do not. Project inspection validates hierarchy/resource
+ownership, evaluates each referenced Part once, then poses every occurrence's Body properties
+through the existing canonical rigid-transform chain. Inertia rotates as R·I·Rᵀ and the common
+parallel-axis aggregator combines all occurrence contributions. No posed BRep reconstruction is
+needed to transform already integrated measures.
+
+Project results retain structured occurrence paths plus Body IDs, root-frame centroids/tensors,
+physical totals and the number of computed Part definitions. An unused owned definition is not
+an occurrence and contributes nothing. Empty/surface-only/partial semantics remain the Part rules.
+Immutable freshness checks exact Project intent and the source/lifetime/actual imported inputs
+of participating Part snapshots. No second occurrence registry, persisted pose/mass or visible
+Physical Properties task is introduced. Material-only reuse remains 150C.
+
 ## Planned modules
 
 | Module | Function |

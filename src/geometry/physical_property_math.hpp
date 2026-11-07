@@ -16,4 +16,6 @@ sum_physical_properties(std::span<const WeightedPhysicalProperties> values);
 physical_mass_properties(const WeightedPhysicalProperties& value);
 [[nodiscard]] Result<PhysicalMassProperties>
 physical_mass_properties(const VolumePhysicalProperties& value, const MassDensity& density);
+[[nodiscard]] Result<PartPhysicalPropertiesData>
+aggregate_physical_bodies(std::vector<BodyPhysicalProperties> bodies);
 } // namespace blcad::geometry::detail
