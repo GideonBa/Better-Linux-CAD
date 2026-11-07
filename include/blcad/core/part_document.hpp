@@ -6,30 +6,31 @@
 #include "blcad/core/construction_geometry.hpp"
 #include "blcad/core/datum_axis.hpp"
 #include "blcad/core/datum_plane.hpp"
-#include "blcad/core/result_face_workplane.hpp"
 #include "blcad/core/dependency_graph.hpp"
 #include "blcad/core/draft_feature.hpp"
 #include "blcad/core/edge_treatment_feature.hpp"
 #include "blcad/core/feature.hpp"
 #include "blcad/core/id.hpp"
 #include "blcad/core/imported_part.hpp"
+#include "blcad/core/imported_topology.hpp"
 #include "blcad/core/invalidation_state.hpp"
 #include "blcad/core/loft_feature.hpp"
 #include "blcad/core/mirror_feature.hpp"
 #include "blcad/core/parameter.hpp"
+#include "blcad/core/part_feature_history.hpp"
 #include "blcad/core/part_pattern_feature.hpp"
 #include "blcad/core/path_curve.hpp"
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/recompute_plan.hpp"
 #include "blcad/core/reference_recovery.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/core/result_face_workplane.hpp"
 #include "blcad/core/revolve_feature.hpp"
 #include "blcad/core/shell_feature.hpp"
 #include "blcad/core/sketch.hpp"
 #include "blcad/core/sketch_3d.hpp"
 #include "blcad/core/sketch_ownership.hpp"
 #include "blcad/core/step_import_source.hpp"
-#include "blcad/core/imported_topology.hpp"
 #include "blcad/core/surface_feature.hpp"
 #include "blcad/core/sweep_feature.hpp"
 
@@ -326,7 +327,14 @@ public:
   find_sketch_origin_override(SketchId id) const noexcept;
   [[nodiscard]] bool has_workplane_id(const DatumPlaneId& id) const noexcept;
 
+  // Read-only projection of all executable families in current dependency order.
+  // Does not author order/suppression state or include Sketch/Body alias nodes.
+  [[nodiscard]] Result<std::vector<PartFeatureHistoryEntry>> executable_history() const;
+
 private:
+  template <typename Visitor> void visit_executable_families(Visitor&& visitor) const;
+  // Shared canonical loading/replay authority. Never partially changes this Part.
+  [[nodiscard]] Result<std::size_t> replay_feature_order(const std::vector<std::string>& order);
   // Loading validates records in dependency order, then restores their authored
   // collection order without exposing mutable collections to other clients.
   friend Result<PartDocument> deserialize_part_document_from_json(std::string_view content,

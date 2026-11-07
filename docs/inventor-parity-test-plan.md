@@ -96,6 +96,11 @@ individual contributing blocks add focused portions as soon as their authorities
   unavailable created Body, explicit dependent diagnostics and unaffected second Body.
 - Oracle: fresh independent rebuild, measured volumes/sections and canonical graph/JSON snapshots.
 
+146A foundation evidence is `[core][feature-history-inventory]`: all fifteen existing executable
+families, historical byte oracles, interleaved predecessors, non-feature consumers and malformed
+orders. Fixture provenance and exact checks live in `development-setup.md`. This prerequisite
+does not satisfy suppression/reorder or Geometry/native H01 acceptance; those gates stay above.
+
 ### H02 End of Part and suffix validation
 
 - **First gate:** 148.

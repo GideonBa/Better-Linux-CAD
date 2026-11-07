@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 145
 current_block: 146
-current_boundary: Block 146 planned; Block 145 delivery PR 143
+current_boundary: Block 146A verified; authored history and suppression intent 146B remains planned
 current_tag: "[parity-b146]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Block 145 implemented and accepted; Blocks 146–204 planned"
+  advanced_modeling_workflows: "Block 145 accepted; Block 146 in progress; Blocks 147–204 planned"
 ---
 
 # MVP Plan
@@ -34,9 +34,9 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 145
-current block        Block 146 (planned; not started)
+current block        Block 146 (in progress; slice A)
 current phase        Authored history and suppression intent
-current boundary     Block 145 accepted; Block 146 awaits PR 143 merge
+current boundary     Block 146A verified; authored history/suppression 146B planned
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1776,7 +1776,8 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Block 145 is **Implemented and accepted**; Blocks 146–204 are **Planned; not started**.
+Status authority: Block 145 is **Implemented and accepted**; Block 146 is **In progress**;
+Blocks 147–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1785,7 +1786,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
-| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145 accepted; 146–151 not started |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145 accepted; 146 in progress; 147–151 not started |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
@@ -1829,7 +1830,7 @@ for the next slice/branch.
 | 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Merged via PR #140 |
 | 145C1 | Extend existing GuiDocumentSession with a complete transient Part-workflow checkpoint, committed-only Save and one-history publication; headless failure/history/sidecar tests | Merged via PR #141 |
 | 145C2 | Existing-owner Extrude/source Sketch breadcrumbs using C1, revalidation, complete Cancel, committed-only Save and guarded consumers; native integration | Merged via PR #142 |
-| 145C3 | Explicit profile-selector command-first/Create Another lifecycle, retained compatible settings without hidden targets; whole-Block-145 native/compact/scaled closure | Verified; delivery PR #143 |
+| 145C3 | Explicit profile-selector command-first/Create Another lifecycle, retained compatible settings without hidden targets; whole-Block-145 native/compact/scaled closure | Merged via PR #143 |
 
 145A starts on `feat/advanced-workflow-evidence` from clean `dbff649`, after verified merged
 PR #138 and refreshed main. `user-interface.md` owns the slice design and baseline boundaries.
@@ -1936,6 +1937,35 @@ only after C3's normal protected PR is merged and refreshed main matches the rev
 Delivery: [PR #143](https://github.com/GideonBa/Better-Linux-CAD/pull/143), implementation `7f50220`.
 The delivery-record change is documentation only. Merge normally, refresh main and compare its
 tree with the reviewed branch before starting Block 146.
+
+### Block 146 serial implementation — 2026-11-07
+
+PR #143 is merged normally as `27256d7`. Refreshed main matches the reviewed branch tree;
+`feat/authored-feature-history` starts from this verified state. Implemented-through stays 145.
+Existing `feature-system.md` owns Core history behavior and `file-format.md` owns persistence.
+Block 147 owns effective suppressed execution/cache semantics; Block 148 owns visible browser edits.
+
+| Slice | Bounded deliverable | Status |
+| --- | --- | --- |
+| 146A | Read-only typed inventory of every executable family; shared atomic replay for existing `feature_order`; unchanged historical JSON and mixed-family/consumer regression proof | Verified; delivery pending |
+| 146B | Persistent authored order and sparse active/suppressed intent, validated candidates, typed dependency diagnostics and complete strict/legacy Core/JSON proof | Planned; not started |
+
+A supplies the existing-authority foundation; it introduces no suppression state, new JSON field,
+reorder command or UI completion claim. Its public query follows the current dependency order and
+includes BodyTransform/imported bases while excluding parameters, Sketches, paths and Body aliases.
+The existing generic JSON replay moves into PartDocument and continues using typed adders, preserving
+collection order and non-feature consumers. Every future history mutation must reuse that authority.
+Full Block 146 acceptance remains contingent on B and the H01 criteria in the consolidated sequence.
+
+146A is verified against the frozen runtime inventory in `development-setup.md`: focused Core
+**12 / 627**, full Core **601 / 22,700**, full Geometry **564 / 49,787**, full GUI **682 cases:
+648 passed, 34 native-only skips / 87,895 assertions**, and native persistence/history/Extrude
+combinations **36 / 2,708**, without skips. Separate native startup reaches expected timeout 124.
+Four checked-in legacy fixtures come from accepted Core `27256d7`, before rebuilding the library.
+Invalid metadata retains historical JSON diagnostics; no existing validation is relaxed. The first
+sandboxed GUI attempt is interrupted after protected atomic-publication failures; the identical
+final run with required filesystem access passes. Exact logs/provenance live in the setup guide.
+Implemented-through remains 145. Source/staged review precedes the normal protected PR delivery.
 
 ## Later phases
 
