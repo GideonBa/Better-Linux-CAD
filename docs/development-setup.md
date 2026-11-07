@@ -3912,3 +3912,8 @@ The separate unchanged-GUI inventory passes **5 / 568**, no skips/failures
 (`/tmp/blcad149a-final-inventory.log`). It confirms implemented-through 148/current 149 and planned
 material UI mappings. All 981 runtime fingerprints remain unchanged after documentation updates.
 Normal PR delivery, confirmed merge and refreshed-main/reviewed-tree comparison precede B.
+
+
+Delivery: [PR #152](https://github.com/GideonBa/Better-Linux-CAD/pull/152), implementation `830e449`.
+The delivery-record commit changes documentation only and preserves all 981 runtime fingerprints.
+Normal merge and verified refreshed-main/reviewed-tree comparison precede 149B.

@@ -2183,7 +2183,7 @@ one common resource store for later Hole/Thread tables, not independent per-modu
 
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
-| 149A | Typed density/engineering pressure, per-value provenance, immutable Material and typed standards-table revisions, duplicate/conflict rules and atomic catalog merge; synthetic Core tests | Verified; delivery pending |
+| 149A | Typed density/engineering pressure, per-value provenance, immutable Material and typed standards-table revisions, duplicate/conflict rules and atomic catalog merge; synthetic Core tests | Delivered via PR #152 |
 | 149B | Standalone Part snapshots, Part default/Body overrides, Project resource deduplication, strict versioned JSON and offline/legacy compatibility | Planned; not started |
 | 149C | Explicit coordinated revision updates, referenced-resource removal guards and atomic multi-document rollback/freshness evidence through existing mutation authorities | Planned; not started |
 
@@ -2201,6 +2201,11 @@ No Part/Project JSON, assignment, mass/UI or capability promotion is added. Geom
 is unchanged and its preceding accepted results are retained without claiming reruns. Exact
 commands/source digest are recorded in `development-setup.md`. Whole 149 remains in progress;
 normal delivery/confirmed merge and refreshed-main/tree comparison precede 149B.
+
+
+149A delivery: [PR #152](https://github.com/GideonBa/Better-Linux-CAD/pull/152), implementation
+`830e449`. The delivery-record update changes documentation only and preserves all 981 runtime
+fingerprints. Confirm normal merge and compare refreshed main with the reviewed tree before 149B.
 
 ## Later phases
 
