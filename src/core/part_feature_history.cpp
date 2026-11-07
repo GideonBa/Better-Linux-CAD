@@ -284,11 +284,13 @@ Result<std::size_t> PartDocument::sync_graph(DependencyGraph graph, Invalidation
 }
 
 void PartDocument::append_history_executable(const std::string& id) {
+  ++executable_generation_;
   if (history_intent_ && std::find(history_intent_->order.begin(), history_intent_->order.end(),
                                    id) == history_intent_->order.end())
     history_intent_->order.push_back(id);
 }
 void PartDocument::erase_history_executable(const std::string& id) {
+  ++executable_generation_;
   if (history_intent_) {
     std::erase(history_intent_->order, id);
     std::erase(history_intent_->suppressed, id);

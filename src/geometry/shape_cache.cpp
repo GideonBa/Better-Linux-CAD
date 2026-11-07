@@ -2,6 +2,7 @@
 #include "part_history_evaluation.hpp"
 
 #include "blcad/core/part_document.hpp"
+#include "blcad/core/part_document_json.hpp"
 
 #include <algorithm>
 #include <iterator>
@@ -25,6 +26,7 @@ Result<ShapeCache> ShapeCache::create(ShapeCacheId id) {
 }
 
 Result<std::size_t> ShapeCache::store_feature_shape(FeatureId feature_id, GeometryShape shape) {
+  invalidate_history_result();
   const auto validation = validate_cache_input(feature_id, shape);
   if (validation.has_error()) {
     return validation;
@@ -46,6 +48,7 @@ Result<std::size_t> ShapeCache::store_feature_shape(FeatureId feature_id, Geomet
 }
 
 Result<std::size_t> ShapeCache::set_final_shape(FeatureId source_feature_id, GeometryShape shape) {
+  invalidate_history_result();
   const auto validation = validate_cache_input(source_feature_id, shape);
   if (validation.has_error()) {
     return validation;
@@ -59,6 +62,7 @@ Result<std::size_t> ShapeCache::set_final_shape(FeatureId source_feature_id, Geo
 }
 
 Result<bool> ShapeCache::remove_feature_shape(FeatureId feature_id) {
+  invalidate_history_result();
   if (feature_id.empty()) {
     return Result<bool>::failure(
         Error::validation(kShapeCacheObjectId, "feature id must not be empty"));
@@ -87,6 +91,7 @@ Result<bool> ShapeCache::remove_feature_shape(FeatureId feature_id) {
 
 Result<std::size_t> ShapeCache::store_body_shape(BodyId body_id, FeatureId source_feature_id,
                                                  GeometryShape shape) {
+  invalidate_history_result();
   if (body_id.empty()) {
     return Result<std::size_t>::failure(
         Error::validation(kShapeCacheObjectId, "body id must not be empty"));
@@ -113,6 +118,7 @@ Result<std::size_t> ShapeCache::store_body_shape(BodyId body_id, FeatureId sourc
 }
 
 Result<bool> ShapeCache::remove_body_shape(BodyId body_id) {
+  invalidate_history_result();
   if (body_id.empty()) {
     return Result<bool>::failure(
         Error::validation(kShapeCacheObjectId, "body id must not be empty"));
@@ -128,6 +134,7 @@ Result<bool> ShapeCache::remove_body_shape(BodyId body_id) {
 }
 
 Result<std::size_t> ShapeCache::store_reference_result(CachedReferencePartResult result) {
+  invalidate_history_result();
   const auto invalid = [](std::string message) {
     return Result<std::size_t>::failure(Error::validation(kShapeCacheObjectId, std::move(message)));
   };
@@ -164,7 +171,7 @@ const CachedReferencePartResult* ShapeCache::reference_result() const noexcept {
 
 Result<const CachedReferencePartResult*>
 ShapeCache::validated_reference_result(const PartDocument& document) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, *this);
   if (!history)
     return Result<const CachedReferencePartResult*>::failure(history.error());
   const auto invalid = [&document](std::string message) {
@@ -193,6 +200,7 @@ ShapeCache::validated_reference_result(const PartDocument& document) const {
 
 Result<std::size_t> ShapeCache::store_imported_body_result(FeatureId feature_id,
                                                            CachedReferencePartResult result) {
+  invalidate_history_result();
   const auto invalid = [](std::string message) {
     return Result<std::size_t>::failure(Error::validation(kShapeCacheObjectId, std::move(message)));
   };
@@ -249,7 +257,7 @@ const GeometryShape* ShapeCache::find_imported_body_shape(const FeatureId& featu
 Result<const CachedImportedBodyFeatureResult*>
 ShapeCache::validated_imported_body_result(const PartDocument& document,
                                            const ImportedBodyFeature& feature) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, *this);
   if (!history)
     return Result<const CachedImportedBodyFeatureResult*>::failure(history.error());
   const auto invalid = [&document](std::string message) {
@@ -293,6 +301,7 @@ Result<std::size_t> ShapeCache::validate_imported_body_owners(const PartDocument
 }
 
 Result<std::size_t> ShapeCache::reconcile_imported_body_owners(const PartDocument& document) {
+  invalidate_history_result();
   std::vector<FeatureId> removed;
   std::vector<BodyId> removed_bodies;
   for (const auto& cached : imported_body_results_) {
@@ -343,6 +352,7 @@ Result<std::size_t> ShapeCache::reconcile_imported_body_owners(const PartDocumen
 Result<std::size_t>
 ShapeCache::store_body_transform_state(BodyTransformId transform_id, BodyId body_id,
                                        GeometryAffineTransform cumulative_transform) {
+  invalidate_history_result();
   if (reference_result_)
     return Result<std::size_t>::failure(
         Error::validation(kShapeCacheObjectId, "Reference Part cache rejects body transforms"));
@@ -367,6 +377,7 @@ Result<std::size_t>
 ShapeCache::store_reference_transform(std::string reference_id, BodyId body_id,
                                       BodyTransformId source_transform_id,
                                       GeometryAffineTransform cumulative_transform) {
+  invalidate_history_result();
   if (reference_result_)
     return Result<std::size_t>::failure(
         Error::validation(kShapeCacheObjectId, "Reference Part cache rejects modeled transforms"));
@@ -390,12 +401,14 @@ ShapeCache::store_reference_transform(std::string reference_id, BodyId body_id,
 }
 
 void ShapeCache::clear_final_shape() noexcept {
+  invalidate_history_result();
   has_final_shape_ = false;
   final_feature_id_ = FeatureId();
   final_shape_ = GeometryShape();
 }
 
 void ShapeCache::clear() noexcept {
+  invalidate_history_result();
   feature_shapes_.clear();
   body_shapes_.clear();
   body_transform_states_.clear();
@@ -403,6 +416,99 @@ void ShapeCache::clear() noexcept {
   reference_result_.reset();
   imported_body_results_.clear();
   clear_final_shape();
+}
+
+void ShapeCache::invalidate_history_result() noexcept {
+  if (history_result_)
+    history_result_->sealed = false;
+}
+bool ShapeCache::has_history_scope() const noexcept {
+  return history_result_.has_value();
+}
+const PartHistoryEvaluationPlan* ShapeCache::history_plan() const noexcept {
+  return history_result_ ? &history_result_->plan : nullptr;
+}
+Result<std::size_t> ShapeCache::match_history_source(const PartDocument& document) const {
+  if (!history_result_) {
+    if (document.authored_history_intent())
+      return Result<std::size_t>::failure(Error::dependency(
+          document.id().value(), "Feature history requires a matching evaluated cache."));
+    return Result<std::size_t>::success(0);
+  }
+  const auto source = serialize_part_document_to_json(document);
+  if (!source)
+    return Result<std::size_t>::failure(source.error());
+  if (source.value() != history_result_->source_json ||
+      document.executable_generation() != history_result_->executable_generation)
+    return Result<std::size_t>::failure(Error::dependency(
+        document.id().value(), "History cache belongs to a different source intent."));
+  return Result<std::size_t>::success(history_result_->plan.entries.size());
+}
+Result<std::size_t>
+ShapeCache::validate_complete_history_result(const PartDocument& document) const {
+  const auto matched = match_history_source(document);
+  if (!matched)
+    return matched;
+  if (history_result_ && (!history_result_->sealed || history_result_->evaluating ||
+                          !history_result_->plan.complete()))
+    return Result<std::size_t>::failure(
+        Error::dependency(document.id().value(), "A complete fresh history result is required; "
+                                                 "partial or modified caches cannot be consumed."));
+  return matched;
+}
+Result<std::size_t> ShapeCache::validate_history_input(const PartDocument& document,
+                                                       std::string_view executing_feature,
+                                                       std::string_view source_feature) const {
+  const auto matched = match_history_source(document);
+  if (!matched)
+    return matched;
+  if (!history_result_)
+    return matched;
+  if (!history_result_->evaluating && !history_result_->sealed)
+    return Result<std::size_t>::failure(
+        Error::dependency(document.id().value(), "History cache was modified after evaluation."));
+  if (!executing_feature.empty() &&
+      (!history_result_->evaluating || history_result_->current_feature != executing_feature))
+    return Result<std::size_t>::failure(
+        Error::dependency(std::string(executing_feature),
+                          "Single-feature history execution requires an orchestrated evaluation."));
+  const auto require_active = [&](std::string_view id) -> Result<std::size_t> {
+    if (id.empty())
+      return Result<std::size_t>::success(0);
+    const auto& entries = history_result_->plan.entries;
+    const auto found = std::find_if(entries.begin(), entries.end(),
+                                    [&](const auto& row) { return row.feature.node_id == id; });
+    if (found == entries.end() || found->state != PartHistoryExecutionState::Active)
+      return Result<std::size_t>::failure(Error::dependency(
+          std::string(id),
+          "History producer is suppressed, blocked or outside the evaluated prefix."));
+    return Result<std::size_t>::success(1);
+  };
+  const auto executing = require_active(executing_feature);
+  if (!executing)
+    return executing;
+  return require_active(source_feature);
+}
+bool ShapeCache::history_body_available(const BodyId& body) const noexcept {
+  if (!history_result_)
+    return true;
+  const auto& bodies = history_result_->plan.bodies;
+  const auto found =
+      std::find_if(bodies.begin(), bodies.end(), [&](const auto& row) { return row.body == body; });
+  return found != bodies.end() && found->available;
+}
+const PartHistoryBodyAvailability*
+ShapeCache::history_body_input(std::string_view feature, const BodyId& body) const noexcept {
+  if (!history_result_)
+    return nullptr;
+  const auto& entries = history_result_->plan.entries;
+  const auto found = std::find_if(entries.begin(), entries.end(),
+                                  [&](const auto& row) { return row.feature.node_id == feature; });
+  if (found == entries.end())
+    return nullptr;
+  const auto input = std::find_if(found->body_inputs.begin(), found->body_inputs.end(),
+                                  [&](const auto& row) { return row.body == body; });
+  return input == found->body_inputs.end() ? nullptr : &*input;
 }
 
 const ShapeCacheId& ShapeCache::id() const noexcept {

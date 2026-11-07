@@ -594,3 +594,70 @@ TEST_CASE("Direct downstream entrypoints verify imported inputs even with a fres
   CHECK(body_volume(shapes, body) == Approx(old_volume));
   CHECK(checked(serialize_part_document_to_json(document)) == intent);
 }
+
+TEST_CASE("Imported mixed histories suppress and restore posed modifiers without stale outputs",
+          "[geometry][parity-b147][history-physical][imported-body-downstream-feature]") {
+  Fixture fixture;
+  fixture.write(BRepPrimAPI_MakeBox(20, 20, 10).Shape());
+  const auto source_bytes = fixture.source_bytes();
+  auto part = command_import(fixture, false);
+  const auto body = part.bodies().front().id();
+  add_boss(part, body);
+  add_cut(part, body);
+  add_hole(part, body);
+  const auto add_pose = [&](PartDocument& document) {
+    REQUIRE(document.add_body_transform(checked(BodyTransform::create_translate(
+        BodyTransformId("pose"), body, BodyTransformCoordinateSpace::World, std::nullopt,
+        {10, 0, 0}, false, false))));
+  };
+  auto oracle_document = part;
+  add_pose(oracle_document);
+  auto oracle = cache();
+  StepImportTopologyContext oracle_context(fixture.root);
+  REQUIRE(GeometryRecomputeExecutor{&oracle_context}.execute_document(oracle_document, oracle));
+  add_imported_fillet(part, body);
+  add_pose(part);
+  const std::vector<std::string> order{"import.base", "boss", "cut", "hole", "fillet", "pose"};
+  REQUIRE(part.apply_history_intent({order, {"fillet"}}));
+  auto shapes = cache();
+  StepImportTopologyContext context(fixture.root);
+  const GeometryRecomputeExecutor executor{&context};
+  REQUIRE(executor.execute_document(part, shapes));
+  REQUIRE(shapes.validate_complete_history_result(part));
+  CHECK(shapes.find_feature_shape(FeatureId("fillet")) == nullptr);
+  CHECK(body_volume(shapes, body) == Approx(expected(14, 2, 0)).margin(1e-5));
+  const auto bounds = checked(BodyTransformAdapter{}.bounds(*shapes.find_body_shape(body)));
+  const auto expected_bounds =
+      checked(BodyTransformAdapter{}.bounds(*oracle.find_body_shape(body)));
+  CHECK(bounds.minimum.x == Approx(expected_bounds.minimum.x));
+  CHECK(bounds.maximum.x == Approx(expected_bounds.maximum.x));
+  reexport(part, shapes, fixture, expected(14, 2, 0));
+  REQUIRE(part.apply_history_intent({order, {}}));
+  REQUIRE(executor.execute_plan(part, checked(part.create_recompute_plan()), shapes));
+  CHECK(body_volume(shapes, body) == Approx(expected()).margin(1e-5));
+  reexport(part, shapes, fixture, expected());
+  REQUIRE(part.apply_history_intent({order, {"pose"}}));
+  REQUIRE(executor.execute_plan(part, checked(part.create_recompute_plan()), shapes));
+  CHECK(shapes.find_body_transform_state(BodyTransformId("pose")) == nullptr);
+  CHECK(checked(BodyTransformAdapter{}.bounds(*shapes.find_body_shape(body))).minimum.x ==
+        Approx(0).margin(1e-6));
+  const auto json = checked(serialize_part_document_to_json(part));
+  for (std::size_t prefix = 0; prefix <= order.size(); ++prefix) {
+    CAPTURE(prefix);
+    REQUIRE(executor.execute_history_prefix(part, prefix, shapes));
+    CHECK_FALSE(shapes.validate_complete_history_result(part));
+    CHECK(checked(serialize_part_document_to_json(part)) == json);
+  }
+  REQUIRE(executor.execute_document(part, shapes));
+  REQUIRE(shapes.validate_complete_history_result(part));
+  const auto topology_before = topology(*shapes.find_body_shape(body));
+  fixture.write_bytes(source_bytes + "\n/* unaccepted supplier revision */\n");
+  StepImportTopologyContext changed_context(fixture.root);
+  CHECK_FALSE(GeometryRecomputeExecutor{&changed_context}.execute_document(part, shapes));
+  CHECK(topology(*shapes.find_body_shape(body)) == topology_before);
+  const auto export_path = fixture.root / "rejected.step";
+  CHECK_FALSE(
+      StepExporter{&changed_context}.write_document_step(part, shapes, export_path.string()));
+  CHECK_FALSE(std::filesystem::exists(export_path));
+  CHECK(checked(serialize_part_document_to_json(part)) == json);
+}

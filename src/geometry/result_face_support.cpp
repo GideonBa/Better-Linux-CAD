@@ -134,7 +134,7 @@ Result<ResolvedWorkplane>
 ResultFaceSupportGeometry::resolve(const PartDocument& document, const ResultFaceWorkplane& plane,
                                    const ShapeCache& cache,
                                    StepImportTopologyContext* import_context) {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_input(document, cache);
   if (!history)
     return Result<ResolvedWorkplane>::failure(history.error());
   auto valid = validate_result_face_workplane_reference(document, plane);
@@ -184,7 +184,7 @@ Result<std::vector<ResultFaceSelectionTarget>>
 ResultFaceSupportGeometry::selectable_faces(const PartDocument& document, const ShapeCache& cache,
                                             const BodyId& body,
                                             StepImportTopologyContext* import_context) {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_evaluation(document, &cache);
   if (!history)
     return Result<std::vector<ResultFaceSelectionTarget>>::failure(history.error());
   const auto* model_body = document.find_body(body);

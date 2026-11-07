@@ -165,7 +165,8 @@ source_transform(const PartDocument& document, const ShapeCache& cache,
 Result<ResolvedSemanticEdge>
 SemanticReferenceEvaluator::resolve_edge(const PartDocument& document,
                                          SemanticEdgeReference reference) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history =
+      detail::validate_history_source(document, reference.source_feature().value());
   if (!history)
     return Result<ResolvedSemanticEdge>::failure(history.error());
   auto corners = resolve_rectangular_additive_extrude_corners(document, reference.source_feature());
@@ -180,7 +181,8 @@ Result<ResolvedSemanticEdge>
 SemanticReferenceEvaluator::resolve_edge(const PartDocument& document,
                                          SemanticEdgeReference reference,
                                          const ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history =
+      detail::validate_history_source(document, reference.source_feature().value(), &shape_cache);
   if (!history)
     return Result<ResolvedSemanticEdge>::failure(history.error());
   const FeatureId source = reference.source_feature();
@@ -197,7 +199,8 @@ SemanticReferenceEvaluator::resolve_edge(const PartDocument& document,
 Result<ResolvedSemanticVertex>
 SemanticReferenceEvaluator::resolve_vertex(const PartDocument& document,
                                            SemanticVertexReference reference) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history =
+      detail::validate_history_source(document, reference.source_feature().value());
   if (!history)
     return Result<ResolvedSemanticVertex>::failure(history.error());
   auto corners = resolve_rectangular_additive_extrude_corners(document, reference.source_feature());
@@ -213,7 +216,8 @@ Result<ResolvedSemanticVertex>
 SemanticReferenceEvaluator::resolve_vertex(const PartDocument& document,
                                            SemanticVertexReference reference,
                                            const ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history =
+      detail::validate_history_source(document, reference.source_feature().value(), &shape_cache);
   if (!history)
     return Result<ResolvedSemanticVertex>::failure(history.error());
   const FeatureId source = reference.source_feature();

@@ -214,7 +214,7 @@ Result<TopoDS_Shape> make_profile_face(const PointRange& points, PointMapper map
 Result<std::vector<ConstructionSelectionTarget>>
 ViewportSceneBuilder::build_body_rotation_sources(const PartDocument& document,
                                                   const ShapeCache& cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_evaluation(document, &cache);
   if (!history)
     return Result<std::vector<ConstructionSelectionTarget>>::failure(history.error());
   std::vector<ConstructionSelectionTarget> targets;
@@ -257,7 +257,7 @@ ViewportSceneBuilder::build_body_rotation_sources(const PartDocument& document,
 Result<std::vector<ConstructionSelectionTarget>>
 ViewportSceneBuilder::build_construction_sources(const PartDocument& document,
                                                  const ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_evaluation(document, &shape_cache);
   if (!history)
     return Result<std::vector<ConstructionSelectionTarget>>::failure(history.error());
   std::vector<ConstructionSelectionTarget> targets;
@@ -344,7 +344,7 @@ ViewportSceneBuilder::build_construction_sources(const PartDocument& document,
 Result<std::vector<ViewportSceneItem>>
 ViewportSceneBuilder::build_part(const PartDocument& document,
                                  const ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_evaluation(document, &shape_cache);
   if (!history)
     return Result<std::vector<ViewportSceneItem>>::failure(history.error());
   try {

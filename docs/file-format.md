@@ -57,8 +57,8 @@ persistence belongs to 146B and must be specified here before its writer is adde
 
 ## Authored Part history intent — Block 146B, 2026-11-07
 
-This is the migration contract for explicit intent. Effective execution and native history UI
-remain assigned to 147–148; the conservative consumer boundary does not claim their completion.
+This is the migration contract for explicit intent. Geometry execution belongs to 147B below;
+native history browser editing remains assigned to 148.
 Legacy Parts retain `blcad.part_document.mvp1`, version **1**, their existing optional `feature_order`
 and exact canonical bytes. New explicit history intent uses the same schema with version **2**.
 Version 2 always requires complete `feature_order` and a `suppressed_features` array of executable
@@ -78,7 +78,8 @@ Version 2 applies the same candidate validation after generic loading and result
 Prelude recursion strips new intent and uses version 1; final publication reinstates the complete
 validated intent. Family arrays retain their independent historical collection-order contract.
 No derived dependency edge, blocked state, shape or cache is persisted. Effective bypass/output
-availability belongs to 147; all consumers must fail closed while that evaluator is unavailable.
+availability belongs to 147; the temporary 146B rejection boundary is replaced by the scoped
+147B evaluator. Derived state still cannot be persisted.
 The history browser and its visible state/diagnostics remain assigned to 148.
 
 Block 147A derives a read-only availability/prefix plan from those records. Its Active, Suppressed,
@@ -86,6 +87,12 @@ Blocked and OutsidePrefix execution states, Body input snapshots, availability a
 issues are transient results. They add no JSON field/version/default and never replace stored
 active/suppressed intent. A complete Core plan is not a fresh Geometry result. Effective evaluation,
 cache manifests and prefix publication protections remain assigned to 147B.
+
+Block 147B implements disposable Geometry evaluation without changing that migration contract.
+Evaluation scopes, exact-source completion stamps and executable lifetime generations stay in
+memory. A prefix never removes suffix definitions or changes persisted active/suppressed flags.
+Version-1 canonical byte oracles and version-2 intent remain unchanged. Runtime/native acceptance
+is recorded in `mvp-plan.md` and `development-setup.md`; visible history editing remains 148.
 
 ## Project structure
 

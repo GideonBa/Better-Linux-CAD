@@ -104,10 +104,10 @@ does not satisfy suppression/reorder or Geometry/native H01 acceptance; those ga
 146B adds `[core][history-intent]` for complete disposable candidates, sparse states, explicit
 independent order, typed producer/resource dependency rejection, same-Body predecessor replacement,
 append/remove/ID reuse across every current family, result-face/Project embedding and strict
-version-1/2 migration. `[history-evaluation-boundary]` currently proves that unsupported explicit
-intent cannot consume old Geometry or publish a falsely fresh GUI result. That conservative
-boundary is replaced by physical effective/prefix/freshness proof in 147; it does not satisfy H01's
-effective-evaluation gate or the native browser gate in 148.
+version-1/2 migration. `[history-evaluation-boundary]` originally proved at 146B delivery that unsupported explicit
+intent could not consume old Geometry or publish a falsely fresh GUI result. That temporary
+boundary is replaced by physical effective/prefix/freshness proof in 147 below; the historical
+rejection alone did not satisfy H01's effective-evaluation gate or the native browser gate in 148.
 
 147A `[core][history-evaluation-plan]` proves logical availability across all families and every
 prefix boundary, exact Body-input predecessors, suppressed creators/modifiers, resource-mediated
@@ -115,6 +115,17 @@ semantic output loss, blocked active chains, explicit dependent closures, indepe
 consumed tools, imported/reference ownership, missing creators and misleading resource ID prefixes.
 Canonical JSON, source graph and invalidation remain unchanged. This remains a Core projection;
 147B must supply physical H01/H02, complete-source cache and native consumer evidence.
+
+147B `[geometry][history-physical]` and `[history-evaluation-boundary]` compare all fourteen native
+families against independent legacy rebuilds, including every prefix and suppression/restore.
+Mixed/negative cases cover independent reorder, explicit dependent closure, unaffected Bodies,
+identical ID/JSON reuse, failed suffix atomicity, imported base/boss/cut/Hole/Fillet/transform with
+STEP readback, immutable Reference scopes and assembly analysis/export. Public cache writes/clear,
+old intent, partial final-row scopes, source changes and direct-operation resurrection cannot
+certify complete results. `[gui][history-evaluation-boundary]` combines native scene ownership,
+Measure, empty-result export preflight, persistence, one-entry Undo/Redo and repair. Exact full/native
+runs and acceptance remain governed by `development-setup.md`/`mvp-plan.md`; browser events, marker
+insertion and Save during marker preview are 148 acceptance, not supplied by these evaluator tests.
 
 ### H02 End of Part and suffix validation
 

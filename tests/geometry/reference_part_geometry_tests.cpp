@@ -593,3 +593,29 @@ TEST_CASE(
   fixture.write_bytes(original);
   CHECK(fixture.bytes() == original);
 }
+
+TEST_CASE("Immutable Reference Parts retain their source basis in disposable prefix scopes",
+          "[geometry][parity-b147][history-physical][reference-part]") {
+  Fixture fixture;
+  fixture.write(box());
+  const auto document = fixture.reference();
+  const auto json = checked(serialize_part_document_to_json(document));
+  StepImportTopologyContext context(fixture.root);
+  const GeometryRecomputeExecutor executor{&context};
+  auto shapes = cache();
+  REQUIRE(executor.execute_history_prefix(document, 0, shapes));
+  REQUIRE(shapes.reference_result());
+  CHECK(shapes.feature_shape_count() == 0);
+  CHECK_FALSE(shapes.validate_complete_history_result(document));
+  CHECK_FALSE(BodyResultInspector{}.inspect(document, shapes));
+  CHECK_FALSE(StepExporter{&context}.write_document_step(document, shapes,
+                                                         (fixture.root / "partial.step").string()));
+  CHECK_FALSE(std::filesystem::exists(fixture.root / "partial.step"));
+  REQUIRE(executor.execute_document(document, shapes));
+  REQUIRE(shapes.validate_complete_history_result(document));
+  CHECK(checked(BodyResultInspector{}.inspect(document, shapes)).solid_body_count == 1);
+  CHECK(RectangleExtrusionAdapter{}
+            .summarize(*shapes.find_body_shape(document.bodies().front().id()))
+            .volume_mm3 == Approx(6000));
+  CHECK(checked(serialize_part_document_to_json(document)) == json);
+}

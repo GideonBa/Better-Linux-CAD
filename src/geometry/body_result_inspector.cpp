@@ -7,7 +7,7 @@ namespace blcad::geometry {
 
 Result<PartBodyInspection> BodyResultInspector::inspect(const PartDocument& document,
                                                         const ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_evaluation(document, &shape_cache);
   if (!history)
     return Result<PartBodyInspection>::failure(history.error());
   if (shape_cache.reference_result() != nullptr) {
@@ -30,6 +30,8 @@ Result<PartBodyInspection> BodyResultInspector::inspect(const PartDocument& docu
   PartBodyInspection inspection;
   inspection.bodies.reserve(document.bodies().size());
   for (const Body& body : document.bodies()) {
+    if (!shape_cache.history_body_available(body.id()))
+      continue;
     BodyResultInspection result{body.id(),         body.name(),  body.kind(),
                                 body.visibility(), std::nullopt, std::nullopt};
     if (body.kind() == BodyKind::Solid)
@@ -53,7 +55,7 @@ Result<PartBodyInspection> BodyResultInspector::inspect(const PartDocument& docu
 Result<GeometryShape>
 BodyResultInspector::resolve_compatible_final_shape(const PartDocument& document,
                                                     const ShapeCache& shape_cache) const {
-  const auto history = detail::validate_history_evaluation(document);
+  const auto history = detail::validate_history_evaluation(document, &shape_cache);
   if (!history)
     return Result<GeometryShape>::failure(history.error());
   if (document.is_reference_part() || shape_cache.reference_result() != nullptr) {
@@ -71,16 +73,31 @@ BodyResultInspector::resolve_compatible_final_shape(const PartDocument& document
     return Result<GeometryShape>::success(*shape);
   }
 
-  if (document.bodies().size() != 1U) {
-    return Result<GeometryShape>::failure(Error::geometry(
-        document.id().value(), "historical final shape is ambiguous for a multi-body part"));
+  const Body* selected = nullptr;
+  if (!shape_cache.has_history_scope()) {
+    if (document.bodies().size() != 1U)
+      return Result<GeometryShape>::failure(Error::geometry(
+          document.id().value(), "historical final shape is ambiguous for a multi-body part"));
+    if (document.bodies().front().kind() != BodyKind::Solid)
+      return Result<GeometryShape>::failure(
+          Error::geometry(document.bodies().front().id().value(),
+                          "historical final shape requires exactly one solid body"));
+    selected = &document.bodies().front();
+  } else {
+    for (const auto& candidate : document.bodies()) {
+      if (!shape_cache.history_body_available(candidate.id()))
+        continue;
+      if (selected || candidate.kind() != BodyKind::Solid)
+        return Result<GeometryShape>::failure(
+            Error::geometry(document.id().value(),
+                            "Historical final shape requires exactly one available solid Body."));
+      selected = &candidate;
+    }
+    if (!selected)
+      return Result<GeometryShape>::failure(
+          Error::geometry(document.id().value(), "Part has no available solid Body."));
   }
-
-  const Body& body = document.bodies().front();
-  if (body.kind() != BodyKind::Solid) {
-    return Result<GeometryShape>::failure(Error::geometry(
-        body.id().value(), "historical final shape requires exactly one solid body"));
-  }
+  const auto& body = *selected;
 
   const GeometryShape* shape = shape_cache.find_body_shape(body.id());
   if (shape == nullptr) {

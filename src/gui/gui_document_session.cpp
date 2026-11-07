@@ -1627,7 +1627,8 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
         std::find_if(part_history_geometry_.begin(), part_history_geometry_.end(),
                      [&](const auto& item) { return item.history_index == index; });
     const bool reuse = !entry.allow_failed_recompute && part->step_import_sources().empty() &&
-                       retained != part_history_geometry_.end();
+                       retained != part_history_geometry_.end() &&
+                       retained->cache.validate_complete_history_result(*part).has_value();
     auto cache = reuse
                      ? Result<geometry::ShapeCache>::success(retained->cache)
                      : geometry::ShapeCache::create(ShapeCacheId("gui.part." + part->id().value()));

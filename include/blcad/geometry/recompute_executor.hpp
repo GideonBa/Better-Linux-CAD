@@ -118,8 +118,14 @@ public:
 
   [[nodiscard]] Result<GeometryRecomputeSummary> execute_document(const PartDocument& document,
                                                                   ShapeCache& shape_cache) const;
+  [[nodiscard]] Result<GeometryRecomputeSummary>
+  execute_history_prefix(const PartDocument& document, std::size_t prefix_count,
+                         ShapeCache& shape_cache) const;
 
 private:
+  [[nodiscard]] Result<GeometryRecomputeSummary>
+  execute_history(const PartDocument& document, std::optional<std::size_t> prefix_count,
+                  ShapeCache& shape_cache) const;
   [[nodiscard]] Result<std::size_t> validate_import_sources() const;
   [[nodiscard]] Result<std::size_t> execute_path_extrude(const PartDocument& document,
                                                          const Feature& feature,
