@@ -181,6 +181,14 @@ volume/bounds and semantic scene identities across adoption, removal and reopeni
 publication/Undo/Redo use existing full candidate recompute; this does not claim material-only
 BRep reuse before 150.
 
+150A exposes complete Part physical inspection through `BodyResultInspector` using its own fresh
+private cache. It accepts no borrowed legacy/prefix result as a physical freshness certificate.
+The immutable result retains private exact Part JSON/executable generation, and `validate_current`
+reobserves actual imported inputs through an explicit context plus final source-byte validation.
+Core final Body availability applies to legacy consumed tools as well as authored suppression;
+visibility does not remove physical Bodies. This query changes no model/cache authority and its
+numbers are never persisted. Reusable material-only evaluation/session integration remains 150C.
+
 ## Validation
 
 Current rules:

@@ -126,6 +126,52 @@ Retained Undo snapshots stay immutable. Resource edits do not change executable 
 geometric dependency edges; ordinary session freshness/recompute still applies. Material-only
 BRep reuse and mass invalidation remain 150, and visible management remains 151.
 
+## Physical properties — Block 150 contract
+
+Geometry owns one read-only physical-properties authority, exposed through `BodyResultInspector`.
+150A computes shape measures and complete Part results using an evaluator-owned fresh cache;
+150B adds posed assembly aggregation; 150C integrates verified material-only reuse and closes R02.
+No physical result is persistent intent or a new parameter kind. Existing Body Summary stays intact;
+the visible Physical Properties task remains 151.
+
+Part coordinates are local model coordinates in mm. Areas use mm², solid volumes mm³, mass kg,
+central inertia tensors kg·mm² in axes parallel to the model frame. Volume-weighted centroid is
+available independently of density. Mass uses the pinned material density in kg/mm³. Principal
+moments are ascending with paired unit directions; near-repeated eigenvalues mark the axes
+non-unique. Axis sign is not identity. Central tensors aggregate by the parallel-axis theorem,
+using shifted/extended-precision sums; posed assemblies rotate tensors and transform centroids
+through the existing exact inner-to-outer authored chain into root coordinates.
+
+Physical participation includes hidden active Bodies/components and excludes suppressed/unavailable
+creators and consumed Boolean tools. Existing visible-only viewport/export participation is unchanged.
+Each repeated occurrence counts separately. Independent overlapping Bodies add volume/mass/face area;
+the query does not fuse them. Surface Bodies have trimmed-face area and no solid volume/mass, even
+with an assigned material. Empty/surface-only scope has `NotApplicable` mass; solids without any
+known density have `Unavailable` mass; mixed known/missing density is `Partial`, exposing only an
+explicit known-subset mass/centroid/tensor. Complete solid density coverage yields `Complete` mass.
+There is no guessed density or silent zero. Surface rows do not make a complete solid-subset total
+partial; their excluded solid-mass status remains explicit. A legacy aggregate has no invented Body ID.
+
+Shape integration uses analytic OCCT geometry, adaptive requested relative tolerance 10⁻⁹ and reports
+the returned area/volume error estimates. Closed valid solids are measured individually, normalizing
+reversed orientation consistently for volume and inertia. Integration uses a disposable shape copy
+translated near the origin; central tensors are computed there and centroids translated back, avoiding
+large-coordinate subtraction inside global moment calculations. Open/invalid Solid results, free faces in
+a Solid Body, missing participating shapes, non-finite or unrepresentable derived numbers fail closed.
+Surface-only area remains valid. No triangulation approximation certifies the numeric result.
+
+Part results are immutable derived snapshots with a private exact canonical source/generation stamp.
+`validate_current` rechecks that source and actual imported inputs through an explicit import context;
+a prefix, stale/foreign borrowed cache or public stamp cannot certify a Part result. 150A recomputes
+its complete private cache instead of trusting the legacy unscoped cache contract. Material-only
+reuse/session integration remains 150C; no performance or visible UI acceptance is inferred from A.
+
+R02A analytic scalar oracles use 10⁻⁹ relative plus 10⁻¹² absolute tolerance in their reported units.
+Tensor/reconstruction checks use 10⁻⁸ relative plus 10⁻¹⁰ absolute; the 10⁸-mm translation case permits
+10⁻⁴ mm⁵ tensor absolute error and 10⁻⁶-mm centroid displacement error. These are fixture comparison
+budgets, not extra guaranteed precision in a published result. Principal directions are marked
+non-unique when adjacent moments differ by at most 10⁻⁸ of the largest moment.
+
 ## Planned modules
 
 | Module | Function |

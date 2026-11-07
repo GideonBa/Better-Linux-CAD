@@ -2,6 +2,7 @@
 
 #include "blcad/core/part_document.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/geometry/physical_properties.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 
@@ -29,6 +30,9 @@ struct PartBodyInspection {
 
 class BodyResultInspector {
 public:
+  [[nodiscard]] Result<PartPhysicalProperties>
+  inspect_physical_properties(const PartDocument& document,
+                              StepImportTopologyContext* imports = nullptr) const;
   [[nodiscard]] Result<PartBodyInspection> inspect(const PartDocument& document,
                                                    const ShapeCache& shape_cache) const;
 

@@ -189,6 +189,9 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_target_compatibility.cpp
     src/geometry/assembly_transform_evaluator.cpp
     src/geometry/body_result_inspector.cpp
+    src/geometry/shape_physical_properties.cpp
+    src/geometry/physical_property_math.cpp
+    src/geometry/part_physical_properties.cpp
     src/geometry/body_transform_adapter.cpp
     src/geometry/body_boolean_adapter.cpp
     src/geometry/circular_cut_adapter.cpp
@@ -589,6 +592,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/assembly_transform_evaluator_tests.cpp
       tests/geometry/back_workplane_pipeline_tests.cpp
       tests/geometry/body_result_inspector_tests.cpp
+      tests/geometry/physical_properties_tests.cpp
       tests/geometry/body_transform_pipeline_tests.cpp
       tests/geometry/body_boolean_pipeline_tests.cpp
       tests/geometry/bolt_circle_pattern_pipeline_tests.cpp

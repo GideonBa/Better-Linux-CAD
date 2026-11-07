@@ -2,6 +2,7 @@
 #include "blcad/core/project_json.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
+#include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -347,6 +348,15 @@ TEST_CASE(
     SKIP("Requires native OCCT measurement picks");
   ShellWindow window;
   fixture(window);
+  int inspect = -1;
+  for (int i = 0; i < window.ribbon().tab_count(); ++i)
+    if (window.ribbon().tab_title(i) == QStringLiteral("Inspect"))
+      inspect = i;
+  REQUIRE(inspect >= 0);
+  REQUIRE(window.ribbon().tab_enabled(inspect));
+  window.ribbon().set_current_tab(inspect);
+  qApp->processEvents();
+  CHECK(window.ribbon().current_tab() == inspect);
   auto& tools = window.measure_tools();
   const auto before = snapshot(window);
   auto& distance_action = action(window, "measure_distance");
