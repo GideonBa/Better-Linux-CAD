@@ -4216,3 +4216,7 @@ Final focused offscreen GUI again passes **20 / 2 native-only skips / 1,503 asse
 (`blcad150a-final-inventory.log`). All 1,000 final runtime fingerprints remain unchanged. Working/
 staged whitespace and complete source review pass before delivery. This accepts A only; whole 150,
 posed assembly properties, material-only reuse and new material/physical UI remain open.
+
+Delivery: [PR #156](https://github.com/GideonBa/Better-Linux-CAD/pull/156), implementation `ab57d37`.
+The delivery-record commit changes documentation only and preserves all 1,000 final runtime
+fingerprints. Normal merge and verified refreshed-main/reviewed-tree comparison precede 150B.

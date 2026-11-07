@@ -2286,7 +2286,7 @@ contracts are extended in `engineering-modules.md` and `gui-measure-mvp9.md`, no
 
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
-| 150A | Analytic shape measures, stable central/principal tensors, density-aware complete Part query with immutable freshness, surface/empty/missing-density semantics and focused analytic/combination tests | Implemented and verified; delivery pending |
+| 150A | Analytic shape measures, stable central/principal tensors, density-aware complete Part query with immutable freshness, surface/empty/missing-density semantics and focused analytic/combination tests | Implemented and verified; PR #156 |
 | 150B | Explicit physical assembly participation, hidden active/repeated nested occurrences, posed centroid/tensor aggregation and independent analytic oracles | Planned; not started |
 | 150C | Authoritative material-only reuse through existing cache/session owners, result invalidation and complete R02/combined acceptance | Planned; not started |
 
@@ -2305,6 +2305,11 @@ Only A is accepted: complete Part snapshots, density-aware tensors/availability 
 freshness. Whole 150 remains in progress; assembly poses, material-only reuse and new UI remain B/C/151.
 Implemented-through stays 149. Complete normal PR delivery/confirmed merge and refreshed-main/tree
 comparison before B.
+
+150A delivery: [PR #156](https://github.com/GideonBa/Better-Linux-CAD/pull/156), implementation
+`ab57d37`. The delivery-record update changes documentation only and preserves all 1,000 final
+runtime fingerprints. Confirm normal merge and compare refreshed main with the reviewed tree
+before B.
 
 ## Later phases
 
