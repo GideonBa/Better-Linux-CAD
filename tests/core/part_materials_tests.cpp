@@ -186,3 +186,77 @@ TEST_CASE("Legacy Project version 1 rejects scoped resources while the writer us
     CHECK_FALSE(deserialize_project_from_json(data.dump()));
   }
 }
+
+TEST_CASE(
+    "Explicit Part revision adoption remaps exact material pins and preserves geometry intent",
+    "[core][parity-b149][resource-revision]") {
+  auto p = part();
+  REQUIRE(p.add_body(checked(Body::create(BodyId("body.tool"), "Tool", BodyKind::Solid))));
+  REQUIRE(p.set_body_material(BodyId("body.base"), fixture::key()));
+  REQUIRE(p.set_body_material(BodyId("body.tool"), fixture::key("synthetic.material", "r2")));
+  const auto generation = p.executable_generation();
+  const auto graph = p.dependency_graph().dependencies();
+  const auto next = fixture::key("synthetic.material", "r3");
+  CHECK(checked(p.adopt_engineering_resource_revision(fixture::key(),
+                                                      fixture::material("r3", 7000))) == 3);
+  CHECK(p.default_material() == next);
+  CHECK(p.effective_material_for_body(BodyId("body.base"))->key() == next);
+  CHECK(p.effective_material_for_body(BodyId("body.tool"))->key().revision() == "r2");
+  REQUIRE(p.engineering_resources().find_material(fixture::key()));
+  CHECK(p.engineering_resources().entries().size() == 4);
+  CHECK(p.executable_generation() == generation);
+  CHECK(p.dependency_graph().dependencies() == graph);
+  const auto before = text(p);
+  CHECK(checked(p.adopt_engineering_resource_revision(next, fixture::material("r3", 7000))) == 0);
+  CHECK_FALSE(p.adopt_engineering_resource_revision(next, fixture::material("r3", 9000)));
+  CHECK_FALSE(p.adopt_engineering_resource_revision(fixture::key("missing"),
+                                                    fixture::material("r4", 8000)));
+  CHECK_FALSE(p.adopt_engineering_resource_revision(next, fixture::table()));
+  CHECK(text(p) == before);
+  const auto table = fixture::table();
+  const auto next_table =
+      checked(EngineeringStandardTable::create(fixture::key("synthetic.table", "r2"), table.name(),
+                                               table.provenance(), table.columns(), table.rows()));
+  CHECK(checked(p.adopt_engineering_resource_revision(table.key(), next_table)) == 1);
+  CHECK(p.default_material() == next);
+  CHECK(p.engineering_resources().find_table(next_table.key()));
+  CHECK(p.engineering_resources().find_table(table.key()));
+  CHECK(text(checked(deserialize_part_document_from_json(text(p)))) == text(p));
+}
+
+TEST_CASE("Resource removal guards material pins and normalizes empty standalone snapshots",
+          "[core][parity-b149][resource-revision]") {
+  auto p = part();
+  REQUIRE(p.set_body_material(BodyId("body.base"), fixture::key("synthetic.material", "r2")));
+  const auto before = text(p);
+  CHECK_FALSE(p.remove_engineering_resource(fixture::key()));
+  CHECK_FALSE(p.remove_engineering_resource(fixture::key("synthetic.material", "r2")));
+  CHECK(text(p) == before);
+  REQUIRE(p.set_default_material(std::nullopt));
+  CHECK(checked(p.remove_engineering_resource(fixture::key())) == 1);
+  CHECK(checked(p.remove_engineering_resource(fixture::key())) == 0);
+  REQUIRE(p.set_body_material(BodyId("body.base"), std::nullopt));
+  REQUIRE(p.remove_engineering_resource(fixture::key("synthetic.material", "r2")));
+  REQUIRE(p.remove_engineering_resource(fixture::key("synthetic.table")));
+  CHECK(p.engineering_resources().entries().empty());
+  CHECK(text(p) == text(history::native_base()));
+  auto reference = history::imported(true);
+  const auto immutable = text(reference);
+  CHECK_FALSE(
+      reference.adopt_engineering_resource_revision(fixture::key(), fixture::material("r2", 6000)));
+  CHECK_FALSE(reference.remove_engineering_resource(fixture::key()));
+  CHECK(text(reference) == immutable);
+}
+
+TEST_CASE("Catalog removal copies keys borrowed from entries before erasing storage",
+          "[core][parity-b149][resource-revision]") {
+  auto catalog = fixture::catalog();
+  const auto retained = catalog;
+  const auto& borrowed = engineering_resource_key(catalog.entries().front());
+  CHECK(checked(catalog.remove(borrowed)) == 1);
+  CHECK(catalog.entries().size() == 2);
+  CHECK_FALSE(catalog.find(fixture::key()));
+  CHECK(catalog.find(fixture::key("synthetic.material", "r2")));
+  CHECK(catalog.find(fixture::key("synthetic.table")));
+  CHECK(retained.entries().size() == 3);
+}

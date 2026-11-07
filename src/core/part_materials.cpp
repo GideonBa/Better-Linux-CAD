@@ -9,6 +9,44 @@ Result<std::size_t> PartDocument::add_engineering_resource(EngineeringResource r
     return Result<std::size_t>::failure(reference_part_edit_error());
   return engineering_resources_.insert(std::move(resource));
 }
+Result<std::size_t>
+PartDocument::adopt_engineering_resource_revision(const EngineeringResourceKey& source,
+                                                  EngineeringResource replacement) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
+  const auto next = engineering_resource_key(replacement);
+  if (!engineering_resources_.find(source) || source.id() != next.id())
+    return Result<std::size_t>::failure(Error::validation(
+        id_.value(), "Revision adoption requires an existing source with the same resource id"));
+  auto candidate = *this;
+  const auto added = candidate.engineering_resources_.insert(std::move(replacement));
+  if (!added)
+    return added;
+  std::size_t changed = added.value();
+  if (source != next && candidate.engineering_resources_.find_material(next)) {
+    if (candidate.default_material_ == source) {
+      candidate.default_material_ = next;
+      ++changed;
+    }
+    for (auto& entry : candidate.body_materials_)
+      if (entry.material == source) {
+        entry.material = next;
+        ++changed;
+      }
+  }
+  *this = std::move(candidate);
+  return Result<std::size_t>::success(changed);
+}
+Result<std::size_t> PartDocument::remove_engineering_resource(const EngineeringResourceKey& key) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
+  if (default_material_ == key ||
+      std::any_of(body_materials_.begin(), body_materials_.end(),
+                  [&](const auto& entry) { return entry.material == key; }))
+    return Result<std::size_t>::failure(Error::validation(
+        id_.value(), "Material revision is still assigned to the Part or a Body"));
+  return engineering_resources_.remove(key);
+}
 Result<std::size_t> PartDocument::set_default_material(std::optional<EngineeringResourceKey> key) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());

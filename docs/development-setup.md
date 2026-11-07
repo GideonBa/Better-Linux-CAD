@@ -4056,3 +4056,74 @@ native verification and documentation updates. Source/diff and staged whitespace
 Delivery: [PR #154](https://github.com/GideonBa/Better-Linux-CAD/pull/154), implementation `15650e6`.
 The delivery-record commit changes documentation only and preserves all 994 runtime fingerprints.
 Normal merge and verified refreshed-main/reviewed-tree comparison precede 149C.
+
+## Block 149C — coordinated resource revisions and removal guards, 2026-11-07
+
+PR #154 is confirmed merged as `5e17135`. Refreshed main matches the reviewed tree before
+`feat/engineering-resource-updates` starts. Existing contracts specify same-ID/kind revision
+adoption, exact material pin remapping, explicit selected-member atomicity and removal guards
+before implementation. Part/Project persistence keeps the existing B1/B2 versions and stores only
+final snapshots/pins. This slice supplies whole-149 R01 acceptance after verification; mass/BRep
+reuse and visible material management remain 150/151. No UI capability promotion is inferred.
+
+All runtime mutations stop during builds/CAD checks. Source review makes catalog removal copy
+a borrowed entry key before erasing vector storage; the dedicated regression tests multiple
+remaining entries. Validation commands/results and the source freeze follow after execution.
+
+```sh
+cmake --build build/dev-gui --target blcad_core_tests blcad_geometry_tests blcad_gui_tests blcad -j8
+./build/dev-gui/blcad_core_tests "[parity-b149],[project]"
+./build/dev-gui/blcad_geometry_tests "[resource-revision-geometry],[resource-history-geometry]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[resource-revision-integration],[project-resource-integration],[engineering-resource-integration],[document-session],[shell-coverage]"
+./build/dev-gui/blcad_core_tests --durations yes
+./build/dev-gui/blcad_geometry_tests --durations yes
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests --durations yes
+```
+
+The 438-object build passes (`/tmp/blcad149c-initial-build.log`). Focused Core passes
+**32 / 2,043**, Geometry **2 / 120**, offscreen GUI **38 / 2,475**, without failures/skips
+(`blcad149c-core-focused.log`, `blcad149c-geometry-focused.log`, `blcad149c-gui-focused.log`).
+Modified-line formatting produces an empty diff (`blcad149c-format.diff`); whitespace checks pass.
+Runtime freeze `/tmp/blcad149c-runtime-freeze.json`: **994** source/test/asset/build-script files,
+SHA-256 `2a57c031bfbbed54e8f2d66c386185e215224a2bc6213d841176b33cc41b223e`.
+Final full/native results follow after execution. Runtime remains unchanged during checks.
+
+Full Core passes **655 / 25,599**, without failures/skips (`/tmp/blcad149c-core-full.log`).
+Full Geometry passes **577 / 51,991**, without failures/skips (`blcad149c-geometry-full.log`).
+Full GUI/native results follow after execution; no preceding slice's results are substituted.
+
+Full offscreen GUI passes **725 total / 688 passed / 37 native-only skips / 90,150 assertions**,
+without failures (`/tmp/blcad149c-gui-full.log`). Required native acceptance follows separately.
+
+```sh
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad149c-native-100 ./build/dev-gui/blcad_gui_tests "[resource-revision-integration],[project-resource-integration],[engineering-resource-integration],[document-session],[history-controller],[history-prefix-session],[history-shell],[history-marker-shell],[history-combined-acceptance],[shell-combined-assembly-context],[shell-combined-assembly-hierarchy],[source-sketch-workflow],[imported-body-preview],[shell-coverage]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_COMPACT=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad149c-native-150 ./build/dev-gui/blcad_gui_tests "[resource-revision-integration],[project-resource-integration],[resource-history-shell],[history-shell],[history-marker-shell],[history-combined-acceptance]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+Native results/capture review and separate startup follow after execution. These prove backend
+resource operations through existing session/history/assembly workflows; the material management
+and physical-properties controls retain their own 151 native gate.
+
+Native 100% passes **80 / 6,481**, without failures/skips
+(`/tmp/blcad149c-native-100.log`). Raw repeated-assembly validation and resource/history captures
+are retained in its capture directory; `combined-assembly-hierarchy-validation.png` is visually
+reviewed. Compact 150% and separate startup results follow after execution.
+
+149C compact native 150% passes **20 / 1,280**, without failures/skips
+(`/tmp/blcad149c-native-150.log`). Its 1024×640-DIP resource/history capture is visually reviewed.
+Raw capture SHA-256: 100% `combined-assembly-hierarchy-validation.png`
+`f1518bc13d0f46918731b0c55ef97366dcb39d00abbd914f5c71aa81f0f5bb54`,
+150% `resource-prefix-inheritance.png`
+`8a8aedb7fbc2778006b20ba287741949f78a08266cf35a3d60e0785103722a7b`.
+Separate native startup reaches the intentional six-second timeout exit **124**
+(`blcad149c-startup.log`). Existing OCCT Visual depth/stencil diagnostics remain in this environment;
+native execution is available and no failure/skip is masked. Whole-149 promotion, final inventory,
+unchanged runtime fingerprints and source/staged review follow before normal PR delivery.
+
+Post-promotion inventory passes **5 / 568**, without failures/skips
+(`/tmp/blcad149c-final-inventory.log`). It accepts implemented-through 149/current 150 while visible
+material commands remain planned. All 994 runtime fingerprints remain unchanged through native
+verification and documentation updates. Working/staged whitespace and complete source review pass.
+Whole 149's R01 backend gate is accepted; 150's physical properties/reuse and 151's material UI
+remain incomplete. Normal PR delivery/confirmed merge and refreshed-main/tree comparison precede 150.

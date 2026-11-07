@@ -221,3 +221,122 @@ TEST_CASE("Resource-free Projects retain exact legacy bytes and normalize empty 
   data["parts"][0]["material_assignments"] = {{"body_overrides", json::array()}};
   CHECK(text(checked(deserialize_project_from_json(data.dump()))) == legacy);
 }
+
+TEST_CASE("Coordinated adoption updates only selected members and retains old resource revisions",
+          "[core][parity-b149][resource-revision]") {
+  auto value = project();
+  auto first = member();
+  REQUIRE(first.set_body_material(BodyId("body.base"), fixture::key()));
+  auto second = member("second");
+  REQUIRE(second.set_body_material(BodyId("body.base"), fixture::key("synthetic.material", "r2")));
+  REQUIRE(value.add_part_document(first));
+  REQUIRE(value.add_part_document(second));
+  REQUIRE(value.add_part_document(member("unselected")));
+  const auto retained = value;
+  CHECK(checked(value.adopt_engineering_resource_revision(
+            fixture::key(), fixture::material("r3", 7000), {first.id(), second.id()})) == 2);
+  const auto next = fixture::key("synthetic.material", "r3");
+  CHECK(value.engineering_resources().entries().size() == 4);
+  CHECK(value.find_part_document(first.id())->default_material() == next);
+  CHECK(value.find_part_document(first.id())
+            ->effective_material_for_body(BodyId("body.base"))
+            ->key() == next);
+  CHECK(value.find_part_document(second.id())->default_material() == next);
+  CHECK(value.find_part_document(second.id())
+            ->effective_material_for_body(BodyId("body.base"))
+            ->key()
+            .revision() == "r2");
+  CHECK(value.find_part_document(DocumentId("unselected"))->default_material() == fixture::key());
+  CHECK(value.find_part_document(first.id())->executable_generation() ==
+        first.executable_generation());
+  CHECK(value.find_part_document(first.id())->dependency_graph().dependencies() ==
+        first.dependency_graph().dependencies());
+  CHECK(retained.find_part_document(first.id())->default_material() == fixture::key());
+  CHECK(retained.engineering_resources().entries().size() == 3);
+  const auto serialized = text(value);
+  CHECK(text(checked(deserialize_project_from_json(serialized))) == serialized);
+  CHECK(checked(value.adopt_engineering_resource_revision(next, fixture::material("r3", 7000),
+                                                          {first.id(), second.id()})) == 0);
+  CHECK(text(value) == serialized);
+}
+
+TEST_CASE("Failed coordinated resource adoption rolls back every selected member and root value",
+          "[core][parity-b149][resource-revision]") {
+  auto value = project();
+  REQUIRE(value.add_part_document(member()));
+  REQUIRE(value.add_part_document(member("second")));
+  REQUIRE(value.add_part_document(empty("without-source")));
+  REQUIRE(value.add_part_document(history::imported(true)));
+  const auto before = text(value);
+  auto replacement = EngineeringResource(fixture::material("r3", 7000));
+  auto source = fixture::key();
+  std::vector<DocumentId> selected{DocumentId("first"), DocumentId("second")};
+  SECTION("late unknown member") {
+    selected.back() = DocumentId("missing");
+  }
+  SECTION("late duplicate member") {
+    selected.back() = selected.front();
+  }
+  SECTION("late immutable member") {
+    selected.back() = DocumentId("history.reference");
+  }
+  SECTION("late member lacks source revision") {
+    selected.back() = DocumentId("without-source");
+  }
+  SECTION("empty selection") {
+    selected.clear();
+  }
+  SECTION("conflicting existing revision") {
+    replacement = fixture::material("r2", 9000);
+  }
+  SECTION("different logical identity") {
+    replacement = new_material();
+  }
+  SECTION("resource kind change") {
+    const auto table = fixture::table();
+    replacement = checked(EngineeringStandardTable::create(fixture::key("synthetic.material", "r3"),
+                                                           table.name(), table.provenance(),
+                                                           table.columns(), table.rows()));
+  }
+  SECTION("unknown source") {
+    source = fixture::key("missing");
+  }
+  CHECK_FALSE(value.adopt_engineering_resource_revision(source, replacement, selected));
+  CHECK(text(value) == before);
+  CHECK(value.engineering_resources().entries().size() == 3);
+  CHECK_FALSE(value.engineering_resources().find(fixture::key("synthetic.material", "r3")));
+}
+
+TEST_CASE("Project removal respects unassigned member snapshots and returns cleared data to legacy "
+          "format",
+          "[core][parity-b149][resource-revision]") {
+  auto value = project();
+  REQUIRE(value.add_part_document(member()));
+  REQUIRE(value.add_part_document(member("second")));
+  auto legacy = project();
+  for (const auto& part : value.part_documents()) {
+    auto data = json::parse(checked(serialize_part_document_to_json(history::native_base())));
+    data["document"]["id"] = part.id().value();
+    REQUIRE(legacy.add_part_document(checked(deserialize_part_document_from_json(data.dump()))));
+  }
+  const auto retained = value;
+  const auto before = text(value);
+  CHECK_FALSE(value.remove_engineering_resource(fixture::key()));
+  CHECK(text(value) == before);
+  for (auto& part : value.part_documents()) {
+    REQUIRE(part.set_default_material(std::nullopt));
+    REQUIRE(part.remove_engineering_resource(fixture::key()));
+  }
+  REQUIRE(value.remove_engineering_resource(fixture::key()));
+  CHECK_FALSE(value.remove_engineering_resource(fixture::key("synthetic.material", "r2")));
+  for (auto& part : value.part_documents()) {
+    REQUIRE(part.remove_engineering_resource(fixture::key("synthetic.material", "r2")));
+    REQUIRE(part.remove_engineering_resource(fixture::key("synthetic.table")));
+  }
+  REQUIRE(value.remove_engineering_resource(fixture::key("synthetic.material", "r2")));
+  REQUIRE(value.remove_engineering_resource(fixture::key("synthetic.table")));
+  CHECK(checked(value.remove_engineering_resource(fixture::key())) == 0);
+  CHECK(value.engineering_resources().entries().empty());
+  CHECK(text(value) == text(legacy));
+  CHECK(text(retained) == before);
+}

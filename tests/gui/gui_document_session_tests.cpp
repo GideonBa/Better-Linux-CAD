@@ -755,3 +755,104 @@ TEST_CASE("Project candidate synchronization and malformed resource Open preserv
   REQUIRE(session.undo());
   CHECK(project_snapshot(session) == before);
 }
+
+TEST_CASE("One Project transaction adopts revisions across selected Parts with exact Undo and Save",
+          "[gui][document-session][parity-b149][resource-revision-integration]") {
+  QTemporaryDir directory;
+  GuiDocumentSession session;
+  REQUIRE(session.create_project(DocumentId("project.revisions"), "Revisions"));
+  REQUIRE(session.commit_project_transaction("Seed members", [](Project& project) {
+    for (const auto& id : {"first", "second", "unselected"}) {
+      auto part = resource_member(id);
+      auto authored = part.apply_history_intent({{"base"}, {}});
+      if (!authored)
+        return authored;
+      auto added = project.add_part_document(std::move(part));
+      if (!added)
+        return added;
+    }
+    return Result<std::size_t>::success(3);
+  }));
+  REQUIRE(session.save_as(directory.filePath("revisions.blcad.project.json").toStdString()));
+  const auto before = project_snapshot(session);
+  REQUIRE(session.commit_project_transaction("Adopt selected revision", [](Project& project) {
+    return project.adopt_engineering_resource_revision(resources::key(),
+                                                       resources::material("r3", 7000),
+                                                       {DocumentId("first"), DocumentId("second")});
+  }));
+  const auto after = project_snapshot(session);
+  CHECK(session.derived_results_fresh());
+  CHECK(session.project()->find_part_document(DocumentId("first"))->default_material() ==
+        resources::key("synthetic.material", "r3"));
+  CHECK(session.project()->find_part_document(DocumentId("second"))->default_material() ==
+        resources::key("synthetic.material", "r3"));
+  CHECK(session.project()->find_part_document(DocumentId("unselected"))->default_material() ==
+        resources::key());
+  CHECK(session.undo_label() == "Adopt selected revision");
+  REQUIRE(session.undo());
+  CHECK(project_snapshot(session) == before);
+  CHECK_FALSE(session.dirty());
+  REQUIRE(session.redo());
+  CHECK(project_snapshot(session) == after);
+  REQUIRE(session.save());
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(session.file_path()));
+  CHECK(project_snapshot(reopened) == after);
+  CHECK(reopened.derived_results_fresh());
+  CHECK_FALSE(session.commit_project_transaction("Late failed adoption", [](Project& project) {
+    return project.adopt_engineering_resource_revision(
+        resources::key("synthetic.material", "r3"), resources::material("r4", 8000),
+        {DocumentId("first"), DocumentId("unselected")});
+  }));
+  CHECK(project_snapshot(session) == after);
+  CHECK(session.derived_results_fresh());
+  CHECK_FALSE(session.dirty());
+  CHECK(session.undo_label() == "Adopt selected revision");
+  REQUIRE(session.undo());
+  CHECK(project_snapshot(session) == before);
+}
+
+TEST_CASE("Session resource removal guards rollback and restore cleared snapshots through history",
+          "[gui][document-session][parity-b149][resource-revision-integration]") {
+  QTemporaryDir directory;
+  GuiDocumentSession session;
+  REQUIRE(session.create_project(DocumentId("project.remove"), "Removal"));
+  REQUIRE(session.commit_project_transaction("Seed member", [](Project& project) {
+    return project.add_part_document(resource_member("first"));
+  }));
+  REQUIRE(session.save_as(directory.filePath("remove.blcad.project.json").toStdString()));
+  const auto before = project_snapshot(session);
+  CHECK_FALSE(
+      session.commit_project_transaction("Remove referenced revision", [](Project& project) {
+        return project.remove_engineering_resource(resources::key());
+      }));
+  CHECK(project_snapshot(session) == before);
+  CHECK(session.derived_results_fresh());
+  REQUIRE(session.commit_project_transaction("Clear unused resources", [](Project& project) {
+    auto* part = project.find_part_document(DocumentId("first"));
+    auto cleared = part->set_default_material(std::nullopt);
+    if (!cleared)
+      return cleared;
+    for (const auto& key : {resources::key(), resources::key("synthetic.material", "r2"),
+                            resources::key("synthetic.table")}) {
+      auto removed = part->remove_engineering_resource(key);
+      if (!removed)
+        return removed;
+      removed = project.remove_engineering_resource(key);
+      if (!removed)
+        return removed;
+    }
+    return Result<std::size_t>::success(3);
+  }));
+  const auto cleared = project_snapshot(session);
+  CHECK(nlohmann::json::parse(cleared).at("version") == 1);
+  REQUIRE(session.undo());
+  CHECK(project_snapshot(session) == before);
+  REQUIRE(session.redo());
+  CHECK(project_snapshot(session) == cleared);
+  REQUIRE(session.save());
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(session.file_path()));
+  CHECK(project_snapshot(reopened) == cleared);
+  CHECK(reopened.derived_results_fresh());
+}

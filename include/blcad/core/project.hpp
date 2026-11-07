@@ -58,6 +58,11 @@ public:
   [[nodiscard]] Result<std::size_t> add_engineering_resource(EngineeringResource resource);
   [[nodiscard]] Result<std::size_t> synchronize_engineering_resources();
   [[nodiscard]] Result<std::size_t> validate_engineering_resources() const;
+  [[nodiscard]] Result<std::size_t>
+  adopt_engineering_resource_revision(const EngineeringResourceKey& source,
+                                      EngineeringResource replacement,
+                                      const std::vector<DocumentId>& part_documents);
+  [[nodiscard]] Result<std::size_t> remove_engineering_resource(const EngineeringResourceKey& key);
   [[nodiscard]] Result<std::size_t> add_child_assembly_document(AssemblyDocument assembly_document);
   [[nodiscard]] Result<std::size_t>
   add_cross_hierarchy_constraint(AssemblyHierarchyConstraint constraint);

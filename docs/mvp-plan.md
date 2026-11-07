@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 148
-current_block: 149
-current_boundary: Block 149B2 verified; coordinated revision updates and removal guards remain
-current_tag: "[parity-b149]"
+implemented_through: Block 149
+current_block: 150
+current_boundary: Block 149 engineering resources accepted; physical properties next
+current_tag: "[parity-b150]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–148 accepted; Block 149 in progress; Blocks 150–204 planned"
+  advanced_modeling_workflows: "Blocks 145–149 accepted; Blocks 150–204 planned"
 ---
 
 # MVP Plan
@@ -33,10 +33,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 148
-current block        Block 149 (in progress; slice B2)
-current phase        Engineering resources and material assignment
-current boundary     Revision-pinned material and standards resources
+implemented through  Block 149
+current block        Block 150 (planned; not started)
+current phase        Physical properties for Parts and posed assemblies
+current boundary     Analytic properties, physical participation and material freshness
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1776,8 +1776,8 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–148 are **Implemented and accepted**;
-Block 149 is **In progress**; Blocks 150–204 are **Planned; not started**.
+Status authority: Blocks 145–149 are **Implemented and accepted**;
+Blocks 150–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1786,7 +1786,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
-| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–148 accepted; 149 in progress; 150–151 not started |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–149 accepted; 150–151 not started |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
@@ -2184,10 +2184,10 @@ one common resource store for later Hole/Thread tables, not independent per-modu
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 149A | Typed density/engineering pressure, per-value provenance, immutable Material and typed standards-table revisions, duplicate/conflict rules and atomic catalog merge; synthetic Core tests | Delivered via PR #152 |
-| 149B | Standalone Part snapshots, Part default/Body overrides, Project resource deduplication, strict versioned JSON and offline/legacy compatibility | Implemented and verified; B2 PR #154 |
+| 149B | Standalone Part snapshots, Part default/Body overrides, Project resource deduplication, strict versioned JSON and offline/legacy compatibility | Delivered via PR #153/#154 |
 | 149B1 | Shared strict resource JSON and standalone Part version 3 with material pins; preserve history/result-face loading; conservative Project-v1 serialization boundary | Delivered via PR #153 |
-| 149B2 | Project resource ownership/deduplication, versioned Project persistence and offline member portability; replace B1's temporary project boundary | Implemented and verified; PR #154 |
-| 149C | Explicit coordinated revision updates, referenced-resource removal guards and atomic multi-document rollback/freshness evidence through existing mutation authorities | Planned; not started |
+| 149B2 | Project resource ownership/deduplication, versioned Project persistence and offline member portability; replace B1's temporary project boundary | Delivered via PR #154 |
+| 149C | Explicit coordinated revision updates, referenced-resource removal guards and atomic multi-document rollback/freshness evidence through existing mutation authorities | Implemented and verified; delivery pending |
 
 149A adds no document assignment, writer/schema, material UI, mass query or capability promotion.
 B specifies exact migration/JSON fields before its writer; C verifies whole-149 integration. The
@@ -2251,6 +2251,27 @@ confirm merge and compare refreshed main with the reviewed tree before C.
 149B2 delivery: [PR #154](https://github.com/GideonBa/Better-Linux-CAD/pull/154), implementation
 `15650e6`. The delivery-record update changes documentation only and preserves all 994 runtime
 fingerprints. Confirm normal merge and compare refreshed main with the reviewed tree before C.
+
+149C starts on `feat/engineering-resource-updates` from verified merged main `5e17135`
+(PR #154), after exact reviewed-tree comparison. The existing resource contract specifies explicit
+candidate adoption/removal before implementation. This slice closes R01 Core/persistence/session
+integration for whole 149 only after verification; material/mass UI remains 150/151. Implemented-
+through stays 148 while C is in progress.
+
+149C is implemented and verified: full Core **655 / 25,599**, Geometry **577 / 51,991**,
+offscreen GUI **688 passed / 37 native-only skips / 90,150 assertions**, native 100%
+**80 / 6,481** and compact native 150% **20 / 1,280**, without failures. Native runs have no skips;
+raw captures are visually reviewed and separate startup reaches intentional timeout 124. Exact
+commands/freeze/inventory/source review remain in `development-setup.md`.
+
+Whole Block 149 is **Implemented and accepted** at the R01 backend gate: typed provenance-bearing
+immutable revisions, default/Body pins, strict standalone/Project persistence, deduplicated insertion,
+offline extraction, explicit selected-member adoption, guarded removal, atomic failure and existing
+history/save/freshness integration. Implemented-through advances to 149 only. Physical mass and
+material-only BRep reuse remain 150; visible Material/Physical Properties commands and R01's native
+assignment UI remain 151. Their GUI capability stays planned. Phase A remains open while 150/151
+are incomplete. Complete normal PR delivery/confirmed merge and refreshed-main/tree comparison
+before starting 150; it remains **Planned; not started** here.
 
 ## Later phases
 

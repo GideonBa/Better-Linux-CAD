@@ -196,6 +196,7 @@ public:
   // conflicting key or resource kind leaves the catalog unchanged.
   [[nodiscard]] Result<std::size_t> insert(EngineeringResource resource);
   [[nodiscard]] Result<std::size_t> merge_from(const EngineeringResourceCatalog& source);
+  [[nodiscard]] Result<std::size_t> remove(const EngineeringResourceKey& key);
   friend bool operator==(const EngineeringResourceCatalog&,
                          const EngineeringResourceCatalog&) = default;
 

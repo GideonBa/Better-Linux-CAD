@@ -223,6 +223,17 @@ late-conflict and malformed-Open rollback, and standalone file extraction/reopen
 the Project file. These proofs retain pinned values without fetching an external library; explicit
 multi-document revision switching/removal and material-only geometry reuse remain C/150.
 
+149C adds `[resource-revision]`: exact default/Body pin remapping, retained old revisions and
+unselected members, identical no-op/conflicting immutable keys, missing/duplicate/Reference/late
+member rollback, kind/identity guards, table availability, referenced/default/override removal,
+unassigned member snapshot guards, borrowed-key erasure and exact legacy normalization. Copies
+retain their old snapshots. `[resource-revision-integration]` exercises one Project transaction,
+Save/Open, Undo/Redo, failed late adoption with retained freshness/dirty/history state, and guarded
+removal/clear/reopen. `[resource-revision-geometry]` independently compares volume/bounds/semantic
+identity, unchanged executable generation, exact-source cache seals and reopened rebuilds.
+Table consumer remapping/removal must extend this authority when 152 adds actual consumers.
+Material-only BRep reuse remains 150; visible resource management remains 151.
+
 ### R02 Physical properties in transformed assemblies
 
 - **First gate:** 150; native completion 151; extend 193.

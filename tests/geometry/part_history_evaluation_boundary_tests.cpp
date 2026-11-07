@@ -621,3 +621,40 @@ TEST_CASE("Material snapshots retain physical geometry while complete history ca
   CHECK(suppressed.default_material() == part.default_material());
   CHECK(suppressed.engineering_resources() == part.engineering_resources());
 }
+
+TEST_CASE(
+    "Revision adoption and removal preserve physical results while invalidating old source seals",
+    "[geometry][parity-b149][resource-revision-geometry]") {
+  namespace resources = blcad::test::engineering_fixture;
+  auto part = fixture::native_base();
+  REQUIRE(part.apply_history_intent({{"base"}, {}}));
+  resources::annotate(part);
+  auto original = evaluate(part);
+  const auto retained = part;
+  const auto generation = part.executable_generation();
+  REQUIRE(
+      part.adopt_engineering_resource_revision(resources::key(), resources::material("r3", 7000)));
+  CHECK(part.executable_generation() == generation);
+  CHECK_FALSE(original.validate_complete_history_result(part));
+  REQUIRE(original.validate_complete_history_result(retained));
+  auto adopted = evaluate(part);
+  same_bodies(retained, original, part, adopted);
+  const auto scene_before = checked(ViewportSceneBuilder{}.build_part(retained, original));
+  const auto scene_after = checked(ViewportSceneBuilder{}.build_part(part, adopted));
+  REQUIRE(scene_before.size() == scene_after.size());
+  for (std::size_t i = 0; i < scene_before.size(); ++i)
+    CHECK(scene_before[i].semantic_id == scene_after[i].semantic_id);
+  const auto before = checked(serialize_part_document_to_json(part));
+  CHECK_FALSE(part.remove_engineering_resource(resources::key("synthetic.material", "r3")));
+  CHECK(checked(serialize_part_document_to_json(part)) == before);
+  REQUIRE(adopted.validate_complete_history_result(part));
+  REQUIRE(part.remove_engineering_resource(resources::key()));
+  CHECK_FALSE(adopted.validate_complete_history_result(part));
+  auto removed = evaluate(part);
+  same_bodies(retained, original, part, removed);
+  const auto reopened =
+      checked(deserialize_part_document_from_json(checked(serialize_part_document_to_json(part))));
+  auto rebuilt = evaluate(reopened);
+  same_bodies(part, removed, reopened, rebuilt);
+  CHECK(reopened.default_material() == resources::key("synthetic.material", "r3"));
+}
