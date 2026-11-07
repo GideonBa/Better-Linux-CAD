@@ -22,8 +22,10 @@ inline const LineSegment* interactive_thin_line(const Sketch& sketch) {
       !sketch.projected_lines().empty() || !sketch.reference_generated_lines().empty())
     return nullptr;
   const auto& line = sketch.line_segments().front();
-  return std::hypot(line.end().x - line.start().x, line.end().y - line.start().y) > 1e-7 ? &line
-                                                                                         : nullptr;
+  return !line.construction() &&
+                 std::hypot(line.end().x - line.start().x, line.end().y - line.start().y) > 1e-7
+             ? &line
+             : nullptr;
 }
 
 inline std::optional<SketchId> interactive_thin_selection(const PartDocument& part,

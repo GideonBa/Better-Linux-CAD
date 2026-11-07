@@ -3058,3 +3058,133 @@ Final source/staged diff review and protected PR delivery follow; Block 145 rema
 
 Delivery: [PR #142](https://github.com/GideonBa/Better-Linux-CAD/pull/142), implementation `11fd8a8`.
 The delivery-record commit changes documentation only and preserves the final runtime freeze.
+
+## Block 145C3 profile collection and Create Another — 2026-11-06
+
+This slice extends the existing Extrude owner, Part workflow and property selector. It adds explicit
+command-first profile/open-line collection, exclusive primary/limit-face Pick roles, correction after
+source changes and Create Another with literal/mode retention and fresh semantic references. Each
+accepted feature includes its source Sketch edits in one history step. Selection-stage Cancel,
+committed-only Save, independent Undo/Redo, canonical reopening and ordinary Repeat retain their
+existing owners. Construction/Centerline single-line sources are excluded by the shared thin-source
+helper. No Core intent/schema or Geometry executor changes.
+
+New proofs are `[create-another]`, `[create-another-workflow]` and
+`[workflow-interaction-baseline]`. The first uses real Qt keyboard input for profile choices/scalars
+and mouse events for completion/pick/clear controls. Analytic volumes are 960, 2200 and 1320 mm³ for
+independent New Bodies and 17520 mm³ for the bounded Cut fixture. Required Cut target/limit choices
+remain empty after Create Another. The combined workflow authors two real Sketches, edits a Point
+inside the second source, saves the first committed feature during that draft and checks one complete
+Undo/Redo plus reopening. The baseline checks 1600 mm³ and exact entry JSON after every cycle.
+
+Development findings and corrections (not accepted gates):
+
+- Initial build succeeds. First three-case focus finds disabled Cancel during empty primary collection;
+  `active()` now recognizes the owned Extrude task before its controller exists. Selection-stage
+  conflict, Cancel and Escape assertions cover the correction. Two original cases already pass.
+- Real-input fixture corrections use a wider unsnapped rectangle hover and explicit control-center
+  scrolling before hit checks. Required hit/enabled checks remain in place.
+- The first broad focus reports 93 passed, one failed and two native-only skips / 7460 passed,
+  two failed assertions. The old thin selection test still expected global Extrude to reject entry
+  despite another valid source. It now verifies empty explicit collection, exclusions and Cancel.
+- Initial native focus passes **11 cases / 1135 assertions**, without skips. The first full offscreen
+  attempt is deliberately stopped (143) after seven stale assertions across four filter/Repeat cases;
+  it is not counted as a full result. Those tests now require the global command/Repeat to open
+  selection while preserving incompatible-selection rejection and restoring original filters/selection.
+- A new test initially equated the session mask with a task-owned viewport role mask. Existing
+  `synchronize_selection_filter` intentionally admits task references in the session while the viewport
+  guards their roles. The assertion now checks that established bridge explicitly. Focused final
+  filter/Repeat/interaction proof passes **13 cases / 2078 assertions**, without skips.
+
+Before the final empty-input hint correction, the complete GUI run passes **648 cases, 34
+native-only skips / 87776 assertions**, and native 100% passes **80 / 11600**, no skips. Review
+then finds a stale profile-summary label after Clear; it now explicitly asks for a source, with
+regression assertions and an empty-stage capture. The first corrected-hint native runs pass
+**80 / 11605** at 100% and **36 / 6927** at 150%.
+
+Visual review of the latter then finds inherited scroll position hiding part of the new primary
+Pick/count row. Newly shown Extrude tasks reset their owned scroll position; a regression requires
+full visible regions for both controls without a reveal helper. Final gates below use this
+corrected source.
+
+The final source/test/asset/build-script freeze is `/tmp/blcad145c3-runtime-freeze.json`: **956 files**,
+including six `.gitkeep` placeholders; compact-inventory SHA-256 is
+`a841100e841bfe0a9f9ab5b9acb38a769d368a492734ee6b6aadcdfd6d2d7e86`.
+The benchmark's existing Qt iterator omits hidden placeholders; its separate inventory contains
+950 fingerprints. Each inventory is compared using its own documented enumeration.
+
+Final checks use the existing presets, serial GUI/native execution and these filters:
+
+```bash
+cmake --build build/dev-gui --target blcad_gui_tests blcad_app -j8
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests --durations yes
+QT_QPA_PLATFORM=xcb BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad145c3-native-100 ./build/dev-gui/blcad_gui_tests "[parity-b145],[shell-combined-profile-context],[block136-profile-context],[block136-selection-filters],[shell-combined-selection-filters],[block136-repeat],[shell-combined-repeat],[block136-feature-edit],[hermes-design-workflow],[workflow-layout],[appearance],[icons],[shell-combined-extrude-extents],[shell-combined-extrude-limit-picking],[shell-combined-thin-extrude],[shell-combined-path-extrude],[extrude-regression],[native-viewer-lifecycle]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad145c3-native-150 ./build/dev-gui/blcad_gui_tests "[create-another],[create-another-workflow],[source-sketch-workflow],[property-controls],[hermes-design-workflow],[workflow-layout],[shell-combined-profile-context],[shell-combined-selection-filters],[shell-combined-repeat],[block136-feature-edit],[shell-combined-extrude-extents],[shell-combined-extrude-limit-picking],[shell-combined-thin-extrude],[shell-combined-path-extrude]"
+QT_QPA_PLATFORM=xcb timeout 6s ./build/dev-gui/blcad
+```
+
+P01 adds UI-transition evidence beside the retained historical 145A shape-only baseline. Execute
+`[workflow-interaction-baseline]` alone in three separate native processes, setting
+`BLCAD_WORKFLOW_INTERACTION_BASELINE` to a distinct JSON path for each. Each process records its
+first measured workflow and ten subsequent trials on the same window after Apply/Create Another,
+Cancel and Undo. Measurements include synchronous Qt input dispatch, kernel work and UI event
+publication; fixture setup, application startup and independent oracle checks are excluded. Record
+first-workflow and reused-window distributions separately. A command uses its actual QAction;
+profile/scalar selection and completion/cancellation use Qt input events. This is a bounded existing
+Extrude baseline, not a latency guarantee for future features or the complete P01 stress matrix.
+Full standalone Core/Geometry suites are not rerun for these GUI changes; full GUI and native
+integration exercise their existing consumers. Final acceptance and measurements are recorded below.
+
+The final 150% scroll/selector focus passes **5 cases / 438 assertions**, without skips. Both the
+empty selection-stage and compact candidate captures are reviewed: Profile label/count/Pick/Clear
+are visible, disabled retained fields remain understandable, and Apply/Create Another/Cancel stay
+outside scrolling content. The fixed source summary asks for input after Clear.
+
+P01 raw results are checked in [block145c3-workflow-baseline.json](benchmarks/block145c3-workflow-baseline.json),
+including environment, source JSON, 950 runtime fingerprints, all shape samples and all three native
+interaction runs. The shape-only test passes **1153 assertions / one case**; its exact console count
+is retained in `/tmp/blcad145c3-shape-baseline.log`. Each standalone native interaction process passes
+**353 assertions / one case**, without skips; there are three first-workflow and thirty reused-window
+samples, with zero failures. Fresh-session shape p50/p95 is **0.925/1.136 ms** (3); reused-controller
+shape p50/p95 is **0.746/1.207 ms** (10). These have the same limited measurement boundary as 145A
+and do not establish a portable speed comparison.
+
+| Native whole transition | First workflow p50 / p95 / max ms (n=3) | Reused window p50 / p95 / max ms (n=30) |
+| --- | --- | --- |
+| Begin command | 11.916 / 12.114 / 12.114 | 5.512 / 8.646 / 9.854 |
+| Profile keyboard choice | 88.747 / 96.393 / 96.393 | 41.830 / 57.437 / 69.611 |
+| Numeric keyboard input | 23.222 / 23.489 / 23.489 | 19.239 / 27.277 / 28.408 |
+| Apply/Create Another | 60.006 / 61.985 / 61.985 | 52.845 / 63.402 / 71.567 |
+| Cancel | 43.713 / 46.925 / 46.925 | 42.168 / 47.673 / 60.606 |
+
+Each row measures a complete scripted transition, including multiple Qt events where applicable,
+not individual key/frame latency. Native process peak RSS is 225488 / 225588 / 226596 KiB. The
+artifact's Qt inventory SHA-256 is `4192e5803b87b7ccf8c85bd06007b8c6e5b0ce5f91605151ea80051e615a5cba`;
+all entries match the corresponding paths in the 956-file freeze. Original 145A evidence is retained.
+These results establish a reference for the current bounded workflow, not budgets for the future
+P01 workloads; those producers and the final budget gate remain assigned to their numbered blocks.
+
+Final acceptance completed on **2026-11-07** after the requested pause, with all 956 runtime
+fingerprints unchanged:
+
+- Resume build is a no-op. The final full offscreen GUI run completes successfully: **682 cases,
+  648 passed and 34 native-only skips / 87784 passed assertions** (`/tmp/blcad145c3-gui-full.log`).
+- Native 100%: **80 cases / 11609 assertions**, no skips or failed cases
+  (`/tmp/blcad145c3-native-100.log`). The first attempted process start waits on an automatic
+  permission-review timeout; the permitted single start retry succeeds. This is not a failed or
+  retried test scenario.
+- Native 150%: **36 cases / 6931 assertions**, no skips or retries
+  (`/tmp/blcad145c3-native-150.log`). Ordinary/compact and empty/populated selector captures are
+  reviewed; final representative captures are checked in under `docs/images/`.
+- Separate native application startup reaches expected timeout **124**. Native logs retain the known
+  Medium depth/stencil warning; no High-severity or BadDrawable failure is observed.
+- Promoted implementation/API/proof inventory: **5 cases / 494 assertions**, no skips
+  (`/tmp/blcad145c3-final-inventory.log`). Its initial status check correctly rejects keeping
+  `current_block` at the just-completed boundary; metadata now identifies 146 as planned/unstarted,
+  while `implemented_through` is 145. No validation code is relaxed.
+
+The full GUI count precedes the documentation-only capability promotion; the final inventory run
+separately validates that promotion, exact API declarations, proof registration and negative cases.
+Both runtime inventories remain unchanged. Scoped C++ formatting, new-file formatting and diff
+checks pass. Block 145 is accepted; subsequent feature blocks remain planned. Delivery uses a normal
+protected PR and requires refreshed main/tree comparison before the next implementation branch.

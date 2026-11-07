@@ -281,7 +281,14 @@ TEST_CASE("Thin Extrude bounds selection and reserves both new wall identities b
   CHECK_FALSE(window.feature_tools().select_open_line(SketchId("sketch.chain")));
   CHECK_FALSE(window.feature_tools().select_open_line(SketchId("sketch.mixed")));
   CHECK_FALSE(window.feature_tools().select_open_line(SketchId("missing")));
-  CHECK_FALSE(window.feature_tools().begin_extrude());
+  // Command-first entry is available because the original single-line source
+  // still exists, but none of these rejected selections may seed its input.
+  REQUIRE(window.feature_tools().begin_extrude());
+  CHECK(window.session().task().stage() == GuiTaskStage::CollectingSelection);
+  CHECK_FALSE(window.feature_tools().coordinator().extrude().active());
+  CHECK(field<QComboBox>(window, "blcad.extrude.profile").currentIndex() == -1);
+  CHECK(field<QComboBox>(window, "blcad.extrude.profile").count() == 1);
+  window.feature_tools().cancel();
   const auto before = snapshot(window);
   begin(window);
   CHECK(window.feature_tools().coordinator().extrude().feature_id() ==

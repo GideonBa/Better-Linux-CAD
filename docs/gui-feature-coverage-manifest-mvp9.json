@@ -515,7 +515,7 @@
         "owner": 136,
         "status": "restored",
         "contract": "docs/gui-interactive-extrude-revolve-mvp9.md",
-        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; all seven Extrude extents with role-based native selection/highlighting of bounded semantic source planes, four Body operations, reversed direction, a local second distance and taper; single-open-line Thin Extrude with three wall modes and atomic new thickness inputs; open-PathCurve Extrude with inherited orientation and no scalar inputs; Full/directed/Symmetric Revolve with typed compatible axes and operation-paired Cut intent; dedicated through-all single/bolt-circle cuts with typed inputs, bindings and complete atomic Preview/Apply. Rotation supports persistent editable Sketch-line identities in normal, construction and centerline roles through the existing axis selector, with current transformed workplanes and associative endpoint/plane updates. Block 145B adopts reusable Input Geometry/Behavior/Advanced property groups in Extrude, command-owned Pick/Clear limit-face selectors with counts and collapsed error diagnostics, and validated Ctrl+Enter completion. No new geometric capability or feature schema is added. Block 145C2 adds existing-owner Extrude/source Sketch breadcrumbs, complete draft cancellation, one root Apply with source intent, committed-only Save, explicit source refresh and guarded full-model STEP/Measure consumers. Create Another and command-first profile collection remain 145C3.",
+        "scope": "Candidate-only Extrude/Revolve with native manipulation and selectable closed spline profiles; all seven Extrude extents with role-based native selection/highlighting of bounded semantic source planes, four Body operations, reversed direction, a local second distance and taper; single-open-line Thin Extrude with three wall modes and atomic new thickness inputs; open-PathCurve Extrude with inherited orientation and no scalar inputs; Full/directed/Symmetric Revolve with typed compatible axes and operation-paired Cut intent; dedicated through-all single/bolt-circle cuts with typed inputs, bindings and complete atomic Preview/Apply. Rotation supports persistent editable Sketch-line identities in normal, construction and centerline roles through the existing axis selector, with current transformed workplanes and associative endpoint/plane updates. Block 145B adopts reusable Input Geometry/Behavior/Advanced property groups in Extrude, command-owned Pick/Clear limit-face selectors with counts and collapsed error diagnostics, and validated Ctrl+Enter completion. No new geometric capability or feature schema is added. Block 145C2 adds existing-owner Extrude/source Sketch breadcrumbs, complete draft cancellation, one root Apply with source intent, committed-only Save, explicit source refresh and guarded full-model STEP/Measure consumers. Explicit command-first profile collection and Create Another reuse the same root workflow, retain only scalar/mode settings and require fresh semantic references; native source editing, committed-only Save and independent history are covered.",
         "gaps": [],
         "proofs": [
           {
@@ -601,6 +601,14 @@
           {
             "filter": "[source-sketch-native]",
             "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "filter": "[create-another]",
+            "source": "tests/gui/gui_shell_create_another_tests.cpp"
+          },
+          {
+            "filter": "[create-another-workflow]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
           }
         ],
         "actions": [
@@ -616,7 +624,10 @@
           "blcad.extrude.thin_mode",
           "blcad.extrude.thickness",
           "blcad.extrude.second_thickness",
-          "blcad.extrude.pick_role"
+          "blcad.extrude.pick_role",
+          "blcad.extrude.profile",
+          "blcad.extrude.profile.selector",
+          "blcad.feature.create_another"
         ]
       }
     },
@@ -1370,17 +1381,83 @@
       {
         "capability": "shared-property-workflow",
         "owner": 145,
-        "disposition": "planned",
+        "disposition": "implemented",
         "contract": "docs/user-interface.md",
-        "planned_commands": [
-          "Property groups",
-          "Active selectors",
-          "Sketch breadcrumb",
-          "Create Another"
+        "commands": [
+          "blcad.action.extrude"
         ],
-        "commands": [],
-        "apis": [],
-        "proofs": []
+        "apis": [
+          {
+            "source": "include/blcad/gui/gui_document_session.hpp",
+            "type": "GuiDocumentSession",
+            "methods": [
+              "begin_part_workflow",
+              "publish_part_workflow",
+              "cancel_part_workflow",
+              "part_workflow_active"
+            ]
+          },
+          {
+            "source": "include/blcad/gui/gui_interactive_extrude_revolve.hpp",
+            "type": "GuiInteractiveExtrudeController",
+            "methods": [
+              "refresh_source"
+            ]
+          },
+          {
+            "source": "include/blcad/gui/shell/shell_feature_tools.hpp",
+            "type": "ShellFeatureTools",
+            "methods": [
+              "begin_extrude",
+              "edit_extrude_source_sketch",
+              "apply_create_another",
+              "apply",
+              "cancel"
+            ]
+          },
+          {
+            "source": "include/blcad/gui/shell/shell_property_controls.hpp",
+            "type": "ShellPropertyGroup",
+            "methods": [
+              "set_expanded",
+              "set_diagnostic"
+            ]
+          },
+          {
+            "source": "include/blcad/gui/shell/shell_property_controls.hpp",
+            "type": "ShellPropertySelector",
+            "methods": [
+              "set_active",
+              "set_diagnostic"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[property-controls-widget]",
+            "source": "tests/gui/gui_shell_property_controls_tests.cpp"
+          },
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[create-another-workflow]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[source-sketch-native]",
+            "source": "tests/gui/gui_shell_combined_workflow_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[extrude-create-another]",
+            "source": "tests/gui/gui_shell_create_another_tests.cpp"
+          }
+        ]
       },
       {
         "capability": "feature-history",

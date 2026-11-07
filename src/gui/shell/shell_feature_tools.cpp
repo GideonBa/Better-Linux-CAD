@@ -26,7 +26,9 @@
 #include <QMetaObject>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QScopedValueRollback>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStatusBar>
@@ -305,8 +307,19 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   apply_button_->setProperty("guiRole", "primary");
   cancel_button_ = make_gui_button(QStringLiteral("Cancel"), dock_contents);
   cancel_button_->setObjectName(QStringLiteral("blcad.feature.cancel"));
+  create_another_button_ = make_gui_button(QStringLiteral("Create Another"), dock_contents);
+  create_another_button_->setObjectName("blcad.feature.create_another");
+  create_another_button_->setToolTip(
+      QStringLiteral("Apply once and choose fresh inputs with the current settings"));
+  create_another_button_->hide();
   buttons->addWidget(apply_button_);
+  buttons->addWidget(create_another_button_);
   buttons->addWidget(cancel_button_);
+  connect(create_another_button_, &QPushButton::clicked, this, [this] {
+    const auto result = apply_create_another();
+    if (!result)
+      report(result.error());
+  });
   column->addStretch(1);
   auto* scroll = new QScrollArea(dock_contents);
   scroll->setObjectName(QStringLiteral("blcad.feature.inputs_scroll"));
@@ -314,6 +327,12 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   scroll->setWidgetResizable(true);
   scroll->setFrameShape(QFrame::NoFrame);
   scroll->setWidget(panel);
+  connect(task_dock_, &QDockWidget::visibilityChanged, this, [this, scroll](bool visible) {
+    if (visible && command_ == Command::Extrude) {
+      scroll->verticalScrollBar()->setValue(0);
+      scroll->horizontalScrollBar()->setValue(0);
+    }
+  });
   feature_breadcrumbs_ = new QWidget(dock_contents);
   feature_breadcrumbs_->setObjectName("blcad.feature.breadcrumbs");
   auto* context_column = new QVBoxLayout(feature_breadcrumbs_);
@@ -366,7 +385,7 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   cancel_button_->installEventFilter(this);
 
   connect(numeric_editor_, &QLineEdit::editingFinished, this, [this] {
-    if (synchronizing_numeric_ || !active() || editing_source_sketch_)
+    if (synchronizing_numeric_ || !active() || editing_source_sketch_ || awaiting_extrude_source())
       return;
     const auto preview = set_numeric_text(numeric_editor_->text());
     if (preview.has_error())
@@ -405,8 +424,9 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
 ShellFeatureTools::~ShellFeatureTools() = default;
 
 bool ShellFeatureTools::active() const noexcept {
-  return command_ != Command::None && (finishing() || pattern() || body_operation() || spatial() ||
-                                       surface() || coordinator_.active());
+  return command_ != Command::None &&
+         (command_ == Command::Extrude || finishing() || pattern() || body_operation() ||
+          spatial() || surface() || coordinator_.active());
 }
 
 std::optional<ShellFeatureTools::ProfileContext> ShellFeatureTools::profile_context() const {
@@ -441,6 +461,18 @@ bool ShellFeatureTools::select_profile(SketchId sketch, ProfileId profile) {
     return false;
   }
   selected_profile_ = std::pair{std::move(sketch), std::move(profile)};
+  if (command_ == Command::Extrude && !editing_source_sketch_ && !synchronizing_extrude_source_ &&
+      (awaiting_extrude_source() || extrude_profile_picking_)) {
+    const QStringList key{QString::fromStdString(selected_profile_->first.value()),
+                          QString::fromStdString(selected_profile_->second.value())};
+    const auto row = extrude_profile_->findData(key);
+    if (row >= 0) {
+      if (extrude_profile_->currentIndex() == row)
+        change_extrude_profile();
+      else
+        extrude_profile_->setCurrentIndex(row);
+    }
+  }
   // Keep the authoritative semantic selection untouched. The explicit
   // handoff is only a fallback for Finish Sketch or browser nodes that have no
   // viewport selection; Cancel therefore preserves the exact prior selection.
@@ -464,6 +496,17 @@ bool ShellFeatureTools::select_open_line(SketchId sketch) {
        part->find_result_face_workplane(source->workplane())) &&
       interactive_thin_line(*source))
     selected_open_line_ = std::move(sketch);
+  if (selected_open_line_ && command_ == Command::Extrude && !editing_source_sketch_ &&
+      !synchronizing_extrude_source_ && (awaiting_extrude_source() || extrude_profile_picking_)) {
+    const auto row = extrude_profile_->findData(
+        QStringList{QString::fromStdString(selected_open_line_->value()), QString{}});
+    if (row >= 0) {
+      if (extrude_profile_->currentIndex() == row)
+        change_extrude_profile();
+      else
+        extrude_profile_->setCurrentIndex(row);
+    }
+  }
   refresh_enablement();
   return selected_open_line_.has_value();
 }
@@ -527,83 +570,159 @@ Result<DatumAxisId> ShellFeatureTools::default_revolve_axis(const GuiSketchPlane
       "gui.shell.feature", "no reference axis compatible with the profile plane found"));
 }
 
-Result<std::size_t> ShellFeatureTools::begin_extrude() {
-  if (active() || session_.task().active())
-    return Result<std::size_t>::failure(
-        Error::validation("gui.shell.feature", "finish the active command first"));
-  auto selected = profile_from_selection();
-  const auto open_line = open_line_from_selection();
-  if (selected.has_error() && !open_line)
-    return Result<std::size_t>::failure(selected.error());
-  const auto sketch = open_line ? *open_line : selected.value().first;
-  auto plane = sketch_workbench_.plane_view(session_, sketch);
-  if (plane.has_error())
-    return Result<std::size_t>::failure(plane.error());
+bool ShellFeatureTools::awaiting_extrude_source() const noexcept {
+  return command_ == Command::Extrude && !coordinator_.extrude().active();
+}
+
+std::vector<ShellFeatureTools::ProfileContext>
+ShellFeatureTools::extrude_profile_choices(bool first_only) const {
+  std::vector<ProfileContext> result;
   const auto* part = session_.part_document();
-  if (part == nullptr)
-    return Result<std::size_t>::failure(
-        Error::validation("gui.shell.feature", "Extrude requires an active part"));
+  if (!part || part->is_reference_part())
+    return result;
+  for (const auto& sketch : part->sketches()) {
+    const auto append = [&](const auto& profiles) {
+      for (const auto& profile : profiles) {
+        if (first_only && !result.empty())
+          return;
+        if (shell_feature_profile_available(*part, sketch.id(), profile.id()))
+          result.push_back({sketch.id(), profile.id(), true});
+      }
+    };
+    append(sketch.rectangle_profiles());
+    append(sketch.circle_profiles());
+    append(sketch.closed_profiles());
+    append(sketch.arc_closed_profiles());
+    append(sketch.composite_closed_profiles());
+    if (first_only && !result.empty())
+      return result;
+    if (interactive_thin_line(sketch))
+      result.push_back({sketch.id(), std::nullopt});
+    else {
+      const auto analysis = analyze_interactive_raw_profiles(*part, sketch);
+      if (analysis && analysis.value().diagnostics.empty())
+        for (const auto& region : analysis.value().regions)
+          result.push_back({sketch.id(), region.id, false});
+    }
+    if (first_only && !result.empty())
+      return result;
+  }
+  return result;
+}
 
-  const std::size_t index = next_extrude_index(*part);
-  const std::string suffix = std::to_string(index);
-  const FeatureId feature("feature.extrusion." + suffix);
-  const ParameterId parameter_id("parameter.extrusion." + suffix + ".depth");
-  const BodyId body_id("body." + suffix);
-  auto quantity = Quantity::length_mm(10.0, parameter_id.value());
-  if (quantity.has_error())
-    return Result<std::size_t>::failure(quantity.error());
-  auto parameter =
-      Parameter::create_length(parameter_id, "Extrude " + suffix + " Depth", quantity.value());
-  if (parameter.has_error())
-    return Result<std::size_t>::failure(parameter.error());
-  auto body = Body::create(body_id, "Body " + suffix, BodyKind::Solid);
-  if (body.has_error())
-    return Result<std::size_t>::failure(body.error());
+Result<std::size_t> ShellFeatureTools::begin_extrude() {
+  return begin_extrude_workflow(std::nullopt);
+}
 
+Result<std::size_t>
+ShellFeatureTools::begin_extrude_workflow(std::optional<ExtrudeSettings> settings) {
+  if (active() || session_.task().active() || window_.active_sketch() ||
+      session_.workspace() != GuiWorkspace::Part || extrude_profile_choices(true).empty())
+    return Result<std::size_t>::failure(Error::validation(
+        "gui.shell.feature",
+        "Extrude requires an idle Part with a supported profile or single open line."));
+  std::optional<ProfileContext> preselection;
+  if (!settings) {
+    const auto selected = profile_from_selection();
+    if (const auto line = open_line_from_selection())
+      preselection = ProfileContext{*line, std::nullopt};
+    else if (selected)
+      preselection = ProfileContext{selected.value().first, selected.value().second};
+  }
   const auto workflow = session_.begin_part_workflow();
   if (!workflow)
     return workflow;
-  extrude_source_ =
-      ProfileContext{sketch, open_line ? std::nullopt : std::optional(selected.value().second)};
-  preview_valid_ = false;
-  if (!session_.task().begin("part.extrude") || !session_.task().begin_parameter_editing()) {
-    session_.cancel_part_workflow();
-    extrude_source_.reset();
-    return Result<std::size_t>::failure(
-        Error::validation("gui.shell.feature", "Could not start extrude task"));
-  }
-  GuiFeatureManipulatorFrame frame{plane.value().origin, plane.value().normal, plane.value().normal,
-                                   plane.value().x_axis};
-  auto begun = coordinator_.begin_extrude_with_new_inputs(
-      sketch, open_line ? std::nullopt : std::optional(selected.value().second), feature,
-      "Extrude " + suffix, std::move(parameter.value()), std::move(body.value()), frame);
-  if (begun.has_error()) {
-    (void)session_.task().cancel();
-    session_.cancel_part_workflow();
-    extrude_source_.reset();
-    return begun;
-  }
-  refresh_extrude_frame(plane.value(), sketch);
   command_ = Command::Extrude;
   previous_selection_mask_ = viewport_.selection_filter_mask();
   previous_semantic_scope_ = viewport_.selection_semantic_scope();
   extrude_previous_selection_ = viewport_.selected_semantic();
   extrude_previous_profile_ = selected_profile_;
   extrude_previous_open_line_ = selected_open_line_;
-  reset_extrude_controls(frame);
-  if (!session_.task().show_preview()) {
+  extrude_source_.reset();
+  preview_valid_ = false;
+  coordinator_.cancel();
+  if (!session_.task().begin("part.extrude")) {
     cancel();
-    return Result<std::size_t>::failure(
-        Error::internal("gui.shell.feature", "Could not activate extrude preview"));
+    return Result<std::size_t>::failure(Error::validation("extrude", "Could not start Extrude."));
   }
-  show_task_panel(QStringLiteral("Extrude"), QStringLiteral("mm"), 10.0);
-  auto preview = preview_and_publish();
-  if (preview.has_error()) {
-    const Error error = preview.error();
-    cancel();
-    return Result<std::size_t>::failure(error);
+  {
+    const QScopedValueRollback guard(synchronizing_extrude_source_, true);
+    show_task_panel(QStringLiteral("Extrude"), QStringLiteral("mm"), 10.0);
+    reset_extrude_controls({});
+    refresh_extrude_profile_choices();
+    if (settings)
+      apply_extrude_settings(*settings);
   }
+  set_extrude_profile_picking(true);
+  if (preselection) {
+    const QStringList key{
+        QString::fromStdString(preselection->sketch.value()),
+        preselection->profile ? QString::fromStdString(preselection->profile->value()) : QString{}};
+    const auto row = extrude_profile_->findData(key);
+    if (row >= 0)
+      extrude_profile_->setCurrentIndex(row);
+  }
+  if (awaiting_extrude_source())
+    task_summary_->setText(
+        QStringLiteral("Select a profile or single open line before editing feature settings."));
+  refresh_enablement();
+  synchronize_overlay();
   window_.refresh();
+  return workflow;
+}
+
+Result<std::size_t> ShellFeatureTools::activate_extrude_source(ProfileContext source) {
+  preview_valid_ = false;
+  viewport_.clear_feature_preview();
+  coordinator_.cancel();
+  extrude_source_.reset();
+  if (session_.task().stage() == GuiTaskStage::Preview)
+    (void)session_.task().return_to_editing();
+  if (session_.task().stage() == GuiTaskStage::EditingParameters)
+    (void)session_.task().return_to_selection();
+  const auto plane = sketch_workbench_.plane_view(session_, source.sketch);
+  if (!plane)
+    return Result<std::size_t>::failure(plane.error());
+  const auto* part = session_.part_document();
+  const auto index = next_extrude_index(*part);
+  const auto suffix = std::to_string(index);
+  const ParameterId distance("parameter.extrusion." + suffix + ".depth");
+  const auto parsed = parse_numeric(numeric_editor_->text(), "mm");
+  const auto value = parsed && *parsed > 0 ? *parsed : 10.0;
+  const auto quantity = Quantity::length_mm(value, distance.value());
+  if (!quantity)
+    return Result<std::size_t>::failure(quantity.error());
+  auto parameter =
+      Parameter::create_length(distance, "Extrude " + suffix + " Depth", quantity.value());
+  auto body = Body::create(BodyId("body." + suffix), "Body " + suffix, BodyKind::Solid);
+  if (!parameter || !body)
+    return Result<std::size_t>::failure(!parameter ? parameter.error() : body.error());
+  GuiFeatureManipulatorFrame frame{plane.value().origin, plane.value().normal, plane.value().normal,
+                                   plane.value().x_axis};
+  const auto begun = coordinator_.begin_extrude_with_new_inputs(
+      source.sketch, source.profile, FeatureId("feature.extrusion." + suffix), "Extrude " + suffix,
+      std::move(parameter.value()), std::move(body.value()), frame);
+  if (!begun)
+    return begun;
+  extrude_source_ = source;
+  {
+    const QSignalBlocker guard(extrude_direction_);
+    const auto direction = extrude_direction_->currentIndex();
+    if (!source.profile)
+      extrude_direction_->removeItem(2);
+    else if (extrude_direction_->count() < 3)
+      extrude_direction_->addItem(QStringLiteral("Along Path"));
+    extrude_direction_->setCurrentIndex(!source.profile && direction == 2 ? -1 : direction);
+  }
+  refresh_extrude_frame(plane.value(), source.sketch);
+  refresh_extrude_reference_choices(true);
+  (void)session_.task().begin_parameter_editing();
+  (void)session_.task().show_preview();
+  set_extrude_profile_picking(false);
+  update_extrude_controls();
+  const auto preview = preview_and_publish();
+  if (!preview)
+    task_summary_->setText(QString::fromStdString(preview.error().message()));
   return begun;
 }
 
@@ -663,9 +782,9 @@ Result<std::size_t> ShellFeatureTools::begin_revolve(std::optional<DatumAxisId> 
 }
 
 Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_text(const QString& text) {
-  if (!active())
+  if (!active() || awaiting_extrude_source())
     return Result<GuiPartFeaturePreview>::failure(
-        Error::validation("gui.shell.feature", "no active feature value"));
+        Error::validation("gui.shell.feature", "Select a feature source before editing values."));
   const std::string_view unit = command_ == Command::BodyScale ? ""
                                 : angular_value()              ? "deg"
                                                                : "mm";
@@ -1055,6 +1174,7 @@ Result<std::size_t> ShellFeatureTools::apply() {
   command_ = Command::None;
   if (was_extrude) {
     extrude_source_.reset();
+    extrude_profile_picking_ = false;
   }
   if (restore_scope)
     viewport_.set_selection_semantic_scope(previous_semantic_scope_);
@@ -1107,6 +1227,7 @@ void ShellFeatureTools::cancel() noexcept {
   if (was_extrude) {
     session_.cancel_part_workflow();
     extrude_source_.reset();
+    extrude_profile_picking_ = false;
   }
   if (restore_scope)
     viewport_.set_selection_semantic_scope(previous_semantic_scope_);
@@ -1148,8 +1269,7 @@ void ShellFeatureTools::refresh_enablement() {
       !session_.part_document()->is_reference_part() &&
       session_.workspace() == GuiWorkspace::Part && !session_.reference_repair_mode();
   const bool profile_available = idle_part && !profile_from_selection().has_error();
-  action_extrude_->setEnabled(profile_available ||
-                              (idle_part && open_line_from_selection().has_value()));
+  action_extrude_->setEnabled(idle_part && !extrude_profile_choices(true).empty());
   bool revolve_available = false;
   if (profile_available) {
     const auto plane = selected_profile_plane();
@@ -1204,7 +1324,10 @@ void ShellFeatureTools::refresh_enablement() {
   if (action_apply_)
     // A corrected field can be validated even when its previous candidate
     // disabled Apply. apply() still validates the complete candidate.
-    action_apply_->setEnabled(active() && command_ == Command::Extrude && !editing_source_sketch_);
+    action_apply_->setEnabled(active() && command_ == Command::Extrude && !editing_source_sketch_ &&
+                              !awaiting_extrude_source());
+  create_another_button_->setVisible(command_ == Command::Extrude);
+  create_another_button_->setEnabled(command_ == Command::Extrude && apply_button_->isEnabled());
   cancel_button_->setEnabled(active());
   window_.refresh_context_toolbar();
 }
@@ -1309,7 +1432,8 @@ void ShellFeatureTools::synchronize_overlay() {
     revolve_controls_->setEnabled(layer_.active_handle_id().empty());
   const bool visible = active() && !editing_source_sketch_ && preview_valid_ &&
                        !layer_.handles().empty() && !pattern_reference_picking_ &&
-                       !body_reference_picking_ && !extrude_reference_picking_;
+                       !body_reference_picking_ && !extrude_reference_picking_ &&
+                       !extrude_profile_picking_;
   overlay_->setVisible(visible);
   if (visible) {
     overlay_->setGeometry(viewport_.rect());
@@ -1428,7 +1552,7 @@ bool ShellFeatureTools::eventFilter(QObject* watched, QEvent* event) {
         break;
       const auto* mouse = static_cast<QMouseEvent*>(event);
       if (mouse->button() == Qt::LeftButton && preview_valid_ && !pattern_reference_picking_ &&
-          !body_reference_picking_ && !extrude_reference_picking_) {
+          !body_reference_picking_ && !extrude_reference_picking_ && !extrude_profile_picking_) {
         (void)update_mapping();
         if (layer_.begin_drag({mouse->position().x(), mouse->position().y()})) {
           drag_start_handle_ = std::string(layer_.active_handle_id());

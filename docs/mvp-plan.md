@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 144
-current_block: 145
-current_boundary: Block 145C2 verified in PR #142; merge before profile/Create Another
-current_tag: "[parity-b145]"
+implemented_through: Block 145
+current_block: 146
+current_boundary: Block 146 planned; Block 145 accepted for regular PR delivery
+current_tag: "[parity-b146]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Block 145 in progress; Blocks 146–204 planned"
+  advanced_modeling_workflows: "Block 145 implemented and accepted; Blocks 146–204 planned"
 ---
 
 # MVP Plan
@@ -33,10 +33,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 144
-current block        Block 145 (in progress; slice C2)
-current phase        Shared workflow contract and evidence inventory
-current boundary     Existing-owner Extrude/source Sketch navigation
+implemented through  Block 145
+current block        Block 146 (planned; not started)
+current phase        Authored history and suppression intent
+current boundary     Block 145 accepted; Block 146 awaits preceding PR delivery
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1774,9 +1774,9 @@ normally and updated main must match the tested tree before any successor branch
 Runtime fingerprints remain unchanged through this documentation-only delivery update.
 Previously deferred modeling capabilities remain scoped by their feature contracts.
 
-## Planned Blocks 145–204 — Advanced modeling workflows
+## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Block 145 is **In progress**; Blocks 146–204 are **Planned; not started**.
+Status authority: Block 145 is **Implemented and accepted**; Blocks 146–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1785,7 +1785,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
-| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145 in progress; 146–151 not started |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145 accepted; 146–151 not started |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
@@ -1828,13 +1828,13 @@ for the next slice/branch.
 | 145A | Extend existing capability inventory with explicit planned/implemented API/command/proof mappings, reject invalid evidence, capture reproducible unchanged-intent/geometry and timing baseline | Merged via PR #139 |
 | 145B | Reusable property groups, active semantic selector and diagnostics controls; adopt in existing Extrude with keyboard/compact/native proof | Merged via PR #140 |
 | 145C1 | Extend existing GuiDocumentSession with a complete transient Part-workflow checkpoint, committed-only Save and one-history publication; headless failure/history/sidecar tests | Merged via PR #141 |
-| 145C2 | Existing-owner Extrude/source Sketch breadcrumbs using C1, revalidation, complete Cancel, committed-only Save and guarded consumers; native integration | Verified; delivery PR #142 |
-| 145C3 | Explicit profile-selector command-first/Create Another lifecycle, retained compatible settings without hidden targets; whole-Block-145 native/compact/scaled closure | Not started |
+| 145C2 | Existing-owner Extrude/source Sketch breadcrumbs using C1, revalidation, complete Cancel, committed-only Save and guarded consumers; native integration | Merged via PR #142 |
+| 145C3 | Explicit profile-selector command-first/Create Another lifecycle, retained compatible settings without hidden targets; whole-Block-145 native/compact/scaled closure | Implemented and accepted; PR delivery pending |
 
 145A starts on `feat/advanced-workflow-evidence` from clean `dbff649`, after verified merged
 PR #138 and refreshed main. `user-interface.md` owns the slice design and baseline boundaries.
 No new CAD command or feature schema is introduced by the evidence slice. Keep the implementation
-boundary at 144 until all three slices and the complete Block-145 criteria pass.
+boundary at 144 until all implementation slices and the complete Block-145 criteria pass.
 
 145A adds 24 explicit capability entries (existing Extrude plus 23 planned extensions), validates
 actual actions, declared/compiled headless APIs and registered nonhidden headless/native proof
@@ -1908,7 +1908,30 @@ are reviewed and startup reaches intentional timeout 124. `development-setup.md`
 commands, failed initial attempts, freeze and scope limits. Implemented-through remains 144.
 
 Delivery: [PR #142](https://github.com/GideonBa/Better-Linux-CAD/pull/142), implementation `11fd8a8`.
-Merge normally, compare the resulting tree and refresh main before creating the C3 branch.
+PR #142 is merged as `23cf279`; refreshed main matches the tested tree.
+`feat/extrude-create-another` starts from that verified state. C3 extends the same owner, session
+workflow and property selector, with no new persistence or geometry authority.
+
+
+C3 completes explicit Profile/Open Line selection, command-first collection and Create Another in
+that owner. Fresh candidates retain only literal/mode settings and require new Profile/Body/Path/
+limit references. Required input, source correction, complete cancellation, committed-only Save,
+separate feature history and reopening are covered by actual Qt workflows. New tasks scroll to their
+primary input; empty summaries and compact/scaled completion controls are verified visually.
+Construction/Centerline thin sources are rejected. No new CAD operation or document schema is added.
+
+Final runtime acceptance, completed on 2026-11-07 after the requested pause: full GUI **648 passed,
+34 native-only skips / 87784 assertions**; native 100% **80 / 11609**; native 150% **36 / 6931**,
+without skips or retries. Separate native startup reaches expected timeout 124. Three isolated native
+processes supply three first-workflow and thirty reused-window timing samples; physical/canonical
+oracles pass each trial. The checked C3 artifact retains host/build metadata, all raw samples and
+runtime fingerprints; historical 145A evidence remains intact. Detailed commands, earlier failed
+attempts, explicit scope limits and the unchanged final freeze live in `development-setup.md`.
+
+Together A/B/C1/C2/C3 meet Block 145 UI01 and bounded P01 baseline criteria. Only the shared workflow
+capability advances to implemented coverage; 22 future extensions remain planned. Implemented-through
+advances to **145**, and Blocks 146–204 remain unstarted. The next implementation branch may begin
+only after C3's normal protected PR is merged and refreshed main matches the reviewed tree.
 
 ## Later phases
 
