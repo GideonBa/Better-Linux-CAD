@@ -2184,9 +2184,9 @@ one common resource store for later Hole/Thread tables, not independent per-modu
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 149A | Typed density/engineering pressure, per-value provenance, immutable Material and typed standards-table revisions, duplicate/conflict rules and atomic catalog merge; synthetic Core tests | Delivered via PR #152 |
-| 149B | Standalone Part snapshots, Part default/Body overrides, Project resource deduplication, strict versioned JSON and offline/legacy compatibility | Implemented and verified; B2 delivery pending |
+| 149B | Standalone Part snapshots, Part default/Body overrides, Project resource deduplication, strict versioned JSON and offline/legacy compatibility | Implemented and verified; B2 PR #154 |
 | 149B1 | Shared strict resource JSON and standalone Part version 3 with material pins; preserve history/result-face loading; conservative Project-v1 serialization boundary | Delivered via PR #153 |
-| 149B2 | Project resource ownership/deduplication, versioned Project persistence and offline member portability; replace B1's temporary project boundary | Implemented and verified; delivery pending |
+| 149B2 | Project resource ownership/deduplication, versioned Project persistence and offline member portability; replace B1's temporary project boundary | Implemented and verified; PR #154 |
 | 149C | Explicit coordinated revision updates, referenced-resource removal guards and atomic multi-document rollback/freshness evidence through existing mutation authorities | Planned; not started |
 
 149A adds no document assignment, writer/schema, material UI, mass query or capability promotion.
@@ -2247,6 +2247,10 @@ standalone extraction are accepted for 149B. Exact commands/freeze/startup/inven
 remain in `development-setup.md`. No material/mass UI or coordinated revision/removal operation
 is inferred; whole 149 stays open with implemented-through 148. Complete normal PR delivery,
 confirm merge and compare refreshed main with the reviewed tree before C.
+
+149B2 delivery: [PR #154](https://github.com/GideonBa/Better-Linux-CAD/pull/154), implementation
+`15650e6`. The delivery-record update changes documentation only and preserves all 994 runtime
+fingerprints. Confirm normal merge and compare refreshed main with the reviewed tree before C.
 
 ## Later phases
 

@@ -4052,3 +4052,7 @@ Final B2 inventory passes **5 / 568**, without failures/skips
 (`/tmp/blcad149b2-final-inventory.log`). All 994 runtime fingerprints remain unchanged after
 native verification and documentation updates. Source/diff and staged whitespace review pass.
 149B persistence is accepted; whole 149 and the material UI are not promoted by this slice.
+
+Delivery: [PR #154](https://github.com/GideonBa/Better-Linux-CAD/pull/154), implementation `15650e6`.
+The delivery-record commit changes documentation only and preserves all 994 runtime fingerprints.
+Normal merge and verified refreshed-main/reviewed-tree comparison precede 149C.
