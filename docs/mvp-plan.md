@@ -2287,7 +2287,7 @@ contracts are extended in `engineering-modules.md` and `gui-measure-mvp9.md`, no
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 150A | Analytic shape measures, stable central/principal tensors, density-aware complete Part query with immutable freshness, surface/empty/missing-density semantics and focused analytic/combination tests | Delivered via PR #156 |
-| 150B | Explicit physical assembly participation, hidden active/repeated nested occurrences, posed centroid/tensor aggregation and independent analytic oracles | Implemented and verified; delivery pending |
+| 150B | Explicit physical assembly participation, hidden active/repeated nested occurrences, posed centroid/tensor aggregation and independent analytic oracles | Implemented and verified; PR #157 |
 | 150C | Authoritative material-only reuse through existing cache/session owners, result invalidation and complete R02/combined acceptance | Planned; not started |
 
 No borrowed legacy cache is accepted as an A freshness certificate; its complete private evaluation
@@ -2330,6 +2330,10 @@ startup timeout **124** pass. Runtime freeze **1,002** files, SHA-256
 `ebdd82493f4a156d9b4ba4e0a46bbc475a1195d664aec67e2255147d9394fdc6` stays unchanged.
 Commands, raw captures and validation scope are recorded in `development-setup.md`. Whole 150
 and new Physical Properties UI remain unaccepted pending C/151.
+
+Delivery: [PR #157](https://github.com/GideonBa/Better-Linux-CAD/pull/157), implementation `fd88b4e`.
+The delivery-record commit changes documentation only; all 1,002 runtime fingerprints remain
+unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main before C.
 
 ## Later phases
 

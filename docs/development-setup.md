@@ -4287,3 +4287,7 @@ Final inventory passes **5 / 568** without skips/failures (`blcad150b-final-inve
 All **1,002** runtime fingerprints remain unchanged after verification. Complete working/staged
 source review, modified-line formatting and whitespace checks precede delivery. This accepts B
 only; material-only reuse and whole-150 combination acceptance remain C, visible controls 151.
+
+Delivery: [PR #157](https://github.com/GideonBa/Better-Linux-CAD/pull/157), implementation `fd88b4e`.
+The delivery-record commit changes documentation only; all 1,002 runtime fingerprints remain
+unchanged. Normal merge and exact reviewed-tree comparison on refreshed main precede 150C.
