@@ -1,8 +1,10 @@
 # Feature Edit Lifecycle and Core Feature-Update Commands MVP-9
 
-Planned extension: Blocks 146–148 in [the consolidated sequence](inventor-parity-sequence.md)
-add suppression, validated reorder and End of Part editing. The non-goals below describe the
-implemented MVP-9 boundary; no history authority changes in this planning delivery.
+History extension: accepted Blocks 146–148 in [the consolidated sequence](inventor-parity-sequence.md)
+add suppression, validated reorder and End of Part editing through the existing browser/editor.
+Their current contracts live in `feature-system.md`, `shape-cache-mvp1-data-model.md` and
+`user-interface.md`. The MVP-9 non-goals below remain the historical feature-update boundary;
+BodyTransform stack editing remains separate from the implemented history commands.
 
 Status: headless lifecycle implemented in Block 129; replacement-shell browser editing restored
 in the Feature Edit slice of Block 136 (22 October 2026).

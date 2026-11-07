@@ -1,8 +1,8 @@
 # Verification Plan for Advanced Modeling Workflows
 
 This is the acceptance and test-design companion to [Blocks 145–204](inventor-parity-sequence.md).
-All scenario IDs and new tags below are planned. They become evidence only when implemented tests
-run against a recorded tree. `development-setup.md` owns actual commands/results;
+Scenario IDs and future tags reserve planned work. They become evidence only when implemented
+tests run against a recorded tree; dated evidence below identifies completed portions. `development-setup.md` owns actual commands/results;
 `mvp-plan.md` owns numbered completion. Existing accepted test suites remain regression baselines.
 
 ## Test layers and required evidence
@@ -161,6 +161,30 @@ reconciles H01–H03/UI01 and capability promotion; the foundation alone does no
   Cover folded browser nodes, long names, disabled illegal drop and suppressed feature selection.
 - Verify diagnostic points to the affected dependency, correction keeps the task usable, selection
   remains semantic and Undo labels distinguish move/suppress/edit. Check compact/high-DPI controls.
+
+
+148C composes the existing history authorities through `[history-combined-acceptance]` in
+`gui_shell_history_tests.cpp`. Its mixed native-base/boss/Hole/Fillet/Chamfer/Transform/Boolean
+fixture checks legacy/authored physical equivalence, explicit creator closure, modifier bypass,
+independent reorder and two unaffected Body volumes. Another scenario combines suppression,
+reorder, upstream prefix edit, restore, exact complete history and physical STEP readback. The
+native parent-cancel case covers long names, folded state, an active Extrude child, selection,
+camera, original redo and replacement. Final status and ordinary-1280×800 / compact-1024×640 native
+results remain in the setup/MVP docs; registered tests alone do not promote the capability.
+
+
+Completed 148 gate reconciliation (exact run counts/source/captures in `development-setup.md`):
+
+| Gate | Executed evidence | Distinct oracle |
+| --- | --- | --- |
+| H01 | 146 Core inventory/intent; 147 physical all-family/imported evaluation; 148 controller/browser and `[history-mixed-chain]` native chain | Canonical intent/graph snapshots, independent legacy physical comparison, modifier bypass, creator closure and unaffected 200/1,600 mm³ Bodies |
+| H02 | `[history-prefix-session]`, `[history-prefix-scope]`, `[history-marker-shell]`, combined prefix edit/restore/exchange | Exact retained complete intent/checkpoint bytes, explicit partial-cache rejection, invalid suffix correction, one root history entry and physical STEP readback |
+| H03 | `[history-shell]`, `[history-marker-shell]`, `[history-combined-acceptance]` native 100%/150% | Real context/drag/double-click/keyboard input, forbidden/stale/foreign drops, folded/long-name cases, semantic selection/camera and distinct Undo/completion labels |
+| UI01 | Accepted 145 baseline/source Sketch/Create Another plus 148 child/root input and native context cases | Existing command ownership, scoped child cancellation, committed Save, restored redo, fixed accessible root/child controls and 1280×800 / 1024×640 layout captures |
+
+This closes those history gates at 148; their later repeats and combinations with future feature
+families remain allocated by the existing sequence and combination matrix. Inventory proof resolution
+is checked separately from the executed native scenarios and never substitutes for them.
 
 ### R01 Material resources and pinned revisions
 

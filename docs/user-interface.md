@@ -312,6 +312,26 @@ The root context and child footer stay accessible, and the failed suffix retains
 marker and correction message without growing the window. Lower child inputs scroll inside the
 existing task. These captures are unmodified Qt/OCCT output from the recorded frozen source.
 
+
+Combined 148C acceptance requests ordinary 1280×800 and compact 1024×640 logical windows, with
+100%/150% scale. History/Extrude context names use bounded labels and retain the complete text in a
+tooltip. A hidden End of Part row does not force folded ancestors open; the fixed context
+still identifies the editing position. Parent Cancel can close an active child and restore the
+complete entry view/history. Root diagnostics remain scrollable without enlarging the compact
+window. Apply/Cancel replace the preview instruction with distinct History/End of Part completion
+messages while the original source checkpoint remains valid. Final combined captures/results are
+recorded in the setup/MVP evidence.
+
+
+148C combined native proof is retained in the [mixed nine-operation history](images/history-mixed-chain-complete.png),
+[combined history after Save/reopen/STEP](images/history-combined-complete.png),
+[compact failed suffix](images/history-end-of-part-compact.png), and
+[compact long-name parent/child context](images/history-parent-child-long-name.png).
+The ordinary views are 1280×800 at 100%; compact views are 1024×640 DIP at 150%. Controls remain
+reachable and the folded Features group stays folded in the long-name child context. Names use
+bounded labels with complete tooltips. Exact counts/hashes and retained historical B evidence are
+in `development-setup.md`; whole-block status belongs to `mvp-plan.md`.
+
 ### Planned command placement and workflows
 
 | Ribbon/context | Planned commands | Required workflow |

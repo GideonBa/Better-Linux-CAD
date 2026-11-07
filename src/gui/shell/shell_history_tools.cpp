@@ -394,6 +394,8 @@ struct ShellHistoryTools::Impl {
         }
     if (restore_snapshot && selected)
       (void)window.viewport().select_semantic(*selected);
+    if (restore_snapshot)
+      window.statusBar()->showMessage(applied ? "End of Part applied." : "End of Part cancelled.");
     finishing_prefix = false;
   }
   Result<std::size_t> apply_prefix() {
@@ -691,6 +693,7 @@ struct ShellHistoryTools::Impl {
                                        : "Unsuppress Feature");
     breadcrumb->setText(text(std::string(window.session().display_name()) + " / History" +
                              (feature.empty() ? "" : " / " + label(feature))));
+    breadcrumb->setToolTip(breadcrumb->text());
     order_group->setVisible(reordering);
     effects_group->setVisible(!reordering);
     loading = false;
@@ -731,6 +734,9 @@ struct ShellHistoryTools::Impl {
         }
     if (restore_snapshot && selected)
       (void)window.viewport().select_semantic(*selected);
+    if (restore_snapshot)
+      window.statusBar()->showMessage(applied ? "History change applied."
+                                              : "History edit cancelled.");
   }
 };
 
@@ -825,6 +831,9 @@ ShellHistoryTools::ShellHistoryTools(ShellWindow& window, ShellRibbon& ribbon, i
   p.breadcrumb->setTextFormat(Qt::PlainText);
   p.breadcrumb->setObjectName("blcad.history.breadcrumb");
   p.breadcrumb->setWordWrap(true);
+  p.breadcrumb->setMinimumWidth(0);
+  p.breadcrumb->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+  p.breadcrumb->setMaximumHeight(p.breadcrumb->fontMetrics().height() * 2 + 8);
   layout->addWidget(p.breadcrumb);
   p.status = new QLabel(panel);
   p.status->setTextFormat(Qt::PlainText);
@@ -1001,7 +1010,7 @@ Result<std::size_t> ShellHistoryTools::begin_prefix(std::size_t count) {
   }
   p.prefix = true;
   p.prefix_owner = p.window.session().part_document()->id().value();
-  p.window.viewport().setMinimumHeight(std::min(p.prefix_minimum_height, 128));
+  p.window.viewport().setMinimumHeight(std::min(p.prefix_minimum_height, 96));
   p.prefix_bar->show();
   p.window.viewport().clear_selection();
   p.window.refresh();
@@ -1016,8 +1025,13 @@ Result<std::size_t> ShellHistoryTools::begin_prefix(std::size_t count) {
   };
   for (int i = 0; i < p.browser().topLevelItemCount(); ++i)
     if (auto* marker = find_marker(find_marker, p.browser().topLevelItem(i))) {
-      p.browser().setCurrentItem(marker);
-      p.browser().scrollToItem(marker);
+      bool visible = true;
+      for (auto* parent = marker->parent(); parent; parent = parent->parent())
+        visible = visible && parent->isExpanded();
+      if (visible) {
+        p.browser().setCurrentItem(marker);
+        p.browser().scrollToItem(marker);
+      }
       break;
     }
   return begun;

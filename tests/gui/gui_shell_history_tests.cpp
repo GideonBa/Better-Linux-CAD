@@ -38,6 +38,7 @@
 #include <QPushButton>
 #include <QScreen>
 #include <QScrollArea>
+#include <QStatusBar>
 #include <QTemporaryDir>
 #include <QThread>
 #include <QTimer>
@@ -50,6 +51,7 @@
 #include <algorithm>
 #include <array>
 #include <memory>
+#include <nlohmann/json.hpp>
 
 using namespace blcad;
 using namespace blcad::gui;
@@ -140,8 +142,8 @@ void open(ShellWindow& w, QTemporaryDir& dir, PartDocument part = history_part()
   const auto path = dir.filePath("history.blcad.json");
   REQUIRE(write_part_document_json_file(part, path.toStdString()));
   REQUIRE(w.open_path(path));
-  const QSize desired_size(qEnvironmentVariableIsSet("BLCAD_UI_COMPACT") ? 1000 : 1440,
-                           qEnvironmentVariableIsSet("BLCAD_UI_COMPACT") ? 720 : 920);
+  const QSize desired_size(qEnvironmentVariableIsSet("BLCAD_UI_COMPACT") ? 1024 : 1280,
+                           qEnvironmentVariableIsSet("BLCAD_UI_COMPACT") ? 640 : 800);
   const QSize practical_size =
       QApplication::platformName() == "offscreen"
           ? desired_size
@@ -151,6 +153,7 @@ void open(ShellWindow& w, QTemporaryDir& dir, PartDocument part = history_part()
   settle_paint();
   w.resize(practical_size);
   settle_paint();
+  CHECK(w.size() == practical_size);
   if (QApplication::platformName() == "xcb")
     REQUIRE(w.viewport().native_viewer_available());
   w.viewport().fit_all();
@@ -195,8 +198,10 @@ void capture(ShellWindow& w, const char* name) {
     return;
   REQUIRE(QDir().mkpath(dir));
   settle_paint();
-  if (qEnvironmentVariableIsSet("BLCAD_UI_COMPACT"))
-    CHECK(w.width() <= 1000);
+  if (qEnvironmentVariableIsSet("BLCAD_UI_COMPACT")) {
+    CHECK(w.width() <= 1024);
+    CHECK(w.height() <= 640);
+  }
   REQUIRE(w.grab().save(QDir(dir).filePath(QString::fromLatin1(name) + ".png")));
 }
 } // namespace
@@ -305,6 +310,7 @@ TEST_CASE("End of Part context input retains complete intent and Cancel restores
   capture(w, "history-end-of-part-prefix");
   click(control<QPushButton>(w, "blcad.history.prefix_cancel"));
   settle_paint();
+  CHECK(w.statusBar()->currentMessage() == "End of Part cancelled.");
   CHECK_FALSE(w.history_tools().active());
   CHECK_FALSE(w.session().history_prefix_count());
   CHECK(snapshot(w) == before);
@@ -354,6 +360,8 @@ TEST_CASE(
   CHECK(w.history_tools().prefix_active());
   CHECK(w.session().history_prefix_count() == 1);
   CHECK(snapshot(w) == invalid);
+  INFO("Window " << w.width() << "x" << w.height() << "; before " << initial_size.width() << "x"
+                 << initial_size.height());
   CHECK(w.size() == initial_size);
   CHECK(control<QLabel>(w, "blcad.history.prefix_status")
             .text()
@@ -370,6 +378,7 @@ TEST_CASE(
   REQUIRE(w.session().part_shape_cache()->validate_complete_history_result(
       *w.session().part_document()));
   CHECK(w.session().undo_label() == "Edit at End of Part");
+  CHECK(w.statusBar()->currentMessage() == "End of Part applied.");
   quick(w, "undo");
   CHECK(snapshot(w) == before);
   CHECK_FALSE(w.session().can_undo());
@@ -547,6 +556,7 @@ TEST_CASE("Prefix Extrude source Sketch cancellation and Create Another retain t
   REQUIRE(w.session().derived_results_fresh());
   CHECK(w.session().part_shape_cache()->body_shape_count() == 3);
   CHECK(w.session().undo_label() == "Edit at End of Part");
+  CHECK(w.statusBar()->currentMessage() == "End of Part applied.");
   quick(w, "undo");
   CHECK(snapshot(w) == before);
   CHECK_FALSE(w.session().can_undo());
@@ -650,6 +660,7 @@ TEST_CASE("History context commands preview cancel save apply undo and edit thro
             checked(read_part_document_json_file(w.session().file_path().string())))) == before);
   capture(w, "history-suppression-preview");
   key(control<QListWidget>(w, "blcad.history.order"), Qt::Key_Escape);
+  CHECK(w.statusBar()->currentMessage() == "History edit cancelled.");
   CHECK_FALSE(w.history_tools().active());
   CHECK(snapshot(w) == before);
   CHECK(w.viewport().feature_preview_count() == 0);
@@ -674,6 +685,7 @@ TEST_CASE("History context commands preview cancel save apply undo and edit thro
   CHECK((w.session().part_document()->authored_history_intent()->suppressed ==
          std::vector<std::string>{"fillet"}));
   CHECK(w.session().undo_label() == "Suppress Fillet");
+  CHECK(w.statusBar()->currentMessage() == "History change applied.");
   CHECK(item(w, "fillet")->text(0).contains("suppressed"));
   CHECK(item(w, "fillet")->font(0).italic());
   auto* group = item(w, "fillet")->parent();
@@ -970,4 +982,268 @@ TEST_CASE("Imported bases and immutable Reference Parts explain unavailable hist
     CHECK(snapshot(w) == before);
     CHECK_FALSE(w.session().can_undo());
   }
+}
+
+TEST_CASE("H01 H02 H03 UI01 compose suppression reorder prefix edit restore and physical exchange",
+          "[gui][parity-b148][history-combined-acceptance][history-native]") {
+  QTemporaryDir directory;
+  ShellWindow w;
+  open(w, directory, prefix_part());
+  const auto camera = w.viewport().camera_bookmark();
+  std::vector<std::string> stages{snapshot(w)};
+  context(w, "fillet", w.history_tools().suppress_action());
+  click(control<QPushButton>(w, "blcad.history.apply"));
+  stages.push_back(snapshot(w));
+  CHECK(w.session().undo_label() == "Suppress Fillet");
+  CHECK(w.statusBar()->currentMessage() == "History change applied.");
+  context(w, "tool", w.history_tools().reorder_action());
+  auto& order = control<QListWidget>(w, "blcad.history.order");
+  key(order, Qt::Key_End);
+  REQUIRE(order.currentItem()->data(Qt::UserRole).toString() == "tool");
+  key(order, Qt::Key_Up, Qt::ControlModifier);
+  key(order, Qt::Key_Up, Qt::ControlModifier);
+  key(order, Qt::Key_Return, Qt::ControlModifier);
+  REQUIRE_FALSE(w.history_tools().active());
+  CHECK(w.session().undo_label() == "Reorder features");
+  CHECK((w.session().part_document()->authored_history_intent()->order ==
+         std::vector<std::string>{"tool", "base", "fillet"}));
+  stages.push_back(snapshot(w));
+  context(w, "fillet", w.history_tools().marker_before_action());
+  REQUIRE(w.session().history_prefix_count() == 2);
+  CHECK(item(w, "fillet")->text(0).contains("suppressed; after End of Part"));
+  edit_prefix_depth(w, 4);
+  const auto partial = directory.filePath("partial.step").toStdString();
+  CHECK_FALSE(geometry::StepExporter{}.write_part_step(*w.session().part_document(),
+                                                       *w.session().part_shape_cache(), partial));
+  CHECK_FALSE(std::filesystem::exists(partial));
+  quick(w, "save");
+  CHECK(checked(serialize_part_document_to_json(checked(
+            read_part_document_json_file(w.session().file_path().string())))) == stages.back());
+  click(control<QPushButton>(w, "blcad.history.prefix_apply"));
+  REQUIRE(w.session().derived_results_fresh());
+  CHECK(w.session().undo_label() == "Edit at End of Part");
+  CHECK(w.statusBar()->currentMessage() == "End of Part applied.");
+  const auto volume = [&](const char* id) {
+    const auto* shape = w.session().part_shape_cache()->find_body_shape(BodyId(id));
+    REQUIRE(shape);
+    return geometry::RectangleExtrusionAdapter{}.summarize(*shape).volume_mm3;
+  };
+  CHECK(volume("body.base") == Catch::Approx(800));
+  CHECK(volume("body.tool") == Catch::Approx(200));
+  stages.push_back(snapshot(w));
+  context(w, "fillet", w.history_tools().restore_action());
+  click(control<QPushButton>(w, "blcad.history.apply"));
+  CHECK(w.session().undo_label() == "Unsuppress Fillet");
+  CHECK(w.session().part_document()->authored_history_intent()->suppressed.empty());
+  REQUIRE(volume("body.base") < 800);
+  CHECK(volume("body.base") > 790);
+  CHECK(volume("body.tool") == Catch::Approx(200));
+  const double final_volume = volume("body.base") + volume("body.tool");
+  stages.push_back(snapshot(w));
+  for (std::size_t i = stages.size() - 1; i > 0; --i) {
+    quick(w, "undo");
+    CHECK(snapshot(w) == stages[i - 1]);
+    CHECK_FALSE(w.session().history_prefix_count());
+    REQUIRE(w.session().derived_results_fresh());
+  }
+  CHECK_FALSE(w.session().can_undo());
+  for (std::size_t i = 1; i < stages.size(); ++i) {
+    quick(w, "redo");
+    CHECK(snapshot(w) == stages[i]);
+    CHECK_FALSE(w.session().history_prefix_count());
+  }
+  camera_matches(w, camera);
+  quick(w, "save");
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(w.session().file_path()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == stages.back());
+  REQUIRE(reopened.derived_results_fresh());
+  const auto step = directory.filePath("combined.step").toStdString();
+  const auto exported = checked(geometry::StepExporter{}.write_part_step(
+      *reopened.part_document(), *reopened.part_shape_cache(), step));
+  CHECK(exported.exported_solid_body_count == 2);
+  const auto root = std::filesystem::path(directory.path().toStdString());
+  const auto asset = checked(inspect_step_import_asset(root, "combined.step"));
+  REQUIRE(asset.observed_sha256_digest());
+  const auto source =
+      checked(StepImportSource::create(StepImportSourceId("readback"), "Readback", "combined.step",
+                                       *asset.observed_sha256_digest(), StepImportMode::Reference));
+  const auto imported = checked(geometry::StepImportReader{}.read(source, root));
+  CHECK(imported.body_count() == 2);
+  double readback_volume = 0;
+  for (const auto& product : imported.products)
+    for (const auto& body : product.bodies)
+      readback_volume += body.volume_mm3;
+  CHECK(readback_volume == Catch::Approx(final_volume).margin(1e-5));
+  capture(w, "history-combined-complete");
+}
+
+TEST_CASE(
+    "Parent Cancel restores a long named folded Part and redo while an Extrude child is active",
+    "[gui][parity-b148][history-combined-acceptance][history-parent-cancel][history-native]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native OCCT selection restoration");
+  QTemporaryDir directory;
+  auto part = prefix_part();
+  const std::string long_name = "History acceptance " + std::string(180, 'L');
+  auto json = nlohmann::json::parse(checked(serialize_part_document_to_json(part)));
+  json["document"]["name"] = long_name;
+  part = checked(deserialize_part_document_from_json(json.dump()));
+  REQUIRE(part.update_fillet_feature(checked(FilletFeature::create(
+      FeatureId("fillet"), long_name, BodyId("body.base"),
+      {fixture::edge(PartFeatureInputRole::FilletEdge)}, ParameterId("radius")))));
+  ShellWindow w;
+  open(w, directory, std::move(part));
+  const auto before = snapshot(w);
+  context(w, "fillet", w.history_tools().suppress_action());
+  click(control<QPushButton>(w, "blcad.history.apply"));
+  const auto redo = snapshot(w);
+  quick(w, "undo");
+  REQUIRE(w.session().can_redo());
+  auto* features = item(w, "fillet")->parent();
+  features->setExpanded(false);
+  REQUIRE(w.viewport().select_semantic("body/body.base"));
+  const auto camera = w.viewport().camera_bookmark();
+  const auto filter = w.viewport().selection_filter_mask();
+  const auto scope = w.viewport().selection_semantic_scope();
+  REQUIRE(w.history_tools().begin_prefix(1));
+  CHECK_FALSE(item(w, "fillet")->parent()->isExpanded());
+  CHECK(control<QLabel>(w, "blcad.history.prefix_label")
+            .toolTip()
+            .contains(QString::fromStdString(long_name)));
+  quick(w, "extrude");
+  auto& profiles = control<QComboBox>(w, "blcad.extrude.profile");
+  profiles.setFocus();
+  key(profiles, Qt::Key_Home);
+  REQUIRE(w.feature_tools().active());
+  REQUIRE(w.session().part_history_command_active());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.history.prefix_apply").isEnabled());
+  capture(w, "history-parent-child-long-name");
+  click(control<QPushButton>(w, "blcad.history.prefix_cancel"));
+  REQUIRE_FALSE(w.history_tools().active());
+  CHECK_FALSE(w.feature_tools().active());
+  CHECK_FALSE(w.session().part_workflow_active());
+  CHECK_FALSE(w.session().part_history_command_active());
+  CHECK_FALSE(w.session().task().active());
+  CHECK_FALSE(w.session().history_prefix_count());
+  CHECK(snapshot(w) == before);
+  CHECK(w.session().derived_results_fresh());
+  CHECK_FALSE(w.session().can_undo());
+  CHECK(w.session().can_redo());
+  CHECK_FALSE(item(w, "fillet")->parent()->isExpanded());
+  CHECK(w.viewport().selection_filter_mask() == filter);
+  CHECK(w.viewport().selection_semantic_scope() == scope);
+  REQUIRE(w.viewport().selected_semantic());
+  CHECK(w.viewport().selected_semantic()->semantic_id == "body/body.base");
+  camera_matches(w, camera);
+  quick(w, "redo");
+  CHECK(snapshot(w) == redo);
+  quick(w, "undo");
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.history_tools().begin_prefix(1));
+  auto replacement = fixture::native_base();
+  const auto target = directory.filePath("replacement.blcad.json");
+  REQUIRE(write_part_document_json_file(replacement, target.toStdString()));
+  REQUIRE(w.open_path(target));
+  CHECK_FALSE(w.history_tools().active());
+  CHECK_FALSE(w.session().part_workflow_active());
+  CHECK_FALSE(w.session().history_prefix_count());
+  CHECK(w.session().derived_results_fresh());
+  CHECK(snapshot(w) == checked(serialize_part_document_to_json(replacement)));
+  CHECK_FALSE(w.session().can_undo());
+}
+
+TEST_CASE(
+    "H01 mixed native chain preserves independent Bodies across modifier and creator suppression",
+    "[gui][parity-b148][history-combined-acceptance][history-mixed-chain][history-native]") {
+  auto part = fixture::native_base();
+  for (const auto& [id, value] :
+       {std::pair{"boss.depth", 14.0}, {"hole.diameter", 2.0}, {"chamfer.distance", 0.5}})
+    REQUIRE(part.add_parameter(checked(
+        Parameter::create_length(ParameterId(id), id, checked(Quantity::length_mm(value))))));
+  auto boss = checked(Feature::create_additive_extrude(
+      FeatureId("boss"), "Boss", SketchId("profile"), ParameterId("boss.depth")));
+  REQUIRE(part.add_feature(
+      checked(boss.with_body_result_context(checked(FeatureBodyResultContext::create(
+          FeatureBodyOperationMode::Join, BodyId("body.base"), std::nullopt))))));
+  auto sketch = checked(Sketch::create(SketchId("hole.sketch"), "Hole", DatumPlaneId("datum.xy")));
+  REQUIRE(sketch.add_profile(checked(
+      CircleProfile::create(ProfileId("hole.profile"), ParameterId("hole.diameter"), {0, 0}))));
+  REQUIRE(part.add_sketch(sketch));
+  auto hole = checked(Feature::create_subtractive_extrude(FeatureId("hole"), "Hole", sketch.id(),
+                                                          FeatureId("boss")));
+  REQUIRE(part.add_feature(
+      checked(hole.with_body_result_context(checked(FeatureBodyResultContext::create(
+          FeatureBodyOperationMode::Cut, BodyId("body.base"), std::nullopt))))));
+  const auto edge = [&](PartFeatureInputRole role, SemanticEdge which) {
+    return checked(EdgeReference::create_linear(
+        role, checked(SemanticEdgeReference::create(FeatureId("boss"), which))));
+  };
+  REQUIRE(part.add_fillet_feature(checked(FilletFeature::create(
+      FeatureId("fillet"), "Fillet", BodyId("body.base"),
+      {edge(PartFeatureInputRole::FilletEdge, SemanticEdge::TopFront)}, ParameterId("radius")))));
+  REQUIRE(part.add_chamfer_feature(checked(ChamferFeature::create_equal_distance(
+      FeatureId("chamfer"), "Chamfer", BodyId("body.base"),
+      {edge(PartFeatureInputRole::ChamferEdge, SemanticEdge::BottomBack)},
+      ParameterId("chamfer.distance")))));
+  REQUIRE(part.add_body_transform(checked(BodyTransform::create_translate(
+      BodyTransformId("pose"), BodyId("body.base"), BodyTransformCoordinateSpace::World,
+      std::nullopt, {10, 0, 0}, false, false))));
+  for (const auto& [id, depth] : {std::pair{"tool", "radius"}, {"unrelated", "depth"}}) {
+    auto feature = checked(Feature::create_additive_extrude(FeatureId(id), id, SketchId("profile"),
+                                                            ParameterId(depth)));
+    REQUIRE(
+        part.add_feature(checked(feature.with_body_result_context(fixture::new_body(part, id)))));
+  }
+  REQUIRE(part.add_body_boolean_feature(checked(BodyBooleanFeature::create(
+      FeatureId("boolean"), BodyBooleanOperation::Subtract, BodyId("body.base"),
+      {BodyId("body.tool")}, BodyBooleanResultMode::ModifyTarget, std::nullopt, true))));
+  auto legacy = checked(geometry::ShapeCache::create(ShapeCacheId("mixed.legacy.oracle")));
+  (void)checked(geometry::GeometryRecomputeExecutor{}.execute_document(part, legacy));
+  const auto original_volume = geometry::RectangleExtrusionAdapter{}
+                                   .summarize(*legacy.find_body_shape(BodyId("body.base")))
+                                   .volume_mm3;
+  REQUIRE(part.apply_history_intent(
+      {{"base", "boss", "hole", "fillet", "chamfer", "pose", "tool", "boolean", "unrelated"}, {}}));
+  QTemporaryDir directory;
+  ShellWindow w;
+  open(w, directory, std::move(part));
+  const auto before = snapshot(w);
+  const auto volume = [&](const char* id) {
+    const auto* shape = w.session().part_shape_cache()->find_body_shape(BodyId(id));
+    REQUIRE(shape);
+    return geometry::RectangleExtrusionAdapter{}.summarize(*shape).volume_mm3;
+  };
+  CHECK(volume("body.base") == Catch::Approx(original_volume).margin(1e-6));
+  CHECK(volume("body.tool") == Catch::Approx(200));
+  CHECK(volume("body.unrelated") == Catch::Approx(1600));
+  context(w, "chamfer", w.history_tools().suppress_action());
+  click(control<QPushButton>(w, "blcad.history.apply"));
+  CHECK(volume("body.base") > original_volume);
+  CHECK(volume("body.tool") == Catch::Approx(200));
+  context(w, "chamfer", w.history_tools().restore_action());
+  click(control<QPushButton>(w, "blcad.history.apply"));
+  CHECK(snapshot(w) == before);
+  CHECK(volume("body.base") == Catch::Approx(original_volume).margin(1e-6));
+  context(w, "base", w.history_tools().suppress_action());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.history.apply").isEnabled());
+  REQUIRE(control<QListWidget>(w, "blcad.history.dependents").count() >= 5);
+  click(control<QCheckBox>(w, "blcad.history.include_dependents"));
+  click(control<QPushButton>(w, "blcad.history.apply"));
+  CHECK_FALSE(w.session().part_shape_cache()->find_body_shape(BodyId("body.base")));
+  CHECK(w.session().part_shape_cache()->body_shape_count() == 2);
+  CHECK(volume("body.tool") == Catch::Approx(200));
+  CHECK(volume("body.unrelated") == Catch::Approx(1600));
+  quick(w, "undo");
+  CHECK(snapshot(w) == before);
+  context(w, "unrelated", w.history_tools().reorder_action());
+  auto& order = control<QListWidget>(w, "blcad.history.order");
+  key(order, Qt::Key_End);
+  for (int i = order.count() - 1; i > 0; --i)
+    key(order, Qt::Key_Up, Qt::ControlModifier);
+  click(control<QPushButton>(w, "blcad.history.apply"));
+  CHECK(w.session().part_document()->authored_history_intent()->order.front() == "unrelated");
+  CHECK(volume("body.base") == Catch::Approx(original_volume).margin(1e-6));
+  CHECK(volume("body.unrelated") == Catch::Approx(1600));
+  capture(w, "history-mixed-chain-complete");
 }

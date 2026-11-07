@@ -196,6 +196,24 @@ imported suppliers on a copy before replacing the session. Failed suffixes leave
 correctable. Exact native evidence lives in `development-setup.md`; whole-block combined acceptance
 and capability promotion remain separately owned by 148C in `mvp-plan.md`.
 
+
+### Combined browser acceptance — Block 148C verified
+
+The combined gate composes the existing commands in one Part: suppress a modifier, legally move an
+independent creator, edit an upstream dimension before the marker, publish once, explicitly restore
+the modifier, then Undo/Redo and Save/reopen/exchange. Its oracles include exact authored snapshots,
+independent Body volume and physical STEP readback. A second case cancels the parent with an active
+Extrude child and retains the original complete redo branch, scene/selection/filter/camera and
+committed bytes; it exercises long names, folded browser nodes and document replacement. These
+are acceptance extensions, not another schema or mutation path. H01 also uses one actual native
+base → boss → Hole → Fillet → Chamfer → Body Transform → Boolean chain, with separate tool and
+unrelated Bodies, comparing legacy complete evaluation, authored replay and unaffected volumes. B2's broad source freeze is the baseline. Compact acceptance exposed two layout limits and a
+folded-parent expansion: bounded context labels retain full tooltips, the prefix viewport minimum
+leaves room for root diagnostics at 640 DIP, and a hidden marker does not expand folded ancestors.
+History/End of Part Apply and Cancel also replace the preview instruction with an explicit
+completion message. The resulting GUI runtime changes pass renewed broad/native verification
+before promotion; exact evidence is recorded in `development-setup.md`.
+
 ## Feature intent, not baked geometry
 
 ```text

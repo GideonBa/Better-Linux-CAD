@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 147
-current_block: 148
-current_boundary: Block 148B verified; combined acceptance and capability promotion pending
-current_tag: "[parity-b148]"
+implemented_through: Block 148
+current_block: 149
+current_boundary: Block 148 accepted; engineering resource revisions and material assignment next
+current_tag: "[parity-b149]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–147 accepted; Block 148 in progress; Blocks 149–204 planned"
+  advanced_modeling_workflows: "Blocks 145–148 accepted; Blocks 149–204 planned"
 ---
 
 # MVP Plan
@@ -33,10 +33,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 147
-current block        Block 148 (in progress; slice B)
-current phase        History browser and End of Part workflow
-current boundary     Native history commands and transient prefix editing
+implemented through  Block 148
+current block        Block 149 (planned; not started)
+current phase        Engineering resources and material assignment
+current boundary     Revision-pinned material and standards resources
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1776,7 +1776,7 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–147 are **Implemented and accepted**; Block 148 is **In progress**;
+Status authority: Blocks 145–148 are **Implemented and accepted**;
 Blocks 149–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -1786,7 +1786,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
-| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–147 accepted; 148 in progress; 149–151 not started |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–148 accepted; 149–151 not started |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
@@ -2071,7 +2071,7 @@ The shared UI contract stays in `user-interface.md`; effective state/cache owner
 | --- | --- | --- |
 | 148A | Existing browser follows executable order and shows authored/effective status; staged suppression/restore with explicit dependent closure; validated reorder/drag/drop; context Edit uses the existing editor; full-source preview/Apply/Cancel, persistence and native interaction tests | Merged via PR #148 |
 | 148B | Visibly labelled transient End of Part prefix, edit/insert at marker, complete suffix validation before one Apply, committed-only Save, disabled incomplete export/analysis and Cancel/camera/selection restoration | Verified; native integration delivered via PR #150 |
-| 148C | H01–H03/UI01 combined native acceptance at 100%/150%, compact layout/captures, failure recovery and complete capability evidence | Planned; not started |
+| 148C | H01–H03/UI01 combined native acceptance at 100%/150%, compact layout/captures, failure recovery and complete capability evidence | Verified; delivery pending |
 
 Only the whole completed/verified block advances numbered status or planned history UI capabilities.
 A preview leaves source intent/history/files intact. Dependents are listed and included only by an
@@ -2132,6 +2132,40 @@ remain 148C. Normal PR delivery, confirmed merge and refreshed-main/tree compari
 implementation `92b8c38`. The delivery-record update changes documentation only and preserves all
 976 runtime fingerprints. Confirm normal merge and compare refreshed main with the reviewed tree
 before starting the 148C acceptance branch.
+
+
+148C starts on `feat/history-workflow-acceptance` after PR #150 is confirmed merged as `266e064`
+and refreshed main matches the exact reviewed tree. It adds combined suppress/reorder/prefix/edit/
+restore/Save/reopen/exchange input evidence and parent cancellation while an existing child owns
+input, including long names, folded browser state and selection/camera restoration. Native history
+acceptance runs at requested 1280×800 ordinary / 1024×640 compact windows, bounded only by actual
+available screen geometry, at 100%/150%. Core/Geometry regression evidence is retained where
+runtime code is unchanged. Compact layout/folding corrections require renewed full GUI verification.
+The capability manifest and numbered boundary advance only after the
+combined acceptance and final inventory pass; no new history authority or feature editor is added.
+
+
+148C final acceptance passes full offscreen GUI **719 cases: 682 passed, 37 expected native-only
+skips / 89,823 assertions**, native 100% combinations **79 / 6,434**, native compact 150%
+**15 / 1,047**, without native skips or failures. Separate startup reaches expected timeout 124.
+The final correction gives completed history commands explicit Apply/Cancel status and retains
+long-name/folded/compact behavior. All 976 runtime fingerprints remain unchanged through final
+checks. Core/Geometry code/tests are unchanged in C; their accepted **627 / 23,727** and
+**575 / 51,871** full results are retained without claiming new runs. Raw captures, commands and
+source digest remain in the existing setup/UI docs.
+
+Whole Block 148 is **Implemented and accepted** after H01–H03/UI01: staged browser history,
+explicit dependent suppression, validated reorder, transient prefix edit/insert, correctable suffix
+validation, committed Save, semantic scene/camera/history restoration and complete-only consumers.
+The existing capability manifest now maps `feature-history` to actual commands/APIs and separate
+Qt/native proofs; the final inventory validates that mapping and numbered boundary before delivery.
+Implemented-through advances to 148 only. Block 149 is **Planned; not started**. Complete normal PR
+delivery, confirm merge, refresh main and compare the reviewed tree before starting its branch.
+
+
+Post-promotion inventory passes **5 / 568**, without skips or failures, and all 976 runtime
+fingerprints remain unchanged after final contract/capture updates. Exact validation is recorded in
+`development-setup.md`. Whole-148 acceptance is complete; delivery is pending the normal protected PR.
 
 ## Later phases
 

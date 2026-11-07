@@ -341,6 +341,9 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   feature_context_->setObjectName("blcad.feature.edit_context");
   feature_context_->setTextFormat(Qt::PlainText);
   feature_context_->setWordWrap(true);
+  feature_context_->setMinimumWidth(0);
+  feature_context_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+  feature_context_->setMaximumHeight(feature_context_->fontMetrics().height() * 2 + 8);
   context_column->addWidget(feature_context_);
   auto* trail = new QHBoxLayout();
   feature_breadcrumb_ = new QToolButton(feature_breadcrumbs_);

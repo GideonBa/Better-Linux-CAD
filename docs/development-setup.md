@@ -3726,3 +3726,128 @@ and its capability promotion remain open for C. Normal protected PR delivery fol
 Delivery: [PR #150](https://github.com/GideonBa/Better-Linux-CAD/pull/150), implementation `92b8c38`.
 The delivery-record commit updates documentation only; all 976 runtime fingerprints stay unchanged.
 Normal merge and verified refreshed-main/reviewed-tree comparison precede the 148C branch.
+
+
+## Block 148C combined history acceptance — 2026-11-07
+
+Starts from verified merged main `266e064` (PR #150), with an exact reviewed-tree comparison before
+`feat/history-workflow-acceptance`. Three new `[history-combined-acceptance]` scenarios compose the
+existing authorities rather than adding another model/history layer:
+
+- H01/H02/H03/UI01 suppress → legal reorder → prefix upstream edit → explicit restore → exact
+  four-operation Undo/Redo → committed Save/reopen → actual STEP write/readback and volume sum.
+- Native parent Cancel during an active Extrude child, with long document/feature names, folded
+  Features, original complete redo branch, scene/semantic selection/filter/camera and subsequent
+  document replacement. Full context names remain available as tooltips.
+- H01 native base → boss → through Hole → Fillet → Chamfer → Body Transform → Boolean, plus
+  independent tool and unrelated Bodies. Compare complete legacy/authored physical evaluation,
+  modifier bypass, explicit creator/dependent closure and independent reorder. The tool/unrelated
+  analytical volumes remain 200/1,600 mm³.
+
+History fixtures now request **1280×800 ordinary** and **1024×640 compact** logical windows, bounded
+only by actual available screen geometry, and assert accepted initial size. Compact captures also
+assert both width and height. This tightened acceptance reproduced a one-DIP diagnostic height
+expansion, long-name task width growth and hidden-marker ancestor expansion. Runtime corrections
+bound History/Extrude context labels to two lines with complete tooltips, leave room for prefix root
+diagnostics at 640 DIP and retain folded ancestors when selecting a hidden marker. Existing complete
+geometry, source validation and checkpoint semantics are unchanged.
+
+Fixture corrections use the actual `document.name` envelope field, explicitly select the final
+reorder row through keyboard input and put the Hole inside the centered native box so it does not
+remove the subsequent semantic Fillet edge. No geometry requirement is weakened. Final builds pass
+(`blcad148c-layout-build.log`, `blcad148c-mixed-interior-build.log`). Preliminary native compact
+acceptance passes **14 / 913** (`blcad148c-corrected-150.log`), before adding the final mixed fixture.
+Final focused combined Qt checks pass **3 cases: two passed, one expected native-only skip / 244
+assertions** (`blcad148c-combined-focused-final.log`). Broad/final native results follow below.
+
+```sh
+cmake --build build/dev-gui --target blcad_gui_tests blcad -j8
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[history-combined-acceptance]"
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests --durations yes
+```
+
+All build/CAD/native/startup processes run serially; GUI checks need regular filesystem access for
+atomic project/STEP publication. Runtime changes stop during verification. Core/Geometry code/tests
+are unchanged in C, so their full **627 / 23,727** and **575 / 51,871** results are retained, not
+newly claimed. GUI runtime changed, requiring a renewed full suite. Pre-status-review runtime freeze
+`/tmp/blcad148c-pre-status-runtime-freeze.json`: **976** source/test/asset/build-script files, SHA-256
+`c071b55161ce52a7d39833c8487adc7f848992924e82e3088c162d50fb676768`. Subsequent changes are
+documentation/evidence only. H01–H03/UI01 and capability promotion remain pending final native proof.
+
+
+Before the final completion-status correction, full offscreen GUI passes **719 cases: 682 passed,
+37 expected native-only skips / 89,817 assertions**, no failures (`/tmp/blcad148c-gui-full.log`). The additional skip is the native parent
+Cancel/selection-restoration scenario; native checks execute it below. This full run includes the
+unchanged complex-rotor preview/cache regression suites.
+
+```sh
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad148c-accepted-100 ./build/dev-gui/blcad_gui_tests "[history-controller],[history-prefix-session],[history-shell],[history-marker-shell],[history-combined-acceptance],[model-browser],[history-evaluation-boundary],[block136-feature-edit],[source-sketch-workflow],[create-another],[create-another-workflow],[part-workflow],[imported-body-preview],[shell-combined-revolve-controls],[shell-coverage]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_COMPACT=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad148c-accepted-150 ./build/dev-gui/blcad_gui_tests "[history-shell],[history-marker-shell],[history-combined-acceptance]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+
+Before that status correction, native 100% combinations pass **79 / 6,427**, without failures or skips
+(`/tmp/blcad148c-native-100.log`). History windows are the requested 1280×800 logical size; other
+retained workflow fixtures use their existing bounded native sizes. Compact final results follow.
+
+
+The pre-status compact native run also passes **15 / 1,040** (`blcad148c-native-150.log`), without
+skips or failures. Visual review then identifies a stale preview instruction in the idle status bar
+after successful history Apply. The existing completion paths now report distinct History/End of
+Part applied/cancelled messages, guarded against overwriting a replaced document's state. Real
+widget tests assert those messages. The final build and refreshed runtime freeze follow below;
+full GUI/native checks repeat for that exact source, superseding the preliminary runs above.
+
+
+Completion-status build passes (`/tmp/blcad148c-completion-status-build.log`). Final focused Qt
+history checks pass **15 cases: 12 passed, three expected native-only skips / 755 assertions**
+(`/tmp/blcad148c-final-focused.log`). Final runtime freeze `/tmp/blcad148c-runtime-freeze.json`:
+**976** files, SHA-256 `1b73710ef0d2768255897a86b391989dd85fa3f37131a7130074bad410ee7340`.
+The following final broad/native/startup checks use that source without further runtime edits.
+
+
+Final full offscreen GUI on that freeze passes **719 cases: 682 passed, 37 expected native-only
+skips / 89,823 assertions**, no failures (`/tmp/blcad148c-gui-full-final.log`). The additional six
+assertions cover the completion-status correction. Final native captures/logs use
+`/tmp/blcad148c-final-100`, `/tmp/blcad148c-final-150`, `blcad148c-native-100-final.log` and
+`blcad148c-native-150-final.log`; they supersede the earlier pre-status native runs.
+
+
+Final native 100% combinations pass **79 / 6,434**, without skips or failures
+(`/tmp/blcad148c-native-100-final.log`). The refreshed capture of the mixed chain visibly reports
+“History change applied.” after publication. Final compact and startup checks follow on the same
+runtime freeze.
+
+
+Final compact native 150% acceptance passes **15 / 1,047**, without failures or skips
+(`/tmp/blcad148c-native-150-final.log`). All history captures are exactly **1536×960 pixels** for the
+requested **1024×640 DIP** window. Ordinary history captures are **1280×800**. Separate native startup
+reaches expected timeout **124** after six seconds (`blcad148c-startup.log`). The known OCCT Medium
+incomplete-depth/stencil Visual warning remains; final native/startup logs contain no High-severity,
+BadDrawable, BadWindow or fatal lifecycle failure.
+
+After evidence-based promotion, the final inventory passes **5 / 568**, without skips or failures
+(`/tmp/blcad148c-final-inventory.log`). It verifies implemented-through 148/current 149 and resolves
+the actual history command/API/headless/native mappings. This documentation-only promotion follows
+the full suite above; its dedicated inventory rerun covers the changed inputs. Core/Geometry remain
+unchanged. Modified-line formatting, source/diff review and all 976 unchanged runtime fingerprints
+pass. Whole 148 is accepted; normal PR delivery and verified refreshed main precede 149.
+
+Final unmodified retained captures, visually reviewed at both scales:
+
+| Retained image | SHA-256 |
+| --- | --- |
+| `history-mixed-chain-complete.png` | `784397c37066f84846382babafc3947d030d14388fda68e08e8afbb11ca741f5` |
+| `history-combined-complete.png` | `9e2fd6773d21ebede6e3434a751a493403497f25cf150b777680551ee9e1b82d` |
+| `history-end-of-part-compact.png` | `87f968d495db60751b0761861fe905651c8f6fefdbf0372f98c207581ef956e8` |
+| `history-parent-child-long-name.png` | `6c93b4f641c9561c16fe4831f16ee96ae6bf03dfa9516f78d52f7a534d7a8ad1` |
+
+
+Final native commands (same semantic filters as above, refreshed output locations):
+
+```sh
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad148c-final-100 ./build/dev-gui/blcad_gui_tests "[history-controller],[history-prefix-session],[history-shell],[history-marker-shell],[history-combined-acceptance],[model-browser],[history-evaluation-boundary],[block136-feature-edit],[source-sketch-workflow],[create-another],[create-another-workflow],[part-workflow],[imported-body-preview],[shell-combined-revolve-controls],[shell-coverage]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_COMPACT=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad148c-final-150 ./build/dev-gui/blcad_gui_tests "[history-shell],[history-marker-shell],[history-combined-acceptance]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
