@@ -3856,3 +3856,64 @@ QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
 Delivery: [PR #151](https://github.com/GideonBa/Better-Linux-CAD/pull/151), implementation `59eeab1`.
 The delivery-record commit changes documentation only; all 976 runtime fingerprints remain
 unchanged. Normal merge and refreshed-main/reviewed-tree comparison precede Block 149.
+
+
+## Block 149A typed engineering resource foundation — 2026-11-07
+
+Starts from confirmed merged main `d9f229b` (PR #151), after exact reviewed-tree comparison before
+`feat/engineering-resource-foundation`. This Core-only slice adds positive finite typed density and
+pressure, per-value source provenance, immutable Material/typed standards-table revisions and one
+conflict-safe catalog/atomic merge authority. It supplies no Part/Project assignment or writer,
+resource UI, physical-properties query or capability promotion. Existing Part/Project versions,
+parameter-expression kinds and appearance stay under their established contracts.
+
+Eight `[engineering-resource]` scenarios cover explicit unit conversions, overflow and subnormal
+representation, absent density, distinct property sources, every table kind, required/optional cells,
+unknown/duplicate keys, wrong dimensions, non-finite data, unsafe count conversion, revision/kind
+collisions, canonical cell order, copied snapshots and late-conflict atomic merge. Fixtures are
+synthetic. The resource catalog validates complete snapshots before insertion and exposes const
+records. A resource ID cannot switch between Material/table kinds across revisions.
+
+```sh
+cmake --build build/dev-gui --target blcad_core_tests -j8
+./build/dev-gui/blcad_core_tests "[engineering-resource]"
+./build/dev-gui/blcad_core_tests --durations yes
+```
+
+Run builds/CAD checks serially and stop runtime mutations during them. The initial 90-object build
+passes (`blcad149a-initial-build.log`). Review corrects a fixture expectation: the smallest positive
+kg/mm³ or GPa input is representable after canonical scaling; it must not be blanket-rejected merely
+because the same raw number in kg/m³ or Pa would underflow during another conversion. Focused tests
+then pass **8 / 1,084** (`blcad149a-focused-final.log`); the initial full Core suite passes
+**635 / 24,811** (`blcad149a-core-full.log`). A final review tightens the count bound to an explicit
+power-of-two limit before size_t conversion, including the largest valid integer and first invalid
+value from the compiled size_t width. The host-width build is exercised here; no separate 32-bit
+toolchain run is claimed. Final rebuilt/focused/full results follow below.
+
+Geometry/GUI runtime and interaction code are unchanged by A; those suites and native startup are
+not rerun for this unused Core foundation. Their preceding accepted results remain retained. No UI
+or mass result is inferred from this typed-catalog evidence. B/C must integrate document pins,
+persistence, coordinated updates and freshness; 151 owns visible assignment/physical-properties UI.
+
+
+Final count-bound build passes (`blcad149a-count-bound-build.log`). Final focused Core passes
+**8 / 1,107** (`blcad149a-count-bound-focused.log`); final full Core passes **635 / 24,834**, without
+failures or skips (`blcad149a-core-full-final.log`). New files pass full clang-format checks and
+working/staged whitespace/source review. Runtime freeze `/tmp/blcad149a-runtime-freeze.json`:
+**981** source/test/asset/build-script files, SHA-256
+`db65e0640472be99341876bc2bc4bba289ffff29f95d17f55e9957ca314f3ed7`.
+All subsequent changes are documentation only. This accepts 149A only, without advancing
+implemented-through 148 or the planned materials UI capability. The existing GUI inventory is
+checked separately against the updated plan using its unchanged binary; it does not exercise or
+claim native acceptance for these unused Core types.
+
+
+The separate unchanged-GUI inventory passes **5 / 568**, no skips/failures
+(`/tmp/blcad149a-final-inventory.log`). It confirms implemented-through 148/current 149 and planned
+material UI mappings. All 981 runtime fingerprints remain unchanged after documentation updates.
+Normal PR delivery, confirmed merge and refreshed-main/reviewed-tree comparison precede B.
+
+
+Delivery: [PR #152](https://github.com/GideonBa/Better-Linux-CAD/pull/152), implementation `830e449`.
+The delivery-record commit changes documentation only and preserves all 981 runtime fingerprints.
+Normal merge and verified refreshed-main/reviewed-tree comparison precede 149B.

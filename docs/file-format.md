@@ -94,6 +94,16 @@ memory. A prefix never removes suffix definitions or changes persisted active/su
 Version-1 canonical byte oracles and version-2 intent remain unchanged. Runtime/native acceptance
 is recorded in `mvp-plan.md` and `development-setup.md`; visible history editing remains 148.
 
+
+## Engineering resource foundation — Block 149A
+
+The new typed material/standards catalog has no Part/Project JSON fields or writer in A. Existing
+Part versions 1/2, Project version 1 and their canonical legacy bytes remain unchanged. Slice 149B
+must define the exact resource snapshot, pin/default/override, deduplication and strict migration
+contract here before introducing its first writer. Standalone Parts retain their pinned values
+offline; embedded Project resources use the same catalog authority. Typed quantities/provenance and
+immutable revision collision rules are owned by `engineering-modules.md`, not a second format.
+
 ## Project structure
 
 ```text
