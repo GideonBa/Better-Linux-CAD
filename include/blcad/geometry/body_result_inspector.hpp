@@ -36,6 +36,12 @@ public:
   [[nodiscard]] Result<ProjectPhysicalProperties>
   inspect_physical_properties(const Project& project,
                               StepImportTopologyContext* imports = nullptr) const;
+  [[nodiscard]] Result<PartPhysicalProperties>
+  inspect_physical_properties(const PartDocument& document, const PartPhysicalProperties& previous,
+                              StepImportTopologyContext* imports = nullptr) const;
+  [[nodiscard]] Result<ProjectPhysicalProperties>
+  inspect_physical_properties(const Project& project, const ProjectPhysicalProperties& previous,
+                              StepImportTopologyContext* imports = nullptr) const;
   [[nodiscard]] Result<PartBodyInspection> inspect(const PartDocument& document,
                                                    const ShapeCache& shape_cache) const;
 
@@ -47,6 +53,10 @@ public:
   resolve_compatible_final_shape(const PartDocument& document, const ShapeCache& shape_cache) const;
 
 private:
+  [[nodiscard]] Result<ProjectPhysicalProperties>
+  inspect_project_physical_properties(const Project& project,
+                                      const ProjectPhysicalProperties* previous,
+                                      StepImportTopologyContext* imports) const;
   RectangleExtrusionAdapter shape_inspector_;
 };
 

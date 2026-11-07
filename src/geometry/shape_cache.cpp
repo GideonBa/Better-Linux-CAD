@@ -419,8 +419,24 @@ void ShapeCache::clear() noexcept {
 }
 
 void ShapeCache::invalidate_history_result() noexcept {
+  complete_geometry_source_.reset();
   if (history_result_)
     history_result_->sealed = false;
+}
+Result<std::size_t>
+ShapeCache::validate_complete_geometry_result(const PartDocument& document) const {
+  if (!complete_geometry_source_)
+    return Result<std::size_t>::failure(Error::dependency(
+        document.id().value(), "Complete executor-owned geometry provenance is required"));
+  const auto source = serialize_part_document_to_json(document);
+  if (!source)
+    return Result<std::size_t>::failure(source.error());
+  if (source.value() != complete_geometry_source_->source_json ||
+      document.executable_generation() != complete_geometry_source_->executable_generation)
+    return Result<std::size_t>::failure(Error::dependency(
+        document.id().value(),
+        "Complete geometry belongs to a different source or executable lifetime"));
+  return validate_complete_history_result(document);
 }
 bool ShapeCache::has_history_scope() const noexcept {
   return history_result_.has_value();

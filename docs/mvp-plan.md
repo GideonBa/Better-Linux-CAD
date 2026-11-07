@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 149
-current_block: 150
-current_boundary: Block 150B verified; material-only reuse and combined acceptance remain
-current_tag: "[parity-b150]"
+implemented_through: Block 150
+current_block: 151
+current_boundary: Block 150 accepted; Material and Physical Properties UI planned
+current_tag: "[parity-b151]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–149 accepted; Block 150 in progress; Blocks 151–204 planned"
+  advanced_modeling_workflows: "Blocks 145–150 accepted; Blocks 151–204 planned"
 ---
 
 # MVP Plan
@@ -33,10 +33,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 149
-current block        Block 150 (in progress; slice B)
-current phase        Physical properties for Parts and posed assemblies
-current boundary     Analytic properties, physical participation and material freshness
+implemented through  Block 150
+current block        Block 151 (planned; not started)
+current phase        Materials and physical properties UI
+current boundary     Inventor-like assignment and physical-property tasks
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1776,8 +1776,8 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–149 are **Implemented and accepted**;
-Block 150 is **In progress**; Blocks 151–204 are **Planned; not started**.
+Status authority: Blocks 145–150 are **Implemented and accepted**;
+Blocks 151–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1786,7 +1786,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
-| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–149 accepted; 150 in progress; 151 not started |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–150 accepted; 151 not started |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
@@ -2287,8 +2287,8 @@ contracts are extended in `engineering-modules.md` and `gui-measure-mvp9.md`, no
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 150A | Analytic shape measures, stable central/principal tensors, density-aware complete Part query with immutable freshness, surface/empty/missing-density semantics and focused analytic/combination tests | Delivered via PR #156 |
-| 150B | Explicit physical assembly participation, hidden active/repeated nested occurrences, posed centroid/tensor aggregation and independent analytic oracles | Implemented and verified; PR #157 |
-| 150C | Authoritative material-only reuse through existing cache/session owners, result invalidation and complete R02/combined acceptance | Planned; not started |
+| 150B | Explicit physical assembly participation, hidden active/repeated nested occurrences, posed centroid/tensor aggregation and independent analytic oracles | Delivered via PR #157 |
+| 150C | Authoritative material-only reuse through existing cache/session owners, result invalidation and complete R02/combined acceptance | Implemented and verified; delivery pending |
 
 No borrowed legacy cache is accepted as an A freshness certificate; its complete private evaluation
 precedes later reuse. Whole 150 advances only after all slices and R02 acceptance. Native Material/
@@ -2334,6 +2334,37 @@ and new Physical Properties UI remain unaccepted pending C/151.
 Delivery: [PR #157](https://github.com/GideonBa/Better-Linux-CAD/pull/157), implementation `fd88b4e`.
 The delivery-record commit changes documentation only; all 1,002 runtime fingerprints remain
 unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main before C.
+
+150C starts on `feat/material-only-physical-reuse` from confirmed merged main `8a492df`
+(PR #157), after exact reviewed-tree comparison. It adds immutable physical-result reweighting,
+executor-owned complete geometry provenance and material-only cache refresh through the existing
+session transaction owners. Geometry inputs, source lifetimes, prefix scope and actual supplier
+bytes remain authoritative; unknown/changed geometry uses the existing recomputation path. Tables
+remain geometry inputs for their assigned later consumers. Whole 150 stays in progress until
+combined numerical/session/history/source acceptance completes; new controls remain 151.
+
+150C completes strict material-only reweighting from immutable integrated snapshots and refreshes
+executor-owned complete ShapeCache metadata without feature execution/BRep reconstruction. Actual
+parameter, standard-table, lifetime, prefix, imported-byte and untrusted-cache changes cannot take
+this path. Legacy unscoped execution remains compatible. Normal transaction copies preserve source
+lifetimes only when canonical intent, evaluated values and Part graphs match strict reconstruction;
+otherwise existing normalization remains in force. The expression-editor and injected-transform
+regressions, corrections, negative proofs and source freezes are recorded in `development-setup.md`.
+
+Whole Block 150 is **Implemented and accepted** at the R02 numerical/cache/session gate: final
+focused Geometry **22 / 1,067**, focused GUI **29 passed / 1 native-only skip / 2,411 assertions**,
+full Geometry **599 / 53,058**, full offscreen GUI **691 passed / 37 native-only skips / 90,279
+assertions** across 728 cases, native 100% **61 / 4,483** and compact 150% **26 / 1,737** pass.
+Native checks have no failures/skips, captures are reviewed, and separate startup reaches intentional
+timeout **124**. Core's unchanged **657 / 25,706** result is retained, not rerun. Final runtime freeze
+**1,005** files, SHA-256 `a82faa248dcab2180f1af4e33a116132a68a763f2a779fe6665a4705a59be29a`,
+remains unchanged. Final inventory/source review and normal PR delivery precede the next branch.
+Implemented-through advances to 150 only; 151 is **Planned; not started**. R01/R02 native Material/
+Physical Properties controls, display units, centroid presentation and clipboard remain 151;
+their GUI capability remains planned. Phase A remains open until 151 is accepted.
+
+Final inventory passes **5 / 568**, without failures/skips. Working/staged source review, formatting
+and whitespace checks complete delivery verification; all 1,005 runtime fingerprints remain unchanged.
 
 ## Later phases
 

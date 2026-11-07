@@ -187,6 +187,36 @@ Immutable freshness checks exact Project intent and the source/lifetime/actual i
 of participating Part snapshots. No second occurrence registry, persisted pose/mass or visible
 Physical Properties task is introduced. Material-only reuse remains 150C.
 
+150C reuses only immutable integrated Part snapshots whose material-independent canonical
+geometry inputs and executable generation still match. It recomputes material pins, density-weighted
+mass and principal properties from stored volume/central geometry tensors; it never reintegrates a
+BRep. Standard-table snapshots remain geometry inputs. Explicit reuse fails on geometry/lifetime
+changes or stale actual imports; callers can request a fresh complete query. Project reuse resolves
+current physical occurrences and poses from trusted matching Part snapshots, including pose-only
+changes, and reports separately computed versus reused Part definitions.
+
+The existing ShapeCache gains private complete-execution provenance, separate from legacy unscoped
+compatibility. Full execution records it only after exact feature/Body ownership checks. Public cache
+mutators invalidate it, even when replacing an output with an identical shape. Prefix results never
+receive complete provenance. Executor material refresh checks the old exact source/generation,
+identical new geometry inputs/lifetime and current imported bytes before atomically updating only
+source metadata. Session Part/Project transactions try this path before existing recomputation;
+unproven or changed inputs use the existing recomputation path. It does not turn zero mutation counts
+into no-op transactions. Material/Physical Properties controls remain 151.
+
+Disposable normal Part/Project edits preserve the committed executable lifetime after strict
+persistence validation by copying the owned value; JSON history replay alone does not become
+an authored lifetime change. Copying requires equivalent canonical intent, evaluated parameters
+and Part dependency graphs; otherwise the validated reconstructed candidate retains its existing
+normalization behavior. Removed/re-added features still invalidate reuse. Reference-repair
+transactions retain their existing repair-read policy. Read-only Project member-cache access
+mirrors the existing Part-cache access and does not certify source freshness on its own.
+
+Legacy full execution may retain prefilled reference-transform inputs. It records complete
+provenance only from an initially empty cache (including transient transform state) or an already
+verified complete cache for the same exact source. Untrusted prefilled execution retains its legacy
+behavior and cannot certify material reuse. Complete history execution always starts disposable.
+
 ## Planned modules
 
 | Module | Function |

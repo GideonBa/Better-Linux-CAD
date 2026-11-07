@@ -74,6 +74,7 @@ struct PhysicalPropertiesTotals {
 };
 struct PartPhysicalPropertiesData : PhysicalPropertiesTotals {
   std::vector<BodyPhysicalProperties> bodies;
+  bool geometry_reused = false;
 };
 struct PhysicalOccurrenceProperties {
   AssemblyLeafOccurrenceDescriptor occurrence;
@@ -83,6 +84,7 @@ struct PhysicalOccurrenceProperties {
 struct ProjectPhysicalPropertiesData : PhysicalPropertiesTotals {
   std::vector<PhysicalOccurrenceProperties> occurrences;
   std::size_t computed_part_count = 0;
+  std::size_t reused_part_count = 0;
 };
 
 // Raw shape integration makes no document freshness claim.

@@ -133,6 +133,9 @@ public:
   // Exact source/scope validation. A Core plan alone is never a fresh result.
   [[nodiscard]] Result<std::size_t>
   validate_complete_history_result(const PartDocument& document) const;
+  // Stricter provenance for reuse; legacy unscoped inspection stays compatible.
+  [[nodiscard]] Result<std::size_t>
+  validate_complete_geometry_result(const PartDocument& document) const;
   [[nodiscard]] Result<std::size_t>
   validate_history_input(const PartDocument& document, std::string_view executing_feature = {},
                          std::string_view source_feature = {}) const;
@@ -152,6 +155,10 @@ private:
     bool sealed = false;
     std::string current_feature;
   };
+  struct CompleteGeometrySource {
+    std::string source_json;
+    std::uint64_t executable_generation;
+  };
   void invalidate_history_result() noexcept;
   [[nodiscard]] Result<std::size_t> match_history_source(const PartDocument& document) const;
   explicit ShapeCache(ShapeCacheId id);
@@ -170,6 +177,7 @@ private:
   FeatureId final_feature_id_;
   GeometryShape final_shape_;
   std::optional<HistoryResult> history_result_;
+  std::optional<CompleteGeometrySource> complete_geometry_source_;
 };
 
 } // namespace blcad::geometry
