@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 146
 current_block: 147
-current_boundary: Block 147 planned; Block 146 delivery pending
+current_boundary: Block 147 planned; Block 146 delivery PR 145
 current_tag: "[parity-b147]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -36,7 +36,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 implemented through  Block 146
 current block        Block 147 (planned; not started)
 current phase        Effective history evaluation and cache correctness
-current boundary     Block 146 accepted; delivery pending
+current boundary     Block 146 accepted; delivery PR 145
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1948,7 +1948,7 @@ Block 147 owns effective suppressed execution/cache semantics; Block 148 owns vi
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 146A | Read-only typed inventory of every executable family; shared atomic replay for existing `feature_order`; unchanged historical JSON and mixed-family/consumer regression proof | Merged via PR #144 |
-| 146B | Persistent authored order and sparse active/suppressed intent, validated candidates, typed dependency diagnostics and complete strict/legacy Core/JSON proof | Verified; delivery pending |
+| 146B | Persistent authored order and sparse active/suppressed intent, validated candidates, typed dependency diagnostics and complete strict/legacy Core/JSON proof | Verified; delivery PR #145 |
 
 A supplies the existing-authority foundation; it introduces no suppression state, new JSON field,
 reorder command or UI completion claim. Its public query follows the current dependency order and
@@ -1992,7 +1992,10 @@ unsupported explicit history from consuming old full-model caches or being publi
 Effective suppression/prefix evaluation is **not implemented** by this proof: 147 replaces that
 conservative boundary with physical fresh/incremental proof; history browser/End of Part remains
 148. Implemented-through advances to 146 only. The post-promotion inventory passes **5 / 495**;
-all runtime fingerprints remain unchanged. Source/staged review precedes normal PR delivery.
+all runtime fingerprints remain unchanged. Source/staged review passes.
+Delivery: [PR #145](https://github.com/GideonBa/Better-Linux-CAD/pull/145), implementation
+`9329de2`. The delivery record changes documentation only. Merge normally and verify/refetch main
+with tree comparison before starting 147.
 
 ## Later phases
 
