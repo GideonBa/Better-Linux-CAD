@@ -127,7 +127,8 @@ elliptical section. Parallel, behind-start, start-crossing, missing and insuffic
 fail atomically. The limit Body remains a nonparticipant; generated bore/seat references and whole
 153 combinations remain assigned to C, and semantic Wizard authoring remains 157.
 
-153C assigns every generated cylindrical wall, flat Blind bottom and planar ToFace termination a producer-owned origin
+153C assigns every generated cylindrical wall, flat Blind bottom and planar ToFace termination a
+producer-owned origin
 `hole/<byte-length>:<placement-id>/wall` or `/bottom`. Placement IDs, rather than center order,
 coordinates or OCCT traversal, distinguish multiple openings. The roots are attached to the
 tool before the final Body cut and followed through surviving/modified kernel faces, including

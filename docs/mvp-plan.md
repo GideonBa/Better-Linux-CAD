@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 153
 current_block: 154
-current_boundary: Block 153 accepted; stop requested by user; Block 154 not started
+current_boundary: Block 153 accepted, delivery PR 169; stopped at user request; Block 154 not started
 current_tag: "[parity-b154]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -2633,7 +2633,7 @@ standards, placement-pattern or geometry-result authority is introduced.
 | --- | --- | --- |
 | 153A | Straight one-direction ThroughAll and Blind flat/conical tools, multiple independent placements and atomic Body cuts on fixed datum/construction or current unposed rectangular primitive supports; analytic tests and real shared-history restoration | Accepted; PR #166 merged as `a9819c6` |
 | 153B | Posed/imported/trimmed result support and finite-face placement, ToNext/ToFace/UpToBody/Symmetric extents, local entry/exit/remaining-bottom semantics and ambiguous/ineffective inputs | B1 accepted in PR #167; B2 accepted in PR #168 |
-| 153C | Generated bore/seat downstream reference integration and combined native/imported, multi-Body, modifier, history/prefix, material/mass, portable exchange and UI regression acceptance | Implemented and verified; protected delivery follows |
+| 153C | Generated bore/seat downstream reference integration and combined native/imported, multi-Body, modifier, history/prefix, material/mass, portable exchange and UI regression acceptance | Accepted; delivery PR #169 |
 
 A cuts forward from the support only; ThroughAll must not silently become bidirectional. Blind depth
 is full-diameter depth, with a conical apex beyond it and positive remaining material required.
@@ -2712,7 +2712,6 @@ finishing and Sketch recompute, native/imported and multi-Body history, material
 Run full Core/Geometry/Qt plus focused native ordinary/compact acceptance on frozen sources, review
 and deliver via a normal protected PR. Only then accept whole 153 and stop as requested.
 
-
 153C/whole-153 acceptance: placement-owned walls and flat Blind/planar ToFace bottoms use the
 existing result-face origin authority in current Body finishing and face-supported Sketches.
 Typed Face JSON, lost/split descendants and Draft surface continuations preserve identity without
@@ -2727,6 +2726,13 @@ not claimed as fully rerun. Final inventory, runtime freeze and reviewed protect
 Whole Block 153 is accepted; Phase B remains open for 154–158. The user’s explicit stop applies
 after delivery of 153: **do not start Block 154 or create its implementation branch**. Next work
 requires a later user instruction. The semantic Hole Wizard remains assigned to 157.
+
+153C delivery: [PR #169](https://github.com/GideonBa/Better-Linux-CAD/pull/169), implementation
+`bf3372ef156f47f2201e03d9f1168ad4988dab18`, reviewed implementation tree
+`37b6894f214cebb8bfe8c8317bf1d2032a244fbd`. Final inventory passes **5 / 658** and all
+1,024 final runtime fingerprints match their tested source state. The delivery record changes
+only documentation. Finish with the exact-head protected merge and refreshed-main tree comparison;
+retain the explicit stop after 153 without opening a 154 branch.
 
 ## Later phases
 

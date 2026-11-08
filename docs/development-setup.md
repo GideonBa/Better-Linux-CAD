@@ -5497,3 +5497,11 @@ with digest `40aaa83ef11c2916d5c212302cca69090499a01ff3bb06ff0b32d997c6b471b9`.
 The unchanged Core/Geometry source bytes retain their successful full-suite evidence; all final
 Qt/native tests use the final complete runtime state. Staged review and normal protected delivery
 follow; stop after this Block 153 delivery without beginning 154.
+
+Delivery: [PR #169](https://github.com/GideonBa/Better-Linux-CAD/pull/169), implementation
+`bf3372ef156f47f2201e03d9f1168ad4988dab18`, reviewed implementation tree
+`37b6894f214cebb8bfe8c8317bf1d2032a244fbd`. Ruleset 18686807 remains active with required PR,
+zero required approvals and no configured required status-check rule; deletion/non-fast-forward
+protections remain active. Delivery uses the normal protected squash merge with an exact expected
+head, followed by confirmed merged PR and refreshed-main tree comparison. This record changes docs
+only. Whole 153 is accepted, Phase B remains open, and work stops before starting 154.
