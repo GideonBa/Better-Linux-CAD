@@ -334,6 +334,13 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
   preserves suppressed V4 intent, blocks unavailable restoration without history mutation, restores
   complete results after prefix Cancel and verifies Save/Open. Repeat natively at ordinary/compact
   scaling; these temporary execution-boundary expectations are replaced by physical oracles in 153.
+- 152C `[hole-combined-acceptance]` combines projected Construction→Sketch→Hole identity and
+  ReferenceRepair transport, Project V1 custom/V4 and V2 mixed legacy/custom/standard members,
+  suppressed Hole→Fillet→rigid-pose equivalence to an independently constructed legacy chain,
+  analytic fillet volume, pinned density mass and V4 material-only integration reuse. The real
+  `[hole-import-combined]` case keeps actual STEP catalog/support identity across V4 reopening,
+  checks analytic supplier volume, changed bytes/cache preservation/recovery and readonly Reference
+  authorship. Broader focused history/import/resource-reuse regressions accompany these cases.
 - Drill blind/through/ToNext/ToFace/up-to-Body holes into extruded, revolved, swept and imported
   supports with nonidentity workplanes. Change support thickness and each extent parameter.
 - Oracle: cylinder/cone volumes, axial section intersections and expected entry/bottom coordinates.

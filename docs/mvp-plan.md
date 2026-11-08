@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 151
-current_block: 152
-current_boundary: Block 152B Hole integration verified; combined acceptance remains
-current_tag: "[parity-b152]"
+implemented_through: Block 152
+current_block: 153
+current_boundary: Block 153 plain blind and bounded Hole execution planned; not started
+current_tag: "[parity-b153]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–151 accepted; Block 152 in progress; Blocks 153–204 planned"
+  advanced_modeling_workflows: "Blocks 145–152 accepted; Blocks 153–204 planned"
 ---
 
 # MVP Plan
@@ -33,10 +33,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 151
-current block        Block 152 (in progress; slice B)
+implemented through  Block 152
+current block        Block 153 (planned; not started)
 current phase        Semantic holes and threads
-current boundary     HoleFeature Core model and standards resolution
+current boundary     Plain, blind and bounded Hole execution
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1776,8 +1776,8 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–151 are **Implemented and accepted**;
-Block 152 is **In progress**; Blocks 153–204 are **Planned; not started**.
+Status authority: Blocks 145–152 are **Implemented and accepted**;
+Blocks 153–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1787,7 +1787,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
-| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152 in progress; 153–158 planned |
+| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152 accepted; 153–158 planned |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
@@ -2531,7 +2531,7 @@ cut workflow. No second pattern executor, standards store or numbered status aut
 | --- | --- | --- |
 | 152A | Typed plain/clearance Hole intent, stable owned/Sketch placements, semantic support/direction, discriminated extents/tips and strict pinned standard/custom diameter resolution with focused Core proofs | Implemented and verified; PR #163 |
 | 152B | Part add/update/remove, complete history/graph/repair inventory and canonical strict JSON; atomic local/selected Project standard-revision consumer remapping/removal guards | Implemented and verified; PR #164 |
-| 152C | Combined native/imported input, legacy persistence/history/resource and integration regression acceptance; executor/GUI remain explicitly gated by 153/157 | Planned; not started |
+| 152C | Combined native/imported input, legacy persistence/history/resource and integration regression acceptance; executor/GUI remain explicitly gated by 153/157 | Implemented and verified; PR #165 |
 
 A validates semantic intent and existing document inputs without publishing executable Hole records.
 Core proof covers finite/duplicate placement identity, typed parameter/table cells, missing pinned
@@ -2588,6 +2588,38 @@ skipped or blocked; normal protected delivery precedes the next branch.
 `5e9f39f`. The delivery-record update changes documentation only and preserves all 1,022 runtime
 fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed main before
 starting the combined-acceptance branch.
+
+152C starts on `feat/semantic-hole-combined-acceptance` after PR #164 is confirmed merged as
+`88c0e0d`; refreshed main matches reviewed tree `b2faba0eec95cc58afc7a04331cc5357fc994380`.
+Extend existing proofs with mixed finishing/transform history, projected Sketch points, custom/
+standard/legacy Project transport and actual imported planar support/source lifetime. Reuse B's
+physical execution boundary and existing native history UI; no new Wizard or bore geometry is
+claimed. Tests-only acceptance retains completed B full regression results unless a runtime change
+or failure requires broader reruns. Whole 152 closes only after all C combinations and final
+inventory/source review pass; the Materials capability stays accepted and semantic-Hole UI stays
+planned until its existing 157 owner.
+
+152C closes **whole Block 152** at the semantic Core/standards/persistence gate. Tests-only changes
+prove projected source identity and repair-mode transport, mixed V1/V2 Project members with V4
+custom/standard Hole intent, mixed Hole/Fillet/pose/material history and actual imported support,
+source-byte failure/recovery and readonly ownership. Independent fillet-volume/density oracles and
+V4 material-only geometry reuse pass. Final focused Core **17 / 353** and expanded Geometry
+**19 / 936** pass without failures/skips; unchanged product sources retain B's full Core **672 /
+26,030**, Geometry **602 / 53,170**, GUI **722 passed / 39 native-only skips / 91,626 assertions**,
+native 100% **26 / 2,399**, compact 150% **26 / 2,417** and startup **124** baselines rather than
+rerun them. No new bore geometry or Wizard UI is claimed. The planned semantic-Hole GUI capability
+now names its existing native completion owner **157**, while numbered implementation advances
+only to 152/current 153 planned. Final inventory after that projection, source/format/freeze review
+and protected PR delivery precede the next branch. Phase B remains open for 153–158.
+
+Final inventory **5 / 658**, source/formatting/whitespace review and unchanged **1,022** runtime
+fingerprints pass (SHA-256 `38f23d6d85c7bf5edfbdecfa2aa8143ed9780e54292f89f36253b07aad596fd5`).
+No new runtime behavior is changed in C; protected delivery precedes 153.
+
+152C/whole-152 delivery: [PR #165](https://github.com/GideonBa/Better-Linux-CAD/pull/165),
+implementation `5969e97`. The delivery-record commit changes documentation only and preserves all
+1,022 runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed
+main before starting Block 153.
 
 ## Later phases
 

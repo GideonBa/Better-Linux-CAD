@@ -1,3 +1,4 @@
+#include "../support/hole_feature_fixture.hpp"
 #include "blcad/geometry/body_result_inspector.hpp"
 #include "imported_body_test_fixture.hpp"
 
@@ -311,4 +312,68 @@ TEST_CASE("Reused imported base identity cannot retain a previous output Body ca
   REQUIRE(GeometryRecomputeExecutor{&context}.execute_document(document, clean));
   CHECK_FALSE(clean.find_body_shape(output.body));
   CHECK(body_volume(clean, replacement_body) == Approx(4000));
+}
+
+TEST_CASE(
+    "Imported Hole support keeps catalog identity portable history and actual source freshness",
+    "[geometry][parity-b152][hole-combined-acceptance][hole-import-combined]") {
+  namespace holes = blcad::test::hole_fixture;
+  Fixture fixture;
+  fixture.write(BRepPrimAPI_MakeBox(20, 10, 8).Shape());
+  const auto supplier = fixture.source_bytes();
+  auto part = fixture.editable();
+  const auto& catalog = part.imported_topology_catalogs().front();
+  const ImportedTopologyEntry* top = nullptr;
+  for (const auto& entry : catalog.entries())
+    if (entry.descriptor.kind == ImportedTopologyKind::Face &&
+        entry.descriptor.geometry == ImportedGeometryClass::Plane &&
+        (!top || entry.descriptor.centroid.z > top->descriptor.centroid.z))
+      top = &entry;
+  REQUIRE(top);
+  CHECK(top->descriptor.centroid.z == Approx(8));
+  const auto plane = checked(
+      ImportedTopologyReference::create(catalog.id(), top->id, ImportedTopologyCapability::Plane));
+  const auto support =
+      checked(PlaneReference::create_imported(PartFeatureInputRole::HoleSupportPlane, plane));
+  const auto body = part.imported_body_features().front().definition().outputs().front().body;
+  REQUIRE(part.add_engineering_resource(holes::table()));
+  REQUIRE(part.add_hole_feature(checked(
+      HoleFeature::create(FeatureId("hole"), "Imported Hole", HoleKind::Clearance, body, support,
+                          {{HolePlacementId("center"), Point2{10, 5}}}, holes::standard()))));
+  REQUIRE(part.apply_history_intent({{"import.base", "hole"}, {"hole"}}));
+  const auto serialized = checked(serialize_part_document_to_json(part));
+  auto reopened = checked(deserialize_part_document_from_json(serialized));
+  const auto& restored =
+      std::get<ImportedTopologyReference>(reopened.hole_features().front().support().source());
+  CHECK(restored == plane);
+  CHECK(checked(serialize_part_document_to_json(reopened)) == serialized);
+  StepImportTopologyContext context(fixture.root);
+  auto shapes = cache();
+  REQUIRE(GeometryRecomputeExecutor{&context}.execute_document(reopened, shapes));
+  REQUIRE(shapes.validate_complete_geometry_result(reopened));
+  CHECK(body_volume(shapes, body) == Approx(1600));
+  const auto original = topology(*shapes.find_body_shape(body));
+  fixture.write_bytes(supplier + "\n");
+  StepImportTopologyContext changed(fixture.root);
+  CHECK_FALSE(GeometryRecomputeExecutor{&changed}.execute_document(reopened, shapes));
+  CHECK(topology(*shapes.find_body_shape(body)) == original);
+  CHECK(checked(serialize_part_document_to_json(reopened)) == serialized);
+  fixture.write_bytes(supplier);
+  StepImportTopologyContext recovered(fixture.root);
+  REQUIRE(GeometryRecomputeExecutor{&recovered}.execute_document(reopened, shapes));
+  REQUIRE(shapes.validate_complete_geometry_result(reopened));
+  CHECK(body_volume(shapes, body) == Approx(1600));
+  CHECK(fixture.source_bytes() == supplier);
+  const auto& base = part.imported_body_features().front();
+  const auto* source = part.find_step_import_source(base.definition().source());
+  REQUIRE(source);
+  auto reference_source = checked(
+      StepImportSource::create(source->id(), source->name(), source->project_relative_asset_path(),
+                               source->sha256_digest(), StepImportMode::Reference));
+  auto reference = checked(
+      PartDocument::create_reference(DocumentId("readonly"), "Reference", reference_source,
+                                     part.imported_topology_catalogs().front(), base.definition()));
+  const auto reference_json = checked(serialize_part_document_to_json(reference));
+  CHECK_FALSE(reference.add_hole_feature(part.hole_features().front()));
+  CHECK(checked(serialize_part_document_to_json(reference)) == reference_json);
 }

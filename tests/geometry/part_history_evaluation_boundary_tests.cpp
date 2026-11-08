@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <numbers>
 
 using namespace blcad;
 using namespace blcad::geometry;
@@ -106,6 +107,9 @@ void add_operation(PartDocument& part, PartFeatureFamily family) {
   }
   case PartFeatureFamily::Fillet:
     add_fillet(part);
+    break;
+  case PartFeatureFamily::Hole:
+    REQUIRE(part.add_hole_feature(blcad::test::hole_fixture::hole(id.value())));
     break;
   case PartFeatureFamily::Chamfer:
     REQUIRE(part.add_chamfer_feature(checked(ChamferFeature::create_equal_distance(
@@ -698,4 +702,50 @@ TEST_CASE("Semantic Hole execution remains explicit and atomic while suppression
   CHECK(RectangleExtrusionAdapter{}
             .summarize(*cache.find_body_shape(BodyId("body.base")))
             .volume_mm3 == Catch::Approx(1600));
+}
+
+TEST_CASE("Suppressed Hole intent combines finishing pose standards and material mass without "
+          "geometry drift",
+          "[geometry][parity-b152][hole-combined-acceptance]") {
+  namespace holes = blcad::test::hole_fixture;
+  namespace resources = blcad::test::engineering_fixture;
+  auto legacy = fixture::native_base();
+  auto part = holes::part("combined", true);
+  const auto finish = [](PartDocument& p) {
+    resources::annotate(p);
+    REQUIRE(p.add_fillet_feature(checked(FilletFeature::create(
+        FeatureId("round"), "Round", BodyId("body.base"),
+        {fixture::edge(PartFeatureInputRole::FilletEdge)}, ParameterId("radius")))));
+    REQUIRE(p.add_body_transform(checked(BodyTransform::create_translate(
+        BodyTransformId("pose"), BodyId("body.base"), BodyTransformCoordinateSpace::World,
+        std::nullopt, {12, -7, 5}, false, false))));
+  };
+  finish(legacy);
+  finish(part);
+  REQUIRE(part.apply_history_intent({{"base", "hole", "round", "pose"}, {"hole"}}));
+  auto expected = evaluate(legacy);
+  auto actual = evaluate(part);
+  same_bodies(legacy, expected, part, actual);
+  const double volume = 1600 - 20 * (1 - std::numbers::pi / 4);
+  CHECK(RectangleExtrusionAdapter{}
+            .summarize(*actual.find_body_shape(BodyId("body.base")))
+            .volume_mm3 == Catch::Approx(volume).margin(1e-6));
+  const auto before = checked(serialize_part_document_to_json(part));
+  auto reopened = checked(deserialize_part_document_from_json(before));
+  auto rebuilt = evaluate(reopened);
+  same_bodies(part, actual, reopened, rebuilt);
+  const BodyResultInspector inspector;
+  const auto properties = checked(inspector.inspect_physical_properties(part));
+  REQUIRE(properties.data().complete_mass());
+  CHECK(properties.data().complete_mass()->mass_kg == Catch::Approx(volume * 4e-6).margin(1e-12));
+  REQUIRE(part.adopt_engineering_resource_revision(holes::key(), holes::table("r2", 7.1)));
+  CHECK_FALSE(properties.validate_current(part));
+  const auto revised = checked(inspector.inspect_physical_properties(part));
+  REQUIRE(revised.data().complete_mass());
+  CHECK(revised.data().complete_mass()->mass_kg == Catch::Approx(volume * 4e-6).margin(1e-12));
+  REQUIRE(part.set_default_material(resources::key("synthetic.material", "r2")));
+  const auto reweighted = checked(inspector.inspect_physical_properties(part, revised));
+  CHECK(reweighted.data().geometry_reused);
+  REQUIRE(reweighted.data().complete_mass());
+  CHECK(reweighted.data().complete_mass()->mass_kg == Catch::Approx(volume * 6e-6).margin(1e-12));
 }

@@ -306,3 +306,63 @@ TEST_CASE("Hole version four preserves typed intent graph and legacy history mod
   CHECK(text(checked(deserialize_part_document_from_json(legacy))) == legacy);
 }
 } // namespace
+
+TEST_CASE("Projected Hole placements preserve their construction and Sketch dependencies",
+          "[core][parity-b152][hole-combined-acceptance]") {
+  auto p = history::native_base();
+  REQUIRE(p.add_construction_point(checked(
+      ConstructionPoint::create_explicit(ConstructionPointId("anchor"), "Anchor", {2, -3, 0}))));
+  auto sketch =
+      checked(Sketch::create(SketchId("centers"), "Projected centers", DatumPlaneId("datum.xy")));
+  REQUIRE(sketch.add_reference(checked(ProjectedSketchPoint::create_from_construction_point(
+      SketchEntityId("projected"), ConstructionPointId("anchor")))));
+  REQUIRE(p.add_sketch(std::move(sketch)));
+  const auto support = checked(PlaneReference::create_datum_plane(
+      PartFeatureInputRole::HoleSupportPlane, DatumPlaneId("datum.xy")));
+  REQUIRE(p.add_hole_feature(checked(HoleFeature::create(
+      FeatureId("hole"), "Projected Hole", HoleKind::Plain, BodyId("body.base"), support,
+      {{HolePlacementId("stable"),
+        HoleSketchPointReference{SketchId("centers"), SketchEntityId("projected")}}},
+      ParameterId("radius"), HoleThroughAllExtent{}, HoleDirection::SupportNormal))));
+  CHECK(p.dependency_graph().has_dependency("anchor", "centers"));
+  CHECK(p.dependency_graph().has_dependency("centers", "hole"));
+  const auto hole = json::parse(text(p)).at("hole_features");
+  REQUIRE(p.update_construction_point(checked(
+      ConstructionPoint::create_explicit(ConstructionPointId("anchor"), "Anchor", {4, 1, 0}))));
+  REQUIRE(p.validate_reference_sources());
+  CHECK(json::parse(text(p)).at("hole_features") == hole);
+  const auto reopened = checked(deserialize_part_document_from_json(text(p)));
+  CHECK(text(reopened) == text(p));
+  CHECK(graph(reopened) == graph(p));
+  const auto& placement = reopened.hole_features().front().placements().front();
+  CHECK(placement.id == HolePlacementId("stable"));
+  CHECK(std::get<HoleSketchPointReference>(placement.source).point == SketchEntityId("projected"));
+  const auto repair =
+      checked(deserialize_part_document_from_json(text(p), PartDocumentReadMode::ReferenceRepair));
+  CHECK(text(repair) == text(p));
+  CHECK(graph(repair) == graph(p));
+}
+
+TEST_CASE("Mixed legacy custom and standard Hole members retain portable Project formats",
+          "[core][parity-b152][hole-combined-acceptance]") {
+  auto p = checked(Project::create(DocumentId("mixed"), "Mixed",
+                                   checked(AssemblyDocument::create(DocumentId("root"), "Root"))));
+  REQUIRE(p.add_part_document(fixture::part("custom", false, false)));
+  auto source = checked(serialize_project_to_json(p));
+  CHECK(json::parse(source).at("version") == 1);
+  CHECK(checked(serialize_project_to_json(checked(deserialize_project_from_json(source)))) ==
+        source);
+  REQUIRE(p.add_part_document(fixture::part("standard", true)));
+  REQUIRE(p.add_part_document(history::native_base()));
+  source = checked(serialize_project_to_json(p));
+  const auto encoded = json::parse(source);
+  CHECK(encoded.at("version") == 2);
+  CHECK(encoded.at("parts")[0].at("version") == 4);
+  CHECK(encoded.at("parts")[0].at("engineering_resource_refs").empty());
+  CHECK(encoded.at("parts")[1].at("engineering_resource_refs").size() == 1);
+  CHECK(encoded.at("parts")[2].at("version") == 1);
+  const auto reopened = checked(deserialize_project_from_json(source));
+  CHECK(checked(serialize_project_to_json(reopened)) == source);
+  for (const auto& part : reopened.part_documents())
+    CHECK(text(checked(deserialize_part_document_from_json(text(part)))) == text(part));
+}
