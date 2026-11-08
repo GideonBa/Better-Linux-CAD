@@ -160,7 +160,7 @@ BodyResultInspector::inspect_project_physical_properties(const Project& project,
       gp_Trsf pose;
       for (const auto& transform : leaf.transforms_inner_to_outer)
         pose = detail::to_occt_rigid_transform(transform) * pose;
-      PhysicalOccurrenceProperties occurrence{leaf, component->name(), {}};
+      PhysicalOccurrenceProperties occurrence{{}, leaf, component->name(), {}};
       for (const auto& body : parts[found->second].properties.data().bodies) {
         auto posed = pose_body(body, pose);
         if (!posed)
@@ -168,6 +168,11 @@ BodyResultInspector::inspect_project_physical_properties(const Project& project,
         flattened.push_back(posed.value());
         occurrence.bodies.push_back(std::move(posed.value()));
       }
+      const auto occurrence_totals = detail::aggregate_physical_bodies(occurrence.bodies);
+      if (!occurrence_totals)
+        return Result<ProjectPhysicalProperties>::failure(occurrence_totals.error());
+      static_cast<PhysicalPropertiesTotals&>(occurrence) =
+          static_cast<const PhysicalPropertiesTotals&>(occurrence_totals.value());
       data.occurrences.push_back(std::move(occurrence));
     }
     auto totals = detail::aggregate_physical_bodies(std::move(flattened));

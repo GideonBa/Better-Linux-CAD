@@ -237,6 +237,13 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
 ### R02 Physical properties in transformed assemblies
 
 - **First gate:** 150; native completion 151; extend 193.
+- 151A `[material-controller]` / `[physical-properties-controller]` combine pending assignments,
+  explicit-member revision/removal, no-op/Cancel, Save/Undo/Redo, prefix metadata, immutable lifetimes,
+  exact repeated nested occurrence/Body scopes, kg/g and mm/cm/m conversions, partial centroids,
+  empty/surface/missing-density availability and locale-independent clipboard data. Real
+  `[physical-controller-imports]` checks readonly Reference intent, supplier changes without a model
+  revision, failed imported Apply/retry and retained OCCT ownership. These controller tests do not
+  accept the visible Material/Physical Properties tasks or centroid overlays assigned to 151B–D.
 - 150C `[physical-reuse]` verifies zero feature execution and identical OCCT shapes for material-only
   refresh, immutable density reweighting, resource-free/v3 round trips, standard-table and lifetime
   invalidation, public mutation/uncertified/prefix rejection and repeated hidden-occurrence pose

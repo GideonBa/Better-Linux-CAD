@@ -322,6 +322,8 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_step_import_workbench.cpp
     src/gui/gui_document_browser.cpp
     src/gui/gui_part_history.cpp
+    src/gui/gui_materials.cpp
+    src/gui/gui_physical_properties.cpp
     src/gui/gui_appearance.cpp
     src/gui/gui_icons.cpp
     src/gui/gui_document_session.cpp
@@ -693,6 +695,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_document_session_tests.cpp
       tests/gui/gui_history_intent_boundary_tests.cpp
       tests/gui/gui_part_history_tests.cpp
+      tests/gui/gui_material_physical_properties_tests.cpp
       tests/gui/gui_part_history_context_tests.cpp
       tests/gui/gui_shell_history_tests.cpp
       tests/gui/gui_part_workflow_transaction_tests.cpp

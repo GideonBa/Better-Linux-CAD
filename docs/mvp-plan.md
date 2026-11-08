@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 150
 current_block: 151
-current_boundary: Block 150 accepted; Material and Physical Properties UI planned
+current_boundary: Block 151A controllers verified; visible Material/Physical Properties tasks remain
 current_tag: "[parity-b151]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–150 accepted; Blocks 151–204 planned"
+  advanced_modeling_workflows: "Blocks 145–150 accepted; Block 151 in progress; Blocks 152–204 planned"
 ---
 
 # MVP Plan
@@ -34,7 +34,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 150
-current block        Block 151 (planned; not started)
+current block        Block 151 (in progress; slice A)
 current phase        Materials and physical properties UI
 current boundary     Inventor-like assignment and physical-property tasks
 ```
@@ -1777,7 +1777,7 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 ## Blocks 145–204 — Advanced modeling workflows
 
 Status authority: Blocks 145–150 are **Implemented and accepted**;
-Blocks 151–204 are **Planned; not started**.
+Block 151 is **In progress**; Blocks 152–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1786,7 +1786,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
-| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–150 accepted; 151 not started |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–150 accepted; 151 in progress |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
@@ -2370,6 +2370,48 @@ and whitespace checks complete delivery verification; all 1,005 runtime fingerpr
 implementation `6fd158e`. The delivery-record update changes documentation only and preserves
 all 1,005 runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on
 refreshed main before starting 151.
+
+### Block 151 serial implementation — 2026-11-07
+
+PR #158 is confirmed merged as `7f27a87`; refreshed main matches reviewed tree
+`066680b24c63ad29f238e1e289a8f4b43df987aa` before
+`feat/material-physical-properties-controllers` starts. Implemented-through stays 150. Existing
+resource/physical contracts remain in `engineering-modules.md`; `gui-measure-mvp9.md` owns read-only
+physical presentation and `user-interface.md` owns command placement/layout. No competing resource,
+occurrence, history or geometry authority is introduced.
+
+| Slice | Bounded deliverable | Status |
+| --- | --- | --- |
+| 151A | Qt-free material candidate/transaction and physical-query controllers; exact source/scope guards, display units/clipboard data, qualified Body/occurrence totals and focused combined tests | Implemented and verified; delivery pending |
+| 151B | Manage Material task, Part/Body assignment/context starts, immutable revision/provenance controls and explicit selected-member updates through existing session owners | Planned; not started |
+| 151C | Inspect Physical Properties task, scope/units/refresh/status/precision, clipboard and transient centroid presentation through existing viewport/task owners | Planned; not started |
+| 151D | R01–R02/UI01 native combined assignment/revision/history/Save/Open, nested/multi-Body/missing-density scopes, ordinary/compact/scaled layout and full acceptance | Planned; not started |
+
+Material editing stages typed changes outside committed intent; identical intent creates no history
+entry. Ready End-of-Part metadata edits use the existing child workflow. Physical Properties requires
+complete fresh geometry and remains read-only: display units, scope, refresh, centroid visibility and
+clipboard never author a model edit. Actual source/supplier changes invalidate results before Copy.
+Existing Body Summary/supporting-geometry Measure behavior is preserved. The planned Materials GUI
+capability stays planned until its actual commands/native proof exist; whole 151 and Phase A remain
+open until all slices are accepted. Standard-table/Hole controls remain in their assigned later blocks.
+
+151A implements disposable typed material proposals and metadata-only replay through the session,
+including explicit-member revision/removal, no-op history protection and ready-prefix metadata.
+The physical controller owns complete immutable queries, exact Body/repeated nested occurrence
+scopes, read-only display-unit/density/tensor conversions, explicit refresh and guarded clipboard data.
+Occurrence totals reuse Geometry aggregation. All 14 new controller cases are included in final
+focused GUI **55 passed / 2 expected native-only skips / 3,840 assertions** across 57 cases;
+full Geometry **599 / 53,058**, native 100% **67 / 4,795**, compact 150% **45 / 3,341** and
+intentional native startup timeout **124** pass. Core **657 / 25,706** and the preceding 728-case
+full-GUI result are explicitly retained, not rerun or claimed as new-UI acceptance. Exact commands,
+the automatic-review timeout/retry and reviewed raw captures are recorded in `development-setup.md`.
+Runtime freeze **1,011** files, SHA-256 `b2638b10a397fd1370ad58c7cd8f494db68783e229a1f9d0745fa1b9fa0acd2b`,
+remains unchanged. Final inventory/source review and normal PR delivery precede B. Whole 151 and
+Phase A stay in progress; Material/Physical Properties GUI capability stays planned until B–D.
+
+Final inventory passes **5 / 568**, without failures/skips. Working/staged source review, full
+new-file and modified-line formatting, whitespace checks and the unchanged runtime freeze complete
+A delivery verification. No visible command/centroid/clipboard-OS acceptance is inferred from A.
 
 ## Later phases
 
