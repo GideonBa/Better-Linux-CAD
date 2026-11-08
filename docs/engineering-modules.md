@@ -217,7 +217,7 @@ provenance only from an initially empty cache (including transient transform sta
 verified complete cache for the same exact source. Untrusted prefilled execution retains its legacy
 behavior and cannot certify material reuse. Complete history execution always starts disposable.
 
-## Planned modules
+## Material and physical-property workflows
 
 151 uses the existing resources and physical snapshots through Qt-free GUI controllers. Material
 editing owns a disposable typed Part/Project candidate, including new immutable revisions and
@@ -246,6 +246,8 @@ Cancel and Save never publish a pending candidate; Apply publishes one validated
 Unstaged editor changes disable Apply until staged or discarded by selecting a library entry.
 Browser context and properties qualify Part-local identifiers with the existing owner document;
 identically named Body IDs in different Project members cannot redirect a material assignment.
+The Project target selector also shows the owning document ID and its full tooltip when display
+names coincide; selection continues to use the existing document identity.
 
 The shell's Project scene consumes the session's complete member caches. It compounds separate
 visible Body results for each definition, then poses the same underlying topology with the existing
@@ -268,8 +270,13 @@ units are mm/cm/m and kg/g, with corresponding squared/cubed/inertia units. Fram
 or root-assembly coordinates. Complete versus known-subset mass/centroid/tensor labels stay distinct;
 surface/empty/unassigned/missing-density scopes never invent solid mass. Explicit Refresh validates
 actual suppliers; stale source/revision/task state blocks result use and Copy. Presentation changes
-do not commit intent or refresh BReps. Visible controls, provenance disclosure and native acceptance
-follow 151's serial slices in `mvp-plan.md`.
+do not commit intent or refresh BReps. The shared read-only shell task exposes the query in Inspect,
+with a fixed current-mass/availability footer and Refresh/Copy/Close. Its optional transient centroid
+triad projects canonical coordinates through the current camera; changing units cannot move it.
+Actual clipboard writes revalidate the result, and unavailable scope requires explicit reselection.
+Whole-block acceptance and delivery follow `mvp-plan.md`.
+
+## Planned modules
 
 | Module | Function |
 |--------|----------|

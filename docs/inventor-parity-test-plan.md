@@ -267,7 +267,20 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
   changes; `[physical-properties-layout]` checks vertical-only scrolling, reachable scope/unit/tensor/
   centroid widgets and the fixed current-mass/availability/Refresh/Copy/Close area at ordinary and
   compact/scaled sizes. Existing Material/history/Measure/assembly combinations run with these cases.
-  Whole 151's R01/R02/UI01 combination acceptance remains D.
+  The continuous D proof below combines these R01/R02/UI01 boundaries.
+- 151D `[material-physical-combined]` is one native shell workflow: adopt a synthetic density
+  revision only in the checked owned definition (including duplicate Part display names), retain
+  an unselected definition and all BReps, query repeated/nested/hidden multi-Body Root totals in
+  cm/g, Save/Refresh, one Undo/Redo and reopen. Independent totals are **44.8 g**, **6.4 cm³**,
+  mass COM **(2.142857142857, 0.642857142857, 0.4) cm** and volume COM **(2.25, 0.75, 0.4) cm**.
+  Extract the owned Part and delete the Project file to prove portable snapshots. Continue with
+  prefix metadata, outer committed Save/parent Cancel and a second prefix edit accepted as one
+  root transaction: unknown default density yields known-subset **0.0096 kg**, mass COM
+  **(30, 0, 4) mm**, distinct volume COM **(15, 0, 4) mm**, clipboard disclosure and one Undo.
+  Run the complete Material/Physical Properties/history/Measure/assembly-analysis/inventory set at
+  native 100% and compact 150%; compare unmodified captures and retain the separate full GUI and
+  startup gates. Existing capability auditing resolves both real commands, public methods and
+  positive registered headless/native proof filters; the numbered boundary remains MVP-owned.
 - 150C `[physical-reuse]` verifies zero feature execution and identical OCCT shapes for material-only
   refresh, immutable density reweighting, resource-free/v3 round trips, standard-table and lifetime
   invalidation, public mutation/uncertified/prefix rejection and repeated hidden-occurrence pose
