@@ -1,3 +1,4 @@
+#include "../support/material_physical_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
@@ -27,6 +28,85 @@
 using namespace blcad;
 using namespace blcad::geometry;
 using Catch::Approx;
+
+TEST_CASE("Project viewport uses complete multi-Body member results and canonical nested poses",
+          "[geometry][material-project-scene]") {
+  namespace f = blcad::test::material_physical_fixture;
+  auto project = f::project();
+  auto* part = project.find_part_document(DocumentId("material.part"));
+  REQUIRE(part);
+  auto cache = f::checked(ShapeCache::create(ShapeCacheId("material.scene")));
+  GeometryRecomputeExecutor executor;
+  REQUIRE(executor.execute_document(*part, cache));
+  const auto provider = [&](DocumentId id) -> const ShapeCache* {
+    return id == part->id() ? &cache : nullptr;
+  };
+  const ViewportSceneBuilder builder;
+  auto scene = f::checked(builder.build_project(project, provider));
+  REQUIRE(scene.size() == 1);
+  CHECK(scene.front().semantic_id == "component/material.child/left/inner");
+  GProp_GProps properties;
+  BRepGProp::VolumeProperties(*OcctShapeView::get(scene.front().shape), properties);
+  CHECK(properties.Mass() == Approx(3200));
+  CHECK(properties.CentreOfMass().X() == Approx(15));
+  CHECK(properties.CentreOfMass().Z() == Approx(4));
+  std::size_t solids = 0;
+  for (TopExp_Explorer it(*OcctShapeView::get(scene.front().shape), TopAbs_SOLID); it.More();
+       it.Next())
+    ++solids;
+  CHECK(solids == 2);
+  REQUIRE(project.assembly().set_subassembly_instance_visibility(SubassemblyInstanceId("right"),
+                                                                 ComponentVisibility::Visible));
+  scene = f::checked(builder.build_project(project, provider));
+  REQUIRE(scene.size() == 2);
+  CHECK(scene.back().semantic_id == "component/material.child/right/inner");
+  BRepGProp::VolumeProperties(*OcctShapeView::get(scene.back().shape), properties);
+  CHECK(properties.Mass() == Approx(3200));
+  CHECK(properties.CentreOfMass().X() == Approx(30));
+  CHECK(properties.CentreOfMass().Y() == Approx(15));
+  const auto shape = *cache.find_body_shape(BodyId("body.base"));
+  const auto before = *part;
+  REQUIRE(part->set_default_material(f::resources::key("synthetic.material", "r2")));
+  CHECK_FALSE(builder.build_project(project, provider));
+  REQUIRE(executor.refresh_material_metadata(before, *part, cache));
+  scene = f::checked(builder.build_project(project, provider));
+  CHECK(scene.size() == 2);
+  CHECK(OcctShapeView::get(*cache.find_body_shape(BodyId("body.base"))) ==
+        OcctShapeView::get(shape));
+  CHECK_FALSE(
+      builder.build_project(project, [](DocumentId) -> const ShapeCache* { return nullptr; }));
+  REQUIRE(project.assembly().set_subassembly_instance_suppression_state(
+      SubassemblyInstanceId("right"), ComponentSuppressionState::Suppressed));
+  CHECK(f::checked(builder.build_project(project, provider)).size() == 1);
+  REQUIRE(project.assembly().set_subassembly_instance_suppression_state(
+      SubassemblyInstanceId("left"), ComponentSuppressionState::Suppressed));
+  CHECK(f::checked(builder.build_project(project, provider)).empty());
+}
+
+TEST_CASE("Project viewport excludes hidden Bodies and refuses partial or mutated member caches",
+          "[geometry][material-project-scene]") {
+  namespace f = blcad::test::material_physical_fixture;
+  auto project = f::project();
+  auto* part = project.find_part_document(DocumentId("material.part"));
+  REQUIRE(part);
+  REQUIRE(part->set_body_visibility(BodyId("body.second"), BodyVisibility::Hidden));
+  auto cache = f::checked(ShapeCache::create(ShapeCacheId("material.scene")));
+  GeometryRecomputeExecutor executor;
+  REQUIRE(executor.execute_document(*part, cache));
+  const auto provider = [&](DocumentId) -> const ShapeCache* { return &cache; };
+  const ViewportSceneBuilder builder;
+  const auto scene = f::checked(builder.build_project(project, provider));
+  REQUIRE(scene.size() == 1);
+  GProp_GProps properties;
+  BRepGProp::VolumeProperties(*OcctShapeView::get(scene.front().shape), properties);
+  CHECK(properties.Mass() == Approx(1600));
+  CHECK(properties.CentreOfMass().X() == Approx(0).margin(1e-9));
+  REQUIRE(part->set_body_visibility(BodyId("body.base"), BodyVisibility::Hidden));
+  REQUIRE(executor.execute_document(*part, cache));
+  CHECK(f::checked(builder.build_project(project, provider)).empty());
+  REQUIRE(executor.execute_history_prefix(*part, 1, cache));
+  CHECK_FALSE(builder.build_project(project, provider));
+}
 
 TEST_CASE("Construction source catalogue retains typed identities and exact bounded geometry",
           "[geometry][construction-picking]") {

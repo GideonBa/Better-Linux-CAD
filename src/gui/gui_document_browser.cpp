@@ -357,6 +357,17 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
                GuiPropertyKind::Enumeration),
       property("status", "Recompute status", "document session", GuiPropertyKind::Status),
   };
+  const auto material_label = [](const EngineeringMaterial* material) {
+    return material ? material->name() + " (" + material->key().id().value() + " @ " +
+                          material->key().revision() + ")"
+                    : std::string("Unassigned");
+  };
+  root.properties.push_back(property(
+      "material", "Default material",
+      material_label(part.default_material()
+                         ? part.engineering_resources().find_material(*part.default_material())
+                         : nullptr),
+      GuiPropertyKind::Reference));
   if (const auto* binding = part.reference_part_definition()) {
     root.properties.push_back(property("reference_source", "Reference source",
                                        binding->source().value(), GuiPropertyKind::Reference));
@@ -488,6 +499,14 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
         "visibility", "Visible", body.visibility() == BodyVisibility::Visible ? "true" : "false",
         GuiPropertyKind::Boolean, !part.is_reference_part(), {"true", "false"},
         "Reference Parts are immutable; change occurrence visibility or create an Editable copy"));
+    const auto* effective_material = part.effective_material_for_body(body.id());
+    const bool override = std::any_of(part.body_materials().begin(), part.body_materials().end(),
+                                      [&](const auto& pin) { return pin.body == body.id(); });
+    node.properties.push_back(property("material", "Effective material",
+                                       material_label(effective_material),
+                                       GuiPropertyKind::Reference));
+    node.properties.push_back(property("material_assignment", "Material assignment",
+                                       override ? "Body override" : "Inherited from Part"));
     node.properties.push_back(property("active", "Active body", "not defined",
                                        GuiPropertyKind::Status, false, {},
                                        "The current Core model has no active-body intent"));
@@ -581,11 +600,13 @@ GuiBrowserNode build_assembly(const AssemblyDocument& assembly, std::string labe
   return root;
 }
 
-const GuiBrowserNode* find_node(const GuiBrowserNode& node, std::string_view id) {
-  if (!id.empty() && (node.semantic_id == id || node.viewport_semantic_id == id))
+const GuiBrowserNode* find_node(const GuiBrowserNode& node, std::string_view id,
+                                std::optional<std::string_view> owner = {}) {
+  if (!id.empty() && (!owner || node.owner_document_id == *owner) &&
+      (node.semantic_id == id || node.viewport_semantic_id == id))
     return &node;
   for (const auto& child : node.children)
-    if (const auto* found = find_node(child, id))
+    if (const auto* found = find_node(child, id, owner))
       return found;
   return nullptr;
 }
@@ -680,6 +701,14 @@ const std::vector<GuiBrowserNode>& GuiDocumentBrowser::roots() const noexcept { 
 const GuiBrowserNode* GuiDocumentBrowser::find(std::string_view semantic_id) const noexcept {
   for (const auto& root : roots_)
     if (const auto* found = find_node(root, semantic_id))
+      return found;
+  return nullptr;
+}
+
+const GuiBrowserNode* GuiDocumentBrowser::find(std::string_view semantic_id,
+                                               std::string_view owner_document_id) const noexcept {
+  for (const auto& root : roots_)
+    if (const auto* found = find_node(root, semantic_id, owner_document_id))
       return found;
   return nullptr;
 }

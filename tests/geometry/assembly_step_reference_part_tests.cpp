@@ -480,6 +480,60 @@ TEST_CASE("Reference assembly geometry shares one definition through exact repea
   StepImportTopologyContext context(fixture.root);
   const auto scene = value(ViewportSceneBuilder{&context}.build_project(project));
   CHECK(scene.size() == 4);
+  auto reference_cache = value(ShapeCache::create(ShapeCacheId("reference.viewport")));
+  REQUIRE(GeometryRecomputeExecutor{&context}.execute_document(fixture.part, reference_cache));
+  CHECK_FALSE(reference_cache.validate_complete_geometry_result(fixture.part));
+  const auto owned_reference = value(reference_cache.validated_reference_result(fixture.part));
+  REQUIRE_FALSE(owned_reference->bodies.empty());
+  const auto original_shape = owned_reference->bodies.front().shape;
+  const auto reused = value(GeometryRecomputeExecutor{&context}.refresh_material_metadata(
+      fixture.part, fixture.part, reference_cache));
+  CHECK(reused.reused_complete_geometry);
+  CHECK(reused.executed_feature_count == 0);
+  auto partial_reference = reference_cache;
+  REQUIRE(GeometryRecomputeExecutor{&context}.execute_history_prefix(fixture.part, 0,
+                                                                     partial_reference));
+  CHECK_FALSE(GeometryRecomputeExecutor{&context}.refresh_material_metadata(
+      fixture.part, fixture.part, partial_reference));
+  CHECK_FALSE(GeometryRecomputeExecutor{}.refresh_material_metadata(fixture.part, fixture.part,
+                                                                    reference_cache));
+  {
+    const auto path = fixture.root / "supplier.step";
+    std::ifstream input(path, std::ios::binary);
+    const std::string original{std::istreambuf_iterator<char>(input), {}};
+    REQUIRE_FALSE(original.empty());
+    input.close();
+    {
+      std::ofstream append(path, std::ios::app | std::ios::binary);
+      append << '\n';
+    }
+    StepImportTopologyContext changed(fixture.root);
+    CHECK_FALSE(GeometryRecomputeExecutor{&changed}.refresh_material_metadata(
+        fixture.part, fixture.part, reference_cache));
+    {
+      std::ofstream restore(path, std::ios::trunc | std::ios::binary);
+      restore << original;
+    }
+    StepImportTopologyContext restored(fixture.root);
+    REQUIRE(GeometryRecomputeExecutor{&restored}.refresh_material_metadata(
+        fixture.part, fixture.part, reference_cache));
+    CHECK(OcctShapeView::get(value(reference_cache.validated_reference_result(fixture.part))
+                                 ->bodies.front()
+                                 .shape) == OcctShapeView::get(original_shape));
+  }
+  const auto cached_scene = value(ViewportSceneBuilder{&context}.build_project(
+      project, [&](DocumentId id) -> const ShapeCache* {
+        return id == fixture.part.id() ? &reference_cache : nullptr;
+      }));
+  REQUIRE(cached_scene.size() == scene.size());
+  for (std::size_t i = 0; i < scene.size(); ++i) {
+    CHECK(cached_scene[i].semantic_id == scene[i].semantic_id);
+    GProp_GProps expected, actual;
+    BRepGProp::VolumeProperties(*OcctShapeView::get(scene[i].shape), expected);
+    BRepGProp::VolumeProperties(*OcctShapeView::get(cached_scene[i].shape), actual);
+    CHECK(actual.Mass() == Catch::Approx(expected.Mass()));
+    CHECK(actual.CentreOfMass().Distance(expected.CentreOfMass()) < 1e-8);
+  }
   const auto contacts = value(AssemblyContactAnalyzer{&context}.analyze(project));
   CHECK(contacts.component_occurrence_count == 4);
   CHECK(contacts.recomputed_part_count == 1);

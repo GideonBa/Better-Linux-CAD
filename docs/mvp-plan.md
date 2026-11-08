@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 150
 current_block: 151
-current_boundary: Block 151A controllers verified; visible Material/Physical Properties tasks remain
+current_boundary: Block 151B Material task verified; Physical Properties task remains
 current_tag: "[parity-b151]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -34,7 +34,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 150
-current block        Block 151 (in progress; slice A)
+current block        Block 151 (in progress; slice B)
 current phase        Materials and physical properties UI
 current boundary     Inventor-like assignment and physical-property tasks
 ```
@@ -2383,7 +2383,7 @@ occurrence, history or geometry authority is introduced.
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 151A | Qt-free material candidate/transaction and physical-query controllers; exact source/scope guards, display units/clipboard data, qualified Body/occurrence totals and focused combined tests | Implemented and verified; PR #159 |
-| 151B | Manage Material task, Part/Body assignment/context starts, immutable revision/provenance controls and explicit selected-member updates through existing session owners | Planned; not started |
+| 151B | Manage Material task, Part/Body assignment/context starts, immutable revision/provenance controls and explicit selected-member updates through existing session owners | Implemented and verified; delivery pending |
 | 151C | Inspect Physical Properties task, scope/units/refresh/status/precision, clipboard and transient centroid presentation through existing viewport/task owners | Planned; not started |
 | 151D | R01–R02/UI01 native combined assignment/revision/history/Save/Open, nested/multi-Body/missing-density scopes, ordinary/compact/scaled layout and full acceptance | Planned; not started |
 
@@ -2417,6 +2417,33 @@ A delivery verification. No visible command/centroid/clipboard-OS acceptance is 
 `65708dc`. The delivery-record update changes documentation only and preserves all 1,011 verified
 runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed main
 before starting B.
+
+151B starts on `feat/material-management-task` after PR #159 is confirmed merged as `956fdc2`.
+Refreshed main matches reviewed tree `489592d1ecdcba75a239acfb59fe0c5c32650004`.
+The Manage ribbon and Part/Body browser context share one Material task. Its scrollable property
+groups stage catalogue snapshots, assignment and explicit-member adoption/removal through 151A;
+Apply/Cancel stay visible outside the scroll area. Existing snapshots are read-only, changed values
+require a new revision, and property provenance is disclosed/preserved when unchanged. Project
+assignment targets a Part definition and therefore all its occurrences. Ready-prefix changes use
+the existing child checkpoint. Native ordinary/compact/scaled interaction and combined persistence,
+history, revision, provenance and Reference Part checks are required before B delivery. Whole 151
+and the Materials capability remain open pending the remaining slices.
+
+151B verification completes on the corrected label/layout source. Full GUI passes **750 cases:
+713 passed / 37 expected native-only skips / 91,012 assertions**. Full Geometry passes **601 /
+53,123**; later edits affect only Material label sizing and its GUI test. Final native 100% passes
+**57 / 5,515**, compact 150% **33 / 3,276**, inventory **5 / 568** and intentional startup timeout
+**124**. Core **657 / 25,706** is retained, not rerun. Eight Material cases cover pending Save,
+one Undo/Redo, immutable/provenance validation, explicit Project members, duplicate local Body IDs,
+Reference read-only/reuse, prefix child/parent publication and vertically reachable compact layout.
+The Project viewport consumes complete native/member or separately validated Reference results,
+including multiple visible Bodies; metadata-only Project library edits retain unchanged Reference
+topology after actual supplier checks. Earlier fixture/Reference/layout failures, corrected scrolling
+diagnostics, approval timeouts/retries and unmodified reviewed captures are recorded in the existing
+setup/UI documents. Runtime freeze **1,014** files, SHA-256
+`8313f8f2f66206da1303258bfa0d088d451fbcd583883e0da3163ae6270356bf`.
+Working/staged formatting, whitespace/source review and normal PR delivery complete B only.
+Implemented-through stays 150; whole 151 and Phase A remain open for C/D.
 
 ## Later phases
 

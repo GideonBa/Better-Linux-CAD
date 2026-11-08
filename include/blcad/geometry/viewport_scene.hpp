@@ -5,6 +5,7 @@
 #include "blcad/core/result.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 
+#include <functional>
 #include <optional>
 #include <string>
 #include <variant>
@@ -59,6 +60,11 @@ public:
   build_body_rotation_sources(const PartDocument& document, const ShapeCache& shape_cache,
                               std::optional<std::size_t> history_prefix = std::nullopt) const;
   [[nodiscard]] Result<std::vector<ViewportSceneItem>> build_project(const Project& project) const;
+  // Uses the session's complete member results, including separate visible Bodies.
+  // Missing or stale supplied results fail rather than silently recomputing them.
+  [[nodiscard]] Result<std::vector<ViewportSceneItem>>
+  build_project(const Project& project,
+                const std::function<const ShapeCache*(DocumentId)>& member_cache) const;
 
 private:
   StepImportTopologyContext* import_context_{};

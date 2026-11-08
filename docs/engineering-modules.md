@@ -231,6 +231,36 @@ does not replace freshly normalized geometry or expression state with a pending 
 Reference Parts retain read-only material intent; ready End-of-Part metadata edits preserve the
 existing parent/child checkpoint and partial-result rules.
 
+151B's Material task is the shared Manage-ribbon / Part-and-Body browser-context entry. Assignment
+shows the effective snapshot and whether a Body overrides or inherits the Part default. Project
+targets are owned Part definitions, so assignment affects every occurrence of that definition.
+Reference Parts expose their existing data read-only. New snapshots require ID, revision, name
+and provenance; optional density uses kg/m³ and optional mechanical pressures use MPa. Blank
+properties remain unknown. Existing per-property provenance is displayed verbatim as plain text;
+unchanged property values retain it, changed values receive the new snapshot editor's provenance.
+Normative provenance still requires a reference. URI/license are passive disclosed metadata.
+Conflicting reuse of an existing immutable key fails. Adoption uses the selected old snapshot and
+the editor's new revision, with explicit checked Project members; unchecked Parts stay pinned.
+Removal uses existing reference guards, including member-local unassigned snapshots. Staging,
+Cancel and Save never publish a pending candidate; Apply publishes one validated transaction.
+Unstaged editor changes disable Apply until staged or discarded by selecting a library entry.
+Browser context and properties qualify Part-local identifiers with the existing owner document;
+identically named Body IDs in different Project members cannot redirect a material assignment.
+
+The shell's Project scene consumes the session's complete member caches. It compounds separate
+visible Body results for each definition, then poses the same underlying topology with the existing
+canonical leaf transform chain. Hidden/suppressed occurrences and hidden Bodies stay excluded from
+the scene; Physical Properties keeps its separate existing physical-participation policy. Missing,
+partial or stale supplied caches fail rather than trigger a second geometry recomputation. This
+viewport path does not change the older single-compatible-shape export contract. Reference Parts
+retain their separate existing complete source/catalog/body-result validation; native feature/body
+provenance is required only for native/editable member caches. Actual import sources are still
+observed and validated through the existing STEP context before a scene is returned.
+An unchanged immutable Reference definition can also retain its existing result across a Project
+library edit: exact serialized Part content and executable lifetime, complete history scope, existing
+Reference ownership and actual supplier freshness must all validate. No native feature/body stamp is
+invented for Reference storage. Changed, partial, foreign or context-free results remain ineligible.
+
 Physical Properties controls consume complete immutable queries from 150, reusing integrated
 geometry when eligible. Whole-model, available Body and exact qualified occurrence scopes use the
 same trusted results; occurrence totals use the existing geometry aggregation authority. Display

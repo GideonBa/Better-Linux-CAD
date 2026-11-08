@@ -72,6 +72,8 @@ public:
 
   [[nodiscard]] const std::vector<GuiBrowserNode>& roots() const noexcept;
   [[nodiscard]] const GuiBrowserNode* find(std::string_view semantic_id) const noexcept;
+  [[nodiscard]] const GuiBrowserNode* find(std::string_view semantic_id,
+                                           std::string_view owner_document_id) const noexcept;
 
 private:
   std::vector<GuiBrowserNode> roots_;

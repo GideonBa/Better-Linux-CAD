@@ -16,6 +16,7 @@
 #include "blcad/gui/shell/shell_history_tools.hpp"
 #include "blcad/gui/shell/shell_hole_tools.hpp"
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
+#include "blcad/gui/shell/shell_material_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
 #include "blcad/gui/shell/shell_navigation_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
@@ -340,6 +341,7 @@ ShellWindow::ShellWindow() {
       std::make_unique<ShellSketchDiagnosticsTools>(*this, *ribbon_, tab_inspect_, tab_sketch_);
   sketch_3d_tools_ = std::make_unique<ShellSketch3DTools>(*this, *ribbon_, tab_model_);
   parameter_tools_ = std::make_unique<ShellParameterTools>(*this, *ribbon_, tab_manage_);
+  material_tools_ = std::make_unique<ShellMaterialTools>(*this, *ribbon_, tab_manage_);
   hole_tools_ = std::make_unique<ShellHoleTools>(*this, *ribbon_, tab_model_);
   step_import_tools_ =
       std::make_unique<ShellStepImportTools>(*this, *ribbon_, tab_manage_, tab_assembly_);
@@ -359,6 +361,7 @@ ShellWindow::~ShellWindow() {
   step_import_tools_.reset();
   sketch_3d_tools_.reset();
   parameter_tools_.reset();
+  material_tools_.reset();
   hole_tools_.reset();
   sketch_diagnostics_tools_.reset();
   reference_repair_tools_.reset();
@@ -563,8 +566,9 @@ void ShellWindow::build_docks() {
             if (id.empty())
               return;
             const bool visible = item->checkState(0) == Qt::Checked;
-            const auto* source =
-                browser_model_.find(item->data(0, kSemanticIdRole).toString().toStdString());
+            const auto* source = browser_model_.find(
+                item->data(0, kSemanticIdRole).toString().toStdString(),
+                item->data(0, ShellHistoryBrowser::owner_role).toString().toStdString());
             if (!source)
               return;
             const GuiBrowserNode node = *source;
@@ -596,7 +600,9 @@ void ShellWindow::build_docks() {
             const std::string id =
                 item ? item->data(0, kVisibilityIdRole).toString().toStdString() : std::string{};
             const auto* source =
-                item ? browser_model_.find(item->data(0, kSemanticIdRole).toString().toStdString())
+                item ? browser_model_.find(
+                           item->data(0, kSemanticIdRole).toString().toStdString(),
+                           item->data(0, ShellHistoryBrowser::owner_role).toString().toStdString())
                      : nullptr;
             const GuiBrowserNode node = source ? *source : GuiBrowserNode{};
             QMenu menu(browser_tree_);
@@ -616,6 +622,25 @@ void ShellWindow::build_docks() {
               menu.addAction(&history_tools_->reorder_action());
               menu.addAction(&history_tools_->marker_before_action());
               menu.addAction(&history_tools_->marker_after_action());
+              menu.addSeparator();
+            }
+            if (source && material_tools_ &&
+                (source->kind == GuiBrowserNodeKind::Body ||
+                 (source->kind == GuiBrowserNodeKind::Document &&
+                  (session_.part_document() ||
+                   (session_.project() && session_.project()->find_part_document(
+                                              DocumentId(source->owner_document_id))))))) {
+              auto* material = menu.addAction(QStringLiteral("Assign Material…"));
+              material->setObjectName("blcad.context.material");
+              material->setEnabled(material_tools_->action().isEnabled());
+              connect(material, &QAction::triggered, &menu, [this, node] {
+                const auto result = material_tools_->begin(
+                    DocumentId(node.owner_document_id),
+                    node.kind == GuiBrowserNodeKind::Body ? std::optional(BodyId(node.semantic_id))
+                                                          : std::nullopt);
+                if (!result)
+                  show_error(result.error());
+              });
               menu.addSeparator();
             }
             QAction* toggle = nullptr;
@@ -906,6 +931,8 @@ void ShellWindow::reset_document_interaction(bool cancel_history) {
     step_import_tools_->cancel();
   if (hole_tools_)
     hole_tools_->cancel();
+  if (material_tools_)
+    material_tools_->cancel();
   if (parameter_tools_)
     parameter_tools_->cancel();
   if (sketch_3d_tools_)
@@ -1318,6 +1345,8 @@ bool ShellWindow::undo() {
     step_import_tools_->cancel();
   if (hole_tools_)
     hole_tools_->cancel();
+  if (material_tools_)
+    material_tools_->cancel();
   if (parameter_tools_)
     parameter_tools_->cancel();
   if (sketch_3d_tools_)
@@ -1374,6 +1403,8 @@ bool ShellWindow::redo() {
     step_import_tools_->cancel();
   if (hole_tools_)
     hole_tools_->cancel();
+  if (material_tools_)
+    material_tools_->cancel();
   if (parameter_tools_)
     parameter_tools_->cancel();
   if (sketch_3d_tools_)
@@ -1577,8 +1608,15 @@ void ShellWindow::refresh_properties() {
   const QSignalBlocker blocker(properties_);
   properties_->clearContents();
   properties_->setRowCount(0);
+  const auto* current = browser_tree_->currentItem();
   const GuiBrowserNode* node =
-      property_semantic_id_.empty() ? nullptr : browser_model_.find(property_semantic_id_);
+      property_semantic_id_.empty() ? nullptr
+      : current &&
+              current->data(0, kSemanticIdRole).toString().toStdString() == property_semantic_id_
+          ? browser_model_.find(
+                property_semantic_id_,
+                current->data(0, ShellHistoryBrowser::owner_role).toString().toStdString())
+          : browser_model_.find(property_semantic_id_);
   if (node == nullptr)
     return;
   properties_->setRowCount(static_cast<int>(node->properties.size()));
@@ -1607,8 +1645,15 @@ void ShellWindow::handle_property_changed(QTableWidgetItem* item) {
   const std::string key = item->data(kSemanticIdRole).toString().toStdString();
   if (key.empty())
     return;
+  const auto* current = browser_tree_->currentItem();
   const GuiBrowserNode* node =
-      property_semantic_id_.empty() ? nullptr : browser_model_.find(property_semantic_id_);
+      property_semantic_id_.empty() ? nullptr
+      : current &&
+              current->data(0, kSemanticIdRole).toString().toStdString() == property_semantic_id_
+          ? browser_model_.find(
+                property_semantic_id_,
+                current->data(0, ShellHistoryBrowser::owner_role).toString().toStdString())
+          : browser_model_.find(property_semantic_id_);
   if (node == nullptr)
     return;
   const auto edited = edit_browser_property(session_, *node, key, item->text().toStdString(), true);
@@ -1682,6 +1727,8 @@ void ShellWindow::refresh() {
     step_import_tools_->refresh();
   if (hole_tools_)
     hole_tools_->refresh();
+  if (material_tools_)
+    material_tools_->refresh();
   if (parameter_tools_)
     parameter_tools_->refresh();
   if (sketch_3d_tools_)
@@ -1826,8 +1873,11 @@ void ShellWindow::refresh_viewport_scene() {
         return session_.part_document() && session_.part_shape_cache()
                    ? builder.build_part(*session_.part_document(), *session_.part_shape_cache(),
                                         session_.history_prefix_count())
-               : session_.project() ? builder.build_project(*session_.project())
-                                    : Result<std::vector<geometry::ViewportSceneItem>>::success({});
+               : session_.project()
+                   ? builder.build_project(
+                         *session_.project(),
+                         [this](DocumentId id) { return session_.project_part_shape_cache(id); })
+                   : Result<std::vector<geometry::ViewportSceneItem>>::success({});
       });
   if (scene.has_error()) {
     viewport_->clear_scene();

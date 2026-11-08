@@ -334,6 +334,26 @@ in `development-setup.md`; whole-block status belongs to `mvp-plan.md`.
 
 ### Planned command placement and workflows
 
+Block 151B places **Material** in Manage → Materials and **Assign Material…** in the existing
+Part/Body browser context menu. Both open the same right-side task. Assignment comes first, then
+the material library, a new immutable snapshot editor and explicit revision-update/removal controls.
+Each section uses the shared collapsible property group; the content scrolls while Apply/Cancel
+remain outside the scroll area. Target selectors show Part definitions and Part-default/Body scope;
+the effective assignment distinguishes inheritance from an override. Project wording states that
+definition changes apply to all its occurrences. Revision updates list individual owned Parts with
+unchecked checkboxes, preserving unselected pins. Reference Part targets remain visibly read-only.
+Snapshots show revision and material/property provenance, with optional density/pressure values and
+no fabricated defaults. Pending edits are staged before the single Apply. Existing Physical
+Properties presentation remains assigned to 151C/D until its controls and native proof are complete.
+
+The [ordinary Material task](images/material-management-assignment.png) is an unmodified native
+1280×800 capture at 100% scaling; the [compact Material task](images/material-management-compact.png)
+is an unmodified native
+1024×640-DIP capture at 150% scaling. Long names retain full tooltips; bounded plain-text labels
+cannot widen the scroll content. Assignment, snapshot properties and update/removal actions are
+reachable by vertical scrolling, with Apply/Cancel fixed outside the scroll area. The layout proof
+checks zero horizontal scroll range and complete widget frames, including text editors.
+
 | Ribbon/context | Planned commands | Required workflow |
 | --- | --- | --- |
 | Model → Modify | Hole, Thread, advanced Fillet, Direct Edit | preselect face/edge → choose operation → dimensions/manipulators → preview → Apply; browser double-click edits the same intent |
