@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 152
 current_block: 153
-current_boundary: Block 153 plain blind and bounded Hole execution planned; not started
+current_boundary: Block 153A verified; protected delivery pending before 153B
 current_tag: "[parity-b153]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–152 accepted; Blocks 153–204 planned"
+  advanced_modeling_workflows: "Blocks 145–152 accepted; Block 153 in progress; Blocks 154–204 planned"
 ---
 
 # MVP Plan
@@ -34,7 +34,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 152
-current block        Block 153 (planned; not started)
+current block        Block 153 (in progress; slice A)
 current phase        Semantic holes and threads
 current boundary     Plain, blind and bounded Hole execution
 ```
@@ -1777,7 +1777,7 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 ## Blocks 145–204 — Advanced modeling workflows
 
 Status authority: Blocks 145–152 are **Implemented and accepted**;
-Blocks 153–204 are **Planned; not started**.
+Block 153 is **In progress**; Blocks 154–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1787,7 +1787,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
-| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152 accepted; 153–158 planned |
+| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152 accepted; 153 in progress; 154–158 planned |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
@@ -2620,6 +2620,42 @@ No new runtime behavior is changed in C; protected delivery precedes 153.
 implementation `5969e97`. The delivery-record commit changes documentation only and preserves all
 1,022 runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed
 main before starting Block 153.
+
+### Block 153 serial implementation — 2026-11-08
+
+PR #165 is confirmed merged as `a932e7f`; refreshed main matches reviewed tree
+`173268d988c6e4ad14ae7193c0bcf22c80d46c26` before `feat/semantic-hole-straight-cuts` starts.
+Implemented-through stays 152. Reuse existing typed Hole intent, scoped Body cache/transactions,
+Revolve/Boolean adapters, plane/Sketch resolution and shared limit queries. No second history,
+standards, placement-pattern or geometry-result authority is introduced.
+
+| Slice | Bounded deliverable | Status |
+| --- | --- | --- |
+| 153A | Straight one-direction ThroughAll and Blind flat/conical tools, multiple independent placements and atomic Body cuts on fixed datum/construction or current unposed rectangular primitive supports; analytic tests and real shared-history restoration | Implemented and verified; protected delivery pending |
+| 153B | Posed/imported/trimmed result support and finite-face placement, ToNext/ToFace/UpToBody/Symmetric extents, local entry/exit/remaining-bottom semantics and ambiguous/ineffective inputs | Planned; not started |
+| 153C | Generated bore/seat downstream reference integration and combined native/imported, multi-Body, modifier, history/prefix, material/mass, portable exchange and UI regression acceptance | Planned; not started |
+
+A cuts forward from the support only; ThroughAll must not silently become bidirectional. Blind depth
+is full-diameter depth, with a conical apex beyond it and positive remaining material required.
+Each placement must remove material; duplicate/ineffective or erased-target cuts reject the entire
+candidate. Unsupported A support/extent combinations fail explicitly until B; the Wizard remains
+157. Update 152's temporary unavailable-execution tests to the newly accepted physical behavior.
+Whole 153 stays open until all slices and the B01 physical/combinations gate pass.
+
+153A verification: focused Geometry **15 / 2,043**, full Geometry **610 / 53,455**; focused Qt
+**37 cases, 34 passed / 3 native-only skipped, 2,778 assertions**. Native Qt/OCCT at 100% passes
+**28 / 2,487**, compact 150% **28 / 2,507**, without failures/skips; these include all three
+offscreen-skipped cases. Native startup reaches the window and times out intentionally at 124.
+Analytic volumes/sections, projected-center edits/coplanarity, explicit target isolation, full Blind
+tool containment, failed later placement and real browser Apply/Undo/Redo/reopen are covered.
+The wider Core/GUI suites remain retained baselines, not rerun claims. Capability/Wizard ownership
+stays 157. Final inventory, staged review, protected merge and exact main-tree verification precede B.
+
+153A delivery uses [PR #166](https://github.com/GideonBa/Better-Linux-CAD/pull/166), implementation
+`8b0187533478a454dede35d26529cd6e12487118`, initial reviewed tree
+`4d59c4d9a4be0ab06733c334b97f7f8c5b4fd7cb`. Final inventory passes **5 / 658** and all 1,023 runtime
+fingerprints remain unchanged. The delivery record changes documentation only. Confirm the exact
+final head/review/check state, merge normally and compare refreshed-main's tree before starting B.
 
 ## Later phases
 

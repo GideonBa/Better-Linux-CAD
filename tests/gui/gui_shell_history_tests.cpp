@@ -54,6 +54,7 @@
 #include <array>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <numbers>
 
 using namespace blcad;
 using namespace blcad::gui;
@@ -1306,6 +1307,8 @@ TEST_CASE("Resource-bearing Part prefix creation preserves pins Save Undo and de
 TEST_CASE("Semantic Hole browser history keeps suppressed intent and unavailable execution atomic",
           "[gui][parity-b152][hole-history-shell]") {
   auto part = blcad::test::hole_fixture::part("hole.shell", true);
+  REQUIRE(part.update_hole_feature(blcad::test::hole_fixture::hole(
+      "hole", blcad::test::hole_fixture::standard(), HoleToNextExtent{})));
   REQUIRE(part.apply_history_intent({{"base", "hole"}, {"hole"}}));
   ShellWindow w;
   QTemporaryDir directory;
@@ -1323,7 +1326,7 @@ TEST_CASE("Semantic Hole browser history keeps suppressed intent and unavailable
   CHECK_FALSE(control<QPushButton>(w, "blcad.history.apply").isEnabled());
   CHECK(control<QLabel>(w, "blcad.history.status")
             .text()
-            .contains("Semantic Hole geometry execution is not available"));
+            .contains("bounded Hole extent is not available"));
   CHECK_FALSE(w.history_tools().apply());
   CHECK(snapshot(w) == before);
   CHECK_FALSE(w.session().can_undo());
@@ -1342,4 +1345,50 @@ TEST_CASE("Semantic Hole browser history keeps suppressed intent and unavailable
   REQUIRE(reopened.open_file(w.session().file_path()));
   CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == before);
   CHECK(reopened.derived_results_fresh());
+}
+
+TEST_CASE("Semantic Hole restore previews a physical cut and commits one reversible history step",
+          "[gui][parity-b153][hole-history-shell][hole-straight-shell]") {
+  auto part = blcad::test::hole_fixture::part("hole.shell.cut", true);
+  REQUIRE(part.apply_history_intent({{"base", "hole"}, {"hole"}}));
+  ShellWindow w;
+  QTemporaryDir directory;
+  open(w, directory, part);
+  const auto before = snapshot(w);
+  context(w, "hole", w.history_tools().restore_action());
+  REQUIRE(control<QPushButton>(w, "blcad.history.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  CHECK_FALSE(w.session().can_undo());
+  click(control<QPushButton>(w, "blcad.history.apply"));
+  const auto after = snapshot(w);
+  CHECK(after != before);
+  REQUIRE(w.session().derived_results_fresh());
+  const auto check_volume = [&](double expected) {
+    const auto* cache = w.session().part_shape_cache();
+    REQUIRE(cache);
+    REQUIRE(cache->validate_complete_geometry_result(*w.session().part_document()));
+    CHECK(geometry::RectangleExtrusionAdapter{}
+              .summarize(*cache->find_body_shape(BodyId("body.base")))
+              .volume_mm3 == Catch::Approx(expected).margin(1e-6));
+  };
+  const double cut_volume = 1600 - std::numbers::pi * 3.3 * 3.3 * 8;
+  check_volume(cut_volume);
+  CHECK(w.session().part_shape_cache()->find_body_result(BodyId("body.base"))->source_feature_id ==
+        FeatureId("hole"));
+  capture(w, "semantic-hole-restored-cut");
+  REQUIRE(w.save_to({}));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(w.session().file_path()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == after);
+  REQUIRE(reopened.derived_results_fresh());
+  CHECK(geometry::RectangleExtrusionAdapter{}
+            .summarize(*reopened.part_shape_cache()->find_body_shape(BodyId("body.base")))
+            .volume_mm3 == Catch::Approx(cut_volume).margin(1e-6));
+  REQUIRE(w.session().undo());
+  CHECK(snapshot(w) == before);
+  check_volume(1600);
+  CHECK_FALSE(w.session().can_undo());
+  REQUIRE(w.session().redo());
+  CHECK(snapshot(w) == after);
+  check_volume(cut_volume);
 }

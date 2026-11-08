@@ -327,13 +327,21 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
   snapshots. A missing later table row rolls back all earlier consumer remaps. Derived resource IDs
   resist delimiter collisions and never erase unrelated authored parameter nodes. Existing V1–V3
   writer behavior remains covered by full Core.
-- `[hole-execution-boundary]` checks the explicit pre-153 active-Hole refusal through full and
+- `[hole-execution-boundary]` checks explicit unsupported-extent refusal through full and
   incremental entry points without changing a prior complete cache. Prefix-before-Hole stays
   partial, failed full-prefix execution retains that prefix, and suppressed Hole history yields
   the unchanged **1,600 mm³** base. `[hole-history-shell]` uses the existing browser context/task,
   preserves suppressed V4 intent, blocks unavailable restoration without history mutation, restores
   complete results after prefix Cancel and verifies Save/Open. Repeat natively at ordinary/compact
-  scaling; these temporary execution-boundary expectations are replaced by physical oracles in 153.
+  scaling; 153A retains the negative boundary for ToNext until 153B and replaces the supported
+  straight-cut expectations with physical oracles below.
+- 153A `[hole-straight-cutting]` checks all six rectangular supports against independently calculated
+  cylinder volumes, flat/conical blind volumes and material-point section checks. Datum-supported
+  independent positions must each remove material; a failing later position preserves the earlier
+  complete cache. Outward, target-erasing and breakthrough tools fail without publishing output.
+  `[history-physical]` includes Hole replay/suppression/prefix/restore, and `[hole-straight-shell]`
+  exercises actual browser restoration, candidate isolation, one Apply/Undo/Redo, physical volume
+  and portable reopen. Native ordinary and compact/high-DPI runs inspect the resulting cut.
 - 152C `[hole-combined-acceptance]` combines projected Construction→Sketch→Hole identity and
   ReferenceRepair transport, Project V1 custom/V4 and V2 mixed legacy/custom/standard members,
   suppressed Hole→Fillet→rigid-pose equivalence to an independently constructed legacy chain,

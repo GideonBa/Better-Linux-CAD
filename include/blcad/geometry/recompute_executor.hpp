@@ -92,6 +92,8 @@ public:
 
   [[nodiscard]] Result<std::size_t>
   execute_fillet(const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const;
+  [[nodiscard]] Result<std::size_t> execute_hole(const PartDocument& document, FeatureId feature_id,
+                                                 ShapeCache& shape_cache) const;
 
   [[nodiscard]] Result<std::size_t> execute_chamfer(const PartDocument& document,
                                                     FeatureId feature_id,
