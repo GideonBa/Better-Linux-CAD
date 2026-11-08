@@ -4780,3 +4780,7 @@ the ninth requires real OCCT projection and passes both final native runs. New-f
 modified-line/staged formatting diffs are empty; working/staged whitespace and source review pass.
 All 1,017 runtime fingerprints remain unchanged through final documentation updates. Only C is
 verified; whole 151/Phase A and the Materials capability retain the D combination gate.
+
+Delivery: [PR #161](https://github.com/GideonBa/Better-Linux-CAD/pull/161), implementation `de88ffe`.
+The delivery-record update changes documentation only; all 1,017 runtime fingerprints remain
+unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main before D.

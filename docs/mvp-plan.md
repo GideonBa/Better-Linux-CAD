@@ -2384,7 +2384,7 @@ occurrence, history or geometry authority is introduced.
 | --- | --- | --- |
 | 151A | Qt-free material candidate/transaction and physical-query controllers; exact source/scope guards, display units/clipboard data, qualified Body/occurrence totals and focused combined tests | Implemented and verified; PR #159 |
 | 151B | Manage Material task, Part/Body assignment/context starts, immutable revision/provenance controls and explicit selected-member updates through existing session owners | Implemented and verified; PR #160 |
-| 151C | Inspect Physical Properties task, scope/units/refresh/status/precision, clipboard and transient centroid presentation through existing viewport/task owners | Implemented and verified; delivery pending |
+| 151C | Inspect Physical Properties task, scope/units/refresh/status/precision, clipboard and transient centroid presentation through existing viewport/task owners | Implemented and verified; PR #161 |
 | 151D | R01–R02/UI01 native combined assignment/revision/history/Save/Open, nested/multi-Body/missing-density scopes, ordinary/compact/scaled layout and full acceptance | Planned; not started |
 
 Material editing stages typed changes outside committed intent; identical intent creates no history
@@ -2477,6 +2477,11 @@ refinement are recorded in existing setup/UI docs. Final runtime freeze **1,017*
 `a6b40e029dd213d063930ada3585284496f16486a449b02fcd825150dcdd4e88`.
 Source/new-file/working/staged formatting and review complete C delivery only. Implemented-through
 stays 150; whole 151/Phase A and combined Materials GUI capability remain gated by D.
+
+151C delivery: [PR #161](https://github.com/GideonBa/Better-Linux-CAD/pull/161), implementation
+`de88ffe`. The delivery-record update changes documentation only and preserves all 1,017 verified
+runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed main
+before starting D.
 
 ## Later phases
 
