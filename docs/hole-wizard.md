@@ -81,7 +81,7 @@ Multiple placements are separate effective cuts;
 effectless or target-erasing tools fail, and no intermediate Body/cache result is published.
 Referenced Sketch points resolve in their own current frame and must lie on the support plane.
 Rectangular supports require the full circular opening inside their bounds. Posed/imported/result
-supports remain assigned to 153B2; stable generated bore/seat references and combined acceptance
+supports are implemented in 153B2; stable generated bore/seat references and combined acceptance
 remain 153C. The shared history preview, Apply,
 Undo/Redo and portable save/reopen use this execution without adding a second authoring workflow.
 
@@ -126,6 +126,21 @@ face and clips to the side containing the start. Thus an oblique bore ends on th
 elliptical section. Parallel, behind-start, start-crossing, missing and insufficient finite limits
 fail atomically. The limit Body remains a nonparticipant; generated bore/seat references and whole
 153 combinations remain assigned to C, and semantic Wizard authoring remains 157.
+
+153C assigns every generated cylindrical wall, flat Blind bottom and planar ToFace termination a
+producer-owned origin
+`hole/<byte-length>:<placement-id>/wall` or `/bottom`. Placement IDs, rather than center order,
+coordinates or OCCT traversal, distinguish multiple openings. The roots are attached to the
+tool before the final Body cut and followed through surviving/modified kernel faces, including
+subsequent Body poses and finishing. Through exits and conical tips do not pretend to be planar
+bottom seats. A missing contributor or multiple descendants rejects the reference explicitly.
+
+The existing `ResultFaceReference` authority also supplies generic Face inputs for Draft/Shell and
+planar extent consumers. Finishing selection offers only uniquely resolved current faces. Bore
+walls can drive a Draft; flat Blind bottoms participate in the existing direct face-Sketch route,
+with one shared support/Sketch Undo action. A face that becomes curved cannot supply a workplane.
+No extra Hole-reference table, duplicated Sketch geometry or new authoring panel is introduced.
+The dedicated Inventor-like Hole property workflow remains assigned to 157.
 
 ## Why more than a cut
 

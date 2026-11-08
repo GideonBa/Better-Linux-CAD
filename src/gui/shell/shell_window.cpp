@@ -1051,6 +1051,7 @@ std::optional<ResultFaceReference> ShellWindow::selected_result_face() const {
   if (!part || !cache || !session_.part_modeling_ready() ||
       (!selected_semantic_id_.starts_with("finishing/face/") &&
        !selected_semantic_id_.starts_with("finishing/imported:") &&
+       !selected_semantic_id_.starts_with("finishing/result-face/") &&
        !selected_semantic_id_.starts_with("support/result-face/")))
     return std::nullopt;
   for (const auto& body : part->bodies()) {

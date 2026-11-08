@@ -624,6 +624,8 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::finishing_selection_
                   using T = std::decay_t<decltype(producer)>;
                   if constexpr (std::is_same_v<T, ImportedTopologyReference>)
                     return std::nullopt;
+                  else if constexpr (std::is_same_v<T, ResultFaceReference>)
+                    return producer.producer();
                   else
                     return producer.source_feature();
                 },

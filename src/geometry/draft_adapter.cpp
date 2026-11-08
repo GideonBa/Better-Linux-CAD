@@ -9,10 +9,13 @@
 #include <BRepOffsetAPI_DraftAngle.hxx>
 #include <Standard_Failure.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
+#include <algorithm>
 #include <gp_Dir.hxx>
 #include <gp_Pln.hxx>
 #include <gp_Pnt.hxx>
+#include <vector>
 
 #include <cmath>
 #include <memory>
@@ -46,11 +49,13 @@ Result<GeometryShape> DraftAdapter::apply(const PartDocument& document, const Dr
     const Vector3 direction = normalized(pull_direction);
     const Vector3 plane_normal = normalized(neutral_normal);
     BRepOffsetAPI_DraftAngle builder(target_shape);
+    std::vector<TopoDS_Face> drafted_faces;
     for (const FaceReference& reference : feature.faces()) {
       auto face = resolve_semantic_face(document, shape_cache, target_shape, reference,
                                         feature.id(), "draft", import_context);
       if (face.has_error())
         return Result<GeometryShape>::failure(face.error());
+      drafted_faces.push_back(face.value());
       builder.Add(face.value(), gp_Dir(direction.x, direction.y, direction.z),
                   -angle_deg * kPi / 180.0,
                   gp_Pln(gp_Pnt(neutral_origin.x, neutral_origin.y, neutral_origin.z),
@@ -75,6 +80,22 @@ Result<GeometryShape> DraftAdapter::apply(const PartDocument& document, const Dr
     auto backing = std::make_shared<GeometryShape::Impl>(std::move(result));
     backing->face_lineage =
         detail::map_lineage(builder, backing->shape, target.impl_->face_lineage);
+    // Draft reports the replacement surface as Generated rather than Modified.
+    // Only explicitly drafted faces own these continuations; adjacent supports
+    // must not acquire the identity of newly generated geometry.
+    for (const auto& entry : target.impl_->face_lineage) {
+      if (std::none_of(drafted_faces.begin(), drafted_faces.end(),
+                       [&](const auto& face) { return face.IsSame(entry.face); }))
+        continue;
+      for (TopTools_ListIteratorOfListOfShape it(builder.Generated(entry.face)); it.More();
+           it.Next()) {
+        if (it.Value().ShapeType() != TopAbs_FACE)
+          continue;
+        auto next = entry;
+        next.face = TopoDS::Face(it.Value());
+        detail::append_lineage(backing->face_lineage, std::move(next), backing->shape);
+      }
+    }
     return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
   } catch (const Standard_Failure& failure) {
     const char* message = failure.GetMessageString();

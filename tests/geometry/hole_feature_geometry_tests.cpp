@@ -1,8 +1,12 @@
 #include "../support/hole_feature_fixture.hpp"
 #include "blcad/geometry/body_result_inspector.hpp"
+#include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/result_face_support.hpp"
+#include <BRepAdaptor_Surface.hxx>
+#include <TopoDS.hxx>
+#include <gp_Cylinder.hxx>
 
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <catch2/catch_approx.hpp>
@@ -589,4 +593,217 @@ TEST_CASE("Material axis intervals exclude tangencies and reject nonfinite input
   CHECK_FALSE(adapter.axis_material_spans(body, {}, {}));
   CHECK_FALSE(adapter.axis_material_spans(body, {std::numeric_limits<double>::quiet_NaN(), 0, 0},
                                           {0, 0, 1}));
+}
+
+TEST_CASE("Hole placement roots remain distinct through reorder dimensions and a downstream pose",
+          "[geometry][parity-b153][hole-result-reference]") {
+  auto p = history::native_base();
+  dimension(p, "diameter", 2);
+  dimension(p, "blind", 3);
+  const auto original =
+      fixture::hole("hole", ParameterId("diameter"), HoleBlindExtent{ParameterId("blind")});
+  const auto make = [&](bool reverse) {
+    std::vector<HolePlacement> placements{{HolePlacementId("a:/one"), Point2{-3, 0}},
+                                          {HolePlacementId("a:/two"), Point2{3, 0}}};
+    if (reverse)
+      std::reverse(placements.begin(), placements.end());
+    return checked(HoleFeature::create(original.id(), original.name(), original.kind(),
+                                       original.target_body(), original.support(),
+                                       std::move(placements), original.diameter(),
+                                       original.extent(), original.direction(), original.tip()));
+  };
+  REQUIRE(p.add_hole_feature(make(false)));
+  auto c = evaluate(p);
+  const auto targets = checked(
+      FinishingSelectionBuilder::build(p, c, BodyId("body.base"), PartFeatureInputRole::DraftFace));
+  std::vector<ResultFaceReference> walls;
+  for (const auto& target : targets) {
+    const auto& input = std::get<FaceReference>(target.reference);
+    const auto* ref = std::get_if<ResultFaceReference>(&input.source());
+    if (ref && ref->origins().front().role.ends_with("/wall"))
+      walls.push_back(*ref);
+  }
+  REQUIRE(walls.size() == 2);
+  CHECK(walls[0].identity() != walls[1].identity());
+  const auto planes =
+      checked(ResultFaceSupportGeometry::selectable_faces(p, c, BodyId("body.base")));
+  CHECK(std::count_if(planes.begin(), planes.end(), [](const auto& target) {
+          return target.reference.origins().front().role.ends_with("/bottom");
+        }) == 2);
+  REQUIRE(p.update_hole_feature(make(true)));
+  REQUIRE(p.set_parameter_value(ParameterId("diameter"), checked(Quantity::length_mm(3))));
+  REQUIRE(p.add_body_transform(checked(BodyTransform::create_rotate(
+      BodyTransformId("pose"), BodyId("body.base"), BodyTransformCoordinateSpace::World,
+      std::nullopt, checked(BodyTransformRotationAxis::create_explicit({}, {1, 0, 0})), 90, false,
+      false))));
+  c = evaluate(p);
+  for (const auto& ref : walls) {
+    const auto face = checked(ResultFaceSupportGeometry::resolve_face(p, c, ref));
+    BRepAdaptor_Surface surface(TopoDS::Face(*OcctShapeView::get(face)));
+    REQUIRE(surface.GetType() == GeomAbs_Cylinder);
+    CHECK(surface.Cylinder().Radius() == Catch::Approx(1.5));
+    CHECK(std::abs(surface.Cylinder().Axis().Direction().Y()) == Catch::Approx(1));
+  }
+  CHECK(volume(c) == Catch::Approx(1600 - 2 * std::numbers::pi * 2.25 * 3).margin(1e-6));
+  const auto encoded = checked(serialize_part_document_to_json(p));
+  auto reopened = checked(deserialize_part_document_from_json(encoded));
+  auto reopened_cache = evaluate(reopened);
+  for (const auto& ref : walls)
+    REQUIRE(ResultFaceSupportGeometry::resolve_face(reopened, reopened_cache, ref));
+  REQUIRE(p.apply_history_intent({{"base", "hole", "pose"}, {"hole"}}));
+  c = evaluate(p);
+  CHECK_FALSE(ResultFaceSupportGeometry::resolve_face(p, c, walls.front()));
+}
+
+TEST_CASE("Blind Hole bottom supports a dependent Sketch and additive feature with editable depth",
+          "[geometry][parity-b153][hole-result-reference]") {
+  auto p = history::native_base();
+  dimension(p, "diameter", 4);
+  dimension(p, "blind", 3);
+  dimension(p, "post.diameter", 1);
+  dimension(p, "post.height", 1);
+  REQUIRE(p.add_hole_feature(
+      fixture::hole("hole", ParameterId("diameter"), HoleBlindExtent{ParameterId("blind")})));
+  auto c = evaluate(p);
+  const auto faces =
+      checked(ResultFaceSupportGeometry::selectable_faces(p, c, BodyId("body.base")));
+  const auto bottom = std::find_if(faces.begin(), faces.end(), [](const auto& target) {
+    return target.reference.origins().front().role.ends_with("/bottom");
+  });
+  REQUIRE(bottom != faces.end());
+  REQUIRE(p.add_result_face_workplane(checked(
+      ResultFaceWorkplane::create(DatumPlaneId("bottom"), "Hole bottom", bottom->reference))));
+  auto sketch = checked(Sketch::create(SketchId("post"), "Post", DatumPlaneId("bottom")));
+  REQUIRE(sketch.add_profile(
+      checked(CircleProfile::create(ProfileId("post"), ParameterId("post.diameter")))));
+  REQUIRE(p.add_sketch(sketch));
+  auto post = checked(Feature::create_additive_extrude(
+      FeatureId("post.feature"), "Post", SketchId("post"), ParameterId("post.height")));
+  REQUIRE(
+      p.add_feature(checked(post.with_body_result_context(checked(FeatureBodyResultContext::create(
+          FeatureBodyOperationMode::Join, BodyId("body.base"), std::nullopt))))));
+  for (double depth : {3., 4.}) {
+    REQUIRE(p.set_parameter_value(ParameterId("blind"), checked(Quantity::length_mm(depth))));
+    c = evaluate(p);
+    CHECK(volume(c) ==
+          Catch::Approx(1600 - std::numbers::pi * 4 * depth + std::numbers::pi * .25).margin(1e-6));
+    CHECK(material_at(c, {0, 0, 8 - depth + .5}));
+    CHECK_FALSE(material_at(c, {1, 0, 8 - depth + .5}));
+    const auto encoded = checked(serialize_part_document_to_json(p));
+    CHECK(volume(evaluate(checked(deserialize_part_document_from_json(encoded)))) ==
+          Catch::Approx(volume(c)).margin(1e-6));
+  }
+  auto prefix = checked(ShapeCache::create(ShapeCacheId("prefix")));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_history_prefix(p, 1, prefix));
+  CHECK_FALSE(ResultFaceSupportGeometry::resolve_face(p, prefix, bottom->reference));
+}
+
+TEST_CASE("A generated bore wall drives a downstream Draft and survives portable intent",
+          "[geometry][parity-b153][hole-result-reference]") {
+  auto p = history::native_base();
+  dimension(p, "diameter", 4);
+  REQUIRE(p.add_hole_feature(fixture::hole("hole", ParameterId("diameter"))));
+  auto c = evaluate(p);
+  const auto targets = checked(
+      FinishingSelectionBuilder::build(p, c, BodyId("body.base"), PartFeatureInputRole::DraftFace));
+  const auto wall = std::find_if(targets.begin(), targets.end(), [](const auto& target) {
+    const auto* ref =
+        std::get_if<ResultFaceReference>(&std::get<FaceReference>(target.reference).source());
+    return ref && ref->origins().front().role.ends_with("/wall");
+  });
+  REQUIRE(wall != targets.end());
+  REQUIRE(p.add_draft_feature(checked(DraftFeature::create(
+      FeatureId("draft"), "Draft bore", BodyId("body.base"),
+      {std::get<FaceReference>(wall->reference)},
+      history::axis(PartFeatureInputRole::DraftPullDirection),
+      history::plane(PartFeatureInputRole::DraftNeutralPlane), ParameterId("angle")))));
+  c = evaluate(p);
+  const double slope = std::tan(2. * std::numbers::pi / 180.);
+  const double r = 2 - 8 * slope;
+  CHECK(volume(c) ==
+        Catch::Approx(1600 - std::numbers::pi * 8 / 3 * (4 + 2 * r + r * r)).margin(1e-5));
+  const auto encoded = checked(serialize_part_document_to_json(p));
+  CHECK(volume(evaluate(checked(deserialize_part_document_from_json(encoded)))) ==
+        Catch::Approx(volume(c)).margin(1e-6));
+  const auto& reference =
+      std::get<ResultFaceReference>(std::get<FaceReference>(wall->reference).source());
+  const auto face = checked(ResultFaceSupportGeometry::resolve_face(p, c, reference));
+  CHECK(BRepAdaptor_Surface(TopoDS::Face(*OcctShapeView::get(face))).GetType() == GeomAbs_Cone);
+}
+
+TEST_CASE("Consumed and split bore walls reject downstream references without publishing a partial "
+          "result",
+          "[geometry][parity-b153][hole-result-reference]") {
+  const bool split = GENERATE(false, true);
+  auto p = history::native_base();
+  dimension(p, "diameter", 2);
+  dimension(p, "second.diameter", 4);
+  REQUIRE(p.add_hole_feature(fixture::hole("hole", ParameterId("diameter"))));
+  auto c = evaluate(p);
+  const auto reference = checked(ResultFaceReference::create(
+      FeatureId("hole"), BodyId("body.base"), {{FeatureId("hole"), "hole/6:center/wall"}}));
+  REQUIRE(ResultFaceSupportGeometry::resolve_face(p, c, reference));
+  const auto support =
+      split ? checked(PlaneReference::create_semantic_face(
+                  PartFeatureInputRole::HoleSupportPlane,
+                  checked(SemanticFaceReference::create(FeatureId("base"), SemanticFace::Left))))
+            : construction_support(p);
+  REQUIRE(p.add_hole_feature(checked(HoleFeature::create(
+      FeatureId("second"), "Second", HoleKind::Plain, BodyId("body.base"), support,
+      {{HolePlacementId("center"), Point2{}}}, ParameterId("second.diameter")))));
+  c = evaluate(p);
+  const auto unavailable = ResultFaceSupportGeometry::resolve_face(p, c, reference);
+  REQUIRE_FALSE(unavailable);
+  CHECK(unavailable.error().message().find(split ? "multiple descendants" : "deleted") !=
+        std::string::npos);
+  const auto prior = p;
+  const auto prior_shape = *OcctShapeView::get(*c.find_body_shape(BodyId("body.base")));
+  const double prior_volume = volume(c);
+  REQUIRE(p.add_draft_feature(checked(DraftFeature::create(
+      FeatureId("draft"), "Draft lost bore", BodyId("body.base"),
+      {checked(FaceReference::create_result(PartFeatureInputRole::DraftFace, reference))},
+      history::axis(PartFeatureInputRole::DraftPullDirection),
+      history::plane(PartFeatureInputRole::DraftNeutralPlane), ParameterId("angle")))));
+  CHECK_FALSE(GeometryRecomputeExecutor{}.execute_document(p, c));
+  REQUIRE(c.validate_complete_geometry_result(prior));
+  CHECK(volume(c) == prior_volume);
+  CHECK(OcctShapeView::get(*c.find_body_shape(BodyId("body.base")))->IsSame(prior_shape));
+}
+
+TEST_CASE("A captured Hole bottom limits another Body and owns its new planar termination",
+          "[geometry][parity-b153][hole-result-reference]") {
+  auto p = history::native_base();
+  auto second = checked(Feature::create_additive_extrude(
+      FeatureId("second"), "Second", SketchId("profile"), ParameterId("depth")));
+  REQUIRE(p.add_feature(checked(second.with_body_result_context(history::new_body(p, "second")))));
+  dimension(p, "diameter", 4);
+  dimension(p, "blind", 3);
+  REQUIRE(p.add_hole_feature(
+      fixture::hole("hole", ParameterId("diameter"), HoleBlindExtent{ParameterId("blind")})));
+  auto c = evaluate(p);
+  const auto bottom = checked(ResultFaceReference::create(
+      FeatureId("hole"), BodyId("body.base"), {{FeatureId("hole"), "hole/6:center/bottom"}}));
+  const auto limit =
+      checked(FaceReference::create_result(PartFeatureInputRole::HoleLimitFace, bottom));
+  REQUIRE(p.add_hole_feature(checked(
+      HoleFeature::create(FeatureId("limited"), "Limited", HoleKind::Plain, BodyId("body.second"),
+                          construction_support(p), {{HolePlacementId("center"), Point2{}}},
+                          ParameterId("radius"), HoleToFaceExtent{limit}))));
+  c = evaluate(p);
+  CHECK(volume(c) == Catch::Approx(1600 - std::numbers::pi * 4 * 3).margin(1e-6));
+  CHECK(
+      RectangleExtrusionAdapter{}.summarize(*c.find_body_shape(BodyId("body.second"))).volume_mm3 ==
+      Catch::Approx(1600 - std::numbers::pi * .25 * 3).margin(1e-6));
+  const auto end =
+      checked(ResultFaceReference::create(FeatureId("limited"), BodyId("body.second"),
+                                          {{FeatureId("limited"), "hole/6:center/bottom"}}));
+  REQUIRE(ResultFaceSupportGeometry::resolve_face(p, c, end));
+  const auto faces =
+      checked(ResultFaceSupportGeometry::selectable_faces(p, c, BodyId("body.second")));
+  CHECK(std::any_of(faces.begin(), faces.end(),
+                    [&](const auto& face) { return face.reference == end; }));
+  const auto encoded = checked(serialize_part_document_to_json(p));
+  auto reopened = checked(deserialize_part_document_from_json(encoded));
+  auto restored = evaluate(reopened);
+  REQUIRE(ResultFaceSupportGeometry::resolve_face(reopened, restored, end));
 }

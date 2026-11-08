@@ -1,4 +1,6 @@
+#include "../support/hole_geometry_acceptance.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include <catch2/generators/catch_generators.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -204,4 +206,12 @@ TEST_CASE("Loft refines different polygon edge counts without kernel corresponde
       LoftAdapter{}.loft_closed_sections(FeatureId("loft.mismatch"), {square, triangle, top}, true);
   REQUIRE(result);
   CHECK(RectangleExtrusionAdapter{}.summarize(result.value()).solid_count == 1);
+}
+
+TEST_CASE("Semantic Hole extents retain analytic material on a Loft target",
+          "[geometry][parity-b153][hole-generated-target]") {
+  const int extent = GENERATE(0, 1, 2, 3);
+  blcad::test::verify_hole_on_generated_body(multi_section_document({20, 20, 20}, {10, 10, 10}),
+                                             BodyId("body.loft"), {0, 0, 20}, {1, 0, 0}, {0, 1, 0},
+                                             {0, 0, 1}, 4000, extent);
 }

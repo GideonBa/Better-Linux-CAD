@@ -1249,7 +1249,48 @@ driving_dimension_from_json(const json& dimension_json) {
       json_error("unsupported extrude direction in part document json"));
 }
 
+[[nodiscard]] json result_face_reference_to_json(const ResultFaceReference& ref) {
+  json origins = json::array();
+  for (const auto& origin : ref.origins())
+    origins.push_back(json{{"feature", origin.feature.value()}, {"role", origin.role}});
+  return {{"producer", ref.producer().value()},
+          {"body", ref.body().value()},
+          {"origins", std::move(origins)}};
+}
+[[nodiscard]] Result<ResultFaceReference> result_face_reference_from_json(const json& ref) {
+  const auto fail = [] {
+    return Result<ResultFaceReference>::failure(json_error("malformed result-face reference"));
+  };
+  if (!has_exact_fields(ref, {"producer", "body", "origins"}) || !ref.at("producer").is_string() ||
+      !ref.at("body").is_string() || !ref.at("origins").is_array())
+    return fail();
+  std::vector<ResultFaceOrigin> origins;
+  for (const auto& origin : ref.at("origins")) {
+    if (!has_exact_fields(origin, {"feature", "role"}) || !origin.at("feature").is_string() ||
+        !origin.at("role").is_string())
+      return fail();
+    origins.push_back(
+        {FeatureId(origin.at("feature").get<std::string>()), origin.at("role").get<std::string>()});
+  }
+  return ResultFaceReference::create(FeatureId(ref.at("producer").get<std::string>()),
+                                     BodyId(ref.at("body").get<std::string>()), std::move(origins));
+}
+[[nodiscard]] Result<FaceReference> result_face_input_from_json(const json& value,
+                                                                PartFeatureInputRole role) {
+  if (!has_exact_fields(value, {"role", "capability", "source_kind", "reference"}))
+    return Result<FaceReference>::failure(json_error("malformed result-face input"));
+  auto reference = result_face_reference_from_json(value.at("reference"));
+  if (!reference)
+    return Result<FaceReference>::failure(reference.error());
+  return FaceReference::create_result(role, std::move(reference.value()));
+}
+
 [[nodiscard]] json face_reference_to_json(const FaceReference& reference) {
+  if (const auto* result = std::get_if<ResultFaceReference>(&reference.source()))
+    return {{"role", to_string(reference.role())},
+            {"capability", "face"},
+            {"source_kind", "result_face"},
+            {"reference", result_face_reference_to_json(*result)}};
   if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
     json value{{"source_kind", "imported_topology"},
                {"reference", detail::imported_reference_to_json(*imported)}};
@@ -1281,6 +1322,8 @@ driving_dimension_from_json(const json& dimension_json) {
     return Result<FaceReference>::failure(
         json_error("extrude limit face requires role and Face capability"));
   const std::string source_kind = value.value("source_kind", "");
+  if (source_kind == "result_face")
+    return result_face_input_from_json(value, expected_role);
   if (source_kind == "imported_topology")
     return imported_input_from_json<FaceReference>(value, expected_role, 4);
   if (source_kind == "semantic_planar_face") {
@@ -1912,6 +1955,11 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
 }
 
 [[nodiscard]] json shell_removal_face_to_json(const FaceReference& reference) {
+  if (const auto* result = std::get_if<ResultFaceReference>(&reference.source()))
+    return {{"role", to_string(reference.role())},
+            {"capability", "face"},
+            {"source_kind", "result_face"},
+            {"reference", result_face_reference_to_json(*result)}};
   if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
     json value{{"source_kind", "imported_topology"},
                {"reference", detail::imported_reference_to_json(*imported)}};
@@ -1941,6 +1989,8 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
     return Result<FaceReference>::failure(
         json_error("shell removal face requires role and Face capability"));
   const std::string source_kind = value.value("source_kind", "");
+  if (source_kind == "result_face")
+    return result_face_input_from_json(value, PartFeatureInputRole::ShellRemovalFace);
   if (source_kind == "imported_topology")
     return imported_input_from_json<FaceReference>(value, PartFeatureInputRole::ShellRemovalFace,
                                                    4);
@@ -2018,6 +2068,11 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
 }
 
 [[nodiscard]] json draft_face_to_json(const FaceReference& reference) {
+  if (const auto* result = std::get_if<ResultFaceReference>(&reference.source()))
+    return {{"role", to_string(reference.role())},
+            {"capability", "face"},
+            {"source_kind", "result_face"},
+            {"reference", result_face_reference_to_json(*result)}};
   if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
     json value{{"source_kind", "imported_topology"},
                {"reference", detail::imported_reference_to_json(*imported)}};
@@ -2047,6 +2102,8 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
     return Result<FaceReference>::failure(
         json_error("draft face requires draft_face role and Face capability"));
   const std::string kind = value.value("source_kind", "");
+  if (kind == "result_face")
+    return result_face_input_from_json(value, PartFeatureInputRole::DraftFace);
   if (kind == "imported_topology")
     return imported_input_from_json<FaceReference>(value, PartFeatureInputRole::DraftFace, 4);
   if (kind == "semantic_planar_face" && value.size() == 5U && value.contains("source_feature") &&
@@ -3982,40 +4039,15 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
 }
 
 [[nodiscard]] json result_face_workplane_to_json(const ResultFaceWorkplane& plane) {
-  const auto& ref = plane.reference();
-  json origins = json::array();
-  for (const auto& origin : ref.origins())
-    origins.push_back(json{{"feature", origin.feature.value()}, {"role", origin.role}});
-  return json{{"id", plane.id().value()},
-              {"name", plane.name()},
-              {"reference",
-               {{"producer", ref.producer().value()},
-                {"body", ref.body().value()},
-                {"origins", std::move(origins)}}}};
+  return {{"id", plane.id().value()},
+          {"name", plane.name()},
+          {"reference", result_face_reference_to_json(plane.reference())}};
 }
 [[nodiscard]] Result<ResultFaceWorkplane> result_face_workplane_from_json(const json& value) {
-  const auto fail = [] {
-    return Result<ResultFaceWorkplane>::failure(
-        json_error("malformed result-face workplane reference"));
-  };
   if (!has_exact_fields(value, {"id", "name", "reference"}) || !value.at("id").is_string() ||
       !value.at("name").is_string())
-    return fail();
-  const auto& ref = value.at("reference");
-  if (!has_exact_fields(ref, {"producer", "body", "origins"}) || !ref.at("producer").is_string() ||
-      !ref.at("body").is_string() || !ref.at("origins").is_array())
-    return fail();
-  std::vector<ResultFaceOrigin> origins;
-  for (const auto& origin : ref.at("origins")) {
-    if (!has_exact_fields(origin, {"feature", "role"}) || !origin.at("feature").is_string() ||
-        !origin.at("role").is_string())
-      return fail();
-    origins.push_back(
-        {FeatureId(origin.at("feature").get<std::string>()), origin.at("role").get<std::string>()});
-  }
-  auto reference =
-      ResultFaceReference::create(FeatureId(ref.at("producer").get<std::string>()),
-                                  BodyId(ref.at("body").get<std::string>()), std::move(origins));
+    return Result<ResultFaceWorkplane>::failure(json_error("malformed result-face workplane"));
+  auto reference = result_face_reference_from_json(value.at("reference"));
   if (!reference)
     return Result<ResultFaceWorkplane>::failure(reference.error());
   return ResultFaceWorkplane::create(DatumPlaneId(value.at("id").get<std::string>()),

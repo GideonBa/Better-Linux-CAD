@@ -366,3 +366,43 @@ TEST_CASE("Mixed legacy custom and standard Hole members retain portable Project
   for (const auto& part : reopened.part_documents())
     CHECK(text(checked(deserialize_part_document_from_json(text(part)))) == text(part));
 }
+
+TEST_CASE("Hole result faces share typed input persistence and dependency authority",
+          "[core][parity-b153][hole-result-reference]") {
+  auto p = fixture::part("references", true, false);
+  const auto reference = checked(ResultFaceReference::create(
+      FeatureId("hole"), BodyId("body.base"), {{FeatureId("hole"), "hole/6:center/wall"}}));
+  const auto face =
+      checked(FaceReference::create_result(PartFeatureInputRole::DraftFace, reference));
+  CHECK(face.source_kind() == PartFeatureInputSourceKind::ResultFace);
+  CHECK(face.source_node_id() == "hole");
+  REQUIRE(validate_part_feature_input_reference(p, face));
+  CHECK_FALSE(FaceReference::create_result(PartFeatureInputRole::FilletEdge, reference));
+  REQUIRE(p.add_draft_feature(checked(DraftFeature::create(
+      FeatureId("draft"), "Draft bore", BodyId("body.base"), {face},
+      history::axis(PartFeatureInputRole::DraftPullDirection),
+      history::plane(PartFeatureInputRole::DraftNeutralPlane), ParameterId("angle")))));
+  CHECK(p.dependency_graph().has_dependency("hole", "draft"));
+  const auto encoded = text(p);
+  const auto root = json::parse(encoded);
+  CHECK(root.at("version") == 4);
+  CHECK(root.at("draft_features")[0]["faces"][0]["source_kind"] == "result_face");
+  CHECK(text(checked(deserialize_part_document_from_json(encoded))) == encoded);
+  for (int mutation = 0; mutation != 5; ++mutation) {
+    auto broken = root;
+    auto& ref = broken["draft_features"][0]["faces"][0]["reference"];
+    if (mutation == 0)
+      ref["producer"] = "missing";
+    if (mutation == 1)
+      ref["body"] = "missing";
+    if (mutation == 2)
+      ref["origins"][0]["feature"] = "missing";
+    if (mutation == 3)
+      ref["origins"].push_back(ref["origins"][0]);
+    if (mutation == 4)
+      ref["kernel_index"] = 2;
+    CHECK_FALSE(deserialize_part_document_from_json(broken.dump()));
+  }
+  CHECK_FALSE(p.remove_hole_feature(FeatureId("hole")));
+  CHECK(text(p) == encoded);
+}

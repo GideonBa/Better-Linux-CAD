@@ -17,6 +17,8 @@ namespace {
         using T = std::decay_t<decltype(source)>;
         if constexpr (std::is_same_v<T, ImportedTopologyReference>)
           return make_imported_topology_target_spelling(source).value();
+        else if constexpr (std::is_same_v<T, ResultFaceReference>)
+          return source.identity();
         else if constexpr (std::is_same_v<T, SemanticFaceReference>)
           return source.source_feature().value() + ":" + std::string(to_string(source.face()));
         else

@@ -1,6 +1,8 @@
+#include "../support/hole_geometry_acceptance.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
+#include <catch2/generators/catch_generators.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -538,4 +540,12 @@ TEST_CASE("Planar rational spline trajectories share 32-span resolution with sol
   REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, shape_cache));
   CHECK(body_volume(shape_cache, "body.spline") == Catch::Approx(480).margin(1e-5));
   CHECK(serialize_part_document_to_json(document).value() == before);
+}
+
+TEST_CASE("Semantic Hole extents retain analytic material on a Sweep target",
+          "[geometry][parity-b153][hole-generated-target]") {
+  const int extent = GENERATE(0, 1, 2, 3);
+  blcad::test::verify_hole_on_generated_body(construction_line_sweep(), BodyId("body.sweep"),
+                                             {0, 0, 20}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 480,
+                                             extent);
 }

@@ -1436,3 +1436,17 @@ Project V2 retains V4 member versions and uses the existing exact root resource 
 of each member catalog, including an empty reference list for a custom-diameter V4 member. Hydration
 restores a full standalone snapshot before ordered replay. Resource-free Project V1 can embed the
 complete standalone V4 envelope; standard-bearing members require the existing Project V2 catalog.
+
+## Result Face input source (Block 153C)
+
+Face inputs add the `result_face` discriminator with exactly `role`, `capability: "face"`,
+`source_kind` and `reference`. The nested reference uses exactly the existing workplane encoding:
+`producer`, `body` and nonempty unique `origins` entries containing `feature` and `role`.
+The same encoder/parser owns workplane and Face-input payloads. Draft, Shell, Extrude and Hole
+face limits retain their existing role checks; malformed or unknown fields reject strict reopen.
+No kernel face index, sampled geometry, radius or detached transform is persisted.
+
+This is an additive input family under the existing version policy. Part documents containing
+Hole records remain V4; old inputs retain identical canonical JSON and older readers reject the
+new discriminator. Placement-owned Hole roots encode the placement ID byte length, preserving
+arbitrary delimiter bytes and avoiding order-dependent references.

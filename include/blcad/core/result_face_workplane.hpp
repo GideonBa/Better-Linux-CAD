@@ -100,6 +100,8 @@ private:
   ResultFaceReference reference_;
 };
 [[nodiscard]] Result<std::size_t>
+validate_result_face_reference(const PartDocument& document, const ResultFaceReference& reference);
+[[nodiscard]] Result<std::size_t>
 validate_result_face_workplane_reference(const PartDocument& document,
                                          const ResultFaceWorkplane& plane);
 } // namespace blcad

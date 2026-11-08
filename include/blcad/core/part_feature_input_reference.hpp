@@ -5,6 +5,7 @@
 #include "blcad/core/id.hpp"
 #include "blcad/core/imported_topology.hpp"
 #include "blcad/core/result.hpp"
+#include "blcad/core/result_face_workplane.hpp"
 #include "blcad/core/sketch_line_reference.hpp"
 
 #include <array>
@@ -56,6 +57,7 @@ enum class PartFeatureInputSourceKind {
   ResultEdge,
   ImportedTopology,
   Body,
+  ResultFace,
 };
 
 [[nodiscard]] std::string_view to_string(PartFeatureInputCapability capability) noexcept;
@@ -146,10 +148,12 @@ private:
 };
 
 using FaceReferenceSource = std::variant<SemanticFaceReference, SemanticCylindricalFaceReference,
-                                         ImportedTopologyReference>;
+                                         ImportedTopologyReference, ResultFaceReference>;
 
 class FaceReference {
 public:
+  [[nodiscard]] static Result<FaceReference> create_result(PartFeatureInputRole role,
+                                                           ResultFaceReference reference);
   [[nodiscard]] static Result<FaceReference> create_imported(PartFeatureInputRole role,
                                                              ImportedTopologyReference reference);
   [[nodiscard]] static Result<FaceReference> create_planar(PartFeatureInputRole role,
