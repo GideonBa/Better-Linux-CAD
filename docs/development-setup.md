@@ -5109,3 +5109,95 @@ implementation `5969e9776035f6129ed01b2fcd37f5db98ea5bd1` (initial reviewed tree
 `27cb453cea32b709c32ead0257af214d84fe0ce4`). The delivery-record commit changes docs only and
 preserves all 1,022 runtime fingerprints. Final exact-head/review/check state, normal protected
 merge and updated-main tree verification precede the next implementation branch.
+
+## Block 153A — straight semantic Hole execution, 2026-11-08
+
+Starts on `feat/semantic-hole-straight-cuts` after PR #165 is confirmed merged as `a932e7f`;
+refreshed main matches reviewed tree `173268d988c6e4ad14ae7193c0bcf22c80d46c26`.
+Keep the serial 153A/B/C gates in the existing MVP plan; whole 153 and the Wizard remain open.
+
+Use the existing exact revolved-profile tool and non-destructive Body Boolean subtraction rather
+than manufacture a Sketch/profile feature or duplicate the standards authority. The history
+executor dispatches Hole as an ordinary Body modifier. All centers/tools execute against local
+working state and publish only after every cut and supplier validation succeeds. Supported A
+frames are fixed datum/construction planes or the current unposed rectangular primitive faces;
+other support/extent variants report their specific pending boundary until B. Flat/conical Blind
+and forward ThroughAll behavior is specified in `hole-wizard.md`.
+
+Initial Geometry build runs as `blcad153a-geometry-build.log`. New analytic tests cover six support
+orientations, flat/conical cylinder/tip volumes and independent solid-classifier section points,
+two separate datum positions and late-position rollback, outward/no-op, breakthrough and erased
+Bodies. Existing physical-history replay/suppression tests now include Hole. Existing negative
+execution/history tests use ToNext until B; a new shared browser restoration test covers physical
+preview, one Apply/Undo/Redo and save/reopen. Final results, native evidence, review and runtime
+fingerprint are recorded below after checks complete.
+
+Initial Geometry build passes; it reports existing unrelated warnings for the unused rectangular
+profile helper and the Reference Part export test's return path. Focused execution
+`[hole-straight-cutting],[hole-execution-boundary],[history-physical]` passes **13 / 2,012**, without
+failures/skips (`blcad153a-geometry-focused.log`). Review adds projected-Sketch recompute/coplanarity
+and explicit construction-plane/two-Body coverage. The next build reports a missing normal argument
+in the new construction-plane test setup; fix that test call after the build stops before retrying.
+Main protection was rechecked: active PR-required rules, zero required reviews, no required check
+rule, and deletion/non-fast-forward protection; use normal protected delivery.
+
+The corrected construction-plane test supplies its explicit normal. Review build is
+`blcad153a-review-build.log`. Runtime inputs are frozen across **1,023** files, SHA-256
+`955e845026bb9ba299a54175c6c14177755a872854ab2bbec97958a36d18e995`
+(`/tmp/blcad153a-runtime-freeze.json`); source/test/CMake edits require a new freeze and relevant
+checks. The 153A GUI gate targets the shared history/browser, earlier bounded Hole commands,
+material/resource/history combinations and existing capability inventory, with native ordinary
+and compact/high-DPI runs plus startup. The broad Geometry suite validates all existing executor
+families. Whole-153 combined acceptance remains assigned to C; retained wider GUI/Core baselines
+are distinguished from checks actually rerun for A.
+
+Review build passes all three targets; remaining warnings are existing signedness in the pattern
+context test and missing Sketch annotation aggregate fields. Expanded focused Geometry passes
+**15 / 2,037**, without failures/skips (`blcad153a-review-geometry-focused.log`). This includes
+physical point movement after Construction→projected Sketch edits, noncoplanar rejection with
+complete-cache retention, and an untouched second Body. Full Geometry is
+`blcad153a-geometry-full.log`; subsequent focused GUI/native/startup results follow.
+
+The first full Geometry run passes **610 / 53,449**, without failures/skips. Review then identifies
+an additional Blind boundary: a datum-supported cylinder can protrude through a side while its
+axis remains inside the Body. Require full-tool material containment using the existing Boolean
+intersection and compare its volume to the complete tool. Add the near-edge datum regression;
+this is a new source change and justifies rebuilding/repeating Geometry before GUI/native checks.
+Containment build is `blcad153a-containment-build.log`. Final runtime freeze stays **1,023** files,
+SHA-256 `c3bd89d3523c4f94e8932a9d579d16a17c5f5c8ae04d59d2c0ab998fdf355f2a`;
+retain the prior manifest as `blcad153a-pre-containment-runtime-freeze.json`.
+
+Containment build passes; its only warning is the existing unused rectangular helper. Final focused
+Geometry passes **15 / 2,043** and final full Geometry passes **610 / 53,455**, without failures/skips
+(`blcad153a-final-geometry-focused.log`, `blcad153a-final-geometry-full.log`). Targeted GUI runs the
+existing hole/history/prefix/resource/material-history/physical-properties/capability tags; the
+full wider GUI suite is retained from 152B rather than represented as rerun. Core product/tests
+are unchanged by 153A; the accepted 152B full plus 152C focused Core evidence remains retained.
+
+Focused Qt offscreen passes **37 cases: 34 passed / 3 native-only skipped; 2,778 assertions**, no
+failures (`blcad153a-gui-focused.log`). The skipped source-Sketch input, finishing preview/selection
+and physical centroid projection cases are included in the native runs, not counted as offscreen
+passes. Native filter is the existing hole/history/prefix/resource/Hole-command/capability set plus
+`[physical-centroid-native]`, run serially at scale 1 and 1.5/compact with shell acceptance required.
+
+Native ordinary passes **28 / 2,487**, compact 150% **28 / 2,507**, without failures/skips
+(`blcad153a-native100.log`, `blcad153a-native150.log`). Native startup reaches the window and
+ends at intentional timeout **124** (`blcad153a-startup.log`). Existing OCCT visual depth/stencil
+notices do not fail the native assertions. Inspect the unmodified captures and copy to:
+
+- `docs/images/semantic-hole-cut.png`, 1280×800, SHA-256
+  `449bdcb6ec646608def7d2d1a937f379f51ae8e800f229645ea3c8d0c1966731`;
+- `docs/images/semantic-hole-cut-compact.png`, 1536×960 physical/1024×640 DIP at 150%, SHA-256
+  `7b50188abf2b537f54abb537e6c09e18a37317d144343e364ee36d7c585bb855`.
+
+The real cut, restored non-italic browser row, existing property inspector and scrollable compact
+layout are visible. Wider Core/GUI evidence remains explicitly retained. MVP records A verified,
+protected delivery pending; implemented-through stays 152 and whole 153/Phase B remain open.
+Run the final existing inventory after this docs-only projection, then inspect/stage exact changes,
+verify the 1,023 runtime fingerprints and deliver through a normal protected PR.
+
+Final inventory passes **5 / 658**, without failures/skips (`blcad153a-final-inventory.log`).
+Modified-line/new-file formatting and whitespace checks pass, and all **1,023** runtime fingerprints
+remain unchanged. No approval, native check or required branch rule is blocked. Review the complete
+working/staged content and push the coherent implementation plus docs/images through the protected
+PR workflow; do not advance all of 153 for this bounded A delivery.

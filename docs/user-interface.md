@@ -395,13 +395,20 @@ End-of-Part material edit and retains its known-subset mass and query footer at 
 
 The 152B Core family appears in the existing feature browser and shared History task under its
 actual owning Part. Suppressed Hole intent remains visible and portable; prefix Cancel restores the
-complete model. Restoring an active semantic Hole is currently a correctable unavailable-execution
-state until 153, with Apply blocked and committed intent preserved. The existing bounded single/
+complete model. In 153A, restoring supported straight ThroughAll/Blind intent previews the real
+cut in the same History task, and Apply commits one reversible update. Unsupported support/extent
+combinations remain correctable diagnostics with Apply blocked and committed intent preserved
+until 153B. The existing bounded single/
 circular Sketch-cut Hole command stays usable; semantic Wizard authoring remains assigned to 157.
 The [ordinary browser view](images/semantic-hole-history.png) is an unmodified 1280×800 capture;
 the [compact view](images/semantic-hole-history-compact.png) is unmodified 1536×960 physical pixels
 for 1024×640 DIP at 150%. The feature keeps the shared suppressed styling and existing property
 inspector; browser/property content remains vertically scrollable in the compact window.
+
+153A's [restored physical cut](images/semantic-hole-cut.png) and
+[compact 150% capture](images/semantic-hole-cut-compact.png) show the same browser/history workflow
+with the computed bore. Captures are unmodified, respectively 1280×800 and 1536×960 physical pixels;
+the compact window is 1024×640 device-independent pixels. They do not claim the planned Wizard UI.
 
 For Hole, use the familiar top-to-bottom order: positions → target/direction → bore/seat type →
 termination → thread → advanced checks. For Fillet, keep constant/variable/face/full-round as modes

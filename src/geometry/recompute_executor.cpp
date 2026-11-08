@@ -465,6 +465,8 @@ store_verified_feature_result(const PartDocument& document, const Feature& featu
     return feature->target_body() == body;
   if (const ShellFeature* feature = document.find_shell_feature(FeatureId(std::string(producer))))
     return feature->target_body() == body;
+  if (const auto* feature = document.find_hole_feature(FeatureId(std::string(producer))))
+    return feature->target_body() == body;
   if (const DraftFeature* feature = document.find_draft_feature(FeatureId(std::string(producer))))
     return feature->target_body() == body;
   if (const BodyBooleanFeature* feature =
@@ -725,6 +727,36 @@ resolve_imported_plane(const PartDocument& document, const ImportedTopologyRefer
   return Result<ResolvedWorkplane>::success(ResolvedWorkplane{
       DatumPlaneId{}, frame->origin, frame->x_axis, frame->y_axis, frame->normal, {}});
 }
+
+[[nodiscard]] Result<ResolvedWorkplane>
+resolve_straight_hole_support(const PartDocument& document, const HoleFeature& feature,
+                              const ShapeCache& cache, const WorkplaneResolver& resolver) {
+  const auto& source = feature.support().source();
+  if (const auto* datum = std::get_if<DatumPlaneId>(&source)) {
+    if (document.find_datum_plane(*datum))
+      return resolver.resolve(document, *datum, cache);
+  } else if (const auto* plane = std::get_if<ConstructionPlaneId>(&source)) {
+    return resolver.resolve(document, DatumPlaneId(plane->value()), cache);
+  } else if (const auto* face = std::get_if<SemanticFaceReference>(&source)) {
+    const auto* primitive = document.find_feature(face->source_feature());
+    const auto* body = cache.find_body_result(feature.target_body());
+    if (primitive && body && body->source_feature_id == primitive->id() &&
+        primitive->type() == FeatureType::AdditiveExtrude &&
+        primitive->direction() == ExtrudeDirection::SketchNormal &&
+        primitive->extrude_intent().is_historical_additive_default() &&
+        !cache.find_latest_body_transform_state(feature.target_body()) &&
+        !cache.find_reference_transform(primitive->input_sketch().value()))
+      return resolver.resolve_generated_face(document, *face);
+  }
+  return Result<ResolvedWorkplane>::failure(
+      geometry_error(feature.id().value(), "This Hole support requires posed, imported or "
+                                           "result-face support that is not available yet."));
+}
+
+[[nodiscard]] Result<std::vector<Point3>>
+resolve_hole_centers(const PartDocument& document, const HoleFeature& feature,
+                     const ShapeCache& cache, const ResolvedWorkplane& support,
+                     const Quantity& diameter, const WorkplaneResolver& resolver);
 
 [[nodiscard]] Result<std::pair<Point3, Vector3>>
 resolve_mirror_plane(const PartDocument& document, const PlaneReference& reference,
@@ -1245,6 +1277,54 @@ evaluate_thin_profile_vertices(const PartDocument& document, const Sketch& sketc
   }
 
   return Result<Point3>::success(resolver.evaluate_point(workplane, center));
+}
+
+[[nodiscard]] Result<std::vector<Point3>>
+resolve_hole_centers(const PartDocument& document, const HoleFeature& feature,
+                     const ShapeCache& cache, const ResolvedWorkplane& support,
+                     const Quantity& diameter, const WorkplaneResolver& resolver) {
+  std::vector<Point3> centers;
+  for (const auto& placement : feature.placements()) {
+    Point2 local;
+    if (const auto* owned = std::get_if<Point2>(&placement.source))
+      local = *owned;
+    else {
+      const auto& reference = std::get<HoleSketchPointReference>(placement.source);
+      const auto* sketch = document.find_sketch(reference.sketch);
+      if (!sketch)
+        return Result<std::vector<Point3>>::failure(
+            geometry_error(feature.id().value(), "Hole placement Sketch is unavailable"));
+      auto frame = resolver.resolve_for_sketch(document, *sketch, cache);
+      if (!frame)
+        return Result<std::vector<Point3>>::failure(frame.error());
+      Point2 point;
+      if (const auto* explicit_point = sketch->find_point(reference.point))
+        point = explicit_point->position();
+      else if (const auto* projected = sketch->find_projected_point(reference.point)) {
+        auto resolved =
+            SketchReferenceProjector{}.resolve_point(document, *sketch, *projected, cache);
+        if (!resolved)
+          return Result<std::vector<Point3>>::failure(resolved.error());
+        point = resolved.value().position;
+      } else
+        return Result<std::vector<Point3>>::failure(
+            geometry_error(feature.id().value(), "Hole placement point is unavailable"));
+      const auto world = resolver.evaluate_point(frame.value(), point);
+      const Vector3 delta{world.x - support.origin.x, world.y - support.origin.y,
+                          world.z - support.origin.z};
+      const auto dot = [](Vector3 a, Vector3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; };
+      if (std::abs(dot(delta, support.normal)) > 1e-7 * std::max(1., diameter.millimeters()))
+        return Result<std::vector<Point3>>::failure(
+            geometry_error(feature.id().value(), "Hole placement must lie on its support plane"));
+      local = {dot(delta, support.x_axis), dot(delta, support.y_axis)};
+    }
+    auto center =
+        evaluate_bounded_circle_center(resolver, support, feature.id().value(), local, diameter);
+    if (!center)
+      return Result<std::vector<Point3>>::failure(center.error());
+    centers.push_back(center.value());
+  }
+  return Result<std::vector<Point3>>::success(std::move(centers));
 }
 
 [[nodiscard]] Result<Point3> evaluate_bounded_circle_center(const WorkplaneResolver& resolver,
@@ -4141,6 +4221,122 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_chamfer(const PartDocumen
   return stored;
 }
 
+Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& document,
+                                                            FeatureId feature_id,
+                                                            ShapeCache& shape_cache) const {
+  const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
+  const auto* feature = document.find_hole_feature(feature_id);
+  if (!feature)
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "Hole feature is unavailable"));
+  auto valid = validate_hole_feature_inputs(document, *feature);
+  if (!valid)
+    return valid;
+  auto imports =
+      validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
+  if (!imports)
+    return imports;
+  const bool through = std::holds_alternative<HoleThroughAllExtent>(feature->extent());
+  const auto* blind = std::get_if<HoleBlindExtent>(&feature->extent());
+  if (!through && !blind)
+    return Result<std::size_t>::failure(
+        geometry_error(feature_id.value(), "This bounded Hole extent is not available yet."));
+  ShapeCache working = shape_cache;
+  auto target = resolve_in_place_body_target(document, feature_id, feature->target_body(), working);
+  if (!target)
+    return Result<std::size_t>::failure(target.error());
+  auto support = resolve_straight_hole_support(document, *feature, working, workplane_resolver_);
+  if (!support)
+    return Result<std::size_t>::failure(support.error());
+  auto diameter = resolve_hole_diameter(document, feature->diameter());
+  if (!diameter)
+    return Result<std::size_t>::failure(diameter.error());
+  auto centers = resolve_hole_centers(document, *feature, working, support.value(),
+                                      diameter.value().diameter, workplane_resolver_);
+  if (!centers)
+    return Result<std::size_t>::failure(centers.error());
+  const double radius = diameter.value().diameter.millimeters() / 2;
+  const double sign = feature->direction() == HoleDirection::SupportNormal ? 1. : -1.;
+  const Vector3 direction{support.value().normal.x * sign, support.value().normal.y * sign,
+                          support.value().normal.z * sign};
+  double cone_height = 0;
+  if (const auto* cone = std::get_if<HoleConicalTip>(&feature->tip()))
+    cone_height =
+        radius /
+        std::tan(document.find_parameter(cone->included_angle)->value().degrees() * k_pi / 360.);
+  if (!std::isfinite(cone_height) || cone_height < 0)
+    return Result<std::size_t>::failure(
+        geometry_error(feature_id.value(), "Hole drill-tip height must be finite"));
+  GeometryShape result = *target.value();
+  for (const auto& center : centers.value()) {
+    double depth = 0;
+    if (through) {
+      auto span = closed_profile_adapter_.projection_span(*target.value(), center, direction);
+      if (!span)
+        return Result<std::size_t>::failure(span.error());
+      depth = span.value().maximum + 1.;
+    } else {
+      depth = document.find_parameter(blind->depth)->value().millimeters();
+      auto exit =
+          closed_profile_adapter_.first_intersection_distance(*target.value(), center, direction);
+      if (!exit)
+        return Result<std::size_t>::failure(exit.error());
+      if (depth + cone_height >= exit.value() - 1e-7)
+        return Result<std::size_t>::failure(geometry_error(
+            feature_id.value(),
+            "Blind Hole breaks through the target; reduce depth or choose Through All."));
+    }
+    if (!std::isfinite(depth) || depth <= k_tolerance)
+      return Result<std::size_t>::failure(
+          geometry_error(feature_id.value(), "Hole has no positive forward extent"));
+    const auto along = [&](double distance, double radial) {
+      return Point3{center.x + direction.x * distance + support.value().x_axis.x * radial,
+                    center.y + direction.y * distance + support.value().x_axis.y * radial,
+                    center.z + direction.z * distance + support.value().x_axis.z * radial};
+    };
+    auto tool = revolve_adapter_.revolve_profile(
+        feature_id, {center, along(0, radius), along(depth, radius), along(depth + cone_height, 0)},
+        center, direction, 0, 360);
+    if (!tool)
+      return Result<std::size_t>::failure(tool.error());
+    if (blind) {
+      auto contained = body_boolean_adapter_.combine(feature_id, BodyBooleanOperation::Intersect,
+                                                     tool.value(), {*target.value()});
+      if (!contained)
+        return Result<std::size_t>::failure(contained.error());
+      const double tool_volume = rectangle_extrusion_adapter_.summarize(tool.value()).volume_mm3;
+      const double contained_volume =
+          rectangle_extrusion_adapter_.summarize(contained.value()).volume_mm3;
+      if (std::abs(tool_volume - contained_volume) > 1e-8 * std::max(1., tool_volume))
+        return Result<std::size_t>::failure(geometry_error(
+            feature_id.value(), "Blind Hole tool must fit fully inside the target material."));
+    }
+    auto cut = body_boolean_adapter_.combine(feature_id, BodyBooleanOperation::Subtract, result,
+                                             {tool.value()});
+    if (!cut)
+      return Result<std::size_t>::failure(cut.error());
+    result = std::move(cut.value());
+  }
+  auto stored = working.store_feature_shape(feature_id, result);
+  if (!stored)
+    return stored;
+  stored = working.store_body_shape(feature->target_body(), feature_id, std::move(result));
+  if (!stored)
+    return stored;
+  if (document.bodies().size() == 1)
+    stored = working.set_final_shape(feature_id, *working.find_body_shape(feature->target_body()));
+  else
+    working.clear_final_shape();
+  if (!stored)
+    return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
+  shape_cache = std::move(working);
+  return stored;
+}
+
 Result<std::size_t> GeometryRecomputeExecutor::execute_shell(const PartDocument& document,
                                                              FeatureId feature_id,
                                                              ShapeCache& shape_cache) const {
@@ -4874,11 +5070,6 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
       return Result<GeometryRecomputeSummary>::failure(
           Error::dependency(entry.feature.node_id, message));
     }
-  for (const auto& entry : plan.value().entries)
-    if (entry.state == PartHistoryExecutionState::Active &&
-        entry.feature.family == PartFeatureFamily::Hole)
-      return Result<GeometryRecomputeSummary>::failure(validation_error(
-          entry.feature.node_id, "Semantic Hole geometry execution is not available yet."));
   const auto source = serialize_part_document_to_json(document);
   if (!source)
     return Result<GeometryRecomputeSummary>::failure(source.error());
@@ -4936,8 +5127,7 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
       case PartFeatureFamily::Shell:
         return execute_shell(document, feature, working);
       case PartFeatureFamily::Hole:
-        return Result<std::size_t>::failure(
-            validation_error(id, "Semantic Hole geometry execution is not available yet."));
+        return execute_hole(document, feature, working);
       case PartFeatureFamily::Draft:
         return execute_draft(document, feature, working);
       case PartFeatureFamily::BodyBoolean:

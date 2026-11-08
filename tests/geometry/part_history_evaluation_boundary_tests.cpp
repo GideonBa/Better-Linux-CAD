@@ -346,7 +346,7 @@ TEST_CASE(
       PartFeatureFamily::Loft, PartFeatureFamily::Surface, PartFeatureFamily::LinearPattern,
       PartFeatureFamily::CircularPattern, PartFeatureFamily::Mirror, PartFeatureFamily::Fillet,
       PartFeatureFamily::Chamfer, PartFeatureFamily::Shell, PartFeatureFamily::Draft,
-      PartFeatureFamily::BodyBoolean, PartFeatureFamily::BodyTransform);
+      PartFeatureFamily::BodyBoolean, PartFeatureFamily::BodyTransform, PartFeatureFamily::Hole);
   CAPTURE(static_cast<int>(family));
   auto before = fixture::native_base();
   if (family == PartFeatureFamily::BodyBoolean)
@@ -664,21 +664,21 @@ TEST_CASE(
   CHECK(reopened.default_material() == resources::key("synthetic.material", "r3"));
 }
 
-TEST_CASE("Semantic Hole execution remains explicit and atomic while suppression and prefixes "
+TEST_CASE("Bounded Hole execution remains explicit and atomic while suppression and prefixes "
           "retain scope",
-          "[geometry][parity-b152][hole-execution-boundary]") {
+          "[geometry][parity-b153][hole-execution-boundary]") {
   const bool authored = GENERATE(false, true);
   auto part = fixture::native_base();
   const auto original = part;
   auto cache = evaluate(part);
   const GeometryRecomputeExecutor executor;
-  REQUIRE(part.add_hole_feature(blcad::test::hole_fixture::hole()));
+  REQUIRE(part.add_hole_feature(
+      blcad::test::hole_fixture::hole("hole", ParameterId("radius"), HoleToNextExtent{})));
   if (authored)
     REQUIRE(part.apply_history_intent({{"base", "hole"}, {}}));
   const auto failed = executor.execute_document(part, cache);
   REQUIRE_FALSE(failed);
-  CHECK(failed.error().message().find("Semantic Hole geometry execution is not available") !=
-        std::string::npos);
+  CHECK(failed.error().message().find("bounded Hole extent is not available") != std::string::npos);
   REQUIRE(cache.validate_complete_geometry_result(original));
   CHECK(RectangleExtrusionAdapter{}
             .summarize(*cache.find_body_shape(BodyId("body.base")))

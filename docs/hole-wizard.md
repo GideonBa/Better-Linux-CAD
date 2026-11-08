@@ -67,9 +67,23 @@ only after all consumers validate. A late missing row/type rolls back the insert
 remaps. Old snapshots remain owned until explicitly removed; referenced snapshots, including those
 of suppressed Holes, cannot be removed. Project adoption retains the existing explicit member list,
 shared immutable catalog and all-or-nothing behavior. See `file-format.md` for V4 Part/V2 Project
-spelling and offline extraction. Active Hole geometry currently fails explicitly before modifying
-cache contents; 153 supplies actual execution. Existing prefix/suppressed evaluation and browser
-history can still expose/retain this Core intent without claiming Wizard authoring before 157.
+spelling and offline extraction. Existing prefix/suppressed evaluation and browser history retain
+this Core intent without claiming Wizard authoring before 157.
+
+153A executes one-direction ThroughAll and Blind on fixed datum/construction supports and current,
+unposed rectangular primitive faces. Positive direction follows the support normal; the default
+cuts opposite it. ThroughAll starts at the support and extends beyond the forward target bound,
+without extending backwards. Blind depth measures the full-diameter cylinder from the support;
+the conical apex adds `radius / tan(included_angle / 2)`. A blind tool that reaches the forward
+exit is rejected with a Through All diagnostic. The complete Blind tool must also lie inside the
+target material, preventing a side breakout that an axis-only exit test would miss.
+Multiple placements are separate effective cuts;
+effectless or target-erasing tools fail, and no intermediate Body/cache result is published.
+Referenced Sketch points resolve in their own current frame and must lie on the support plane.
+Rectangular supports require the full circular opening inside their bounds. Posed/imported/result
+supports and the remaining extent variants retain explicit diagnostics until 153B; stable generated
+bore/seat references and combined acceptance remain 153C. The shared history preview, Apply,
+Undo/Redo and portable save/reopen use this execution without adding a second authoring workflow.
 
 ## Why more than a cut
 

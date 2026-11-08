@@ -566,6 +566,7 @@ if(BLCAD_BUILD_TESTS)
     add_executable(
       blcad_geometry_tests
       tests/geometry/part_history_evaluation_boundary_tests.cpp
+      tests/geometry/hole_feature_geometry_tests.cpp
       tests/geometry/arc_closed_profile_pipeline_tests.cpp
       tests/geometry/assembly_angle_numeric_solver_tests.cpp
       tests/geometry/assembly_concentric_constraint_equation_builder_tests.cpp
