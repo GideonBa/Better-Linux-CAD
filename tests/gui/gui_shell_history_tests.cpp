@@ -1304,11 +1304,14 @@ TEST_CASE("Resource-bearing Part prefix creation preserves pins Save Undo and de
   CHECK(reopened.derived_results_fresh());
 }
 
-TEST_CASE("Semantic Hole browser history keeps suppressed intent and unavailable execution atomic",
-          "[gui][parity-b152][hole-history-shell]") {
+TEST_CASE("Semantic Hole browser history keeps invalid extent restoration atomic",
+          "[gui][parity-b153][hole-history-shell]") {
   auto part = blcad::test::hole_fixture::part("hole.shell", true);
-  REQUIRE(part.update_hole_feature(blcad::test::hole_fixture::hole(
-      "hole", blcad::test::hole_fixture::standard(), HoleToNextExtent{})));
+  const auto hole = blcad::test::hole_fixture::hole("hole", blcad::test::hole_fixture::standard(),
+                                                    HoleToNextExtent{});
+  REQUIRE(part.update_hole_feature(checked(HoleFeature::create(
+      hole.id(), hole.name(), hole.kind(), hole.target_body(), hole.support(), hole.placements(),
+      hole.diameter(), hole.extent(), HoleDirection::SupportNormal))));
   REQUIRE(part.apply_history_intent({{"base", "hole"}, {"hole"}}));
   ShellWindow w;
   QTemporaryDir directory;
@@ -1326,7 +1329,7 @@ TEST_CASE("Semantic Hole browser history keeps suppressed intent and unavailable
   CHECK_FALSE(control<QPushButton>(w, "blcad.history.apply").isEnabled());
   CHECK(control<QLabel>(w, "blcad.history.status")
             .text()
-            .contains("bounded Hole extent is not available"));
+            .contains("no forward material intersection"));
   CHECK_FALSE(w.history_tools().apply());
   CHECK(snapshot(w) == before);
   CHECK_FALSE(w.session().can_undo());
@@ -1349,7 +1352,11 @@ TEST_CASE("Semantic Hole browser history keeps suppressed intent and unavailable
 
 TEST_CASE("Semantic Hole restore previews a physical cut and commits one reversible history step",
           "[gui][parity-b153][hole-history-shell][hole-straight-shell]") {
+  const bool to_next = GENERATE(false, true);
   auto part = blcad::test::hole_fixture::part("hole.shell.cut", true);
+  if (to_next)
+    REQUIRE(part.update_hole_feature(blcad::test::hole_fixture::hole(
+        "hole", blcad::test::hole_fixture::standard(), HoleToNextExtent{})));
   REQUIRE(part.apply_history_intent({{"base", "hole"}, {"hole"}}));
   ShellWindow w;
   QTemporaryDir directory;
@@ -1375,7 +1382,7 @@ TEST_CASE("Semantic Hole restore previews a physical cut and commits one reversi
   check_volume(cut_volume);
   CHECK(w.session().part_shape_cache()->find_body_result(BodyId("body.base"))->source_feature_id ==
         FeatureId("hole"));
-  capture(w, "semantic-hole-restored-cut");
+  capture(w, to_next ? "semantic-hole-to-next-cut" : "semantic-hole-restored-cut");
   REQUIRE(w.save_to({}));
   GuiDocumentSession reopened;
   REQUIRE(reopened.open_file(w.session().file_path()));

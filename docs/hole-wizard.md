@@ -70,7 +70,7 @@ shared immutable catalog and all-or-nothing behavior. See `file-format.md` for V
 spelling and offline extraction. Existing prefix/suppressed evaluation and browser history retain
 this Core intent without claiming Wizard authoring before 157.
 
-153A executes one-direction ThroughAll and Blind on fixed datum/construction supports and current,
+153A introduces one-direction ThroughAll and Blind on fixed datum/construction supports and current,
 unposed rectangular primitive faces. Positive direction follows the support normal; the default
 cuts opposite it. ThroughAll starts at the support and extends beyond the forward target bound,
 without extending backwards. Blind depth measures the full-diameter cylinder from the support;
@@ -81,9 +81,31 @@ Multiple placements are separate effective cuts;
 effectless or target-erasing tools fail, and no intermediate Body/cache result is published.
 Referenced Sketch points resolve in their own current frame and must lie on the support plane.
 Rectangular supports require the full circular opening inside their bounds. Posed/imported/result
-supports and the remaining extent variants retain explicit diagnostics until 153B; stable generated
-bore/seat references and combined acceptance remain 153C. The shared history preview, Apply,
+supports remain assigned to 153B2; stable generated bore/seat references and combined acceptance
+remain 153C. The shared history preview, Apply,
 Undo/Redo and portable save/reopen use this execution without adding a second authoring workflow.
+
+153B1 adds actual-solid axis intervals, excluding tangencies and boundary-only contacts. ToNext
+clips the cylindrical tool to the target and selects its first separated forward material component,
+retaining curved exits rather than substituting a center-line depth plane. If that component wraps
+around an opening into a later axis interval, the limit is ambiguous and fails atomically.
+UpToBody subtracts the explicit limit Body from the tool and retains the first separated forward
+component; the limit Body itself is unchanged. It must begin ahead of the support and fully separate
+the tool, otherwise it is ineffective or ambiguous. ThroughAll still traverses all forward material.
+
+ToFace reuses the existing Extrude planar-limit resolution. B1 supports current unposed rectangular
+primitive limits perpendicular to the bore axis, and requires the entire circular footprint inside
+one actual trimmed face. Posed/imported face and broader support integration remain B2. Symmetric
+uses its persisted positive **total depth**, split equally about the support; it never means an
+unbounded ThroughAll cut. Blind depth remains measured from the support even when material starts
+later: entry is resolved separately, the depth must reach material, and the remaining cylinder/tip
+must fit fully before the first material exit.
+
+Inventor workflow reference: [Autodesk's current Hole documentation](https://help.autodesk.com/cloudhelp/2027/ENU/Inventor-Help/files/GUID-94EB6947-0347-4888-870D-4BA22DB144D8.htm)
+(checked 2026-11-08) confirms support-based distance, progressive positions/type/termination fields,
+explicit solid participants and Create Another. Its Symmetric option is limited to simple ThroughAll;
+BLCAD's already persisted finite symmetric extent is an explicit extension and must be labelled as
+total depth in 157, rather than presented as identical to that Inventor option.
 
 ## Why more than a cut
 

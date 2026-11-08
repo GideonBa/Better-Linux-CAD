@@ -397,8 +397,9 @@ The 152B Core family appears in the existing feature browser and shared History 
 actual owning Part. Suppressed Hole intent remains visible and portable; prefix Cancel restores the
 complete model. In 153A, restoring supported straight ThroughAll/Blind intent previews the real
 cut in the same History task, and Apply commits one reversible update. Unsupported support/extent
-combinations remain correctable diagnostics with Apply blocked and committed intent preserved
-until 153B. The existing bounded single/
+combinations remain correctable diagnostics with Apply blocked and committed intent preserved.
+153B1 adds ToNext/ToFace/UpToBody and finite symmetric intent to that same history workflow;
+posed/imported/result-support authoring stays gated by B2/157. The existing bounded single/
 circular Sketch-cut Hole command stays usable; semantic Wizard authoring remains assigned to 157.
 The [ordinary browser view](images/semantic-hole-history.png) is an unmodified 1280×800 capture;
 the [compact view](images/semantic-hole-history-compact.png) is unmodified 1536×960 physical pixels

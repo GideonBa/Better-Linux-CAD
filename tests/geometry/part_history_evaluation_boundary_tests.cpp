@@ -664,7 +664,7 @@ TEST_CASE(
   CHECK(reopened.default_material() == resources::key("synthetic.material", "r3"));
 }
 
-TEST_CASE("Bounded Hole execution remains explicit and atomic while suppression and prefixes "
+TEST_CASE("Hole extents without forward material fail atomically while suppression and prefixes "
           "retain scope",
           "[geometry][parity-b153][hole-execution-boundary]") {
   const bool authored = GENERATE(false, true);
@@ -672,13 +672,16 @@ TEST_CASE("Bounded Hole execution remains explicit and atomic while suppression 
   const auto original = part;
   auto cache = evaluate(part);
   const GeometryRecomputeExecutor executor;
-  REQUIRE(part.add_hole_feature(
-      blcad::test::hole_fixture::hole("hole", ParameterId("radius"), HoleToNextExtent{})));
+  const auto hole =
+      blcad::test::hole_fixture::hole("hole", ParameterId("radius"), HoleToNextExtent{});
+  REQUIRE(part.add_hole_feature(checked(HoleFeature::create(
+      hole.id(), hole.name(), hole.kind(), hole.target_body(), hole.support(), hole.placements(),
+      hole.diameter(), hole.extent(), HoleDirection::SupportNormal))));
   if (authored)
     REQUIRE(part.apply_history_intent({{"base", "hole"}, {}}));
   const auto failed = executor.execute_document(part, cache);
   REQUIRE_FALSE(failed);
-  CHECK(failed.error().message().find("bounded Hole extent is not available") != std::string::npos);
+  CHECK(failed.error().message().find("no forward material intersection") != std::string::npos);
   REQUIRE(cache.validate_complete_geometry_result(original));
   CHECK(RectangleExtrusionAdapter{}
             .summarize(*cache.find_body_shape(BodyId("body.base")))

@@ -333,8 +333,8 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
   the unchanged **1,600 mm³** base. `[hole-history-shell]` uses the existing browser context/task,
   preserves suppressed V4 intent, blocks unavailable restoration without history mutation, restores
   complete results after prefix Cancel and verifies Save/Open. Repeat natively at ordinary/compact
-  scaling; 153A retains the negative boundary for ToNext until 153B and replaces the supported
-  straight-cut expectations with physical oracles below.
+  scaling; 153A retained the negative boundary for ToNext until 153B1. B1 uses outward ToNext as
+  the atomic negative case while supported straight/bounded cuts use physical oracles below.
 - 153A `[hole-straight-cutting]` checks all six rectangular supports against independently calculated
   cylinder volumes, flat/conical blind volumes and material-point section checks. Datum-supported
   independent positions must each remove material; a failing later position preserves the earlier
@@ -342,6 +342,13 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
   `[history-physical]` includes Hole replay/suppression/prefix/restore, and `[hole-straight-shell]`
   exercises actual browser restoration, candidate isolation, one Apply/Undo/Redo, physical volume
   and portable reopen. Native ordinary and compact/high-DPI runs inspect the resulting cut.
+- 153B1 `[hole-bounded-cutting]` checks independent cylinder volumes for ToNext/ToFace/UpToBody,
+  offset-support Blind depth, edited finite symmetric total depth and actual material intervals.
+  Specific section points distinguish a curved cavity exit and curved limit from a false axial
+  end plane. Limit Bodies retain their producer/volume. A tool wrapping around a narrow void or
+  undersized limit fails with prior complete cache retained; ToFace rejects trimmed-away openings
+  and nonnormal faces. Axis-only tangencies and nonfinite inputs fail closed. The shared browser
+  restoration case now runs both ThroughAll and ToNext through preview, Apply, Undo/Redo/reopen.
 - 152C `[hole-combined-acceptance]` combines projected Construction→Sketch→Hole identity and
   ReferenceRepair transport, Project V1 custom/V4 and V2 mixed legacy/custom/standard members,
   suppressed Hole→Fillet→rigid-pose equivalence to an independently constructed legacy chain,

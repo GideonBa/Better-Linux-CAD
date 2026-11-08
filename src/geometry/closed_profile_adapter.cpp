@@ -3,21 +3,32 @@
 #include "geometry_shape_internal.hpp"
 #include "occt_failure_message.hpp"
 
+#include <BRepAdaptor_Surface.hxx>
+#include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepClass3d_SolidClassifier.hxx>
+#include <BRepGProp.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <Bnd_Box.hxx>
+#include <GProp_GProps.hxx>
 #include <IntCurvesFace_ShapeIntersector.hxx>
 #include <Standard_Failure.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopTools_ListOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Shape.hxx>
-#include <TopTools_ListOfShape.hxx>
 #include <TopoDS_Wire.hxx>
+#include <gp_Ax2.hxx>
+#include <gp_Circ.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Lin.hxx>
+#include <gp_Pln.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
 
@@ -499,6 +510,162 @@ Result<double> ClosedProfileAdapter::first_intersection_distance(const GeometryS
     return Result<double>::success(nearest);
   } catch (const Standard_Failure& failure) {
     return Result<double>::failure(make_geometry_error(standard_failure_message(failure)));
+  }
+}
+
+Result<std::vector<AxisProjectionSpan>>
+ClosedProfileAdapter::axis_material_spans(const GeometryShape& target, Point3 origin,
+                                          Vector3 axis_direction) const {
+  if (!std::isfinite(origin.x) || !std::isfinite(origin.y) || !std::isfinite(origin.z) ||
+      !std::isfinite(length(axis_direction)))
+    return Result<std::vector<AxisProjectionSpan>>::failure(
+        make_geometry_error("Material interval inputs must be finite"));
+  if (target.empty())
+    return Result<std::vector<AxisProjectionSpan>>::failure(
+        make_geometry_error("Material intervals require a non-empty solid target"));
+  auto axis = normalize_axis(axis_direction);
+  if (!axis)
+    return Result<std::vector<AxisProjectionSpan>>::failure(axis.error());
+  try {
+    const gp_Lin line(to_gp_point(origin), gp_Dir(axis.value().x, axis.value().y, axis.value().z));
+    IntCurvesFace_ShapeIntersector intersections;
+    intersections.Load(target.impl_->shape, kAxisTolerance);
+    intersections.Perform(line, -1e100, 1e100);
+    std::vector<double> distances;
+    for (int i = 1; i <= intersections.NbPnt(); ++i)
+      distances.push_back(intersections.WParameter(i));
+    std::sort(distances.begin(), distances.end());
+    distances.erase(std::unique(distances.begin(), distances.end(),
+                                [](double a, double b) { return std::abs(a - b) <= 1e-7; }),
+                    distances.end());
+    std::vector<AxisProjectionSpan> spans;
+    for (std::size_t i = 1; i < distances.size(); ++i) {
+      const double begin = distances[i - 1], end = distances[i];
+      if (end - begin <= 1e-7)
+        continue;
+      const double distance = begin + (end - begin) / 2;
+      const gp_Pnt midpoint(origin.x + axis.value().x * distance,
+                            origin.y + axis.value().y * distance,
+                            origin.z + axis.value().z * distance);
+      bool material = false;
+      for (TopExp_Explorer solids(target.impl_->shape, TopAbs_SOLID); solids.More();
+           solids.Next()) {
+        BRepClass3d_SolidClassifier classifier(TopoDS::Solid(solids.Current()), midpoint,
+                                               kAxisTolerance);
+        material = material || classifier.State() == TopAbs_IN;
+      }
+      if (material) {
+        if (!spans.empty() && std::abs(spans.back().maximum - begin) <= 1e-7)
+          spans.back().maximum = end;
+        else
+          spans.push_back({begin, end});
+      }
+    }
+    return Result<std::vector<AxisProjectionSpan>>::success(std::move(spans));
+  } catch (const Standard_Failure& failure) {
+    return Result<std::vector<AxisProjectionSpan>>::failure(
+        make_geometry_error(standard_failure_message(failure)));
+  }
+}
+
+Result<GeometryShape> ClosedProfileAdapter::first_forward_material_component(
+    const GeometryShape& clipped_tool, Point3 origin, Vector3 axis_direction) const {
+  auto spans = axis_material_spans(clipped_tool, origin, axis_direction);
+  if (!spans)
+    return Result<GeometryShape>::failure(spans.error());
+  auto axis = normalize_axis(axis_direction);
+  if (!axis)
+    return Result<GeometryShape>::failure(axis.error());
+  std::vector<gp_Pnt> samples;
+  for (const auto& span : spans.value())
+    if (span.maximum > 1e-7) {
+      const double distance = (std::max(0., span.minimum) + span.maximum) / 2;
+      samples.emplace_back(origin.x + axis.value().x * distance,
+                           origin.y + axis.value().y * distance,
+                           origin.z + axis.value().z * distance);
+    }
+  if (samples.empty())
+    return Result<GeometryShape>::failure(make_geometry_error("No forward material component"));
+  try {
+    TopoDS_Shape selected;
+    for (TopExp_Explorer solids(clipped_tool.impl_->shape, TopAbs_SOLID); solids.More();
+         solids.Next()) {
+      const auto solid = TopoDS::Solid(solids.Current());
+      BRepClass3d_SolidClassifier classifier(solid, samples.front(), kAxisTolerance);
+      if (classifier.State() != TopAbs_IN)
+        continue;
+      if (!selected.IsNull())
+        return Result<GeometryShape>::failure(
+            make_geometry_error("Ambiguous first material component"));
+      for (std::size_t i = 1; i < samples.size(); ++i) {
+        classifier.Perform(samples[i], kAxisTolerance);
+        if (classifier.State() != TopAbs_OUT)
+          return Result<GeometryShape>::failure(make_geometry_error(
+              "Limit is ambiguous: the tool wraps around an opening into later material"));
+      }
+      selected = solid;
+    }
+    if (selected.IsNull())
+      return Result<GeometryShape>::failure(make_geometry_error("Lost first material component"));
+    auto backing = std::make_shared<GeometryShape::Impl>(std::move(selected));
+    for (const auto& entry : clipped_tool.impl_->face_lineage)
+      detail::append_lineage(backing->face_lineage, entry, backing->shape);
+    return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
+  } catch (const Standard_Failure& failure) {
+    return Result<GeometryShape>::failure(make_geometry_error(standard_failure_message(failure)));
+  }
+}
+
+Result<std::size_t>
+ClosedProfileAdapter::validate_planar_circle_footprint(const GeometryShape& support, Point3 center,
+                                                       Vector3 normal, double radius_mm) const {
+  if (support.empty() || !std::isfinite(radius_mm) || radius_mm <= kAxisTolerance ||
+      !std::isfinite(center.x) || !std::isfinite(center.y) || !std::isfinite(center.z) ||
+      !std::isfinite(length(normal)))
+    return Result<std::size_t>::failure(make_geometry_error("Invalid circular face footprint"));
+  auto axis = normalize_axis(normal);
+  if (!axis)
+    return Result<std::size_t>::failure(axis.error());
+  try {
+    const gp_Pnt origin = to_gp_point(center);
+    const gp_Dir direction(axis.value().x, axis.value().y, axis.value().z);
+    const auto edge = BRepBuilderAPI_MakeEdge(gp_Circ(gp_Ax2(origin, direction), radius_mm)).Edge();
+    const auto disk = BRepBuilderAPI_MakeFace(BRepBuilderAPI_MakeWire(edge).Wire()).Face();
+    GProp_GProps disk_properties;
+    BRepGProp::SurfaceProperties(disk, disk_properties);
+    const double expected_area = disk_properties.Mass();
+    std::size_t matches = 0;
+    for (TopExp_Explorer faces(support.impl_->shape, TopAbs_FACE); faces.More(); faces.Next()) {
+      const auto face = TopoDS::Face(faces.Current());
+      BRepAdaptor_Surface surface(face);
+      if (surface.GetType() != GeomAbs_Plane)
+        continue;
+      const auto plane = surface.Plane();
+      if (std::abs(std::abs(plane.Axis().Direction().Dot(direction)) - 1.) > 1e-7 ||
+          plane.Distance(origin) > 1e-7)
+        continue;
+      BRepAlgoAPI_Common common;
+      TopTools_ListOfShape arguments, tools;
+      arguments.Append(face);
+      tools.Append(disk);
+      common.SetArguments(arguments);
+      common.SetTools(tools);
+      common.SetNonDestructive(true);
+      common.Build();
+      if (!common.IsDone() || common.HasErrors())
+        return Result<std::size_t>::failure(
+            make_geometry_error("Cannot validate trimmed face footprint"));
+      GProp_GProps overlap;
+      BRepGProp::SurfaceProperties(common.Shape(), overlap);
+      if (std::abs(overlap.Mass() - expected_area) <= 1e-7 * expected_area)
+        ++matches;
+    }
+    if (matches != 1)
+      return Result<std::size_t>::failure(make_geometry_error(
+          "Hole opening must fit inside one unambiguous planar face normal to its axis"));
+    return Result<std::size_t>::success(matches);
+  } catch (const Standard_Failure& failure) {
+    return Result<std::size_t>::failure(make_geometry_error(standard_failure_message(failure)));
   }
 }
 
