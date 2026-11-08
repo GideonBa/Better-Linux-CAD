@@ -57,7 +57,7 @@ Result<ResolvedWorkplane> frame_for(const DatumPlaneId& id, const detail::FaceLi
 
 GeometryShape ResultFaceSupportGeometry::tag_plane(const GeometryShape& shape, FeatureId producer,
                                                    std::string role, Point3 origin, Vector3 x_axis,
-                                                   Vector3 normal) {
+                                                   Vector3 normal, bool selectable) {
   if (shape.empty() || length(normal) < tolerance)
     return shape;
   normal = unit(normal);
@@ -78,9 +78,10 @@ GeometryShape ResultFaceSupportGeometry::tag_plane(const GeometryShape& shape, F
   if (matches.size() != 1)
     return shape;
   auto backing = std::make_shared<GeometryShape::Impl>(*shape.impl_);
-  detail::append_lineage(backing->face_lineage,
-                         {{std::move(producer), std::move(role)}, matches.front(), origin, x_axis},
-                         backing->shape);
+  detail::append_lineage(
+      backing->face_lineage,
+      {{std::move(producer), std::move(role)}, matches.front(), origin, x_axis, selectable},
+      backing->shape);
   return GeometryShape(std::move(backing));
 }
 
@@ -111,6 +112,47 @@ GeometryShape ResultFaceSupportGeometry::tag_prismatic_caps(const GeometryShape&
                         frame.origin.z + d * frame.normal.z},
                        frame.x_axis, frame.normal);
   }
+  return result;
+}
+
+GeometryShape ResultFaceSupportGeometry::tag_rectangular_supports(const GeometryShape& shape,
+                                                                  FeatureId producer,
+                                                                  const ResolvedWorkplane& frame,
+                                                                  Point2 center, double width_mm,
+                                                                  double height_mm) {
+  if (shape.empty())
+    return shape;
+  std::vector<double> caps;
+  for (TopExp_Explorer it(shape.impl_->shape, TopAbs_FACE); it.More(); it.Next()) {
+    BRepAdaptor_Surface surface(TopoDS::Face(it.Current()));
+    if (surface.GetType() != GeomAbs_Plane)
+      continue;
+    const auto plane = surface.Plane();
+    const auto n = plane.Axis().Direction();
+    if (std::abs(std::abs(dot(frame.normal, {n.X(), n.Y(), n.Z()})) - 1) <= tolerance)
+      caps.push_back(dot(between(frame.origin, project(frame.origin, plane)), frame.normal));
+  }
+  if (caps.size() != 2)
+    return shape;
+  std::sort(caps.begin(), caps.end());
+  const auto point = [&](double x, double y, double z) {
+    return Point3{frame.origin.x + frame.x_axis.x * x + frame.y_axis.x * y + frame.normal.x * z,
+                  frame.origin.y + frame.x_axis.y * x + frame.y_axis.y * y + frame.normal.y * z,
+                  frame.origin.z + frame.x_axis.z * x + frame.y_axis.z * y + frame.normal.z * z};
+  };
+  const auto neg = [](Vector3 v) { return Vector3{-v.x, -v.y, -v.z}; };
+  const double mid = (caps.front() + caps.back()) / 2;
+  GeometryShape result = shape;
+  const auto tag = [&](const char* role, Point3 origin, Vector3 x, Vector3 normal) {
+    result = tag_plane(result, producer, std::string("hole-support/rectangle/") + role, origin, x,
+                       normal, false);
+  };
+  tag("top", point(center.x, center.y, caps.back()), frame.x_axis, frame.normal);
+  tag("bottom", point(center.x, center.y, caps.front()), frame.x_axis, neg(frame.normal));
+  tag("right", point(center.x + width_mm / 2, center.y, mid), frame.y_axis, frame.x_axis);
+  tag("left", point(center.x - width_mm / 2, center.y, mid), neg(frame.y_axis), neg(frame.x_axis));
+  tag("front", point(center.x, center.y + height_mm / 2, mid), neg(frame.x_axis), frame.y_axis);
+  tag("back", point(center.x, center.y - height_mm / 2, mid), frame.x_axis, neg(frame.y_axis));
   return result;
 }
 
@@ -180,6 +222,52 @@ ResultFaceSupportGeometry::resolve(const PartDocument& document, const ResultFac
   return frame_for(plane.id(), matches.front());
 }
 
+Result<ResolvedResultFace> ResultFaceSupportGeometry::resolve_current(
+    const PartDocument& document, const ShapeCache& cache, const BodyId& body,
+    const std::vector<ResultFaceOrigin>& origins, StepImportTopologyContext* import_context) {
+  const auto history = detail::validate_history_input(document, cache);
+  if (!history)
+    return Result<ResolvedResultFace>::failure(history.error());
+  for (const auto& base : document.imported_body_features())
+    for (const auto& output : base.definition().outputs())
+      if (output.body == body) {
+        auto owned = cache.validated_imported_body_result(document, base);
+        if (!owned)
+          return Result<ResolvedResultFace>::failure(owned.error());
+      }
+  if (import_context) {
+    auto observed = observe_imported_part_sources(document, import_context);
+    if (!observed)
+      return Result<ResolvedResultFace>::failure(observed.error());
+  }
+  const auto* shape = cache.find_body_shape(body);
+  const auto fail = [&](const char* message) {
+    return Result<ResolvedResultFace>::failure(Error::geometry(body.value(), message));
+  };
+  if (!shape || shape->empty() || origins.empty())
+    return fail("Lost current face support: Body or contributors are unavailable");
+  std::vector<detail::FaceLineage> matches;
+  for (const auto& origin : origins) {
+    bool found = false;
+    for (const auto& entry : shape->impl_->face_lineage)
+      if (entry.origin == origin) {
+        found = true;
+        if (std::none_of(matches.begin(), matches.end(),
+                         [&](const auto& old) { return old.face.IsSame(entry.face); }))
+          matches.push_back(entry);
+      }
+    if (!found)
+      return fail("Lost current face support: an authored contributor was deleted");
+  }
+  if (matches.size() != 1)
+    return fail("Ambiguous current face support: authored face has multiple descendants");
+  auto frame = frame_for(DatumPlaneId(body.value()), matches.front());
+  if (!frame)
+    return Result<ResolvedResultFace>::failure(frame.error());
+  return Result<ResolvedResultFace>::success(
+      {frame.value(), GeometryShape(std::make_shared<GeometryShape::Impl>(matches.front().face))});
+}
+
 Result<std::vector<ResultFaceSelectionTarget>> ResultFaceSupportGeometry::selectable_faces(
     const PartDocument& document, const ShapeCache& cache, const BodyId& body,
     StepImportTopologyContext* import_context, std::optional<std::size_t> history_prefix) {
@@ -202,7 +290,7 @@ Result<std::vector<ResultFaceSelectionTarget>> ResultFaceSupportGeometry::select
       continue;
     std::vector<ResultFaceOrigin> origins;
     for (const auto& entry : result->shape.impl_->face_lineage)
-      if (entry.face.IsSame(face))
+      if (entry.selectable && entry.face.IsSame(face))
         origins.push_back(entry.origin);
     auto reference =
         ResultFaceReference::create(result->source_feature_id, body, std::move(origins));

@@ -2,6 +2,7 @@
 #include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <catch2/catch_approx.hpp>
@@ -405,6 +406,172 @@ TEST_CASE("UpToBody rejects a boundary that the tool can bypass without publishi
   CHECK(failed.error().message().find("wraps around") != std::string::npos);
   REQUIRE(cache.validate_complete_geometry_result(original));
   CHECK(volume(cache) == Catch::Approx(1600));
+}
+
+namespace {
+GeometryAffineTransform pose_body(PartDocument& p, int mode) {
+  if (mode == 0) {
+    REQUIRE(p.add_body_transform(checked(BodyTransform::create_translate(
+        BodyTransformId("pose"), BodyId("body.base"), BodyTransformCoordinateSpace::World,
+        std::nullopt, {12, -7, 5}, false, false))));
+    return GeometryAffineTransform::translation({12, -7, 5});
+  }
+  if (mode == 1) {
+    REQUIRE(p.add_body_transform(checked(BodyTransform::create_rotate(
+        BodyTransformId("pose"), BodyId("body.base"), BodyTransformCoordinateSpace::World,
+        std::nullopt, checked(BodyTransformRotationAxis::create_explicit({}, {1, 0, 0})), 90, false,
+        false))));
+    return GeometryAffineTransform::rotation({}, {1, 0, 0}, 90);
+  }
+  REQUIRE(p.add_body_transform(checked(BodyTransform::create_uniform_scale(
+      BodyTransformId("pose"), BodyId("body.base"), BodyTransformCoordinateSpace::World,
+      std::nullopt, 2, {}, false, false))));
+  return GeometryAffineTransform::uniform_scale({}, 2);
+}
+} // namespace
+
+TEST_CASE("Semantic Hole frames follow every rectangular face through Body placement and scale",
+          "[geometry][parity-b153][hole-current-support]") {
+  const auto face = GENERATE(SemanticFace::Top, SemanticFace::Bottom, SemanticFace::Left,
+                             SemanticFace::Right, SemanticFace::Front, SemanticFace::Back);
+  const int mode = GENERATE(0, 1, 2);
+  const bool offset = GENERATE(false, true);
+  auto p = history::native_base();
+  const auto reference = checked(SemanticFaceReference::create(FeatureId("base"), face));
+  const auto raw = checked(WorkplaneResolver{}.resolve_generated_face(p, reference));
+  const auto pose = pose_body(p, mode);
+  const auto support = checked(
+      PlaneReference::create_semantic_face(PartFeatureInputRole::HoleSupportPlane, reference));
+  const Point2 local = offset ? Point2{1, 1} : Point2{};
+  REQUIRE(p.add_hole_feature(checked(
+      HoleFeature::create(FeatureId("hole"), "Posed Hole", HoleKind::Plain, BodyId("body.base"),
+                          support, {{HolePlacementId("center"), local}}, ParameterId("radius")))));
+  const auto cache = evaluate(p);
+  const double scale = mode == 2 ? 2. : 1.;
+  const double depth = scale * (face == SemanticFace::Top || face == SemanticFace::Bottom   ? 8.
+                                : face == SemanticFace::Left || face == SemanticFace::Right ? 20.
+                                                                                            : 10.);
+  CHECK(volume(cache) ==
+        Catch::Approx(1600 * scale * scale * scale - std::numbers::pi * .25 * depth).margin(1e-6));
+  const auto center = pose.transform_point(raw.origin);
+  const auto x = normalized(pose.transform_vector(raw.x_axis));
+  const auto y = normalized(pose.transform_vector(raw.y_axis));
+  const auto normal = normalized(pose.transform_vector(raw.normal));
+  const Point3 probe{center.x + x.x * local.x + y.x * local.y - normal.x * depth / 2,
+                     center.y + x.y * local.x + y.y * local.y - normal.y * depth / 2,
+                     center.z + x.z * local.x + y.z * local.y - normal.z * depth / 2};
+  CHECK_FALSE(material_at(cache, probe));
+  CHECK(material_at(cache, {probe.x + x.x, probe.y + x.y, probe.z + x.z}));
+  REQUIRE(cache.validate_complete_geometry_result(p));
+}
+
+TEST_CASE("Repeated semantic-face Holes retain their frame on the current trimmed face",
+          "[geometry][parity-b153][hole-current-support]") {
+  auto p = history::native_base();
+  const auto support = fixture::hole().support();
+  for (const auto& [id, x] : {std::pair{"left", -3.}, {"right", 3.}})
+    REQUIRE(p.add_hole_feature(checked(
+        HoleFeature::create(FeatureId(id), id, HoleKind::Plain, BodyId("body.base"), support,
+                            {{HolePlacementId("center"), Point2{x, 0}}}, ParameterId("radius")))));
+  const auto cache = evaluate(p);
+  CHECK(volume(cache) == Catch::Approx(1600 - 2 * std::numbers::pi * .25 * 8).margin(1e-6));
+  CHECK_FALSE(material_at(cache, {-3, 0, 4}));
+  CHECK_FALSE(material_at(cache, {3, 0, 4}));
+  const auto choices =
+      checked(ResultFaceSupportGeometry::selectable_faces(p, cache, BodyId("body.base")));
+  for (const auto& choice : choices)
+    for (const auto& origin : choice.reference.origins())
+      CHECK_FALSE(origin.role.starts_with("hole-support/"));
+}
+
+TEST_CASE("Captured result-face Hole supports follow later Body placement",
+          "[geometry][parity-b153][hole-current-support]") {
+  auto p = history::native_base();
+  const auto original = evaluate(p);
+  const auto targets =
+      checked(ResultFaceSupportGeometry::selectable_faces(p, original, BodyId("body.base")));
+  const auto top = std::find_if(targets.begin(), targets.end(), [](const auto& target) {
+    return std::any_of(target.reference.origins().begin(), target.reference.origins().end(),
+                       [](const auto& origin) { return origin.role == "extrude/upper-cap"; });
+  });
+  REQUIRE(top != targets.end());
+  REQUIRE(p.add_result_face_workplane(
+      checked(ResultFaceWorkplane::create(DatumPlaneId("captured"), "Captured", top->reference))));
+  const auto pose = pose_body(p, 1);
+  const auto support = checked(PlaneReference::create_datum_plane(
+      PartFeatureInputRole::HoleSupportPlane, DatumPlaneId("captured")));
+  const auto added = p.add_hole_feature(checked(HoleFeature::create(
+      FeatureId("hole"), "Captured Hole", HoleKind::Plain, BodyId("body.base"), support,
+      {{HolePlacementId("center"), Point2{}}}, ParameterId("radius"))));
+  INFO((added ? "ok" : added.error().message()));
+  REQUIRE(added);
+  const auto cache = evaluate(p);
+  CHECK(volume(cache) == Catch::Approx(1600 - std::numbers::pi * .25 * 8).margin(1e-6));
+  CHECK_FALSE(material_at(cache, pose.transform_point({0, 0, 4})));
+  const auto reopened =
+      checked(deserialize_part_document_from_json(checked(serialize_part_document_to_json(p))));
+  CHECK(volume(evaluate(reopened)) == Catch::Approx(volume(cache)).margin(1e-6));
+}
+
+TEST_CASE("ToFace retains an oblique planar bottom and its complete elliptical section",
+          "[geometry][parity-b153][hole-current-support]") {
+  const bool valid = GENERATE(false, true);
+  auto p = history::native_base();
+  dimension(p, "limit.depth", 4);
+  REQUIRE(p.add_feature(checked(
+      checked(Feature::create_additive_extrude(FeatureId("limit"), "Limit", SketchId("profile"),
+                                               ParameterId("limit.depth")))
+          .with_body_result_context(history::new_body(p, "limit")))));
+  REQUIRE(p.add_body_transform(checked(BodyTransform::create_rotate(
+      BodyTransformId("limit.pose"), BodyId("body.limit"), BodyTransformCoordinateSpace::World,
+      std::nullopt, checked(BodyTransformRotationAxis::create_explicit({}, {1, 0, 0})), 30, false,
+      false))));
+  const auto face = checked(FaceReference::create_planar(
+      PartFeatureInputRole::HoleLimitFace,
+      checked(SemanticFaceReference::create(FeatureId("limit"), SemanticFace::Top))));
+  const auto original = p;
+  auto cache = evaluate(p);
+  REQUIRE(p.add_hole_feature(checked(HoleFeature::create(
+      FeatureId("hole"), "Oblique Hole", HoleKind::Plain, BodyId("body.base"),
+      fixture::hole().support(), {{HolePlacementId("center"), Point2{0, valid ? 0. : 2.3}}},
+      ParameterId("radius"), HoleToFaceExtent{face}))));
+  const auto evaluated = GeometryRecomputeExecutor{}.execute_document(p, cache);
+  if (!valid) {
+    REQUIRE_FALSE(evaluated);
+    CHECK(evaluated.error().message().find("selected trimmed limit face") != std::string::npos);
+    REQUIRE(cache.validate_complete_geometry_result(original));
+    CHECK(volume(cache) == Catch::Approx(1600));
+    return;
+  }
+  REQUIRE(evaluated);
+  const double depth = 8 - 4 / std::cos(std::numbers::pi / 6);
+  CHECK(volume(cache) == Catch::Approx(1600 - std::numbers::pi * .25 * depth).margin(1e-6));
+  CHECK(material_at(cache, {0, .4, 4.75}));
+  CHECK_FALSE(material_at(cache, {0, -.4, 4.5}));
+  CHECK_FALSE(material_at(cache, {0, 0, 6}));
+  CHECK(RectangleExtrusionAdapter{}
+            .summarize(*cache.find_body_shape(BodyId("body.limit")))
+            .volume_mm3 == Catch::Approx(800));
+}
+
+TEST_CASE("Trimmed and split semantic Hole supports reject atomically",
+          "[geometry][parity-b153][hole-current-support]") {
+  const bool split = GENERATE(false, true);
+  auto p = history::native_base();
+  dimension(p, "opening.diameter", split ? 12 : 2);
+  const auto construction = construction_support(p);
+  REQUIRE(p.add_hole_feature(checked(HoleFeature::create(
+      FeatureId("opening"), "Opening", HoleKind::Plain, BodyId("body.base"), construction,
+      {{HolePlacementId("center"), Point2{}}}, ParameterId("opening.diameter")))));
+  const auto original = p;
+  auto cache = evaluate(p);
+  REQUIRE(p.add_hole_feature(fixture::hole()));
+  const auto evaluated = GeometryRecomputeExecutor{}.execute_document(p, cache);
+  REQUIRE_FALSE(evaluated);
+  CHECK(evaluated.error().message().find(split ? "multiple descendants" : "Hole opening") !=
+        std::string::npos);
+  REQUIRE(cache.validate_complete_geometry_result(original));
+  CHECK(cache.find_feature_shape(FeatureId("hole")) == nullptr);
 }
 
 TEST_CASE("Material axis intervals exclude tangencies and reject nonfinite inputs",

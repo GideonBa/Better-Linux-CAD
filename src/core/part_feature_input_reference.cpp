@@ -663,12 +663,17 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
         using T = std::decay_t<decltype(source)>;
         if constexpr (std::is_same_v<T, ImportedTopologyReference>)
           return validate_imported_topology_reference(document, source);
-        else if constexpr (std::is_same_v<T, DatumPlaneId>)
+        else if constexpr (std::is_same_v<T, DatumPlaneId>) {
+          if (const auto* captured = document.find_result_face_workplane(source))
+            return validate_result_face_workplane_reference(document, *captured);
+          if (const auto* derived = document.find_derived_workplane(source))
+            return validate_feature_source(document, derived->face_reference().source_feature(),
+                                           "derived plane");
           return document.find_datum_plane(source) != nullptr
                      ? Result<std::size_t>::success(1U)
                      : Result<std::size_t>::failure(
                            validation_error(source.value(), "datum plane source must exist"));
-        else if constexpr (std::is_same_v<T, ConstructionPlaneId>)
+        } else if constexpr (std::is_same_v<T, ConstructionPlaneId>)
           return document.find_construction_plane(source) != nullptr
                      ? Result<std::size_t>::success(1U)
                      : Result<std::size_t>::failure(validation_error(

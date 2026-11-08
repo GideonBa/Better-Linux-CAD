@@ -349,6 +349,16 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
   undersized limit fails with prior complete cache retained; ToFace rejects trimmed-away openings
   and nonnormal faces. Axis-only tangencies and nonfinite inputs fail closed. The shared browser
   restoration case now runs both ThroughAll and ToNext through preview, Apply, Undo/Redo/reopen.
+- 153B2 `[hole-current-support]` checks all six native faces under translation/rotation/scale with
+  centered and offset coordinates, repeated Holes on actual trims, unchanged public face origins,
+  captured workplanes after later placement and V4 replay. Shared Core plane validation has a
+  separate derived/captured identity and missing-source regression. An oblique limit uses an
+  analytic volume and opposite section-point oracles; a partially covered ellipse and split/lost
+  openings preserve the previous complete cache. `[hole-import-combined]` crosses active/suppressed,
+  placed/unplaced, ThroughAll/ToFace and one/two Hole features on real STEP geometry, retaining
+  source identity, exact volume, stale-supplier rollback/recovery and Reference-mode rejection.
+  Native browser restoration adds a preceding rotation for ThroughAll and ToNext; the existing
+  shared task/one-transaction/save/Undo/Redo contract remains its UI authority.
 - 152C `[hole-combined-acceptance]` combines projected Construction→Sketch→Hole identity and
   ReferenceRepair transport, Project V1 custom/V4 and V2 mixed legacy/custom/standard members,
   suppressed Hole→Fillet→rigid-pose equivalence to an independently constructed legacy chain,
