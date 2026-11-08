@@ -4684,3 +4684,7 @@ pre-correction GUI run. Source/new-file/modified-line/staged review and whitespa
 final formatting diffs `blcad151b-final-format.diff` / `blcad151b-staged-format.diff` are empty.
 All 1,014 runtime fingerprints remain unchanged through the verification and documentation updates.
 B alone is verified. Whole 151, Physical Properties controls and Phase A retain their C/D gates.
+
+Delivery: [PR #160](https://github.com/GideonBa/Better-Linux-CAD/pull/160), implementation `f6ec440`.
+The delivery-record update changes documentation only; all 1,014 runtime fingerprints remain
+unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main before C.
