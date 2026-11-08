@@ -5201,3 +5201,9 @@ Modified-line/new-file formatting and whitespace checks pass, and all **1,023** 
 remain unchanged. No approval, native check or required branch rule is blocked. Review the complete
 working/staged content and push the coherent implementation plus docs/images through the protected
 PR workflow; do not advance all of 153 for this bounded A delivery.
+
+153A delivery uses [PR #166](https://github.com/GideonBa/Better-Linux-CAD/pull/166), implementation
+`8b0187533478a454dede35d26529cd6e12487118` (initial reviewed tree
+`4d59c4d9a4be0ab06733c334b97f7f8c5b4fd7cb`). The delivery-record commit changes docs only and
+preserves all 1,023 verified runtime fingerprints. Confirm the final exact head/review/check state,
+merge normally and compare the updated-main tree before opening the next serial branch.

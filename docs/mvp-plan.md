@@ -2651,6 +2651,12 @@ tool containment, failed later placement and real browser Apply/Undo/Redo/reopen
 The wider Core/GUI suites remain retained baselines, not rerun claims. Capability/Wizard ownership
 stays 157. Final inventory, staged review, protected merge and exact main-tree verification precede B.
 
+153A delivery uses [PR #166](https://github.com/GideonBa/Better-Linux-CAD/pull/166), implementation
+`8b0187533478a454dede35d26529cd6e12487118`, initial reviewed tree
+`4d59c4d9a4be0ab06733c334b97f7f8c5b4fd7cb`. Final inventory passes **5 / 658** and all 1,023 runtime
+fingerprints remain unchanged. The delivery record changes documentation only. Confirm the exact
+final head/review/check state, merge normally and compare refreshed-main's tree before starting B.
+
 ## Later phases
 
 Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R
