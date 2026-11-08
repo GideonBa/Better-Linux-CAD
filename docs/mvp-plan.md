@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 152
 current_block: 153
-current_boundary: Block 153A verified; protected delivery pending before 153B
+current_boundary: Block 153B1 bounded Hole extents verified; protected delivery pending before B2
 current_tag: "[parity-b153]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -34,7 +34,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 152
-current block        Block 153 (in progress; slice A)
+current block        Block 153 (in progress; slice B1)
 current phase        Semantic holes and threads
 current boundary     Plain, blind and bounded Hole execution
 ```
@@ -2631,8 +2631,8 @@ standards, placement-pattern or geometry-result authority is introduced.
 
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
-| 153A | Straight one-direction ThroughAll and Blind flat/conical tools, multiple independent placements and atomic Body cuts on fixed datum/construction or current unposed rectangular primitive supports; analytic tests and real shared-history restoration | Implemented and verified; protected delivery pending |
-| 153B | Posed/imported/trimmed result support and finite-face placement, ToNext/ToFace/UpToBody/Symmetric extents, local entry/exit/remaining-bottom semantics and ambiguous/ineffective inputs | Planned; not started |
+| 153A | Straight one-direction ThroughAll and Blind flat/conical tools, multiple independent placements and atomic Body cuts on fixed datum/construction or current unposed rectangular primitive supports; analytic tests and real shared-history restoration | Accepted; PR #166 merged as `a9819c6` |
+| 153B | Posed/imported/trimmed result support and finite-face placement, ToNext/ToFace/UpToBody/Symmetric extents, local entry/exit/remaining-bottom semantics and ambiguous/ineffective inputs | In progress; B1 verified/delivery pending, B2 support/trim integration not started |
 | 153C | Generated bore/seat downstream reference integration and combined native/imported, multi-Body, modifier, history/prefix, material/mass, portable exchange and UI regression acceptance | Planned; not started |
 
 A cuts forward from the support only; ThroughAll must not silently become bidirectional. Blind depth
@@ -2656,6 +2656,21 @@ stays 157. Final inventory, staged review, protected merge and exact main-tree v
 `4d59c4d9a4be0ab06733c334b97f7f8c5b4fd7cb`. Final inventory passes **5 / 658** and all 1,023 runtime
 fingerprints remain unchanged. The delivery record changes documentation only. Confirm the exact
 final head/review/check state, merge normally and compare refreshed-main's tree before starting B.
+
+153B starts after PR #166 is confirmed merged as `a9819c6`; refreshed main matches the final
+reviewed tree `8369a7eab7980f1d6144443c83d6c6ecfeb7f1f3`. Its serial sub-deliveries retain the
+same existing B owner: **B1** supplies shared actual-material axis queries and bounded extents on
+the existing supports; **B2** extends current posed/imported/result supports, actual finite trims
+and their limit integration. Whole B and 153 remain open until both and C are accepted.
+
+153B1 verification: focused Hole Geometry **16 / 251**, full Geometry **619 / 53,548**; focused
+Qt history/inventory **7 / 774**, native ordinary **2 / 125**, compact 150% **2 / 131**, no
+failures/skips. Geometry covers curved first exits/Body limits, explicit nonparticipating limits,
+offset-support Blind depth, edited finite symmetric extent, actual trimmed ToFace and ambiguity/
+tangent/atomic-cache negatives. Native restoration covers ThroughAll and ToNext as one reversible
+Apply plus portable reopen. Core/wider GUI and A's broad native evidence remain retained baselines.
+Final startup/inventory, exact runtime freeze, staged review and protected delivery precede B2;
+implemented-through remains 152 and the Wizard remains 157.
 
 ## Later phases
 

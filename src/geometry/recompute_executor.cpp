@@ -4239,10 +4239,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
   if (!imports)
     return imports;
   const bool through = std::holds_alternative<HoleThroughAllExtent>(feature->extent());
+  const bool to_next = std::holds_alternative<HoleToNextExtent>(feature->extent());
   const auto* blind = std::get_if<HoleBlindExtent>(&feature->extent());
-  if (!through && !blind)
-    return Result<std::size_t>::failure(
-        geometry_error(feature_id.value(), "This bounded Hole extent is not available yet."));
   ShapeCache working = shape_cache;
   auto target = resolve_in_place_body_target(document, feature_id, feature->target_body(), working);
   if (!target)
@@ -4271,22 +4269,94 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
         geometry_error(feature_id.value(), "Hole drill-tip height must be finite"));
   GeometryShape result = *target.value();
   for (const auto& center : centers.value()) {
-    double depth = 0;
-    if (through) {
+    double start = 0, depth = 0, entry = 0;
+    const auto forward_material = [&](const GeometryShape& body) -> Result<AxisProjectionSpan> {
+      auto spans = closed_profile_adapter_.axis_material_spans(body, center, direction);
+      if (!spans)
+        return Result<AxisProjectionSpan>::failure(spans.error());
+      for (const auto& span : spans.value())
+        if (span.maximum > 1e-7)
+          return Result<AxisProjectionSpan>::success(span);
+      return Result<AxisProjectionSpan>::failure(
+          geometry_error(feature_id.value(), "Hole axis has no forward material intersection"));
+    };
+    const GeometryShape* limit_body = nullptr;
+    if (const auto* limit = std::get_if<HoleUpToBodyExtent>(&feature->extent())) {
+      limit_body = working.find_body_shape(limit->body);
+      if (!limit_body)
+        return Result<std::size_t>::failure(
+            geometry_error(limit->body.value(), "Hole limit Body is unavailable"));
+      auto material = forward_material(*limit_body);
+      if (!material)
+        return Result<std::size_t>::failure(material.error());
+      if (material.value().minimum <= 1e-7)
+        return Result<std::size_t>::failure(
+            geometry_error(limit->body.value(), "Hole limit Body must start ahead of its support"));
+    }
+    if (through || to_next || limit_body) {
       auto span = closed_profile_adapter_.projection_span(*target.value(), center, direction);
       if (!span)
         return Result<std::size_t>::failure(span.error());
       depth = span.value().maximum + 1.;
-    } else {
+      if (to_next) {
+        auto material = forward_material(*target.value());
+        if (!material)
+          return Result<std::size_t>::failure(material.error());
+      }
+      if (limit_body) {
+        auto limit_span = closed_profile_adapter_.projection_span(*limit_body, center, direction);
+        if (!limit_span)
+          return Result<std::size_t>::failure(limit_span.error());
+        depth = std::max(depth, limit_span.value().maximum + 1.);
+      }
+    } else if (blind) {
       depth = document.find_parameter(blind->depth)->value().millimeters();
-      auto exit =
-          closed_profile_adapter_.first_intersection_distance(*target.value(), center, direction);
-      if (!exit)
-        return Result<std::size_t>::failure(exit.error());
-      if (depth + cone_height >= exit.value() - 1e-7)
+      auto material = forward_material(*target.value());
+      if (!material)
+        return Result<std::size_t>::failure(material.error());
+      entry = std::max(0., material.value().minimum);
+      if (depth <= entry + 1e-7)
+        return Result<std::size_t>::failure(
+            geometry_error(feature_id.value(), "Blind Hole depth does not reach target material"));
+      if (depth + cone_height >= material.value().maximum - 1e-7)
         return Result<std::size_t>::failure(geometry_error(
             feature_id.value(),
             "Blind Hole breaks through the target; reduce depth or choose Through All."));
+    } else if (const auto* symmetric = std::get_if<HoleSymmetricExtent>(&feature->extent())) {
+      depth = document.find_parameter(symmetric->total_depth)->value().millimeters() / 2;
+      start = -depth;
+    } else if (const auto* limit = std::get_if<HoleToFaceExtent>(&feature->extent())) {
+      const auto* reference = std::get_if<SemanticFaceReference>(&limit->face.source());
+      const auto* primitive =
+          reference ? document.find_feature(reference->source_feature()) : nullptr;
+      if (!primitive || !primitive->extrude_intent().is_historical_additive_default() ||
+          primitive->direction() != ExtrudeDirection::SketchNormal ||
+          working.find_reference_transform(primitive->id().value()) ||
+          working.find_reference_transform(primitive->input_sketch().value()))
+        return Result<std::size_t>::failure(geometry_error(
+            feature_id.value(),
+            "This Hole limit requires posed or imported face support not available yet."));
+      auto plane = resolve_limit_face_workplane(document, limit->face, workplane_resolver_,
+                                                import_context_, working, feature_id);
+      if (!plane)
+        return Result<std::size_t>::failure(plane.error());
+      if (std::abs(dot(plane.value().normal, direction)) < 1. - 1e-7)
+        return Result<std::size_t>::failure(geometry_error(
+            feature_id.value(), "Hole limit face must be normal to the drilling axis"));
+      depth = point_projection(center, plane.value().origin, direction);
+      const GeometryShape* face_body = working.find_feature_shape(primitive->id());
+      if (primitive->body_result_context())
+        face_body =
+            working.find_body_shape(primitive->body_result_context()->effective_produced_body());
+      if (!face_body)
+        return Result<std::size_t>::failure(
+            geometry_error(feature_id.value(), "Hole limit face Body is unavailable"));
+      const Point3 endpoint{center.x + direction.x * depth, center.y + direction.y * depth,
+                            center.z + direction.z * depth};
+      auto footprint = closed_profile_adapter_.validate_planar_circle_footprint(
+          *face_body, endpoint, direction, radius);
+      if (!footprint)
+        return Result<std::size_t>::failure(footprint.error());
     }
     if (!std::isfinite(depth) || depth <= k_tolerance)
       return Result<std::size_t>::failure(
@@ -4296,17 +4366,39 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
                     center.y + direction.y * distance + support.value().x_axis.y * radial,
                     center.z + direction.z * distance + support.value().x_axis.z * radial};
     };
-    auto tool = revolve_adapter_.revolve_profile(
-        feature_id, {center, along(0, radius), along(depth, radius), along(depth + cone_height, 0)},
-        center, direction, 0, 360);
+    auto tool =
+        revolve_adapter_.revolve_profile(feature_id,
+                                         {along(start, 0), along(start, radius),
+                                          along(depth, radius), along(depth + cone_height, 0)},
+                                         center, direction, 0, 360);
     if (!tool)
       return Result<std::size_t>::failure(tool.error());
+    if (to_next || limit_body) {
+      auto clipped = body_boolean_adapter_.combine(
+          feature_id, to_next ? BodyBooleanOperation::Intersect : BodyBooleanOperation::Subtract,
+          tool.value(), {to_next ? *target.value() : *limit_body});
+      if (!clipped)
+        return Result<std::size_t>::failure(clipped.error());
+      tool = closed_profile_adapter_.first_forward_material_component(clipped.value(), center,
+                                                                      direction);
+      if (!tool)
+        return Result<std::size_t>::failure(tool.error());
+    }
     if (blind) {
+      auto material_tool = entry > 1e-7 ? revolve_adapter_.revolve_profile(
+                                              feature_id,
+                                              {along(entry, 0), along(entry, radius),
+                                               along(depth, radius), along(depth + cone_height, 0)},
+                                              center, direction, 0, 360)
+                                        : Result<GeometryShape>::success(tool.value());
+      if (!material_tool)
+        return Result<std::size_t>::failure(material_tool.error());
       auto contained = body_boolean_adapter_.combine(feature_id, BodyBooleanOperation::Intersect,
-                                                     tool.value(), {*target.value()});
+                                                     material_tool.value(), {*target.value()});
       if (!contained)
         return Result<std::size_t>::failure(contained.error());
-      const double tool_volume = rectangle_extrusion_adapter_.summarize(tool.value()).volume_mm3;
+      const double tool_volume =
+          rectangle_extrusion_adapter_.summarize(material_tool.value()).volume_mm3;
       const double contained_volume =
           rectangle_extrusion_adapter_.summarize(contained.value()).volume_mm3;
       if (std::abs(tool_volume - contained_volume) > 1e-8 * std::max(1., tool_volume))

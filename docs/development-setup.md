@@ -5207,3 +5207,67 @@ PR workflow; do not advance all of 153 for this bounded A delivery.
 `4d59c4d9a4be0ab06733c334b97f7f8c5b4fd7cb`). The delivery-record commit changes docs only and
 preserves all 1,023 verified runtime fingerprints. Confirm the final exact head/review/check state,
 merge normally and compare the updated-main tree before opening the next serial branch.
+
+## Block 153B1 — bounded semantic Hole extents, 2026-11-08
+
+Starts on `feat/semantic-hole-bounded-extents` after PR #166 is confirmed merged as `a9819c6`;
+refreshed main matches final reviewed tree `8369a7eab7980f1d6144443c83d6c6ecfeb7f1f3`.
+B1/B2 are serial subdivisions of the existing 153B owner, not a second feature plan: B1 supplies
+actual-material/limit queries and extents on A's supports; B2 supplies posed/imported/result/trim
+support integration. Whole B/153 and Phase B stay open through their remaining gates.
+
+Keep exact cylindrical tools and existing safe-input Boolean operations. Shared ClosedProfileAdapter
+queries classify actual solid intervals, select separated first forward tool components, and compare
+complete circular footprint area on one actual trimmed planar face. ToNext clips against target
+material; UpToBody clips against the explicit limit, then modifies only the target. A tool connected
+around a void/undersized limit into a later axis interval is ambiguous, rather than permission to
+cut the far wall. This handles curved exits/limits without replacing them with an axial flat cap.
+ToFace reuses Extrude's perpendicular planar-limit convention on unposed native faces in B1;
+B2 owns broader support integration. Finite symmetric total depth is split about the support.
+Blind keeps support-based depth with separately resolved material entry and complete remaining
+cylinder/tip containment. The current Autodesk Hole reference is linked in `hole-wizard.md`.
+
+New `[hole-bounded-cutting]` tests use analytic volumes, edited total depth, offset-workplane depth,
+independent points on curved cavity/limit sections, limit-Body volume/producer preservation and V4
+reopen. Negative cases cover wrapped tools, trimmed-away/nonnormal limit faces, axis tangencies
+and nonfinite inputs with certified old cache retention. The existing boundary test now uses outward
+ToNext; the native-capable shared history restoration test runs ThroughAll and ToNext. Initial
+Geometry build is `blcad153b1-geometry-build.log`; results/review/final freeze follow below.
+
+Initial Geometry build passes; only the existing unused rectangular helper and Reference Part
+export-test return-path warnings remain. Focused Hole/extent/boundary tests pass **16 / 251**,
+without failures/skips (`blcad153b1-geometry-focused.log`). Qt/application build runs as
+`blcad153b1-gui-build.log`; the already completed, unchanged Geometry binary can run its full suite
+in parallel with that separate build target. No source/test/CMake editing occurs during either.
+Runtime freeze: **1,023** files, SHA-256
+`09ba1978592c2cbe05e13f1e368eb46b4d9e8e1db474169c1840dbb98c384e63`
+(`/tmp/blcad153b1-runtime-freeze.json`). Broader Core/GUI/native baseline evidence is retained from
+153A/152; new B1 geometry and actual Hole history restoration are verified explicitly below.
+
+Full Geometry passes **619 / 53,548**, without failures/skips
+(`blcad153b1-geometry-full.log`). New bounded-hole Geometry adds nine cases beyond 153A and keeps
+all earlier suites green. After the separate Qt build, run focused `[hole-history-shell]` and
+`[shell-coverage]`, then the changed Hole history cases natively at ordinary/compact 150% and a
+native startup smoke check. A's wider native history/Sketch/finishing/material coverage remains
+retained, rather than rerun because B1 adds no GUI production/layout implementation.
+
+Qt/application build passes (`blcad153b1-gui-build.log`), with the existing pattern signedness and
+Sketch annotation aggregate warnings. Focused Qt history/capability tests pass **7 / 774**, without
+failures/skips (`blcad153b1-gui-focused.log`). Run the changed Hole history cases serially under
+xcb at scale 1 and compact scale 1.5, with shell acceptance required and unmodified captures in
+`/tmp/blcad153b1-native100` and `/tmp/blcad153b1-native150`. These exercise both ThroughAll and
+ToNext restoration plus outward-ToNext rejection; retain A's broader native suite explicitly.
+
+Native ordinary passes **2 / 125**, compact 150% **2 / 131**, without failures/skips
+(`blcad153b1-native100.log`, `blcad153b1-native150.log`). Startup reaches the window and ends at
+intentional timeout **124** (`blcad153b1-startup.log`). Inspect both ToNext captures: the straight
+box's ToNext and ThroughAll are physically equivalent, and the new unmodified images exactly match
+A's existing ordinary/compact image hashes (`449bdcb6…1966731`, `7b50188a…85bb855`); no duplicate
+image files are added. Native OpenGL visual notices remain the existing nonfailing environment
+notices. Project the verified B1 status without advancing whole B/153, then run the final inventory.
+
+Final inventory passes **5 / 658**, without failures/skips (`blcad153b1-final-inventory.log`).
+Working diff, modified-line formatting and whitespace checks pass; all **1,023** runtime fingerprints
+remain unchanged with final digest `09ba1978592c2cbe05e13f1e368eb46b4d9e8e1db474169c1840dbb98c384e63`.
+No required check or approval is blocked. Staged review and normal protected PR delivery follow.
+Whole B/153/Phase B remain open; B2 and C retain their existing scope.
