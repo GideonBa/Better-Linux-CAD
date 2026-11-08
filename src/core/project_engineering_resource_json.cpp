@@ -18,7 +18,7 @@ Result<nlohmann::json> resource_part_to_project_json(const PartDocument& part,
     if (!serialized)
       return Result<nlohmann::json>::failure(serialized.error());
     auto value = nlohmann::json::parse(serialized.value());
-    if (!part.engineering_resources().entries().empty()) {
+    if (!part.engineering_resources().entries().empty() || !part.hole_features().empty()) {
       auto refs = nlohmann::json::array();
       for (const auto& entry : part.engineering_resources().entries()) {
         const auto& key = engineering_resource_key(entry);
@@ -38,12 +38,13 @@ Result<nlohmann::json> resource_part_to_project_json(const PartDocument& part,
 Result<PartDocument> resource_part_from_project_json(const nlohmann::json& value,
                                                      const EngineeringResourceCatalog& catalog) {
   try {
-    if (!value.at("version").is_number_integer() || value.at("version") != 3)
+    if (!value.at("version").is_number_integer() ||
+        (value.at("version") != 3 && value.at("version") != 4))
       return deserialize_part_document_from_json(value.dump());
     if (value.contains("engineering_resources") || !value.contains("engineering_resource_refs") ||
         !value.at("engineering_resource_refs").is_array())
       return Result<PartDocument>::failure(
-          error("Project Part version 3 requires resource references only"));
+          error("Project resource-aware Part requires resource references only"));
     EngineeringResourceCatalog local;
     std::vector<EngineeringResourceKey> seen;
     for (const auto& ref : value.at("engineering_resource_refs")) {

@@ -320,6 +320,20 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
   revision diameters and cell provenance, reject unavailable/incorrect data without fallback and
   compare exact document bytes/executable lifetime before/after pure validation. These proofs do
   not claim persisted feature registration, geometry or Wizard authoring before their assigned gates.
+- 152B `[part-hole]` / `[hole-json]` / `[hole-history]` / `[hole-resources]` cover Part modifier
+  add/update/remove and preserved upstream/downstream order, suppression/prefix plans, pure-failure
+  document/graph/lifetime snapshots, V4 history modes and all six extent/tip variants, strict malformed
+  JSON, stable Sketch-point edits/loss/recovery, selected Project revision adoption and offline
+  snapshots. A missing later table row rolls back all earlier consumer remaps. Derived resource IDs
+  resist delimiter collisions and never erase unrelated authored parameter nodes. Existing V1–V3
+  writer behavior remains covered by full Core.
+- `[hole-execution-boundary]` checks the explicit pre-153 active-Hole refusal through full and
+  incremental entry points without changing a prior complete cache. Prefix-before-Hole stays
+  partial, failed full-prefix execution retains that prefix, and suppressed Hole history yields
+  the unchanged **1,600 mm³** base. `[hole-history-shell]` uses the existing browser context/task,
+  preserves suppressed V4 intent, blocks unavailable restoration without history mutation, restores
+  complete results after prefix Cancel and verifies Save/Open. Repeat natively at ordinary/compact
+  scaling; these temporary execution-boundary expectations are replaced by physical oracles in 153.
 - Drill blind/through/ToNext/ToFace/up-to-Body holes into extruded, revolved, swept and imported
   supports with nonidentity workplanes. Change support thickness and each extent parameter.
 - Oracle: cylinder/cone volumes, axial section intersections and expected entry/bottom coordinates.

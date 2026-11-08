@@ -9,6 +9,10 @@
 #include <utility>
 
 namespace blcad {
+std::string engineering_resource_node_id(const EngineeringResourceKey& key) {
+  return "resource:" + std::to_string(key.id().value().size()) + ":" + key.id().value() + ":" +
+         key.revision();
+}
 namespace {
 bool label_valid(std::string_view value) {
   return !value.empty() && std::none_of(value.begin(), value.end(), [](unsigned char c) {

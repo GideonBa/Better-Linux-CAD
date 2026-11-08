@@ -330,3 +330,17 @@ Output:
 - concrete normative standard values shipped in the repository (only the database structure).
 - FEM/CAM coupling.
 - gear/spline exact tooth geometry before the simpler modules are stable.
+
+
+## Semantic Hole standard-table consumers — Block 152B
+
+Hole diameters consume exact owned standard-table revisions, rows and Length cells through the
+149 catalog; custom diameters remain existing Part parameters. The executable graph distinguishes
+those sources from support/Sketch inputs and target/limit Bodies. Local revision adoption validates
+and remaps every matching Hole on a disposable document, retaining old snapshots and rejecting any
+late consumer failure atomically. Suppression retains revision references. Removal guards actual
+Hole consumers, and unused derived resource nodes are cleaned without erasing unrelated authored
+identities. Existing Project explicit-member adoption delegates to this validated Part operation;
+unselected definitions stay pinned. Material-only geometry reuse keeps its existing conservative
+standard-table signature rules. Exact persistence is owned by `file-format.md`; numbered acceptance
+remains in `mvp-plan.md`.

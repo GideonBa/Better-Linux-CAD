@@ -51,6 +51,9 @@ template <typename FeatureT>
 [[nodiscard]] inline BodyId record_result_body(const FilletFeature& f) { return f.target_body(); }
 [[nodiscard]] inline BodyId record_result_body(const ChamferFeature& f) { return f.target_body(); }
 [[nodiscard]] inline BodyId record_result_body(const ShellFeature& f) { return f.target_body(); }
+[[nodiscard]] inline BodyId record_result_body(const HoleFeature& f) {
+  return f.target_body();
+}
 [[nodiscard]] inline BodyId record_result_body(const DraftFeature& f) { return f.target_body(); }
 [[nodiscard]] inline BodyId record_result_body(const BodyBooleanFeature& f) {
   return f.effective_result_body();
@@ -75,8 +78,8 @@ template <typename FeatureT>
       matches(part.surface_features()) || matches(part.linear_pattern_features()) ||
       matches(part.circular_pattern_features()) || matches(part.mirror_features()) ||
       matches(part.fillet_features()) || matches(part.chamfer_features()) ||
-      matches(part.shell_features()) || matches(part.draft_features()) ||
-      matches(part.body_boolean_features()))
+      matches(part.shell_features()) || matches(part.hole_features()) ||
+      matches(part.draft_features()) || matches(part.body_boolean_features()))
     return true;
   const auto* transform = part.find_body_transform(BodyTransformId(node));
   return transform && transform->body() == body;
@@ -137,7 +140,7 @@ validate_result_face_source(const PartDocument& document, const ResultFaceWorkpl
         document.find_mirror_feature(origin.feature) ||
         document.find_fillet_feature(origin.feature) ||
         document.find_chamfer_feature(origin.feature) ||
-        document.find_shell_feature(origin.feature) ||
+        document.find_shell_feature(origin.feature) || document.find_hole_feature(origin.feature) ||
         document.find_draft_feature(origin.feature) ||
         document.find_body_boolean_feature(origin.feature);
     if (!exists && !may_retain(origin.feature.value()))
@@ -1552,6 +1555,11 @@ Result<std::size_t> PartDocument::add_sketch_impl(Sketch sketch, const Sketch* r
 }
 
 Result<std::size_t> PartDocument::validate_reference_sources() const {
+  for (const auto& hole : hole_features_) {
+    auto valid = validate_hole_feature_inputs(*this, hole);
+    if (!valid)
+      return valid;
+  }
   for (const auto& plane : result_face_workplanes_) {
     auto valid = validate_result_face_source(*this, plane);
     if (!valid)
@@ -2895,6 +2903,83 @@ Result<std::size_t> PartDocument::add_shell_dependencies(const ShellFeature& fea
   return Result<std::size_t>::success(1U);
 }
 
+Result<std::size_t> PartDocument::add_hole_dependencies(const HoleFeature& feature) {
+  auto graph = dependency_graph_;
+  auto added = add_authored_graph_node(graph, feature.id().value());
+  if (!added)
+    return added;
+  std::vector<std::string> inputs{feature.support().source_node_id()};
+  for (const auto& parameter : feature.parameter_dependencies())
+    inputs.push_back(parameter.value());
+  for (const auto& placement : feature.placements())
+    if (const auto* point = std::get_if<HoleSketchPointReference>(&placement.source))
+      inputs.push_back(point->sketch.value());
+  if (const auto* standard = std::get_if<HoleStandardSelection>(&feature.diameter())) {
+    const auto node = engineering_resource_node_id(standard->table);
+    if (has_authored_node_identity(node) || is_imported_authority_node(node))
+      return Result<std::size_t>::failure(
+          Error::dependency(node, "Standard revision identity aliases model intent"));
+    if (!graph.has_node(node)) {
+      auto resource = graph.add_node(node);
+      if (!resource)
+        return resource;
+    }
+    inputs.push_back(node);
+  }
+  if (const auto* face = std::get_if<HoleToFaceExtent>(&feature.extent()))
+    inputs.push_back(face->face.source_node_id());
+  if (const auto* limit = std::get_if<HoleUpToBodyExtent>(&feature.extent()))
+    inputs.push_back(body_dependency_node_id(limit->body));
+  for (const auto& input : inputs) {
+    auto dependency = add_dependency_if_missing(graph, input, feature.id().value());
+    if (!dependency)
+      return dependency;
+  }
+  const auto body_node = body_dependency_node_id(feature.target_body());
+  const auto previous = dependency_sources_of(graph, body_node);
+  if (previous.empty())
+    return Result<std::size_t>::failure(
+        Error::dependency(feature.id().value(), "Hole target requires an upstream Body producer"));
+  graph.remove_dependencies_of_dependent(body_node);
+  for (const auto& producer : previous) {
+    auto dependency = add_dependency_if_missing(graph, producer, feature.id().value());
+    if (!dependency)
+      return dependency;
+  }
+  auto output = add_dependency_if_missing(graph, feature.id().value(), body_node);
+  if (!output)
+    return output;
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(
+        Error::dependency(feature.id().value(), "Hole inputs create a dependency cycle"));
+  auto invalidation = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation, dependency_graph_, feature.id().value());
+  if (!synced)
+    return synced;
+  invalidation_state_ = std::move(invalidation);
+  return Result<std::size_t>::success(1);
+}
+
+Result<std::size_t> PartDocument::add_hole_feature(HoleFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "Feature identity must be unique within Part"));
+  auto valid = validate_hole_feature_inputs(*this, feature);
+  if (!valid)
+    return valid;
+  auto candidate = *this;
+  auto dependencies = candidate.add_hole_dependencies(feature);
+  if (!dependencies)
+    return dependencies;
+  candidate.hole_features_.push_back(std::move(feature));
+  candidate.append_history_executable(candidate.hole_features_.back().id().value());
+  const auto index = candidate.hole_features_.size() - 1;
+  *this = std::move(candidate);
+  return Result<std::size_t>::success(index);
+}
+
 Result<std::size_t> PartDocument::add_shell_feature(ShellFeature feature) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
@@ -3344,6 +3429,12 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
     if (feature.target_body() == id)
       return Result<std::size_t>::failure(
           Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
+  for (const auto& feature : hole_features_)
+    if (feature.target_body() == id ||
+        (std::holds_alternative<HoleUpToBodyExtent>(feature.extent()) &&
+         std::get<HoleUpToBodyExtent>(feature.extent()).body == id))
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "Body is referenced by Hole intent"));
   for (const auto& feature : shell_features_)
     if (feature.target_body() == id)
       return Result<std::size_t>::failure(
@@ -3752,6 +3843,9 @@ const std::vector<ChamferFeature>& PartDocument::chamfer_features() const noexce
 const std::vector<ShellFeature>& PartDocument::shell_features() const noexcept {
   return shell_features_;
 }
+const std::vector<HoleFeature>& PartDocument::hole_features() const noexcept {
+  return hole_features_;
+}
 const std::vector<DraftFeature>& PartDocument::draft_features() const noexcept {
   return draft_features_;
 }
@@ -3847,6 +3941,9 @@ std::size_t PartDocument::chamfer_feature_count() const noexcept {
 }
 std::size_t PartDocument::shell_feature_count() const noexcept {
   return shell_features_.size();
+}
+std::size_t PartDocument::hole_feature_count() const noexcept {
+  return hole_features_.size();
 }
 std::size_t PartDocument::draft_feature_count() const noexcept {
   return draft_features_.size();
@@ -4009,6 +4106,12 @@ const ShellFeature* PartDocument::find_shell_feature(FeatureId id) const noexcep
       return &feature;
   return nullptr;
 }
+const HoleFeature* PartDocument::find_hole_feature(FeatureId id) const noexcept {
+  for (const auto& feature : hole_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
 const DraftFeature* PartDocument::find_draft_feature(FeatureId id) const noexcept {
   for (const auto& feature : draft_features_)
     if (feature.id() == id)
@@ -4135,6 +4238,9 @@ bool PartDocument::has_chamfer_feature_id(const FeatureId& id) const noexcept {
 bool PartDocument::has_shell_feature_id(const FeatureId& id) const noexcept {
   return find_shell_feature(id) != nullptr;
 }
+bool PartDocument::has_hole_feature_id(const FeatureId& id) const noexcept {
+  return find_hole_feature(id) != nullptr;
+}
 bool PartDocument::has_draft_feature_id(const FeatureId& id) const noexcept {
   return find_draft_feature(id) != nullptr;
 }
@@ -4156,7 +4262,8 @@ bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
          has_loft_feature_id(id) || has_surface_feature_id(id) ||
          has_linear_pattern_feature_id(id) || has_circular_pattern_feature_id(id) ||
          has_mirror_feature_id(id) || has_fillet_feature_id(id) || has_chamfer_feature_id(id) ||
-         has_shell_feature_id(id) || has_draft_feature_id(id) || has_body_boolean_feature_id(id);
+         has_shell_feature_id(id) || has_hole_feature_id(id) || has_draft_feature_id(id) ||
+         has_body_boolean_feature_id(id);
 }
 
 bool PartDocument::has_authored_node_identity(std::string_view node) const {
@@ -4176,8 +4283,9 @@ bool PartDocument::has_authored_node_identity(std::string_view node) const {
       contains(loft_features_) || contains(surface_features_) ||
       contains(linear_pattern_features_) || contains(circular_pattern_features_) ||
       contains(mirror_features_) || contains(fillet_features_) || contains(chamfer_features_) ||
-      contains(shell_features_) || contains(draft_features_) || contains(body_boolean_features_) ||
-      contains(body_transforms_) || contains(reference_statuses_) || contains(reference_remaps_))
+      contains(shell_features_) || contains(hole_features_) || contains(draft_features_) ||
+      contains(body_boolean_features_) || contains(body_transforms_) ||
+      contains(reference_statuses_) || contains(reference_remaps_))
     return true;
   for (const auto& sketch : sketches_)
     for (const auto& line : sketch.reference_generated_lines())
@@ -4476,6 +4584,19 @@ Result<std::size_t> PartDocument::remove_chamfer_feature(FeatureId id) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::chamfer_features_, id);
+}
+Result<std::size_t> PartDocument::update_hole_feature(HoleFeature feature) {
+  auto updated = update_feature_record(&PartDocument::hole_features_, std::move(feature),
+                                       &PartDocument::add_hole_feature);
+  if (updated)
+    prune_unused_engineering_resource_nodes();
+  return updated;
+}
+Result<std::size_t> PartDocument::remove_hole_feature(FeatureId id) {
+  auto removed = remove_feature_record(&PartDocument::hole_features_, id);
+  if (removed)
+    prune_unused_engineering_resource_nodes();
+  return removed;
 }
 Result<std::size_t> PartDocument::update_shell_feature(ShellFeature feature) {
   if (is_reference_part())

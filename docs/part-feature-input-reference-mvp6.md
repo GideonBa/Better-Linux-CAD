@@ -109,3 +109,16 @@ construction or centerline role. The source node is the Sketch, whose own plane/
 dependencies feed downstream recompute. Body Rotate stores the same reference through its separate
 `BodyTransformRotationAxisKind::SketchLine` variant. Missing, unsupported or ambiguous sources fail
 with the exact source identity and an instruction to repair it, never with positional retargeting.
+
+
+## Semantic Hole inputs — Block 152B
+
+Hole support uses the existing PlaneReference variants with `hole_support_plane`; explicit face
+limits use existing FaceReference variants with `hole_limit_face`. Capabilities remain Plane and
+Face respectively, including imported topology with the same canonical catalog identity. Stable
+Hole placements either own signed finite support-frame coordinates or reference an existing
+Sketch/free-or-projected-point identity. The referenced Sketch is a graph input; coordinates are
+resolved from that source rather than copied. Missing point input is reported by Core reference
+validation and strict reopening; restoring the same source identity recovers the Hole. Generated
+result-edge and captured result-face producer validation recognizes the registered Hole family.
+Physical support coplanarity, trimmed boundaries and generated bore references remain at 153.

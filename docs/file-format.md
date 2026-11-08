@@ -1,7 +1,8 @@
 # Project and Save File Format
 
 History intent has the explicit Part-version-2 contract below. Revision-pinned resources use
-Part version 3 and Project version 2 as specified in the owning 149B sections. Planned evolution
+Part version 3 and Project version 2 as specified in the owning 149B sections. Semantic Hole intent
+uses the Part-version-4 extension owned by 152B below. Planned evolution
 in [Blocks 145–204](inventor-parity-sequence.md) additionally assigns new feature families,
 equation/spatial constraints, model states, occurrence poses and cross-document references.
 Their future intent is not implied by the current JSON fields. Each owning block must specify
@@ -1401,3 +1402,37 @@ existing supports. An ID present under a different record kind is not missing. T
 mode retains repairable intent without calling its geometry fresh. Rebinding keeps the
 support and Sketch IDs, validates the complete graph and requires successful recompute
 before leaving repair mode. Old files without this array use the existing reader.
+
+
+## Semantic Hole intent — Block 152B
+
+Numbered implementation status remains in `mvp-plan.md`. A native/editable Part with semantic
+Hole records uses the same `blcad.part_document.mvp1` schema, integer version **4**. It retains the
+V3 resource envelope (`history_version`, complete `engineering_resources`, `material_assignments`),
+even for a custom-diameter Hole with an empty catalog, and requires a nonempty `hole_features` array
+plus complete `feature_order`. Authored history remains independently V1/V2; only V2 has required
+`suppressed_features`. The existing ordered replay reader handles all V4 records, including
+interleaved modifiers and optional result-face workplanes. Older versions reject `hole_features`;
+Hole-free documents keep their previous writer selection and canonical bytes. V4 does not author
+Reference Parts. No resolved diameter, geometry, result stamp or dependency edge is persisted.
+
+Each Hole has exactly `id`, `name`, `kind` (`plain`/`clearance`), `target_body`, `support`, `direction`
+(`support_normal`/`opposite_support_normal`), `diameter`, `placements`, `extent`, `tip`. Support uses
+the shared typed Plane reference spelling with role `hole_support_plane`. Custom diameter is
+`{kind: custom, parameter}`; standard diameter is `{kind: standard, table: {id, revision}, row,
+diameter_column}`. Owned placement is `{id, kind: owned_point, position: {x, y}}` in millimeters;
+Sketch placement is `{id, kind: sketch_point, sketch, point}` using existing entity identity.
+Placement order and IDs remain authored; nonfinite coordinates, duplicate IDs and unknown sources
+are invalid. JSON booleans cannot be coordinates.
+
+Extent is exactly one of `{kind: blind, depth}`, `{kind: through_all}`, `{kind: to_next}`,
+`{kind: to_face, face}`, `{kind: up_to_body, body}` or `{kind: symmetric, total_depth}`. Depths and
+included angle reference existing typed parameters. The shared Face spelling for `to_face` requires
+role `hole_limit_face`. Tip is `{kind: flat}` or `{kind: conical, included_angle}`; Core limits a
+conical tip to Blind with an angle strictly between 0 and 180 degrees. Unknown/extra variant fields,
+invalid enum strings, wrong primitives or incompatible/missing references reject the entire read.
+
+Project V2 retains V4 member versions and uses the existing exact root resource references in place
+of each member catalog, including an empty reference list for a custom-diameter V4 member. Hydration
+restores a full standalone snapshot before ordered replay. Resource-free Project V1 can embed the
+complete standalone V4 envelope; standard-bearing members require the existing Project V2 catalog.

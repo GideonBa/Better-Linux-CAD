@@ -27,6 +27,7 @@ enum class PartFeatureFamily {
   Draft,
   BodyBoolean,
   BodyTransform,
+  Hole,
 };
 
 enum class PartFeatureState { Active, Suppressed };

@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 151
 current_block: 152
-current_boundary: Block 152A typed Hole intent verified; document integration remains
+current_boundary: Block 152B Hole integration verified; combined acceptance remains
 current_tag: "[parity-b152]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -34,7 +34,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 151
-current block        Block 152 (in progress; slice A)
+current block        Block 152 (in progress; slice B)
 current phase        Semantic holes and threads
 current boundary     HoleFeature Core model and standards resolution
 ```
@@ -2530,7 +2530,7 @@ cut workflow. No second pattern executor, standards store or numbered status aut
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 152A | Typed plain/clearance Hole intent, stable owned/Sketch placements, semantic support/direction, discriminated extents/tips and strict pinned standard/custom diameter resolution with focused Core proofs | Implemented and verified; PR #163 |
-| 152B | Part add/update/remove, complete history/graph/repair inventory and canonical strict JSON; atomic local/selected Project standard-revision consumer remapping/removal guards | Planned; not started |
+| 152B | Part add/update/remove, complete history/graph/repair inventory and canonical strict JSON; atomic local/selected Project standard-revision consumer remapping/removal guards | Implemented and verified; delivery pending |
 | 152C | Combined native/imported input, legacy persistence/history/resource and integration regression acceptance; executor/GUI remain explicitly gated by 153/157 | Planned; not started |
 
 A validates semantic intent and existing document inputs without publishing executable Hole records.
@@ -2554,6 +2554,35 @@ implemented-through stays 151 and the semantic-Hole GUI capability remains plann
 `a009265`. The delivery-record update changes documentation only and preserves all 1,020 runtime
 fingerprints. Confirm the normal merge and exact reviewed-tree comparison on refreshed main before
 starting the document-integration branch.
+
+152B starts on `feat/semantic-hole-document-integration` after PR #163 is confirmed merged as
+`2f670c4`; refreshed main matches reviewed tree `5fd99fd425a7ef4dfc7c8987c76d70dde76a2286`.
+Register Hole in the existing typed executable inventory and modifier graph/history replay, retain
+single-Body/prefix/suppression semantics, and extend strict canonical Part persistence while keeping
+older Hole-free bytes unchanged. Standard-table consumers must participate in atomic local and
+explicit-selected Project adoption/removal. Active geometry execution remains explicitly unavailable
+until 153; no incomplete cache may be certified. Extend existing browser/repair/inventory paths only
+where the new Core family requires them; visible Wizard authoring remains 157.
+
+152B implements shared Hole modifier/history/update/remove participation and pure source validation,
+collision-safe resource dependency identity, atomic standard-consumer revision remapping/removal,
+Part V4 strict ordered persistence and portable Project V2 member references. Legacy Hole-free
+writer selection stays unchanged. Existing browser/history includes the Core family; active geometry
+refuses explicitly before cache mutation until 153, while suppressed/prefix scopes keep their rules.
+Final focused Core **15 / 324**, full Core **672 / 26,030**, focused Geometry **1 / 47**, full Geometry
+**602 / 53,170**, focused offscreen GUI **1 / 33**, native 100% **26 / 2,399** and compact 150%
+**26 / 2,417** pass without failures/skips. Full offscreen GUI passes **722 / 39 expected native-only
+skips / 91,626 assertions** across **761 cases**. Reviewed unmodified ordinary/compact captures,
+existing rebuild warnings and exact commands are in `development-setup.md`. Final inventory/startup,
+source review and normal protected delivery precede C; implemented-through stays 151 and whole 152
+remains in progress. C additionally combines mixed finishing/transform history, projected-point
+identity, actual imported support and portable mixed-resource Project members without duplicating
+this implementation or advancing the Wizard/physical execution gates.
+
+Final inventory **5 / 658**, separate native startup **124**, formatting/whitespace review and
+unchanged **1,022** runtime fingerprints complete B verification (SHA-256
+`08a3b709c124c22ee5fd2fed74b11e3be6fc6ce90c0224e9d7b1b6a447d4bd33`). No required check is
+skipped or blocked; normal protected delivery precedes the next branch.
 
 ## Later phases
 

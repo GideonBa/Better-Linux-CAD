@@ -31,6 +31,7 @@ constexpr std::string_view k_schema = "blcad.part_document.mvp1";
 constexpr int k_version = 1;
 constexpr int k_history_version = 2;
 constexpr int k_resource_version = 3;
+constexpr int k_hole_version = 4;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -1248,7 +1249,7 @@ driving_dimension_from_json(const json& dimension_json) {
       json_error("unsupported extrude direction in part document json"));
 }
 
-[[nodiscard]] json extrude_limit_face_to_json(const FaceReference& reference) {
+[[nodiscard]] json face_reference_to_json(const FaceReference& reference) {
   if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
     json value{{"source_kind", "imported_topology"},
                {"reference", detail::imported_reference_to_json(*imported)}};
@@ -1272,15 +1273,16 @@ driving_dimension_from_json(const json& dimension_json) {
   return value;
 }
 
-[[nodiscard]] Result<FaceReference> extrude_limit_face_from_json(const json& value) {
-  if (!value.is_object() || value.value("role", "") != "extrude_limit_face" ||
+[[nodiscard]] Result<FaceReference> face_reference_from_json(
+    const json& value,
+    PartFeatureInputRole expected_role = PartFeatureInputRole::ExtrudeLimitFace) {
+  if (!value.is_object() || value.value("role", "") != to_string(expected_role) ||
       value.value("capability", "") != "face")
     return Result<FaceReference>::failure(
         json_error("extrude limit face requires role and Face capability"));
   const std::string source_kind = value.value("source_kind", "");
   if (source_kind == "imported_topology")
-    return imported_input_from_json<FaceReference>(value, PartFeatureInputRole::ExtrudeLimitFace,
-                                                   4);
+    return imported_input_from_json<FaceReference>(value, expected_role, 4);
   if (source_kind == "semantic_planar_face") {
     if (value.size() != 5U || !value.contains("source_feature") || !value.contains("face"))
       return Result<FaceReference>::failure(
@@ -1292,8 +1294,7 @@ driving_dimension_from_json(const json& dimension_json) {
         FeatureId(value.at("source_feature").get<std::string>()), face.value());
     if (identity.has_error())
       return Result<FaceReference>::failure(identity.error());
-    return FaceReference::create_planar(PartFeatureInputRole::ExtrudeLimitFace,
-                                        std::move(identity.value()));
+    return FaceReference::create_planar(expected_role, std::move(identity.value()));
   }
   if (source_kind == "semantic_cylindrical_face") {
     if (value.size() != 6U || !value.contains("source_feature") ||
@@ -1308,8 +1309,7 @@ driving_dimension_from_json(const json& dimension_json) {
         ProfileId(value.at("source_profile").get<std::string>()));
     if (identity.has_error())
       return Result<FaceReference>::failure(identity.error());
-    return FaceReference::create_cylindrical(PartFeatureInputRole::ExtrudeLimitFace,
-                                             std::move(identity.value()));
+    return FaceReference::create_cylindrical(expected_role, std::move(identity.value()));
   }
   return Result<FaceReference>::failure(json_error("unsupported extrude limit face source kind"));
 }
@@ -1322,9 +1322,9 @@ driving_dimension_from_json(const json& dimension_json) {
   if (extent.second_distance_parameter().has_value())
     value["second_distance_parameter"] = extent.second_distance_parameter()->value();
   if (extent.first_face().has_value())
-    value["first_face"] = extrude_limit_face_to_json(*extent.first_face());
+    value["first_face"] = face_reference_to_json(*extent.first_face());
   if (extent.second_face().has_value())
-    value["second_face"] = extrude_limit_face_to_json(*extent.second_face());
+    value["second_face"] = face_reference_to_json(*extent.second_face());
   if (intent.taper_angle_deg().has_value())
     value["taper_angle_deg"] = *intent.taper_angle_deg();
   if (intent.thin().has_value()) {
@@ -1370,13 +1370,13 @@ driving_dimension_from_json(const json& dimension_json) {
   else if (mode == "to_next")
     extent = Result<ExtrudeExtentIntent>::success(ExtrudeExtentIntent::to_next());
   else if (mode == "to_face") {
-    auto face = extrude_limit_face_from_json(value.at("first_face"));
+    auto face = face_reference_from_json(value.at("first_face"));
     if (face.has_error())
       return Result<ExtrudeFeatureIntent>::failure(face.error());
     extent = ExtrudeExtentIntent::to_face(std::move(face.value()));
   } else if (mode == "between") {
-    auto first = extrude_limit_face_from_json(value.at("first_face"));
-    auto second = extrude_limit_face_from_json(value.at("second_face"));
+    auto first = face_reference_from_json(value.at("first_face"));
+    auto second = face_reference_from_json(value.at("second_face"));
     if (first.has_error())
       return Result<ExtrudeFeatureIntent>::failure(first.error());
     if (second.has_error())
@@ -2159,7 +2159,7 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
       json_error("unsupported or malformed draft pull direction"));
 }
 
-[[nodiscard]] json draft_neutral_plane_to_json(const PlaneReference& plane) {
+[[nodiscard]] json plane_reference_to_json(const PlaneReference& plane) {
   if (const auto* imported = std::get_if<ImportedTopologyReference>(&plane.source())) {
     json value{{"source_kind", "imported_topology"},
                {"reference", detail::imported_reference_to_json(*imported)}};
@@ -2182,26 +2182,25 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
   return value;
 }
 
-[[nodiscard]] Result<PlaneReference> draft_neutral_plane_from_json(const json& value) {
-  if (!value.is_object() || value.value("role", "") != "draft_neutral_plane" ||
+[[nodiscard]] Result<PlaneReference> plane_reference_from_json(
+    const json& value,
+    PartFeatureInputRole expected_role = PartFeatureInputRole::DraftNeutralPlane) {
+  if (!value.is_object() || value.value("role", "") != to_string(expected_role) ||
       value.value("capability", "") != "plane" || !value.contains("source_kind") ||
       !value.at("source_kind").is_string())
     return Result<PlaneReference>::failure(
         json_error("draft neutral plane requires role Plane capability and source_kind"));
   const std::string kind = value.at("source_kind").get<std::string>();
   if (kind == "imported_topology")
-    return imported_input_from_json<PlaneReference>(value, PartFeatureInputRole::DraftNeutralPlane,
-                                                    4);
+    return imported_input_from_json<PlaneReference>(value, expected_role, 4);
   if (kind == "datum_plane" && value.size() == 4U && value.contains("datum_plane") &&
       value.at("datum_plane").is_string())
     return PlaneReference::create_datum_plane(
-        PartFeatureInputRole::DraftNeutralPlane,
-        DatumPlaneId(value.at("datum_plane").get<std::string>()));
+        expected_role, DatumPlaneId(value.at("datum_plane").get<std::string>()));
   if (kind == "construction_plane" && value.size() == 4U && value.contains("construction_plane") &&
       value.at("construction_plane").is_string())
     return PlaneReference::create_construction_plane(
-        PartFeatureInputRole::DraftNeutralPlane,
-        ConstructionPlaneId(value.at("construction_plane").get<std::string>()));
+        expected_role, ConstructionPlaneId(value.at("construction_plane").get<std::string>()));
   if (kind == "semantic_planar_face" && value.size() == 5U && value.contains("source_feature") &&
       value.at("source_feature").is_string() && value.contains("face") &&
       value.at("face").is_string()) {
@@ -2212,11 +2211,169 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
         FeatureId(value.at("source_feature").get<std::string>()), face.value());
     if (semantic.has_error())
       return Result<PlaneReference>::failure(semantic.error());
-    return PlaneReference::create_semantic_face(PartFeatureInputRole::DraftNeutralPlane,
-                                                std::move(semantic.value()));
+    return PlaneReference::create_semantic_face(expected_role, std::move(semantic.value()));
   }
   return Result<PlaneReference>::failure(
       json_error("unsupported or malformed draft neutral plane"));
+}
+
+[[nodiscard]] json hole_feature_to_json(const HoleFeature& feature) {
+  json diameter;
+  if (const auto* parameter = std::get_if<ParameterId>(&feature.diameter()))
+    diameter = {{"kind", "custom"}, {"parameter", parameter->value()}};
+  else {
+    const auto& selected = std::get<HoleStandardSelection>(feature.diameter());
+    diameter = {{"kind", "standard"},
+                {"table", detail::engineering_resource_key_to_json(selected.table)},
+                {"row", selected.row},
+                {"diameter_column", selected.diameter_column}};
+  }
+  json extent = std::visit(
+      [](const auto& value) -> json {
+        using T = std::decay_t<decltype(value)>;
+        if constexpr (std::is_same_v<T, HoleBlindExtent>)
+          return {{"kind", "blind"}, {"depth", value.depth.value()}};
+        else if constexpr (std::is_same_v<T, HoleThroughAllExtent>)
+          return {{"kind", "through_all"}};
+        else if constexpr (std::is_same_v<T, HoleToNextExtent>)
+          return {{"kind", "to_next"}};
+        else if constexpr (std::is_same_v<T, HoleToFaceExtent>)
+          return {{"kind", "to_face"}, {"face", face_reference_to_json(value.face)}};
+        else if constexpr (std::is_same_v<T, HoleUpToBodyExtent>)
+          return {{"kind", "up_to_body"}, {"body", value.body.value()}};
+        else
+          return {{"kind", "symmetric"}, {"total_depth", value.total_depth.value()}};
+      },
+      feature.extent());
+  json tip{{"kind", "flat"}};
+  if (const auto* cone = std::get_if<HoleConicalTip>(&feature.tip()))
+    tip = {{"kind", "conical"}, {"included_angle", cone->included_angle.value()}};
+  json placements = json::array();
+  for (const auto& placement : feature.placements()) {
+    json value{{"id", placement.id.value()}};
+    if (const auto* point = std::get_if<Point2>(&placement.source)) {
+      value["kind"] = "owned_point";
+      value["position"] = point2_to_json(*point);
+    } else {
+      const auto& reference = std::get<HoleSketchPointReference>(placement.source);
+      value["kind"] = "sketch_point";
+      value["sketch"] = reference.sketch.value();
+      value["point"] = reference.point.value();
+    }
+    placements.push_back(std::move(value));
+  }
+  return {{"id", feature.id().value()},
+          {"name", feature.name()},
+          {"kind", to_string(feature.kind())},
+          {"target_body", feature.target_body().value()},
+          {"support", plane_reference_to_json(feature.support())},
+          {"direction", to_string(feature.direction())},
+          {"diameter", std::move(diameter)},
+          {"placements", std::move(placements)},
+          {"extent", std::move(extent)},
+          {"tip", std::move(tip)}};
+}
+
+[[nodiscard]] Result<HoleDiameter> hole_diameter_from_json(const json& value) {
+  if (has_exact_fields(value, {"kind", "parameter"}) && value.at("kind") == "custom")
+    return Result<HoleDiameter>::success(ParameterId(value.at("parameter").get<std::string>()));
+  if (has_exact_fields(value, {"kind", "table", "row", "diameter_column"}) &&
+      value.at("kind") == "standard") {
+    auto key = detail::engineering_resource_key_from_json(value.at("table"));
+    if (!key)
+      return Result<HoleDiameter>::failure(key.error());
+    return Result<HoleDiameter>::success(
+        HoleStandardSelection{std::move(key.value()), value.at("row").get<std::string>(),
+                              value.at("diameter_column").get<std::string>()});
+  }
+  return Result<HoleDiameter>::failure(json_error("Malformed Hole diameter selection"));
+}
+
+[[nodiscard]] Result<HoleExtent> hole_extent_from_json(const json& value) {
+  if (!value.is_object() || !value.contains("kind") || !value.at("kind").is_string())
+    return Result<HoleExtent>::failure(json_error("Hole extent requires a kind"));
+  const auto kind = value.at("kind").get<std::string>();
+  if (kind == "blind" && has_exact_fields(value, {"kind", "depth"}))
+    return Result<HoleExtent>::success(
+        HoleBlindExtent{ParameterId(value.at("depth").get<std::string>())});
+  if (kind == "through_all" && has_exact_fields(value, {"kind"}))
+    return Result<HoleExtent>::success(HoleThroughAllExtent{});
+  if (kind == "to_next" && has_exact_fields(value, {"kind"}))
+    return Result<HoleExtent>::success(HoleToNextExtent{});
+  if (kind == "to_face" && has_exact_fields(value, {"kind", "face"})) {
+    auto face = face_reference_from_json(value.at("face"), PartFeatureInputRole::HoleLimitFace);
+    if (!face)
+      return Result<HoleExtent>::failure(face.error());
+    return Result<HoleExtent>::success(HoleToFaceExtent{std::move(face.value())});
+  }
+  if (kind == "up_to_body" && has_exact_fields(value, {"kind", "body"}))
+    return Result<HoleExtent>::success(
+        HoleUpToBodyExtent{BodyId(value.at("body").get<std::string>())});
+  if (kind == "symmetric" && has_exact_fields(value, {"kind", "total_depth"}))
+    return Result<HoleExtent>::success(
+        HoleSymmetricExtent{ParameterId(value.at("total_depth").get<std::string>())});
+  return Result<HoleExtent>::failure(json_error("Unknown or malformed Hole extent"));
+}
+
+[[nodiscard]] Result<HoleFeature> hole_feature_from_json(const json& value) {
+  const auto fail = [] {
+    return Result<HoleFeature>::failure(json_error("Unknown or malformed Hole feature"));
+  };
+  if (!has_exact_fields(value, {"id", "name", "kind", "target_body", "support", "direction",
+                                "diameter", "placements", "extent", "tip"}) ||
+      !value.at("placements").is_array())
+    return fail();
+  const auto kind = value.at("kind").get<std::string>();
+  if (kind != "plain" && kind != "clearance")
+    return fail();
+  const auto direction = value.at("direction").get<std::string>();
+  if (direction != "support_normal" && direction != "opposite_support_normal")
+    return fail();
+  auto support =
+      plane_reference_from_json(value.at("support"), PartFeatureInputRole::HoleSupportPlane);
+  if (!support)
+    return Result<HoleFeature>::failure(support.error());
+  auto diameter = hole_diameter_from_json(value.at("diameter"));
+  if (!diameter)
+    return Result<HoleFeature>::failure(diameter.error());
+  auto extent = hole_extent_from_json(value.at("extent"));
+  if (!extent)
+    return Result<HoleFeature>::failure(extent.error());
+  HoleTip tip = HoleFlatTip{};
+  const auto& tip_json = value.at("tip");
+  if (has_exact_fields(tip_json, {"kind"}) && tip_json.at("kind") == "flat") {
+  } else if (has_exact_fields(tip_json, {"kind", "included_angle"}) &&
+             tip_json.at("kind") == "conical")
+    tip = HoleConicalTip{ParameterId(tip_json.at("included_angle").get<std::string>())};
+  else
+    return fail();
+  std::vector<HolePlacement> placements;
+  for (const auto& placement : value.at("placements")) {
+    if (has_exact_fields(placement, {"id", "kind", "position"}) &&
+        placement.at("kind") == "owned_point") {
+      const auto& position = placement.at("position");
+      if (!has_exact_fields(position, {"x", "y"}) || !position.at("x").is_number() ||
+          !position.at("y").is_number())
+        return fail();
+      placements.push_back(
+          {HolePlacementId(placement.at("id").get<std::string>()), point2_from_json(position)});
+    } else if (has_exact_fields(placement, {"id", "kind", "sketch", "point"}) &&
+               placement.at("kind") == "sketch_point") {
+      placements.push_back(
+          {HolePlacementId(placement.at("id").get<std::string>()),
+           HoleSketchPointReference{SketchId(placement.at("sketch").get<std::string>()),
+                                    SketchEntityId(placement.at("point").get<std::string>())}});
+    } else
+      return fail();
+  }
+  return HoleFeature::create(
+      FeatureId(value.at("id").get<std::string>()), value.at("name").get<std::string>(),
+      kind == "plain" ? HoleKind::Plain : HoleKind::Clearance,
+      BodyId(value.at("target_body").get<std::string>()), std::move(support.value()),
+      std::move(placements), std::move(diameter.value()), std::move(extent.value()),
+      direction == "support_normal" ? HoleDirection::SupportNormal
+                                    : HoleDirection::OppositeSupportNormal,
+      std::move(tip));
 }
 
 [[nodiscard]] json draft_feature_to_json(const DraftFeature& feature) {
@@ -2225,7 +2382,7 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
              {"target_body", feature.target_body().value()},
              {"faces", json::array()},
              {"pull_direction", draft_pull_direction_to_json(feature.pull_direction())},
-             {"neutral_plane", draft_neutral_plane_to_json(feature.neutral_plane())},
+             {"neutral_plane", plane_reference_to_json(feature.neutral_plane())},
              {"angle_parameter", feature.angle_parameter().value()}};
   for (const FaceReference& face : feature.faces())
     value["faces"].push_back(draft_face_to_json(face));
@@ -2252,7 +2409,7 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
   auto direction = draft_pull_direction_from_json(value.at("pull_direction"));
   if (direction.has_error())
     return Result<DraftFeature>::failure(direction.error());
-  auto plane = draft_neutral_plane_from_json(value.at("neutral_plane"));
+  auto plane = plane_reference_from_json(value.at("neutral_plane"));
   if (plane.has_error())
     return Result<DraftFeature>::failure(plane.error());
   return DraftFeature::create(FeatureId(value.at("id").get<std::string>()),
@@ -3872,8 +4029,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   json root;
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
-  if (!document.engineering_resources().entries().empty()) {
-    root["version"] = k_resource_version;
+  if (!document.engineering_resources().entries().empty() || !document.hole_features().empty()) {
+    root["version"] = document.hole_features().empty() ? k_resource_version : k_hole_version;
     root["history_version"] = document.authored_history_intent() ? k_history_version : k_version;
     root["engineering_resources"] =
         detail::engineering_resources_to_json(document.engineering_resources());
@@ -4161,6 +4318,11 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   for (const std::string& node : pattern_order.value())
     if (const auto* shell = document.find_shell_feature(FeatureId(node)))
       root["shell_features"].push_back(shell_feature_to_json(*shell));
+  if (!document.hole_features().empty()) {
+    root["hole_features"] = json::array();
+    for (const auto& hole : document.hole_features())
+      root["hole_features"].push_back(hole_feature_to_json(hole));
+  }
   root["draft_features"] = json::array();
   for (const std::string& node : pattern_order.value())
     if (const auto* draft = document.find_draft_feature(FeatureId(node)))
@@ -4234,7 +4396,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   for (const auto* family :
        {"imported_body_features", "features", "revolve_features", "sweep_features", "loft_features",
         "surface_features", "body_booleans", "part_patterns", "mirror_features", "edge_treatments",
-        "shell_features", "draft_features", "body_transforms"})
+        "shell_features", "hole_features", "draft_features", "body_transforms"})
     for (const auto& feature : root.value(family, json::array()))
       historical_positions.emplace(feature.at("id").get<std::string>(),
                                    historical_positions.size() + 1U);
@@ -4253,7 +4415,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     latest_ancestor_position[node] = latest;
   }
   if (interleaved || !document.result_face_workplanes().empty() ||
-      document.authored_history_intent())
+      !document.hole_features().empty() || document.authored_history_intent())
     root["feature_order"] = std::move(feature_order);
   if (document.authored_history_intent())
     root["suppressed_features"] = document.authored_history_intent()->suppressed;
@@ -4283,14 +4445,23 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       return Result<PartDocument>::failure(json_error("unsupported part document json schema"));
     if (!root.at("version").is_number_integer() ||
         (root.at("version") != k_version && root.at("version") != k_history_version &&
-         root.at("version") != k_resource_version))
+         root.at("version") != k_resource_version && root.at("version") != k_hole_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
     const auto version = root.at("version").get<int>();
     int history_version = version;
+    const bool resource_envelope = version == k_resource_version || version == k_hole_version;
+    if (version == k_hole_version) {
+      if (!root.contains("hole_features") || !root.at("hole_features").is_array() ||
+          root.at("hole_features").empty())
+        return Result<PartDocument>::failure(
+            json_error("Part version 4 requires nonempty hole_features"));
+    } else if (root.contains("hole_features"))
+      return Result<PartDocument>::failure(
+          json_error("Semantic Hole intent requires Part version 4"));
     if (root.contains("engineering_resource_refs"))
       return Result<PartDocument>::failure(
           json_error("Standalone Part cannot resolve Project resource references"));
-    if (version == k_resource_version) {
+    if (resource_envelope) {
       if (!root.contains("history_version") || !root.at("history_version").is_number_integer() ||
           (root.at("history_version") != k_version &&
            root.at("history_version") != k_history_version) ||
@@ -4385,11 +4556,11 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
           return Result<PartDocument>::failure(
               json_error("Reference Part cannot contain authored Part intent"));
     }
-    if (root.contains("result_face_workplanes")) {
-      const auto& supports = root.at("result_face_workplanes");
+    if (root.contains("result_face_workplanes") || version == k_hole_version) {
+      const auto supports = root.value("result_face_workplanes", json::array());
       if (!supports.is_array())
         return Result<PartDocument>::failure(json_error("result_face_workplanes must be an array"));
-      if (supports.empty()) {
+      if (supports.empty() && version != k_hole_version) {
         auto legacy = root;
         legacy.erase("result_face_workplanes");
         return deserialize_part_document_from_json(legacy.dump(), mode);
@@ -4401,28 +4572,45 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       // independent document/parameter/datum/Body/asset records, then interleave
       // metadata with the authored executable order. A support can depend on
       // any preceding Loft/Boolean/finishing/transform producer.
-      const std::vector<std::string> dependent_arrays{
-          "construction_points",   "construction_lines", "construction_planes",
-          "derived_workplanes",    "datum_axes",         "sketches",
-          "sketches_3d",           "path_curves",        "features",
-          "revolve_features",      "sweep_features",     "loft_features",
-          "surface_features",      "body_booleans",      "part_patterns",
-          "mirror_features",       "edge_treatments",    "shell_features",
-          "draft_features",        "body_transforms",    "sketch_ownerships",
-          "reference_statuses",    "reference_remaps",   "sketch_origin_overrides",
-          "imported_body_features"};
+      const std::vector<std::string> dependent_arrays{"construction_points",
+                                                      "construction_lines",
+                                                      "construction_planes",
+                                                      "derived_workplanes",
+                                                      "datum_axes",
+                                                      "sketches",
+                                                      "sketches_3d",
+                                                      "path_curves",
+                                                      "features",
+                                                      "revolve_features",
+                                                      "sweep_features",
+                                                      "loft_features",
+                                                      "surface_features",
+                                                      "body_booleans",
+                                                      "part_patterns",
+                                                      "mirror_features",
+                                                      "edge_treatments",
+                                                      "shell_features",
+                                                      "draft_features",
+                                                      "body_transforms",
+                                                      "sketch_ownerships",
+                                                      "hole_features",
+                                                      "reference_statuses",
+                                                      "reference_remaps",
+                                                      "sketch_origin_overrides",
+                                                      "imported_body_features"};
       auto prelude = root;
       prelude.erase("result_face_workplanes");
       prelude.erase("feature_order");
       prelude.erase("suppressed_features");
-      prelude["version"] = version == k_resource_version ? k_resource_version : k_version;
-      if (version == k_resource_version)
+      prelude["version"] = resource_envelope ? k_resource_version : k_version;
+      if (resource_envelope)
         prelude["history_version"] = k_version;
       for (const auto& key : dependent_arrays) {
         if (root.contains(key) && !root.at(key).is_array())
           return Result<PartDocument>::failure(json_error(key + " must be an array"));
         prelude[key] = json::array();
       }
+      prelude.erase("hole_features");
       auto document = deserialize_part_document_from_json(prelude.dump(), mode);
       if (!document)
         return document;
@@ -4572,6 +4760,9 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
           "shell_features", shell_feature_from_json,
           [](auto& doc, const auto& value) { return doc.add_shell_feature(value); }, true);
       enqueue(
+          "hole_features", hole_feature_from_json,
+          [](auto& doc, const auto& value) { return doc.add_hole_feature(value); }, true);
+      enqueue(
           "draft_features", draft_feature_from_json,
           [](auto& doc, const auto& value) { return doc.add_draft_feature(value); }, true);
       enqueue(
@@ -4666,6 +4857,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       restore(part.fillet_features_, "edge_treatments");
       restore(part.chamfer_features_, "edge_treatments");
       restore(part.shell_features_, "shell_features");
+      restore(part.hole_features_, "hole_features");
       restore(part.draft_features_, "draft_features");
       restore(part.body_transforms_, "body_transforms");
       if (!retained) {
@@ -4691,7 +4883,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
                                          document_json.at("name").get<std::string>());
     if (document.has_error())
       return document;
-    if (version == k_resource_version) {
+    if (resource_envelope) {
       const auto resources = detail::load_part_engineering_resources(root, document.value());
       if (!resources)
         return Result<PartDocument>::failure(resources.error());
@@ -4714,7 +4906,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       if (added.has_error())
         return Result<PartDocument>::failure(added.error());
     }
-    if (version == k_resource_version) {
+    if (resource_envelope) {
       const auto assignments = detail::load_part_material_assignments(root, document.value());
       if (!assignments)
         return Result<PartDocument>::failure(assignments.error());

@@ -1,4 +1,5 @@
 #include "../support/engineering_resource_fixture.hpp"
+#include "../support/hole_feature_fixture.hpp"
 #include "../support/part_history_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/step_import_freshness.hpp"
@@ -1299,5 +1300,46 @@ TEST_CASE("Resource-bearing Part prefix creation preserves pins Save Undo and de
   GuiDocumentSession reopened;
   REQUIRE(reopened.open_file(w.session().file_path()));
   CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == after);
+  CHECK(reopened.derived_results_fresh());
+}
+
+TEST_CASE("Semantic Hole browser history keeps suppressed intent and unavailable execution atomic",
+          "[gui][parity-b152][hole-history-shell]") {
+  auto part = blcad::test::hole_fixture::part("hole.shell", true);
+  REQUIRE(part.apply_history_intent({{"base", "hole"}, {"hole"}}));
+  ShellWindow w;
+  QTemporaryDir directory;
+  open(w, directory, part);
+  const auto before = snapshot(w);
+  auto* row = item(w, "hole");
+  REQUIRE(row);
+  CHECK(row->data(0, ShellHistoryBrowser::owner_role).toString() == "hole.shell");
+  CHECK(row->text(0).contains("Semantic Hole"));
+  REQUIRE(w.session().derived_results_fresh());
+  REQUIRE(w.session().part_shape_cache()->validate_complete_geometry_result(
+      *w.session().part_document()));
+  context(w, "hole", w.history_tools().restore_action());
+  REQUIRE(w.history_tools().active());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.history.apply").isEnabled());
+  CHECK(control<QLabel>(w, "blcad.history.status")
+            .text()
+            .contains("Semantic Hole geometry execution is not available"));
+  CHECK_FALSE(w.history_tools().apply());
+  CHECK(snapshot(w) == before);
+  CHECK_FALSE(w.session().can_undo());
+  w.history_tools().cancel();
+  REQUIRE(w.history_tools().begin_prefix(1));
+  CHECK_FALSE(w.session().part_shape_cache()->validate_complete_history_result(
+      *w.session().part_document()));
+  CHECK(w.session().part_shape_cache()->body_shape_count() == 1);
+  w.history_tools().cancel();
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.session().derived_results_fresh());
+  CHECK_FALSE(w.session().can_undo());
+  capture(w, "semantic-hole-suppressed-browser");
+  REQUIRE(w.save_to({}));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(w.session().file_path()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == before);
   CHECK(reopened.derived_results_fresh());
 }

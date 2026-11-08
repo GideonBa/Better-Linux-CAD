@@ -393,6 +393,16 @@ End-of-Part material edit and retains its known-subset mass and query footer at 
 | Assembly → representations | model states, positions and design views | select the clearly labelled representation type → preview/activate → explicitly author/save changes to that type |
 | Inspect | Physical Properties, finite Measure, Zebra, Curvature, Section, Thickness, Motion/Contact | choose actual scope → compute with visible units/precision/status → inspect overlay/copy → close |
 
+The 152B Core family appears in the existing feature browser and shared History task under its
+actual owning Part. Suppressed Hole intent remains visible and portable; prefix Cancel restores the
+complete model. Restoring an active semantic Hole is currently a correctable unavailable-execution
+state until 153, with Apply blocked and committed intent preserved. The existing bounded single/
+circular Sketch-cut Hole command stays usable; semantic Wizard authoring remains assigned to 157.
+The [ordinary browser view](images/semantic-hole-history.png) is an unmodified 1280×800 capture;
+the [compact view](images/semantic-hole-history-compact.png) is unmodified 1536×960 physical pixels
+for 1024×640 DIP at 150%. The feature keeps the shared suppressed styling and existing property
+inspector; browser/property content remains vertically scrollable in the compact window.
+
 For Hole, use the familiar top-to-bottom order: positions → target/direction → bore/seat type →
 termination → thread → advanced checks. For Fillet, keep constant/variable/face/full-round as modes
 of the same feature tool; highlight edge stations and face roles directly. Direct Edit exposes its

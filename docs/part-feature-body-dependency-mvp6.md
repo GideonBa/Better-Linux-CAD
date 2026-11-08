@@ -101,3 +101,16 @@ removal cleanup/rejection, duplicate producers, and transactional cycle rejectio
 
 Blocks 52–56 body-scoped recompute/inspection, Boolean execution, and BodyTransform/SketchOwnership
 intent are implemented. Block 57 is the transform Geometry handoff.
+
+
+## Semantic Hole modifier integration — Block 152B
+
+Hole is registered in the existing typed executable inventory. Its single target Body has an
+upstream producer; adding the Hole replaces that Body's terminal producer with the Hole and links
+the previous producer to it. Support, Sketch point owners, dimension parameters, exact pinned
+standard resource and explicit extent limits remain distinct dependency inputs. Up-to-Body limits
+are input Bodies without produced/consumed output intent. Update retains the existing history slot
+and downstream edges. Guarded removal restores the previous producer and removes unused derived
+table nodes without changing unrelated authored identities. Suppression bypasses a modifier while
+retaining authored intent and revision pins; an out-of-prefix Hole never makes a partial result
+complete. Pure Core participation does not assert physical execution before its 153 gate.
