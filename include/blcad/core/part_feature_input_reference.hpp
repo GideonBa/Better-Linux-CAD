@@ -37,6 +37,8 @@ enum class PartFeatureInputRole {
   TargetBody,
   ToolBody,
   SourceBody,
+  HoleSupportPlane,
+  HoleLimitFace,
 };
 
 enum class PartFeatureInputSourceKind {

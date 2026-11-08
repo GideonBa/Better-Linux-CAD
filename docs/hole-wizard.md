@@ -1,6 +1,7 @@
 # Hole Wizard
 
-Status: target architecture. Not implemented yet.
+Status: staged target architecture. Numbered implementation and delivery status belong to
+`mvp-plan.md`; the semantic Core foundation starts at 152, execution at 153 and Wizard UI at 157.
 
 Execution planning is consolidated in [Blocks 152–157 and 196–198](inventor-parity-sequence.md).
 Blocks 149–151 own shared revisioned resources/materials; Block 156 owns integration with the existing
@@ -15,6 +16,43 @@ through `CircleProfile` / `CircularHolePattern` and `SubtractiveExtrude`; see
 standards-oriented `HoleFeature`, threads, countersinks or assembly hole features described here.
 
 The hole wizard creates holes as semantic, parametric, standards-oriented features, not as a bare circle plus cut. A `HoleFeature` carries hole type, standard, diameter, depth, thread, counterbore/countersink, fit, fastener type, and manufacturing intent. This makes later drawings, BOMs, fastener placement, collision checks, and manufacturing notes possible.
+
+## Typed Core intent (Block 152)
+
+`HoleFeature` is a separate semantic record. `HoleKind` initially distinguishes Plain and Clearance;
+seats and threads extend it in their assigned later blocks. It owns one existing solid target Body,
+a typed `PlaneReference` with role `hole_support_plane`, explicit SupportNormal/OppositeSupportNormal
+direction, diameter intent, ordered stable placements, a discriminated extent and drill tip.
+OppositeSupportNormal is the default; support orientation remains semantic, without kernel face IDs.
+Reference Parts reject authored Hole intent. A limit Body never becomes an implicit cut participant.
+
+`HolePlacementId` is unique within a Hole. Independent owned `Point2` positions are finite signed
+millimeter coordinates in the support frame; a referenced placement retains its existing Sketch ID
+and free/projected point entity ID. Sketch-driven points retain the existing dimension/constraint
+and workplane authorities. No coordinates are copied from referenced Sketches. Geometric
+coplanarity, finite support boundaries and duplicate/effectless bores are checked at execution, not
+inferred by the Core factory. Repetition remains assigned to the shared Pattern authority in 156.
+
+A custom diameter references a positive Length parameter. A standard diameter stores an immutable
+`EngineeringResourceKey`, row key and explicitly selected Length column. Resolution uses only the
+Part's owned 149 catalog snapshot and returns the exact cell value and cell provenance. Missing
+revision/row/column/cell, a Material in place of a table or a differently typed column is an error;
+there is no latest-revision fallback, numeric default or invented attribution for custom parameters.
+Lookup does not mutate the document or executable lifetime. JSON stores this intent in 152B rather
+than serialize a resolved numeric cache; revision adoption/removal must then guard actual consumers.
+
+Extent intent distinguishes Blind (positive depth parameter), ThroughAll, ToNext, ToFace (typed
+`hole_limit_face`), UpToBody (a distinct existing solid Body) and Symmetric (positive total-depth
+parameter). Flat tip is the default. A conical tip is limited to Blind and requires an Angle
+parameter strictly between 0° and 180°. Execution in 153 defines entry/bottom coordinates and uses
+shared limit queries; Symmetric splits total depth about the support. For a conical blind bore,
+depth denotes the full-diameter cylinder depth and the apex extends beyond it by the drill-tip
+height. This intent does not itself execute geometry or publish an executable Part record.
+
+`HoleFeature::create` validates structural intent; `validate_hole_feature_inputs` resolves existing
+Core bodies, typed support/limit references, actual Sketch point entities and typed dimensions.
+Document/history/graph/repair/JSON registration remains 152B; geometry and visible authoring remain
+153/157. Legacy CircleProfile and CircularHolePattern cuts keep their existing contracts and bytes.
 
 ## Why more than a cut
 

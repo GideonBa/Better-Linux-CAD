@@ -4890,3 +4890,58 @@ audit implementation is retained. Delivery proceeds by reviewed staged diff and 
 `2bdd0365db3bd7227e7f4e71488054134337046d`). The separate delivery-record commit changes these
 existing docs only; all 1,017 runtime fingerprints remain unchanged. Check the final pushed head's
 merge/review/check state and merge normally before refreshing main and opening the next branch.
+
+
+## Block 152A — typed semantic Hole intent, 2026-11-08
+
+Starts on `feat/semantic-hole-intent` after PR #162 is confirmed merged as `10c794b`; refreshed
+main exactly matches reviewed tree `9a45a9655203376fe5a49bde8a62032eb1382e46`. New Qt/OCCT-free
+Hole intent uses existing semantic Plane/Face references, Part dimensions/Sketch points and pinned
+149 standard-table snapshots. Structural and contextual validation are pure. Owned coordinates and
+Sketch identity, single solid target, explicit direction, six extent types and flat/blind-conical
+tips remain distinct; no second pattern or standard-data authority is introduced. Registration/
+strict persistence/resource-consumer changes remain 152B; geometry/UI remain 153/157.
+
+Initial Core build: `cmake --build build/dev --target blcad_core_tests -j8`
+(`blcad152a-initial-core-build.log`). Focused `[parity-b152]` proofs and existing reference/resource/
+legacy-cut regressions precede full Core and final diff/format/runtime review. No numbered whole
+block is advanced by the bounded A slice.
+
+The initial Core build passes. Review appends the two new role enum values so all existing role
+values remain stable, adds explicit Hole kind/direction spellings and unknown-value rejection, and
+strengthens the document-input cases. Review build: `blcad152a-review-core-build.log`.
+Runtime freeze `/tmp/blcad152a-runtime-freeze.json` covers **1,020** source/test/asset/build-script
+files, SHA-256 `7a1b1983dec83eeccd13c6cc3bad071a3c02cc2f809ad9656f66d65c0c3cd4b4`.
+These new APIs do not yet publish executable records, change legacy JSON, render or expose an
+interaction. Full Core plus focused legacy typed-reference/resource/cut regressions are the A gate;
+Geometry/GUI/native results from 151D are retained unchanged rather than claim a new runtime proof.
+The persisted-feature/native/imported combination gate remains 152B/C.
+
+The review Core build passes. Focused command:
+
+```bash
+./build/dev/blcad_core_tests "[parity-b152],[part-feature-input-reference],[engineering-resource],[feature]"
+./build/dev/blcad_core_tests
+```
+
+Focused Core passes **25 / 1,400**, without failures/skips (`blcad152a-focused-core.log`), including
+all six new Hole cases and unchanged typed-reference/resource/legacy Extrude contracts. Synthetic
+pinned revisions resolve independently to **6.6 mm** and **7.1 mm** and disclose the exact cell's
+Manufacturer provenance; these values are explicitly test data, not a normative standard database.
+Full Core follows on the same 1,020-file frozen runtime (`blcad152a-full-core.log`).
+
+Initial full Core passes **663 / 25,828**, without failures/skips (`blcad152a-full-core.log`). The
+review build emits one `-Wrange-loop-construct` warning in a test-only Body loop. Bind the loop by
+const reference and include `<string_view>` directly in the new public header. The final four-step
+rebuild passes without warnings (`blcad152a-final-core-build.log`); final focused Core still passes
+**25 / 1,400** (`blcad152a-final-focused-core.log`). Repeat full Core after this final cleanup.
+Final runtime freeze **1,020** files, SHA-256
+`35c40d12e4c2fa33fff409e3a5abac99900ad30d97901b43a978e9ed7f4723ae`;
+the pre-cleanup manifest remains `blcad152a-review-runtime-freeze.json`.
+
+Final full Core passes **663 / 25,828**, without failures/skips
+(`blcad152a-final-full-core.log`). Final full-new-file formatting and modified-line formatting/
+whitespace checks pass. All **1,020** runtime fingerprints remain unchanged after verification.
+No Geometry, GUI, startup or native test is rerun for these non-executable Qt/OCCT-free APIs;
+151D results remain the prior accepted baseline. Persisted feature/executor/GUI evidence stays at
+its assigned 152B/C, 153 and 157 gates. Final staged source review and protected delivery follow.
