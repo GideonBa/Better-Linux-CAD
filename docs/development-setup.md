@@ -5277,3 +5277,103 @@ Whole B/153/Phase B remain open; B2 and C retain their existing scope.
 `4d9553b58de81be010626ee4788561bc968364fd`). The delivery-record commit changes docs only and
 preserves all 1,023 verified runtime fingerprints. Confirm the final exact head/review/check state,
 merge normally and compare the updated-main tree before opening the next serial branch.
+
+## Block 153B2 — current posed/imported/result-face Hole supports, 2026-11-08
+
+Starts on `feat/semantic-hole-bounded-supports` after PR #167 is confirmed merged as `7ab617a`;
+refreshed main matches reviewed tree `2975e67a4b692747c867f18e5889211aeb58da28`.
+B2 remains the existing support/trim/limit integration gate; no whole-B/153 promotion occurs yet.
+
+Resolve current native/captured faces through the existing authored face lineage and actual Body
+result. Internal rectangular face-center aliases preserve semantic Hole coordinates through rigid
+poses and scaling. Mark these aliases nonselectable, retaining existing public face origins and
+captured Sketch/workplane frames. Imported supports retain verified source/catalog witnesses and
+current placed geometry. Finite-circle checks use the exact selected face, not another coincident
+face on the same Body. The initial support implementation also shares this resolution with ToFace.
+
+New tests cover all six rectangular faces under translation, rotation and scale with nonzero point
+coordinates, repeated Holes on trimmed native faces, public-origin compatibility, captured face
+supports after later placement, and active/suppressed STEP Hole intent before/after rotation plus
+portable identity, stale supplier rollback/recovery and readonly Reference input. Initial Geometry
+build is `blcad153b2-initial-geometry-build.log`; review notices a new range-loop copy warning in
+the new test, to fix once the running build completes. General planar termination and final combined
+support regressions remain in progress; final checks/freeze/delivery are recorded after completion.
+
+Initial focused support run exposes two integration gaps: generic PlaneReference validation rejects
+existing captured workplanes, and the older suppressed-only STEP fixture's point was outside the
+actual canonical support frame. Diagnostic test output first needs parenthesized Catch INFO ternaries
+(`blcad153b2-diagnostic-build.log` fails, corrected diagnostic build passes). Core now accepts actual
+captured/derived workplane sources with existing source validation. New Core V4 replay proof passes
+**1 / 47**. Imported support follows the existing imported-face lineage from the verified base,
+preserving canonical in-plane coordinates through placements instead of re-canonicalizing posed
+normals. The corrected support run passes **19 / 582**, no failures/skips
+(`blcad153b2-core-support.log`, `blcad153b2-support-review-geometry.log`). The range-loop warning is
+fixed; only the existing unused rectangular helper remains in the review build.
+
+General planar termination now constructs the complete plane section, requires its full area on
+the selected trimmed face, and clips the cylindrical tool on the retained side of the actual plane.
+An oblique native limit has an independent analytic volume and opposite section-point oracles.
+Extend the real STEP case across active/suppressed, placed/unplaced, ThroughAll/ToFace and one/two
+Hole features, preserving source-change rollback/recovery. Planar build is
+`blcad153b2-planar-geometry-build.log`; broader results and final freeze remain pending.
+
+Planar/source combination run passes **20 / 1,044**, without failures/skips
+(`blcad153b2-planar-geometry-focused.log`). Review adds partial-ellipse rejection, trimmed/split
+support cache retention and a preceding rotation to the real shared browser ThroughAll/ToNext
+restoration case. Final build is `blcad153b2-final-build.log`. Full Core passes **675 / 26,106**,
+without failures/skips (`blcad153b2-core-full.log`); its completed independent binary ran while
+separate Geometry/Qt targets built, without source/test/CMake edits.
+
+Runtime freeze: **1,023** files, SHA-256
+`20e8501c174c6231c8cd65ec8530866fb9099e1710369747826b5ccf05f41f4f`
+(`/tmp/blcad153b2-runtime-freeze.json`). It includes the final native test/negative-section additions;
+relevant checks below use this exact unchanged source state. Final Geometry, Qt/native support
+regressions, inventory/startup, staged review and normal protected delivery remain pending.
+
+Final focused Hole/support Geometry passes **21 / 1,064**; full Geometry passes **624 / 54,374**,
+without failures/skips (`blcad153b2-final-geometry-focused.log`,
+`blcad153b2-final-geometry-full.log`). Final three-target build passes; only existing unrelated
+unused-helper, Reference export return-path, pattern signedness and Sketch annotation aggregate
+warnings remain. Final formatting/whitespace checks pass. The unchanged completed Geometry binary
+ran while the separate remaining Qt targets finished building.
+
+Target Qt/native regressions combine `[hole-history-shell]`, `[result-face-sketch]`,
+`[native-step-editable-parts]` and final capability inventory. The new Hole test adds a preceding
+rotation for both ThroughAll and ToNext while retaining candidate isolation, one Undo/Redo and
+portable reopen. Wider Core/Geometry are rerun above; the broader GUI/native baseline remains
+explicitly retained instead of reporting unexecuted full-GUI checks for B2.
+
+Focused Qt passes **9 cases: 8 passed / 1 native-only skipped; 977 assertions**, without failures
+(`blcad153b2-gui-focused.log`). Its skipped real STEP picking/Part-authoring case is included in the
+native runs. Native ordinary passes **4 / 973**, without failures/skips
+(`blcad153b2-native100.log`), including posed ThroughAll/ToNext restoration, existing direct
+face-Sketch creation/Undo/repair and the actual editable-STEP workflow. Compact 150% uses the same
+filter. Unmodified captures remain under `/tmp/blcad153b2-native100` / `blcad153b2-native150`.
+
+Native compact 150% passes **4 / 983**, without failures/skips
+(`blcad153b2-native150.log`). Startup reaches the window and ends at intentional timeout **124**
+(`blcad153b2-startup.log`). All offscreen-skipped coverage is exercised natively. Existing OCCT
+visual depth/stencil notices remain nonfailing environment notices. Inspect/copy the unmodified
+posed Hole captures:
+
+- `docs/images/semantic-hole-posed.png`, 1280×800, SHA-256
+  `809a926951d10be696933fa62cab4b7af3c61f91598738925f77bf916f12f9a8`;
+- `docs/images/semantic-hole-posed-compact.png`, 1536×960 physical/1024×640 DIP at 150%, SHA-256
+  `0d1c015282918f0f357ae4de31da67808fbb8de35dcbec0ecdf31210aff15022`.
+
+The real rotated-face bore, preceding pose row, restored Hole, shared property inspector and
+scrollable compact layout remain visible. MVP records B2 implemented/verified, protected delivery
+pending; whole 153/Phase B stay open and implemented-through remains 152. Run final inventory after
+this docs-only projection, then review/stage, confirm the runtime freeze and deliver normally.
+
+Final inventory passes **5 / 658**, no failures/skips (`blcad153b2-final-inventory.log`).
+Final formatting, whitespace and working-diff review pass; all **1,023** runtime fingerprints remain
+unchanged with digest `20e8501c174c6231c8cd65ec8530866fb9099e1710369747826b5ccf05f41f4f`.
+No approval or required native/check rule is blocked. Staged review and normal protected delivery
+follow. The wider GUI baseline is retained explicitly; whole-153 C acceptance remains open.
+
+153B2 delivery: [PR #168](https://github.com/GideonBa/Better-Linux-CAD/pull/168), implementation
+`0527d3b9caedae9341c5d9001e1dcd19ac920dac`, reviewed implementation tree
+`1d19e550c79cf8e2b1b39ba6aaa7cfbe3ee5fd23`. This delivery record changes documentation only.
+Confirm the exact final head, normal protected merge and refreshed-main tree before 153C.
+User boundary: complete whole 153, then stop without beginning 154.

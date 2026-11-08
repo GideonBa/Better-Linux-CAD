@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 152
 current_block: 153
-current_boundary: Block 153B1 bounded Hole extents verified; protected delivery pending before B2
+current_boundary: Block 153B2 verified delivery PR 168; C remains open; stop after whole 153
 current_tag: "[parity-b153]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -34,7 +34,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 152
-current block        Block 153 (in progress; slice B1)
+current block        Block 153 (in progress; slice B2)
 current phase        Semantic holes and threads
 current boundary     Plain, blind and bounded Hole execution
 ```
@@ -2632,7 +2632,7 @@ standards, placement-pattern or geometry-result authority is introduced.
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 153A | Straight one-direction ThroughAll and Blind flat/conical tools, multiple independent placements and atomic Body cuts on fixed datum/construction or current unposed rectangular primitive supports; analytic tests and real shared-history restoration | Accepted; PR #166 merged as `a9819c6` |
-| 153B | Posed/imported/trimmed result support and finite-face placement, ToNext/ToFace/UpToBody/Symmetric extents, local entry/exit/remaining-bottom semantics and ambiguous/ineffective inputs | In progress; B1 verified/delivery pending, B2 support/trim integration not started |
+| 153B | Posed/imported/trimmed result support and finite-face placement, ToNext/ToFace/UpToBody/Symmetric extents, local entry/exit/remaining-bottom semantics and ambiguous/ineffective inputs | B1 accepted in PR #167; B2 implemented/verified, protected delivery pending |
 | 153C | Generated bore/seat downstream reference integration and combined native/imported, multi-Body, modifier, history/prefix, material/mass, portable exchange and UI regression acceptance | Planned; not started |
 
 A cuts forward from the support only; ThroughAll must not silently become bidirectional. Blind depth
@@ -2677,6 +2677,31 @@ implemented-through remains 152 and the Wizard remains 157.
 `4d9553b58de81be010626ee4788561bc968364fd`. Final inventory passes **5 / 658** and all 1,023 runtime
 fingerprints remain unchanged. The delivery record changes docs only. Confirm the exact final
 head/review/check state, merge normally and compare refreshed-main's tree before starting B2.
+
+153B2 starts after PR #167 is confirmed merged as `7ab617a`; refreshed main matches reviewed tree
+`2975e67a4b692747c867f18e5889211aeb58da28`. Reuse current Body face lineage for native/result
+supports and verified complete STEP witnesses for imported supports. Additional internal rectangular
+aliases retain semantic face-center coordinates and stay outside public selectable face origins.
+Actual selected-face geometry supplies the finite footprint check. Preserve existing captured
+Sketch/workplane frames, scoped cache/input validation and all-or-nothing recompute.
+
+153B2 verification: focused Core **1 / 47**, full Core **675 / 26,106**; final focused Geometry
+**21 / 1,064**, full Geometry **624 / 54,374**. Focused Qt **9 cases: 8 passed / 1 native-only
+skipped, 977 assertions**; native 100% **4 / 973**, compact 150% **4 / 983**, no native failures/skips.
+The native runs include the skipped real editable-STEP workflow plus existing direct face-Sketch
+selection/Undo/repair and posed Hole restoration. Startup reaches the window, intentional timeout
+124. All six native faces, nonzero coordinates, actual trims/splits, oblique complete/partial plane
+sections and active/suppressed/placed/repeated STEP ThroughAll/ToFace combinations have independent
+volume/section/identity and rollback evidence. Runtime freeze **1,023** files remains unchanged.
+Final inventory, staged review and normal protected delivery precede C. Whole 153/Phase B remain
+open, implemented-through stays 152 and Wizard authoring remains 157.
+
+153B2 delivery: [PR #168](https://github.com/GideonBa/Better-Linux-CAD/pull/168), implementation
+`0527d3b9caedae9341c5d9001e1dcd19ac920dac`, reviewed implementation tree
+`1d19e550c79cf8e2b1b39ba6aaa7cfbe3ee5fd23`. Final inventory is **5 / 658** and all
+1,023 runtime fingerprints remain unchanged. Confirm the exact final head and normal protected
+merge, then compare refreshed main before C. The user requests completion of whole Block 153
+and an immediate stop afterward; do not begin Block 154.
 
 ## Later phases
 

@@ -1353,11 +1353,24 @@ TEST_CASE("Semantic Hole browser history keeps invalid extent restoration atomic
 TEST_CASE("Semantic Hole restore previews a physical cut and commits one reversible history step",
           "[gui][parity-b153][hole-history-shell][hole-straight-shell]") {
   const bool to_next = GENERATE(false, true);
+  const bool posed = GENERATE(false, true);
   auto part = blcad::test::hole_fixture::part("hole.shell.cut", true);
   if (to_next)
     REQUIRE(part.update_hole_feature(blcad::test::hole_fixture::hole(
         "hole", blcad::test::hole_fixture::standard(), HoleToNextExtent{})));
-  REQUIRE(part.apply_history_intent({{"base", "hole"}, {"hole"}}));
+  std::vector<std::string> order{"base"};
+  if (posed) {
+    const auto hole = *part.find_hole_feature(FeatureId("hole"));
+    REQUIRE(part.remove_hole_feature(hole.id()));
+    REQUIRE(part.add_body_transform(checked(BodyTransform::create_rotate(
+        BodyTransformId("pose"), BodyId("body.base"), BodyTransformCoordinateSpace::World,
+        std::nullopt, checked(BodyTransformRotationAxis::create_explicit({}, {1, 0, 0})), 90, false,
+        false))));
+    REQUIRE(part.add_hole_feature(hole));
+    order.push_back("pose");
+  }
+  order.push_back("hole");
+  REQUIRE(part.apply_history_intent({order, {"hole"}}));
   ShellWindow w;
   QTemporaryDir directory;
   open(w, directory, part);
@@ -1382,7 +1395,8 @@ TEST_CASE("Semantic Hole restore previews a physical cut and commits one reversi
   check_volume(cut_volume);
   CHECK(w.session().part_shape_cache()->find_body_result(BodyId("body.base"))->source_feature_id ==
         FeatureId("hole"));
-  capture(w, to_next ? "semantic-hole-to-next-cut" : "semantic-hole-restored-cut");
+  capture(w, posed ? (to_next ? "semantic-hole-posed-next" : "semantic-hole-posed-through")
+                   : (to_next ? "semantic-hole-to-next-cut" : "semantic-hole-restored-cut"));
   REQUIRE(w.save_to({}));
   GuiDocumentSession reopened;
   REQUIRE(reopened.open_file(w.session().file_path()));

@@ -1,6 +1,7 @@
 #include "blcad/core/part_feature_input_reference.hpp"
 
 #include "blcad/core/part_document.hpp"
+#include "blcad/core/part_document_json.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -239,4 +240,49 @@ TEST_CASE("Part feature input validation resolves typed document and generated t
   REQUIRE(missing_profile);
   CHECK(validate_part_feature_input_reference(document, missing_body.value()).has_error());
   CHECK(validate_part_feature_input_reference(document, missing_profile.value()).has_error());
+}
+
+TEST_CASE("Hole plane inputs retain captured and derived workplane identity through V4 replay",
+          "[core][parity-b153][hole-current-support]") {
+  auto part = reference_document();
+  const auto source = SemanticFaceReference::create(FeatureId("feature.base"), SemanticFace::Top);
+  REQUIRE(source);
+  const auto derived =
+      DerivedWorkplane::create_on_feature_face(DatumPlaneId("derived"), "Derived", source.value());
+  REQUIRE(derived);
+  REQUIRE(part.add_derived_workplane(derived.value()));
+  const auto origins =
+      ResultFaceReference::create(FeatureId("feature.base"), BodyId("body.base"),
+                                  {{FeatureId("feature.base"), "extrude/upper-cap"}});
+  REQUIRE(origins);
+  const auto captured =
+      ResultFaceWorkplane::create(DatumPlaneId("captured"), "Captured", origins.value());
+  REQUIRE(captured);
+  REQUIRE(part.add_result_face_workplane(captured.value()));
+  for (const char* id : {"derived", "captured"}) {
+    const auto plane = PlaneReference::create_datum_plane(PartFeatureInputRole::HoleSupportPlane,
+                                                          DatumPlaneId(id));
+    REQUIRE(plane);
+    CHECK(validate_part_feature_input_reference(part, plane.value()));
+  }
+  const auto missing = PlaneReference::create_datum_plane(PartFeatureInputRole::HoleSupportPlane,
+                                                          DatumPlaneId("missing"));
+  REQUIRE(missing);
+  CHECK_FALSE(validate_part_feature_input_reference(part, missing.value()));
+  const auto support = PlaneReference::create_datum_plane(PartFeatureInputRole::HoleSupportPlane,
+                                                          DatumPlaneId("captured"));
+  REQUIRE(support);
+  const auto hole = HoleFeature::create(
+      FeatureId("hole"), "Captured Hole", HoleKind::Plain, BodyId("body.base"), support.value(),
+      {{HolePlacementId("center"), Point2{}}}, ParameterId("depth"));
+  REQUIRE(hole);
+  REQUIRE(part.add_hole_feature(hole.value()));
+  CHECK(part.dependency_graph().has_dependency("captured", "hole"));
+  const auto serialized = serialize_part_document_to_json(part);
+  REQUIRE(serialized);
+  const auto reopened = deserialize_part_document_from_json(serialized.value());
+  REQUIRE(reopened);
+  const auto repeated = serialize_part_document_to_json(reopened.value());
+  REQUIRE(repeated);
+  CHECK(repeated.value() == serialized.value());
 }

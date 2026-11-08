@@ -66,6 +66,11 @@ public:
   [[nodiscard]] Result<std::size_t> validate_planar_circle_footprint(const GeometryShape& support,
                                                                      Point3 center, Vector3 normal,
                                                                      double radius_mm) const;
+  // Clip to the side containing kept_point and require the complete (possibly
+  // elliptical) plane section inside the actual finite trimmed face.
+  [[nodiscard]] Result<GeometryShape> terminate_at_planar_face(const GeometryShape& tool,
+                                                               const GeometryShape& face,
+                                                               Point3 kept_point) const;
 
   [[nodiscard]] Result<GeometryShape>
   make_extruded_profile_with_holes(const std::vector<Point3>& outer_vertices,

@@ -107,6 +107,26 @@ explicit solid participants and Create Another. Its Symmetric option is limited 
 BLCAD's already persisted finite symmetric extent is an explicit extension and must be labelled as
 total depth in 157, rather than presented as identical to that Inventor option.
 
+153B2 resolves semantic rectangular supports on the current Body through authored face lineage,
+including preceding rigid transforms, scale and surviving modifier descendants. Internal face-center
+aliases retain native placement coordinates; they are excluded from public selectable origins so
+existing captured Sketch/workplane frames stay unchanged. Captured/derived support IDs remain their
+existing Core workplane identities. A deleted contributor or split face fails explicitly.
+
+Imported supports first verify their owned source/catalog and then follow the existing imported-face
+origin on the current Body. Canonical in-plane coordinates are transported with the original frame;
+they are not re-canonicalized after a pose. For owned outputs, the outward face normal defines drilling direction,
+while the original in-plane coordinate convention is retained. Changed supplier bytes invalidate
+the operation; no geometric-proximity fallback selects another face. Multiple features can reuse
+surviving trimmed supports, provided each complete opening fits the actual selected face.
+
+ToFace uses this same current native/imported resolution and accepts oblique planar faces. It
+computes the complete plane section of the tool, checks its full area against the selected trimmed
+face and clips to the side containing the start. Thus an oblique bore ends on that plane with an
+elliptical section. Parallel, behind-start, start-crossing, missing and insufficient finite limits
+fail atomically. The limit Body remains a nonparticipant; generated bore/seat references and whole
+153 combinations remain assigned to C, and semantic Wizard authoring remains 157.
+
 ## Why more than a cut
 
 ```text

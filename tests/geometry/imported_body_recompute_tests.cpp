@@ -8,6 +8,7 @@
 #include <gp_Pln.hxx>
 
 #include <catch2/generators/catch_generators.hpp>
+#include <numbers>
 
 using namespace imported_body_test;
 
@@ -317,6 +318,10 @@ TEST_CASE("Reused imported base identity cannot retain a previous output Body ca
 TEST_CASE(
     "Imported Hole support keeps catalog identity portable history and actual source freshness",
     "[geometry][parity-b152][hole-combined-acceptance][hole-import-combined]") {
+  const bool active = GENERATE(false, true);
+  const bool posed = GENERATE(false, true);
+  const bool bounded = GENERATE(false, true);
+  const bool repeated = GENERATE(false, true);
   namespace holes = blcad::test::hole_fixture;
   Fixture fixture;
   fixture.write(BRepPrimAPI_MakeBox(20, 10, 8).Shape());
@@ -336,11 +341,49 @@ TEST_CASE(
   const auto support =
       checked(PlaneReference::create_imported(PartFeatureInputRole::HoleSupportPlane, plane));
   const auto body = part.imported_body_features().front().definition().outputs().front().body;
+  HoleExtent extent = HoleThroughAllExtent{};
+  if (bounded) {
+    const auto bottom = std::min_element(
+        catalog.entries().begin(), catalog.entries().end(), [](const auto& a, const auto& b) {
+          const auto score = [](const auto& entry) {
+            return entry.descriptor.kind == ImportedTopologyKind::Face &&
+                           entry.descriptor.geometry == ImportedGeometryClass::Plane
+                       ? entry.descriptor.centroid.z
+                       : 1e100;
+          };
+          return score(a) < score(b);
+        });
+    REQUIRE(bottom != catalog.entries().end());
+    const auto limit = checked(ImportedTopologyReference::create(catalog.id(), bottom->id,
+                                                                 ImportedTopologyCapability::Face));
+    extent = HoleToFaceExtent{
+        checked(FaceReference::create_imported(PartFeatureInputRole::HoleLimitFace, limit))};
+  }
+  if (posed)
+    REQUIRE(part.add_body_transform(checked(BodyTransform::create_rotate(
+        BodyTransformId("pose"), body, BodyTransformCoordinateSpace::World, std::nullopt,
+        checked(BodyTransformRotationAxis::create_explicit({}, {1, 0, 0})), 90, false, false))));
   REQUIRE(part.add_engineering_resource(holes::table()));
-  REQUIRE(part.add_hole_feature(checked(
-      HoleFeature::create(FeatureId("hole"), "Imported Hole", HoleKind::Clearance, body, support,
-                          {{HolePlacementId("center"), Point2{10, 5}}}, holes::standard()))));
-  REQUIRE(part.apply_history_intent({{"import.base", "hole"}, {"hole"}}));
+  REQUIRE(part.add_hole_feature(checked(HoleFeature::create(
+      FeatureId("hole"), "Imported Hole", HoleKind::Clearance, body, support,
+      {{HolePlacementId("center"), Point2{-5, 5}}}, holes::standard(), extent))));
+  if (repeated)
+    REQUIRE(part.add_hole_feature(checked(HoleFeature::create(
+        FeatureId("hole.second"), "Second Hole", HoleKind::Clearance, body, support,
+        {{HolePlacementId("center"), Point2{-5, 15}}}, holes::standard(), extent))));
+  std::vector<std::string> order{"import.base"};
+  if (posed)
+    order.push_back("pose");
+  order.push_back("hole");
+  if (repeated)
+    order.push_back("hole.second");
+  std::vector<std::string> suppressed;
+  if (!active) {
+    suppressed.push_back("hole");
+    if (repeated)
+      suppressed.push_back("hole.second");
+  }
+  REQUIRE(part.apply_history_intent({order, suppressed}));
   const auto serialized = checked(serialize_part_document_to_json(part));
   auto reopened = checked(deserialize_part_document_from_json(serialized));
   const auto& restored =
@@ -349,9 +392,15 @@ TEST_CASE(
   CHECK(checked(serialize_part_document_to_json(reopened)) == serialized);
   StepImportTopologyContext context(fixture.root);
   auto shapes = cache();
-  REQUIRE(GeometryRecomputeExecutor{&context}.execute_document(reopened, shapes));
+  const auto recomputed = GeometryRecomputeExecutor{&context}.execute_document(reopened, shapes);
+  INFO(active);
+  INFO(posed);
+  INFO((recomputed ? "ok" : recomputed.error().message()));
+  REQUIRE(recomputed);
   REQUIRE(shapes.validate_complete_geometry_result(reopened));
-  CHECK(body_volume(shapes, body) == Approx(1600));
+  const double expected_volume =
+      1600 - (active ? (repeated ? 2 : 1) * std::numbers::pi * 3.3 * 3.3 * 8 : 0);
+  CHECK(body_volume(shapes, body) == Approx(expected_volume).margin(1e-6));
   const auto original = topology(*shapes.find_body_shape(body));
   fixture.write_bytes(supplier + "\n");
   StepImportTopologyContext changed(fixture.root);
@@ -362,7 +411,7 @@ TEST_CASE(
   StepImportTopologyContext recovered(fixture.root);
   REQUIRE(GeometryRecomputeExecutor{&recovered}.execute_document(reopened, shapes));
   REQUIRE(shapes.validate_complete_geometry_result(reopened));
-  CHECK(body_volume(shapes, body) == Approx(1600));
+  CHECK(body_volume(shapes, body) == Approx(expected_volume).margin(1e-6));
   CHECK(fixture.source_bytes() == supplier);
   const auto& base = part.imported_body_features().front();
   const auto* source = part.find_step_import_source(base.definition().source());

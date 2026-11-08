@@ -64,6 +64,13 @@ EdgeReference           SemanticEdgeReference | SemanticCircularEdgeReference
 BodyReference           BodyId
 ```
 
+153B2 extends shared plane validation for the existing workplane identity namespace:
+`DatumPlaneId` may identify an actual fixed datum, DerivedWorkplane or ResultFaceWorkplane.
+Derived sources retain their existing producer validation; captured sources use
+`validate_result_face_workplane_reference`, including Body, contributor and lifetime checks.
+Missing workplanes remain errors. This uses the existing source spelling and dependency node,
+without copying a captured face into a new fixed datum or introducing another persistence format.
+
 The semantic cylindrical-face and circular-edge identities are the exact Block-35 generated
 topology types. Validation delegates those sources, and semantic linear edges, to
 `validate_generated_topology_reference`; their producer-owned role/cardinality and recovery rules

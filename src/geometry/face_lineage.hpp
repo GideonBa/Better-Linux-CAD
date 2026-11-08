@@ -21,6 +21,7 @@ struct FaceLineage {
   TopoDS_Face face;
   Point3 frame_origin;
   Vector3 x_axis;
+  bool selectable = true;
 };
 
 inline void append_lineage(std::vector<FaceLineage>& result, FaceLineage entry,

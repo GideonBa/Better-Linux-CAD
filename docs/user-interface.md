@@ -399,7 +399,8 @@ complete model. In 153A, restoring supported straight ThroughAll/Blind intent pr
 cut in the same History task, and Apply commits one reversible update. Unsupported support/extent
 combinations remain correctable diagnostics with Apply blocked and committed intent preserved.
 153B1 adds ToNext/ToFace/UpToBody and finite symmetric intent to that same history workflow;
-posed/imported/result-support authoring stays gated by B2/157. The existing bounded single/
+153B2 extends physical restoration to current posed/imported/result supports and oblique planar
+limits. The dedicated semantic authoring tool remains assigned to 157. The existing bounded single/
 circular Sketch-cut Hole command stays usable; semantic Wizard authoring remains assigned to 157.
 The [ordinary browser view](images/semantic-hole-history.png) is an unmodified 1280×800 capture;
 the [compact view](images/semantic-hole-history-compact.png) is unmodified 1536×960 physical pixels
@@ -410,6 +411,12 @@ inspector; browser/property content remains vertically scrollable in the compact
 [compact 150% capture](images/semantic-hole-cut-compact.png) show the same browser/history workflow
 with the computed bore. Captures are unmodified, respectively 1280×800 and 1536×960 physical pixels;
 the compact window is 1024×640 device-independent pixels. They do not claim the planned Wizard UI.
+
+153B2's [posed Hole result](images/semantic-hole-posed.png) and
+[compact 150% result](images/semantic-hole-posed-compact.png) retain that same browser/history
+workflow after a preceding Body rotation. Both are unmodified native captures at the same ordinary/
+compact dimensions. The hole follows the rotated face while existing face-Sketch selection remains
+covered by the native regression suite.
 
 For Hole, use the familiar top-to-bottom order: positions → target/direction → bore/seat type →
 termination → thread → advanced checks. For Fillet, keep constant/variable/face/full-round as modes

@@ -728,29 +728,109 @@ resolve_imported_plane(const PartDocument& document, const ImportedTopologyRefer
       DatumPlaneId{}, frame->origin, frame->x_axis, frame->y_axis, frame->normal, {}});
 }
 
-[[nodiscard]] Result<ResolvedWorkplane>
-resolve_straight_hole_support(const PartDocument& document, const HoleFeature& feature,
-                              const ShapeCache& cache, const WorkplaneResolver& resolver) {
-  const auto& source = feature.support().source();
+[[nodiscard]] Result<ResolvedResultFace>
+resolve_hole_plane(const PartDocument& document, const PlaneReferenceSource& source,
+                   const ShapeCache& cache, const WorkplaneResolver& resolver,
+                   StepImportTopologyContext* import_context, const FeatureId& consumer) {
+  const auto fixed_plane = [&](DatumPlaneId id) -> Result<ResolvedResultFace> {
+    auto plane = resolver.resolve(document, id, cache);
+    if (!plane)
+      return Result<ResolvedResultFace>::failure(plane.error());
+    if (const auto* pose = cache.find_reference_transform(id.value())) {
+      plane.value().origin = pose->cumulative_transform.transform_point(plane.value().origin);
+      plane.value().x_axis =
+          normalized(pose->cumulative_transform.transform_vector(plane.value().x_axis));
+      plane.value().y_axis =
+          normalized(pose->cumulative_transform.transform_vector(plane.value().y_axis));
+      plane.value().normal =
+          normalized(pose->cumulative_transform.transform_vector(plane.value().normal));
+    }
+    return Result<ResolvedResultFace>::success({plane.value(), {}});
+  };
+  const auto semantic = [&](const SemanticFaceReference& face) -> Result<ResolvedResultFace> {
+    const auto* primitive = document.find_feature(face.source_feature());
+    if (!primitive || !primitive->body_result_context())
+      return Result<ResolvedResultFace>::failure(
+          geometry_error(consumer.value(), "Hole support requires an owned primitive face"));
+    auto resolved = ResultFaceSupportGeometry::resolve_current(
+        document, cache, primitive->body_result_context()->effective_produced_body(),
+        {{primitive->id(), "hole-support/rectangle/" + std::string(to_string(face.face()))}},
+        import_context);
+    if (resolved && face.face() == SemanticFace::Bottom) {
+      auto& y = resolved.value().plane.y_axis;
+      y = {-y.x, -y.y, -y.z};
+    }
+    return resolved;
+  };
   if (const auto* datum = std::get_if<DatumPlaneId>(&source)) {
+    if (const auto* captured = document.find_result_face_workplane(*datum))
+      return ResultFaceSupportGeometry::resolve_current(
+          document, cache, captured->reference().body(), captured->reference().origins(),
+          import_context);
+    if (const auto* derived = document.find_derived_workplane(*datum))
+      return semantic(derived->face_reference());
     if (document.find_datum_plane(*datum))
-      return resolver.resolve(document, *datum, cache);
+      return fixed_plane(*datum);
   } else if (const auto* plane = std::get_if<ConstructionPlaneId>(&source)) {
-    return resolver.resolve(document, DatumPlaneId(plane->value()), cache);
+    return fixed_plane(DatumPlaneId(plane->value()));
   } else if (const auto* face = std::get_if<SemanticFaceReference>(&source)) {
-    const auto* primitive = document.find_feature(face->source_feature());
-    const auto* body = cache.find_body_result(feature.target_body());
-    if (primitive && body && body->source_feature_id == primitive->id() &&
-        primitive->type() == FeatureType::AdditiveExtrude &&
-        primitive->direction() == ExtrudeDirection::SketchNormal &&
-        primitive->extrude_intent().is_historical_additive_default() &&
-        !cache.find_latest_body_transform_state(feature.target_body()) &&
-        !cache.find_reference_transform(primitive->input_sketch().value()))
-      return resolver.resolve_generated_face(document, *face);
+    return semantic(*face);
+  } else if (const auto* imported = std::get_if<ImportedTopologyReference>(&source)) {
+    if (!import_context)
+      return Result<ResolvedResultFace>::failure(geometry_error(
+          consumer.value(), "Imported Hole support requires a verified source context"));
+    auto current = import_context->resolve(document, *imported);
+    if (!current)
+      return Result<ResolvedResultFace>::failure(current.error());
+    auto descriptor =
+        detail::imported_descriptor_on_body(document, cache, *imported, current.value(), consumer);
+    if (!descriptor)
+      return Result<ResolvedResultFace>::failure(descriptor.error());
+    GeometryShape face_shape = current.value().shape;
+    const auto* catalog = document.find_imported_topology_catalog(imported->catalog());
+    const auto* entry = catalog ? catalog->find(imported->entry()) : nullptr;
+    for (const auto& base : document.imported_body_features())
+      if (base.definition().catalog() == imported->catalog())
+        for (const auto& output : base.definition().outputs())
+          if (entry && entry->parent_body == output.imported_body) {
+            auto face_reference = ImportedTopologyReference::create(
+                imported->catalog(), imported->entry(), ImportedTopologyCapability::Face);
+            if (!face_reference)
+              return Result<ResolvedResultFace>::failure(face_reference.error());
+            auto role = make_imported_face_origin_role(face_reference.value());
+            if (!role)
+              return Result<ResolvedResultFace>::failure(role.error());
+            auto resolved = ResultFaceSupportGeometry::resolve_current(
+                document, cache, output.body, {{base.id(), role.value()}}, import_context);
+            if (!resolved)
+              return resolved;
+            auto pose =
+                detail::body_transform_before(document, cache, output.body, consumer.value());
+            if (!pose)
+              return Result<ResolvedResultFace>::failure(pose.error());
+            Vector3 canonical_normal = current.value().descriptor->direction;
+            if (pose.value())
+              canonical_normal =
+                  pose.value()->cumulative_transform.transform_vector(canonical_normal);
+            if (dot(resolved.value().plane.normal, canonical_normal) < 0) {
+              auto& y = resolved.value().plane.y_axis;
+              y = {-y.x, -y.y, -y.z};
+            }
+            return resolved;
+          }
+    auto analytic = imported_topology_analytic_descriptor(descriptor.value());
+    if (!analytic)
+      return Result<ResolvedResultFace>::failure(analytic.error());
+    const auto* frame = std::get_if<AssemblyPlanarTargetDescriptor>(&analytic.value());
+    if (!frame)
+      return Result<ResolvedResultFace>::failure(
+          geometry_error(consumer.value(), "Hole support must be planar"));
+    return Result<ResolvedResultFace>::success(
+        {{DatumPlaneId{}, frame->origin, frame->x_axis, frame->y_axis, frame->normal, {}},
+         face_shape});
   }
-  return Result<ResolvedWorkplane>::failure(
-      geometry_error(feature.id().value(), "This Hole support requires posed, imported or "
-                                           "result-face support that is not available yet."));
+  return Result<ResolvedResultFace>::failure(
+      geometry_error(consumer.value(), "Hole support is unavailable"));
 }
 
 [[nodiscard]] Result<std::vector<Point3>>
@@ -2360,6 +2440,9 @@ GeometryShape tag_extrude_faces(const PartDocument& document, const Feature& fea
     const auto* width = document.find_parameter(rectangle->width_parameter());
     const auto* height = document.find_parameter(rectangle->height_parameter());
     if (width && height) {
+      shape = ResultFaceSupportGeometry::tag_rectangular_supports(
+          shape, feature.id(), frame, rectangle->center(), width->value().millimeters(),
+          height->value().millimeters());
       const auto vertices = rectangle_local_vertices(*rectangle, width->value(), height->value());
       const std::array<std::string, 4> roles{"front", "right", "back", "left"};
       for (std::size_t i = 0; i < 4; ++i)
@@ -4245,20 +4328,22 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
   auto target = resolve_in_place_body_target(document, feature_id, feature->target_body(), working);
   if (!target)
     return Result<std::size_t>::failure(target.error());
-  auto support = resolve_straight_hole_support(document, *feature, working, workplane_resolver_);
-  if (!support)
-    return Result<std::size_t>::failure(support.error());
+  auto resolved_support = resolve_hole_plane(document, feature->support().source(), working,
+                                             workplane_resolver_, import_context_, feature_id);
+  if (!resolved_support)
+    return Result<std::size_t>::failure(resolved_support.error());
+  const auto& support = resolved_support.value().plane;
   auto diameter = resolve_hole_diameter(document, feature->diameter());
   if (!diameter)
     return Result<std::size_t>::failure(diameter.error());
-  auto centers = resolve_hole_centers(document, *feature, working, support.value(),
+  auto centers = resolve_hole_centers(document, *feature, working, support,
                                       diameter.value().diameter, workplane_resolver_);
   if (!centers)
     return Result<std::size_t>::failure(centers.error());
   const double radius = diameter.value().diameter.millimeters() / 2;
   const double sign = feature->direction() == HoleDirection::SupportNormal ? 1. : -1.;
-  const Vector3 direction{support.value().normal.x * sign, support.value().normal.y * sign,
-                          support.value().normal.z * sign};
+  const Vector3 direction{support.normal.x * sign, support.normal.y * sign,
+                          support.normal.z * sign};
   double cone_height = 0;
   if (const auto* cone = std::get_if<HoleConicalTip>(&feature->tip()))
     cone_height =
@@ -4269,6 +4354,13 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
         geometry_error(feature_id.value(), "Hole drill-tip height must be finite"));
   GeometryShape result = *target.value();
   for (const auto& center : centers.value()) {
+    std::optional<ResolvedResultFace> planar_limit;
+    if (!resolved_support.value().face.empty()) {
+      auto footprint = closed_profile_adapter_.validate_planar_circle_footprint(
+          resolved_support.value().face, center, support.normal, radius);
+      if (!footprint)
+        return Result<std::size_t>::failure(footprint.error());
+    }
     double start = 0, depth = 0, entry = 0;
     const auto forward_material = [&](const GeometryShape& body) -> Result<AxisProjectionSpan> {
       auto spans = closed_profile_adapter_.axis_material_spans(body, center, direction);
@@ -4327,44 +4419,38 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
       start = -depth;
     } else if (const auto* limit = std::get_if<HoleToFaceExtent>(&feature->extent())) {
       const auto* reference = std::get_if<SemanticFaceReference>(&limit->face.source());
-      const auto* primitive =
-          reference ? document.find_feature(reference->source_feature()) : nullptr;
-      if (!primitive || !primitive->extrude_intent().is_historical_additive_default() ||
-          primitive->direction() != ExtrudeDirection::SketchNormal ||
-          working.find_reference_transform(primitive->id().value()) ||
-          working.find_reference_transform(primitive->input_sketch().value()))
-        return Result<std::size_t>::failure(geometry_error(
-            feature_id.value(),
-            "This Hole limit requires posed or imported face support not available yet."));
-      auto plane = resolve_limit_face_workplane(document, limit->face, workplane_resolver_,
-                                                import_context_, working, feature_id);
-      if (!plane)
-        return Result<std::size_t>::failure(plane.error());
-      if (std::abs(dot(plane.value().normal, direction)) < 1. - 1e-7)
-        return Result<std::size_t>::failure(geometry_error(
-            feature_id.value(), "Hole limit face must be normal to the drilling axis"));
-      depth = point_projection(center, plane.value().origin, direction);
-      const GeometryShape* face_body = working.find_feature_shape(primitive->id());
-      if (primitive->body_result_context())
-        face_body =
-            working.find_body_shape(primitive->body_result_context()->effective_produced_body());
-      if (!face_body)
+      const auto* imported = std::get_if<ImportedTopologyReference>(&limit->face.source());
+      if (!reference && !imported)
         return Result<std::size_t>::failure(
-            geometry_error(feature_id.value(), "Hole limit face Body is unavailable"));
-      const Point3 endpoint{center.x + direction.x * depth, center.y + direction.y * depth,
-                            center.z + direction.z * depth};
-      auto footprint = closed_profile_adapter_.validate_planar_circle_footprint(
-          *face_body, endpoint, direction, radius);
-      if (!footprint)
-        return Result<std::size_t>::failure(footprint.error());
+            geometry_error(feature_id.value(), "Hole limit face must be planar"));
+      auto resolved = resolve_hole_plane(
+          document, reference ? PlaneReferenceSource{*reference} : PlaneReferenceSource{*imported},
+          working, workplane_resolver_, import_context_, feature_id);
+      if (!resolved)
+        return Result<std::size_t>::failure(resolved.error());
+      const auto& plane = resolved.value().plane;
+      const double alignment = dot(plane.normal, direction);
+      if (std::abs(alignment) <= 1e-7)
+        return Result<std::size_t>::failure(geometry_error(
+            feature_id.value(), "Hole limit face must not be parallel to the drilling axis"));
+      const Vector3 offset{plane.origin.x - center.x, plane.origin.y - center.y,
+                           plane.origin.z - center.z};
+      const double center_depth = dot(offset, plane.normal) / alignment;
+      const double spread =
+          radius * std::sqrt(std::max(0., 1. - alignment * alignment)) / std::abs(alignment);
+      if (center_depth - spread <= 1e-7)
+        return Result<std::size_t>::failure(
+            geometry_error(feature_id.value(), "Hole limit crosses or precedes its start"));
+      depth = center_depth + spread + 1.;
+      planar_limit = std::move(resolved.value());
     }
     if (!std::isfinite(depth) || depth <= k_tolerance)
       return Result<std::size_t>::failure(
           geometry_error(feature_id.value(), "Hole has no positive forward extent"));
     const auto along = [&](double distance, double radial) {
-      return Point3{center.x + direction.x * distance + support.value().x_axis.x * radial,
-                    center.y + direction.y * distance + support.value().x_axis.y * radial,
-                    center.z + direction.z * distance + support.value().x_axis.z * radial};
+      return Point3{center.x + direction.x * distance + support.x_axis.x * radial,
+                    center.y + direction.y * distance + support.x_axis.y * radial,
+                    center.z + direction.z * distance + support.x_axis.z * radial};
     };
     auto tool =
         revolve_adapter_.revolve_profile(feature_id,
@@ -4373,6 +4459,12 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
                                          center, direction, 0, 360);
     if (!tool)
       return Result<std::size_t>::failure(tool.error());
+    if (planar_limit) {
+      tool = closed_profile_adapter_.terminate_at_planar_face(tool.value(), planar_limit->face,
+                                                              center);
+      if (!tool)
+        return Result<std::size_t>::failure(tool.error());
+    }
     if (to_next || limit_body) {
       auto clipped = body_boolean_adapter_.combine(
           feature_id, to_next ? BodyBooleanOperation::Intersect : BodyBooleanOperation::Subtract,

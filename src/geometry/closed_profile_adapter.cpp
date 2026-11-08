@@ -11,9 +11,11 @@
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepCheck_Analyzer.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepGProp.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
+#include <BRepPrimAPI_MakeHalfSpace.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <Bnd_Box.hxx>
 #include <GProp_GProps.hxx>
@@ -666,6 +668,70 @@ ClosedProfileAdapter::validate_planar_circle_footprint(const GeometryShape& supp
     return Result<std::size_t>::success(matches);
   } catch (const Standard_Failure& failure) {
     return Result<std::size_t>::failure(make_geometry_error(standard_failure_message(failure)));
+  }
+}
+
+Result<GeometryShape> ClosedProfileAdapter::terminate_at_planar_face(
+    const GeometryShape& tool, const GeometryShape& face_shape, Point3 kept_point) const {
+  const auto fail = [&](const char* message) {
+    return Result<GeometryShape>::failure(make_geometry_error(message));
+  };
+  if (tool.empty() || face_shape.empty() || !std::isfinite(kept_point.x) ||
+      !std::isfinite(kept_point.y) || !std::isfinite(kept_point.z))
+    return fail("Planar termination requires a tool and an actual limit face");
+  try {
+    TopExp_Explorer faces(face_shape.impl_->shape, TopAbs_FACE);
+    if (!faces.More())
+      return fail("Planar termination face is unavailable");
+    const auto face = TopoDS::Face(faces.Current());
+    faces.Next();
+    if (faces.More())
+      return fail("Planar termination face is ambiguous");
+    BRepAdaptor_Surface surface(face);
+    if (surface.GetType() != GeomAbs_Plane)
+      return fail("Hole termination requires a planar face");
+    const auto plane = surface.Plane();
+    if (plane.Distance(to_gp_point(kept_point)) <= 1e-7)
+      return fail("Hole limit must lie ahead of its start");
+    const auto infinite = BRepBuilderAPI_MakeFace(plane).Face();
+    const auto common = [&](BRepAlgoAPI_Common& algorithm, const TopoDS_Shape& left,
+                            const TopoDS_Shape& right) {
+      TopTools_ListOfShape arguments, tools;
+      arguments.Append(left);
+      tools.Append(right);
+      algorithm.SetArguments(arguments);
+      algorithm.SetTools(tools);
+      algorithm.SetNonDestructive(true);
+      algorithm.Build();
+    };
+    BRepAlgoAPI_Common section;
+    common(section, tool.impl_->shape, infinite);
+    if (!section.IsDone() || section.HasErrors() || section.Shape().IsNull())
+      return fail("Cannot compute the complete Hole limit section");
+    GProp_GProps full_area;
+    BRepGProp::SurfaceProperties(section.Shape(), full_area);
+    if (!std::isfinite(full_area.Mass()) || full_area.Mass() <= 0)
+      return fail("Hole limit has no finite section");
+    BRepAlgoAPI_Common overlap;
+    common(overlap, section.Shape(), face);
+    if (!overlap.IsDone() || overlap.HasErrors() || overlap.Shape().IsNull())
+      return fail("Cannot validate the trimmed Hole limit section");
+    GProp_GProps covered_area;
+    BRepGProp::SurfaceProperties(overlap.Shape(), covered_area);
+    if (std::abs(covered_area.Mass() - full_area.Mass()) > 1e-7 * full_area.Mass())
+      return fail("Hole section must fit completely inside the selected trimmed limit face");
+    const auto halfspace = BRepPrimAPI_MakeHalfSpace(infinite, to_gp_point(kept_point)).Solid();
+    BRepAlgoAPI_Common clipped;
+    common(clipped, tool.impl_->shape, halfspace);
+    if (!clipped.IsDone() || clipped.HasErrors() || clipped.Shape().IsNull() ||
+        !TopExp_Explorer(clipped.Shape(), TopAbs_SOLID).More() ||
+        !BRepCheck_Analyzer(clipped.Shape(), true).IsValid())
+      return fail("Planar Hole termination did not produce a valid solid tool");
+    auto backing = std::make_shared<GeometryShape::Impl>(clipped.Shape());
+    backing->face_lineage = detail::map_lineage(clipped, backing->shape, tool.impl_->face_lineage);
+    return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
+  } catch (const Standard_Failure& failure) {
+    return Result<GeometryShape>::failure(make_geometry_error(standard_failure_message(failure)));
   }
 }
 
