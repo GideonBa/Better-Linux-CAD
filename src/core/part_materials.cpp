@@ -34,6 +34,28 @@ PartDocument::adopt_engineering_resource_revision(const EngineeringResourceKey& 
         ++changed;
       }
   }
+  if (source != next && candidate.engineering_resources_.find_table(next)) {
+    // Each update uses the existing modifier/history transaction. Work on a
+    // copy so one missing row, wrong cell type or later invalid consumer rolls
+    // back the catalog insertion and all previously remapped consumers.
+    const auto holes = candidate.hole_features_;
+    for (const auto& hole : holes) {
+      const auto* selected = std::get_if<HoleStandardSelection>(&hole.diameter());
+      if (!selected || selected->table != source)
+        continue;
+      auto selection = *selected;
+      selection.table = next;
+      auto replacement_hole = HoleFeature::create(
+          hole.id(), hole.name(), hole.kind(), hole.target_body(), hole.support(),
+          hole.placements(), std::move(selection), hole.extent(), hole.direction(), hole.tip());
+      if (!replacement_hole)
+        return Result<std::size_t>::failure(replacement_hole.error());
+      auto updated = candidate.update_hole_feature(std::move(replacement_hole.value()));
+      if (!updated)
+        return updated;
+      ++changed;
+    }
+  }
   *this = std::move(candidate);
   return Result<std::size_t>::success(changed);
 }
@@ -45,7 +67,40 @@ Result<std::size_t> PartDocument::remove_engineering_resource(const EngineeringR
                   [&](const auto& entry) { return entry.material == key; }))
     return Result<std::size_t>::failure(Error::validation(
         id_.value(), "Material revision is still assigned to the Part or a Body"));
-  return engineering_resources_.remove(key);
+  for (const auto& hole : hole_features_)
+    if (const auto* selected = std::get_if<HoleStandardSelection>(&hole.diameter());
+        selected && selected->table == key)
+      return Result<std::size_t>::failure(Error::dependency(
+          hole.id().value(), "Standard revision is still referenced by Hole intent"));
+  auto candidate = *this;
+  auto removed = candidate.engineering_resources_.remove(key);
+  if (!removed)
+    return removed;
+  const auto node = engineering_resource_node_id(key);
+  if (candidate.dependency_graph_.has_node(node) && !candidate.has_authored_node_identity(node) &&
+      !candidate.is_imported_authority_node(node)) {
+    if (!candidate.dependency_graph_.direct_dependents(node).empty())
+      return Result<std::size_t>::failure(
+          Error::dependency(node, "Standard revision still has model consumers"));
+    auto erased = candidate.dependency_graph_.remove_node(node);
+    if (!erased)
+      return erased;
+    candidate.invalidation_state_.untrack_node(node);
+  }
+  *this = std::move(candidate);
+  return removed;
+}
+void PartDocument::prune_unused_engineering_resource_nodes() {
+  for (const auto& resource : engineering_resources_.entries()) {
+    if (!std::holds_alternative<EngineeringStandardTable>(resource))
+      continue;
+    const auto node = engineering_resource_node_id(engineering_resource_key(resource));
+    if (dependency_graph_.has_node(node) && !has_authored_node_identity(node) &&
+        !is_imported_authority_node(node) && dependency_graph_.direct_dependents(node).empty()) {
+      (void)dependency_graph_.remove_node(node);
+      invalidation_state_.untrack_node(node);
+    }
+  }
 }
 Result<std::size_t> PartDocument::set_default_material(std::optional<EngineeringResourceKey> key) {
   if (is_reference_part())

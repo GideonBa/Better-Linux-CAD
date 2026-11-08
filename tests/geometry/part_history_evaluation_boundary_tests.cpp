@@ -1,4 +1,5 @@
 #include "../support/engineering_resource_fixture.hpp"
+#include "../support/hole_feature_fixture.hpp"
 #include "../support/part_history_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/assembly_interference_analyzer.hpp"
@@ -657,4 +658,44 @@ TEST_CASE(
   auto rebuilt = evaluate(reopened);
   same_bodies(part, removed, reopened, rebuilt);
   CHECK(reopened.default_material() == resources::key("synthetic.material", "r3"));
+}
+
+TEST_CASE("Semantic Hole execution remains explicit and atomic while suppression and prefixes "
+          "retain scope",
+          "[geometry][parity-b152][hole-execution-boundary]") {
+  const bool authored = GENERATE(false, true);
+  auto part = fixture::native_base();
+  const auto original = part;
+  auto cache = evaluate(part);
+  const GeometryRecomputeExecutor executor;
+  REQUIRE(part.add_hole_feature(blcad::test::hole_fixture::hole()));
+  if (authored)
+    REQUIRE(part.apply_history_intent({{"base", "hole"}, {}}));
+  const auto failed = executor.execute_document(part, cache);
+  REQUIRE_FALSE(failed);
+  CHECK(failed.error().message().find("Semantic Hole geometry execution is not available") !=
+        std::string::npos);
+  REQUIRE(cache.validate_complete_geometry_result(original));
+  CHECK(RectangleExtrusionAdapter{}
+            .summarize(*cache.find_body_shape(BodyId("body.base")))
+            .volume_mm3 == Catch::Approx(1600));
+  CHECK_FALSE(executor.execute_plan(part, checked(part.create_recompute_plan()), cache));
+  REQUIRE(cache.validate_complete_geometry_result(original));
+  REQUIRE(executor.execute_history_prefix(part, 1, cache));
+  REQUIRE(cache.history_plan());
+  CHECK(cache.history_plan()->prefix_count == 1);
+  CHECK_FALSE(cache.validate_complete_history_result(part));
+  CHECK_FALSE(executor.execute_history_prefix(part, 2, cache));
+  REQUIRE(cache.history_plan());
+  CHECK(cache.history_plan()->prefix_count == 1);
+  CHECK(RectangleExtrusionAdapter{}
+            .summarize(*cache.find_body_shape(BodyId("body.base")))
+            .volume_mm3 == Catch::Approx(1600));
+  REQUIRE(part.apply_history_intent({{"base", "hole"}, {"hole"}}));
+  REQUIRE(executor.execute_document(part, cache));
+  REQUIRE(cache.validate_complete_geometry_result(part));
+  REQUIRE(cache.validate_complete_history_result(part));
+  CHECK(RectangleExtrusionAdapter{}
+            .summarize(*cache.find_body_shape(BodyId("body.base")))
+            .volume_mm3 == Catch::Approx(1600));
 }

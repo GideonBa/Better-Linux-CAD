@@ -514,6 +514,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/project_engineering_resources_tests.cpp
     tests/core/shell_feature_tests.cpp
     tests/core/hole_feature_tests.cpp
+    tests/core/part_hole_feature_tests.cpp
     tests/core/part_feature_input_reference_tests.cpp
     tests/core/part_pattern_feature_tests.cpp
     tests/core/recompute_plan_tests.cpp

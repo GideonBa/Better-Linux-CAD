@@ -179,6 +179,8 @@ private:
 };
 
 using EngineeringResource = std::variant<EngineeringMaterial, EngineeringStandardTable>;
+// Collision-safe dependency identity for an exact immutable resource revision.
+[[nodiscard]] std::string engineering_resource_node_id(const EngineeringResourceKey& key);
 [[nodiscard]] const EngineeringResourceKey&
 engineering_resource_key(const EngineeringResource&) noexcept;
 

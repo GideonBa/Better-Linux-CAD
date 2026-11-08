@@ -4952,3 +4952,101 @@ its assigned 152B/C, 153 and 157 gates. Final staged source review and protected
 permission review timed out; the single explicitly permitted retry was approved and completed.
 No permission/check remains blocked. The delivery-record commit changes docs only and retains all
 1,020 runtime fingerprints; final head/review/check and normal protected merge precede the next branch.
+
+
+## Block 152B — Hole document/history/persistence integration, 2026-11-08
+
+Starts on `feat/semantic-hole-document-integration` after confirmed merged PR #163/main `2f670c4`,
+with exact reviewed-tree comparison `5fd99fd425a7ef4dfc7c8987c76d70dde76a2286`. Extend the existing
+Core typed inventory, Body-modifier graph, update/remove/history replay, exact standard consumer
+guards and canonical Part/Project resource persistence. Active Hole geometry fails explicitly until
+153; suppressed/outside-prefix Hole intent must retain the existing scoped evaluation rules.
+
+Initial Core build: `cmake --build build/dev --target blcad_core_tests -j8`
+(`blcad152b-initial-core-build.log`). Focused new storage/history/revision/strict-JSON proofs and
+Geometry refusal/prefix plus native browser/history regressions follow on a final frozen runtime.
+Whole 152 remains in progress until the existing C combination gate is accepted.
+
+Initial integrated Core build passes without warnings (`blcad152b-initial-core-build.log`). Initial
+8 storage/history/resource/strict-JSON cases pass **8 / 189** (`blcad152b-initial-focused.log`). Add
+Sketch-point edit/loss/recovery and shared Geometry/GUI boundary proofs. Review Core build passes;
+all 15 B152 cases pass **15 / 324**, without failures/skips (`blcad152b-review-focused-core.log`).
+The full GUI-preset four-target build runs next (`blcad152b-gui-build.log`); a full Core run in the
+independent already-built `build/dev` directory runs alongside that build, without editing runtime
+inputs. Runtime freeze **1,022** files (`/tmp/blcad152b-runtime-freeze.json`), SHA-256
+`08a3b709c124c22ee5fd2fed74b11e3be6fc6ce90c0224e9d7b1b6a447d4bd33`.
+
+Full Core in `build/dev` passes **672 / 26,030**, without failures/skips (`blcad152b-full-core.log`).
+The larger GUI-preset rebuild surfaces existing untouched warnings: the unused rectangle-profile
+helper in `recompute_executor.cpp` and aggregate annotation fields in unchanged
+`gui_sketch_interaction.cpp`. Do not describe that full build as warning-free; the earlier new-Core
+builds are warning-free. No unrelated warning cleanup is included. Geometry/GUI/native execution
+and final inventory/source/capture review remain pending on this same runtime freeze.
+
+Once the GUI-preset Geometry test executable is linked (remaining build work is GUI-only), its
+new focused boundary case passes **1 / 47**, without failures/skips
+(`blcad152b-focused-geometry.log`). Both authored and legacy-history modes reject active Hole
+execution before cache mutation, retain the prior complete/prefix scope, and evaluate suppressed
+Hole intent as the unchanged 1,600 mm³ base. Full Geometry now runs in that already-linked test
+binary while the independent GUI test objects finish compiling; source remains frozen and no
+other CAD test runs concurrently (`blcad152b-full-geometry.log`).
+
+Full Geometry passes **602 / 53,170**, without failures/skips (`blcad152b-full-geometry.log`). The
+prior 601-case suite plus the new 47-assertion boundary case run on the same frozen source. GUI
+execution follows after the final GUI test link; native filters also include `[block136-holes]`
+for the preserved legacy single/circular Sketch-cut workflows.
+
+The GUI-preset build completes all **530** steps and four requested targets. New focused offscreen
+GUI passes **1 / 33**, without failures/skips (`blcad152b-focused-gui.log`): the suppressed V4 Hole
+appears under its real owner, unavailable restore remains correctable without publishing history,
+prefix Cancel restores complete results and Save/Open retains exact intent. No runtime edits were
+needed after the initial freeze. Native 100%/compact 150%, full GUI and final inventory/startup follow.
+
+Native acceptance commands on the 1,022-file runtime freeze:
+
+```bash
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad152b-native-100 ./build/dev-gui/blcad_gui_tests "[hole-history-shell],[history-shell],[history-marker-shell],[resource-history-shell],[block136-holes],[shell-coverage]" --durations yes
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_COMPACT=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad152b-native-150 ./build/dev-gui/blcad_gui_tests "[hole-history-shell],[history-shell],[history-marker-shell],[resource-history-shell],[block136-holes],[shell-coverage]" --durations yes
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+Whole 152's C gate additionally combines the family with mixed finishing/transform history and
+actual imported support, including projected-point identity. Those combinations remain in the
+existing serial plan rather than advance the whole block with this B slice.
+
+Native 100% passes **26 / 2,399**, without failures/skips (`blcad152b-native-100.log`), including
+the new Hole browser/context/prefix/Save/Open case, existing marker/parent-child/resource history,
+legacy single/circular Hole cuts and existing capability inventory. Reviewed the unmodified native
+1280×800 capture `images/semantic-hole-history.png`: the owned Hole row is visibly suppressed,
+keeps its existing feature/Body presentation, and the complete base plus restored End-of-Part marker
+are present. The 150% run follows on unchanged source; the capture hash is recorded below.
+
+Native compact 150% passes **26 / 2,417**, without failures/skips (`blcad152b-native-150.log`).
+Reviewed the unmodified new compact capture and copied it to
+`images/semantic-hole-history-compact.png` (1536×960 physical / 1024×640 DIP). Shared suppressed
+styling, owner/identifier, base geometry and scrollable browser/property content remain intact.
+Capture SHA-256: ordinary `d28a7568d2fd8fe9901350bcd1270716fbc302f5a9b31bd1b1f8d1e34b4ee77f`,
+compact `748a7f0dd971f362d7f5204222237d689dc68f8df1f6068a534388309a1f0d56`.
+Full GUI now runs on the unchanged 1,022-file freeze (`blcad152b-full-gui.log`).
+
+Full offscreen GUI passes **761 cases: 722 passed / 39 expected native-only skips / 91,626
+assertions**, without failures (`blcad152b-full-gui.log`). The automatic permission review for the
+ruleset re-read times out before process creation; use its single explicitly allowed retry. This
+technical timeout does not invalidate runtime checks. Final independent inventory/native startup,
+working/staged diff and source-freeze review precede protected delivery.
+
+Final inventory passes **5 / 658**, without failures/skips (`blcad152b-final-inventory.log`).
+Separate native startup reaches intentional timeout **124** (`blcad152b-startup.log`,
+`blcad152b-startup-status.txt`). The permitted ruleset retry succeeds: active PR requirement,
+zero required approving reviews, no required status-check rule, deletion/non-fast-forward protection.
+No approval or check remains blocked. Final modified-line/new-file formatting and whitespace pass;
+all **1,022** runtime fingerprints remain unchanged with digest
+`08a3b709c124c22ee5fd2fed74b11e3be6fc6ce90c0224e9d7b1b6a447d4bd33`.
+Staged diff review and normal protected delivery complete B without advancing whole 152.
+
+152B delivery uses [PR #164](https://github.com/GideonBa/Better-Linux-CAD/pull/164), implementation
+`5e9f39f5f1b125e355049acbc69d87c1f1b0c1a4` (initial reviewed tree
+`9feda8a6599e2a4de17ac46463ea7edb0fc7b1a2`). The delivery-record commit changes docs only; all
+1,022 verified runtime fingerprints remain unchanged. Check the final exact head/review/check state,
+merge normally and compare the updated-main tree before opening the next serial branch.

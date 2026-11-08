@@ -100,6 +100,18 @@ template <typename Record> ExecutionContract execution_contract(const Record& re
     if (!record.keep_tool_bodies())
       contract.consumed = record.tool_bodies();
   } else {
+    if constexpr (std::is_same_v<Record, HoleFeature>) {
+      add_input(contract, record.support().source_node_id());
+      for (const auto& placement : record.placements())
+        if (const auto* point = std::get_if<HoleSketchPointReference>(&placement.source))
+          add_input(contract, point->sketch.value());
+      if (const auto* standard = std::get_if<HoleStandardSelection>(&record.diameter()))
+        add_input(contract, engineering_resource_node_id(standard->table));
+      if (const auto* face = std::get_if<HoleToFaceExtent>(&record.extent()))
+        add_input(contract, face->face.source_node_id());
+      if (const auto* limit = std::get_if<HoleUpToBodyExtent>(&record.extent()))
+        contract.body_inputs.push_back(limit->body);
+    }
     if constexpr (requires { record.body_result_context(); })
       add_context(contract, record.body_result_context());
     if constexpr (requires { record.target_body(); }) {
@@ -173,6 +185,7 @@ template <typename Visitor> void PartDocument::visit_executable_families(Visitor
           PartFeatureFamily::Chamfer);
   visitor(&PartDocument::shell_features_, &PartDocument::add_shell_feature,
           PartFeatureFamily::Shell);
+  visitor(&PartDocument::hole_features_, &PartDocument::add_hole_feature, PartFeatureFamily::Hole);
   visitor(&PartDocument::draft_features_, &PartDocument::add_draft_feature,
           PartFeatureFamily::Draft);
   visitor(&PartDocument::body_boolean_features_, &PartDocument::add_body_boolean_feature,

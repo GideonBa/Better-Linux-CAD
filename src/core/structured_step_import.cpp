@@ -133,10 +133,11 @@ Result<std::size_t> fresh_part(const PartDocument& part, const StepImportSource&
       !part.linear_pattern_features().empty() || !part.circular_pattern_features().empty() ||
       !part.mirror_features().empty() || !part.fillet_features().empty() ||
       !part.chamfer_features().empty() || !part.shell_features().empty() ||
-      !part.draft_features().empty() || !part.body_boolean_features().empty() ||
-      !part.sketch_ownerships().empty() || !part.body_transforms().empty() ||
-      !part.reference_statuses().empty() || !part.reference_remaps().empty() ||
-      !part.sketch_origin_overrides().empty() || part.datum_planes().size() != 3)
+      !part.hole_features().empty() || !part.draft_features().empty() ||
+      !part.body_boolean_features().empty() || !part.sketch_ownerships().empty() ||
+      !part.body_transforms().empty() || !part.reference_statuses().empty() ||
+      !part.reference_remaps().empty() || !part.sketch_origin_overrides().empty() ||
+      part.datum_planes().size() != 3)
     return Result<std::size_t>::failure(
         invalid("initial imported Parts must contain no downstream authored intent"));
   std::size_t plane_index = 0;

@@ -54,6 +54,23 @@ Core bodies, typed support/limit references, actual Sketch point entities and ty
 Document/history/graph/repair/JSON registration remains 152B; geometry and visible authoring remain
 153/157. Legacy CircleProfile and CircularHolePattern cuts keep their existing contracts and bytes.
 
+152B registers Hole in the existing executable family inventory and Body-modifier chain. Support,
+Sketch sources, dimensional parameters, exact standard revision and explicit limits are dependency
+inputs. Updates retain the history slot and downstream edges; guarded removal restores the previous
+Body producer. Suppression retains typed intent and revision pins; scoped prefixes remain partial.
+The derived resource node spells `resource:<ID length>:<ID>:<revision>`, preventing delimiter
+collisions, and cannot alias authored/imported model identity. Unused table nodes are pruned after
+consumer updates/removal while unrelated authored nodes remain intact.
+
+Standard revision adoption rebuilds every affected Hole against the candidate table and publishes
+only after all consumers validate. A late missing row/type rolls back the insertion and earlier
+remaps. Old snapshots remain owned until explicitly removed; referenced snapshots, including those
+of suppressed Holes, cannot be removed. Project adoption retains the existing explicit member list,
+shared immutable catalog and all-or-nothing behavior. See `file-format.md` for V4 Part/V2 Project
+spelling and offline extraction. Active Hole geometry currently fails explicitly before modifying
+cache contents; 153 supplies actual execution. Existing prefix/suppressed evaluation and browser
+history can still expose/retain this Core intent without claiming Wizard authoring before 157.
+
 ## Why more than a cut
 
 ```text

@@ -4458,7 +4458,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_imported_body_feature(
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const RecomputePlan& plan,
                                         ShapeCache& shape_cache) const {
-  if (document.authored_history_intent())
+  if (document.authored_history_intent() || !document.hole_features().empty())
     return execute_history(document, std::nullopt, shape_cache);
   if (shape_cache.has_history_scope()) {
     auto fresh_cache = ShapeCache::create(shape_cache.id());
@@ -4599,7 +4599,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_document(const PartDocument& document,
                                             ShapeCache& shape_cache) const {
-  if (document.authored_history_intent())
+  if (document.authored_history_intent() || !document.hole_features().empty())
     return execute_history(document, std::nullopt, shape_cache);
   if (shape_cache.has_history_scope()) {
     auto fresh_cache = ShapeCache::create(shape_cache.id());
@@ -4874,6 +4874,11 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
       return Result<GeometryRecomputeSummary>::failure(
           Error::dependency(entry.feature.node_id, message));
     }
+  for (const auto& entry : plan.value().entries)
+    if (entry.state == PartHistoryExecutionState::Active &&
+        entry.feature.family == PartFeatureFamily::Hole)
+      return Result<GeometryRecomputeSummary>::failure(validation_error(
+          entry.feature.node_id, "Semantic Hole geometry execution is not available yet."));
   const auto source = serialize_part_document_to_json(document);
   if (!source)
     return Result<GeometryRecomputeSummary>::failure(source.error());
@@ -4930,6 +4935,9 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
         return execute_chamfer(document, feature, working);
       case PartFeatureFamily::Shell:
         return execute_shell(document, feature, working);
+      case PartFeatureFamily::Hole:
+        return Result<std::size_t>::failure(
+            validation_error(id, "Semantic Hole geometry execution is not available yet."));
       case PartFeatureFamily::Draft:
         return execute_draft(document, feature, working);
       case PartFeatureFamily::BodyBoolean:
