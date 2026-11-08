@@ -23,6 +23,8 @@
 #include <QImage>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
 #include <QPushButton>
 #include <QScreen>
 #include <QScrollArea>
@@ -574,4 +576,165 @@ TEST_CASE("Physical task keeps scope units tensors and footer reachable at ordin
   CHECK(field<QTableWidget>(w, "inertia").editTriggers() == QAbstractItemView::NoEditTriggers);
   field<QPushButton>(w, "close").click();
   CHECK_FALSE(w.physical_properties_tools().active());
+}
+
+TEST_CASE("Native Material revision Physical Properties and End of Part form one portable atomic "
+          "workflow",
+          "[gui][parity-b151][material-physical-combined]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native combined Material/Physical Properties acceptance");
+  ClipboardRestore clipboard;
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto path = open(w, dir, fixture::project(true));
+  const auto original = source(w);
+  begin(w);
+  numeric(w, "mass", .032);
+  field<QComboBox>(w, "length_unit").setCurrentIndex(1);
+  field<QComboBox>(w, "mass_unit").setCurrentIndex(1);
+  numeric(w, "mass", 32);
+  centroid(w, "mass_centroid", {2.4, .9, .4}, "cm");
+  w.physical_properties_tools().cancel();
+  const auto old_shape = *w.session()
+                              .project_part_shape_cache(DocumentId("material.part"))
+                              ->find_body_shape(BodyId("body.base"));
+  const auto unused_shape = *w.session()
+                                 .project_part_shape_cache(DocumentId("unselected"))
+                                 ->find_body_shape(BodyId("body.base"));
+  REQUIRE(w.material_tools().begin(DocumentId("material.part")));
+  auto* targets = w.findChild<QComboBox*>("blcad.material.part");
+  REQUIRE(targets);
+  REQUIRE(targets->count() == 2);
+  CHECK(targets->itemText(0) != targets->itemText(1));
+  CHECK(targets->currentText().contains("material.part"));
+  CHECK(targets->toolTip().contains("material.part"));
+  auto* library = w.findChild<QComboBox*>("blcad.material.material");
+  REQUIRE(library);
+  const auto r1 = library->findText(" @ r1", Qt::MatchContains);
+  REQUIRE(r1 >= 0);
+  library->setCurrentIndex(r1);
+  for (const auto& [name, value] : {std::pair{"revision", "r3"},
+                                    {"density", "8000"},
+                                    {"source", "Synthetic manufacturer fixture"}}) {
+    auto* input = w.findChild<QLineEdit*>(QString("blcad.material.") + name);
+    REQUIRE(input);
+    input->setText(value);
+  }
+  auto* origin = w.findChild<QComboBox*>("blcad.material.origin");
+  REQUIRE(origin);
+  origin->setCurrentIndex(1);
+  auto* members = w.findChild<QListWidget*>("blcad.material.members");
+  REQUIRE(members);
+  REQUIRE(members->count() == 2);
+  for (int i = 0; i < members->count(); ++i)
+    members->item(i)->setCheckState(
+        members->item(i)->data(Qt::UserRole).toString() == "material.part" ? Qt::Checked
+                                                                           : Qt::Unchecked);
+  auto* material_dock = w.findChild<QDockWidget*>("blcad.shell.material_task");
+  REQUIRE(material_dock);
+  auto* material_scroll = material_dock->findChild<QScrollArea*>();
+  REQUIRE(material_scroll);
+  const auto material_click = [&](const char* id) {
+    auto* button = w.findChild<QPushButton*>(QString("blcad.material.") + id);
+    REQUIRE(button);
+    REQUIRE(button->isEnabled());
+    if (id != std::string_view("apply"))
+      material_scroll->ensureWidgetVisible(button, 0, button->height());
+    settle();
+    REQUIRE(button->isVisible());
+    button->click();
+    settle();
+  };
+  material_click("adopt");
+  CHECK(source(w) == original);
+  CHECK_FALSE(w.session().dirty());
+  capture(w, "material-physical-selected-revision");
+  material_click("apply");
+  REQUIRE_FALSE(w.material_tools().active());
+  const auto* root = w.session().project();
+  REQUIRE(root);
+  CHECK(root->find_part_document(DocumentId("material.part"))->default_material() ==
+        resources::key("synthetic.material", "r3"));
+  CHECK(root->find_part_document(DocumentId("unselected"))->default_material() == resources::key());
+  CHECK(root->find_part_document(DocumentId("material.part"))
+            ->effective_material_for_body(BodyId("body.second"))
+            ->key() == resources::key("synthetic.material", "r2"));
+  CHECK(geometry::OcctShapeView::get(*w.session()
+                                          .project_part_shape_cache(DocumentId("material.part"))
+                                          ->find_body_shape(BodyId("body.base"))) ==
+        geometry::OcctShapeView::get(old_shape));
+  CHECK(geometry::OcctShapeView::get(*w.session()
+                                          .project_part_shape_cache(DocumentId("unselected"))
+                                          ->find_body_shape(BodyId("body.base"))) ==
+        geometry::OcctShapeView::get(unused_shape));
+  const auto revised = source(w);
+  REQUIRE(w.session().can_undo());
+  begin(w);
+  numeric(w, "mass", 44.8);
+  numeric(w, "volume", 6.4);
+  centroid(w, "mass_centroid", {2.1428571428571429, .6428571428571429, .4}, "cm");
+  centroid(w, "volume_centroid", {2.25, .75, .4}, "cm");
+  REQUIRE(w.physical_properties_tools().copy());
+  CHECK(QApplication::clipboard()->text().contains("Mass: 44.8 g"));
+  REQUIRE(w.save_to(path));
+  CHECK_FALSE(field<QPushButton>(w, "copy").isEnabled());
+  REQUIRE(w.physical_properties_tools().update_query());
+  numeric(w, "mass", 44.8);
+  capture(w, "material-physical-root-revision");
+  REQUIRE(w.undo());
+  CHECK_FALSE(w.physical_properties_tools().active());
+  CHECK(source(w) == original);
+  CHECK_FALSE(w.session().can_undo());
+  REQUIRE(w.redo());
+  CHECK(source(w) == revised);
+  ShellWindow reopened;
+  REQUIRE(reopened.open_path(path));
+  show(reopened);
+  CHECK(source(reopened) == revised);
+  begin(reopened);
+  numeric(reopened, "mass", .0448);
+  reopened.physical_properties_tools().cancel();
+  const auto standalone =
+      *reopened.session().project()->find_part_document(DocumentId("material.part"));
+  ShellWindow part;
+  const auto part_path = open(part, dir, standalone);
+  REQUIRE(QFile::remove(path)); // Standalone material snapshots survive without the Project file.
+  const auto standalone_source = source(part);
+  begin(part);
+  numeric(part, "mass", .0224);
+  part.physical_properties_tools().cancel();
+  REQUIRE(part.history_tools().begin_prefix(1));
+  REQUIRE(part.material_tools().begin());
+  auto* assignment = part.findChild<QComboBox*>("blcad.material.assignment");
+  REQUIRE(assignment);
+  const auto r2 = assignment->findText(" @ r2", Qt::MatchContains);
+  REQUIRE(r2 >= 0);
+  assignment->setCurrentIndex(r2);
+  REQUIRE(part.material_tools().stage_assignment());
+  REQUIRE(part.material_tools().apply());
+  CHECK_FALSE(part.physical_properties_tools().begin());
+  REQUIRE(part.save_to(part_path));
+  CHECK(checked(serialize_part_document_to_json(
+            checked(read_part_document_json_file(part_path.toStdString())))) == standalone_source);
+  part.history_tools().cancel();
+  CHECK(source(part) == standalone_source);
+  CHECK_FALSE(part.session().can_undo());
+  REQUIRE(part.history_tools().begin_prefix(1));
+  REQUIRE(part.material_tools().begin());
+  assignment->setCurrentIndex(0);
+  REQUIRE(part.material_tools().stage_assignment());
+  REQUIRE(part.material_tools().apply());
+  REQUIRE(part.history_tools().apply());
+  REQUIRE(part.session().derived_results_fresh());
+  begin(part);
+  CHECK(field<QLabel>(part, "mass").text() == "Known subset: 0.0096 kg");
+  centroid(part, "mass_centroid", {30, 0, 4}, "mm", true);
+  centroid(part, "volume_centroid", {15, 0, 4}, "mm");
+  REQUIRE(part.physical_properties_tools().copy());
+  CHECK(QApplication::clipboard()->text().contains("Known-subset Mass: 0.0096 kg"));
+  capture(part, "material-physical-prefix-partial");
+  REQUIRE(part.undo());
+  CHECK_FALSE(part.physical_properties_tools().active());
+  CHECK(source(part) == standalone_source);
+  CHECK_FALSE(part.session().can_undo());
 }

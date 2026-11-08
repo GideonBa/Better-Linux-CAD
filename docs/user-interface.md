@@ -332,7 +332,7 @@ reachable and the folded Features group stays folded in the long-name child cont
 bounded labels with complete tooltips. Exact counts/hashes and retained historical B evidence are
 in `development-setup.md`; whole-block status belongs to `mvp-plan.md`.
 
-### Planned command placement and workflows
+### Command placement and workflows
 
 Block 151B places **Material** in Manage → Materials and **Assign Material…** in the existing
 Part/Body browser context menu. Both open the same right-side task. Assignment comes first, then
@@ -342,9 +342,11 @@ remain outside the scroll area. Target selectors show Part definitions and Part-
 the effective assignment distinguishes inheritance from an override. Project wording states that
 definition changes apply to all its occurrences. Revision updates list individual owned Parts with
 unchecked checkboxes, preserving unselected pins. Reference Part targets remain visibly read-only.
+Owned Part target labels include their existing document identifier and a complete tooltip, so
+duplicate display names cannot conceal which definition receives an assignment.
 Snapshots show revision and material/property provenance, with optional density/pressure values and
-no fabricated defaults. Pending edits are staged before the single Apply. Existing Physical
-Properties presentation remains assigned to 151C/D until its controls and native proof are complete.
+no fabricated defaults. Pending edits are staged before the single Apply. Physical Properties uses
+the separate read-only Inspect task described below.
 
 The [ordinary Material task](images/material-management-assignment.png) is an unmodified native
 1280×800 capture at 100% scaling; the [compact Material task](images/material-management-compact.png)
@@ -370,6 +372,13 @@ readout states. Whole 151 status and combined acceptance remain in the existing 
 The [compact Root query](images/physical-properties-compact.png) is the unmodified 1536×960-pixel
 capture of a 1024×640-DIP window at 150%. Its current mass, availability and Refresh/Copy/Close stay
 visible without scrolling; units/scopes, tensor and centroid controls remain reachable vertically.
+
+The continuous revision/history proof captures [explicit definition selection](images/material-physical-revision-selection.png)
+and [revised Root totals](images/material-physical-revision-totals.png) at 100%. The first view
+distinguishes equally named definitions by document ID and leaves the unselected member pinned;
+the second displays **44.8 g**, unchanged **6.4 cm³** and separate mass/volume centroids.
+The [compact partial query](images/material-physical-partial-compact.png) follows a completed
+End-of-Part material edit and retains its known-subset mass and query footer at 150% scaling.
 
 | Ribbon/context | Planned commands | Required workflow |
 | --- | --- | --- |

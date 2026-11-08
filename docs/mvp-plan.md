@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 150
-current_block: 151
-current_boundary: Block 151C Physical Properties task verified; combined acceptance remains
-current_tag: "[parity-b151]"
+implemented_through: Block 151
+current_block: 152
+current_boundary: Block 152 HoleFeature Core model and standards resolution planned; not started
+current_tag: "[parity-b152]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–150 accepted; Block 151 in progress; Blocks 152–204 planned"
+  advanced_modeling_workflows: "Blocks 145–151 accepted; Blocks 152–204 planned"
 ---
 
 # MVP Plan
@@ -33,10 +33,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 150
-current block        Block 151 (in progress; slice C)
-current phase        Materials and physical properties UI
-current boundary     Inventor-like assignment and physical-property tasks
+implemented through  Block 151
+current block        Block 152 (planned; not started)
+current phase        Semantic holes and threads
+current boundary     HoleFeature Core model and standards resolution
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1776,8 +1776,8 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–150 are **Implemented and accepted**;
-Block 151 is **In progress**; Blocks 152–204 are **Planned; not started**.
+Status authority: Blocks 145–151 are **Implemented and accepted**;
+Blocks 152–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1786,7 +1786,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
-| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | 145–150 accepted; 151 in progress |
+| A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
@@ -2385,7 +2385,7 @@ occurrence, history or geometry authority is introduced.
 | 151A | Qt-free material candidate/transaction and physical-query controllers; exact source/scope guards, display units/clipboard data, qualified Body/occurrence totals and focused combined tests | Implemented and verified; PR #159 |
 | 151B | Manage Material task, Part/Body assignment/context starts, immutable revision/provenance controls and explicit selected-member updates through existing session owners | Implemented and verified; PR #160 |
 | 151C | Inspect Physical Properties task, scope/units/refresh/status/precision, clipboard and transient centroid presentation through existing viewport/task owners | Implemented and verified; PR #161 |
-| 151D | R01–R02/UI01 native combined assignment/revision/history/Save/Open, nested/multi-Body/missing-density scopes, ordinary/compact/scaled layout and full acceptance | Planned; not started |
+| 151D | R01–R02/UI01 native combined assignment/revision/history/Save/Open, nested/multi-Body/missing-density scopes, ordinary/compact/scaled layout and full acceptance | Implemented and verified; PR #162 |
 
 Material editing stages typed changes outside committed intent; identical intent creates no history
 entry. Ready End-of-Part metadata edits use the existing child workflow. Physical Properties requires
@@ -2482,6 +2482,42 @@ stays 150; whole 151/Phase A and combined Materials GUI capability remain gated 
 `de88ffe`. The delivery-record update changes documentation only and preserves all 1,017 verified
 runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed main
 before starting D.
+
+151D starts on `feat/material-physical-combined-acceptance` after PR #161 is confirmed merged as
+`0888712`; refreshed main matches reviewed tree `ad444074d9f422fda200076032a8e7c59e35758c`.
+Extend the existing Physical Properties shell proof with one continuous native scenario: query
+repeated/hidden multi-Body occurrences → adopt a synthetic density revision for explicitly selected
+definitions → verify independent mass/centroid and unchanged topology/unselected pins → Save while
+querying/explicit Refresh → Undo/Redo/reopen offline snapshots → standalone End-of-Part material
+child/outer Save/Cancel → publish a partial known-density mass and undo once. Ordinary/compact native
+layout and clipboard/centroid proofs from B/C run alongside it. Existing actual-supplier, empty/
+Surface/unknown-density, stale scopes and source/lifetime guards remain acceptance inputs. Whole 151
+and Phase A advance only after this combined gate; the existing Materials capability then records
+both real commands, their APIs and native proof filters without a competing feature plan.
+
+151D final acceptance closes **whole Block 151 and Phase A (145–151)**. The continuous native
+scenario passes with independent Root mass **44.8 g**, unchanged **6.4 cm³**, distinct mass/volume
+centroids, portable standalone snapshots, selected-member-only revision adoption, unchanged BRep
+ownership and one-step history. Equal Part display names expose one bounded UI defect: qualify
+Material target labels/tooltips by existing document ID, keeping the existing target data unchanged.
+Final native 100% **52 / 3,316** and compact 150% **52 / 3,324** pass without failures/skips.
+Full offscreen GUI passes **721 / 39 expected native-only skips / 91,503 assertions** across
+**760 cases**, before the docs-only boundary/capability projection; final inventory runs after it.
+The existing Materials capability now records both actual commands, four public APIs and six
+positive headless/native proof mappings, reusing the existing audit. Reviewed unmodified captures,
+negative label proof and final source freeze are in `development-setup.md`. Core **657 / 25,706**
+and Geometry **601 / 53,123** are retained unchanged, not rerun. Final inventory, separate native
+startup, staged source/freeze review and normal protected PR delivery complete the delivery gate.
+Final post-projection inventory passes **5 / 658**, without failures/skips. Separate native startup
+reaches intentional timeout **124**. Working-source formatting/whitespace review passes and all
+**1,017** runtime fingerprints remain unchanged (SHA-256
+`f45525e715c899c6c3638e27edb38bf4743575a02bcba3395eec9a718a4727ee`).
+Block 152 is **Planned; not started** until this branch is merged and refreshed main is verified.
+
+151D/whole-151 delivery: [PR #162](https://github.com/GideonBa/Better-Linux-CAD/pull/162),
+implementation `985849a`. The delivery-record update changes documentation only and preserves all
+1,017 runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed
+main before starting Block 152.
 
 ## Later phases
 

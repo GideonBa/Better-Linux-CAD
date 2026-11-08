@@ -165,8 +165,11 @@ struct ShellMaterialTools::Impl {
       if (const auto* p = controller.part())
         parts->addItem(text(p->name()), text(p->id().value()));
       if (const auto* root = controller.project())
-        for (const auto& p : root->part_documents())
-          parts->addItem(text(p.name()), text(p.id().value()));
+        for (const auto& p : root->part_documents()) {
+          const auto qualified = text(p.name()) + " — " + text(p.id().value());
+          parts->addItem(qualified, text(p.id().value()));
+          parts->setItemData(parts->count() - 1, qualified, Qt::ToolTipRole);
+        }
       const auto index = parts->findData(old_part);
       if (index >= 0)
         parts->setCurrentIndex(index);
@@ -183,6 +186,7 @@ struct ShellMaterialTools::Impl {
     show_assignment();
   }
   void show_assignment() {
+    parts->setToolTip(parts->currentText());
     const QSignalBlocker blocker(assignment);
     assignment->clear();
     assignment->addItem(selected_body() ? "Inherit Part default" : "Unassigned", -1);

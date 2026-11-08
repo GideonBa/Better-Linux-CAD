@@ -4784,3 +4784,109 @@ verified; whole 151/Phase A and the Materials capability retain the D combinatio
 Delivery: [PR #161](https://github.com/GideonBa/Better-Linux-CAD/pull/161), implementation `de88ffe`.
 The delivery-record update changes documentation only; all 1,017 runtime fingerprints remain
 unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main before D.
+
+## Block 151D — combined Material/Physical Properties acceptance, 2026-11-08
+
+Starts on `feat/material-physical-combined-acceptance` from confirmed merged PR #161/main
+`0888712`, after exact comparison with reviewed tree `ad444074d9f422fda200076032a8e7c59e35758c`.
+The initial D proof changes no production/Core/Geometry code. Extend the existing shell proof with a continuous
+native revision→qualified hidden/multi-Body Root query→Save/Refresh→Undo/Redo/reopen→standalone
+prefix metadata/outer Save/Cancel→partial known-density mass→single Undo scenario. Independent
+oracles are Root mass **0.0448 kg**, COM **(21.4285714286, 6.4285714286, 4) mm**, unchanged VCOM
+**(22.5, 7.5, 4) mm**, then standalone partial mass **0.0096 kg**, COM **(30, 0, 4) mm** versus
+VCOM **(15, 0, 4) mm**. Unselected definitions and selected/untouched BRep identity remain fixed.
+
+Initial two-target build passes (`blcad151d-initial-build.log`); first native combined case passes
+**1 / 186** (`blcad151d-native-focused.log`). Extend the offline oracle by removing the Project
+file after standalone extraction. Reconcile the existing Materials capability to native owner 151,
+both real commands, existing public APIs and positive headless/native filters; a focused inventory
+case resolves actual ribbon entries, header methods and registered proof/source identities.
+Review build: `blcad151d-review-build.log`. Whole 151/Phase A acceptance remains pending the final
+ordinary/compact combined native, full GUI, inventory/source/freeze review and normal PR delivery.
+
+The review build passes. An initial inventory run has **6 cases: 4 passed / 2 failed**, **526
+passing / 2 failing assertions** (`blcad151d-inventory.log`): the existing workflow-evidence audit
+correctly rejects an implemented capability owned by 151 while the numbered boundary remains 150.
+Keep the Materials mapping planned until final D execution passes, then advance the MVP boundary
+and mapping together and rerun that audit. Reuse the existing API/command/proof validator rather
+than keep the newly duplicated material-specific audit case; restore its source unchanged.
+The prepared single capability projection is retained only as a temporary review artifact, not a
+second repository authority. Gated rebuild: `blcad151d-gated-build.log`.
+
+With the numbered/capability mapping still correctly planned, the combined native 100% set passes
+**52 / 3,311** and compact 150% **52 / 3,319**, without failures/skips (`blcad151d-native-100.log`,
+`blcad151d-native-150.log`). This includes deletion of the Project file, standalone snapshot
+portability and the unchanged existing inventory. Capture review adds one bounded UI correction:
+different owned Part definitions may share the same display name, but their Material target combo
+previously displayed that name alone. Require distinct qualified target labels/current identity/
+full tooltip before final acceptance. Diagnostic build: `blcad151d-target-proof-build.log`.
+
+The new native target-label oracle fails **3 assertions** while the other **183 pass** in one
+case (`blcad151d-target-proof.log`): two target labels are identical and the current label/tooltip
+omit the owning identity. Qualify Project Part display labels with their existing document ID and
+set full item/current tooltips, retaining the unchanged ID data and controller authority. This is
+the only D production change; it does not change assignment, geometry or persistence behavior.
+Corrective rebuild: `blcad151d-target-fix-build.log`.
+
+The corrective two-target build passes. Final source/test/asset/build-script freeze covers **1,017**
+files (`/tmp/blcad151d-runtime-freeze.json`), SHA-256
+`f45525e715c899c6c3638e27edb38bf4743575a02bcba3395eec9a718a4727ee`.
+The pre-target-label manifest remains in `blcad151d-pre-target-runtime-freeze.json`. Final native
+runs use the following commands on this frozen runtime; their results are recorded below.
+
+```bash
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad151d-native-final-100 ./build/dev-gui/blcad_gui_tests "[physical-properties-shell],[material-shell],[material-physical-combined],[physical-properties-controller],[physical-reuse-session],[history-marker-shell],[block136-measure],[block136-assembly-analysis],[shell-coverage]" --durations yes
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_COMPACT=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad151d-native-final-150 ./build/dev-gui/blcad_gui_tests "[physical-properties-shell],[material-shell],[material-physical-combined],[physical-properties-controller],[physical-reuse-session],[history-marker-shell],[block136-measure],[block136-assembly-analysis],[shell-coverage]" --durations yes
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+Final native 100% passes **52 / 3,316**, without failures/skips
+(`blcad151d-native-final-100.log`). The combined case now passes the previously failing qualified
+target assertions. Reviewed raw selected-revision and Root-query captures show only the explicitly
+checked definition updated, complete **44.8 g**, the independent mass/volume centroids and fixed
+read-only query footer. Compact 150%, full GUI and post-boundary inventory remain pending.
+
+Reviewed unmodified 1280×800 final 100% captures are copied to
+`images/material-physical-revision-selection.png` (SHA-256
+`0d51e55da5a62b02cc0c8ae8bd4627e65f20d962c6221d0c0c2963d635733a10`) and
+`images/material-physical-revision-totals.png` (SHA-256
+`a78614c29d47d2c4999abe10c7fcd8583f9197208b1a6ce639511c47a0b4cc8b`).
+These are native captures without image edits. The source freeze still has zero changed runtime
+files after capture review and documentation edits.
+
+Final compact 150% passes **52 / 3,324**, without failures/skips
+(`blcad151d-native-final-150.log`). Reviewed all three final compact captures: revision selection
+shows the checked/unchecked qualified members, Root footer retains complete **44.8 g**, and the
+completed prefix edit shows known-density subset **0.0096 kg** with fixed Refresh/Copy/Close. The
+latter is copied unchanged to `images/material-physical-partial-compact.png` (1536×960 physical
+pixels / 1024×640 DIP); its hash is recorded with the final review below. Full offscreen GUI runs
+on the same frozen source before the docs-only numbered/capability projection is advanced.
+
+Compact partial-query capture SHA-256:
+`527cb1ed67ae8c0ce6077b8d0af81fbd73c86df66a93c34f079be431b8be1262`.
+Upstream ruleset `18686807` is rechecked at delivery preparation (2026-11-08 13:19 UTC): active
+PR requirement, zero required approving reviews, no required status-check rule, deletion and
+non-fast-forward protections. Delivery uses a normal protected PR merge with exact head, never bypass.
+Core (**657 / 25,706**) and Geometry (**601 / 53,123**) are unchanged from the accepted foundations;
+these results are retained rather than rerun for this bounded shell-label/test change.
+
+Full offscreen GUI passes **760 cases: 721 passed / 39 expected native-only skips / 91,503
+assertions** (`blcad151d-full-gui.log`) on the frozen runtime before the documentation projection.
+Advance only the existing MVP boundary to accepted-through 151/current 152 planned and the Materials
+capability to its completed owner 151 with both commands, four APIs and six positive proof mappings.
+No runtime file changes for this projection; rerun the existing inventory audit after it.
+
+Post-projection inventory passes **5 / 658**, without failures/skips
+(`blcad151d-final-inventory.log`). Separate native startup reaches intentional timeout **124**
+(`blcad151d-startup.log`, `blcad151d-startup-status.txt`). Final working-source diff review,
+modified-line formatting and whitespace checks pass; all **1,017** runtime fingerprints remain
+unchanged. The inventory count increases from 568 because the existing audit now resolves the
+additional Material/Physical Properties APIs, commands and registered proof sources. No duplicate
+audit implementation is retained. Delivery proceeds by reviewed staged diff and normal protected PR.
+
+151D delivery uses [PR #162](https://github.com/GideonBa/Better-Linux-CAD/pull/162), implementation
+`985849a319eab74c7024ffdb7f364484efff998d` (initial reviewed tree
+`2bdd0365db3bd7227e7f4e71488054134337046d`). The separate delivery-record commit changes these
+existing docs only; all 1,017 runtime fingerprints remain unchanged. Check the final pushed head's
+merge/review/check state and merge normally before refreshing main and opening the next branch.

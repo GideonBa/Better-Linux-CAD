@@ -1531,16 +1531,101 @@
       },
       {
         "capability": "materials",
-        "owner": 149,
-        "disposition": "planned",
+        "owner": 151,
+        "disposition": "implemented",
         "contract": "docs/engineering-modules.md",
-        "planned_commands": [
-          "Material",
-          "Physical Properties"
+        "commands": [
+          "blcad.action.material",
+          "blcad.action.physical_properties"
         ],
-        "commands": [],
-        "apis": [],
-        "proofs": []
+        "apis": [
+          {
+            "source": "include/blcad/gui/gui_materials.hpp",
+            "type": "GuiMaterialController",
+            "methods": [
+              "begin",
+              "stage_material",
+              "stage_assignment",
+              "stage_revision",
+              "stage_remove",
+              "apply",
+              "cancel"
+            ]
+          },
+          {
+            "source": "include/blcad/gui/gui_physical_properties.hpp",
+            "type": "GuiPhysicalPropertiesController",
+            "methods": [
+              "begin",
+              "refresh",
+              "set_units",
+              "select_scope",
+              "view",
+              "clipboard_text",
+              "cancel"
+            ]
+          },
+          {
+            "source": "include/blcad/gui/shell/shell_material_tools.hpp",
+            "type": "ShellMaterialTools",
+            "methods": [
+              "begin",
+              "stage_assignment",
+              "stage_snapshot",
+              "remove_snapshot",
+              "apply",
+              "cancel"
+            ]
+          },
+          {
+            "source": "include/blcad/gui/shell/shell_physical_properties_tools.hpp",
+            "type": "ShellPhysicalPropertiesTools",
+            "methods": [
+              "begin",
+              "update_query",
+              "copy",
+              "cancel"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[gui][material-shell]",
+            "source": "tests/gui/gui_shell_material_tests.cpp"
+          },
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[gui][physical-properties-shell]",
+            "source": "tests/gui/gui_shell_physical_properties_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][material-shell]",
+            "source": "tests/gui/gui_shell_material_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][physical-properties-shell]",
+            "source": "tests/gui/gui_shell_physical_properties_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][physical-centroid-native]",
+            "source": "tests/gui/gui_shell_physical_properties_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][material-physical-combined]",
+            "source": "tests/gui/gui_shell_physical_properties_tests.cpp"
+          }
+        ]
       },
       {
         "capability": "semantic-holes",
