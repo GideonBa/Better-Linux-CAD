@@ -195,6 +195,18 @@ is checked separately from the executed native scenarios and never substitutes f
   override later in 190 and failed multi-document resource update. Appearance changes cannot alter mass.
 - Oracle: dimensionally converted pinned values, resource hashes and unchanged geometry fingerprints.
 
+151B adds `[material-shell]` for the actual Manage action/shared Part-and-Body browser context:
+pending assignment plus Save, one accepted Undo/Redo, reopen, identical intent and Cancel, foreign
+and stale targets, immutable-key conflicts, normative-reference validation and preservation of
+unchanged property provenance. Project adoption checks only explicitly selected definitions and
+retains unselected pins/BRep identity. `[material-history-shell]` checks the ready-prefix child,
+blocked unfinished parent Apply, outer Save, parent Cancel and single final Undo.
+`[material-layout]` runs the visible task with long plain-text names and unknown density at ordinary
+and compact/scaled sizes, checking the viewport and Apply/Cancel remain reachable and capturing the
+result. `[material-project-scene]` checks complete member-cache use, multiple visible Bodies,
+canonical repeated/nested poses, hidden participation and rejection of missing/stale/partial caches.
+These bounded B proofs do not advance the Physical Properties controls or whole 151 before C/D.
+
 
 149A `[core][engineering-resource]` supplies the typed foundation: normalized density/pressure,
 per-value provenance, absent density, schema/row/cell validation, immutable key collisions,

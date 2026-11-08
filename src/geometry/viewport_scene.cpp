@@ -2,6 +2,7 @@
 #include "blcad/core/sketch_contour.hpp"
 #include "part_history_evaluation.hpp"
 
+#include "assembly_occt_rigid_transform.hpp"
 #include "assembly_posed_leaf_shapes.hpp"
 #include "geometry_shape_internal.hpp"
 
@@ -22,6 +23,7 @@
 #include <BRepBuilderAPI_MakePolygon.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepBuilderAPI_Transform.hxx>
 #include <BRep_Builder.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <Geom_BezierCurve.hxx>
@@ -45,6 +47,7 @@
 #include <numbers>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -914,6 +917,80 @@ ViewportSceneBuilder::build_project(const Project& project) const {
     items.push_back({ViewportSceneKind::Component, semantic_id, std::move(shape)});
   }
   return Result<std::vector<ViewportSceneItem>>::success(std::move(items));
+}
+
+Result<std::vector<ViewportSceneItem>> ViewportSceneBuilder::build_project(
+    const Project& project,
+    const std::function<const ShapeCache*(DocumentId)>& member_cache) const {
+  const auto valid = project.validate_assembly_structure();
+  if (!valid)
+    return Result<std::vector<ViewportSceneItem>>::failure(valid.error());
+  auto leaves = AssemblyLeafOccurrenceResolver{}.resolve(project);
+  if (!leaves)
+    return Result<std::vector<ViewportSceneItem>>::failure(leaves.error());
+  try {
+    std::unordered_map<std::string, TopoDS_Shape> definitions;
+    std::vector<ViewportSceneItem> items;
+    for (const auto& leaf : leaves.value()) {
+      const auto id = leaf.referenced_part_document;
+      if (!definitions.contains(id.value())) {
+        const auto* part = project.find_part_document(id);
+        const auto* cache = member_cache ? member_cache(id) : nullptr;
+        if (!part || !cache)
+          return Result<std::vector<ViewportSceneItem>>::failure(
+              scene_error("Complete member results are unavailable"));
+        if (part->is_reference_part()) {
+          // Reference geometry has its own complete source/catalog/body owner;
+          // native feature/body provenance does not describe that storage.
+          const auto reference = cache->validated_reference_result(*part);
+          if (!reference)
+            return Result<std::vector<ViewportSceneItem>>::failure(reference.error());
+        } else {
+          const auto complete = cache->validate_complete_geometry_result(*part);
+          if (!complete)
+            return Result<std::vector<ViewportSceneItem>>::failure(complete.error());
+        }
+        auto scene = build_part(*part, *cache);
+        if (!scene)
+          return scene;
+        BRep_Builder builder;
+        TopoDS_Compound compound;
+        builder.MakeCompound(compound);
+        bool any = false;
+        for (const auto& item : scene.value())
+          if ((item.kind == ViewportSceneKind::SolidBody ||
+               item.kind == ViewportSceneKind::SurfaceBody) &&
+              !item.shape.empty() && (part->bodies().empty() || !item.owner_body_id.empty())) {
+            builder.Add(compound, item.shape.impl_->shape);
+            any = true;
+          }
+        definitions.emplace(id.value(), any ? TopoDS_Shape(compound) : TopoDS_Shape{});
+      }
+      const auto& definition = definitions.at(id.value());
+      if (definition.IsNull())
+        continue;
+      gp_Trsf transform;
+      for (const auto& pose : leaf.transforms_inner_to_outer)
+        transform = detail::to_occt_rigid_transform(pose) * transform;
+      // Rigid location only: retain the authoritative member BRep topology.
+      BRepBuilderAPI_Transform posed(definition, transform, false);
+      if (!posed.IsDone() || posed.Shape().IsNull())
+        return Result<std::vector<ViewportSceneItem>>::failure(
+            scene_error("Could not pose member results"));
+      GeometryShape shape(std::make_shared<GeometryShape::Impl>(posed.Shape()));
+      items.push_back({ViewportSceneKind::Component,
+                       "component/" + detail::leaf_occurrence_key(leaf), std::move(shape)});
+    }
+    if (import_context_) {
+      const auto fresh = import_context_->validate_sources();
+      if (!fresh)
+        return Result<std::vector<ViewportSceneItem>>::failure(fresh.error());
+    }
+    return Result<std::vector<ViewportSceneItem>>::success(std::move(items));
+  } catch (const Standard_Failure& failure) {
+    return Result<std::vector<ViewportSceneItem>>::failure(scene_error(
+        failure.GetMessageString() ? failure.GetMessageString() : "Could not build member scene"));
+  }
 }
 
 } // namespace blcad::geometry

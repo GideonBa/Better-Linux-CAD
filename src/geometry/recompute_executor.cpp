@@ -4800,6 +4800,35 @@ void GeometryRecomputeExecutor::record_complete_geometry_source(const PartDocume
 
 Result<GeometryRecomputeSummary> GeometryRecomputeExecutor::refresh_material_metadata(
     const PartDocument& before, const PartDocument& after, ShapeCache& cache) const {
+  if (before.is_reference_part() || after.is_reference_part()) {
+    // Immutable Reference Parts retain their own source/catalog/body result.
+    // Unchanged definitions can accompany a Project catalogue edit without
+    // receiving fabricated native feature/body provenance or new topology.
+    const auto old_source = serialize_part_document_to_json(before);
+    const auto new_source = serialize_part_document_to_json(after);
+    if (!before.is_reference_part() || !after.is_reference_part() || !old_source || !new_source ||
+        old_source.value() != new_source.value() ||
+        before.executable_generation() != after.executable_generation())
+      return Result<GeometryRecomputeSummary>::failure(Error::dependency(
+          after.id().value(),
+          "Reference result reuse requires an unchanged definition and lifetime"));
+    const auto complete = cache.validate_complete_history_result(before);
+    if (!complete)
+      return Result<GeometryRecomputeSummary>::failure(complete.error());
+    const auto previous = cache.validated_reference_result(before);
+    if (!previous)
+      return Result<GeometryRecomputeSummary>::failure(previous.error());
+    const auto next = cache.validated_reference_result(after);
+    if (!next)
+      return Result<GeometryRecomputeSummary>::failure(next.error());
+    const auto observed = observe_imported_part_sources(after, import_context_);
+    if (!observed)
+      return Result<GeometryRecomputeSummary>::failure(observed.error());
+    const auto fresh = validate_import_sources();
+    if (!fresh)
+      return Result<GeometryRecomputeSummary>::failure(fresh.error());
+    return Result<GeometryRecomputeSummary>::success({0, true});
+  }
   const auto provenance = cache.validate_complete_geometry_result(before);
   if (!provenance)
     return Result<GeometryRecomputeSummary>::failure(provenance.error());

@@ -4539,3 +4539,152 @@ documentation updates. A alone is verified; whole 151, visible tasks and Phase A
 Delivery: [PR #159](https://github.com/GideonBa/Better-Linux-CAD/pull/159), implementation `65708dc`.
 The delivery-record update changes documentation only; all 1,011 runtime fingerprints remain
 unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main before B.
+
+## Block 151B — Material task, 2026-11-08
+
+Starts on `feat/material-management-task` from confirmed merged PR #159, main `956fdc2`, after
+exact comparison with reviewed tree `489592d1ecdcba75a239acfb59fe0c5c32650004`. Whole-block status
+stays in `mvp-plan.md`; the existing engineering/UI contracts own assignment and provenance.
+The task reuses 151A's typed candidate and the existing task/prefix-child owners. The Project
+viewport additionally accepts complete session member caches, retaining visible multiple Bodies
+and canonical nested poses without a second geometry recomputation. Existing export behavior is
+unchanged. Six new shell cases cover pending Save, one Undo, no-op/Cancel/staleness, immutable and
+normative/property provenance, explicit selected definitions, prefix parent/child publication and
+ordinary/compact long-name layout. Two Geometry cases cover multi-Body/hidden/suppressed scope,
+canonical transforms, metadata reuse and rejection of missing/stale/partial member results.
+
+Initial affected-target build:
+
+```bash
+cmake --build build/dev-gui --target blcad_geometry_tests blcad_gui_tests blcad -j8
+```
+
+The initial 121-target build passes (`blcad151b-initial-build.log`); existing missing-field
+initializers in older viewport/sketch tests and the optional XKB configure diagnostic are retained.
+Initial focused Geometry passes **2 / 28**. Initial shell verification passes **5 of 6 cases**,
+with **158 passing / 1 failing assertions**: the Project fixture used `.project.json` rather than
+the documented `.blcad.project.json` dispatch suffix. Correct the fixture, without changing Open.
+Logs: `blcad151b-initial-geometry-focused.log`, `blcad151b-initial-gui-focused.log`.
+Review additionally qualifies local browser IDs by their existing owner, adds a second-member Body
+context regression and real STEP Reference Part read-only/Project-library checks, and excludes the
+legacy final-shape fallback when every explicit Body is hidden. Extended Geometry covers all-hidden
+and suppressed occurrences. Eight shell cases and the two extended Geometry cases now require
+verification. The review rebuild is retained in `/tmp/blcad151b-review-build.log`.
+
+The review rebuild passes all 97 targets. Extended focused Geometry passes **2 / 35**, and the
+full Geometry suite passes **601 / 53,093**, without failures/skips. Extended UI passes **7 of 8**,
+with **267 passing / 1 failing assertions**: the new scene path incorrectly requested native
+feature/body cache provenance for a Reference Part, whose complete source/catalog/body result is
+owned separately. Retain the existing Reference-result validator and actual-import checks rather
+than fabricate native feature provenance. Add an independent repeated/nested Reference scene
+comparison against the existing cold path (matching IDs, volumes and posed centroids). Logs are
+`blcad151b-review-gui-focused.log`, `blcad151b-review-geometry-focused.log`,
+`blcad151b-geometry-full.log`; the corrective rebuild is `blcad151b-reference-build.log`.
+These initial full-suite results precede the Reference correction and are not final acceptance.
+
+The Reference scene correction builds successfully (120 targets), and focused Geometry passes
+**27 / 8,132** (`blcad151b-reference-geometry-focused.log`). A further GUI identity assertion
+demonstrates an existing metadata-reuse gap: adding only a Project library snapshot rebuilds the
+unchanged Reference member. Isolated proof has **60 passing / 1 failing assertions** in one case
+(`blcad151b-reference-identity-proof.log`); the corrected scene itself is now present. Add a narrow
+unchanged-Reference branch to metadata refresh, retaining its separate ownership plus complete
+scope/exact-content/lifetime/actual-import validation. Geometry additionally checks no-context,
+partial and changed-byte rejection and recovery without replacing the original topology.
+Corrective build: `blcad151b-reuse-build.log`. An optional read-only host process diagnostic was
+not started because automatic approval review timed out; no process arguments were read and no
+retry is needed after the build completes. This timeout does not imply an unsafe build/test action.
+
+The six-target metadata-reuse rebuild passes (`blcad151b-reuse-build.log`), with the existing unused
+helper warning in `recompute_executor.cpp`. Corrected focused Geometry passes **27 / 8,146**,
+including separate Reference ownership, no-context/partial/changed-supplier rejection and restored
+supplier recovery. Focused combined GUI/controller verification passes **29 / 964** without
+failures/skips, including all eight Material task cases and actual Reference BRep identity.
+Logs: `blcad151b-reuse-geometry-focused.log`, `blcad151b-final-gui-focused.log`.
+Current runtime freeze: **1,014** files, SHA-256
+`d95caf6800ca6cc74988a06f4df2ad6aaec08dc373c561a9b97279333e02e5de`
+(`/tmp/blcad151b-runtime-freeze.json`); the earlier 1,014-file manifest remains in
+`blcad151b-initial-runtime-freeze.json`. Final full Geometry/GUI, native ordinary/compact/scaled
+interaction, startup, captures and inventory/source review remain pending.
+
+Final full Geometry passes **601 / 53,123** without failures/skips
+(`blcad151b-geometry-final-full.log`). The complete GUI suite is running against the same frozen
+runtime sources (`blcad151b-gui-full.log`). Core **657 / 25,706** is retained from the preceding
+accepted delivery: this slice changes no Core runtime or Core tests and does not claim a rerun.
+
+Final full GUI passes **750 cases: 713 passed / 37 expected native-only skips**, with **90,971
+passing assertions** and no failures (`blcad151b-gui-full.log`). This also runs all 14 controllers
+introduced in 151A, whose bounded delivery deliberately retained the preceding full-GUI result.
+All eight new visible Material cases pass. Native ordinary/compact/scaled evidence still follows.
+The initial native 100% invocation is not started because automatic approval review times out;
+the explicitly permitted single retry is approved and starts normally. No rejected test execution
+or failed UI assertion is inferred from that approval timeout.
+
+```bash
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad151b-native-100 ./build/dev-gui/blcad_gui_tests "[material-shell],[resource-revision-integration],[physical-reuse-session],[history-marker-shell],[block136-assembly],[block136-assembly-context],[block136-assembly-analysis],[block140-reference-parts],[block136-measure],[shell-coverage]" --durations yes
+```
+
+Initial native 100% passes **57 / 5,474**, without failures/skips. Raw capture review nevertheless
+finds horizontal overflow from the long effective-material label: the Stage Assignment caption is
+outside the visible area. Footer-only layout assertions had missed this. Apply the existing history
+label sizing pattern (ignored horizontal size hint, bounded dynamic-label heights with full tooltips)
+to Material labels. Strengthen layout proof with zero horizontal scroll range, fully reachable
+assignment/property/adoption/removal widgets and a visible Stage Assignment caption. The 150%
+invocation has not started because automatic approval times out; its permitted retry is postponed
+until the layout correction is rebuilt. These initial native/full-GUI results precede the final
+label sizing correction. Layout rebuild: `blcad151b-layout-build.log`.
+
+The layout rebuild passes. Strengthened focused UI yields **7 of 8 cases**, **315 passing / 1
+failing assertions** (`blcad151b-layout-gui-focused.log`): the horizontal-overflow check now passes,
+but one scrolled widget's bottom corner is outside the viewport. Add widget/rectangle diagnostics
+and resolve the clipped reachability condition before native reruns. Diagnostic build:
+`blcad151b-layout-diagnostic-build.log`. No final layout acceptance is claimed from the earlier
+footer-only test or the 100% capture.
+
+The diagnostic isolates the Density editor at `(153,393)…(296,424)` in a `310×413` viewport.
+Qt's `ensureWidgetVisible` uses QLineEdit's cursor rectangle; a two-pixel margin does not scroll
+the complete editor frame into view. Keep the full-widget containment assertion and use a margin
+covering the editor frame. This corrects the test's scrolling action, without weakening the layout
+requirement. Logs: `blcad151b-layout-diagnostic.log`, `blcad151b-layout-final-build.log`.
+
+The corrected scrolling action rebuilds successfully and all eight Material cases pass **316
+assertions** (`blcad151b-layout-final-focused.log`), including zero horizontal overflow and full
+widget/frame reachability. The explicitly permitted 150% approval retry starts normally against
+the corrected runtime sources; final native results/capture review and full-GUI confirmation follow.
+
+Final native compact 150% passes **33 / 3,276**, without failures/skips (`blcad151b-native-150.log`):
+
+```bash
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_COMPACT=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad151b-native-150 ./build/dev-gui/blcad_gui_tests "[material-shell],[resource-revision-integration],[physical-reuse-session],[history-marker-shell],[block136-assembly-analysis],[native-step-reference-parts],[block136-measure]" --durations yes
+```
+
+Final native 100% passes **57 / 5,515**, without failures/skips (`blcad151b-native-final-100.log`),
+using the initial 100% filter with capture directory `blcad151b-native-final-100`. Both runs include
+all eight Material cases and existing history, resource, assembly, Reference and finite-Measure
+combinations. Native viewer/pick assertions run; OCCT's existing Visual depth/stencil diagnostics
+remain without a viewer-unavailable/test failure. Raw capture review confirms the Stage Assignment
+caption, bounded plain-text long names, vertical-only task scrolling and fixed Apply/Cancel footer.
+The ordinary capture is 1280×800; compact is 1536×960 physical pixels = 1024×640 DIP at 150%.
+Unmodified copies are `images/material-management-assignment.png` and
+`images/material-management-compact.png`, with SHA-256 respectively
+`1bcf1af4f72db50e8f31e8a80f5b18f362ee2661271b6948feb4e4e6a512047d` and
+`1d10f405d60e389940eddda036ff43b829cf76d5da551174448b5896efb6c325`.
+
+Separate native startup reaches intentional timeout **124** (`blcad151b-startup.log`,
+`blcad151b-startup-status.txt`). Final inventory passes **5 / 568** without failures/skips
+(`blcad151b-final-inventory.log`). Final runtime freeze remains **1,014** files, now SHA-256
+`8313f8f2f66206da1303258bfa0d088d451fbcd583883e0da3163ae6270356bf` after the label/test correction;
+the preceding manifests are retained separately. The final full GUI confirmation is running in
+`blcad151b-gui-final-full.log`. Full Geometry **601 / 53,123** is retained: subsequent changes are
+confined to Material label sizing and its GUI test, without Geometry/Core changes.
+
+Final full GUI confirmation passes **750 cases: 713 passed / 37 expected native-only skips**,
+with **91,012 passing assertions**, no failures (`blcad151b-gui-final-full.log`). These are the
+final corrected Material labels and strengthened reachability tests, rather than the earlier
+pre-correction GUI run. Source/new-file/modified-line/staged review and whitespace checks pass;
+final formatting diffs `blcad151b-final-format.diff` / `blcad151b-staged-format.diff` are empty.
+All 1,014 runtime fingerprints remain unchanged through the verification and documentation updates.
+B alone is verified. Whole 151, Physical Properties controls and Phase A retain their C/D gates.
+
+Delivery: [PR #160](https://github.com/GideonBa/Better-Linux-CAD/pull/160), implementation `f6ec440`.
+The delivery-record update changes documentation only; all 1,014 runtime fingerprints remain
+unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main before C.
