@@ -4688,3 +4688,99 @@ B alone is verified. Whole 151, Physical Properties controls and Phase A retain 
 Delivery: [PR #160](https://github.com/GideonBa/Better-Linux-CAD/pull/160), implementation `f6ec440`.
 The delivery-record update changes documentation only; all 1,014 runtime fingerprints remain
 unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main before C.
+
+## Block 151C — Physical Properties task, 2026-11-08
+
+Starts on `feat/physical-properties-task` after PR #160 is confirmed merged as `8a4d9f5` and main
+matches reviewed tree `23bfd037ad6a2c4151c43c6fb2987e88f8828f4e`. The existing GUI Measure and
+engineering contracts own the read-only boundary; `mvp-plan.md` alone owns numbered acceptance.
+The task reuses 151A's controller and the existing explicit window/task/camera owners, without a
+new geometry, occurrence, selection or persistence authority. A transparent viewport child draws
+the explicitly chosen canonical volume/mass centroid; frame-aligned axes are presentation only.
+Scope/units/refresh/copy and complete/partial/unavailable/not-applicable values remain distinct.
+Nine new shell cases cover real ribbon/clipboard, typed units/tensors/provenance, qualified repeated
+occurrence/Body scopes, Save staleness, Material→partial mass→Undo, lost scopes, empty/Surface,
+busy/prefix guards, actual STEP supplier bytes, native marker pixels/camera/unit invariance and
+ordinary/compact/scaled widget/footer reachability. Native centroid proof skips offscreen explicitly.
+
+Initial affected-target build:
+
+```bash
+cmake --build build/dev-gui --target blcad_gui_tests blcad -j8
+```
+
+Output: `/tmp/blcad151c-initial-build.log`. Verification is pending; whole 151/Phase A remain open.
+
+The initial 88-target build passes with only existing older-test warnings. Initial focused UI has
+**9 cases: 6 passed / 2 failed / 1 expected native-only skip**, **409 passing / 3 failing assertions**
+(`blcad151c-initial-gui-focused.log`). All failures compare formatted centroid strings to exact
+zero-coordinate spellings; the analytic integrator retains tiny nonzero floating-point residuals.
+Use independent numeric centroid oracles with `1e-9` relative / `1e-10` absolute display-unit
+tolerance, retaining explicit unit and known-subset assertions rather than rounding model data.
+Extend the no-density scope with its still-available material provenance and unassigned/missing-density
+distinction. Review rebuild: `blcad151c-review-build.log`.
+
+Review rebuild passes. Focused combined GUI passes **34 cases: 33 passed / 1 expected native-only
+skip**, **1,337 assertions**, without failures (`blcad151c-review-gui-focused.log`). It combines
+all nine new Physical Properties cases with Material controls, both controllers and material-only
+session reuse. Initial runtime freeze `/tmp/blcad151c-runtime-freeze.json`: **1,017** files,
+SHA-256 `7d2865c9d2d186b69e6d193ce71c2a3fbd4ccc154eac7404e295d2a91d6f1695`.
+Native marker/layout proof is run before full-GUI acceptance to catch actual presentation issues.
+No Core/Geometry code changes are introduced; the preceding **657 / 25,706** Core and **601 /
+53,123** Geometry results are retained, not rerun. Final native/full-GUI/source review remains open.
+
+Initial native 100% passes **46 / 2,547**, without failures/skips (`blcad151c-native-100.log`).
+Actual centroid pixels are found at the independently expected mass/volume coordinates before and
+after unit/camera changes. Raw mass-centroid/root-scope captures are reviewed: marker/XYZ axes,
+separate centroids/units and fixed footer are present. Review adds the visible participation
+statement (hidden active results included, suppressed excluded) and a Root clipboard count oracle
+of four physical Bodies versus two visible Bodies. This is a presentation clarification, without
+changing physical participation. Rebuild passes (`blcad151c-participation-build.log`); final native
+ordinary/compact/scaled checks follow before full GUI confirmation.
+
+The first compact 150% invocation is not started because automatic approval review times out;
+its explicitly permitted single retry starts and passes **46 / 2,559**, without failures/skips
+(`blcad151c-native-150.log`). Compact marker/camera/unit and complete widget reachability checks
+run natively. Raw review confirms the triad and fixed footer; numeric details initially lie below
+the fold, so the footer's availability line now also shows the current known mass and unit, with
+explicit subset wording for partial mass. A layout assertion keeps the Root mass visible without
+scrolling. The summary rebuild passes (`blcad151c-summary-build.log`). This is presentation only;
+no extra integration/model edit is introduced. Final native captures/results follow this refinement.
+
+Final native 100% passes **46 / 2,555**, compact 150% **46 / 2,563**, without failures/skips
+(`blcad151c-native-final-100.log`, `blcad151c-native-final-150.log`):
+
+```bash
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad151c-native-final-100 ./build/dev-gui/blcad_gui_tests "[physical-properties-shell],[material-shell],[physical-properties-controller],[physical-reuse-session],[history-marker-shell],[block136-measure],[block136-assembly-analysis]" --durations yes
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_COMPACT=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad151c-native-final-150 ./build/dev-gui/blcad_gui_tests "[physical-properties-shell],[material-shell],[physical-properties-controller],[physical-reuse-session],[history-marker-shell],[block136-measure],[block136-assembly-analysis]" --durations yes
+```
+
+All nine new cases run natively, including actual OS clipboard, independent centroid pixel oracles,
+scope/unit/camera invariance, actual supplier failure/recovery, unknown density/provenance, readonly
+history boundaries and full widget/footer reachability. Existing Material/history/Measure/assembly
+combinations also pass. OCCT's existing Visual depth/stencil diagnostics remain without an unavailable
+viewer or failed assertion. Reviewed final captures show the current mass/availability in the fixed
+footer, separate volume/mass centroids and the correctly projected frame XYZ marker. Unmodified
+1280×800 normal copies: `images/physical-properties-centroid.png` (SHA-256
+`66109d789b9df6062cc389d2cd930319956f3b29c776c3843965ee35ac393a8a`) and
+`images/physical-properties-assembly.png` (`98419298c4a30a9c6b17295b7bd6977e4e353bc70ddb8634152ad318bb2ef0d1`).
+The 1536×960 physical / 1024×640-DIP compact Root copy is `images/physical-properties-compact.png`
+(`c6bb53864109996be2d571c529b7d47e1976b576c1b4abd09e0e314999dca79f`); the raw compact centroid
+capture hash is `bc8b1273ac6b005a8f5a14b7d5f0a7058d09f94158395f5c6c2b770c5c1fb19c`.
+
+Separate startup reaches intentional timeout **124** (`blcad151c-startup.log`,
+`blcad151c-startup-status.txt`); final inventory passes **5 / 568** (`blcad151c-final-inventory.log`).
+The final **1,017**-file runtime freeze is SHA-256
+`a6b40e029dd213d063930ada3585284496f16486a449b02fcd825150dcdd4e88`; earlier manifests remain
+separate. Final full GUI is running (`blcad151c-gui-full.log`). No Core/Geometry rerun is claimed.
+
+Final full GUI passes **759 cases: 721 passed / 38 expected native-only skips**, **91,503 passing
+assertions**, without failures (`blcad151c-gui-full.log`). All eight new offscreen-capable cases run;
+the ninth requires real OCCT projection and passes both final native runs. New-file formatting and
+modified-line/staged formatting diffs are empty; working/staged whitespace and source review pass.
+All 1,017 runtime fingerprints remain unchanged through final documentation updates. Only C is
+verified; whole 151/Phase A and the Materials capability retain the D combination gate.
+
+Delivery: [PR #161](https://github.com/GideonBa/Better-Linux-CAD/pull/161), implementation `de88ffe`.
+The delivery-record update changes documentation only; all 1,017 runtime fingerprints remain
+unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main before D.

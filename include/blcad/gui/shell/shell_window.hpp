@@ -42,6 +42,7 @@ class ShellSketchDiagnosticsTools;
 class ShellSketch3DTools;
 class ShellParameterTools;
 class ShellMaterialTools;
+class ShellPhysicalPropertiesTools;
 class ShellHoleTools;
 class ShellStepImportTools;
 
@@ -101,6 +102,10 @@ public:
 
   [[nodiscard]] ShellSketch3DTools& sketch_3d_tools() noexcept {
     return *sketch_3d_tools_;
+  }
+
+  [[nodiscard]] ShellPhysicalPropertiesTools& physical_properties_tools() noexcept {
+    return *physical_properties_tools_;
   }
 
   [[nodiscard]] ShellMaterialTools& material_tools() noexcept {
@@ -196,6 +201,7 @@ private:
   std::unique_ptr<ShellSketch3DTools> sketch_3d_tools_;
   std::unique_ptr<ShellParameterTools> parameter_tools_;
   std::unique_ptr<ShellMaterialTools> material_tools_;
+  std::unique_ptr<ShellPhysicalPropertiesTools> physical_properties_tools_;
   std::unique_ptr<ShellHoleTools> hole_tools_;
   std::unique_ptr<ShellStepImportTools> step_import_tools_;
 

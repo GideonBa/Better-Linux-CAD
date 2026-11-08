@@ -21,6 +21,7 @@
 #include "blcad/gui/shell/shell_navigation_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_parameter_tools.hpp"
+#include "blcad/gui/shell/shell_physical_properties_tools.hpp"
 #include "blcad/gui/shell/shell_reference_repair_tools.hpp"
 #include "blcad/gui/shell/shell_repeat_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
@@ -342,6 +343,8 @@ ShellWindow::ShellWindow() {
   sketch_3d_tools_ = std::make_unique<ShellSketch3DTools>(*this, *ribbon_, tab_model_);
   parameter_tools_ = std::make_unique<ShellParameterTools>(*this, *ribbon_, tab_manage_);
   material_tools_ = std::make_unique<ShellMaterialTools>(*this, *ribbon_, tab_manage_);
+  physical_properties_tools_ =
+      std::make_unique<ShellPhysicalPropertiesTools>(*this, *ribbon_, tab_inspect_);
   hole_tools_ = std::make_unique<ShellHoleTools>(*this, *ribbon_, tab_model_);
   step_import_tools_ =
       std::make_unique<ShellStepImportTools>(*this, *ribbon_, tab_manage_, tab_assembly_);
@@ -362,6 +365,7 @@ ShellWindow::~ShellWindow() {
   sketch_3d_tools_.reset();
   parameter_tools_.reset();
   material_tools_.reset();
+  physical_properties_tools_.reset();
   hole_tools_.reset();
   sketch_diagnostics_tools_.reset();
   reference_repair_tools_.reset();
@@ -740,6 +744,8 @@ void ShellWindow::wire_viewport() {
       feature_tools_->refresh_presentation();
     if (measure_tools_)
       measure_tools_->refresh_presentation();
+    if (physical_properties_tools_)
+      physical_properties_tools_->refresh_presentation();
     if (assembly_tools_)
       assembly_tools_->refresh_presentation();
     if (feature_edit_tools_)
@@ -931,6 +937,8 @@ void ShellWindow::reset_document_interaction(bool cancel_history) {
     step_import_tools_->cancel();
   if (hole_tools_)
     hole_tools_->cancel();
+  if (physical_properties_tools_)
+    physical_properties_tools_->cancel();
   if (material_tools_)
     material_tools_->cancel();
   if (parameter_tools_)
@@ -1345,6 +1353,8 @@ bool ShellWindow::undo() {
     step_import_tools_->cancel();
   if (hole_tools_)
     hole_tools_->cancel();
+  if (physical_properties_tools_)
+    physical_properties_tools_->cancel();
   if (material_tools_)
     material_tools_->cancel();
   if (parameter_tools_)
@@ -1403,6 +1413,8 @@ bool ShellWindow::redo() {
     step_import_tools_->cancel();
   if (hole_tools_)
     hole_tools_->cancel();
+  if (physical_properties_tools_)
+    physical_properties_tools_->cancel();
   if (material_tools_)
     material_tools_->cancel();
   if (parameter_tools_)
@@ -1727,6 +1739,8 @@ void ShellWindow::refresh() {
     step_import_tools_->refresh();
   if (hole_tools_)
     hole_tools_->refresh();
+  if (physical_properties_tools_)
+    physical_properties_tools_->refresh();
   if (material_tools_)
     material_tools_->refresh();
   if (parameter_tools_)
