@@ -2672,6 +2672,12 @@ Apply plus portable reopen. Core/wider GUI and A's broad native evidence remain 
 Final startup/inventory, exact runtime freeze, staged review and protected delivery precede B2;
 implemented-through remains 152 and the Wizard remains 157.
 
+153B1 delivery uses [PR #167](https://github.com/GideonBa/Better-Linux-CAD/pull/167), implementation
+`a16fe5579bc71516a7d72b7a35ea584a120f79b2`, initial reviewed tree
+`4d9553b58de81be010626ee4788561bc968364fd`. Final inventory passes **5 / 658** and all 1,023 runtime
+fingerprints remain unchanged. The delivery record changes docs only. Confirm the exact final
+head/review/check state, merge normally and compare refreshed-main's tree before starting B2.
+
 ## Later phases
 
 Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R

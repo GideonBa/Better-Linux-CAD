@@ -5271,3 +5271,9 @@ Working diff, modified-line formatting and whitespace checks pass; all **1,023**
 remain unchanged with final digest `09ba1978592c2cbe05e13f1e368eb46b4d9e8e1db474169c1840dbb98c384e63`.
 No required check or approval is blocked. Staged review and normal protected PR delivery follow.
 Whole B/153/Phase B remain open; B2 and C retain their existing scope.
+
+153B1 delivery uses [PR #167](https://github.com/GideonBa/Better-Linux-CAD/pull/167), implementation
+`a16fe5579bc71516a7d72b7a35ea584a120f79b2` (initial reviewed tree
+`4d9553b58de81be010626ee4788561bc968364fd`). The delivery-record commit changes docs only and
+preserves all 1,023 verified runtime fingerprints. Confirm the final exact head/review/check state,
+merge normally and compare the updated-main tree before opening the next serial branch.
