@@ -2385,7 +2385,7 @@ occurrence, history or geometry authority is introduced.
 | 151A | Qt-free material candidate/transaction and physical-query controllers; exact source/scope guards, display units/clipboard data, qualified Body/occurrence totals and focused combined tests | Implemented and verified; PR #159 |
 | 151B | Manage Material task, Part/Body assignment/context starts, immutable revision/provenance controls and explicit selected-member updates through existing session owners | Implemented and verified; PR #160 |
 | 151C | Inspect Physical Properties task, scope/units/refresh/status/precision, clipboard and transient centroid presentation through existing viewport/task owners | Implemented and verified; PR #161 |
-| 151D | R01–R02/UI01 native combined assignment/revision/history/Save/Open, nested/multi-Body/missing-density scopes, ordinary/compact/scaled layout and full acceptance | Implemented and verified; delivery pending |
+| 151D | R01–R02/UI01 native combined assignment/revision/history/Save/Open, nested/multi-Body/missing-density scopes, ordinary/compact/scaled layout and full acceptance | Implemented and verified; PR #162 |
 
 Material editing stages typed changes outside committed intent; identical intent creates no history
 entry. Ready End-of-Part metadata edits use the existing child workflow. Physical Properties requires
@@ -2513,6 +2513,11 @@ reaches intentional timeout **124**. Working-source formatting/whitespace review
 **1,017** runtime fingerprints remain unchanged (SHA-256
 `f45525e715c899c6c3638e27edb38bf4743575a02bcba3395eec9a718a4727ee`).
 Block 152 is **Planned; not started** until this branch is merged and refreshed main is verified.
+
+151D/whole-151 delivery: [PR #162](https://github.com/GideonBa/Better-Linux-CAD/pull/162),
+implementation `985849a`. The delivery-record update changes documentation only and preserves all
+1,017 runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed
+main before starting Block 152.
 
 ## Later phases
 

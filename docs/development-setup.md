@@ -4884,3 +4884,9 @@ modified-line formatting and whitespace checks pass; all **1,017** runtime finge
 unchanged. The inventory count increases from 568 because the existing audit now resolves the
 additional Material/Physical Properties APIs, commands and registered proof sources. No duplicate
 audit implementation is retained. Delivery proceeds by reviewed staged diff and normal protected PR.
+
+151D delivery uses [PR #162](https://github.com/GideonBa/Better-Linux-CAD/pull/162), implementation
+`985849a319eab74c7024ffdb7f364484efff998d` (initial reviewed tree
+`2bdd0365db3bd7227e7f4e71488054134337046d`). The separate delivery-record commit changes these
+existing docs only; all 1,017 runtime fingerprints remain unchanged. Check the final pushed head's
+merge/review/check state and merge normally before refreshing main and opening the next branch.
