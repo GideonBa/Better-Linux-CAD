@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 150
 current_block: 151
-current_boundary: Block 151B Material task verified; Physical Properties task remains
+current_boundary: Block 151C Physical Properties task verified; combined acceptance remains
 current_tag: "[parity-b151]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -34,7 +34,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 150
-current block        Block 151 (in progress; slice B)
+current block        Block 151 (in progress; slice C)
 current phase        Materials and physical properties UI
 current boundary     Inventor-like assignment and physical-property tasks
 ```
@@ -2384,7 +2384,7 @@ occurrence, history or geometry authority is introduced.
 | --- | --- | --- |
 | 151A | Qt-free material candidate/transaction and physical-query controllers; exact source/scope guards, display units/clipboard data, qualified Body/occurrence totals and focused combined tests | Implemented and verified; PR #159 |
 | 151B | Manage Material task, Part/Body assignment/context starts, immutable revision/provenance controls and explicit selected-member updates through existing session owners | Implemented and verified; PR #160 |
-| 151C | Inspect Physical Properties task, scope/units/refresh/status/precision, clipboard and transient centroid presentation through existing viewport/task owners | Planned; not started |
+| 151C | Inspect Physical Properties task, scope/units/refresh/status/precision, clipboard and transient centroid presentation through existing viewport/task owners | Implemented and verified; delivery pending |
 | 151D | R01–R02/UI01 native combined assignment/revision/history/Save/Open, nested/multi-Body/missing-density scopes, ordinary/compact/scaled layout and full acceptance | Planned; not started |
 
 Material editing stages typed changes outside committed intent; identical intent creates no history
@@ -2449,6 +2449,34 @@ Implemented-through stays 150; whole 151 and Phase A remain open for C/D.
 `f6ec440`. This delivery-record update changes documentation only and preserves all 1,014 verified
 runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed main
 before starting C.
+
+151C starts on `feat/physical-properties-task` after PR #160 is confirmed merged as `8a4d9f5`.
+Refreshed main matches reviewed tree `23bfd037ad6a2c4151c43c6fb2987e88f8828f4e`. Inspect exposes
+one read-only Physical Properties task through the existing 151A controller. Scope and unit changes
+are presentation only; Refresh is explicit. Stale model/Save/supplier state clears usable readout,
+Copy and centroid presentation until refreshed. Complete, known-subset, unavailable and not-applicable
+mass stay distinct, with separate volume/mass centroids, material density/revision, precision and
+central/principal tensors. A transparent viewport child reprojects a labelled centroid triad from
+canonical mm coordinates through the existing camera notification; no scene/selection authority,
+model object or polling is added. Content scrolls vertically with bounded text and fixed Refresh/
+Copy/Close actions. Native ordinary/compact/scaled clipboard, source-staleness, camera/centroid,
+material/history/Save/Open and qualified nested/multi-Body scopes are required before C delivery.
+Whole 151/Phase A remain open for D.
+
+151C verification: full GUI **759 cases: 721 passed / 38 expected native-only skips / 91,503
+assertions**; final native 100% **46 / 2,555**, compact 150% **46 / 2,563**; inventory **5 / 568**;
+intentional startup timeout **124**. Initial focused combinations pass **33 / 1 expected native
+skip / 1,337 assertions** across 34 cases. Core **657 / 25,706** and Geometry **601 / 53,123** are
+retained without a rerun: C changes GUI code/tests only. Nine new cases cover actual ribbon and
+clipboard, units/tensors/source provenance, qualified repeated scopes, Save/supplier staleness,
+Material→known-subset mass→Undo, lost scopes, empty/Surface/unknown density, prefix/busy refusal,
+independent native centroid pixels across units/camera and fully reachable compact widgets/footer.
+Reviewed unmodified captures retain the fixed current mass, availability/participation and actions.
+The exact-zero string failures and numeric-oracle correction, approval retry and compact summary
+refinement are recorded in existing setup/UI docs. Final runtime freeze **1,017** files, SHA-256
+`a6b40e029dd213d063930ada3585284496f16486a449b02fcd825150dcdd4e88`.
+Source/new-file/working/staged formatting and review complete C delivery only. Implemented-through
+stays 150; whole 151/Phase A and combined Materials GUI capability remain gated by D.
 
 ## Later phases
 

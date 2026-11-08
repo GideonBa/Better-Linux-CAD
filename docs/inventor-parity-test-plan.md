@@ -256,6 +256,18 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
   `[physical-controller-imports]` checks readonly Reference intent, supplier changes without a model
   revision, failed imported Apply/retry and retained OCCT ownership. These controller tests do not
   accept the visible Material/Physical Properties tasks or centroid overlays assigned to 151B–D.
+- 151C `[physical-properties-shell]` supplies nine actual-shell cases: Inspect ribbon/task ownership,
+  typed display units, central/principal readout, material/property provenance including unknown
+  density, guarded OS clipboard, qualified repeated/hidden occurrence and Body scopes, Save staleness,
+  Material→known-subset mass→Undo, lost-scope explicit reselection, empty/Surface/unknown-density
+  distinctions, busy/prefix refusal and real supplier-byte invalidation/recovery without model edits.
+  Numeric centroids use independent tight tolerances plus explicit frame/unit/subset labels, retaining
+  tiny integration residuals rather than requiring zero-string spellings. `[physical-centroid-native]`
+  locates actual marker pixels at independent canonical mass/volume centroids across units and camera
+  changes; `[physical-properties-layout]` checks vertical-only scrolling, reachable scope/unit/tensor/
+  centroid widgets and the fixed current-mass/availability/Refresh/Copy/Close area at ordinary and
+  compact/scaled sizes. Existing Material/history/Measure/assembly combinations run with these cases.
+  Whole 151's R01/R02/UI01 combination acceptance remains D.
 - 150C `[physical-reuse]` verifies zero feature execution and identical OCCT shapes for material-only
   refresh, immutable density reweighting, resource-free/v3 round trips, standard-table and lifetime
   invalidation, public mutation/uncertified/prefix rejection and repeated hidden-occurrence pose

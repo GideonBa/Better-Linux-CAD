@@ -32,6 +32,22 @@ their non-unique-axis status. A later visible centroid triad uses canonical mm c
 same labelled centroid choice, without changing selection scope or model data. Native task/clipboard/
 overlay acceptance is not inferred from controller-only tests.
 
+151C adds a dedicated **Physical Properties** task on Inspect. Its explicit shell owner reserves
+`inspect.physical_properties`, uses the existing controller and never starts a document transaction.
+Scope, units and centroid choice remain presentation state. Refresh computes/reweights complete
+results; Save/model/actual-supplier changes invalidate usable results and Copy until explicit
+Refresh. Missing selected scopes require an explicit new choice, without silently selecting the
+whole model. The task discloses scope/frame, availability, volume/area, separate volume/mass
+centroids, central/principal inertia, material revision/density/provenance and numerical precision.
+The availability readout explicitly states that hidden active results participate and suppressed
+results do not; the selected scope still limits the query. Root clipboard body counts include
+hidden occurrences, independently of the visible scene.
+Known-density subset values are labelled throughout. A transparent, non-selectable viewport child
+draws a frame-aligned XYZ triad at the explicitly chosen volume or mass centroid in canonical mm;
+units do not move it. Existing camera/resize notifications reproject it without polling, fitting or
+changing the scene, camera, selection, model/history or persistence. Close/Escape/document change
+remove the presentation. Copy revalidates through the controller before writing the OS clipboard.
+
 `ShellWindow` explicitly owns `ShellMeasureTools` and wires it to the ribbon, document session,
 viewport selection and view-change notification. There is no binder, component discovery or polling.
 The **Inspect** ribbon exposes **Distance**, **Angle**, **Radius / Diameter** and

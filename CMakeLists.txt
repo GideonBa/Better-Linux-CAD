@@ -354,6 +354,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_sketch_diagnostics_tools.cpp
     src/gui/shell/shell_parameter_tools.cpp
     src/gui/shell/shell_material_tools.cpp
+    src/gui/shell/shell_physical_properties_tools.cpp
     src/gui/shell/shell_hole_tools.cpp
     src/gui/shell/shell_step_import_tools.cpp
     src/gui/shell/shell_sketch_3d_tools.cpp
@@ -726,6 +727,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_sketch_diagnostics_tests.cpp
       tests/gui/gui_shell_parameter_tests.cpp
       tests/gui/gui_shell_material_tests.cpp
+      tests/gui/gui_shell_physical_properties_tests.cpp
       tests/gui/gui_shell_hole_tests.cpp
       tests/gui/gui_shell_extrude_extent_tests.cpp
       tests/gui/gui_shell_path_extrude_tests.cpp

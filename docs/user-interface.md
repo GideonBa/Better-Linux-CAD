@@ -354,6 +354,23 @@ cannot widen the scroll content. Assignment, snapshot properties and update/remo
 reachable by vertical scrolling, with Apply/Cancel fixed outside the scroll area. The layout proof
 checks zero horizontal scroll range and complete widget frames, including text editors.
 
+Block 151C places **Physical Properties** in Inspect → Properties. The read-only right-side task
+offers qualified scope and display units, physical totals, central/principal inertia, material
+revision/density/provenance and requested/estimated precision in the shared collapsible groups.
+Refresh/Copy/Close and the current mass/availability remain visible outside the vertical scroll
+area. The availability text explicitly includes hidden active results and excludes suppressed
+results; partial mass names the known-density subset. The task separates volume and mass centroids.
+The optional frame-aligned XYZ triad uses canonical coordinates and follows camera/resize events;
+unit changes never move it or author model data. Stale Save/model/supplier state blocks Copy until
+validated again, and a lost Body/occurrence requires an explicit new scope choice.
+The [native centroid view](images/physical-properties-centroid.png) and
+[Root Assembly query](images/physical-properties-assembly.png) are unmodified 1280×800 captures.
+The Root query includes four physical Bodies while only two are visible, as the participation
+readout states. Whole 151 status and combined acceptance remain in the existing MVP plan.
+The [compact Root query](images/physical-properties-compact.png) is the unmodified 1536×960-pixel
+capture of a 1024×640-DIP window at 150%. Its current mass, availability and Refresh/Copy/Close stay
+visible without scrolling; units/scopes, tensor and centroid controls remain reachable vertically.
+
 | Ribbon/context | Planned commands | Required workflow |
 | --- | --- | --- |
 | Model → Modify | Hole, Thread, advanced Fillet, Direct Edit | preselect face/edge → choose operation → dimensions/manipulators → preview → Apply; browser double-click edits the same intent |
