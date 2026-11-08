@@ -2382,7 +2382,7 @@ occurrence, history or geometry authority is introduced.
 
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
-| 151A | Qt-free material candidate/transaction and physical-query controllers; exact source/scope guards, display units/clipboard data, qualified Body/occurrence totals and focused combined tests | Implemented and verified; delivery pending |
+| 151A | Qt-free material candidate/transaction and physical-query controllers; exact source/scope guards, display units/clipboard data, qualified Body/occurrence totals and focused combined tests | Implemented and verified; PR #159 |
 | 151B | Manage Material task, Part/Body assignment/context starts, immutable revision/provenance controls and explicit selected-member updates through existing session owners | Planned; not started |
 | 151C | Inspect Physical Properties task, scope/units/refresh/status/precision, clipboard and transient centroid presentation through existing viewport/task owners | Planned; not started |
 | 151D | R01–R02/UI01 native combined assignment/revision/history/Save/Open, nested/multi-Body/missing-density scopes, ordinary/compact/scaled layout and full acceptance | Planned; not started |
@@ -2412,6 +2412,11 @@ Phase A stay in progress; Material/Physical Properties GUI capability stays plan
 Final inventory passes **5 / 568**, without failures/skips. Working/staged source review, full
 new-file and modified-line formatting, whitespace checks and the unchanged runtime freeze complete
 A delivery verification. No visible command/centroid/clipboard-OS acceptance is inferred from A.
+
+151A delivery: [PR #159](https://github.com/GideonBa/Better-Linux-CAD/pull/159), implementation
+`65708dc`. The delivery-record update changes documentation only and preserves all 1,011 verified
+runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed main
+before starting B.
 
 ## Later phases
 

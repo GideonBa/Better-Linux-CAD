@@ -4535,3 +4535,7 @@ Final inventory passes **5 / 568** without failures/skips (`blcad151a-final-inve
 modified-line formatting is empty (`blcad151a-final-format.diff`); full new-file formatting, working/
 staged whitespace and source review pass. All 1,011 runtime fingerprints remain unchanged through
 documentation updates. A alone is verified; whole 151, visible tasks and Phase A remain open.
+
+Delivery: [PR #159](https://github.com/GideonBa/Better-Linux-CAD/pull/159), implementation `65708dc`.
+The delivery-record update changes documentation only; all 1,011 runtime fingerprints remain
+unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main before B.
