@@ -359,6 +359,19 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
   source identity, exact volume, stale-supplier rollback/recovery and Reference-mode rejection.
   Native browser restoration adds a preceding rotation for ThroughAll and ToNext; the existing
   shared task/one-transaction/save/Undo/Redo contract remains its UI authority.
+- 153C `[hole-result-reference]` checks typed Face input/JSON/graph ownership and malformed
+  references; physical tests verify distinct placement roots under reordering, changed dimensions,
+  downstream rotation, suppression/prefix and portable reopen. Consumed/split walls retain the prior
+  certified BRep after downstream failure. A flat Blind bottom supports a
+  dependent Sketch and additive feature; a cylindrical bore drives Draft with an independent
+  frustum-volume oracle and retains its changed-surface origin. A captured bottom limits a second
+  Body and the resulting ToFace termination owns its own planar root. `[hole-generated-target]` covers ThroughAll/ToNext/flat Blind/conical Blind
+  on analytic Revolve, Sweep and Loft targets using independent material points. Additional
+  `[hole-combined-acceptance]` cases combine exact standard revision changes, density-only BRep
+  reuse, hidden second-Body mass, explicit cut participants, history and real STEP exchange.
+  `[hole-result-reference-shell]` uses actual face selection, direct Sketch creation and the complete
+  Draft preview/Apply workflow, each with one Undo/Redo and Save/Open in ordinary/compact layouts. Full Core/Geometry/Qt and native
+  regressions are required before whole-153 acceptance; execution results belong to development setup.
 - 152C `[hole-combined-acceptance]` combines projected Construction→Sketch→Hole identity and
   ReferenceRepair transport, Project V1 custom/V4 and V2 mixed legacy/custom/standard members,
   suppressed Hole→Fillet→rigid-pose equivalence to an independently constructed legacy chain,

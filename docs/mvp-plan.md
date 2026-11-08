@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 152
-current_block: 153
-current_boundary: Block 153B2 verified delivery PR 168; C remains open; stop after whole 153
-current_tag: "[parity-b153]"
+implemented_through: Block 153
+current_block: 154
+current_boundary: Block 153 accepted; stop requested by user; Block 154 not started
+current_tag: "[parity-b154]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–152 accepted; Block 153 in progress; Blocks 154–204 planned"
+  advanced_modeling_workflows: "Blocks 145–153 accepted; Blocks 154–204 planned; stopped after 153"
 ---
 
 # MVP Plan
@@ -33,10 +33,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 152
-current block        Block 153 (in progress; slice B2)
+implemented through  Block 153
+current block        Block 154 (planned; not started)
 current phase        Semantic holes and threads
-current boundary     Plain, blind and bounded Hole execution
+current boundary     Stopped after completed Block 153 at the user’s request
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1776,8 +1776,8 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–152 are **Implemented and accepted**;
-Block 153 is **In progress**; Blocks 154–204 are **Planned; not started**.
+Status authority: Blocks 145–153 are **Implemented and accepted**;
+Blocks 154–204 are **Planned; not started**. Work stops after 153 at the user’s request.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1787,7 +1787,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
-| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152 accepted; 153 in progress; 154–158 planned |
+| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152–153 accepted; 154–158 planned |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
@@ -2632,8 +2632,8 @@ standards, placement-pattern or geometry-result authority is introduced.
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 153A | Straight one-direction ThroughAll and Blind flat/conical tools, multiple independent placements and atomic Body cuts on fixed datum/construction or current unposed rectangular primitive supports; analytic tests and real shared-history restoration | Accepted; PR #166 merged as `a9819c6` |
-| 153B | Posed/imported/trimmed result support and finite-face placement, ToNext/ToFace/UpToBody/Symmetric extents, local entry/exit/remaining-bottom semantics and ambiguous/ineffective inputs | B1 accepted in PR #167; B2 implemented/verified, protected delivery pending |
-| 153C | Generated bore/seat downstream reference integration and combined native/imported, multi-Body, modifier, history/prefix, material/mass, portable exchange and UI regression acceptance | Planned; not started |
+| 153B | Posed/imported/trimmed result support and finite-face placement, ToNext/ToFace/UpToBody/Symmetric extents, local entry/exit/remaining-bottom semantics and ambiguous/ineffective inputs | B1 accepted in PR #167; B2 accepted in PR #168 |
+| 153C | Generated bore/seat downstream reference integration and combined native/imported, multi-Body, modifier, history/prefix, material/mass, portable exchange and UI regression acceptance | Implemented and verified; protected delivery follows |
 
 A cuts forward from the support only; ThroughAll must not silently become bidirectional. Blind depth
 is full-diameter depth, with a conical apex beyond it and positive remaining material required.
@@ -2702,6 +2702,31 @@ open, implemented-through stays 152 and Wizard authoring remains 157.
 1,023 runtime fingerprints remain unchanged. Confirm the exact final head and normal protected
 merge, then compare refreshed main before C. The user requests completion of whole Block 153
 and an immediate stop afterward; do not begin Block 154.
+
+153C begins after confirmed PR #168 merge `8535f71` and an exact refreshed-main tree match
+`eba2925eddabf474b8573dec604a73e6b8dc2590`. Extend the existing result-face origin authority
+for placement-owned cylindrical walls and planar blind bottoms; reuse it in finishing face inputs
+and existing face-supported Sketches. Preserve old JSON encodings and private support aliases.
+Verify stable placement identity, parameter changes, poses, missing/split descendants, downstream
+finishing and Sketch recompute, native/imported and multi-Body history, material/mass and exchange.
+Run full Core/Geometry/Qt plus focused native ordinary/compact acceptance on frozen sources, review
+and deliver via a normal protected PR. Only then accept whole 153 and stop as requested.
+
+
+153C/whole-153 acceptance: placement-owned walls and flat Blind/planar ToFace bottoms use the
+existing result-face origin authority in current Body finishing and face-supported Sketches.
+Typed Face JSON, lost/split descendants and Draft surface continuations preserve identity without
+traversal-based fallback. Combined proof covers Extrude/Revolve/Sweep/Loft/owned STEP, poses,
+explicit target/limit Bodies, history/prefix/suppression, standards/material mass and portable STEP.
+Full Core **676 / 26,122**, full Geometry **634 / 55,193**; focused Qt **10 passed / 1 native-only
+skip, 1,044 assertions**; full Qt **725 passed / 39 skips, 91,867 assertions**. Relevant native
+ordinary **13 / 1,457** and compact 150% **13 / 1,471** have no failures/skips. Startup reaches the
+window, intentional timeout 124. Broader native-only/optional offscreen skips remain reported,
+not claimed as fully rerun. Final inventory, runtime freeze and reviewed protected delivery follow.
+
+Whole Block 153 is accepted; Phase B remains open for 154–158. The user’s explicit stop applies
+after delivery of 153: **do not start Block 154 or create its implementation branch**. Next work
+requires a later user instruction. The semantic Hole Wizard remains assigned to 157.
 
 ## Later phases
 

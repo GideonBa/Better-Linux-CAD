@@ -129,3 +129,19 @@ resolved from that source rather than copied. Missing point input is reported by
 validation and strict reopening; restoring the same source identity recovers the Hole. Generated
 result-edge and captured result-face producer validation recognizes the registered Hole family.
 Physical support coplanarity, trimmed boundaries and generated bore references remain at 153.
+
+## Current result Face inputs — Block 153C
+
+`FaceReference::create_result` accepts the existing `ResultFaceReference` producer/Body/origins
+identity with Face capability. The source kind is `result_face`; its dependency source is the
+captured producer. Model validation reuses the result-face ownership/ancestry contract, allowing
+curved faces for Face consumers while preserving planar-only imported workplane validation.
+Geometry follows every contributor on the current referenced Body and requires exactly one face.
+Finishing additionally verifies that face belongs to the actual target. Missing, suppressed,
+out-of-prefix, deleted, split and stale imported sources fail closed. A generic Face identity does
+not imply Plane capability: planar extent/workplane consumers still check actual geometry.
+
+Draft's explicitly selected input faces also follow OCCT `Generated` replacement faces, because
+Draft reports the changed supporting surface through that history channel. This exception applies
+to the selected faces only; generated geometry does not inherit adjacent support identities.
+All descendants remain recorded so subsequent splits are ambiguous rather than guessed.

@@ -1,4 +1,5 @@
 #include "semantic_face_resolution.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 #include "imported_body_placement.hpp"
 
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
@@ -11,6 +12,7 @@
 #include <GeomAbs_SurfaceType.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp.hxx>
+#include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS.hxx>
 #include <gp_Dir.hxx>
@@ -232,6 +234,18 @@ Result<TopoDS_Face> resolve_semantic_face(const PartDocument& document, const Sh
                                           const FaceReference& reference, const FeatureId& id,
                                           std::string_view feature_label,
                                           StepImportTopologyContext* import_context) {
+  if (const auto* captured = std::get_if<ResultFaceReference>(&reference.source())) {
+    auto resolved =
+        ResultFaceSupportGeometry::resolve_face(document, cache, *captured, import_context);
+    if (!resolved)
+      return Result<TopoDS_Face>::failure(resolved.error());
+    const auto face = TopoDS::Face(*OcctShapeView::get(resolved.value()));
+    for (TopExp_Explorer it(target, TopAbs_FACE); it.More(); it.Next())
+      if (it.Current().IsSame(face))
+        return Result<TopoDS_Face>::success(TopoDS::Face(it.Current()));
+    return Result<TopoDS_Face>::failure(
+        face_error(id, "result face belongs to a different target Body"));
+  }
   if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source())) {
     if (import_context == nullptr)
       return Result<TopoDS_Face>::failure(

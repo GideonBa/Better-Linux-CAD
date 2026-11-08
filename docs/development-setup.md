@@ -5377,3 +5377,123 @@ follow. The wider GUI baseline is retained explicitly; whole-153 C acceptance re
 `1d19e550c79cf8e2b1b39ba6aaa7cfbe3ee5fd23`. This delivery record changes documentation only.
 Confirm the exact final head, normal protected merge and refreshed-main tree before 153C.
 User boundary: complete whole 153, then stop without beginning 154.
+
+## Block 153C — generated Hole references and combined acceptance, 2026-11-08
+
+Start from confirmed PR #168 merge `8535f71` with exact main tree
+`eba2925eddabf474b8573dec604a73e6b8dc2590`. Current branch is
+`feat/semantic-hole-reference-acceptance`. Reuse the existing result-face origin authority for
+placement-owned walls/flat bottoms, generic finishing Face inputs and face-supported Sketches.
+No new Hole Wizard is assigned here. User boundary: finish whole 153, deliver it, then stop.
+
+Review build: `/tmp/blcad153c-review-build.log`, all four Core/Geometry/Qt/application targets.
+Sources/tests/CMake are frozen while it runs. New tests target typed reference persistence,
+placement/dimension/pose stability, actual downstream Draft/Sketch, analytic generated targets,
+material-only reuse versus standard-diameter change, multi-Body history/mass/exchange and native
+face-Sketch Undo/reopen. Results, review fixes and final source freeze will be recorded below.
+
+Initial review builds found a missing direct `TopExp_Explorer` include and two remaining calls
+while extracting the shared result-face validator. Both are corrected before the next build;
+`blcad153c-review-build3.log` is the current build. No CAD tests were run against failed builds.
+
+The UI build identifies two additional visitors over the newly extended Face input variant:
+interactive finishing deduplication and surface/finishing presentation ownership. Both now handle
+the existing result-face identity explicitly. Direct result-face resolution also requires imported
+source context instead of accepting an owned cache alone. Add consumed/split-wall regressions that
+verify precise diagnostics and retention of the previous certified BRep after downstream failure.
+The current Core/Geometry review build is `blcad153c-core-geometry-build.log`; UI compilation follows
+the first focused physical run. No source edits occur while this build is active.
+
+Core focused result-reference test passes **1 / 16**, full Core **676 / 26,122**, without failures
+or skips (`blcad153c-core-focused.log`, `blcad153c-core-full.log`). Core's completed independent
+binary ran while unchanged separate Geometry test objects compiled. Core/Geometry build completes
+in `blcad153c-core-geometry-build.log`.
+
+First focused Geometry run: **11 cases, 9 passed / 2 failed; 1,430 assertions, 2 failed**
+(`blcad153c-geometry-focused.log`). The additive-post fixture used the same Feature and Sketch ID;
+rename the Feature. Draft consumes the generated wall correctly (including independent frustum
+volume and portable reopen), but its resulting cone loses lineage because OCCT reports the selected
+surface replacement as `Generated`. Preserve those continuations only for explicitly drafted faces.
+Add a captured Hole-bottom ToFace cross-Body regression and tag its new planar termination with its
+own Hole root. Extend real STEP combinations to resolve generated walls with verified context and
+reject missing/changed context. Finishing labels name the Hole/position/wall or bottom, and the
+existing face-Sketch presentation shares those labels. Follow-up Geometry build is
+`blcad153c-reference-fix-build.log`. Source freeze holds throughout each build/test run.
+
+Follow-up focused Geometry passes **12 / 1,474**, without failures/skips
+(`blcad153c-reference-fix-focused.log`). The post/bottom associative feature chain, Draft continuation,
+consumed/split atomic rollback and cross-Body captured-bottom ToFace termination all pass.
+Core source/tests remain unchanged since their successful full run. Runtime freeze contains
+**1,024** files, SHA-256 `df95ca8f10fd2bfb572e5166db943384489a13660b78cb8949b238cb59fb4fa8`
+(`/tmp/blcad153c-runtime-freeze.json`). Full Geometry uses this freeze in
+`blcad153c-geometry-full.log`; the separate unchanged Geometry binary runs while remaining UI targets
+build (`blcad153c-gui-build.log`). No runtime sources/tests/CMake change during either check.
+
+Full Geometry passes **634 / 55,193**, without failures/skips
+(`blcad153c-geometry-full.log`). The final runtime freeze remains unchanged. Full Core's
+**676 / 26,122** and final Geometry now cover the combined gate. The GUI target build is still
+running; Qt/native counts are not claimed until the corresponding binaries have completed and run.
+
+GUI/application build succeeds (`blcad153c-gui-build.log`); add one complete Draft ribbon/face
+selection/preview/Apply/Undo/Redo/Save/Open acceptance case and rebuild the GUI test target
+(`blcad153c-ui-acceptance-build.log`). Only the GUI test source changes relative to Core/Geometry.
+The first focused Qt run reports **11 cases: 9 passed, 1 failed, 1 native-only skipped; 1,029
+assertions** (`blcad153c-gui-focused.log`). Draft completes correctly. The Blind-bottom creation
+fails because `ShellWindow::selected_result_face` retains a prefix allowlist missing the new
+`finishing/result-face/` alias. Extend that existing filter; actual selectable planar-face validation
+remains authoritative. Rebuild GUI/app in `blcad153c-ui-filter-build.log` and repeat focused Qt.
+
+Final runtime freeze: **1,024** files, SHA-256
+`40aaa83ef11c2916d5c212302cca69090499a01ff3bb06ff0b32d997c6b471b9`
+(`/tmp/blcad153c-final-runtime-freeze.json`; verify digest before delivery). Relative to the passing
+Core/Geometry freeze, only `src/gui/shell/shell_window.cpp` and the GUI acceptance test change.
+Core/Geometry product and test bytes remain identical to their successful full runs. Full Qt and
+native acceptance use the final runtime state, with no source edits during checks.
+
+Final focused Qt passes **11 cases: 10 passed / 1 native-only skipped; 1,044 assertions**,
+without failures (`blcad153c-gui-final-focused.log`). The missing allowlist alias is corrected and
+both bottom Sketch and complete wall Draft workflows pass with one Undo/Redo and portable reopen.
+Run full Qt (`blcad153c-gui-full.log`) serially before native ordinary/compact, then startup and
+post-status inventory. The native filter includes both new reference workflows, Hole history,
+existing face-Sketch/repair, real editable STEP and the affected existing finishing dialogs.
+
+Full offscreen Qt passes **764 cases: 725 passed / 39 skipped; 91,867 assertions**, without failures
+(`blcad153c-gui-full.log`). Skips remain explicitly reported as native-only or optional existing
+coverage; do not equate this with full native-suite execution. Native ordinary/compact use
+`[hole-result-reference-shell],[hole-history-shell],[result-face-sketch],[native-step-editable-parts],[block136-finishing]`
+and capture original windows under `/tmp/blcad153c-native100` / `blcad153c-native150`.
+
+Native ordinary 100% passes **13 / 1,457**, without failures/skips
+(`blcad153c-native100.log`). Inspect the unmodified bottom-Sketch and wall-Draft captures: the
+existing Sketch environment and Draft property panel show the actual computed bore, selected
+`Semantic Hole / Bohrung 1 / Wand`, valid preview and pinned Apply/Cancel controls. The ordinary
+window is 1280×800. Model geometry remains small in the existing Fit All framing that includes
+origin geometry; these captures demonstrate the actual layout without image edits.
+Native compact 150% uses the identical filter; remaining broad-suite native skips stay explicitly
+retained baseline coverage, not falsely claimed as rerun by this focused native acceptance.
+
+Native compact 150% passes **13 / 1,471**, without failures/skips
+(`blcad153c-native150.log`). The new compact captures are 1536×960 physical pixels for
+1024×640 DIP. Inspect both original captures: the Draft panel remains scrollable and Apply/Cancel
+stay visible; the bottom enters the existing Sketch ribbon/environment. Existing OCCT visual
+buffer notices remain nonfailing environment output. Native startup reaches the window and ends
+at intentional timeout **124** (`blcad153c-startup.log`). Original images copied without edits:
+
+- `docs/images/semantic-hole-bottom-sketch.png`, 1280×800, SHA-256 `ab5dec0d308cbf782e3338a442f2e51d78bd66a4a4227f81e9b93ce516a62fd9`.
+- `docs/images/semantic-hole-wall-draft.png`, 1280×800, SHA-256 `b61ca48714c08cd4b9067d4be7a147610962cde0b1237bdec9fa1da267b79239`.
+- `docs/images/semantic-hole-bottom-sketch-compact.png`, 1536×960, SHA-256 `21c44a0b4abee1c1fac8b7e9f6ced0b8e7c57c6b0c67c09e27b8a59216862e4e`.
+- `docs/images/semantic-hole-wall-draft-compact.png`, 1536×960, SHA-256 `f008d1f897a1643282af9d25a87906ed31df8d8f8669e51c35eb7fdc5c9007a3`.
+
+All runtime product/source fingerprints remain unchanged. Project/exchange/combined physical
+coverage, full Core/Geometry/Qt and both relevant native layouts now satisfy whole-153 acceptance.
+Final post-status inventory and working/staged review precede normal protected delivery. Broader
+native-only skips from the full offscreen suite are not claimed as rerun. No successor starts;
+the user explicitly requests stopping after this completed block.
+
+Post-status inventory passes **5 / 658**, without failures/skips
+(`blcad153c-final-inventory.log`). Final modified-line formatting, complete new-header formatting,
+whitespace and working-diff review pass. All **1,024** final runtime fingerprints remain unchanged
+with digest `40aaa83ef11c2916d5c212302cca69090499a01ff3bb06ff0b32d997c6b471b9`.
+The unchanged Core/Geometry source bytes retain their successful full-suite evidence; all final
+Qt/native tests use the final complete runtime state. Staged review and normal protected delivery
+follow; stop after this Block 153 delivery without beginning 154.

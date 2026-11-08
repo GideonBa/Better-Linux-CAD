@@ -1,5 +1,6 @@
 #include "../support/hole_feature_fixture.hpp"
 #include "blcad/geometry/body_result_inspector.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 #include "imported_body_test_fixture.hpp"
 
 #include <BRepBuilderAPI_Copy.hxx>
@@ -401,9 +402,17 @@ TEST_CASE(
   const double expected_volume =
       1600 - (active ? (repeated ? 2 : 1) * std::numbers::pi * 3.3 * 3.3 * 8 : 0);
   CHECK(body_volume(shapes, body) == Approx(expected_volume).margin(1e-6));
+  const auto wall = checked(ResultFaceReference::create(
+      FeatureId("hole"), body, {{FeatureId("hole"), "hole/6:center/wall"}}));
+  if (active) {
+    REQUIRE(ResultFaceSupportGeometry::resolve_face(reopened, shapes, wall, &context));
+    CHECK_FALSE(ResultFaceSupportGeometry::resolve_face(reopened, shapes, wall));
+  }
   const auto original = topology(*shapes.find_body_shape(body));
   fixture.write_bytes(supplier + "\n");
   StepImportTopologyContext changed(fixture.root);
+  if (active)
+    CHECK_FALSE(ResultFaceSupportGeometry::resolve_face(reopened, shapes, wall, &changed));
   CHECK_FALSE(GeometryRecomputeExecutor{&changed}.execute_document(reopened, shapes));
   CHECK(topology(*shapes.find_body_shape(body)) == original);
   CHECK(checked(serialize_part_document_to_json(reopened)) == serialized);
@@ -425,4 +434,54 @@ TEST_CASE(
   const auto reference_json = checked(serialize_part_document_to_json(reference));
   CHECK_FALSE(reference.add_hole_feature(part.hole_features().front()));
   CHECK(checked(serialize_part_document_to_json(reference)) == reference_json);
+}
+
+TEST_CASE("Semantic Hole export and history preserve an explicit second Body and hidden mass",
+          "[geometry][parity-b153][hole-combined-acceptance]") {
+  namespace holes = blcad::test::hole_fixture;
+  namespace history = blcad::test::history_fixture;
+  auto part = history::native_base();
+  auto second = checked(Feature::create_additive_extrude(
+      FeatureId("second"), "Second", SketchId("profile"), ParameterId("depth")));
+  REQUIRE(part.add_feature(
+      checked(second.with_body_result_context(history::new_body(part, "second")))));
+  REQUIRE(part.add_engineering_resource(holes::table()));
+  blcad::test::engineering_fixture::annotate(part);
+  REQUIRE(part.set_body_material(
+      BodyId("body.second"), blcad::test::engineering_fixture::key("synthetic.material", "r2")));
+  REQUIRE(part.add_hole_feature(holes::hole("hole", holes::standard())));
+  REQUIRE(part.apply_history_intent({{"base", "second", "hole"}, {}}));
+  auto shapes = cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, shapes));
+  const auto summary = [&](const BodyId& id) {
+    return RectangleExtrusionAdapter{}.summarize(*shapes.find_body_shape(id)).volume_mm3;
+  };
+  const double cut = 1600 - std::numbers::pi * 3.3 * 3.3 * 8;
+  CHECK(summary(BodyId("body.base")) == Approx(cut));
+  CHECK(summary(BodyId("body.second")) == Approx(1600));
+  REQUIRE(part.set_body_visibility(BodyId("body.second"), BodyVisibility::Hidden));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, shapes));
+  const auto physical = checked(BodyResultInspector{}.inspect_physical_properties(part));
+  CHECK(physical.data().volume_mm3 == Approx(cut + 1600));
+  CHECK(physical.data().complete_mass()->mass_kg == Approx(cut * 4e-6 + 1600 * 6e-6));
+  Fixture output;
+  const auto exported = checked(StepExporter{}.write_part_step(part, shapes, output.path()));
+  CHECK(exported.exported_body_count == 1);
+  const auto source = checked(StepImportSource::create(
+      StepImportSourceId("export"), "Export", "supplier.step",
+      checked(step_import_sha256(output.source_bytes())), StepImportMode::EditableBody));
+  const auto imported = checked(StepImportReader{}.read(source, output.root));
+  CHECK(imported.body_count() == 1);
+  CHECK(imported.products.front().bodies.front().volume_mm3 == Approx(cut).margin(1e-6));
+  const auto before = checked(serialize_part_document_to_json(part));
+  CHECK_FALSE(part.apply_history_intent({{"hole", "base", "second"}, {}}));
+  CHECK(checked(serialize_part_document_to_json(part)) == before);
+  REQUIRE(part.apply_history_intent({{"base", "second", "hole"}, {"hole"}}));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, shapes));
+  CHECK(summary(BodyId("body.base")) == Approx(1600));
+  CHECK(summary(BodyId("body.second")) == Approx(1600));
+  REQUIRE(part.apply_history_intent({{"base", "second", "hole"}, {}}));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, shapes));
+  CHECK(summary(BodyId("body.base")) == Approx(cut));
+  CHECK(summary(BodyId("body.second")) == Approx(1600));
 }

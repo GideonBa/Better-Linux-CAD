@@ -1080,6 +1080,16 @@ struct ResolvedExtrudeSpan {
 [[nodiscard]] Result<ResolvedWorkplane> resolve_limit_face_workplane(
     const PartDocument& document, const FaceReference& reference, const WorkplaneResolver& resolver,
     StepImportTopologyContext* import_context, const ShapeCache& cache, const FeatureId& consumer) {
+  if (const auto* captured = std::get_if<ResultFaceReference>(&reference.source())) {
+    auto face = ResultFaceSupportGeometry::resolve_face(document, cache, *captured, import_context);
+    if (!face)
+      return Result<ResolvedWorkplane>::failure(face.error());
+    auto resolved = ResultFaceSupportGeometry::resolve_current(document, cache, captured->body(),
+                                                               captured->origins(), import_context);
+    if (!resolved)
+      return Result<ResolvedWorkplane>::failure(resolved.error());
+    return Result<ResolvedWorkplane>::success(resolved.value().plane);
+  }
   if (const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source()))
     return resolve_imported_plane(document, *imported, import_context, cache, consumer);
   if (reference.source_kind() != PartFeatureInputSourceKind::SemanticPlanarFace)
@@ -4353,7 +4363,12 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
     return Result<std::size_t>::failure(
         geometry_error(feature_id.value(), "Hole drill-tip height must be finite"));
   GeometryShape result = *target.value();
-  for (const auto& center : centers.value()) {
+  for (std::size_t placement_index = 0; placement_index < centers.value().size();
+       ++placement_index) {
+    const auto& center = centers.value()[placement_index];
+    const auto& placement_id = feature->placements()[placement_index].id.value();
+    const std::string root =
+        "hole/" + std::to_string(placement_id.size()) + ":" + placement_id + "/";
     std::optional<ResolvedResultFace> planar_limit;
     if (!resolved_support.value().face.empty()) {
       auto footprint = closed_profile_adapter_.validate_planar_circle_footprint(
@@ -4418,14 +4433,23 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
       depth = document.find_parameter(symmetric->total_depth)->value().millimeters() / 2;
       start = -depth;
     } else if (const auto* limit = std::get_if<HoleToFaceExtent>(&feature->extent())) {
-      const auto* reference = std::get_if<SemanticFaceReference>(&limit->face.source());
-      const auto* imported = std::get_if<ImportedTopologyReference>(&limit->face.source());
-      if (!reference && !imported)
-        return Result<std::size_t>::failure(
-            geometry_error(feature_id.value(), "Hole limit face must be planar"));
-      auto resolved = resolve_hole_plane(
-          document, reference ? PlaneReferenceSource{*reference} : PlaneReferenceSource{*imported},
-          working, workplane_resolver_, import_context_, feature_id);
+      Result<ResolvedResultFace> resolved = Result<ResolvedResultFace>::failure(
+          geometry_error(feature_id.value(), "Hole limit face must be planar"));
+      if (const auto* captured = std::get_if<ResultFaceReference>(&limit->face.source())) {
+        auto verified =
+            ResultFaceSupportGeometry::resolve_face(document, working, *captured, import_context_);
+        if (!verified)
+          return Result<std::size_t>::failure(verified.error());
+        resolved = ResultFaceSupportGeometry::resolve_current(document, working, captured->body(),
+                                                              captured->origins(), import_context_);
+      } else {
+        const auto* native = std::get_if<SemanticFaceReference>(&limit->face.source());
+        const auto* imported = std::get_if<ImportedTopologyReference>(&limit->face.source());
+        if (native || imported)
+          resolved = resolve_hole_plane(
+              document, native ? PlaneReferenceSource{*native} : PlaneReferenceSource{*imported},
+              working, workplane_resolver_, import_context_, feature_id);
+      }
       if (!resolved)
         return Result<std::size_t>::failure(resolved.error());
       const auto& plane = resolved.value().plane;
@@ -4459,11 +4483,19 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
                                          center, direction, 0, 360);
     if (!tool)
       return Result<std::size_t>::failure(tool.error());
+    tool.value() = ResultFaceSupportGeometry::tag_hole_wall(
+        tool.value(), feature_id, root + "wall", center, direction, support.x_axis, radius);
+    if (blind && cone_height == 0)
+      tool.value() = ResultFaceSupportGeometry::tag_plane(
+          tool.value(), feature_id, root + "bottom", along(depth, 0), support.x_axis, direction);
     if (planar_limit) {
       tool = closed_profile_adapter_.terminate_at_planar_face(tool.value(), planar_limit->face,
                                                               center);
       if (!tool)
         return Result<std::size_t>::failure(tool.error());
+      tool.value() = ResultFaceSupportGeometry::tag_plane(
+          tool.value(), feature_id, root + "bottom", planar_limit->plane.origin,
+          planar_limit->plane.x_axis, planar_limit->plane.normal);
     }
     if (to_next || limit_body) {
       auto clipped = body_boolean_adapter_.combine(

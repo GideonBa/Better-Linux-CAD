@@ -130,6 +130,8 @@ std::string_view to_string(PartFeatureInputSourceKind source_kind) noexcept {
     return "semantic_circular_edge";
   case PartFeatureInputSourceKind::ResultEdge:
     return "result_edge";
+  case PartFeatureInputSourceKind::ResultFace:
+    return "result_face";
   case PartFeatureInputSourceKind::ImportedTopology:
     return "imported_topology";
   case PartFeatureInputSourceKind::Body:
@@ -422,6 +424,13 @@ std::string PlaneReference::source_node_id() const {
 
 FaceReference::FaceReference(PartFeatureInputRole role, FaceReferenceSource source)
     : role_(role), source_(std::move(source)) {}
+Result<FaceReference> FaceReference::create_result(PartFeatureInputRole role,
+                                                   ResultFaceReference reference) {
+  auto valid = validate_role(role, PartFeatureInputCapability::Face, reference.producer().value());
+  if (!valid)
+    return Result<FaceReference>::failure(valid.error());
+  return Result<FaceReference>::success(FaceReference(role, std::move(reference)));
+}
 Result<FaceReference> FaceReference::create_planar(PartFeatureInputRole role,
                                                    SemanticFaceReference face) {
   auto valid = validate_role(role, PartFeatureInputCapability::Face, face.source_feature().value());
@@ -446,6 +455,8 @@ const FaceReferenceSource& FaceReference::source() const noexcept {
   return source_;
 }
 PartFeatureInputSourceKind FaceReference::source_kind() const noexcept {
+  if (std::holds_alternative<ResultFaceReference>(source_))
+    return PartFeatureInputSourceKind::ResultFace;
   if (std::holds_alternative<ImportedTopologyReference>(source_))
     return PartFeatureInputSourceKind::ImportedTopology;
   return std::holds_alternative<SemanticFaceReference>(source_)
@@ -457,6 +468,8 @@ std::string FaceReference::source_node_id() const {
       [](const auto& source) {
         if constexpr (std::is_same_v<std::decay_t<decltype(source)>, ImportedTopologyReference>)
           return source.source_node_id();
+        else if constexpr (std::is_same_v<std::decay_t<decltype(source)>, ResultFaceReference>)
+          return source.producer().value();
         else
           return source.source_feature().value();
       },
@@ -691,6 +704,8 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
         using T = std::decay_t<decltype(source)>;
         if constexpr (std::is_same_v<T, ImportedTopologyReference>)
           return validate_imported_topology_reference(document, source);
+        else if constexpr (std::is_same_v<T, ResultFaceReference>)
+          return validate_result_face_reference(document, source);
         else if constexpr (std::is_same_v<T, SemanticFaceReference>)
           return validate_feature_source(document, source.source_feature(), "semantic planar face");
         else

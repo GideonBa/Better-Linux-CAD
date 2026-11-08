@@ -86,13 +86,14 @@ template <typename FeatureT>
 }
 
 [[nodiscard]] Result<std::size_t>
-validate_result_face_source(const PartDocument& document, const ResultFaceWorkplane& plane,
-                            const std::vector<std::string>& retained_missing = {}) {
-  const auto& reference = plane.reference();
+validate_result_face_source(const PartDocument& document, const ResultFaceReference& reference,
+                            const std::string& object_id,
+                            const std::vector<std::string>& retained_missing = {},
+                            bool planar_only = true) {
   const auto& graph = document.dependency_graph();
   const auto fail = [&](const std::string& message) {
     return Result<std::size_t>::failure(
-        Error::dependency(plane.id().value(), "Lost result-face support: " + message));
+        Error::dependency(object_id, "Lost result-face support: " + message));
   };
   const auto may_retain = [&](const std::string& id) {
     return !graph.has_node(id) && std::find(retained_missing.begin(), retained_missing.end(), id) !=
@@ -121,7 +122,7 @@ validate_result_face_source(const PartDocument& document, const ResultFaceWorkpl
           document.find_imported_topology_catalog(imported_face.value().catalog());
       const auto* entry = catalog ? catalog->find(imported_face.value().entry()) : nullptr;
       if (!entry || entry->descriptor.kind != ImportedTopologyKind::Face ||
-          entry->descriptor.geometry != ImportedGeometryClass::Plane ||
+          (planar_only && entry->descriptor.geometry != ImportedGeometryClass::Plane) ||
           std::none_of(imported->definition().outputs().begin(),
                        imported->definition().outputs().end(), [&](const auto& output) {
                          return entry->parent_body == output.imported_body &&
@@ -1301,9 +1302,14 @@ Result<std::size_t> PartDocument::add_derived_workplane_impl(DerivedWorkplane wo
   return Result<std::size_t>::success(derived_workplanes_.size() - 1U);
 }
 
+Result<std::size_t> validate_result_face_reference(const PartDocument& document,
+                                                   const ResultFaceReference& reference) {
+  return validate_result_face_source(document, reference, reference.producer().value(), {}, false);
+}
+
 Result<std::size_t> validate_result_face_workplane_reference(const PartDocument& document,
                                                              const ResultFaceWorkplane& plane) {
-  return validate_result_face_source(document, plane);
+  return validate_result_face_source(document, plane.reference(), plane.id().value());
 }
 
 Result<std::size_t> PartDocument::add_result_face_workplane(ResultFaceWorkplane workplane) {
@@ -1319,7 +1325,8 @@ Result<std::size_t> PartDocument::add_result_face_workplane_impl(
   if (has_workplane_id(workplane.id()) || dependency_graph_.has_node(workplane.id().value()))
     return Result<std::size_t>::failure(Error::validation(
         workplane.id().value(), "workplane id must be unique within part document"));
-  auto valid = validate_result_face_source(*this, workplane, retained_missing_sources);
+  auto valid = validate_result_face_source(*this, workplane.reference(), workplane.id().value(),
+                                           retained_missing_sources);
   if (!valid)
     return valid;
   auto graph = dependency_graph_;
@@ -1561,7 +1568,7 @@ Result<std::size_t> PartDocument::validate_reference_sources() const {
       return valid;
   }
   for (const auto& plane : result_face_workplanes_) {
-    auto valid = validate_result_face_source(*this, plane);
+    auto valid = validate_result_face_source(*this, plane.reference(), plane.id().value());
     if (!valid)
       return valid;
   }

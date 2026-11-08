@@ -3,6 +3,7 @@
 #include "../support/part_history_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/step_import_freshness.hpp"
+#include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/step_editable_commands.hpp"
 #include "blcad/geometry/step_exporter.hpp"
@@ -52,6 +53,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <numbers>
@@ -1412,4 +1414,106 @@ TEST_CASE("Semantic Hole restore previews a physical cut and commits one reversi
   REQUIRE(w.session().redo());
   CHECK(snapshot(w) == after);
   check_volume(cut_volume);
+}
+
+TEST_CASE("A semantic blind Hole bottom offers direct Sketch creation as one reversible action",
+          "[gui][parity-b153][hole-result-reference-shell]") {
+  auto part = blcad::test::hole_fixture::part("hole.bottom.shell", true);
+  REQUIRE(part.add_parameter(checked(Parameter::create_length(ParameterId("blind"), "Blind depth",
+                                                              checked(Quantity::length_mm(3))))));
+  REQUIRE(part.update_hole_feature(blcad::test::hole_fixture::hole(
+      "hole", blcad::test::hole_fixture::standard(), HoleBlindExtent{ParameterId("blind")})));
+  ShellWindow w;
+  QTemporaryDir directory;
+  open(w, directory, part);
+  auto& filter = control<QComboBox>(w, "blcad.selection.filter");
+  const int row = filter.findData(selection_kind_bit(GuiSelectionKind::Face));
+  REQUIRE(row >= 0);
+  filter.setCurrentIndex(row);
+  const auto targets = checked(geometry::FinishingSelectionBuilder::build(
+      *w.session().part_document(), *w.session().part_shape_cache(), BodyId("body.base"),
+      PartFeatureInputRole::ShellRemovalFace));
+  const auto bottom = std::find_if(targets.begin(), targets.end(), [](const auto& target) {
+    const auto& face = std::get<FaceReference>(target.reference);
+    const auto* ref = std::get_if<ResultFaceReference>(&face.source());
+    return ref && ref->origins().front().role.ends_with("/bottom");
+  });
+  REQUIRE(bottom != targets.end());
+  CHECK(bottom->label.find("Bohrung 1 / Boden") != std::string::npos);
+  REQUIRE(w.viewport().select_semantic(bottom->semantic_id));
+  const auto before = snapshot(w);
+  REQUIRE(w.create_sketch_on_selection());
+  REQUIRE(w.active_sketch());
+  CHECK(w.session().part_document()->result_face_workplane_count() == 1);
+  CHECK(w.session()
+            .part_document()
+            ->result_face_workplanes()
+            .front()
+            .reference()
+            .origins()
+            .front()
+            .role.ends_with("/bottom"));
+  const auto after = snapshot(w);
+  capture(w, "semantic-hole-bottom-sketch");
+  REQUIRE(w.undo());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.redo());
+  CHECK(snapshot(w) == after);
+  REQUIRE(w.save_to({}));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(w.session().file_path()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == after);
+  CHECK(reopened.derived_results_fresh());
+}
+
+TEST_CASE("A semantic bore wall follows the existing Draft selection preview and Apply workflow",
+          "[gui][parity-b153][hole-result-reference-shell]") {
+  ShellWindow w;
+  QTemporaryDir directory;
+  open(w, directory, blcad::test::hole_fixture::part("hole.draft.shell", true));
+  const auto before = snapshot(w);
+  auto* start = w.feature_tools().findChild<QAction*>("blcad.action.draft");
+  REQUIRE(start);
+  REQUIRE(start->isEnabled());
+  start->trigger();
+  REQUIRE(w.feature_tools().active());
+  const auto targets = checked(geometry::FinishingSelectionBuilder::build(
+      *w.session().part_document(), *w.session().part_shape_cache(), BodyId("body.base"),
+      PartFeatureInputRole::DraftFace));
+  const auto wall = std::find_if(targets.begin(), targets.end(), [](const auto& target) {
+    const auto* reference =
+        std::get_if<ResultFaceReference>(&std::get<FaceReference>(target.reference).source());
+    return reference && reference->origins().front().role.ends_with("/wall");
+  });
+  REQUIRE(wall != targets.end());
+  CHECK(wall->label.find("Bohrung 1 / Wand") != std::string::npos);
+  REQUIRE(w.viewport().select_semantic(wall->semantic_id));
+  REQUIRE(w.feature_tools().set_numeric_text("4 deg"));
+  REQUIRE(w.viewport().feature_preview_active());
+  CHECK(snapshot(w) == before);
+  auto& apply = control<QPushButton>(w, "blcad.feature.apply");
+  REQUIRE(apply.isEnabled());
+  capture(w, "semantic-hole-wall-draft-preview");
+  click(apply);
+  CHECK_FALSE(w.feature_tools().active());
+  REQUIRE(w.session().derived_results_fresh());
+  REQUIRE(w.session().part_document()->draft_feature_count() == 1);
+  CHECK(std::holds_alternative<ResultFaceReference>(
+      w.session().part_document()->draft_features().front().faces().front().source()));
+  const double r = 3.3 - 8 * std::tan(4 * std::numbers::pi / 180.);
+  CHECK(
+      geometry::RectangleExtrusionAdapter{}
+          .summarize(*w.session().part_shape_cache()->find_body_shape(BodyId("body.base")))
+          .volume_mm3 ==
+      Catch::Approx(1600 - std::numbers::pi * 8 / 3 * (3.3 * 3.3 + 3.3 * r + r * r)).margin(1e-5));
+  const auto after = snapshot(w);
+  REQUIRE(w.undo());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.redo());
+  CHECK(snapshot(w) == after);
+  REQUIRE(w.save_to({}));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(w.session().file_path()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == after);
+  CHECK(reopened.derived_results_fresh());
 }

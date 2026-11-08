@@ -1,10 +1,12 @@
 #include "../support/engineering_resource_fixture.hpp"
+#include "../support/hole_feature_fixture.hpp"
 #include "../support/part_history_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include <numbers>
 
 #include <TopoDS_Shape.hxx>
 #include <catch2/catch_approx.hpp>
@@ -233,4 +235,41 @@ TEST_CASE("Legacy execution cannot certify an untrusted prefilled reference-tran
   const auto fresh =
       checked(inspect_shape_physical_properties(*trusted.find_body_shape(BodyId("body.base"))));
   CHECK(fresh.volume->centroid_mm.x == approximately(0));
+}
+
+TEST_CASE("Semantic Hole dimensions invalidate geometry while material refresh reuses the cut",
+          "[geometry][parity-b153][hole-combined-acceptance]") {
+  auto before = blcad::test::hole_fixture::part("mass.hole", true);
+  resources::annotate(before);
+  auto c = cache(before);
+  const auto integrated = checked(BodyResultInspector{}.inspect_physical_properties(before));
+  const double expected_volume = 1600 - std::numbers::pi * 3.3 * 3.3 * 8;
+  CHECK(integrated.data().volume_mm3 == approximately(expected_volume));
+  CHECK(integrated.data().complete_mass()->mass_kg == approximately(expected_volume * 4e-6));
+  auto after = before;
+  REQUIRE(after.set_default_material(resources::key("synthetic.material", "r2")));
+  const auto old_shape = *OcctShapeView::get(*c.find_body_shape(BodyId("body.base")));
+  REQUIRE(GeometryRecomputeExecutor{}.refresh_material_metadata(before, after, c));
+  CHECK(OcctShapeView::get(*c.find_body_shape(BodyId("body.base")))->IsSame(old_shape));
+  const auto refreshed =
+      checked(BodyResultInspector{}.inspect_physical_properties(after, integrated));
+  CHECK(refreshed.data().geometry_reused);
+  CHECK(refreshed.data().complete_mass()->mass_kg == approximately(expected_volume * 6e-6));
+  const auto material_only = after;
+  REQUIRE(after.add_engineering_resource(blcad::test::hole_fixture::table("r2", 8, 9)));
+  REQUIRE(after.update_hole_feature(
+      blcad::test::hole_fixture::hole("hole", blcad::test::hole_fixture::standard("r2"))));
+  CHECK_FALSE(GeometryRecomputeExecutor{}.refresh_material_metadata(material_only, after, c));
+  REQUIRE(c.validate_complete_geometry_result(material_only));
+  c = cache(after);
+  const auto changed = checked(BodyResultInspector{}.inspect_physical_properties(after));
+  CHECK(changed.data().volume_mm3 == approximately(1600 - std::numbers::pi * 16 * 8));
+  CHECK(changed.data().complete_mass()->mass_kg ==
+        approximately((1600 - std::numbers::pi * 16 * 8) * 6e-6));
+  const auto portable = checked(serialize_part_document_to_json(after));
+  const auto reopened = checked(deserialize_part_document_from_json(portable));
+  CHECK(checked(BodyResultInspector{}.inspect_physical_properties(reopened))
+            .data()
+            .complete_mass()
+            ->mass_kg == approximately(changed.data().complete_mass()->mass_kg));
 }

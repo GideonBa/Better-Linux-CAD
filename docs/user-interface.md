@@ -418,6 +418,21 @@ workflow after a preceding Body rotation. Both are unmodified native captures at
 compact dimensions. The hole follows the rotated face while existing face-Sketch selection remains
 covered by the native regression suite.
 
+153C reuses direct face selection for flat Blind bottoms: select the bottom face, choose
+**2D-Skizze erstellen**, and author the dependent Sketch in the existing environment. Support and
+Sketch share one Undo/Redo boundary and portable Save/Open. Cylindrical bore walls also appear in
+the existing finishing face selector and can drive Draft; curved walls do not offer planar Sketch
+creation. Placement identity follows the authored Hole position when dimensions or poses change.
+Deleted or split source faces require correction through the existing reference diagnostics.
+
+The unmodified native [bore-wall Draft preview](images/semantic-hole-wall-draft.png) and
+[compact 150% preview](images/semantic-hole-wall-draft-compact.png) show the existing face list,
+valid preview, angle and pinned Apply/Cancel controls. The [bottom-supported Sketch](images/semantic-hole-bottom-sketch.png)
+and [compact Sketch view](images/semantic-hole-bottom-sketch-compact.png) use the existing Sketch
+ribbon and face-normal camera. Ordinary captures are 1280×800; compact captures are 1536×960
+physical pixels for 1024×640 DIP. Model geometry stays small in the existing Fit All framing with
+origin geometry. These are actual UI captures, without image edits.
+
 For Hole, use the familiar top-to-bottom order: positions → target/direction → bore/seat type →
 termination → thread → advanced checks. For Fillet, keep constant/variable/face/full-round as modes
 of the same feature tool; highlight edge stations and face roles directly. Direct Edit exposes its

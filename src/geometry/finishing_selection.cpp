@@ -1,6 +1,7 @@
 #include "blcad/geometry/finishing_selection.hpp"
 
 #include "blcad/core/part_document.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include "geometry_shape_internal.hpp"
 #include "imported_body_placement.hpp"
@@ -56,6 +57,22 @@ FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache&
   }
   std::vector<FinishingSelectionTarget> targets;
   std::vector<TopoDS_Shape> represented_edges;
+  std::vector<TopoDS_Shape> represented_faces;
+  const auto result_label = [&](const ResultFaceReference& reference) {
+    for (const auto& origin : reference.origins()) {
+      const auto* hole = document.find_hole_feature(origin.feature);
+      if (!hole)
+        continue;
+      for (std::size_t index = 0; index < hole->placements().size(); ++index) {
+        const auto& id = hole->placements()[index].id.value();
+        const auto root = "hole/" + std::to_string(id.size()) + ":" + id + "/";
+        if (origin.role == root + "wall" || origin.role == root + "bottom")
+          return hole->name() + " / Bohrung " + std::to_string(index + 1) +
+                 (origin.role.ends_with("/bottom") ? " / Boden" : " / Wand");
+      }
+    }
+    return "Result face / " + reference.origins().front().role;
+  };
   const auto append = [&](auto reference, const TopoDS_Shape& shape, const std::string& label,
                           const std::string& identity) {
     Bnd_Box bounds;
@@ -64,6 +81,8 @@ FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache&
     bounds.Get(xmin, ymin, zmin, xmax, ymax, zmax);
     if (edge)
       represented_edges.push_back(shape);
+    else
+      represented_faces.push_back(shape);
     targets.push_back({"finishing/" + identity,
                        label,
                        reference,
@@ -149,6 +168,27 @@ FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache&
                  "face/" + std::to_string(source.id().value().size()) + ":" + source.id().value() +
                      "/" + std::string(to_string(semantic.value().face())));
       }
+    }
+  }
+  if (!edge) {
+    for (TopExp_Explorer it(target, TopAbs_FACE); it.More(); it.Next()) {
+      const auto face = TopoDS::Face(it.Current());
+      if (std::any_of(represented_faces.begin(), represented_faces.end(),
+                      [&](const auto& old) { return old.IsSame(face); }))
+        continue;
+      std::vector<ResultFaceOrigin> origins;
+      for (const auto& entry : result->shape.impl_->face_lineage)
+        if (entry.selectable && entry.face.IsSame(face))
+          origins.push_back(entry.origin);
+      auto captured =
+          ResultFaceReference::create(result->source_feature_id, body, std::move(origins));
+      if (!captured)
+        continue;
+      auto reference = FaceReference::create_result(role, captured.value());
+      if (!reference || !ResultFaceSupportGeometry::resolve_face(document, cache, captured.value(),
+                                                                 import_context))
+        continue;
+      append(reference.value(), face, result_label(captured.value()), captured.value().identity());
     }
   }
   if (edge) {

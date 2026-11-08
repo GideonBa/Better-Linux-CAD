@@ -29,6 +29,13 @@ struct ResolvedResultFace {
 // position or geometric proximity becomes persistent identity.
 class ResultFaceSupportGeometry {
 public:
+  [[nodiscard]] static GeometryShape tag_hole_wall(const GeometryShape& shape, FeatureId producer,
+                                                   std::string role, Point3 center, Vector3 axis,
+                                                   Vector3 x_axis, double radius_mm);
+  [[nodiscard]] static Result<GeometryShape>
+  resolve_face(const PartDocument& document, const ShapeCache& cache,
+               const ResultFaceReference& reference,
+               StepImportTopologyContext* import_context = nullptr);
   // Attach semantic roots to a fresh primitive. Returns detached metadata so
   // earlier cached shapes sharing the same OCCT topology remain immutable.
   [[nodiscard]] static GeometryShape tag_prismatic_caps(const GeometryShape& shape,

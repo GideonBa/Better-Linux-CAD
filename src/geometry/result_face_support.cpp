@@ -10,6 +10,7 @@
 #include <GeomAbs_SurfaceType.hxx>
 #include <Standard_Failure.hxx>
 #include <TopoDS.hxx>
+#include <gp_Cylinder.hxx>
 #include <gp_Pln.hxx>
 
 #include <algorithm>
@@ -83,6 +84,85 @@ GeometryShape ResultFaceSupportGeometry::tag_plane(const GeometryShape& shape, F
       {{std::move(producer), std::move(role)}, matches.front(), origin, x_axis, selectable},
       backing->shape);
   return GeometryShape(std::move(backing));
+}
+
+GeometryShape ResultFaceSupportGeometry::tag_hole_wall(const GeometryShape& shape,
+                                                       FeatureId producer, std::string role,
+                                                       Point3 center, Vector3 axis, Vector3 x_axis,
+                                                       double radius_mm) {
+  if (shape.empty() || length(axis) < tolerance)
+    return shape;
+  axis = unit(axis);
+  std::vector<TopoDS_Face> matches;
+  for (TopExp_Explorer it(shape.impl_->shape, TopAbs_FACE); it.More(); it.Next()) {
+    const auto face = TopoDS::Face(it.Current());
+    BRepAdaptor_Surface surface(face);
+    if (surface.GetType() != GeomAbs_Cylinder)
+      continue;
+    const auto cylinder = surface.Cylinder();
+    const auto n = cylinder.Axis().Direction();
+    const auto p = cylinder.Location();
+    const Vector3 offset{center.x - p.X(), center.y - p.Y(), center.z - p.Z()};
+    if (std::abs(cylinder.Radius() - radius_mm) <= tolerance &&
+        std::abs(std::abs(dot(axis, {n.X(), n.Y(), n.Z()})) - 1) <= tolerance &&
+        length(cross(offset, axis)) <= tolerance)
+      matches.push_back(face);
+  }
+  if (matches.size() != 1)
+    return shape;
+  auto backing = std::make_shared<GeometryShape::Impl>(*shape.impl_);
+  detail::append_lineage(backing->face_lineage,
+                         {{std::move(producer), std::move(role)}, matches.front(), center, x_axis},
+                         backing->shape);
+  return GeometryShape(std::move(backing));
+}
+
+Result<GeometryShape>
+ResultFaceSupportGeometry::resolve_face(const PartDocument& document, const ShapeCache& cache,
+                                        const ResultFaceReference& reference,
+                                        StepImportTopologyContext* import_context) {
+  auto valid = validate_result_face_reference(document, reference);
+  if (!valid)
+    return Result<GeometryShape>::failure(valid.error());
+  const auto history = detail::validate_history_input(document, cache);
+  if (!history)
+    return Result<GeometryShape>::failure(history.error());
+  for (const auto& base : document.imported_body_features())
+    for (const auto& output : base.definition().outputs())
+      if (output.body == reference.body()) {
+        auto owned = cache.validated_imported_body_result(document, base);
+        if (!owned)
+          return Result<GeometryShape>::failure(owned.error());
+      }
+  auto fresh = observe_imported_part_sources(document, import_context);
+  if (!fresh)
+    return Result<GeometryShape>::failure(fresh.error());
+  const auto fail = [&](const char* message) {
+    return Result<GeometryShape>::failure(Error::geometry(reference.producer().value(), message));
+  };
+  if (!detail::validate_history_source(document, reference.producer().value(), &cache))
+    return fail("Lost result face: captured producer is unavailable in this history scope");
+  const auto* shape = cache.find_body_shape(reference.body());
+  if (!shape || shape->empty())
+    return fail("Lost result face: current Body is unavailable");
+  std::vector<TopoDS_Face> matches;
+  for (const auto& origin : reference.origins()) {
+    bool found = false;
+    for (const auto& entry : shape->impl_->face_lineage) {
+      if (entry.origin != origin)
+        continue;
+      found = true;
+      if (std::none_of(matches.begin(), matches.end(),
+                       [&](const auto& face) { return face.IsSame(entry.face); }))
+        matches.push_back(entry.face);
+    }
+    if (!found)
+      return fail("Lost result face: an authored contributor was deleted");
+  }
+  if (matches.size() != 1)
+    return fail("Ambiguous result face: authored face has multiple descendants");
+  return Result<GeometryShape>::success(
+      GeometryShape(std::make_shared<GeometryShape::Impl>(matches.front())));
 }
 
 GeometryShape ResultFaceSupportGeometry::tag_prismatic_caps(const GeometryShape& shape,
@@ -301,17 +381,19 @@ Result<std::vector<ResultFaceSelectionTarget>> ResultFaceSupportGeometry::select
     if (!plane || !resolve(document, plane.value(), cache, import_context))
       continue;
     std::string semantic = "support/" + reference.value().identity();
+    std::string label = "Result face / " + reference.value().origins().front().role;
     if (aliases)
       for (const auto& alias : aliases.value())
         if (alias.shape.impl_->shape.IsSame(face)) {
           semantic = alias.semantic_id;
+          label = alias.label;
           break;
         }
     GProp_GProps properties;
     BRepGProp::SurfaceProperties(face, properties);
     const auto p = properties.CentreOfMass();
     targets.push_back({std::move(semantic),
-                       "Result face / " + reference.value().origins().front().role,
+                       std::move(label),
                        reference.value(),
                        GeometryShape(std::make_shared<GeometryShape::Impl>(face)),
                        {p.X(), p.Y(), p.Z()}});
