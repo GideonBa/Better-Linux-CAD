@@ -5103,3 +5103,9 @@ all **1,022** runtime fingerprints remain unchanged. Whole 152 is accepted at it
 persistence gate, current 153 stays planned until protected delivery and main-tree verification.
 B's full Core/Geometry/GUI, native ordinary/compact and startup checks are retained explicitly,
 not reported as rerun. No approval or required check is blocked. Staged review and normal PR follow.
+
+152C/whole-152 delivery uses [PR #165](https://github.com/GideonBa/Better-Linux-CAD/pull/165),
+implementation `5969e9776035f6129ed01b2fcd37f5db98ea5bd1` (initial reviewed tree
+`27cb453cea32b709c32ead0257af214d84fe0ce4`). The delivery-record commit changes docs only and
+preserves all 1,022 runtime fingerprints. Final exact-head/review/check state, normal protected
+merge and updated-main tree verification precede the next implementation branch.

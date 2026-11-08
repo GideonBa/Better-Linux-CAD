@@ -2531,7 +2531,7 @@ cut workflow. No second pattern executor, standards store or numbered status aut
 | --- | --- | --- |
 | 152A | Typed plain/clearance Hole intent, stable owned/Sketch placements, semantic support/direction, discriminated extents/tips and strict pinned standard/custom diameter resolution with focused Core proofs | Implemented and verified; PR #163 |
 | 152B | Part add/update/remove, complete history/graph/repair inventory and canonical strict JSON; atomic local/selected Project standard-revision consumer remapping/removal guards | Implemented and verified; PR #164 |
-| 152C | Combined native/imported input, legacy persistence/history/resource and integration regression acceptance; executor/GUI remain explicitly gated by 153/157 | Implemented and verified; delivery pending |
+| 152C | Combined native/imported input, legacy persistence/history/resource and integration regression acceptance; executor/GUI remain explicitly gated by 153/157 | Implemented and verified; PR #165 |
 
 A validates semantic intent and existing document inputs without publishing executable Hole records.
 Core proof covers finite/duplicate placement identity, typed parameter/table cells, missing pinned
@@ -2615,6 +2615,11 @@ and protected PR delivery precede the next branch. Phase B remains open for 153â
 Final inventory **5 / 658**, source/formatting/whitespace review and unchanged **1,022** runtime
 fingerprints pass (SHA-256 `38f23d6d85c7bf5edfbdecfa2aa8143ed9780e54292f89f36253b07aad596fd5`).
 No new runtime behavior is changed in C; protected delivery precedes 153.
+
+152C/whole-152 delivery: [PR #165](https://github.com/GideonBa/Better-Linux-CAD/pull/165),
+implementation `5969e97`. The delivery-record commit changes documentation only and preserves all
+1,022 runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed
+main before starting Block 153.
 
 ## Later phases
 
