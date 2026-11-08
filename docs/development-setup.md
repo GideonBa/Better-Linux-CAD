@@ -5044,3 +5044,9 @@ No approval or check remains blocked. Final modified-line/new-file formatting an
 all **1,022** runtime fingerprints remain unchanged with digest
 `08a3b709c124c22ee5fd2fed74b11e3be6fc6ce90c0224e9d7b1b6a447d4bd33`.
 Staged diff review and normal protected delivery complete B without advancing whole 152.
+
+152B delivery uses [PR #164](https://github.com/GideonBa/Better-Linux-CAD/pull/164), implementation
+`5e9f39f5f1b125e355049acbc69d87c1f1b0c1a4` (initial reviewed tree
+`9feda8a6599e2a4de17ac46463ea7edb0fc7b1a2`). The delivery-record commit changes docs only; all
+1,022 verified runtime fingerprints remain unchanged. Check the final exact head/review/check state,
+merge normally and compare the updated-main tree before opening the next serial branch.

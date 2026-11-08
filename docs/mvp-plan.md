@@ -2530,7 +2530,7 @@ cut workflow. No second pattern executor, standards store or numbered status aut
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
 | 152A | Typed plain/clearance Hole intent, stable owned/Sketch placements, semantic support/direction, discriminated extents/tips and strict pinned standard/custom diameter resolution with focused Core proofs | Implemented and verified; PR #163 |
-| 152B | Part add/update/remove, complete history/graph/repair inventory and canonical strict JSON; atomic local/selected Project standard-revision consumer remapping/removal guards | Implemented and verified; delivery pending |
+| 152B | Part add/update/remove, complete history/graph/repair inventory and canonical strict JSON; atomic local/selected Project standard-revision consumer remapping/removal guards | Implemented and verified; PR #164 |
 | 152C | Combined native/imported input, legacy persistence/history/resource and integration regression acceptance; executor/GUI remain explicitly gated by 153/157 | Planned; not started |
 
 A validates semantic intent and existing document inputs without publishing executable Hole records.
@@ -2583,6 +2583,11 @@ Final inventory **5 / 658**, separate native startup **124**, formatting/whitesp
 unchanged **1,022** runtime fingerprints complete B verification (SHA-256
 `08a3b709c124c22ee5fd2fed74b11e3be6fc6ce90c0224e9d7b1b6a447d4bd33`). No required check is
 skipped or blocked; normal protected delivery precedes the next branch.
+
+152B delivery: [PR #164](https://github.com/GideonBa/Better-Linux-CAD/pull/164), implementation
+`5e9f39f`. The delivery-record update changes documentation only and preserves all 1,022 runtime
+fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed main before
+starting the combined-acceptance branch.
 
 ## Later phases
 
