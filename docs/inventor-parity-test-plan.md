@@ -313,7 +313,13 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
 
 ### B01 Semantic bores and termination
 
-- **First gate:** 153; native completion 157.
+- **First gate:** 152 Core/JSON; 153 physical execution; native completion 157.
+- 152A `[hole-intent]`, `[hole-standards]` and `[hole-inputs]` exercise stable owned/Sketch point
+  identities, finite signed coordinates, discriminated extents/tips, support/limit capabilities,
+  typed custom parameters and exact immutable table cells. Use independently specified synthetic
+  revision diameters and cell provenance, reject unavailable/incorrect data without fallback and
+  compare exact document bytes/executable lifetime before/after pure validation. These proofs do
+  not claim persisted feature registration, geometry or Wizard authoring before their assigned gates.
 - Drill blind/through/ToNext/ToFace/up-to-Body holes into extruded, revolved, swept and imported
   supports with nonidentity workplanes. Change support thickness and each extent parameter.
 - Oracle: cylinder/cone volumes, axial section intersections and expected entry/bottom coordinates.

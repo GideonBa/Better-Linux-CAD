@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 151
 current_block: 152
-current_boundary: Block 152 HoleFeature Core model and standards resolution planned; not started
+current_boundary: Block 152A typed Hole intent verified; document integration remains
 current_tag: "[parity-b152]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–151 accepted; Blocks 152–204 planned"
+  advanced_modeling_workflows: "Blocks 145–151 accepted; Block 152 in progress; Blocks 153–204 planned"
 ---
 
 # MVP Plan
@@ -34,7 +34,7 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 
 ```text
 implemented through  Block 151
-current block        Block 152 (planned; not started)
+current block        Block 152 (in progress; slice A)
 current phase        Semantic holes and threads
 current boundary     HoleFeature Core model and standards resolution
 ```
@@ -1777,7 +1777,7 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 ## Blocks 145–204 — Advanced modeling workflows
 
 Status authority: Blocks 145–151 are **Implemented and accepted**;
-Blocks 152–204 are **Planned; not started**.
+Block 152 is **In progress**; Blocks 153–204 are **Planned; not started**.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1787,7 +1787,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
-| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Planned; not started |
+| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152 in progress; 153–158 planned |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
@@ -2518,6 +2518,42 @@ Block 152 is **Planned; not started** until this branch is merged and refreshed 
 implementation `985849a`. The delivery-record update changes documentation only and preserves all
 1,017 runtime fingerprints. Confirm normal merge and exact reviewed-tree comparison on refreshed
 main before starting Block 152.
+
+### Block 152 serial implementation — 2026-11-08
+
+PR #162 is confirmed merged as `10c794b`; refreshed main matches reviewed tree
+`9a45a9655203376fe5a49bde8a62032eb1382e46` before `feat/semantic-hole-intent` starts.
+Implemented-through stays 151. Extend `hole-wizard.md`, the existing typed feature/reference
+contracts and the immutable 149 resource catalog; retain the legacy CircleProfile/CircularHolePattern
+cut workflow. No second pattern executor, standards store or numbered status authority is introduced.
+
+| Slice | Bounded deliverable | Status |
+| --- | --- | --- |
+| 152A | Typed plain/clearance Hole intent, stable owned/Sketch placements, semantic support/direction, discriminated extents/tips and strict pinned standard/custom diameter resolution with focused Core proofs | Implemented and verified; PR #163 |
+| 152B | Part add/update/remove, complete history/graph/repair inventory and canonical strict JSON; atomic local/selected Project standard-revision consumer remapping/removal guards | Planned; not started |
+| 152C | Combined native/imported input, legacy persistence/history/resource and integration regression acceptance; executor/GUI remain explicitly gated by 153/157 | Planned; not started |
+
+A validates semantic intent and existing document inputs without publishing executable Hole records.
+Core proof covers finite/duplicate placement identity, typed parameter/table cells, missing pinned
+revisions/rows/columns, provenance and independent revision values, support capabilities and immutable
+lookup. B owns persisted feature integration and resource-consumer migration; C closes whole 152 only
+after the combined gate. Geometry and Wizard behavior retain their existing 153–157 owners.
+
+152A implements pure typed Hole intent/validation and exact pinned/custom diameter lookup, with
+stable placement identity, existing semantic support/limit roles, explicit single target/direction,
+six extent variants and flat/blind-conical tips. There is no persisted/executable Hole registration
+yet. Final warning-free Core build, focused **25 / 1,400** and full **663 / 25,828** pass without
+failures/skips. Existing JSON/resource/legacy-cut contracts remain covered by full Core. Geometry/
+GUI/native 151D baselines are retained, not rerun or claimed as Hole execution evidence. Final
+**1,020** runtime fingerprints remain unchanged (SHA-256
+`35c40d12e4c2fa33fff409e3a5abac99900ad30d97901b43a978e9ed7f4723ae`); formatting/whitespace
+checks pass. Staged review and normal protected PR delivery precede B. Whole 152 remains in progress;
+implemented-through stays 151 and the semantic-Hole GUI capability remains planned.
+
+152A delivery: [PR #163](https://github.com/GideonBa/Better-Linux-CAD/pull/163), implementation
+`a009265`. The delivery-record update changes documentation only and preserves all 1,020 runtime
+fingerprints. Confirm the normal merge and exact reviewed-tree comparison on refreshed main before
+starting the document-integration branch.
 
 ## Later phases
 
