@@ -5371,3 +5371,9 @@ Final formatting, whitespace and working-diff review pass; all **1,023** runtime
 unchanged with digest `20e8501c174c6231c8cd65ec8530866fb9099e1710369747826b5ccf05f41f4f`.
 No approval or required native/check rule is blocked. Staged review and normal protected delivery
 follow. The wider GUI baseline is retained explicitly; whole-153 C acceptance remains open.
+
+153B2 delivery: [PR #168](https://github.com/GideonBa/Better-Linux-CAD/pull/168), implementation
+`0527d3b9caedae9341c5d9001e1dcd19ac920dac`, reviewed implementation tree
+`1d19e550c79cf8e2b1b39ba6aaa7cfbe3ee5fd23`. This delivery record changes documentation only.
+Confirm the exact final head, normal protected merge and refreshed-main tree before 153C.
+User boundary: complete whole 153, then stop without beginning 154.

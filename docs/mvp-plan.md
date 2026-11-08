@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 152
 current_block: 153
-current_boundary: Block 153B2 current Hole supports verified; protected delivery pending before C
+current_boundary: Block 153B2 verified delivery PR 168; C remains open; stop after whole 153
 current_tag: "[parity-b153]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -2695,6 +2695,13 @@ sections and active/suppressed/placed/repeated STEP ThroughAll/ToFace combinatio
 volume/section/identity and rollback evidence. Runtime freeze **1,023** files remains unchanged.
 Final inventory, staged review and normal protected delivery precede C. Whole 153/Phase B remain
 open, implemented-through stays 152 and Wizard authoring remains 157.
+
+153B2 delivery: [PR #168](https://github.com/GideonBa/Better-Linux-CAD/pull/168), implementation
+`0527d3b9caedae9341c5d9001e1dcd19ac920dac`, reviewed implementation tree
+`1d19e550c79cf8e2b1b39ba6aaa7cfbe3ee5fd23`. Final inventory is **5 / 658** and all
+1,023 runtime fingerprints remain unchanged. Confirm the exact final head and normal protected
+merge, then compare refreshed main before C. The user requests completion of whole Block 153
+and an immediate stop afterward; do not begin Block 154.
 
 ## Later phases
 
