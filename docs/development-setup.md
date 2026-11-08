@@ -5050,3 +5050,56 @@ Staged diff review and normal protected delivery complete B without advancing wh
 `9feda8a6599e2a4de17ac46463ea7edb0fc7b1a2`). The delivery-record commit changes docs only; all
 1,022 verified runtime fingerprints remain unchanged. Check the final exact head/review/check state,
 merge normally and compare the updated-main tree before opening the next serial branch.
+
+
+## Block 152C — combined semantic Hole Core acceptance, 2026-11-08
+
+Starts on `feat/semantic-hole-combined-acceptance` after PR #164 is confirmed merged as `88c0e0d`;
+refreshed main matches reviewed tree `b2faba0eec95cc58afc7a04331cc5357fc994380`. Change only tests
+and existing documentation. Product sources/build definitions remain exactly those accepted in B.
+
+Initial two-target build passes (`blcad152c-initial-build.log`). Review adds the new Hole enum to
+an existing operation-construction test helper (actual physical Hole execution stays gated by 153)
+and re-reads a catalog reference after replacing the test's Part value. Review rebuild passes
+without warnings (`blcad152c-review-build.log`). New combined cases pass Core **2 / 27** and
+Geometry **2 / 91**, without failures/skips (`blcad152c-core-combined.log`,
+`blcad152c-geometry-combined.log`). Extend the projected-point case with ReferenceRepair-mode
+roundtrip; final Core rebuild is `blcad152c-final-core-build.log`.
+
+Independent oracles: the finished 20×10×8 box loses `20 × (1 − π/4)` mm³ at a full-length radius-1
+edge fillet. A suppressed Hole adds no cut, and a rigid pose preserves that volume. Density 4,000
+versus 6,000 kg/m³ scales complete mass from `V × 4e-6` to `V × 6e-6` kg; the material-only query
+reuses integrated geometry even with V4 Hole intent. A standard revision invalidates the earlier
+physical snapshot while suppressed geometry remains equal to a separately built legacy chain.
+Actual STEP evidence uses a 20×10×8 supplier, real XDE/catalog/planar support and exact 1,600 mm³
+base. V4 preserves the imported support identity; changed supplier bytes reject recompute without
+replacing the cached Body, restored bytes recover, and Reference Part authorship stays read-only.
+
+Expanded focused commands:
+
+```bash
+./build/dev-gui/blcad_core_tests "[parity-b152]"
+./build/dev-gui/blcad_geometry_tests "[parity-b152],[history-evaluation-boundary],[imported-body-recompute],[physical-reuse]"
+```
+
+Before the final repair-mode addition, Core passes **17 / 351** and Geometry **19 / 936**, without
+failures/skips (`blcad152c-focused-core.log`, `blcad152c-focused-geometry.log`). No runtime changes
+or failed checks require repeating B's full Core/Geometry/GUI or native/startup suites; those remain
+retained baselines. Final repair-mode Core, unchanged product-source proof, inventory after the
+numbered/GUI-owner projection, formatting and runtime freeze precede whole-152 acceptance/delivery.
+
+Final repair-mode Core passes **17 / 353**, without failures/skips (`blcad152c-final-core.log`).
+Final freeze **1,022** files, SHA-256
+`38f23d6d85c7bf5edfbdecfa2aa8143ed9780e54292f89f36253b07aad596fd5`
+(`/tmp/blcad152c-runtime-freeze.json`); earlier manifest is `blcad152c-initial-runtime-freeze.json`.
+`git diff --exit-code -- CMakeLists.txt src include assets cmake scripts` proves product sources
+unchanged. Advance MVP through 152/current 153 planned and keep the semantic-Hole GUI capability
+planned under its existing native UI gate 157. This does not promote physical cutting or the Wizard.
+Final existing inventory runs after this docs-only projection; no product/native baseline is rerun.
+
+Final inventory after the projection passes **5 / 658**, without failures/skips
+(`blcad152c-final-inventory.log`). Working diff, modified-line formatting and whitespace review pass;
+all **1,022** runtime fingerprints remain unchanged. Whole 152 is accepted at its Core/standards/
+persistence gate, current 153 stays planned until protected delivery and main-tree verification.
+B's full Core/Geometry/GUI, native ordinary/compact and startup checks are retained explicitly,
+not reported as rerun. No approval or required check is blocked. Staged review and normal PR follow.
