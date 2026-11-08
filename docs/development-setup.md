@@ -4945,3 +4945,10 @@ whitespace checks pass. All **1,020** runtime fingerprints remain unchanged afte
 No Geometry, GUI, startup or native test is rerun for these non-executable Qt/OCCT-free APIs;
 151D results remain the prior accepted baseline. Persisted feature/executor/GUI evidence stays at
 its assigned 152B/C, 153 and 157 gates. Final staged source review and protected delivery follow.
+
+152A delivery uses [PR #163](https://github.com/GideonBa/Better-Linux-CAD/pull/163), implementation
+`a009265e16507ee2caacfaa349b04609f8898ead` (initial reviewed tree
+`41cdc53ce8da8017a70fc9b5d28507e156936222`). Initial staging was not started because automatic
+permission review timed out; the single explicitly permitted retry was approved and completed.
+No permission/check remains blocked. The delivery-record commit changes docs only and retains all
+1,020 runtime fingerprints; final head/review/check and normal protected merge precede the next branch.

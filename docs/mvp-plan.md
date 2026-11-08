@@ -2529,7 +2529,7 @@ cut workflow. No second pattern executor, standards store or numbered status aut
 
 | Slice | Bounded deliverable | Status |
 | --- | --- | --- |
-| 152A | Typed plain/clearance Hole intent, stable owned/Sketch placements, semantic support/direction, discriminated extents/tips and strict pinned standard/custom diameter resolution with focused Core proofs | Implemented and verified; delivery pending |
+| 152A | Typed plain/clearance Hole intent, stable owned/Sketch placements, semantic support/direction, discriminated extents/tips and strict pinned standard/custom diameter resolution with focused Core proofs | Implemented and verified; PR #163 |
 | 152B | Part add/update/remove, complete history/graph/repair inventory and canonical strict JSON; atomic local/selected Project standard-revision consumer remapping/removal guards | Planned; not started |
 | 152C | Combined native/imported input, legacy persistence/history/resource and integration regression acceptance; executor/GUI remain explicitly gated by 153/157 | Planned; not started |
 
@@ -2549,6 +2549,11 @@ GUI/native 151D baselines are retained, not rerun or claimed as Hole execution e
 `35c40d12e4c2fa33fff409e3a5abac99900ad30d97901b43a978e9ed7f4723ae`); formatting/whitespace
 checks pass. Staged review and normal protected PR delivery precede B. Whole 152 remains in progress;
 implemented-through stays 151 and the semantic-Hole GUI capability remains planned.
+
+152A delivery: [PR #163](https://github.com/GideonBa/Better-Linux-CAD/pull/163), implementation
+`a009265`. The delivery-record update changes documentation only and preserves all 1,020 runtime
+fingerprints. Confirm the normal merge and exact reviewed-tree comparison on refreshed main before
+starting the document-integration branch.
 
 ## Later phases
 
