@@ -219,6 +219,28 @@ behavior and cannot certify material reuse. Complete history execution always st
 
 ## Planned modules
 
+151 uses the existing resources and physical snapshots through Qt-free GUI controllers. Material
+editing owns a disposable typed Part/Project candidate, including new immutable revisions and
+explicit selected-member adoption/removal. Assignment targets are the existing Part/Body IDs;
+Project assignment copies a chosen root material snapshot into the member before pinning it.
+Conflicts/late failure leave the previous candidate intact. Apply revalidates exact session intent,
+executable lifetimes and command scope, then uses one existing session transaction. Identical
+candidate intent creates no history entry. Cancel/Save do not publish pending material changes.
+Apply replays only staged typed metadata operations onto the session's validated candidate; it
+does not replace freshly normalized geometry or expression state with a pending document copy.
+Reference Parts retain read-only material intent; ready End-of-Part metadata edits preserve the
+existing parent/child checkpoint and partial-result rules.
+
+Physical Properties controls consume complete immutable queries from 150, reusing integrated
+geometry when eligible. Whole-model, available Body and exact qualified occurrence scopes use the
+same trusted results; occurrence totals use the existing geometry aggregation authority. Display
+units are mm/cm/m and kg/g, with corresponding squared/cubed/inertia units. Frames remain Part-local
+or root-assembly coordinates. Complete versus known-subset mass/centroid/tensor labels stay distinct;
+surface/empty/unassigned/missing-density scopes never invent solid mass. Explicit Refresh validates
+actual suppliers; stale source/revision/task state blocks result use and Copy. Presentation changes
+do not commit intent or refresh BReps. Visible controls, provenance disclosure and native acceptance
+follow 151's serial slices in `mvp-plan.md`.
+
 | Module | Function |
 |--------|----------|
 | Bolt assistant | choose bolt size, clearance hole, countersink, nut, washer, engagement depth, safety factor. |

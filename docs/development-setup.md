@@ -4457,3 +4457,85 @@ Delivery: [PR #158](https://github.com/GideonBa/Better-Linux-CAD/pull/158), impl
 The delivery-record commit changes documentation only; all 1,005 verified runtime fingerprints
 remain unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main
 before 151 begins.
+
+## Block 151A — material/physical controllers, 2026-11-08
+
+PR #158 is confirmed merged as `7f27a87`; refreshed main exactly matches reviewed tree
+`066680b24c63ad29f238e1e289a8f4b43df987aa` before the serial
+`feat/material-physical-properties-controllers` branch starts. Existing resource, physical and
+Measure/UI contracts own the behavior; `mvp-plan.md` keeps whole 151/Phase A open.
+
+Qt-free controllers stage typed metadata outside committed intent, replay only those operations
+through existing session owners, reject foreign/stale/lifetime contexts and skip identical intent.
+The physical controller owns immutable 150 queries, guarded reweight/Refresh, exact existing Body/
+occurrence scopes, display-only units and locale-independent clipboard data. Occurrence totals use
+the existing Geometry aggregator. No visible Material/Physical Properties command, centroid overlay
+or new persistence field is introduced in A.
+
+```sh
+cmake --build build/dev-gui --target blcad_geometry_tests blcad_gui_tests blcad -j8
+QT_QPA_PLATFORM=offscreen ./build/dev-gui/blcad_gui_tests "[material-controller],[physical-properties-controller]"
+./build/dev-gui/blcad_geometry_tests "[physical-properties],[physical-reuse],[assembly-physical-properties]"
+./build/dev-gui/blcad_geometry_tests --durations yes
+```
+
+The 14 new controller cases include both history modes, Body overrides, selected Project revision/
+removal and late rollback, no-op/Cancel, committed Save/Undo/Redo/reopen, prefix metadata, scalar/
+tensor/density display units, exact repeated nested hidden scopes, partial centroids, suppressed/
+empty/surface/missing-density results, locale and actual Reference/editable STEP-source freshness.
+New C++ files receive full clang-format; existing files receive modified-line formatting.
+Initial `blcad151a-format.diff` is empty and whitespace checks pass. Runtime freeze
+`/tmp/blcad151a-runtime-freeze.json`: **1,011** source/test/asset/build-script files, SHA-256
+`f07c843ec86e6aa7ba95a3772557e7015cedfaf28689744e21f26a2ecfcff12f`.
+Actual build/test results and any corrections follow after execution. Unchanged Core's preceding
+**657 / 25,706** result is retained, not rerun. Visible controls/native acceptance remain B–D.
+
+The initial 33-object affected-target build passes (`blcad151a-initial-build.log`), without build
+errors. The first focused GUI invocation is not started because automatic permission review times
+out; the permitted single retry runs and passes **13 / 385** (`blcad151a-controllers-focused.log`).
+Focused Geometry passes **22 / 1,067** (`blcad151a-geometry-focused.log`); full Geometry passes
+**599 / 53,058** (`blcad151a-geometry-full.log`), without failures/skips. Review then adds a direct
+material × expression-driven extrusion case before final controller/regression verification.
+Only the new GUI test changes; the complete Geometry result remains valid on identical Geometry
+runtime/test fingerprints. Final build/freeze and controller results follow.
+
+The expression-combination rebuild passes (`blcad151a-combination-build.log`). Extended focused
+GUI passes **57 total / 55 passed / 2 expected native-only skips / 3,840 assertions**, without
+failures (`blcad151a-gui-final-focused.log`). It includes all 14 new controller cases plus existing
+resource/history/prefix/feature-edit/Measure/inventory regressions. No production source changes
+after the original build. Final runtime freeze `/tmp/blcad151a-runtime-freeze.json`: **1,011** files,
+SHA-256 `b2638b10a397fd1370ad58c7cd8f494db68783e229a1f9d0745fa1b9fa0acd2b`.
+The original 1,011-file manifest is retained at `/tmp/blcad151a-initial-runtime-freeze.json`;
+only the new GUI test differs. The complete **599 / 53,058** Geometry result remains valid.
+
+```sh
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad151a-native-100 ./build/dev-gui/blcad_gui_tests "[material-controller],[physical-properties-controller],[resource-revision-integration],[engineering-resource-integration],[history-prefix-session],[history-shell],[history-marker-shell],[history-combined-acceptance],[block136-feature-edit],[block136-measure],[shell-coverage]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1.5 BLCAD_REQUIRE_SHELL_ACCEPTANCE=1 BLCAD_UI_COMPACT=1 BLCAD_UI_CAPTURE_DIR=/tmp/blcad151a-native-150 ./build/dev-gui/blcad_gui_tests "[material-controller],[physical-properties-controller],[resource-history-shell],[history-shell],[history-marker-shell],[history-combined-acceptance],[block136-feature-edit],[block136-measure]"
+QT_QPA_PLATFORM=xcb QT_SCALE_FACTOR=1 timeout 6s ./build/dev-gui/blcad
+```
+
+Native 100% passes **67 / 4,795**, without failures/skips (`blcad151a-native-100.log`). These are
+controller integration and existing workflow/viewer regressions, not visible 151 Material/Physical
+Properties controls. Full GUI is not rerun for the unwired controller additions; the preceding
+728-case full result is retained rather than represented as validation of the new controls.
+Full combined/native UI acceptance remains 151D. Compact/native capture/startup results follow.
+
+Native compact 150% passes **45 / 3,341**, without failures/skips (`blcad151a-native-150.log`).
+Reviewed raw ordinary `history-mixed-chain-complete.png` (1280×800) SHA-256
+`784397c37066f84846382babafc3947d030d14388fda68e08e8afbb11ca741f5`; compact-150%
+`resource-prefix-inheritance.png` (1536×960 physical / 1024×640 logical) SHA-256
+`8a8aedb7fbc2778006b20ba287741949f78a08266cf35a3d60e0785103722a7b`. Existing workflow/browser/
+geometry presentation is retained. Long-name child capture SHA-256
+`6c93b4f641c9561c16fe4831f16ee96ae6bf03dfa9516f78d52f7a534d7a8ad1`.
+Separate startup reaches intentional six-second timeout **124** (`blcad151a-startup.log`). Existing
+OCCT Visual depth/stencil diagnostics remain without an unavailable viewer/test failure. All 1,011
+runtime fingerprints stay unchanged. Final inventory, source/staged review and formatting follow.
+
+Final inventory passes **5 / 568** without failures/skips (`blcad151a-final-inventory.log`). Final
+modified-line formatting is empty (`blcad151a-final-format.diff`); full new-file formatting, working/
+staged whitespace and source review pass. All 1,011 runtime fingerprints remain unchanged through
+documentation updates. A alone is verified; whole 151, visible tasks and Phase A remain open.
+
+Delivery: [PR #159](https://github.com/GideonBa/Better-Linux-CAD/pull/159), implementation `65708dc`.
+The delivery-record update changes documentation only; all 1,011 runtime fingerprints remain
+unchanged. Confirm normal merge and exact reviewed-tree comparison on refreshed main before B.

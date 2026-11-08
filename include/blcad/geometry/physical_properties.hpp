@@ -76,7 +76,7 @@ struct PartPhysicalPropertiesData : PhysicalPropertiesTotals {
   std::vector<BodyPhysicalProperties> bodies;
   bool geometry_reused = false;
 };
-struct PhysicalOccurrenceProperties {
+struct PhysicalOccurrenceProperties : PhysicalPropertiesTotals {
   AssemblyLeafOccurrenceDescriptor occurrence;
   std::string name;
   std::vector<BodyPhysicalProperties> bodies;

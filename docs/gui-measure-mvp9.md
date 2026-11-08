@@ -16,6 +16,22 @@ Block 136. Block 144 places its commands on Inspect. Numbered status is owned by
 
 ## Ownership and read-only boundary
 
+151 Physical Properties reuses the existing Inspect/task surface through its own explicit owner;
+Body Summary keeps the volume-only behavior below. Its Qt-free controller stores a complete 150
+snapshot and validates the current model revision, exact source/lifetime and actual imports before
+presenting/copying a result. Refresh may reweight stored geometry; changed geometry takes a fresh
+query. A Part Body scope uses its existing Body ID; Project occurrence/Body choices retain the
+existing assembly document/path/component/Part identities and current query poses. Scope and display
+units never become authored intent. Physical Properties is unavailable in partial End-of-Part scope.
+
+Display length units mm/cm/m also define area, volume, centroid and inertia units; mass is kg/g.
+Clipboard uses deterministic locale-independent numbers, explicit units/frame/scope and availability/
+precision labels. Partial totals explicitly name the known-density subset; both mass and volume
+centroids remain distinct. Principal-direction sign is not identity, and near-repeated moments keep
+their non-unique-axis status. A later visible centroid triad uses canonical mm coordinates and the
+same labelled centroid choice, without changing selection scope or model data. Native task/clipboard/
+overlay acceptance is not inferred from controller-only tests.
+
 `ShellWindow` explicitly owns `ShellMeasureTools` and wires it to the ribbon, document session,
 viewport selection and view-change notification. There is no binder, component discovery or polling.
 The **Inspect** ribbon exposes **Distance**, **Angle**, **Radius / Diameter** and
