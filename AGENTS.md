@@ -4,6 +4,10 @@
 - Keep behavior, persistence and UI contracts in the relevant existing `docs/` files in sync with
   the implementation. `docs/mvp-plan.md` owns numbered implementation status; do not advance an
   entire block merely because individual fixes have shipped.
+- Keep documentation useful for focused LLM work: start with `docs/mvp-plan.md`, then read only the
+  affected contracts and tests. Summarize completed work with contract/proof links; retain detailed
+  run chronology in Git/PR history instead of duplicating it across documents. Preserve planning
+  for unimplemented features, including deferred scope embedded in older documents.
 - Follow `docs/development-setup.md` for builds and checks. Use focused regression tests for fixes;
   changes to rendering or interaction also need native Qt/OCCT verification when available. Report
   any skipped or unavailable checks accurately.
