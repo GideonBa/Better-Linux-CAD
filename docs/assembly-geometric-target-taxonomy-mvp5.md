@@ -101,6 +101,8 @@ DatumAxis
 ConstructionLine
 ConstructionPoint
 CircularFeatureSeat
+GeneratedHoleAxis
+GeneratedHoleSeat
 ```
 
 Implemented capabilities in canonical global order:
@@ -152,6 +154,14 @@ ConstructionPoint
   -> Point
 
 CircularFeatureSeat
+  -> Plane
+  -> Axis
+  -> Frame
+
+GeneratedHoleAxis
+  -> Axis
+
+GeneratedHoleSeat
   -> Plane
   -> Axis
   -> Frame
@@ -220,6 +230,7 @@ optional source_profile
 optional semantic_face
 optional semantic_axis
 optional semantic_seating_plane
+optional hole_instance
 ```
 
 The endpoint semantic-reference remains identity authority. Metadata is derived resolved model context for validation, compatibility adapters, diagnostics, and future presentation.
@@ -239,7 +250,19 @@ GeneratedLinearEdge / GeneratedCircularEdge / GeneratedVertex
 CircularFeatureSeat
   source_feature + source_profile
   + semantic_axis + semantic_seating_plane
+
+GeneratedHoleAxis / GeneratedHoleSeat
+  source_feature + exact HoleInstanceReference
+  no synthetic profile/legacy semantic role metadata
 ```
+
+Block 156 adds direct and patterned Hole endpoints using the canonical Core `hole:` grammar.
+`GeneratedHoleAxis` requires the Axis role and an Axis descriptor. Entry, counterbore/spotface Seat
+and authored Step roles use `GeneratedHoleSeat` with an oriented Frame descriptor. Their metadata
+must reproduce the exact endpoint and producer. Resolution uses current actual Body descendants;
+the existing Assembly catalog labels and selects individual placements/occurrences. A removed or
+excluded occurrence diagnoses its own relationship. `hole-wizard.md` owns physical limits and
+`tests/geometry/hole_pattern_combined_tests.cpp` owns posed Insert/skip/restore/STEP proof.
 
 Block 35 now freezes richer producer/profile/role identity for generated topology at the Core endpoint boundary. Block 36 may extend derived source metadata as needed for diagnostics, but semantic endpoint identity remains authoritative and no raw OCCT id may be persisted.
 

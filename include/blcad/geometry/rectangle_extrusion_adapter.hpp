@@ -62,6 +62,8 @@ private:
   friend class ShellAdapter;
   friend class DraftAdapter;
   friend class ThreadAdapter;
+  friend class HoleInstanceGeometry;
+  friend class PatternPlacementAdapter;
   friend class StepExporter;
   friend class StepImportReader;
   friend class StepImportTopology;

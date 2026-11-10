@@ -145,6 +145,10 @@ AssemblyGeometricTargetSourceMetadata synthetic_metadata(AssemblyGeometricTarget
   case AssemblyGeometricTargetSourceKind::DatumPlaneFrame:
     FAIL("Explicit datum Frames use owned datum fixtures in reference_part_geometry_tests.cpp");
     break;
+  case AssemblyGeometricTargetSourceKind::GeneratedHoleAxis:
+  case AssemblyGeometricTargetSourceKind::GeneratedHoleSeat:
+    FAIL("Hole targets use current native geometry in hole_pattern_combined_tests.cpp");
+    break;
   }
   return metadata;
 }

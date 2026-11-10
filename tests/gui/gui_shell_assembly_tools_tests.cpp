@@ -1,5 +1,8 @@
+#include "../support/hole_pattern_fixture.hpp"
+#include "blcad/core/hole_instance_reference.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
+#include "blcad/geometry/assembly_hierarchy_transform_evaluator.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -548,4 +551,79 @@ TEST_CASE("Native Assembly joint motion drives an angular handle with typed refi
   capture(window, "native-assembly-motion");
   REQUIRE(tools.apply());
   history(window, before);
+}
+
+TEST_CASE("Assembly task selects individual Hole Pattern seats with exact Apply history and reopen",
+          "[gui][parity-b156][hole-pattern-consumer-shell]") {
+  namespace holes = blcad::test::hole_pattern_fixture;
+  auto part = holes::part();
+  REQUIRE(part.set_parameter_value(ParameterId("count"), checked(Quantity::count(2))));
+  REQUIRE(part.set_parameter_value(ParameterId("rows"), checked(Quantity::count(1))));
+  REQUIRE(part.add_linear_pattern_feature(holes::linear()));
+  ShellWindow window;
+  REQUIRE(window.new_project("Hole Pattern consumers"));
+  REQUIRE(window.session().commit_project_transaction("Patterned inputs", [&](Project& project) {
+    REQUIRE(project.add_part_document(part));
+    REQUIRE(project.assembly().add_member_part(part.id()));
+    REQUIRE(project.assembly().add_component_instance(checked(ComponentInstance::create(
+        ComponentInstanceId("fixed"), "Fixed", part.id(), ComponentVisibility::Visible,
+        ComponentSuppressionState::Active, ComponentGroundingState::Grounded))));
+    REQUIRE(project.assembly().add_component_instance(checked(ComponentInstance::create(
+        ComponentInstanceId("moving"), "Moving", part.id(), ComponentVisibility::Visible,
+        ComponentSuppressionState::Active, ComponentGroundingState::Free, {{50, 0, 10}, {}}))));
+    return Result<std::size_t>::success(1);
+  }));
+  window.resize(qEnvironmentVariableIsSet("BLCAD_UI_COMPACT") ? 1024 : 1280,
+                qEnvironmentVariableIsSet("BLCAD_UI_COMPACT") ? 640 : 800);
+  window.refresh();
+  window.show();
+  qApp->processEvents();
+  window.viewport().fit_all();
+  qApp->processEvents();
+  const auto copy = checked(make_hole_target_spelling(checked(HoleInstanceReference::create(
+      FeatureId("holes"), HolePlacementId("first"), HoleReferenceRole::Seat,
+      HolePatternOccurrence{FeatureId("pattern"), {1, 0}}))));
+  const auto seed = checked(make_hole_target_spelling(checked(HoleInstanceReference::create(
+      FeatureId("holes"), HolePlacementId("first"), HoleReferenceRole::Seat))));
+  auto& tools = window.assembly_tools();
+  const auto before = snapshot(window);
+  const auto mask = window.viewport().selection_filter_mask();
+  const auto scope = window.viewport().selection_semantic_scope();
+  for (bool apply : {false, true}) {
+    REQUIRE(tools.begin(C::Relationship));
+    tools.relationship_editor().setCurrentIndex(static_cast<int>(AssemblyConstraintType::Insert));
+    reference(tools, tools.first_editor(), "fixed", copy.c_str());
+    CHECK(tools.first_editor().currentText().contains("Hole pattern"));
+    tools.pick_editor().setCurrentIndex(1);
+    CHECK_FALSE(window.viewport().select_semantic(
+        tools.targets().at(target(tools, "fixed", seed.c_str())).presentation.semantic_id));
+    reference(tools, tools.second_editor(), "moving", seed.c_str());
+    INFO(window.findChild<QLabel*>("blcad.assembly.summary")->text().toStdString());
+    REQUIRE(button(window, "apply").isEnabled());
+    REQUIRE(window.viewport().feature_preview_active());
+    CHECK(snapshot(window) == before);
+    if (apply) {
+      capture(window, "hole-pattern-insert-preview");
+      REQUIRE(tools.apply());
+      CHECK(window.session().project()->assembly().constraint_count() == 1);
+      const auto pose = window.session()
+                            .project()
+                            ->assembly()
+                            .find_component_instance(ComponentInstanceId("moving"))
+                            ->transform();
+      // Insert intentionally leaves axial rotation free. Check the physical
+      // seat after the accepted pose rather than fixing an arbitrary origin.
+      const auto seat =
+          geometry::AssemblyHierarchyTransformEvaluator{}.evaluate_point({pose}, {-20, -15, 7});
+      CHECK(seat.x == Catch::Approx(-8).margin(1e-6));
+      CHECK(seat.y == Catch::Approx(-15).margin(1e-6));
+      CHECK(seat.z == Catch::Approx(7).margin(1e-6));
+      history(window, before);
+    } else {
+      tools.cancel();
+      CHECK(snapshot(window) == before);
+      CHECK(window.viewport().selection_filter_mask() == mask);
+      CHECK(window.viewport().selection_semantic_scope() == scope);
+    }
+  }
 }

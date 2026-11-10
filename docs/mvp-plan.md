@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 155
 current_block: 156
-current_boundary: Block 155 accepted within its contract; 156 not started; dedicated Hole/Thread authoring remains 157
+current_boundary: Block 155 accepted; 156 placement and Hole-consumer integration in progress; authoring remains 157
 current_tag: "[parity-b156]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–155 accepted; Blocks 156–204 planned"
+  advanced_modeling_workflows: "Blocks 145–155 accepted; Block 156 in progress; Blocks 157–204 planned"
 ---
 
 # MVP Plan
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 155
-current block        Block 156 (not started)
+current block        Block 156 (in progress)
 current phase        Semantic holes and threads
-current boundary     Thread backend/display accepted; placement patterns next; dedicated authoring remains 157
+current boundary     Placement intent, repeated Hole operations and stable consumers in progress; authoring remains 157
 ```
 
 The next assigned work is Block 156. [The consolidated sequence](inventor-parity-sequence.md)
@@ -132,8 +132,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–154 are **Implemented and accepted**;
-Block 155 is **In progress**; Blocks 156–204 are **Planned; not started**.
+Status authority: Blocks 145–155 are **Implemented and accepted**;
+Block 156 is **In progress**; Blocks 157–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -144,7 +144,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
-| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152–155 accepted; 156–158 planned |
+| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152–155 accepted; 156 in progress; 157–158 planned |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
@@ -240,6 +240,25 @@ remain geometry inputs for their assigned later consumers.
 **Hole workflow:** Existing top-to-bottom property/preview/Apply/Undo contracts apply; dedicated authoring remains 157.
 
 Phase B stays open for 156–158.
+
+### Block 156 implementation
+
+The unchanged sequence/B04 criteria remain authoritative. `feat/hole-placement-patterns` began
+only after PR #174 was confirmed merged and main refreshed. Whole-block acceptance stays open.
+
+| Area | Work / verification |
+| --- | --- |
+| Shared placements — 156A verified | Stable two-coordinate occurrence identity, dormant skips, optional second linear direction, bounded layout/count one; Part V7/Project snapshots and dependency rollback. Legacy V1–V6 bytes/count validation retained. |
+| Hole execution and consumers — 156B verified | Repeat the actual seed cut once per active copy; current per-instance axes/seats, transformed seeds, native/imported entry/termination checks, Thread/finishing/material/resource/history/STEP combinations and downstream Insert. Limits in `hole-wizard.md`. |
+| UI and combined acceptance | Extend existing Pattern controls; verify counts, skip/restore, resize, modifiers, Thread/material/history/reopen/STEP combinations and affected native 100%/150% workflows. Pending. Dedicated Hole/Thread authoring remains 157. |
+
+156A/B verification: full Core **706 cases / 26,802 assertions**, full Geometry **670 / 57,533**,
+focused Geometry **13 / 689**, focused Qt **5 / 187**, new native Assembly consumer **1 / 67** at
+100%, no skips/failures. Five targets build; changed/new C++ formatting and native original capture
+reviewed. Insert proof checks world-space seats while retaining its intentional free axial rotation.
+Numeric solve requests reuse at most 16 exact-intent Part results only within their scope; source
+freshness is revalidated and no geometry survives the request. Whole-block native/layout and full
+GUI acceptance remain open with the Pattern authoring controls.
 
 ## Later phases
 

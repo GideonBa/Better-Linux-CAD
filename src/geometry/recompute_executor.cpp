@@ -2,6 +2,7 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/sketch_contour.hpp"
 #include "blcad/core/sketch_profile_roles.hpp"
+#include "blcad/geometry/pattern_placement_adapter.hpp"
 #include "blcad/geometry/result_face_support.hpp"
 #include "blcad/geometry/thread_adapter.hpp"
 #include "imported_body_placement.hpp"
@@ -24,6 +25,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <gp_Ax1.hxx>
+#include <gp_Vec.hxx>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -3516,6 +3519,157 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
   return stored;
 }
 
+template <class Pattern>
+Result<std::size_t> GeometryRecomputeExecutor::execute_placement_pattern(
+    const PartDocument& document, const Pattern& feature, ShapeCache& cache) const {
+  const auto fail = [&](std::string message) {
+    return Result<std::size_t>::failure(geometry_error(feature.id().value(), std::move(message)));
+  };
+  auto layout = evaluate_pattern_placements(document, feature);
+  if (!layout)
+    return Result<std::size_t>::failure(layout.error());
+  ShapeCache working = cache;
+  auto target = resolve_pattern_target(document, feature, working);
+  if (!target)
+    return Result<std::size_t>::failure(target.error());
+  const auto& reference = [&]() -> const AxisReference& {
+    if constexpr (std::is_same_v<Pattern, LinearPatternFeature>)
+      return feature.direction();
+    else
+      return feature.axis();
+  }();
+  auto first = resolve_axis_reference(document, reference, working, workplane_resolver_,
+                                      import_context_, feature.id());
+  if (!first)
+    return Result<std::size_t>::failure(first.error());
+  const auto first_direction = normalized(first.value().second);
+  Vector3 second_direction{};
+  if (feature.placements()->second_direction) {
+    auto second =
+        resolve_axis_reference(document, feature.placements()->second_direction->direction, working,
+                               workplane_resolver_, import_context_, feature.id());
+    if (!second)
+      return Result<std::size_t>::failure(second.error());
+    second_direction = normalized(second.value().second);
+    if (length(cross(first_direction, second_direction)) <= 1e-7)
+      return fail("Two linear Pattern directions must be independent");
+  }
+  std::vector<PatternPlacementTransform> transforms;
+  for (const auto& occurrence : layout.value()) {
+    if (occurrence.skipped)
+      continue;
+    gp_Trsf placement;
+    if constexpr (std::is_same_v<Pattern, LinearPatternFeature>) {
+      const Vector3 offset{first_direction.x * occurrence.first_distance_mm +
+                               second_direction.x * occurrence.second_distance_mm,
+                           first_direction.y * occurrence.first_distance_mm +
+                               second_direction.y * occurrence.second_distance_mm,
+                           first_direction.z * occurrence.first_distance_mm +
+                               second_direction.z * occurrence.second_distance_mm};
+      if (!std::isfinite(offset.x) || !std::isfinite(offset.y) || !std::isfinite(offset.z))
+        return fail("Pattern translation overflows");
+      placement.SetTranslation(gp_Vec(offset.x, offset.y, offset.z));
+    } else {
+      const auto& p = first.value().first;
+      placement.SetRotation(gp_Ax1(gp_Pnt(p.x, p.y, p.z),
+                                   gp_Dir(first_direction.x, first_direction.y, first_direction.z)),
+                            occurrence.angle_deg * k_pi / 180.);
+    }
+    transforms.push_back({occurrence.index, placement});
+  }
+  const auto& sources = feature.sources();
+  const bool holes = std::any_of(sources.begin(), sources.end(), [&](const auto& source) {
+    return source.kind() == PatternSourceKind::Feature &&
+           document.find_hole_feature(std::get<FeatureId>(source.source()));
+  });
+  GeometryShape result;
+  if (holes) {
+    auto workload = PatternPlacementAdapter::validate_holes(document, sources, transforms.size());
+    if (!workload)
+      return Result<std::size_t>::failure(workload.error());
+    if (!target.value())
+      return fail("Hole Pattern requires its current target Body");
+    result = *target.value();
+    for (const auto& source : sources) {
+      const auto* hole = document.find_hole_feature(std::get<FeatureId>(source.source()));
+      auto predecessor =
+          resolve_in_place_body_target(document, hole->id(), hole->target_body(), working);
+      const auto* seed = working.find_feature_shape(hole->id());
+      if (!predecessor)
+        return Result<std::size_t>::failure(predecessor.error());
+      if (!seed)
+        return fail("Hole Pattern seed result is unavailable");
+      auto cut = PatternPlacementAdapter::repeat_hole(
+          document, feature.id(), *hole, *predecessor.value(), *seed, result, transforms);
+      if (!cut)
+        return Result<std::size_t>::failure(cut.error());
+      result = std::move(cut.value());
+    }
+  } else {
+    auto source_shapes = resolve_pattern_sources(feature, working, target.value());
+    if (!source_shapes)
+      return Result<std::size_t>::failure(source_shapes.error());
+    std::vector<GeometryShape> tools;
+    const auto& context = feature.body_result_context();
+    if (target.value())
+      result = *target.value();
+    for (const auto& occurrence : transforms)
+      for (std::size_t i = 0; i < sources.size(); ++i) {
+        const auto& source = sources[i];
+        bool original_in_target = false;
+        if (occurrence.index == PatternOccurrenceIndex{} && context.target_body()) {
+          original_in_target =
+              source.kind() == PatternSourceKind::Body
+                  ? std::get<BodyId>(source.source()) == *context.target_body()
+                  : feature_produces_body(document, std::get<FeatureId>(source.source()).value(),
+                                          *context.target_body());
+        }
+        const auto key = pattern_source_occurrence_key(source, occurrence.index);
+        if (original_in_target && context.operation_mode() != FeatureBodyOperationMode::NewBody) {
+          result = ResultFaceSupportGeometry::alias_copy(
+              result, feature.id(), key,
+              source.kind() == PatternSourceKind::Feature
+                  ? std::optional(std::get<FeatureId>(source.source()))
+                  : std::nullopt);
+          continue;
+        }
+        auto placed =
+            PatternPlacementAdapter::place(source_shapes.value()[i], occurrence.transform);
+        if (!placed)
+          return Result<std::size_t>::failure(placed.error());
+        tools.push_back(ResultFaceSupportGeometry::scope_copy(placed.value(), feature.id(), key));
+      }
+    if (!tools.empty()) {
+      auto tool = fuse_pattern_shapes(feature, tools, body_boolean_adapter_);
+      if (!tool)
+        return Result<std::size_t>::failure(tool.error());
+      if (context.operation_mode() == FeatureBodyOperationMode::NewBody)
+        result = std::move(tool.value());
+      else {
+        auto operation = context.operation_mode() == FeatureBodyOperationMode::Cut
+                             ? BodyBooleanOperation::Subtract
+                         : context.operation_mode() == FeatureBodyOperationMode::Intersect
+                             ? BodyBooleanOperation::Intersect
+                             : BodyBooleanOperation::Add;
+        auto combined =
+            body_boolean_adapter_.combine(feature.id(), operation, result, {tool.value()});
+        if (!combined)
+          return Result<std::size_t>::failure(combined.error());
+        result = std::move(combined.value());
+      }
+    }
+    if (result.empty())
+      return fail("Pattern has no result");
+  }
+  auto stored = store_pattern_result(document, feature, std::move(result), working);
+  if (!stored)
+    return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
+  cache = std::move(working);
+  return stored;
+}
+
 Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
     const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const {
   const auto history = detail::validate_history_input(document, shape_cache, feature_id.value());
@@ -3533,6 +3687,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_linear_pattern(
   if (feature == nullptr)
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "linear pattern feature must exist in part document"));
+  if (feature->placements())
+    return execute_placement_pattern(document, *feature, shape_cache);
   const Parameter* count = document.find_parameter(feature->count_parameter());
   const Parameter* extent = document.find_parameter(feature->extent_parameter());
   if (count == nullptr || count->type() != ParameterType::Count ||
@@ -3641,6 +3797,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_circular_pattern(
   if (feature == nullptr)
     return Result<std::size_t>::failure(validation_error(
         feature_id.value(), "circular pattern feature must exist in part document"));
+  if (feature->placements())
+    return execute_placement_pattern(document, *feature, shape_cache);
   const Parameter* count = document.find_parameter(feature->count_parameter());
   if (count == nullptr || count->type() != ParameterType::Count ||
       count->value().count_value() < 2U)

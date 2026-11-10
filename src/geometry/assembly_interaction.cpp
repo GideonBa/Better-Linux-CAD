@@ -18,6 +18,7 @@
 #include <TopoDS_Wire.hxx>
 #include <gp_Circ.hxx>
 #include <gp_Pln.hxx>
+#include <map>
 #include <set>
 #include <type_traits>
 
@@ -109,12 +110,70 @@ AssemblyInteractionGeometry::targets(const Project& project,
             if (reference && validate_imported_topology_reference(*part, reference.value()))
               add(make_imported_topology_target_spelling(reference.value()));
           }
+      std::map<std::string, std::string> hole_labels;
+      const auto add_hole = [&](const HoleFeature& hole,
+                                std::optional<HolePatternOccurrence> occurrence,
+                                const std::string& prefix) {
+        for (const auto& placement : hole.placements()) {
+          const auto add_role = [&](HoleReferenceRole role, std::string step = {}) {
+            auto ref =
+                HoleInstanceReference::create(hole.id(), placement.id, role, occurrence, step);
+            if (!ref)
+              return;
+            auto spelling = make_hole_target_spelling(ref.value());
+            if (!spelling)
+              return;
+            sources.insert(spelling.value());
+            hole_labels.emplace(spelling.value(), prefix + hole.name() + " / " +
+                                                      placement.id.value() + " / " +
+                                                      std::string(to_string(role)) +
+                                                      (step.empty() ? "" : " " + step));
+          };
+          add_role(HoleReferenceRole::Axis);
+          add_role(HoleReferenceRole::Entry);
+          if (std::holds_alternative<HoleCounterbore>(hole.manufacturing()) ||
+              std::holds_alternative<HoleSpotface>(hole.manufacturing()))
+            add_role(HoleReferenceRole::Seat);
+          if (const auto* steps = std::get_if<HoleStepped>(&hole.manufacturing()))
+            for (const auto& step : steps->steps)
+              add_role(HoleReferenceRole::Step, step.id);
+        }
+      };
+      for (const auto& hole : part->hole_features())
+        add_hole(hole, std::nullopt, "");
+      const auto add_pattern = [&](const auto& pattern) {
+        if (!pattern.placements())
+          return;
+        auto layout = evaluate_pattern_placements(*part, pattern);
+        if (!layout)
+          return;
+        for (const auto& source : pattern.sources()) {
+          const auto* hole = source.kind() == PatternSourceKind::Feature
+                                 ? part->find_hole_feature(std::get<FeatureId>(source.source()))
+                                 : nullptr;
+          if (!hole)
+            continue;
+          for (const auto& p : layout.value()) {
+            // The already-authored seed has one catalog presentation. Explicit
+            // Pattern-zero aliases remain valid for saved API relationships.
+            if (p.skipped || p.index == PatternOccurrenceIndex{})
+              continue;
+            add_hole(*hole, HolePatternOccurrence{pattern.id(), p.index},
+                     pattern.name() + " (" + std::to_string(p.index.first + 1) + ", " +
+                         std::to_string(p.index.second + 1) + ") / ");
+          }
+        }
+      };
+      for (const auto& pattern : part->linear_pattern_features())
+        add_pattern(pattern);
+      for (const auto& pattern : part->circular_pattern_features())
+        add_pattern(pattern);
       for (const auto& source : sources) {
         auto target = AssemblyConstraintTarget::create(component.id(), source);
         if (!target)
           continue;
         auto resolved = AssemblyConstraintTargetResolver{import_context}.resolve_geometric(
-            project, target.value());
+            project, target.value(), &cache.value());
         if (!resolved)
           continue;
         const auto& value = resolved.value();
@@ -250,7 +309,8 @@ AssemblyInteractionGeometry::targets(const Project& project,
                                      component.id().value() + "/" + source;
         results.push_back({target.value(),
                            value,
-                           component.name() + " / " + source,
+                           component.name() + " / " +
+                               (hole_labels.contains(source) ? hole_labels.at(source) : source),
                            {ViewportSceneKind::AssemblyTarget, identity,
                             GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape)))},
                            anchor});

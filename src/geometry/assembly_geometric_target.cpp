@@ -117,7 +117,29 @@ validate_source_metadata(const AssemblyResolvedGeometricTarget& target) {
         validation_error("resolved geometric target referenced part document must not be empty"));
   }
 
+  if (source.hole_instance &&
+      target.source_kind != AssemblyGeometricTargetSourceKind::GeneratedHoleAxis &&
+      target.source_kind != AssemblyGeometricTargetSourceKind::GeneratedHoleSeat)
+    return Result<std::size_t>::failure(
+        validation_error("Hole metadata requires a typed Hole source"));
   switch (target.source_kind) {
+  case AssemblyGeometricTargetSourceKind::GeneratedHoleAxis:
+  case AssemblyGeometricTargetSourceKind::GeneratedHoleSeat: {
+    if (!source.hole_instance ||
+        source.source_feature != std::optional(source.hole_instance->producer()) ||
+        source.source_profile || source.semantic_face || source.semantic_axis ||
+        source.semantic_seating_plane || source.imported_topology)
+      return Result<std::size_t>::failure(
+          validation_error("Hole target must retain its exact typed instance and producer"));
+    const auto spelling = std::visit(
+        [](const auto& endpoint) { return endpoint.semantic_reference; }, target.endpoint);
+    if (make_hole_target_spelling(*source.hole_instance).value() != spelling ||
+        (target.source_kind == AssemblyGeometricTargetSourceKind::GeneratedHoleAxis) !=
+            (source.hole_instance->role() == HoleReferenceRole::Axis))
+      return Result<std::size_t>::failure(
+          validation_error("Hole source kind/metadata must match its exact endpoint"));
+    break;
+  }
   case AssemblyGeometricTargetSourceKind::GeneratedPlanarFace:
     if (!source.source_feature.has_value() || !source.semantic_face.has_value()) {
       return Result<std::size_t>::failure(validation_error(
@@ -234,7 +256,9 @@ validate_source_metadata(const AssemblyResolvedGeometricTarget& target) {
   case AssemblyGeometricTargetSourceKind::ConstructionPoint:
     return std::holds_alternative<AssemblyPointTargetDescriptor>(target.descriptor);
   case AssemblyGeometricTargetSourceKind::DatumAxis:
+  case AssemblyGeometricTargetSourceKind::GeneratedHoleAxis:
     return std::holds_alternative<AssemblyAxisTargetDescriptor>(target.descriptor);
+  case AssemblyGeometricTargetSourceKind::GeneratedHoleSeat:
   case AssemblyGeometricTargetSourceKind::CircularFeatureSeat:
   case AssemblyGeometricTargetSourceKind::DatumPlaneFrame:
     return std::holds_alternative<AssemblyFrameTargetDescriptor>(target.descriptor);
@@ -332,6 +356,10 @@ std::string_view to_string(AssemblyGeometricTargetSourceKind kind) noexcept {
     return "ConstructionLine";
   case AssemblyGeometricTargetSourceKind::ConstructionPoint:
     return "ConstructionPoint";
+  case AssemblyGeometricTargetSourceKind::GeneratedHoleAxis:
+    return "GeneratedHoleAxis";
+  case AssemblyGeometricTargetSourceKind::GeneratedHoleSeat:
+    return "GeneratedHoleSeat";
   case AssemblyGeometricTargetSourceKind::CircularFeatureSeat:
     return "CircularFeatureSeat";
   }
@@ -371,6 +399,8 @@ std::string_view to_string(AssemblyGeometricTargetCoordinateSpace space) noexcep
 std::vector<AssemblyGeometricTargetCapability>
 assembly_geometric_target_capabilities(AssemblyGeometricTargetSourceKind kind) {
   switch (kind) {
+  case AssemblyGeometricTargetSourceKind::GeneratedHoleAxis:
+    return {AssemblyGeometricTargetCapability::Axis};
   case AssemblyGeometricTargetSourceKind::GeneratedPlanarFace:
   case AssemblyGeometricTargetSourceKind::ImportedPlanarFace:
   case AssemblyGeometricTargetSourceKind::DatumPlane:
@@ -395,6 +425,7 @@ assembly_geometric_target_capabilities(AssemblyGeometricTargetSourceKind kind) {
   case AssemblyGeometricTargetSourceKind::DatumAxis:
     return {AssemblyGeometricTargetCapability::Axis,
             AssemblyGeometricTargetCapability::Line};
+  case AssemblyGeometricTargetSourceKind::GeneratedHoleSeat:
   case AssemblyGeometricTargetSourceKind::CircularFeatureSeat:
   case AssemblyGeometricTargetSourceKind::DatumPlaneFrame:
     return {AssemblyGeometricTargetCapability::Plane,

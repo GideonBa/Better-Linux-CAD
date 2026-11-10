@@ -68,6 +68,7 @@ add_library(
   src/core/surface_feature.cpp
   src/core/mirror_feature.cpp
   src/core/part_pattern_feature.cpp
+  src/core/hole_instance_reference.cpp
   src/core/part_document.cpp
   src/core/part_feature_history.cpp
   src/core/part_document_json.cpp
@@ -186,6 +187,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_revolute_sweep_analyzer.cpp
     src/geometry/assembly_rigid_body_solver.cpp
     src/geometry/assembly_semantic_target_freshness.cpp
+    src/geometry/assembly_hole_geometry_scope.cpp
     src/geometry/assembly_solve_diagnostics.cpp
     src/geometry/assembly_step_exporter.cpp
     src/geometry/assembly_structured_step_exporter.cpp
@@ -228,6 +230,8 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/reference_generated_profile_resolver.cpp
     src/geometry/revolve_adapter.cpp
     src/geometry/thread_adapter.cpp
+    src/geometry/hole_instance_geometry.cpp
+    src/geometry/pattern_placement_adapter.cpp
     src/geometry/sweep_adapter.cpp
     src/geometry/surface_adapter.cpp
     src/geometry/semantic_reference_evaluator.cpp
@@ -523,6 +527,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/part_hole_feature_tests.cpp
     tests/core/part_feature_input_reference_tests.cpp
     tests/core/part_pattern_feature_tests.cpp
+    tests/core/pattern_placement_tests.cpp
     tests/core/recompute_plan_tests.cpp
     tests/core/reference_driven_sketch_constraint_tests.cpp
     tests/core/reference_generated_line_json_tests.cpp
@@ -575,6 +580,8 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/hole_feature_geometry_tests.cpp
       tests/geometry/thread_feature_geometry_tests.cpp
       tests/geometry/thread_feature_combined_tests.cpp
+      tests/geometry/hole_pattern_geometry_tests.cpp
+      tests/geometry/hole_pattern_combined_tests.cpp
       tests/geometry/hole_manufacturing_geometry_tests.cpp
       tests/geometry/arc_closed_profile_pipeline_tests.cpp
       tests/geometry/assembly_angle_numeric_solver_tests.cpp

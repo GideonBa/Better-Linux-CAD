@@ -57,6 +57,9 @@ public:
   // Copy instances have distinct authored identities even when their faces fuse.
   [[nodiscard]] static GeometryShape scope_copy(const GeometryShape& shape, FeatureId producer,
                                                 std::string instance);
+  [[nodiscard]] static GeometryShape alias_copy(const GeometryShape& shape, FeatureId producer,
+                                                std::string instance,
+                                                std::optional<FeatureId> source = {});
   [[nodiscard]] static Result<std::vector<ResultFaceSelectionTarget>>
   selectable_faces(const PartDocument& document, const ShapeCache& cache, const BodyId& body,
                    StepImportTopologyContext* import_context = nullptr,

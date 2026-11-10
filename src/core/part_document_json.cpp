@@ -35,6 +35,7 @@ constexpr int k_resource_version = 3;
 constexpr int k_hole_version = 4;
 constexpr int k_manufacturing_hole_version = 5;
 constexpr int k_thread_version = 6;
+constexpr int k_pattern_placement_version = 7;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -1798,6 +1799,65 @@ feature_body_result_context_from_json(const json& feature_json) {
   return value;
 }
 
+[[nodiscard]] json pattern_placements_to_json(const PatternPlacementOptions& options) {
+  json value{{"skipped", json::array()}};
+  for (const auto index : options.skipped)
+    value["skipped"].push_back({{"first", index.first}, {"second", index.second}});
+  if (options.second_direction) {
+    const auto& second = *options.second_direction;
+    value["second_direction"] = {{"direction", revolve_axis_to_json(second.direction)},
+                                 {"count_parameter", second.count.value()},
+                                 {"extent",
+                                  {{"mode", std::string(to_string(second.extent_mode))},
+                                   {"parameter", second.extent.value()},
+                                   {"direction", std::string(to_string(second.sign))}}}};
+  }
+  return value;
+}
+[[nodiscard]] Result<PatternPlacementOptions> pattern_placements_from_json(const json& value) {
+  const auto fail = [] {
+    return Result<PatternPlacementOptions>::failure(json_error("Malformed Pattern placements"));
+  };
+  if (!(has_exact_fields(value, {"skipped"}) ||
+        has_exact_fields(value, {"skipped", "second_direction"})) ||
+      !value.at("skipped").is_array() || value.at("skipped").size() > pattern_placement_limit)
+    return fail();
+  PatternPlacementOptions options;
+  for (const auto& index : value.at("skipped")) {
+    if (!has_exact_fields(index, {"first", "second"}) || !index.at("first").is_number_integer() ||
+        !index.at("second").is_number_integer() || index.at("first") < 0 ||
+        index.at("second") < 0 || index.at("first") >= pattern_placement_limit ||
+        index.at("second") >= pattern_placement_limit)
+      return fail();
+    options.skipped.push_back(
+        {index.at("first").get<std::size_t>(), index.at("second").get<std::size_t>()});
+  }
+  if (value.contains("second_direction")) {
+    const auto& second = value.at("second_direction");
+    if (!has_exact_fields(second, {"direction", "count_parameter", "extent"}) ||
+        !second.at("count_parameter").is_string() ||
+        !has_exact_fields(second.at("extent"), {"mode", "parameter", "direction"}))
+      return fail();
+    auto axis = pattern_axis_from_json(second.at("direction"));
+    if (!axis)
+      return Result<PatternPlacementOptions>::failure(axis.error());
+    const auto& extent = second.at("extent");
+    if (!extent.at("mode").is_string() || !extent.at("parameter").is_string() ||
+        !extent.at("direction").is_string())
+      return fail();
+    const auto mode = extent.at("mode").get<std::string>();
+    const auto sign = extent.at("direction").get<std::string>();
+    if ((mode != "spacing" && mode != "total_extent") || (sign != "positive" && sign != "negative"))
+      return fail();
+    options.second_direction = LinearPatternDirection{
+        std::move(axis.value()), ParameterId(second.at("count_parameter").get<std::string>()),
+        mode == "spacing" ? LinearPatternExtentMode::Spacing : LinearPatternExtentMode::TotalExtent,
+        ParameterId(extent.at("parameter").get<std::string>()),
+        sign == "positive" ? PatternDirectionSign::Positive : PatternDirectionSign::Negative};
+  }
+  return Result<PatternPlacementOptions>::success(std::move(options));
+}
+
 [[nodiscard]] json linear_pattern_to_json(const LinearPatternFeature& feature) {
   json value{{"id", feature.id().value()},
              {"name", feature.name()},
@@ -1810,6 +1870,8 @@ feature_body_result_context_from_json(const json& feature_json) {
                              {"direction", std::string(to_string(feature.direction_sign()))}}}};
   for (const auto& source : feature.sources())
     value["sources"].push_back(pattern_source_to_json(source));
+  if (feature.placements())
+    value["placements"] = pattern_placements_to_json(*feature.placements());
   value.update(pattern_body_context_to_json(feature.body_result_context()));
   return value;
 }
@@ -1825,6 +1887,8 @@ feature_body_result_context_from_json(const json& feature_json) {
              {"equal_spacing", feature.equal_spacing()}};
   for (const auto& source : feature.sources())
     value["sources"].push_back(pattern_source_to_json(source));
+  if (feature.placements())
+    value["placements"] = pattern_placements_to_json(*feature.placements());
   value.update(pattern_body_context_to_json(feature.body_result_context()));
   return value;
 }
@@ -2669,6 +2733,22 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
   const std::string name = value.at("name").get<std::string>();
   const ParameterId count(value.at("count_parameter").get<std::string>());
   const std::string type = value.at("type").get<std::string>();
+  std::optional<PatternPlacementOptions> placements;
+  if (value.contains("placements")) {
+    auto parsed = pattern_placements_from_json(value.at("placements"));
+    if (!parsed)
+      return Result<ParsedPartPattern>::failure(parsed.error());
+    placements = std::move(parsed.value());
+    const std::unordered_set<std::string> common{
+        "id",          "name",          "type",      "sources", "count_parameter", "operation_mode",
+        "target_body", "produced_body", "placements"};
+    for (auto it = value.begin(); it != value.end(); ++it)
+      if (!common.contains(it.key()) &&
+          !(type == "linear_pattern" && (it.key() == "direction" || it.key() == "extent")) &&
+          !(type == "circular_pattern" &&
+            (it.key() == "axis" || it.key() == "total_angle_deg" || it.key() == "equal_spacing")))
+        return Result<ParsedPartPattern>::failure(json_error("Unknown Pattern placement field"));
+  }
   if (type == "linear_pattern") {
     if (!value.contains("direction") || !value.at("direction").is_object() ||
         !value.contains("extent") || !value.at("extent").is_object())
@@ -2692,7 +2772,7 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
         mode == "spacing" ? LinearPatternExtentMode::Spacing : LinearPatternExtentMode::TotalExtent,
         ParameterId(extent.at("parameter").get<std::string>()),
         sign == "positive" ? PatternDirectionSign::Positive : PatternDirectionSign::Negative,
-        std::move(*context.value()));
+        std::move(*context.value()), std::move(placements));
     if (feature.has_error())
       return Result<ParsedPartPattern>::failure(feature.error());
     return Result<ParsedPartPattern>::success(std::move(feature.value()));
@@ -2709,7 +2789,7 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
     auto feature = CircularPatternFeature::create(
         id, name, std::move(sources), std::move(axis.value()), count,
         value.at("total_angle_deg").get<double>(), value.at("equal_spacing").get<bool>(),
-        std::move(*context.value()));
+        std::move(*context.value()), std::move(placements));
     if (feature.has_error())
       return Result<ParsedPartPattern>::failure(feature.error());
     return Result<ParsedPartPattern>::success(std::move(feature.value()));
@@ -4227,8 +4307,15 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   json root;
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
-  if (!document.engineering_resources().entries().empty() || !document.hole_features().empty() ||
-      !document.thread_features().empty()) {
+  const bool extended_patterns =
+      std::any_of(document.linear_pattern_features().begin(),
+                  document.linear_pattern_features().end(),
+                  [](const auto& f) { return f.placements().has_value(); }) ||
+      std::any_of(document.circular_pattern_features().begin(),
+                  document.circular_pattern_features().end(),
+                  [](const auto& f) { return f.placements().has_value(); });
+  if (extended_patterns || !document.engineering_resources().entries().empty() ||
+      !document.hole_features().empty() || !document.thread_features().empty()) {
     const bool manufacturing = std::any_of(
         document.hole_features().begin(), document.hole_features().end(), [](const auto& hole) {
           return !std::holds_alternative<std::monostate>(hole.manufacturing());
@@ -4237,7 +4324,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
         !document.thread_features().empty() ||
         std::any_of(document.hole_features().begin(), document.hole_features().end(),
                     [](const auto& hole) { return hole.thread().has_value(); });
-    root["version"] = threads                            ? k_thread_version
+    root["version"] = extended_patterns                  ? k_pattern_placement_version
+                      : threads                          ? k_thread_version
                       : manufacturing                    ? k_manufacturing_hole_version
                       : document.hole_features().empty() ? k_resource_version
                                                          : k_hole_version;
@@ -4630,7 +4718,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     latest_ancestor_position[node] = latest;
   }
-  if (interleaved || !document.result_face_workplanes().empty() ||
+  if (extended_patterns || interleaved || !document.result_face_workplanes().empty() ||
       !document.hole_features().empty() || !document.thread_features().empty() ||
       document.authored_history_intent())
     root["feature_order"] = std::move(feature_order);
@@ -4664,20 +4752,30 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         (root.at("version") != k_version && root.at("version") != k_history_version &&
          root.at("version") != k_resource_version && root.at("version") != k_hole_version &&
          root.at("version") != k_manufacturing_hole_version &&
-         root.at("version") != k_thread_version))
+         root.at("version") != k_thread_version &&
+         root.at("version") != k_pattern_placement_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
     const auto version = root.at("version").get<int>();
     int history_version = version;
     const bool hole_envelope = version == k_hole_version || version == k_manufacturing_hole_version;
     const bool thread_envelope = version == k_thread_version;
+    const bool pattern_envelope = version == k_pattern_placement_version;
+    const auto patterns = root.value("part_patterns", json::array());
+    const bool extended_patterns =
+        patterns.is_array() && std::any_of(patterns.begin(), patterns.end(), [](const auto& f) {
+          return f.is_object() && f.contains("placements");
+        });
+    if (pattern_envelope != extended_patterns)
+      return Result<PartDocument>::failure(
+          json_error("Pattern placement intent requires canonical Part version 7"));
     const bool resource_envelope =
-        version == k_resource_version || hole_envelope || thread_envelope;
+        version == k_resource_version || hole_envelope || thread_envelope || pattern_envelope;
     if (hole_envelope) {
       if (!root.contains("hole_features") || !root.at("hole_features").is_array() ||
           root.at("hole_features").empty())
         return Result<PartDocument>::failure(
             json_error("Part version 4 requires nonempty hole_features"));
-    } else if (root.contains("hole_features") && !thread_envelope)
+    } else if (root.contains("hole_features") && !thread_envelope && !pattern_envelope)
       return Result<PartDocument>::failure(
           json_error("Semantic Hole intent requires Part version 4"));
     if (hole_envelope) {
@@ -4689,7 +4787,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
             json_error("Manufacturing Hole intent requires Part version 5; legacy Hole intent "
                        "remains version 4"));
     }
-    if (thread_envelope && root.contains("hole_features") &&
+    if ((thread_envelope || pattern_envelope) && root.contains("hole_features") &&
         (!root.at("hole_features").is_array() || root.at("hole_features").empty()))
       return Result<PartDocument>::failure(
           json_error("Thread Part hole_features must be a nonempty array when present"));
@@ -4701,8 +4799,9 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     const bool external_thread = root.contains("thread_features") &&
                                  root.at("thread_features").is_array() &&
                                  !root.at("thread_features").empty();
-    if (thread_envelope != (internal_thread || external_thread) ||
-        (root.contains("thread_features") && (!thread_envelope || !external_thread)))
+    if ((!pattern_envelope && thread_envelope != (internal_thread || external_thread)) ||
+        (root.contains("thread_features") &&
+         ((!thread_envelope && !pattern_envelope) || !external_thread)))
       return Result<PartDocument>::failure(
           json_error("Thread intent requires canonical Part version 6"));
     if (root.contains("engineering_resource_refs"))
@@ -4805,11 +4904,12 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
           return Result<PartDocument>::failure(
               json_error("Reference Part cannot contain authored Part intent"));
     }
-    if (root.contains("result_face_workplanes") || hole_envelope || thread_envelope) {
+    if (root.contains("result_face_workplanes") || hole_envelope || thread_envelope ||
+        pattern_envelope) {
       const auto supports = root.value("result_face_workplanes", json::array());
       if (!supports.is_array())
         return Result<PartDocument>::failure(json_error("result_face_workplanes must be an array"));
-      if (supports.empty() && !hole_envelope && !thread_envelope) {
+      if (supports.empty() && !hole_envelope && !thread_envelope && !pattern_envelope) {
         auto legacy = root;
         legacy.erase("result_face_workplanes");
         return deserialize_part_document_from_json(legacy.dump(), mode);

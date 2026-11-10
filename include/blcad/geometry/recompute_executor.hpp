@@ -144,6 +144,9 @@ public:
                             ShapeCache& cache) const;
 
 private:
+  template <class Pattern>
+  [[nodiscard]] Result<std::size_t> execute_placement_pattern(const PartDocument&, const Pattern&,
+                                                              ShapeCache&) const;
   void record_complete_geometry_source(const PartDocument& document, ShapeCache& cache) const;
   [[nodiscard]] Result<GeometryRecomputeSummary>
   execute_history(const PartDocument& document, std::optional<std::size_t> prefix_count,

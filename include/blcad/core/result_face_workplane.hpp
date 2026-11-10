@@ -20,6 +20,17 @@ struct ResultFaceOrigin {
   friend bool operator==(const ResultFaceOrigin&, const ResultFaceOrigin&) = default;
 };
 
+// Shared spelling for authored copy origins; byte-compatible with the existing
+// Pattern/Mirror lineage contract. Geometry owns the corresponding descendants.
+inline ResultFaceOrigin copy_result_face_origin(FeatureId producer, const std::string& instance,
+                                                const ResultFaceOrigin& source) {
+  const auto segment = [](const std::string& value) {
+    return std::to_string(value.size()) + ":" + value + "/";
+  };
+  return {std::move(producer),
+          "copy/" + segment(instance) + segment(source.feature.value()) + segment(source.role)};
+}
+
 class ResultFaceReference {
 public:
   [[nodiscard]] static Result<ResultFaceReference> create(FeatureId producer, BodyId body,
