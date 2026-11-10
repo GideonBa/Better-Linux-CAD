@@ -464,6 +464,7 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
   append_part_nodes(features, part, part.chamfer_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.shell_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.hole_features(), GuiBrowserNodeKind::Feature);
+  append_part_nodes(features, part, part.thread_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.draft_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.body_boolean_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.body_transforms(), GuiBrowserNodeKind::Feature);

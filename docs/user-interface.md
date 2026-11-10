@@ -264,6 +264,10 @@ Cancel restores the scene, selection, filter and camera; Save during this task w
 intent. Stale document replacement cancels the task. Browser folding and semantic selection survive
 ordinary refreshes. The End of Part marker/edit lifecycle belongs to 148B and is not claimed here.
 
+History preview failures replace any earlier success message in both the task diagnostics and
+status bar. Apply remains disabled and the committed model/history stay intact; a stale "preview
+valid" banner must not contradict a failed candidate (155B Thread/Hole regression).
+
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
 [compact suppression at 150%](images/history-suppression-compact.png) and
 [explicit dependent inclusion at 150%](images/history-dependent-compact.png). These are unchanged
@@ -329,8 +333,8 @@ recorded in the setup/MVP evidence.
 [compact long-name parent/child context](images/history-parent-child-long-name.png).
 The ordinary views are 1280×800 at 100%; compact views are 1024×640 DIP at 150%. Controls remain
 reachable and the folded Features group stays folded in the long-name child context. Names use
-bounded labels with complete tooltips. Exact counts/hashes and retained historical B evidence are
-in `development-setup.md`; whole-block status belongs to `mvp-plan.md`.
+bounded labels with complete tooltips. Historical counts/hashes remain in Git and delivery PRs;
+`development-setup.md` owns current commands and `mvp-plan.md` owns numbered status/evidence.
 
 ### Command placement and workflows
 

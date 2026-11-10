@@ -199,6 +199,11 @@ drill depth. Length references an existing positive Length parameter; an omitted
 otherwise start also references a positive Length parameter. This reuses the existing parameter
 authority without inventing a zero-valued Length parameter.
 
+Workflow reference: [Inventor 2027 Thread](https://help.autodesk.com/cloudhelp/2027/ENU/Inventor-Help/files/GUID-C0848D58-12CB-4605-8165-0836232927F0.htm)
+(checked 2026-11-10) uses cylindrical/conical face selection, sourced type/size/designation/class,
+offset/length and cosmetic graphics. These guide 157's selectors; optional modeled geometry is an
+additional BLCAD capability.
+
 `ThreadParameterProfile` names an authored system, designation and tolerance plus existing typed
 parameters for major/minor diameter, pitch and included flank angle. Those labels do not assert
 normative conformity. `ThreadStandardProfile` selects one exact immutable table revision, row and
@@ -226,10 +231,36 @@ The external `ThreadFeature` input owns its Feature ID/name, editable solid targ
 reference existence, Body kind and dimensions; actual cylindrical/conical compatibility and axial
 placement require Geometry. Reference Parts reject authored Thread inputs.
 
-This foundation adds no Part/history/JSON registration, Hole field, visible command, thread display
-or thread geometry. Those integration/execution steps remain open within 155; the complete B03
-gate and dedicated Inventor-like authoring in 157 remain required. Focused tests:
+155A delivered the input foundation. The document integration below is 155B; geometry/display
+execution remains 155C. The complete B03 gate and dedicated Inventor-like authoring in 157 remain
+required. Focused tests:
 `tests/core/thread_feature_tests.cpp`, `[core][parity-b155]`.
+
+## Thread document integration (Block 155B)
+
+A plain round one-direction Hole may carry an optional `ThreadDefinition`. Clearance, fit/reamed,
+center, slot and Symmetric combinations reject it. Entry seats remain allowed intent; physical seat
+clearance is checked at execution. The explicit pilot diameter must equal the thread minor diameter
+within 1e-7 mm. For Blind, start + length must not exceed the full-diameter drill depth (same numeric
+tolerance); the conical tip does not extend the threaded interval. Geometry must additionally check
+actual support/material and any taper over the whole interval.
+
+External Threads register as the existing Body-modifier chain, with `PartFeatureFamily::Thread`.
+Support, thread parameters and exact standard pins are graph inputs; the previous Body producer
+precedes the Thread and the Thread becomes the next producer. Update preserves the history slot;
+guarded removal restores its predecessor. The existing authored-order/suppression/prefix machinery
+retains typed definitions, including pins of suppressed consumers.
+
+Revision adoption uses the shared catalog and candidate-only updates across internal and external
+consumers. Any missing row/type or invalid late consumer rejects catalog insertion and all earlier
+remaps. Project adoption retains the explicit member list and offline ownership. Removal rejects
+referenced snapshots, including suppressed Threads. See `file-format.md` for canonical Part V6;
+legacy Parts without thread intent retain their previous bytes.
+
+Part registration does not imply execution. Until 155C, active internal/external Thread intent fails
+explicitly in Geometry and cannot silently become an ordinary Hole or an unchanged external Body.
+The existing suppressed/prefix evaluation can retain the preceding producer. Native execution and
+complete B03 acceptance remain open. Tests: `tests/core/part_thread_feature_tests.cpp`.
 
 ## Why more than a cut
 

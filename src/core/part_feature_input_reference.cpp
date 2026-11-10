@@ -743,7 +743,8 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
               document.find_circular_pattern_feature(id) || document.find_mirror_feature(id) ||
               document.find_fillet_feature(id) || document.find_chamfer_feature(id) ||
               document.find_shell_feature(id) || document.find_hole_feature(id) ||
-              document.find_draft_feature(id) || document.find_body_boolean_feature(id) ||
+              document.find_thread_feature(id) || document.find_draft_feature(id) ||
+              document.find_body_boolean_feature(id) ||
               document.find_body_transform(BodyTransformId(id.value())))
             return Result<std::size_t>::success(1U);
           return Result<std::size_t>::failure(

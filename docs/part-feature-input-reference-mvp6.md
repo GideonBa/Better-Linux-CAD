@@ -160,4 +160,6 @@ All descendants remain recorded so subsequent splits are ambiguous rather than g
 `ThreadSupportFace` adds role spelling `thread_support_face` with existing Face capability and
 source variants. Core validates reference membership; cylindrical/conical support compatibility,
 trimmed bounds and material participation require Geometry. `thread_feature.hpp` defines the
-standalone input record; Part/history/JSON registration and execution remain later steps in 155.
+standalone input record. 155B registers it in Part/history/JSON; execution remains 155C. For an
+explicit `ResultFaceReference`, Core also requires its captured Body to equal the Thread target.
+Actual current-face geometry and other source families still require Geometry ownership checks.

@@ -508,6 +508,7 @@ struct ShellHistoryTools::Impl {
     if (!result) {
       const auto message = text(result.error().object_id() + ": " + result.error().message());
       status->setText(message);
+      window.statusBar()->showMessage(message);
       order_group->set_diagnostic(reordering ? message : QString{});
       effects_group->set_diagnostic(!reordering ? message : QString{});
       return Result<std::size_t>::failure(result.error());

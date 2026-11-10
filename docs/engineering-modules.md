@@ -344,3 +344,11 @@ identities. Existing Project explicit-member adoption delegates to this validate
 unselected definitions stay pinned. Material-only geometry reuse keeps its existing conservative
 standard-table signature rules. Exact persistence is owned by `file-format.md`; numbered acceptance
 remains in `mvp-plan.md`.
+
+155B extends those same consumers to a Hole's optional shared Thread definition and standalone
+external Threads. A sourced profile pins one exact table row and metadata/dimension columns with
+actual cell provenance; custom profiles use authored labels/parameters. Both internal and external
+consumers participate in atomic revision adoption and guarded removal, including suppressed
+records. A late external failure rolls back earlier Hole remaps and the new catalog insertion.
+Project selection and offline extraction keep the existing ownership rules. No Thread-specific
+resource store or normative values are introduced; physical execution and exchange remain 155C.

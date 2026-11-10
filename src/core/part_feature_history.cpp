@@ -100,6 +100,11 @@ template <typename Record> ExecutionContract execution_contract(const Record& re
     if (!record.keep_tool_bodies())
       contract.consumed = record.tool_bodies();
   } else {
+    if constexpr (std::is_same_v<Record, ThreadFeature>) {
+      add_input(contract, record.support().source_node_id());
+      for (const auto& standard : record.standard_dependencies())
+        add_input(contract, engineering_resource_node_id(standard));
+    }
     if constexpr (std::is_same_v<Record, HoleFeature>) {
       add_input(contract, record.support().source_node_id());
       for (const auto& placement : record.placements())
@@ -188,6 +193,8 @@ template <typename Visitor> void PartDocument::visit_executable_families(Visitor
   visitor(&PartDocument::shell_features_, &PartDocument::add_shell_feature,
           PartFeatureFamily::Shell);
   visitor(&PartDocument::hole_features_, &PartDocument::add_hole_feature, PartFeatureFamily::Hole);
+  visitor(&PartDocument::thread_features_, &PartDocument::add_thread_feature,
+          PartFeatureFamily::Thread);
   visitor(&PartDocument::draft_features_, &PartDocument::add_draft_feature,
           PartFeatureFamily::Draft);
   visitor(&PartDocument::body_boolean_features_, &PartDocument::add_body_boolean_feature,

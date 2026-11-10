@@ -109,8 +109,7 @@ struct ResolvedThreadDefinition {
 resolve_thread_definition(const PartDocument& part, const ThreadDefinition& definition,
                           std::string_view context = "thread");
 
-// Core input record. Part/history/JSON registration and Geometry execution are
-// separate integration steps; constructing this record does not modify a Part.
+// External thread modifier. Constructing a record does not modify a Part.
 class ThreadFeature {
 public:
   [[nodiscard]] static Result<ThreadFeature>
@@ -134,6 +133,15 @@ public:
   [[nodiscard]] ThreadDirection direction() const noexcept {
     return direction_;
   }
+  [[nodiscard]] std::vector<ParameterId> parameter_dependencies() const {
+    return thread_.parameter_dependencies();
+  }
+  [[nodiscard]] std::vector<EngineeringResourceKey> standard_dependencies() const {
+    return thread_.standard_dependencies();
+  }
+  [[nodiscard]] Result<ThreadFeature>
+  remap_standard_revision(const EngineeringResourceKey& source,
+                          const EngineeringResourceKey& next) const;
 
 private:
   ThreadFeature(FeatureId id, std::string name, BodyId target_body, FaceReference support,

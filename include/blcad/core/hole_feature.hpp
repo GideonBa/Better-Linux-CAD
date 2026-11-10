@@ -2,6 +2,7 @@
 
 #include "blcad/core/engineering_resource.hpp"
 #include "blcad/core/part_feature_input_reference.hpp"
+#include "blcad/core/thread_feature.hpp"
 
 #include <cstddef>
 #include <optional>
@@ -109,7 +110,8 @@ public:
          std::vector<HolePlacement> placements, HoleDiameter diameter,
          HoleExtent extent = HoleThroughAllExtent{},
          HoleDirection direction = HoleDirection::OppositeSupportNormal,
-         HoleTip tip = HoleFlatTip{}, HoleManufacturing manufacturing = {});
+         HoleTip tip = HoleFlatTip{}, HoleManufacturing manufacturing = {},
+         std::optional<ThreadDefinition> thread = {});
 
   [[nodiscard]] const FeatureId& id() const noexcept {
     return id_;
@@ -144,6 +146,9 @@ public:
   [[nodiscard]] const HoleManufacturing& manufacturing() const noexcept {
     return manufacturing_;
   }
+  [[nodiscard]] const std::optional<ThreadDefinition>& thread() const noexcept {
+    return thread_;
+  }
   [[nodiscard]] std::vector<ParameterId> parameter_dependencies() const;
   [[nodiscard]] std::vector<EngineeringResourceKey> standard_dependencies() const;
   [[nodiscard]] Result<HoleFeature>
@@ -154,7 +159,7 @@ private:
   HoleFeature(FeatureId id, std::string name, HoleKind kind, BodyId target_body,
               PlaneReference support, std::vector<HolePlacement> placements, HoleDiameter diameter,
               HoleExtent extent, HoleDirection direction, HoleTip tip,
-              HoleManufacturing manufacturing);
+              HoleManufacturing manufacturing, std::optional<ThreadDefinition> thread);
   FeatureId id_;
   std::string name_;
   HoleKind kind_;
@@ -166,6 +171,7 @@ private:
   HoleDirection direction_;
   HoleTip tip_;
   HoleManufacturing manufacturing_;
+  std::optional<ThreadDefinition> thread_;
 };
 
 struct ResolvedHoleDiameter {

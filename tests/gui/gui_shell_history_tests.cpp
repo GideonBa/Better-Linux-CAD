@@ -2,6 +2,7 @@
 #include "../support/hole_feature_fixture.hpp"
 #include "../support/hole_manufacturing_fixture.hpp"
 #include "../support/part_history_fixture.hpp"
+#include "../support/thread_feature_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/step_import_freshness.hpp"
 #include "blcad/geometry/finishing_selection.hpp"
@@ -1333,6 +1334,7 @@ TEST_CASE("Semantic Hole browser history keeps invalid extent restoration atomic
   CHECK(control<QLabel>(w, "blcad.history.status")
             .text()
             .contains("no forward material intersection"));
+  CHECK(w.statusBar()->currentMessage().contains("no forward material intersection"));
   CHECK_FALSE(w.history_tools().apply());
   CHECK(snapshot(w) == before);
   CHECK_FALSE(w.session().can_undo());
@@ -1634,4 +1636,59 @@ TEST_CASE("An impossible manufacturing seat blocks History Apply and retains the
   REQUIRE(w.session().part_shape_cache()->validate_complete_geometry_result(
       *w.session().part_document()));
   CHECK(snapshot(w) == before);
+}
+
+TEST_CASE("Thread browser rows retain suppressed intent and reject an invalid support restoration",
+          "[gui][parity-b155][thread-history-shell]") {
+  namespace threads = blcad::test::thread_fixture;
+  auto part = threads::pair_part("thread.shell");
+  REQUIRE(part.add_hole_feature(threads::internal()));
+  const auto support = fixture::face(PartFeatureInputRole::ThreadSupportFace);
+  REQUIRE(part.add_thread_feature(
+      checked(ThreadFeature::create(FeatureId("external"), "Invalid planar thread",
+                                    BodyId("body.base"), support, threads::definition()))));
+  std::vector<std::string> order;
+  for (const auto& row : checked(part.executable_history()))
+    order.push_back(row.node_id);
+  REQUIRE(part.apply_history_intent({order, {"internal", "external"}}));
+  ShellWindow w;
+  QTemporaryDir directory;
+  open(w, directory, part);
+  const auto before = snapshot(w);
+  auto* row = item(w, "external");
+  REQUIRE(row);
+  CHECK(row->text(0).contains("Invalid planar thread"));
+  CHECK(row->data(0, ShellHistoryBrowser::owner_role).toString() == "thread.shell");
+  REQUIRE(w.session().derived_results_fresh());
+  const auto verify = [&] {
+    const auto* cache = w.session().part_shape_cache();
+    REQUIRE(cache);
+    REQUIRE(cache->validate_complete_geometry_result(*w.session().part_document()));
+    CHECK(cache->body_shape_count() == 2);
+    CHECK(geometry::RectangleExtrusionAdapter{}
+              .summarize(*cache->find_body_shape(BodyId("body.base")))
+              .volume_mm3 == Catch::Approx(20 * 16 * 8).margin(1e-6));
+    CHECK(geometry::RectangleExtrusionAdapter{}
+              .summarize(*cache->find_body_shape(BodyId("body.shaft")))
+              .volume_mm3 == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  };
+  verify();
+  context(w, "external", w.history_tools().restore_action());
+  REQUIRE(w.history_tools().active());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.history.apply").isEnabled());
+  CHECK(control<QLabel>(w, "blcad.history.status").text().contains("Thread", Qt::CaseInsensitive));
+  CHECK(w.statusBar()->currentMessage() == control<QLabel>(w, "blcad.history.status").text());
+  CHECK_FALSE(w.history_tools().apply());
+  CHECK(snapshot(w) == before);
+  CHECK_FALSE(w.session().can_undo());
+  capture(w, "thread-invalid-restore");
+  click(control<QPushButton>(w, "blcad.history.cancel"));
+  CHECK(snapshot(w) == before);
+  verify();
+  REQUIRE(w.save_to({}));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(w.session().file_path()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == before);
+  CHECK(reopened.part_document()->thread_feature_count() == 1);
+  REQUIRE(reopened.derived_results_fresh());
 }

@@ -51,6 +51,19 @@ PartDocument::adopt_engineering_resource_revision(const EngineeringResourceKey& 
         return updated;
       ++changed;
     }
+    const auto threads = candidate.thread_features_;
+    for (const auto& thread : threads) {
+      const auto dependencies = thread.standard_dependencies();
+      if (std::find(dependencies.begin(), dependencies.end(), source) == dependencies.end())
+        continue;
+      auto replacement_thread = thread.remap_standard_revision(source, next);
+      if (!replacement_thread)
+        return Result<std::size_t>::failure(replacement_thread.error());
+      auto updated = candidate.update_thread_feature(std::move(replacement_thread.value()));
+      if (!updated)
+        return updated;
+      ++changed;
+    }
   }
   *this = std::move(candidate);
   return Result<std::size_t>::success(changed);
@@ -68,6 +81,12 @@ Result<std::size_t> PartDocument::remove_engineering_resource(const EngineeringR
     if (std::find(keys.begin(), keys.end(), key) != keys.end())
       return Result<std::size_t>::failure(Error::dependency(
           hole.id().value(), "Standard revision is still referenced by Hole intent"));
+  }
+  for (const auto& thread : thread_features_) {
+    const auto keys = thread.standard_dependencies();
+    if (std::find(keys.begin(), keys.end(), key) != keys.end())
+      return Result<std::size_t>::failure(Error::dependency(
+          thread.id().value(), "Standard revision is still referenced by Thread intent"));
   }
   auto candidate = *this;
   auto removed = candidate.engineering_resources_.remove(key);

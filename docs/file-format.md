@@ -3,7 +3,7 @@
 History intent has the explicit Part-version-2 contract below. Revision-pinned resources use
 Part version 3 and Project version 2 as specified in the owning 149B sections. Semantic Hole intent
 uses the Part-version-4 extension owned by 152B below; manufacturing variants use Part V5 as
-specified in the 154 section. Planned evolution
+specified in the 154 section. Thread integration uses Part V6 (155B) below. Planned evolution
 in [Blocks 145–204](inventor-parity-sequence.md) additionally assigns new feature families,
 equation/spatial constraints, model states, occurrence poses and cross-document references.
 Their future intent is not implied by the current JSON fields. Each owning block must specify
@@ -1484,3 +1484,39 @@ member catalogs with exact root resource references and hydrates the standalone 
 ordered replay, including seat-only revision consumers. Portable native Part/Project JSON retains
 fit/process/designation metadata. STEP export retains the evaluated solid geometry; it does not
 claim to transfer semantic fit, process, designation or table provenance.
+
+## Internal and external Thread intent — Block 155B
+
+Part **V6** retains the resource envelope (`history_version`, `engineering_resources`,
+`material_assignments`) and complete executable `feature_order`. It requires at least one Hole
+with `thread` or a nonempty `thread_features` array. Empty optional feature arrays, downgraded
+versions, unknown fields/modes and unresolved sources reject strict loading. Without any Thread
+intent the writer selects the previous V1–V5 format and retains legacy bytes. Thread intent is
+never accepted by an older envelope and silently discarded.
+
+A Thread definition has exactly `profile`, `length` (Length Parameter ID), `handedness`
+(`right`/`left`), `representation` (`cosmetic`/`modeled`), and optional `start` (Length Parameter ID).
+Missing start means zero; explicit null or numeric resolved values are invalid. The two profile
+discriminators are:
+
+- `custom`: exactly `kind`, authored Text `system`/`designation`/`tolerance`, parameter IDs
+  `major_diameter`/`minor_diameter`/`pitch`/`included_angle`, optional `taper_angle` parameter ID.
+- `standard`: exactly `kind`, `table` (`{id,revision}`), `row`, `columns`. Columns have exactly
+  `system`/`designation`/`tolerance`/`major_diameter`/`minor_diameter`/`pitch`/`included_angle`
+  and optional `taper_angle`, each naming one selected column in that row. Metadata requires Text,
+  diameters/pitch Length and angles Angle. Actual immutable cells/provenance live in the shared
+  catalog, with no latest-revision lookup or cached numeric substitution in the definition.
+
+Internal threads add that same optional `thread` object to a plain Hole record; existing placement,
+pilot, extent/tip, seat and direction fields remain authoritative. Standalone external records have
+exactly `id`, `name`, `target_body`, `support` (existing Face-reference payload for
+`thread_support_face`), `direction` (`along_support_axis`/`opposite_support_axis`) and `thread`.
+Core validates profiles and bindings on reopen, including pilot/minor agreement and Blind thread
+length independent of drill depth. Physical support/clearance/modeling checks belong to execution.
+The definition encoder/parser is shared by both consumers (`src/core/thread_json.*`).
+
+Resource-free Project V1 embeds standalone V6 Parts. Project V2 retains member V6 and replaces its
+catalog with `engineering_resource_refs`, including an empty list for a custom-only Thread member.
+The existing owner hydrates a complete local snapshot before ordered replay. Extraction writes a
+standalone offline snapshot. No derived display/helix, OCCT topology or exchange-entity identity is
+persisted. STEP geometry/metadata preservation is an explicit 155C gate, not implied by V6 JSON.

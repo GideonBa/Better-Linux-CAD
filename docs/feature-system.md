@@ -214,6 +214,18 @@ History/End of Part Apply and Cancel also replace the preview instruction with a
 completion message. The resulting GUI runtime changes pass renewed broad/native verification
 before promotion; exact evidence is recorded in `development-setup.md`.
 
+## Thread modifier registration — Block 155B
+
+External `ThreadFeature` records join the existing executable inventory, Body modifier chain and
+authored history as `PartFeatureFamily::Thread`; internal threads remain part of their Hole record.
+Typed support, dimensional parameters and exact standard revisions participate in dependency,
+invalidation, update/removal, suppression and prefix evaluation. The previous Body producer is
+restored on terminal removal. Shared resource adoption validates all candidate internal/external
+consumers before publishing, including suppressed consumers; a late failure rolls back the catalog
+and all earlier remaps. `hole-wizard.md` and `file-format.md` own behavior and canonical V6 spelling.
+Active Thread geometry remains an explicit unavailable error until 155C, rather than an ignored
+modifier. Registered intent alone does not close 155 or introduce the authoring panel assigned to 157.
+
 ## Feature intent, not baked geometry
 
 ```text
