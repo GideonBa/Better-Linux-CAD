@@ -1,119 +1,63 @@
 # Part Construction Sequence MVP-6
 
-Status: complete. Blocks 48–94 and GUI Feature Validation Blocks 95–105 are implemented and
-accepted. Interactive Sketcher Blocks 106–121 and Interactive Modeling Blocks 122–131 form the
-planned GUI continuation, followed by STEP Import Blocks 137–143.
+Blocks 48–94 are implemented and accepted. This document maps each completed block to its
+current contract. [mvp-plan.md](mvp-plan.md) owns current numbered status and the next block;
+[inventor-parity-sequence.md](inventor-parity-sequence.md) owns the later extensions.
 
-Block 47 completed the Assembly MVP handoff. Blocks 48–94 establish Body identity, body-scoped recompute/inspection, Body Boolean execution, associative transform Geometry, reusable semantic Part-feature inputs, richer Extrude/Cut intent plus Geometry, persistent plus executed Revolve/RevolveCut, general Pattern and Mirror Geometry, persistent plus executed Fillet/Chamfer/Shell/Draft Geometry, persistent model-space 3D Sketch Geometry, connected PathCurve Core intent, executed Sweep/SweepCut/SweepSurface through spatial paths, twist, and guide control, path-following Extrude/Extruded Cut, persistent plus executed guided multi-section Loft intent through verified G1/C1, persistent Surface-feature intent, executed Boundary/Fill, Trim/Extend, Stitch/Knit/Sew shell and Closed-shell-to-solid Surface Geometry, plus deterministic multi-body STEP export. Block 94 proves those contracts together through reproducible headless acceptance workflows. GUI Feature Validation Blocks 95–105 are implemented and accepted (`docs/gui-feature-validation-sequence-mvp7.md`); Block 106 Interactive Sketch workspace and command lifecycle is the current next technical step.
+## Implemented contract map
 
-This document is the completed status, phase-order, authority-boundary, and handoff summary for the first broad BLCAD Part Construction MVP after the Assembly MVP.
+Read the affected contract, public header and tests; the original implementation chronology is
+available in Git history. Core intent/JSON and Geometry execution have separate owners below.
 
-The complete original Blocks 48-94 per-block planning detail is preserved, under a header banner
-marking it historical, in:
-
-- `docs/part-construction-sequence-mvp6-planning-detail.md`
-
-The implemented Blocks 48–94 contracts are canonical in:
-
-- `docs/part-body-identity-mvp6.md`
-- `docs/part-body-json-mvp6.md`
-- `docs/part-feature-body-operation-mvp6.md`
-- `docs/part-feature-body-dependency-mvp6.md`
-- `docs/part-multi-body-recompute-mvp6.md`
-- `docs/part-multi-body-inspection-mvp6.md`
-- `docs/part-body-boolean-mvp6.md`
-- `docs/part-body-boolean-geometry-mvp6.md`
-- `docs/part-body-transform-ownership-mvp6.md`
-- `docs/part-body-transform-geometry-mvp6.md`
-- `docs/part-feature-input-reference-mvp6.md`
-- `docs/part-extrude-extent-intent-mvp6.md`
-- `docs/part-extrude-extent-geometry-mvp6.md`
-- `docs/part-revolve-intent-mvp6.md`
-- `docs/part-revolve-geometry-mvp6.md`
-- `docs/part-pattern-core-mvp6.md`
-- `docs/part-linear-pattern-geometry-mvp6.md`
-- `docs/part-circular-pattern-geometry-mvp6.md`
-- `docs/part-mirror-intent-mvp6.md`
-- `docs/part-mirror-geometry-mvp6.md`
-- `docs/part-edge-treatment-intent-mvp6.md`
-- `docs/part-fillet-geometry-mvp6.md`
-- `docs/part-chamfer-geometry-mvp6.md`
-- `docs/part-shell-intent-mvp6.md`
-- `docs/part-shell-geometry-mvp6.md`
-- `docs/part-draft-intent-mvp6.md`
-- `docs/part-draft-geometry-mvp6.md`
-- `docs/part-sketch-3d-core-mvp6.md`
-- `docs/part-sketch-3d-curves-core-mvp6.md`
-- `docs/part-sketch-3d-json-mvp6.md`
-- `docs/part-sketch-3d-geometry-mvp6.md`
-- `docs/part-path-curve-core-mvp6.md`
-- `docs/part-sweep-intent-mvp6.md`
-- `docs/part-sweep-geometry-mvp6.md`
-- `docs/part-sweep-3d-geometry-mvp6.md`
-- `docs/part-path-extrude-geometry-mvp6.md`
-- `docs/part-loft-intent-mvp6.md`
-- `docs/part-loft-geometry-mvp6.md`
-- `docs/part-multi-section-loft-geometry-mvp6.md`
-- `docs/part-guided-loft-geometry-mvp6.md`
-- `docs/part-surface-feature-intent-mvp6.md`
-- `docs/part-boundary-fill-surface-geometry-mvp6.md`
-- `docs/part-trim-extend-surface-geometry-mvp6.md`
-- `docs/part-surface-stitch-geometry-mvp6.md`
-- `docs/part-closed-shell-to-solid-geometry-mvp6.md`
-- `docs/part-multi-body-step-export-mvp6.md`
-- `docs/part-construction-mvp6-acceptance.md`
-
-The post-Block-94 GUI handoff and subsequent STEP import handoff are canonical in:
-
-- `docs/gui-feature-validation-sequence-mvp7.md`
-- `docs/interactive-sketcher-sequence-mvp8.md`
-- `docs/interactive-modeling-sequence-mvp9.md`
-- `docs/step-import-sequence-mvp10.md`
-
-That companion document's block goals, required work, failure policies, acceptance tags, proofs, and explicit deferrals are incorporated by reference here. Its historical top-level statement that repository work was on Block 35 is preserved planning context, not current status authority.
-
-This sequence consolidates architecture from:
-
-- `docs/multi-body-transform-and-path-features-roadmap.md`
-- `docs/inventor-like-sketcher-and-feature-roadmap.md`
-- `docs/advanced-surfacing-and-3d-sketch-mvp.md`
-
-Those documents remain canonical planning sources for detailed use cases and long-term capability breadth. This active sequence is authoritative for current block order, authority boundaries, MVP cuts, and implementation handoffs.
-
-## Goal
-
-After Block 94, one `PartDocument` should support a first serious headless parametric construction workflow covering:
-
-```text
-multiple solid/surface bodies
-explicit feature-to-body result authority
-new-body / join / cut / intersect operation modes
-body booleans
-body transforms with explicit sketch/reference ownership behavior
-richer extrude/cut extents
-Revolve / RevolveCut
-general Linear Pattern
-general Circular Pattern
-Mirror Feature
-Fillet
-Chamfer
-Shell
-Draft
-3D sketches
-semantic connected PathCurve values
-Sweep / SweepCut / SweepSurface
-path-following extrude/cut
-Loft / LoftCut / LoftSurface
-multi-section and guided lofts
-first continuity-controlled loft semantics
-Boundary / Fill surfaces
-Trim / Extend surfaces
-Stitch / Knit / Sew shell
-closed-shell-to-solid conversion
-multi-body STEP export
-```
-
-The goal is not to clone SolidWorks or Inventor feature-for-feature. The goal is to finish a coherent first Part Construction kernel whose persistent model intent, dependency graph, semantic references, geometry execution, recompute behavior, and exchange products use one architecture.
+| Block | Implemented boundary | Canonical contract |
+| --- | --- | --- |
+| 48 | Body identity and PartDocument ownership | [part-body-identity-mvp6](part-body-identity-mvp6.md) |
+| 49 | Body JSON and structural validation | [part-body-json-mvp6](part-body-json-mvp6.md) |
+| 50 | Feature output-body and operation-mode Core intent | [part-feature-body-operation-mvp6](part-feature-body-operation-mvp6.md) |
+| 51 | Feature body-operation JSON, dependencies, and invalidation | [part-feature-body-dependency-mvp6](part-feature-body-dependency-mvp6.md) |
+| 52 | Multi-body ShapeCache and recompute execution | [part-multi-body-recompute-mvp6](part-multi-body-recompute-mvp6.md) |
+| 53 | Multi-body compatibility and body-result inspection | [part-multi-body-inspection-mvp6](part-multi-body-inspection-mvp6.md) |
+| 54 | BodyBooleanFeature Core intent and JSON | [part-body-boolean-mvp6](part-body-boolean-mvp6.md) |
+| 55 | Body boolean Geometry and recompute | [part-body-boolean-geometry-mvp6](part-body-boolean-geometry-mvp6.md) |
+| 56 | BodyTransform and SketchOwnership Core intent + JSON | [part-body-transform-ownership-mvp6](part-body-transform-ownership-mvp6.md) |
+| 57 | Body transform Geometry and associative ownership behavior | [part-body-transform-geometry-mvp6](part-body-transform-geometry-mvp6.md) |
+| 58 | Part feature semantic input reference contract | [part-feature-input-reference-mvp6](part-feature-input-reference-mvp6.md) |
+| 59 | Richer Extrude/Cut extent and thin-feature intent + JSON | [part-extrude-extent-intent-mvp6](part-extrude-extent-intent-mvp6.md) |
+| 60 | Richer Extrude/Cut Geometry | [part-extrude-extent-geometry-mvp6](part-extrude-extent-geometry-mvp6.md) |
+| 61 | Revolve/RevolveCut Core intent and JSON | [part-revolve-intent-mvp6](part-revolve-intent-mvp6.md) |
+| 62 | Revolve/RevolveCut Geometry | [part-revolve-geometry-mvp6](part-revolve-geometry-mvp6.md) |
+| 63 | General Part Pattern Core model and JSON | [part-pattern-core-mvp6](part-pattern-core-mvp6.md) |
+| 64 | General Linear Pattern Geometry | [part-linear-pattern-geometry-mvp6](part-linear-pattern-geometry-mvp6.md) |
+| 65 | General Circular Pattern Geometry | [part-circular-pattern-geometry-mvp6](part-circular-pattern-geometry-mvp6.md) |
+| 66 | MirrorFeature Core intent and JSON | [part-mirror-intent-mvp6](part-mirror-intent-mvp6.md) |
+| 67 | MirrorFeature Geometry | [part-mirror-geometry-mvp6](part-mirror-geometry-mvp6.md) |
+| 68 | Edge treatment Core intent and JSON | [part-edge-treatment-intent-mvp6](part-edge-treatment-intent-mvp6.md) |
+| 69 | Fillet Geometry | [part-fillet-geometry-mvp6](part-fillet-geometry-mvp6.md) |
+| 70 | Chamfer Geometry | [part-chamfer-geometry-mvp6](part-chamfer-geometry-mvp6.md) |
+| 71 | ShellFeature Core intent and JSON | [part-shell-intent-mvp6](part-shell-intent-mvp6.md) |
+| 72 | ShellFeature Geometry | [part-shell-geometry-mvp6](part-shell-geometry-mvp6.md) |
+| 73 | DraftFeature Core intent and JSON | [part-draft-intent-mvp6](part-draft-intent-mvp6.md) |
+| 74 | DraftFeature Geometry | [part-draft-geometry-mvp6](part-draft-geometry-mvp6.md) |
+| 75 | Basic 3D Sketch Core intent | [part-sketch-3d-core-mvp6](part-sketch-3d-core-mvp6.md) |
+| 76 | 3D spline, arc, helix, and guide-curve intent | [part-sketch-3d-curves-core-mvp6](part-sketch-3d-curves-core-mvp6.md) |
+| 77 | 3D Sketch JSON and semantic references | [part-sketch-3d-json-mvp6](part-sketch-3d-json-mvp6.md) |
+| 78 | 3D Sketch Geometry conversion | [part-sketch-3d-geometry-mvp6](part-sketch-3d-geometry-mvp6.md) |
+| 79 | Connected PathCurve Core intent, JSON, and validation | [part-path-curve-core-mvp6](part-path-curve-core-mvp6.md) |
+| 80 | Sweep feature Core intent and JSON | [part-sweep-intent-mvp6](part-sweep-intent-mvp6.md) |
+| 81 | Basic Sweep Geometry | [part-sweep-geometry-mvp6](part-sweep-geometry-mvp6.md) |
+| 82 | 3D path, twist, and guide-controlled Sweep | [part-sweep-3d-geometry-mvp6](part-sweep-3d-geometry-mvp6.md) |
+| 83 | Path-following Extrude and Extruded Cut | [part-path-extrude-geometry-mvp6](part-path-extrude-geometry-mvp6.md) |
+| 84 | ProfileSectionReference and Loft Core intent + JSON | [part-loft-intent-mvp6](part-loft-intent-mvp6.md) |
+| 85 | Two-section Loft Geometry on arbitrary planes | [part-loft-geometry-mvp6](part-loft-geometry-mvp6.md) |
+| 86 | Multi-section Loft | [part-multi-section-loft-geometry-mvp6](part-multi-section-loft-geometry-mvp6.md) |
+| 87 | Guided and continuity-controlled Loft | [part-guided-loft-geometry-mvp6](part-guided-loft-geometry-mvp6.md) |
+| 88 | Surface feature Core intent and JSON | [part-surface-feature-intent-mvp6](part-surface-feature-intent-mvp6.md) |
+| 89 | Boundary and Fill Surface Geometry | [part-boundary-fill-surface-geometry-mvp6](part-boundary-fill-surface-geometry-mvp6.md) |
+| 90 | Trim and Extend Surface Geometry | [part-trim-extend-surface-geometry-mvp6](part-trim-extend-surface-geometry-mvp6.md) |
+| 91 | Stitch/Knit/Sew shell Geometry | [part-surface-stitch-geometry-mvp6](part-surface-stitch-geometry-mvp6.md) |
+| 92 | Closed shell to solid conversion | [part-closed-shell-to-solid-geometry-mvp6](part-closed-shell-to-solid-geometry-mvp6.md) |
+| 93 | Multi-body STEP export and deterministic body naming | [part-multi-body-step-export-mvp6](part-multi-body-step-export-mvp6.md) |
+| 94 | Integrated Part Construction MVP acceptance and headless workflows | [part-construction-mvp6-acceptance](part-construction-mvp6-acceptance.md) |
 
 ## Non-negotiable architecture rules
 
@@ -138,101 +82,25 @@ The goal is not to clone SolidWorks or Inventor feature-for-feature. The goal is
 19. Existing straight Extrude/Cut remain simple fast paths.
 20. No block silently broadens into GUI editing, direct modeling, Class-A surfacing, sheet metal, or topology healing.
 
-## Frozen phase order
+## Acceptance and later work
 
-```text
-48-57   multi-body/result/transform authority
-58-60   shared Part feature inputs and richer Extrude/Cut
-61-62   Revolve / RevolveCut
-63-65   general Linear/Circular Pattern
-66-67   Mirror Feature
-68-70   Fillet and Chamfer
-71-74   Shell and Draft
-75-78   3D Sketch
-79      PathCurve
-80-83   Sweep and path-following Extrude/Cut
-84-87   Loft
-88-92   Surface Features and surface-to-solid
-93      multi-body STEP exchange
-94      integrated Part Construction MVP acceptance
-```
+[Part Construction acceptance](part-construction-mvp6-acceptance.md) owns the combined mechanical,
+routed/Sweep and Loft/Surface fixtures, persistence, invalidation, incremental recompute, semantic
+recovery and multi-body STEP proof. Run its `[integration][part-construction-mvp]` filter in both
+Core and Geometry using the current presets in [development-setup.md](development-setup.md).
+Acceptance of this bounded MVP does not imply full feature breadth: consult each contract's
+unsupported-input and failure policy before extending it.
 
-Do not merge these phases into one feature branch.
+The [retained planning detail](part-construction-sequence-mvp6-planning-detail.md) preserves the
+original deferred scope and combined proof requirements. Broader use cases and future plans remain
+in [multi-body/transform/path](multi-body-transform-and-path-features-roadmap.md),
+[Sketcher/features](inventor-like-sketcher-and-feature-roadmap.md) and
+[Surfacing/Sketch3D](advanced-surfacing-and-3d-sketch-mvp.md); their content is not compacted here.
 
-## Current handoff
-
-Blocks 35–37 stable generated-topology identity, Geometry target resolution, and explicit relationship compatibility are implemented. Blocks 38–39 generic relationship intent/equations, Block 40 joint target compatibility/oriented Frame, Blocks 41–42 typed coordinate state/JSON, and Block 43 shared vector joint drives are also implemented. Blocks 44–47 Prismatic, Cylindrical, Planar, and passive Ball/Spherical are implemented.
-
-The prerequisite Assembly sequence is complete. Blocks 48–50 provide Body identity, persistence,
-and explicit NewBody/Join/Cut/Intersect intent. Block 51 persists that Feature context and connects
-Body producer/consumer state to dependency, invalidation, recompute planning, cycle rejection, and
-removal protection. Block 52 adds deterministic body-scoped cache products and transactional
-recompute. Block 53 adds checked headless result inspection and final-shape compatibility. Block 54
-adds persistent BodyBooleanFeature intent, JSON, and graph semantics. Block 55 adds deterministic,
-transactional OCCT Boolean Geometry and incremental recompute. Block 56 adds ordered BodyTransform
-and SketchOwnership Core intent, JSON, graph semantics, and removal protection. Block 57 executes
-the stack in OCCT and derives associative owned frames plus refreshed semantic/projected references.
-Block 58 freezes reusable typed ProfileRegion/Axis/Plane/Face/Edge/Body references with independent
-source identity, expected capability, feature role, dependency identity, and document validation.
-Block 59 freezes seven extent modes, optional taper/thin intent, typed limit-face and Length
-parameter validation/dependencies, and legacy-compatible JSON. Block 60 executes deterministic
-extent spans, taper, the first thin profile, and all four Body operations in OCCT while preserving
-historical fast paths. Block 61 adds typed persistent Revolve/RevolveCut profile, axis, angle, side,
-Body-result, graph, invalidation, and compatible JSON intent. Block 62 maps that intent to OCCT,
-executes full/partial/symmetric rotational tools plus all Body operations, and rejects invalid or
-self-intersecting results transactionally. Block 63 adds ordered Feature/Body Pattern sources,
-Linear/Circular parameter and Body-result intent, dependency semantics, and compatible JSON.
-Block 64 executes Feature/Body Linear Patterns with deterministic spacing/total-extent placement,
-reversed direction, all Body operations, and incremental recompute. Block 65 executes deterministic
-full/partial Circular Patterns around typed axes with all Body operations and incremental
-recompute. Block 66 adds ordered Feature/Body Mirror sources, typed plane identity, Body-result and
-graph semantics, and compatible JSON. Block 67 executes deterministic reflection through typed
-planes, all Body-result modes, transactional recompute, and reference failure. Block 68 adds
-ordered semantic Fillet/Chamfer edge intent, three Chamfer modes, angle parameters, Body-history
-dependencies, invalidation, and compatible strict JSON. Block 69 resolves the current target
-Body's ordered semantic edges, executes constant-radius OCCT fillets, supports incremental radius
-and upstream recompute, and preserves prior cache products on topology or radius failure. Block 70
-executes all three Chamfer modes with deterministic semantic reference sides, incremental
-recompute, and transactional topology/size failure. Block 71 adds ordered semantic removed-face,
-positive thickness, explicit direction, Body-history, invalidation, and strict compatible Shell
-intent/JSON. Block 72 resolves the current target Body's semantic planar/cylindrical removal faces,
-executes inward/outward OCCT thick-solid offsets, validates a single manifold solid, supports
-incremental parameter/upstream recompute, and preserves prior cache products on failure. Block 73
-adds ordered semantic Draft faces, Axis/Line pull-direction authority, typed neutral-plane
-identity, a signed non-zero Angle convention, Body-history dependencies, invalidation, removal
-protection, and strict compatible JSON. Block 74 resolves semantic faces, pull directions, and
-neutral planes into checked signed OCCT DraftAngle execution with associative and transactional
-recompute. Block 75 adds separate model-space 3D sketch identity, points, lines, ordered polylines,
-typed coordinates, graph invalidation, and removal behavior. Block 76 adds referenced three-point
-Arcs, Fit/Control Splines, typed Helices, Guide roles, and their dependencies. Block 77 adds strict,
-deterministic JSON plus source-identity-only semantic point references. Block 78 resolves those
-references and executes Points, Lines, Polylines, Arcs, Splines, and Helices as deterministic,
-transient OCCT products without persisting topology identity. Block 79 adds persistent connected
-PathCurve identity, ordered semantic segment references, explicit orientation/continuity/tolerance,
-strict JSON, and dependency-safe connectivity validation. Block 80 adds persistent Sweep,
-SweepCut, and SweepSurface intent with closed-region or open-PathCurve profiles, trajectory
-identity, orientation override, optional twist, Body-result semantics, dependency tracking, and
-strict additive JSON. Block 81 executes bounded ConstructionLine and planar line/arc/polyline
-paths for solid Sweep, SweepCut, and SweepSurface with explicit orientation and transactional
-Body-cache publication. Blocks 82–93 add spatial/twist/guide Sweep, path-following Extrude/Cut,
-ordered and guided Loft Geometry, Surface-feature intent, Boundary/Fill, Trim/Extend,
-Stitch/Knit/Sew shell, Closed-shell-to-solid execution, and deterministic multi-body STEP export.
-Block 94 integrates these authorities under one acceptance tag; its canonical result is
-`docs/part-construction-mvp6-acceptance.md`. The original planning contract remains preserved in
-`docs/part-construction-sequence-mvp6-planning-detail.md`, which is a historical snapshot and not
-status authority.
-
-## Post-Block-94 handoff
-
-Block 94 completes the first Part Construction MVP. Blocks 95–105 add a simple Qt desktop that makes
-all feature families implemented through Block 94 testable through familiar CAD workbenches and
-closes with a GUI/headless feature-coverage acceptance. Blocks 106–121 then add the productive
-Interactive Sketcher. Blocks 122–131 add interactive Part, Surface, and Assembly modeling —
-preselection-driven commands, viewport manipulators, live previews, feature editing, and joint
-motion manipulation — over the same Block-94 feature families. Blocks 137–143 add STEP import with
-two explicit modes: immutable Reference Parts for Assembly use and EditableBody Parts whose
-`ImportedBodyFeature` is followed by normal BLCAD feature history. Stable imported topology, source
-freshness, structured STEP assembly import, and integrated refresh/re-export behavior remain
-separate blocks rather than implicit additions to Part Construction or GUI infrastructure.
-Canonical plans are `docs/interactive-sketcher-sequence-mvp8.md`,
-`docs/interactive-modeling-sequence-mvp9.md`, and `docs/step-import-sequence-mvp10.md`.
+Subsequent GUI/Sketcher/modeling, replacement-shell and STEP-import phases are also completed
+milestones, not a new queue. Their contracts remain in
+[GUI validation](gui-feature-validation-sequence-mvp7.md),
+[Interactive Sketcher](interactive-sketcher-sequence-mvp8.md),
+[Interactive Modeling](interactive-modeling-sequence-mvp9.md),
+[Shell reset](gui-shell-reset-sequence-mvp9r.md) and
+[STEP import](step-import-sequence-mvp10.md).

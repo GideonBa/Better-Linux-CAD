@@ -36,7 +36,12 @@ cmake --workflow --preset dev-gui-build-test       # Core + Geometry + Qt GUI (o
 
 ## Documentation
 
-Start here:
+For a repository task, read `AGENTS.md`, then the current status in
+[`mvp-plan.md`](docs/mvp-plan.md). Follow its link to the affected contract and inspect the matching
+headers, implementation and tests. Read the future sequence/test plan when implementing planned
+work; use the setup guide for commands. There is no need to load all documentation as context.
+
+Choose additional context by task:
 
 - [`docs/project-goal.md`](docs/project-goal.md) — what BLCAD is and why
 - [`docs/architecture-summary.md`](docs/architecture-summary.md) — layered architecture and authority
@@ -48,24 +53,11 @@ Start here:
 - [`docs/inventor-parity-sequence.md`](docs/inventor-parity-sequence.md) — planned advanced modeling blocks and existing contract ownership
 - [`docs/inventor-parity-test-plan.md`](docs/inventor-parity-test-plan.md) — planned feature, combination, native UI and performance acceptance
 
-Per-phase sequence contracts, each canonical for its block range:
-
-- [`docs/assembly-cross-hierarchy-solver-sequence-mvp5.md`](docs/assembly-cross-hierarchy-solver-sequence-mvp5.md)
-  — Assembly system (MVP-5)
-- [`docs/part-construction-sequence-mvp6.md`](docs/part-construction-sequence-mvp6.md) — Part
-  Construction (MVP-6)
-- [`docs/gui-feature-validation-sequence-mvp7.md`](docs/gui-feature-validation-sequence-mvp7.md) —
-  GUI Feature Validation (MVP-7)
-- [`docs/interactive-sketcher-sequence-mvp8.md`](docs/interactive-sketcher-sequence-mvp8.md) —
-  Interactive Sketcher (MVP-8)
-- [`docs/interactive-modeling-sequence-mvp9.md`](docs/interactive-modeling-sequence-mvp9.md) —
-  Interactive Part & Assembly Modeling (MVP-9)
-- [`docs/gui-shell-reset-sequence-mvp9r.md`](docs/gui-shell-reset-sequence-mvp9r.md) — GUI Shell
-  Reset (MVP-9R)
-- [`docs/step-import-sequence-mvp10.md`](docs/step-import-sequence-mvp10.md) — STEP Import (MVP-10)
-
-Feature-specific documents under [`docs/`](docs/) remain canonical for exact mathematics, persistence
-spellings, migration rules, ordering, and failure policy. Each states its own implementation status.
+The completed-block index in [`mvp-plan.md`](docs/mvp-plan.md) links the phase and feature owners.
+Feature-specific documents remain canonical for exact mathematics, persistence spellings, migration,
+ordering and failure policy. Use their test tags to find executable proofs. Superseded implementation
+logs are available in Git/PR history; unimplemented plans and their acceptance requirements remain
+in the working documentation.
 
 ## License
 
