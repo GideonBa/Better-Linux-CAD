@@ -248,7 +248,7 @@ remains 157.
 
 | Slice | Scope and acceptance | Status |
 | --- | --- | --- |
-| 155A | One shared Thread definition, authored/pinned profiles with exact provenance, independent start/length, handedness/mode/taper, dependency/remap queries and standalone external input record. Read-only Core validation and negative tests. | Implemented and verified; delivery pending |
+| 155A | One shared Thread definition, authored/pinned profiles with exact provenance, independent start/length, handedness/mode/taper, dependency/remap queries and standalone external input record. Read-only Core validation and negative tests. | Implemented and verified; [PR #172](https://github.com/GideonBa/Better-Linux-CAD/pull/172) |
 | 155B | Internal Hole and standalone Thread registration in Part/Project persistence, Body history, dependency/removal/suppression and atomic resource adoption. Preserve legacy bytes; prove reopen, parameter edits and failed late consumers. | Planned |
 | 155C | Checked supports/material/depths, cosmetic geometry invariance and derived display, explicit modeled helical execution with cost/capability limits. Complete independent pitch/hand/radial/volume oracles, blind clearance, resources/history/material/import/STEP combinations and relevant native checks at both scales. | Planned |
 
@@ -257,8 +257,10 @@ owns its exact input contract. Core build passes; focused Thread proof **9 / 232
 Thread/Hole/resource proof **58 / 2,634**, full Core **689 / 26,531**, no skips/failures.
 All 1,031 runtime fingerprints remain frozen. Formatting, contract references and diff review pass.
 Geometry/Qt/native suites are not rerun for this Core-only input foundation; registered/executed/UI
-Threads remain open. Protected-PR delivery is pending on `feat/semantic-thread-definition` after
-verified merged PR #171 and refreshed main. Whole Block 155 remains incomplete.
+Threads remain open. Delivery: [PR #172](https://github.com/GideonBa/Better-Linux-CAD/pull/172),
+reviewed implementation `3f3d707`, on `feat/semantic-thread-definition` after verified merged
+PR #171 and refreshed main. This delivery-record update leaves runtime inputs unchanged.
+Whole Block 155 remains incomplete; continue with 155B after the protected merge.
 
 ## Later phases
 
