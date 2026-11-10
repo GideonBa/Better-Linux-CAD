@@ -137,6 +137,7 @@ Representative entry points (select the layer where the tag exists):
 | History intent, scoped evaluation and browser | `[parity-b146]`, `[parity-b147]`, `[parity-b148]`, `[history-prefix-session]`, `[history-combined-acceptance]` |
 | Engineering resources and physical properties | `[parity-b149]`, `[parity-b150]`, `[parity-b151]`, `[material-physical-combined]`; `engineering-modules.md` |
 | Semantic and manufacturing Holes | `[parity-b152]`, `[parity-b153]`, `[parity-b154]`; `hole-wizard.md`, `tests/support/hole_*`, `tests/{core,geometry}/*hole*`, `tests/gui/gui_shell_history_tests.cpp` |
+| Shared Thread Core inputs | `[core][parity-b155]`; `hole-wizard.md`, `tests/core/thread_feature_tests.cpp` (Part/Geometry/UI integration remains open) |
 
 The shared GUI executable owns one Qt application instance. `ShellWindow` consumes the existing
 headless controllers under `include/blcad/gui/gui_interactive_*`; new tests must exercise current
