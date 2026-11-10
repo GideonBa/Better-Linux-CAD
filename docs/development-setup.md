@@ -5673,3 +5673,12 @@ four original native screenshots; no unrelated work is staged. Refreshed upstrea
 `5840dd9`; ruleset `18686807` still requires normal PR delivery (no required approving reviews or
 required status-check rule). Commit/push the implementation branch and merge only its exact reviewed
 head through the protected PR workflow, then compare refreshed main's tree.
+
+154 delivery uses [PR #170](https://github.com/GideonBa/Better-Linux-CAD/pull/170), implementation
+`dc8d40f50f6e8c11f62542448a494bfd8092be83`, reviewed implementation tree
+`7484af4d6386c1067a1bc8f7a3a2dc0b42803834`. Final inventory is **5 / 658**; all **1,027** final
+runtime fingerprints match the tested state, manifest SHA-256
+`940542ec04338219b157a58ca4f738d3632bae0e15575a393a0a4bb0f8362813`.
+This delivery record changes documentation only. Verify the final PR head/review/check state,
+merge that exact head normally under the active protected-branch rules and compare refreshed
+main's tree. Whole 154 is accepted; 155 is the next planned block and has not started.

@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 154
 current_block: 155
-current_boundary: Block 154 accepted; Block 155 semantic threads planned
+current_boundary: Block 154 accepted, delivery PR 170; Block 155 semantic threads planned
 current_tag: "[parity-b155]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -2773,7 +2773,13 @@ actual action/dialog and geometry outcomes, with unchanged five-second phase lim
 reaches the native window and exits at intentional timeout **124**. All **1,027** runtime fingerprints
 match the final tested state. Shared UI captures are original ordinary/compact screenshots; the
 progressive Inventor-like authoring panel remains 157. Phase B stays open for 155–158. Final
-inventory, staged review and regular protected PR delivery follow; 155 has not started.
+inventory passes **5 / 658**; working/staged review and formatting pass. Block 155 has not started.
+
+154 delivery: [PR #170](https://github.com/GideonBa/Better-Linux-CAD/pull/170), implementation
+`dc8d40f50f6e8c11f62542448a494bfd8092be83`, reviewed implementation tree
+`7484af4d6386c1067a1bc8f7a3a2dc0b42803834`. All **1,027** final runtime fingerprints remain
+unchanged. The delivery record changes documentation only; verify the exact final head and normal
+protected merge, then compare refreshed main's tree before a later implementation branch.
 
 ## Later phases
 
