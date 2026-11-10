@@ -1519,4 +1519,6 @@ Resource-free Project V1 embeds standalone V6 Parts. Project V2 retains member V
 catalog with `engineering_resource_refs`, including an empty list for a custom-only Thread member.
 The existing owner hydrates a complete local snapshot before ordered replay. Extraction writes a
 standalone offline snapshot. No derived display/helix, OCCT topology or exchange-entity identity is
-persisted. STEP geometry/metadata preservation is an explicit 155C gate, not implied by V6 JSON.
+persisted. STEP writes evaluated Body geometry/names: modeled cuts are physical; cosmetic graphics
+are excluded. Thread system/designation, hand/class and resource provenance are not semantic STEP
+metadata. `hole-wizard.md` owns execution limits and actual geometry-roundtrip proofs.

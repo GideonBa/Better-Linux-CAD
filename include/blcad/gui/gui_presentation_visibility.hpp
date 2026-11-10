@@ -14,6 +14,9 @@ inline void filter_presentation_visibility(const GuiDocumentSession& session,
   std::erase_if(items, [&](const auto& item) {
     if (!session.presentation_visible(item.semantic_id))
       return true;
+    if (!item.owner_presentation_id.empty() &&
+        !session.presentation_visible(item.owner_presentation_id))
+      return true;
     const std::string owner_body_id =
         !item.owner_body_id.empty()
             ? item.owner_body_id

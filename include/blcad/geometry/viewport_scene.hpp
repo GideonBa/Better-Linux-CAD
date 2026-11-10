@@ -25,6 +25,7 @@ enum class ViewportSceneKind {
   Path,
   Component,
   AssemblyTarget,
+  ThreadAnnotation,
 };
 
 struct ViewportSceneItem {
@@ -33,6 +34,8 @@ struct ViewportSceneItem {
   GeometryShape shape;
   SketchLineRole line_role{SketchLineRole::Geometry};
   std::string owner_body_id{};
+  // Transient parent visibility, e.g. a component's derived Thread graphics.
+  std::string owner_presentation_id{};
 };
 
 struct ConstructionSelectionTarget {

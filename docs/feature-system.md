@@ -223,8 +223,9 @@ invalidation, update/removal, suppression and prefix evaluation. The previous Bo
 restored on terminal removal. Shared resource adoption validates all candidate internal/external
 consumers before publishing, including suppressed consumers; a late failure rolls back the catalog
 and all earlier remaps. `hole-wizard.md` and `file-format.md` own behavior and canonical V6 spelling.
-Active Thread geometry remains an explicit unavailable error until 155C, rather than an ignored
-modifier. Registered intent alone does not close 155 or introduce the authoring panel assigned to 157.
+155C integrates checked cosmetic/modeled execution and derived graphics under the limits in
+`hole-wizard.md`; unsupported inputs fail atomically. `mvp-plan.md` owns the numbered acceptance
+status; the dedicated authoring panel and its native B03 completion remain assigned to 157.
 
 ## Feature intent, not baked geometry
 

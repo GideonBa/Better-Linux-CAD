@@ -6,6 +6,7 @@
 
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepGProp.hxx>
+#include <BRepTools.hxx>
 #include <GProp_GProps.hxx>
 #include <GeomAbs_SurfaceType.hxx>
 #include <Standard_Failure.hxx>
@@ -125,7 +126,8 @@ GeometryShape ResultFaceSupportGeometry::tag_conical_wall(const GeometryShape& s
 GeometryShape ResultFaceSupportGeometry::tag_hole_wall(const GeometryShape& shape,
                                                        FeatureId producer, std::string role,
                                                        Point3 center, Vector3 axis, Vector3 x_axis,
-                                                       double radius_mm) {
+                                                       double radius_mm,
+                                                       std::optional<Vector3> radial_witness) {
   if (shape.empty() || length(axis) < tolerance)
     return shape;
   axis = unit(axis);
@@ -139,6 +141,18 @@ GeometryShape ResultFaceSupportGeometry::tag_hole_wall(const GeometryShape& shap
     const auto n = cylinder.Axis().Direction();
     const auto p = cylinder.Location();
     const Vector3 offset{center.x - p.X(), center.y - p.Y(), center.z - p.Z()};
+    if (radial_witness) {
+      double u0, u1, v0, v1;
+      BRepTools::UVBounds(face, u0, u1, v0, v1);
+      const auto mid = surface.Value((u0 + u1) / 2, (v0 + v1) / 2);
+      const double z = dot({mid.X() - center.x, mid.Y() - center.y, mid.Z() - center.z}, axis);
+      const auto radial = unit(*radial_witness);
+      const gp_Pnt witness(center.x + z * axis.x + radius_mm * radial.x,
+                           center.y + z * axis.y + radius_mm * radial.y,
+                           center.z + z * axis.z + radius_mm * radial.z);
+      if (mid.Distance(witness) > tolerance)
+        continue;
+    }
     if (std::abs(cylinder.Radius() - radius_mm) <= tolerance &&
         std::abs(std::abs(dot(axis, {n.X(), n.Y(), n.Z()})) - 1) <= tolerance &&
         length(cross(offset, axis)) <= tolerance)
@@ -147,9 +161,10 @@ GeometryShape ResultFaceSupportGeometry::tag_hole_wall(const GeometryShape& shap
   if (matches.size() != 1)
     return shape;
   auto backing = std::make_shared<GeometryShape::Impl>(*shape.impl_);
-  detail::append_lineage(backing->face_lineage,
-                         {{std::move(producer), std::move(role)}, matches.front(), center, x_axis},
-                         backing->shape);
+  detail::append_lineage(
+      backing->face_lineage,
+      {{std::move(producer), std::move(role)}, matches.front(), center, x_axis, true, axis},
+      backing->shape);
   return GeometryShape(std::move(backing));
 }
 
