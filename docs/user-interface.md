@@ -268,6 +268,12 @@ History preview failures replace any earlier success message in both the task di
 status bar. Apply remains disabled and the committed model/history stay intact; a stale "preview
 valid" banner must not contradict a failed candidate (155B Thread/Hole regression).
 
+Cosmetic Thread graphics show derived interval rims and a bounded illustrative helix. They remain
+nonselectable and follow Body/component visibility and placements. History previews replace the
+committed graphics without adding Body results or changing Body-preview counts; Apply, Cancel,
+Undo/Redo and reopen regenerate the appropriate display. The dedicated Hole/Thread selectors and
+Inventor-like authoring remain assigned to 157.
+
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
 [compact suppression at 150%](images/history-suppression-compact.png) and
 [explicit dependent inclusion at 150%](images/history-dependent-compact.png). These are unchanged

@@ -351,4 +351,5 @@ actual cell provenance; custom profiles use authored labels/parameters. Both int
 consumers participate in atomic revision adoption and guarded removal, including suppressed
 records. A late external failure rolls back earlier Hole remaps and the new catalog insertion.
 Project selection and offline extraction keep the existing ownership rules. No Thread-specific
-resource store or normative values are introduced; physical execution and exchange remain 155C.
+resource store or normative values are introduced. `hole-wizard.md` owns 155C execution/display
+limits and the explicit geometry-only Thread STEP contract.

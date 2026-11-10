@@ -8,20 +8,33 @@
 #include <TopTools_ListIteratorOfListOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
-#include <gp_Trsf.hxx>
 #include <gp_Pnt.hxx>
+#include <gp_Trsf.hxx>
 #include <gp_Vec.hxx>
 
 #include <algorithm>
+#include <cmath>
+#include <optional>
 #include <vector>
 
 namespace blcad::geometry::detail {
+struct CosmeticThread {
+  double major_radius;
+  double minor_radius;
+  double length;
+  double pitch;
+  double slope;
+  bool right;
+  bool internal;
+};
 struct FaceLineage {
   ResultFaceOrigin origin;
   TopoDS_Face face;
   Point3 frame_origin;
   Vector3 x_axis;
   bool selectable = true;
+  std::optional<Vector3> support_axis{};
+  std::optional<CosmeticThread> cosmetic_thread{};
 };
 
 inline void append_lineage(std::vector<FaceLineage>& result, FaceLineage entry,
@@ -70,6 +83,22 @@ inline void transform_frames(std::vector<FaceLineage>& entries, const gp_Trsf& t
     axis.Transform(transform);
     entry.frame_origin = {point.X(), point.Y(), point.Z()};
     entry.x_axis = {axis.X(), axis.Y(), axis.Z()};
+    if (entry.support_axis) {
+      gp_Vec support(entry.support_axis->x, entry.support_axis->y, entry.support_axis->z);
+      support.Transform(transform);
+      support.Normalize();
+      entry.support_axis = Vector3{support.X(), support.Y(), support.Z()};
+    }
+    if (entry.cosmetic_thread) {
+      const double scale = std::abs(transform.ScaleFactor());
+      auto& thread = *entry.cosmetic_thread;
+      thread.major_radius *= scale;
+      thread.minor_radius *= scale;
+      thread.length *= scale;
+      thread.pitch *= scale;
+      if (transform.IsNegative())
+        thread.right = !thread.right;
+    }
   }
 }
 } // namespace blcad::geometry::detail

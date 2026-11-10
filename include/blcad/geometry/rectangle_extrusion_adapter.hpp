@@ -61,6 +61,7 @@ private:
   friend class ChamferAdapter;
   friend class ShellAdapter;
   friend class DraftAdapter;
+  friend class ThreadAdapter;
   friend class StepExporter;
   friend class StepImportReader;
   friend class StepImportTopology;

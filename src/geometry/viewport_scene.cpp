@@ -1,5 +1,6 @@
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/core/sketch_contour.hpp"
+#include "blcad/geometry/thread_adapter.hpp"
 #include "part_history_evaluation.hpp"
 
 #include "assembly_occt_rigid_transform.hpp"
@@ -383,6 +384,15 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
                                                           : ViewportSceneKind::SolidBody;
       items.push_back({kind, "body/" + cached.body_id.value(), cached.shape,
                        SketchLineRole::Geometry, cached.body_id.value()});
+      auto threads = ThreadAdapter::cosmetic_presentations(cached.shape);
+      if (!threads)
+        return Result<std::vector<ViewportSceneItem>>::failure(threads.error());
+      for (auto& thread : threads.value())
+        items.push_back({ViewportSceneKind::ThreadAnnotation,
+                         "thread-display/" + std::to_string(cached.body_id.value().size()) + ":" +
+                             cached.body_id.value() + "/" + thread.identity,
+                         std::move(thread.shape), SketchLineRole::Geometry,
+                         cached.body_id.value()});
     }
 
     if (items.empty() && shape_cache.has_final_shape() && shape_cache.final_shape() != nullptr &&
@@ -905,6 +915,45 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
 
 Result<std::vector<ViewportSceneItem>>
 ViewportSceneBuilder::build_project(const Project& project) const {
+  const bool cosmetic = std::any_of(
+      project.part_documents().begin(), project.part_documents().end(), [](const auto& part) {
+        return std::any_of(part.thread_features().begin(), part.thread_features().end(),
+                           [](const auto& f) {
+                             return f.thread().representation() == ThreadRepresentation::Cosmetic;
+                           }) ||
+               std::any_of(part.hole_features().begin(), part.hole_features().end(),
+                           [](const auto& f) {
+                             return f.thread() &&
+                                    f.thread()->representation() == ThreadRepresentation::Cosmetic;
+                           });
+      });
+  if (cosmetic) {
+    auto leaves = AssemblyLeafOccurrenceResolver{}.resolve(project);
+    if (!leaves)
+      return Result<std::vector<ViewportSceneItem>>::failure(leaves.error());
+    std::unordered_map<std::string, ShapeCache> caches;
+    for (const auto& leaf : leaves.value()) {
+      const auto id = leaf.referenced_part_document;
+      if (caches.contains(id.value()))
+        continue;
+      const auto* part = project.find_part_document(id);
+      if (!part)
+        return Result<std::vector<ViewportSceneItem>>::failure(
+            scene_error("Thread member is unavailable"));
+      auto cache = ShapeCache::create(ShapeCacheId("scene.thread." + id.value()));
+      if (!cache)
+        return Result<std::vector<ViewportSceneItem>>::failure(cache.error());
+      auto result =
+          GeometryRecomputeExecutor{import_context_}.execute_document(*part, cache.value());
+      if (!result)
+        return Result<std::vector<ViewportSceneItem>>::failure(result.error());
+      caches.emplace(id.value(), std::move(cache.value()));
+    }
+    return build_project(project, [&](DocumentId id) -> const ShapeCache* {
+      const auto found = caches.find(id.value());
+      return found == caches.end() ? nullptr : &found->second;
+    });
+  }
   auto posed = detail::AssemblyPosedLeafShapeBuilder{import_context_}.build(project);
   if (posed.has_error())
     return Result<std::vector<ViewportSceneItem>>::failure(posed.error());
@@ -929,7 +978,11 @@ Result<std::vector<ViewportSceneItem>> ViewportSceneBuilder::build_project(
   if (!leaves)
     return Result<std::vector<ViewportSceneItem>>::failure(leaves.error());
   try {
-    std::unordered_map<std::string, TopoDS_Shape> definitions;
+    struct Definition {
+      TopoDS_Shape shape;
+      std::vector<ViewportSceneItem> annotations;
+    };
+    std::unordered_map<std::string, Definition> definitions;
     std::vector<ViewportSceneItem> items;
     for (const auto& leaf : leaves.value()) {
       const auto id = leaf.referenced_part_document;
@@ -957,29 +1010,47 @@ Result<std::vector<ViewportSceneItem>> ViewportSceneBuilder::build_project(
         TopoDS_Compound compound;
         builder.MakeCompound(compound);
         bool any = false;
-        for (const auto& item : scene.value())
+        std::vector<ViewportSceneItem> annotations;
+        for (const auto& item : scene.value()) {
+          if (item.kind == ViewportSceneKind::ThreadAnnotation)
+            annotations.push_back(item);
           if ((item.kind == ViewportSceneKind::SolidBody ||
                item.kind == ViewportSceneKind::SurfaceBody) &&
               !item.shape.empty() && (part->bodies().empty() || !item.owner_body_id.empty())) {
             builder.Add(compound, item.shape.impl_->shape);
             any = true;
           }
-        definitions.emplace(id.value(), any ? TopoDS_Shape(compound) : TopoDS_Shape{});
+        }
+        definitions.emplace(id.value(), Definition{any ? TopoDS_Shape(compound) : TopoDS_Shape{},
+                                                   std::move(annotations)});
       }
       const auto& definition = definitions.at(id.value());
-      if (definition.IsNull())
+      if (definition.shape.IsNull())
         continue;
       gp_Trsf transform;
       for (const auto& pose : leaf.transforms_inner_to_outer)
         transform = detail::to_occt_rigid_transform(pose) * transform;
       // Rigid location only: retain the authoritative member BRep topology.
-      BRepBuilderAPI_Transform posed(definition, transform, false);
+      BRepBuilderAPI_Transform posed(definition.shape, transform, false);
       if (!posed.IsDone() || posed.Shape().IsNull())
         return Result<std::vector<ViewportSceneItem>>::failure(
             scene_error("Could not pose member results"));
       GeometryShape shape(std::make_shared<GeometryShape::Impl>(posed.Shape()));
       items.push_back({ViewportSceneKind::Component,
                        "component/" + detail::leaf_occurrence_key(leaf), std::move(shape)});
+      for (const auto& annotation : definition.annotations) {
+        BRepBuilderAPI_Transform placed(annotation.shape.impl_->shape, transform, false);
+        if (!placed.IsDone())
+          return Result<std::vector<ViewportSceneItem>>::failure(
+              scene_error("Cannot pose Thread display"));
+        items.push_back({ViewportSceneKind::ThreadAnnotation,
+                         "thread-display/component/" + detail::leaf_occurrence_key(leaf) + "/" +
+                             annotation.semantic_id,
+                         GeometryShape(std::make_shared<GeometryShape::Impl>(placed.Shape())),
+                         SketchLineRole::Geometry,
+                         {},
+                         "component/" + detail::leaf_occurrence_key(leaf)});
+      }
     }
     if (import_context_) {
       const auto fresh = import_context_->validate_sources();

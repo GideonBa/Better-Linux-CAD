@@ -227,6 +227,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/reference_driven_sketch_helper.cpp
     src/geometry/reference_generated_profile_resolver.cpp
     src/geometry/revolve_adapter.cpp
+    src/geometry/thread_adapter.cpp
     src/geometry/sweep_adapter.cpp
     src/geometry/surface_adapter.cpp
     src/geometry/semantic_reference_evaluator.cpp
@@ -573,6 +574,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/part_history_evaluation_boundary_tests.cpp
       tests/geometry/hole_feature_geometry_tests.cpp
       tests/geometry/thread_feature_geometry_tests.cpp
+      tests/geometry/thread_feature_combined_tests.cpp
       tests/geometry/hole_manufacturing_geometry_tests.cpp
       tests/geometry/arc_closed_profile_pipeline_tests.cpp
       tests/geometry/assembly_angle_numeric_solver_tests.cpp

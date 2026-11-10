@@ -4,6 +4,7 @@
 #include "blcad/gui/gui_sketch_annotation_layout.hpp"
 
 #include "blcad/geometry/occt_shape_view.hpp"
+#include "blcad/geometry/thread_adapter.hpp"
 #include "blcad/gui/gui_viewport_manipulator.hpp"
 
 #include <AIS_InteractiveContext.hxx>
@@ -316,6 +317,7 @@ GuiSelectionKind selection_kind(geometry::ViewportSceneKind kind) {
   case geometry::ViewportSceneKind::SurfaceBody:
     return GuiSelectionKind::Body;
   case geometry::ViewportSceneKind::Face:
+  case geometry::ViewportSceneKind::ThreadAnnotation:
     return GuiSelectionKind::Face;
   case geometry::ViewportSceneKind::Edge:
     return GuiSelectionKind::Edge;
@@ -336,6 +338,8 @@ GuiSelectionKind selection_kind(geometry::ViewportSceneKind kind) {
 
 Quantity_Color presentation_color(geometry::ViewportSceneKind kind) {
   switch (kind) {
+  case geometry::ViewportSceneKind::ThreadAnnotation:
+    return Quantity_Color(0.22, 0.24, 0.28, Quantity_TOC_RGB);
   case geometry::ViewportSceneKind::SurfaceBody:
     return Quantity_Color(0.35, 0.70, 0.95, Quantity_TOC_RGB);
   case geometry::ViewportSceneKind::Datum:
@@ -441,6 +445,11 @@ V3d_TypeOfOrientation occt_orientation(GuiStandardView view) {
 // Sketch helper roles keep their dashed/dash-dot technical drawing style.
 void apply_construction_line_style(const geometry::ViewportSceneItem& item,
                                    const Handle(AIS_Shape)& interactive) {
+  if (item.kind == geometry::ViewportSceneKind::ThreadAnnotation && !interactive.IsNull()) {
+    interactive->SetWidth(1.4);
+    return;
+  }
+
   if (interactive.IsNull() || (item.semantic_id.rfind("construction-line/", 0U) != 0U &&
                                item.line_role == SketchLineRole::Geometry))
     return;
@@ -750,13 +759,14 @@ Result<std::size_t> OcctViewport::set_feature_previews(std::vector<geometry::Geo
     return Result<std::size_t>::failure(
         viewport_error("feature preview requires shapes or replacements"));
   std::vector<Impl::Presentation> candidates;
+  std::size_t body_count = 0;
   for (auto& shape : shapes) {
     if (shape.empty())
       return Result<std::size_t>::failure(viewport_error("feature preview shape is empty"));
-    Impl::Presentation candidate{
-        {geometry::ViewportSceneKind::SolidBody,
-         "preview/interactive-feature/" + std::to_string(candidates.size()), std::move(shape)},
-        {}};
+    Impl::Presentation candidate{{geometry::ViewportSceneKind::SolidBody,
+                                  "preview/interactive-feature/" + std::to_string(body_count++),
+                                  std::move(shape)},
+                                 {}};
     if (!impl_->context.IsNull()) {
       const auto* native = geometry::OcctShapeView::get(candidate.item.shape);
       if (!native || native->IsNull())
@@ -766,7 +776,24 @@ Result<std::size_t> OcctViewport::set_feature_previews(std::vector<geometry::Geo
       candidate.interactive->SetTransparency(0.18);
       candidate.interactive->Attributes()->SetFaceBoundaryDraw(true);
     }
+    auto threads = geometry::ThreadAdapter::cosmetic_presentations(candidate.item.shape);
+    if (!threads)
+      return Result<std::size_t>::failure(threads.error());
     candidates.push_back(std::move(candidate));
+    for (auto& thread : threads.value()) {
+      Impl::Presentation annotation{
+          {geometry::ViewportSceneKind::ThreadAnnotation,
+           "preview/thread-display/" + std::to_string(body_count) + "/" + thread.identity,
+           std::move(thread.shape)},
+          {}};
+      if (!impl_->context.IsNull()) {
+        annotation.interactive =
+            new AIS_Shape(*geometry::OcctShapeView::get(annotation.item.shape));
+        annotation.interactive->SetColor(presentation_color(annotation.item.kind));
+        annotation.interactive->SetWidth(1.4);
+      }
+      candidates.push_back(std::move(annotation));
+    }
   }
   for (const auto& previous : impl_->feature_previews)
     if (!impl_->context.IsNull() && !previous.interactive.IsNull())
@@ -777,20 +804,34 @@ Result<std::size_t> OcctViewport::set_feature_previews(std::vector<geometry::Geo
   for (const auto& preview : impl_->feature_previews)
     if (!impl_->context.IsNull() && !preview.interactive.IsNull()) {
       impl_->context->Display(preview.interactive, false);
-      impl_->context->SetDisplayMode(
-          preview.interactive, display_mode_ == GuiViewportDisplayMode::Wireframe ? 0 : 1, false);
+      impl_->context->SetDisplayMode(preview.interactive,
+                                     preview.item.kind ==
+                                                 geometry::ViewportSceneKind::ThreadAnnotation ||
+                                             display_mode_ == GuiViewportDisplayMode::Wireframe
+                                         ? 0
+                                         : 1,
+                                     false);
       impl_->context->SetSelectionModeActive(preview.interactive, 0, false,
                                              AIS_SelectionModesConcurrency_Single, true);
     }
   apply_sketch_focus();
   update();
-  return Result<std::size_t>::success(impl_->feature_previews.size());
+  return Result<std::size_t>::success(feature_preview_count());
 }
 
 bool OcctViewport::feature_preview_replaces(std::string_view semantic_id) const noexcept {
-  return std::find(impl_->feature_preview_replaced_bodies.begin(),
-                   impl_->feature_preview_replaced_bodies.end(),
-                   semantic_id) != impl_->feature_preview_replaced_bodies.end();
+  const auto replaced = [&](std::string_view id) {
+    return std::find(impl_->feature_preview_replaced_bodies.begin(),
+                     impl_->feature_preview_replaced_bodies.end(),
+                     id) != impl_->feature_preview_replaced_bodies.end();
+  };
+  if (replaced(semantic_id))
+    return true;
+  if (semantic_id.starts_with("thread-display/"))
+    for (const auto& item : impl_->presentations)
+      if (item.item.semantic_id == semantic_id && !item.item.owner_body_id.empty())
+        return replaced("body/" + item.item.owner_body_id);
+  return false;
 }
 
 void OcctViewport::clear_feature_preview() {
@@ -1215,6 +1256,9 @@ void OcctViewport::set_selection_filter_mask(std::uint32_t mask) {
 }
 
 bool OcctViewport::selection_allowed(const GuiSelection& selection) const noexcept {
+  if (selection.semantic_id.starts_with("thread-display/") ||
+      selection.semantic_id.starts_with("preview/thread-display/"))
+    return false;
   return (selection_filter_mask_ & selection_kind_bit(selection.kind)) != 0U &&
          (!selection_semantic_scope_ ||
           std::find(selection_semantic_scope_->begin(), selection_semantic_scope_->end(),
@@ -1308,7 +1352,10 @@ bool OcctViewport::scene_presentation_visible(std::string_view semantic_id) cons
 }
 
 std::size_t OcctViewport::feature_preview_count() const noexcept {
-  return impl_->feature_previews.size();
+  return std::count_if(impl_->feature_previews.begin(), impl_->feature_previews.end(),
+                       [](const auto& item) {
+                         return item.item.kind != geometry::ViewportSceneKind::ThreadAnnotation;
+                       });
 }
 
 bool OcctViewport::feature_preview_active() const noexcept {
@@ -1663,8 +1710,12 @@ void OcctViewport::initialize_native_viewer() {
       const TopoDS_Shape* native = geometry::OcctShapeView::get(preview.item.shape);
       if (native != nullptr && !native->IsNull()) {
         preview.interactive = new AIS_Shape(*native);
-        preview.interactive->SetColor(feature_preview_color());
-        preview.interactive->SetTransparency(0.18);
+        preview.interactive->SetColor(preview.item.kind ==
+                                              geometry::ViewportSceneKind::ThreadAnnotation
+                                          ? presentation_color(preview.item.kind)
+                                          : feature_preview_color());
+        preview.interactive->SetTransparency(
+            preview.item.kind == geometry::ViewportSceneKind::ThreadAnnotation ? 0 : 0.18);
         preview.interactive->Attributes()->SetFaceBoundaryDraw(true);
         impl_->context->Display(preview.interactive, false);
         impl_->context->SetSelectionModeActive(preview.interactive, 0, false,
@@ -1810,13 +1861,18 @@ void OcctViewport::apply_display_mode() {
     const bool profile_face = sketch_profile_face(presentation.item);
     presentation.interactive->Attributes()->SetFaceBoundaryDraw(
         profile_face || display_mode_ == GuiViewportDisplayMode::ShadedWithEdges);
-    impl_->context->SetDisplayMode(presentation.interactive, datum ? 0 : mode, false);
+    impl_->context->SetDisplayMode(
+        presentation.interactive,
+        datum || presentation.item.kind == geometry::ViewportSceneKind::ThreadAnnotation ? 0 : mode,
+        false);
   }
   for (const auto& preview : impl_->feature_previews)
     if (!preview.interactive.IsNull()) {
       preview.interactive->Attributes()->SetFaceBoundaryDraw(
           display_mode_ == GuiViewportDisplayMode::ShadedWithEdges);
-      impl_->context->SetDisplayMode(preview.interactive, mode, false);
+      impl_->context->SetDisplayMode(
+          preview.interactive,
+          preview.item.kind == geometry::ViewportSceneKind::ThreadAnnotation ? 0 : mode, false);
     }
   for (const auto& target : impl_->preview_selection_targets)
     if (!target.interactive.IsNull())
@@ -1831,9 +1887,11 @@ void OcctViewport::apply_selection_filters() {
     if (presentation.interactive.IsNull())
       continue;
     const GuiSelectionKind kind = selection_kind(presentation.item.kind);
-    impl_->context->SetSelectionModeActive(presentation.interactive, 0,
-                                           selection_allowed({kind, presentation.item.semantic_id}),
-                                           AIS_SelectionModesConcurrency_Single, true);
+    impl_->context->SetSelectionModeActive(
+        presentation.interactive, 0,
+        presentation.item.kind != geometry::ViewportSceneKind::ThreadAnnotation &&
+            selection_allowed({kind, presentation.item.semantic_id}),
+        AIS_SelectionModesConcurrency_Single, true);
     apply_selection_priority(presentation.item, presentation.interactive);
   }
   for (auto& target : impl_->preview_selection_targets) {

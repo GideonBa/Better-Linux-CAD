@@ -4,13 +4,16 @@
 #include "../support/part_history_fixture.hpp"
 #include "../support/thread_feature_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/project_json.hpp"
 #include "blcad/core/step_import_freshness.hpp"
 #include "blcad/geometry/finishing_selection.hpp"
+#include "blcad/geometry/physical_properties.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/step_editable_commands.hpp"
 #include "blcad/geometry/step_exporter.hpp"
 #include "blcad/geometry/step_import_reader.hpp"
 #include "blcad/geometry/step_import_topology.hpp"
+#include "blcad/gui/gui_presentation_visibility.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_history_tools.hpp"
@@ -1691,4 +1694,109 @@ TEST_CASE("Thread browser rows retain suppressed intent and reject an invalid su
   CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == before);
   CHECK(reopened.part_document()->thread_feature_count() == 1);
   REQUIRE(reopened.derived_results_fresh());
+}
+
+TEST_CASE("Thread History previews commit undo and reopen cosmetic graphics and real modeled cuts",
+          "[gui][parity-b155][thread-geometry-shell]") {
+  namespace threads = blcad::test::thread_fixture;
+  for (const auto mode : {ThreadRepresentation::Cosmetic, ThreadRepresentation::Modeled}) {
+    CAPTURE(mode == ThreadRepresentation::Modeled);
+    auto part = threads::pair_part("thread.native");
+    REQUIRE(part.add_hole_feature(threads::internal()));
+    REQUIRE(part.add_thread_feature(threads::external(
+        threads::definition(threads::custom(), true, ThreadHandedness::Left, mode))));
+    std::vector<std::string> order;
+    for (const auto& row : checked(part.executable_history()))
+      order.push_back(row.node_id);
+    REQUIRE(part.apply_history_intent({order, {"external"}}));
+    ShellWindow w;
+    QTemporaryDir directory;
+    open(w, directory, part);
+    for (const auto& plane : part.datum_planes())
+      REQUIRE(w.session().set_presentation_visible("datum-plane/" + plane.id().value(), false));
+    w.refresh();
+    w.viewport().fit_all();
+    const auto before = snapshot(w);
+    const auto shaft_volume = [&] {
+      const auto* shape = w.session().part_shape_cache()->find_body_shape(BodyId("body.shaft"));
+      REQUIRE(shape);
+      return checked(geometry::inspect_shape_physical_properties(*shape)).volume->volume_mm3;
+    };
+    CHECK(shaft_volume() == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+    context(w, "external", w.history_tools().restore_action());
+    REQUIRE(control<QPushButton>(w, "blcad.history.apply").isEnabled());
+    CHECK(w.viewport().feature_preview_count() == 2);
+    CHECK(snapshot(w) == before);
+    CHECK_FALSE(w.session().can_undo());
+    w.viewport().fit_feature_preview();
+    capture(w, mode == ThreadRepresentation::Modeled ? "thread-modeled-preview"
+                                                     : "thread-cosmetic-preview");
+    click(control<QPushButton>(w, "blcad.history.apply"));
+    REQUIRE(w.session().derived_results_fresh());
+    const double loss =
+        4 * std::numbers::pi * std::tan(55 * std::numbers::pi / 360) * 4 / 1.7 * (4. / 2 + 1. / 3);
+    CHECK(shaft_volume() ==
+          Catch::Approx(200 * std::numbers::pi - (mode == ThreadRepresentation::Modeled ? loss : 0))
+              .margin(2e-4));
+    std::size_t annotations = 0;
+    for (const auto& id : w.viewport().scene_semantic_ids())
+      if (id.starts_with("thread-display/")) {
+        ++annotations;
+        CHECK_FALSE(w.viewport().select_semantic(id));
+        if (w.viewport().native_viewer_available())
+          CHECK(w.viewport().scene_presentation_visible(id));
+      }
+    CHECK(annotations == (mode == ThreadRepresentation::Modeled ? 1 : 2));
+    const auto applied = snapshot(w);
+    REQUIRE(w.undo());
+    CHECK(snapshot(w) == before);
+    CHECK(shaft_volume() == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+    REQUIRE(w.redo());
+    CHECK(snapshot(w) == applied);
+    REQUIRE(w.save_to({}));
+    GuiDocumentSession reopened;
+    REQUIRE(reopened.open_file(w.session().file_path()));
+    CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == applied);
+    REQUIRE(reopened.derived_results_fresh());
+    CHECK(checked(geometry::inspect_shape_physical_properties(
+                      *reopened.part_shape_cache()->find_body_shape(BodyId("body.shaft"))))
+              .volume->volume_mm3 == Catch::Approx(shaft_volume()).margin(2e-4));
+  }
+}
+
+TEST_CASE("Project Thread graphics follow their component visibility without hiding peers",
+          "[gui][parity-b155][thread-geometry-shell]") {
+  auto part = blcad::test::thread_fixture::pair_part("thread.component");
+  REQUIRE(part.add_thread_feature(blcad::test::thread_fixture::external()));
+  auto assembly = checked(AssemblyDocument::create(DocumentId("root"), "Root"));
+  REQUIRE(assembly.add_member_part(part.id()));
+  for (const auto* id : {"first", "second"})
+    REQUIRE(assembly.add_component_instance(
+        checked(ComponentInstance::create(ComponentInstanceId(id), id, part.id()))));
+  auto project = checked(Project::create(DocumentId("threads"), "Threads", assembly));
+  REQUIRE(project.add_part_document(part));
+  QTemporaryDir directory;
+  const auto path =
+      std::filesystem::path(directory.path().toStdString()) / "threads.blcad.project.json";
+  REQUIRE(write_project_json_file(project, path));
+  GuiDocumentSession session;
+  REQUIRE(session.open_file(path));
+  auto scene = checked(geometry::ViewportSceneBuilder{}.build_project(project));
+  const auto glyph = std::find_if(scene.begin(), scene.end(), [](const auto& item) {
+    return item.kind == geometry::ViewportSceneKind::ThreadAnnotation;
+  });
+  REQUIRE(glyph != scene.end());
+  REQUIRE_FALSE(glyph->owner_presentation_id.empty());
+  const auto hidden = glyph->owner_presentation_id;
+  REQUIRE(session.set_presentation_visible(hidden, false));
+  filter_presentation_visibility(session, scene);
+  CHECK(std::count_if(scene.begin(), scene.end(), [](const auto& item) {
+          return item.kind == geometry::ViewportSceneKind::Component;
+        }) == 1);
+  CHECK(std::count_if(scene.begin(), scene.end(), [](const auto& item) {
+          return item.kind == geometry::ViewportSceneKind::ThreadAnnotation;
+        }) == 1);
+  CHECK(std::none_of(scene.begin(), scene.end(), [&](const auto& item) {
+    return item.semantic_id == hidden || item.owner_presentation_id == hidden;
+  }));
 }

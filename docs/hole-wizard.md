@@ -257,10 +257,53 @@ remaps. Project adoption retains the explicit member list and offline ownership.
 referenced snapshots, including suppressed Threads. See `file-format.md` for canonical Part V6;
 legacy Parts without thread intent retain their previous bytes.
 
-Part registration does not imply execution. Until 155C, active internal/external Thread intent fails
-explicitly in Geometry and cannot silently become an ordinary Hole or an unchanged external Body.
-The existing suppressed/prefix evaluation can retain the preceding producer. Native execution and
-complete B03 acceptance remain open. Tests: `tests/core/part_thread_feature_tests.cpp`.
+155B registered intent with a guarded unavailable execution boundary. The 155C executor below
+replaces that boundary; dedicated Inventor-like Hole/Thread authoring remains 157.
+
+## Thread execution and display (155C)
+
+Geometry validates the current typed cylindrical/conical support, authored axis/seam orientation,
+actual axial interval and profile diameter/taper at the thread start. Native circle-extrusion patches
+are rooted by source-frame angular witnesses, never traversal ordinals. Their authored axis follows
+Body transforms instead of inheriting an incidental kernel cylinder direction. Whole-envelope material
+and opposite-side clearance checks reject breakout, covered supports, incomplete bores, seats and
+blind/trimmed terminations within the threaded interval. Overlapping cosmetic definitions on one
+coaxial interval reject. Hole pilot/thread depths remain independent; attached tapered Hole threads
+reject until a matching conical pilot is supported.
+
+Cosmetic remains the default. It preserves native BRep identity for external threads and plain
+pilot geometry for internal threads. Derived, nonselectable graphics contain interval rims and at
+most four illustrative turns at the actual pitch, clipped to surviving support faces. Very small
+pitches use rims. These graphics follow Body transforms/copies, remain outside solid/surface
+results and are never exported as physical threads. Their metadata is derived, not new persistence.
+
+Modeled execution supports single-start straight symmetric ideal V profiles with the authored flank
+angle and major/minor diameters. Labels/classes do not imply unprovided standard root radii or
+allowances. Conical modeled threads, multi-start/rounded normative profiles and overlapping threads
+are unsupported. The checked helix helper is independent of general Sweep and reusable by 166.
+It constructs a surface-guided quarter-turn tool and joins at most 136 exact screw placements,
+extending beyond both ends. Cuts use the authored interval; an unclipped tool is allowed only when
+an aligned bound proves the whole Body already lies within that interval. Only the
+selected cylinder's tangent patches may simplify in a safe candidate; every other edge is kept,
+material invariance is checked and all face descendants are mapped through kernel history.
+
+Modeled limits: 32 turns per thread; pitch, radial depth, minor radius and length at least 0.01 mm;
+pitch/major radius/length at most 1e6 mm; separated flanks with more than 0.001 mm axial gap; at most
+512 target faces. A multi-position Hole permits 16 modeled placements and 128 aggregate turns.
+Curve/pipe construction requests 1e-7 mm; actual tool/result edge, vertex and face tolerances must
+stay at or below 1e-4 mm. Unsupported/cost/numerical failures preserve prior cache/model results.
+These are explicit execution limits, not standard dimensional defaults.
+
+Native JSON retains the entire definition and exact resource pins. Existing STEP writes evaluated
+Body geometry/names, including real modeled cuts, without semantic thread system/designation,
+handedness/class or table provenance. Cosmetic STEP contains the unchanged shaft/pilot geometry.
+Focused proof lives in `tests/geometry/thread_feature_geometry_tests.cpp` (independent material-point,
+pitch/hand/radial/volume oracles and cosmetic identity) and `thread_feature_combined_tests.cpp`
+(resource revisions, mass, history/prefix, mode switching, offline reopen, actual STEP readback,
+immutable imports, conical cosmetic supports, rotated shafts and atomic cost failures).
+`[thread-geometry-shell]` covers History preview/Apply/Undo/Redo/reopen, nonselection and component
+visibility; `[thread-history-shell]` retains failed-preview rollback. `mvp-plan.md` owns acceptance
+and native proof. B03's dedicated keyboard/mouse authoring completion remains assigned to 157.
 
 ## Why more than a cut
 

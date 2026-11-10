@@ -3,6 +3,7 @@
 #include "blcad/core/sketch_contour.hpp"
 #include "blcad/core/sketch_profile_roles.hpp"
 #include "blcad/geometry/result_face_support.hpp"
+#include "blcad/geometry/thread_adapter.hpp"
 #include "imported_body_placement.hpp"
 #include "material_geometry_source.hpp"
 #include "part_history_evaluation.hpp"
@@ -466,6 +467,8 @@ store_verified_feature_result(const PartDocument& document, const Feature& featu
   if (const ShellFeature* feature = document.find_shell_feature(FeatureId(std::string(producer))))
     return feature->target_body() == body;
   if (const auto* feature = document.find_hole_feature(FeatureId(std::string(producer))))
+    return feature->target_body() == body;
+  if (const auto* feature = document.find_thread_feature(FeatureId(std::string(producer))))
     return feature->target_body() == body;
   if (const DraftFeature* feature = document.find_draft_feature(FeatureId(std::string(producer))))
     return feature->target_body() == body;
@@ -2459,6 +2462,23 @@ GeometryShape tag_extrude_faces(const PartDocument& document, const Feature& fea
         side(vertices[i], vertices[(i + 1) % 4],
              "extrude/rectangle/" + rectangle->id().value() + "/" + roles[i]);
     }
+  } else if (const auto* circle = extrude_circle_profile(*sketch, feature)) {
+    if (const auto* diameter = document.find_parameter(circle->diameter_parameter())) {
+      // Circle extrusion currently uses four authored quarter arcs. Anchor each
+      // patch by its source-frame angular witness, never by topology traversal.
+      for (int quadrant = 0; quadrant < 4; ++quadrant) {
+        const double angle = (quadrant + .5) * k_pi / 2;
+        const Vector3 witness{frame.x_axis.x * std::cos(angle) + frame.y_axis.x * std::sin(angle),
+                              frame.x_axis.y * std::cos(angle) + frame.y_axis.y * std::sin(angle),
+                              frame.x_axis.z * std::cos(angle) + frame.y_axis.z * std::sin(angle)};
+        shape = ResultFaceSupportGeometry::tag_hole_wall(
+            shape, feature.id(),
+            "extrude/circle/" + circle->id().value() +
+                (quadrant == 0 ? "/wall" : "/wall/quadrant/" + std::to_string(quadrant)),
+            WorkplaneResolver{}.evaluate_point(frame, circle->center()), frame.normal, frame.x_axis,
+            diameter->value().millimeters() / 2, witness);
+      }
+    }
   } else {
     std::vector<SketchEntityId> boundary;
     if (const auto* closed = extrude_closed_profile(*sketch, feature))
@@ -4378,12 +4398,21 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
   if (!feature)
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "Hole feature is unavailable"));
-  if (feature->thread())
-    return Result<std::size_t>::failure(
-        validation_error(feature_id.value(), "Thread geometry is unavailable"));
   auto valid = validate_hole_feature_inputs(document, *feature);
   if (!valid)
     return valid;
+  if (feature->thread()) {
+    auto definition = resolve_thread_definition(document, *feature->thread(), feature_id.value());
+    if (!definition)
+      return Result<std::size_t>::failure(definition.error());
+    if (definition.value().representation == ThreadRepresentation::Modeled &&
+        (feature->placements().size() > 16 ||
+         definition.value().length_mm / definition.value().pitch_mm * feature->placements().size() >
+             128))
+      return Result<std::size_t>::failure(geometry_error(
+          feature_id.value(),
+          "Modeled Threaded Hole cost limit: at most 16 placements and 128 aggregate turns"));
+  }
   auto imports =
       validate_feature_imports(document, shape_cache, feature_id.value(), import_context_);
   if (!imports)
@@ -4835,6 +4864,15 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
       return Result<std::size_t>::failure(cut.error());
     result = std::move(cut.value());
   }
+  if (feature->thread()) {
+    for (std::size_t index = 0; index < centers.value().size(); ++index) {
+      auto threaded = ThreadAdapter{}.apply_hole(document, *feature, result, index,
+                                                 centers.value()[index], direction, support.x_axis);
+      if (!threaded)
+        return Result<std::size_t>::failure(threaded.error());
+      result = std::move(threaded.value());
+    }
+  }
   auto stored = working.store_feature_shape(feature_id, result);
   if (!stored)
     return stored;
@@ -4850,6 +4888,44 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
   if (auto fresh = validate_import_sources(); !fresh)
     return fresh;
   shape_cache = std::move(working);
+  return stored;
+}
+
+Result<std::size_t> GeometryRecomputeExecutor::execute_thread(const PartDocument& document,
+                                                              FeatureId id,
+                                                              ShapeCache& cache) const {
+  auto history = detail::validate_history_input(document, cache, id.value());
+  if (!history)
+    return Result<std::size_t>::failure(history.error());
+  const auto* feature = document.find_thread_feature(id);
+  if (!feature)
+    return Result<std::size_t>::failure(validation_error(id.value(), "Thread is unavailable"));
+  auto imports = validate_feature_imports(document, cache, id.value(), import_context_);
+  if (!imports)
+    return imports;
+  ShapeCache working = cache;
+  auto target = resolve_in_place_body_target(document, id, feature->target_body(), working);
+  if (!target)
+    return Result<std::size_t>::failure(target.error());
+  auto result =
+      ThreadAdapter{}.apply(document, *feature, *target.value(), working, import_context_);
+  if (!result)
+    return Result<std::size_t>::failure(result.error());
+  auto stored = working.store_feature_shape(id, result.value());
+  if (!stored)
+    return stored;
+  stored = working.store_body_shape(feature->target_body(), id, std::move(result.value()));
+  if (!stored)
+    return stored;
+  if (document.bodies().size() == 1)
+    stored = working.set_final_shape(id, *working.find_body_shape(feature->target_body()));
+  else
+    working.clear_final_shape();
+  if (!stored)
+    return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
+  cache = std::move(working);
   return stored;
 }
 
@@ -5647,7 +5723,7 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
       case PartFeatureFamily::Hole:
         return execute_hole(document, feature, working);
       case PartFeatureFamily::Thread:
-        return Result<std::size_t>::failure(validation_error(id, "Thread geometry is unavailable"));
+        return execute_thread(document, feature, working);
       case PartFeatureFamily::Draft:
         return execute_draft(document, feature, working);
       case PartFeatureFamily::BodyBoolean:
