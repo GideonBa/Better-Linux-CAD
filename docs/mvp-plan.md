@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 154
 current_block: 155
-current_boundary: Block 154 accepted; 155A delivered in PR 172; 155B verified for delivery; 155C planned
+current_boundary: Block 154 accepted; 155A delivered in PR 172; 155B verified in PR 173; 155C planned
 current_tag: "[parity-b155]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -249,7 +249,7 @@ remains 157.
 | Slice | Scope and acceptance | Status |
 | --- | --- | --- |
 | 155A | One shared Thread definition, authored/pinned profiles with exact provenance, independent start/length, handedness/mode/taper, dependency/remap queries and standalone external input record. Read-only Core validation and negative tests. | Implemented and verified; [PR #172](https://github.com/GideonBa/Better-Linux-CAD/pull/172) |
-| 155B | Internal Hole and standalone Thread registration in Part/Project persistence, Body history, dependency/removal/suppression and atomic resource adoption. Preserve legacy bytes; prove reopen, parameter edits and failed late consumers. | Implemented and verified; delivery pending |
+| 155B | Internal Hole and standalone Thread registration in Part/Project persistence, Body history, dependency/removal/suppression and atomic resource adoption. Preserve legacy bytes; prove reopen, parameter edits and failed late consumers. | Implemented and verified; [PR #173](https://github.com/GideonBa/Better-Linux-CAD/pull/173) |
 | 155C | Checked supports/material/depths, cosmetic geometry invariance and derived display, explicit modeled helical execution with cost/capability limits. Complete independent pitch/hand/radial/volume oracles, blind clearance, resources/history/material/import/STEP combinations and relevant native checks at both scales. | Planned |
 
 The shared contract lives in `hole-wizard.md`; V6 spelling lives in `file-format.md`. 155A was
@@ -264,7 +264,9 @@ passed**. Affected native filters pass with no skips at ordinary 100% (**9 / 1,0
 stale History success messages in the status bar. Five affected targets build; formatting/diff review
 pass. All 1,035 runtime inputs remain frozen; unchanged Core/Geometry binaries retain their full-run
 proof after the final GUI-only correction. Separate native app startup passes: a PID-matched X11
-window is viewable before the intentional six-second timeout (124). Protected PR delivery follows.
+window is viewable before the intentional six-second timeout (124). Delivery:
+[PR #173](https://github.com/GideonBa/Better-Linux-CAD/pull/173), reviewed implementation `b5b52b3`;
+this delivery-record update leaves runtime inputs unchanged.
 Whole Block 155 and the full B03 gate remain open; 155C is next, dedicated authoring remains 157.
 
 ## Later phases
