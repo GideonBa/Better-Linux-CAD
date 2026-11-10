@@ -179,7 +179,7 @@ PR links preserve individual slice provenance without copying intermediate compl
 | 152 | Typed plain/clearance Hole intent, stable owned/Sketch placements, support/direction/extents/tips, pinned/custom dimensions, graph/history/repair, atomic resource remapping and strict portable Part V4 JSON | [Hole](hole-wizard.md), [file format](file-format.md); semantic Core/standards/persistence gate | [163](https://github.com/GideonBa/Better-Linux-CAD/pull/163), [164](https://github.com/GideonBa/Better-Linux-CAD/pull/164), [165](https://github.com/GideonBa/Better-Linux-CAD/pull/165) |
 | 153 | Physical Hole tools, six bounded extent modes, finite native/imported/posed support, material checks and stable bore/bottom origins for finishing/Sketch consumers; atomic failure | [Hole](hole-wizard.md); B01 combined geometry/history/material/import/exchange gate | [166](https://github.com/GideonBa/Better-Linux-CAD/pull/166), [167](https://github.com/GideonBa/Better-Linux-CAD/pull/167), [168](https://github.com/GideonBa/Better-Linux-CAD/pull/168), [169](https://github.com/GideonBa/Better-Linux-CAD/pull/169) |
 | 154 | Counterbore/countersink/spotface/stepped/fitted/reamed/center/slot intent, table/parameter/resource integration and Part V5 persistence; physical seats/steps/cones/slots and stable seat/step/curve roots | [Hole](hole-wizard.md), [file format](file-format.md); B02 combined acceptance | [170](https://github.com/GideonBa/Better-Linux-CAD/pull/170) |
-| 155 | Shared internal/external Thread definitions, Part V6/Project snapshots and resource/history integration; cosmetic invariance/derived graphics and checked ideal-V helical cuts with explicit limits | [Hole/Thread](hole-wizard.md), [file format](file-format.md); B03 first gate, native authoring completion remains 157 | [172](https://github.com/GideonBa/Better-Linux-CAD/pull/172), [173](https://github.com/GideonBa/Better-Linux-CAD/pull/173); 155C verified for protected PR delivery |
+| 155 | Shared internal/external Thread definitions, Part V6/Project snapshots and resource/history integration; cosmetic invariance/derived graphics and checked ideal-V helical cuts with explicit limits | [Hole/Thread](hole-wizard.md), [file format](file-format.md); B03 first gate, native authoring completion remains 157 | [172](https://github.com/GideonBa/Better-Linux-CAD/pull/172), [173](https://github.com/GideonBa/Better-Linux-CAD/pull/173), [174](https://github.com/GideonBa/Better-Linux-CAD/pull/174) |
 
 The initial full parity plan was delivered in [PR #138](https://github.com/GideonBa/Better-Linux-CAD/pull/138).
 
@@ -207,8 +207,10 @@ Five targets build; new files and changed C++ ranges pass formatting. All 1,039 
 inputs and five verified binary hashes match. Working/staged diffs and original 100%/150% captures
 are reviewed. Focused native filters cover the affected Thread/Hole/History/resource/inventory
 workflows; this is not a full native-suite claim for the 39 offscreen skips.
-155C is verified for protected PR delivery from `feat/thread-geometry`, started only after PR #173
-was confirmed merged and main refreshed. Earlier slice evidence remains in PRs #172/#173.
+Delivery: [PR #174](https://github.com/GideonBa/Better-Linux-CAD/pull/174), reviewed implementation
+`28ae194`; this delivery-record update leaves runtime inputs unchanged. `feat/thread-geometry`
+began only after PR #173 was verified merged and main refreshed. Earlier slice evidence remains
+in PRs #172/#173.
 
 ### Retained extension boundaries
 
