@@ -250,7 +250,7 @@ only after PR #174 was confirmed merged and main refreshed. Whole-block acceptan
 | --- | --- |
 | Shared placements — 156A verified | Stable two-coordinate occurrence identity, dormant skips, optional second linear direction, bounded layout/count one; Part V7/Project snapshots and dependency rollback. Legacy V1–V6 bytes/count validation retained. |
 | Hole execution and consumers — 156B verified | Repeat the actual seed cut once per active copy; current per-instance axes/seats, transformed seeds, native/imported entry/termination checks, Thread/finishing/material/resource/history/STEP combinations and downstream Insert. Limits in `hole-wizard.md`. |
-| UI and combined acceptance | Extend existing Pattern controls; verify counts, skip/restore, resize, modifiers, Thread/material/history/reopen/STEP combinations and affected native 100%/150% workflows. Pending. Dedicated Hole/Thread authoring remains 157. |
+| UI and combined acceptance — 156C in progress | Existing Pattern controls now collect Hole sources, direction two and retained exclusions; existing Feature editing preserves integer coordinates. Build and focused offscreen tests pass; native acceptance is blocked by a SIGSEGV in the new Hole Pattern interaction test. Dedicated Hole/Thread authoring remains 157. |
 
 156A/B verification: full Core **706 cases / 26,802 assertions**, full Geometry **670 / 57,533**,
 focused Geometry **13 / 689**, focused Qt **5 / 187**, new native Assembly consumer **1 / 67** at
@@ -259,6 +259,19 @@ reviewed. Insert proof checks world-space seats while retaining its intentional 
 Numeric solve requests reuse at most 16 exact-intent Part results only within their scope; source
 freshness is revalidated and no geometry survives the request. Whole-block native/layout and full
 GUI acceptance remain open with the Pattern authoring controls.
+
+156C checkpoint verification: all five targets build; full Geometry **671 cases / 57,576 assertions**;
+focused Qt **24 passed / 3 skipped / 2,865 assertions**; B04 plate/cover combination **1 / 43**.
+The native 100% run stopped at **12 passed / 1 failed** with a SIGSEGV in
+`[native-hole-pattern-shell]`; its cause is not yet diagnosed. Native 150%, separate app startup and
+full Qt acceptance remain pending. Runtime inputs: **1,052 files**, SHA-256
+`8bca233ddf6f243003c7bd86e6ff5a94a0f3a112cde255c5aaf34fbc5572bb67`.
+Next: diagnose the native crash, rebuild affected targets and complete the remaining acceptance
+checks before marking the block complete or merging its draft PR.
+
+Delivery in progress: [draft PR #175](https://github.com/GideonBa/Better-Linux-CAD/pull/175),
+verified 156A/B commit `d49cb89`; 156C is committed as a work-in-progress checkpoint on the same
+branch at the user's request, with the native failure and remaining checks recorded above.
 
 ## Later phases
 

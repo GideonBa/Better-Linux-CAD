@@ -4,6 +4,7 @@
 #include "assembly_hole_geometry_scope.hpp"
 #include "blcad/core/assembly_reference_target.hpp"
 #include "blcad/core/project_json.hpp"
+#include "blcad/geometry/assembly_hierarchy_transform_evaluator.hpp"
 #include "blcad/geometry/assembly_insert_constraint_equation_builder.hpp"
 #include "blcad/geometry/assembly_interaction.hpp"
 #include "blcad/geometry/assembly_rigid_body_solver.hpp"
@@ -566,4 +567,110 @@ TEST_CASE("Explicit two-direction whole Body copies retain their separate positi
   CHECK(volume(*c.find_body_shape(BodyId("body.copy"))) ==
         Catch::Approx(38400 - 17.5 * std::numbers::pi).margin(1e-6));
   CHECK_FALSE(ResultFaceSupportGeometry::resolve_face(p, c, reference));
+}
+
+TEST_CASE("B04 plate and cover share bound Hole counts physical seats mass and structured STEP",
+          "[geometry][parity-b156][hole-pattern-combined][hole-pattern-b04]") {
+  auto base = f::part(true);
+  const auto seed = *base.find_hole_feature(FeatureId("holes"));
+  REQUIRE(base.update_hole_feature(
+      altered(seed, HoleThroughAllExtent{}, seed.tip(), seed.manufacturing())));
+  REQUIRE(base.add_linear_pattern_feature(f::linear()));
+  resource::annotate(base);
+  auto data = nlohmann::json::parse(checked(serialize_part_document_to_json(f::part(true))));
+  data["document"]["id"] = "cover";
+  auto cover = checked(deserialize_part_document_from_json(data.dump()));
+  length(cover, "depth", 4);
+  length(cover, "seat.depth", .5);
+  REQUIRE(cover.add_construction_plane(checked(
+      ConstructionPlane::create_explicit(ConstructionPlaneId("underside"), "Cover underside", {},
+                                         {1, 0, 0}, {0, -1, 0}, {0, 0, -1}))));
+  const auto underside = checked(PlaneReference::create_construction_plane(
+      PartFeatureInputRole::HoleSupportPlane, ConstructionPlaneId("underside")));
+  REQUIRE(cover.update_hole_feature(checked(HoleFeature::create(
+      seed.id(), seed.name(), seed.kind(), seed.target_body(), underside,
+      {{HolePlacementId("first"), Point2{-20, 15}}, {HolePlacementId("other"), Point2{-20, 6}}},
+      seed.diameter(), HoleThroughAllExtent{}, seed.direction(), seed.tip(),
+      seed.manufacturing()))));
+  REQUIRE(cover.add_linear_pattern_feature(f::linear()));
+  resource::annotate(cover);
+  REQUIRE(cover.set_default_material(resource::key("synthetic.material", "r2")));
+  auto root = checked(AssemblyDocument::create(DocumentId("b04.root"), "Plate and cover"));
+  REQUIRE(root.add_parameter(
+      checked(Parameter::create_count(ParameterId("driver"), "Hole count",
+                                      checked(Quantity::count(3)), ParameterScope::Assembly))));
+  for (const auto* p : {&base, &cover}) {
+    REQUIRE(root.add_member_part(p->id()));
+    REQUIRE(root.add_binding(
+        checked(ParameterBinding::create(ParameterBindingId("binding." + p->id().value()), p->id(),
+                                         ParameterId("count"), ParameterId("driver")))));
+  }
+  REQUIRE(root.add_component_instance(checked(ComponentInstance::create(
+      ComponentInstanceId("base"), "Base", base.id(), ComponentVisibility::Visible,
+      ComponentSuppressionState::Active, ComponentGroundingState::Grounded))));
+  REQUIRE(root.add_component_instance(checked(ComponentInstance::create(
+      ComponentInstanceId("cover"), "Cover", cover.id(), ComponentVisibility::Visible,
+      ComponentSuppressionState::Active, ComponentGroundingState::Free, {{0, 0, 11}, {}}))));
+  for (unsigned i : {1U, 2U}) {
+    const auto id = i == 1 ? "retained" : "removed";
+    const auto spelling =
+        checked(make_hole_target_spelling(instance(i, 1, HoleReferenceRole::Entry)));
+    REQUIRE(root.add_constraint(checked(
+        AssemblyConstraint::create(AssemblyConstraintId(id), id, AssemblyConstraintType::Insert,
+                                   target("base", spelling), target("cover", spelling)))));
+  }
+  auto project = checked(Project::create(DocumentId("b04.project"), "B04", root));
+  REQUIRE(project.add_part_document(base));
+  REQUIRE(project.add_part_document(cover));
+  const auto solved = checked(AssemblyRigidBodySolver{}.solve(
+      project, {ComponentInstanceId("base"), ComponentInstanceId("cover")}));
+  REQUIRE(solved.converged());
+  REQUIRE(AssemblySolveResultApplier{}.apply(project, solved));
+  const auto pose =
+      project.assembly().find_component_instance(ComponentInstanceId("cover"))->transform();
+  const auto center = AssemblyHierarchyTransformEvaluator{}.evaluate_point({pose}, {4, 0, 0});
+  near(center, {4, 0, 8});
+  const auto expected_mass = [](unsigned n) {
+    return (38400 - n * 22 * std::numbers::pi) * 4e-6 + (19200 - n * 11 * std::numbers::pi) * 6e-6;
+  };
+  CHECK(checked(BodyResultInspector{}.inspect_physical_properties(project))
+            .data()
+            .complete_mass()
+            ->mass_kg == Catch::Approx(expected_mass(12)).margin(1e-9));
+  REQUIRE(project.set_assembly_parameter_value(ParameterId("driver"), checked(Quantity::count(2))));
+  REQUIRE(AssemblyInsertConstraintEquationBuilder{}.build(
+      project, *project.assembly().find_constraint(AssemblyConstraintId("retained"))));
+  CHECK_FALSE(AssemblyInsertConstraintEquationBuilder{}.build(
+      project, *project.assembly().find_constraint(AssemblyConstraintId("removed"))));
+  const auto saved = checked(serialize_project_to_json(project));
+  CHECK_FALSE(AssemblySolveResultApplier{}.apply(project, solved));
+  CHECK(checked(serialize_project_to_json(project)) == saved);
+  project = checked(deserialize_project_from_json(saved));
+  CHECK(checked(BodyResultInspector{}.inspect_physical_properties(project))
+            .data()
+            .complete_mass()
+            ->mass_kg == Catch::Approx(expected_mass(8)).margin(1e-9));
+  imported_body_test::Fixture output;
+  REQUIRE(AssemblyStructuredStepExporter{}.write_step(project, output.path()));
+  const auto source = checked(StepImportSource::create(
+      StepImportSourceId("b04"), "B04", "supplier.step",
+      checked(step_import_sha256(output.source_bytes())), StepImportMode::EditableBody));
+  const auto imported = checked(StepImportReader{}.read(source, output.root));
+  REQUIRE(imported.body_count() == 2);
+  std::vector<double> volumes;
+  for (const auto& product : imported.products)
+    for (const auto& body : product.bodies) {
+      volumes.push_back(body.volume_mm3);
+      CHECK(BRepClass3d_SolidClassifier(*OcctShapeView::get(body.shape), gp_Pnt(-8, 0, 2), 1e-7)
+                .State() == TopAbs_OUT);
+      CHECK(BRepClass3d_SolidClassifier(*OcctShapeView::get(body.shape), gp_Pnt(10, 20, 2), 1e-7)
+                .State() == TopAbs_IN);
+    }
+  std::sort(volumes.begin(), volumes.end());
+  CHECK(volumes[0] == Catch::Approx(19200 - 8 * 11 * std::numbers::pi).margin(1e-6));
+  CHECK(volumes[1] == Catch::Approx(38400 - 8 * 22 * std::numbers::pi).margin(1e-6));
+  CHECK(std::any_of(
+      imported.occurrences.begin(), imported.occurrences.end(),
+      [](const auto& occurrence) { return std::abs(occurrence.transform.matrix[11] - 8) < 1e-6; }));
+  CHECK(checked(serialize_project_to_json(project)) == saved);
 }

@@ -313,3 +313,34 @@ collection scope. Geometry resolves the current transformed Sketch plane and end
 authority. Source edits invalidate the transform through the Sketch dependency. Missing/invalid
 line sources fail with repair diagnostics, without copying coordinates or retargeting another line.
 See `gui-interactive-extrude-revolve-mvp9.md` for the common authoring and native workflow proof.
+
+## Hole placement patterns — Block 156
+
+The existing Linear/Circular task adds ordered **Sources → Direction 1 / Axis → Direction 2 →
+Occurrences to Skip** groups in the shared scroll area, with pinned Apply/Cancel. The same primary
+numeric editor moves into Direction 1 and returns to its original row for other commands. No second
+numeric-input or transaction authority is introduced.
+
+Sources chooses Bodies (the existing NewBody behavior) or Hole Features (an in-place Cut on their
+common current target). A preselected Hole browser node starts the latter mode. The list/model picks
+select the whole Hole Feature, including all its placements. Disposable face presentations use the
+actual current bore descendants and a scoped Face filter; choosing either direction temporarily
+scopes Datum picks to the axis chooser, suspends handles and then restores Hole collection. No
+kernel identity is persisted. Apply/Cancel remove these presentations and restore prior masks/scope.
+
+Direction two reuses the same axis, Count, Spacing/Overall Length and sign types as direction one.
+Each interactive count accepts 1–1000; the shared Core layout and Hole workload caps remain enforced
+before publication. Exclusion checkboxes display one-based column/row coordinates, retain dormant
+entries after count reduction and keep the original source included. Parallel axes, excessive counts,
+unsupported recipes or geometric overlap disable Apply with the current diagnostic; correction retains
+sources and exclusions. The preview replaces the affected Body instead of overlaying another solid.
+No provisional result Body is persisted for a Hole Cut.
+
+The existing Feature editor retains V7 placement structure and parameter bindings. Its exclusion
+column/row fields also display one-based integers and write canonical zero-based integer intent.
+Count edits preserve dormant exclusions. Creation/editing/Apply remain one existing Part transaction;
+Save during a task writes the committed snapshot. Dedicated Hole/Thread authoring remains Block 157.
+Core/Geometry contracts and limits are in `part-pattern-core-mvp6.md`, `hole-wizard.md` and
+`file-format.md`. Tests: `[hole-pattern-shell]` / `[native-hole-pattern-shell]` in
+`tests/gui/gui_shell_hole_pattern_tests.cpp`; `[hole-pattern-consumer-shell]` covers Assembly Insert.
+`mvp-plan.md` alone owns actual verification and completion status.

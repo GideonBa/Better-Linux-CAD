@@ -1,8 +1,8 @@
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
-#include "blcad/gui/gui_icons.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -19,6 +19,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSignalBlocker>
+#include <QSpinBox>
 #include <QStatusBar>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -70,6 +71,11 @@ QString label(const std::string& key) {
       {"faces", "Faces"},
       {"removed_faces", "Removed Faces"},
       {"sources", "Sources"},
+      {"placements", "Placements"},
+      {"second_direction", "Direction 2"},
+      {"skipped", "Skipped Occurrences"},
+      {"first", "Column"},
+      {"second", "Row"},
       {"length_parameter", "Length"},
       {"radius_parameter", "Radius"},
       {"thickness_parameter", "Wall Thickness"},
@@ -677,6 +683,18 @@ struct ShellFeatureEditTools::Impl {
       form->addRow(label(key), input);
       QObject::connect(input, &QCheckBox::toggled, &owner, [this, path](bool state) {
         value(path) = state;
+        (void)preview();
+      });
+    } else if (item.is_number_unsigned() && path.startsWith("/placements/skipped/") &&
+               (key == "first" || key == "second")) {
+      auto* input = new QSpinBox(parent);
+      input->setRange(1, static_cast<int>(pattern_placement_limit));
+      input->setValue(item.get<unsigned>() + 1);
+      input->setKeyboardTracking(false);
+      register_field(input, path);
+      form->addRow(label(key), input);
+      QObject::connect(input, &QSpinBox::valueChanged, &owner, [this, path](int index) {
+        value(path) = static_cast<unsigned>(index - 1);
         (void)preview();
       });
     } else if (item.is_number()) {

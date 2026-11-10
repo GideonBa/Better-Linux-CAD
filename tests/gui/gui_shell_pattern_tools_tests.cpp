@@ -210,7 +210,7 @@ TEST_CASE("Pattern rejection restores numeric and count candidates while cancell
   pick_body(window);
   CHECK_FALSE(tools.set_numeric_text(QStringLiteral("20 deg")));
   CHECK_FALSE(tools.set_numeric_value(-1));
-  CHECK_FALSE(tools.set_pattern_count(1));
+  CHECK_FALSE(tools.set_pattern_count(0));
   CHECK_FALSE(tools.set_pattern_count(1001));
   GuiViewportManipulatorCandidate invalid;
   invalid.handle_id = std::string(kPatternCountHandleId);

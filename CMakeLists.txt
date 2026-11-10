@@ -738,6 +738,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_feature_tools_tests.cpp
       tests/gui/gui_shell_finishing_tools_tests.cpp
       tests/gui/gui_shell_pattern_tools_tests.cpp
+      tests/gui/gui_shell_hole_pattern_tests.cpp
       tests/gui/gui_shell_body_tools_tests.cpp
       tests/gui/gui_shell_spatial_tools_tests.cpp
       tests/gui/gui_shell_surface_tools_tests.cpp

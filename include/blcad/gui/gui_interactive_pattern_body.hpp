@@ -47,15 +47,21 @@ public:
                        AxisReference direction, ParameterId count_parameter,
                        LinearPatternExtentMode extent_mode, ParameterId extent_parameter,
                        BodyId result_body, std::vector<Parameter> pending_parameters = {},
-                       std::optional<Body> pending_result_body = std::nullopt) {
+                       std::optional<Body> pending_result_body = std::nullopt,
+                       std::optional<PatternPlacementOptions> placements = {}) {
     const auto* part = session.part_document();
     if (part == nullptr) return fail("interactive pattern requires an active Part document");
     auto body_valid = detail::validate_new_feature_body(session, result_body, pending_result_body);
     if (!body_valid)
       return body_valid;
-    auto parameters_valid = detail::validate_new_feature_parameters(
-        session, pending_parameters,
-        {{count_parameter, ParameterType::Count}, {extent_parameter, ParameterType::Length}});
+    std::vector<std::pair<ParameterId, ParameterType>> expected{
+        {count_parameter, ParameterType::Count}, {extent_parameter, ParameterType::Length}};
+    if (placements && placements->second_direction) {
+      expected.emplace_back(placements->second_direction->count, ParameterType::Count);
+      expected.emplace_back(placements->second_direction->extent, ParameterType::Length);
+    }
+    auto parameters_valid =
+        detail::validate_new_feature_parameters(session, pending_parameters, expected);
     if (!parameters_valid)
       return parameters_valid;
     const Parameter* count = part->find_parameter(count_parameter);
@@ -77,6 +83,7 @@ public:
     const int initial_count = static_cast<int>(count->value().count_value());
     const double initial_extent = extent->value().millimeters();
     reset(std::move(feature), std::move(name), std::move(result_body));
+    placements_ = std::move(placements);
     pending_parameters_ = std::move(pending_parameters);
     pending_result_body_ = std::move(pending_result_body);
     kind_ = GuiPatternMirrorKind::LinearPattern;
@@ -85,6 +92,8 @@ public:
     extent_parameter_ = std::move(extent_parameter);
     extent_mode_ = extent_mode;
     count_ = initial_count;
+    if (count_ == 1 && !placements_)
+      placements_ = PatternPlacementOptions{};
     spacing_ = initial_extent;
     return Result<std::size_t>::success(1);
   }
@@ -121,6 +130,8 @@ public:
     count_parameter_ = std::move(count_parameter);
     equal_spacing_ = equal_spacing;
     count_ = initial_count;
+    if (count_ == 1)
+      placements_ = PatternPlacementOptions{};
     angle_ = 360.0;
     return Result<std::size_t>::success(1);
   }
@@ -148,7 +159,23 @@ public:
   [[nodiscard]] double spacing() const noexcept { return spacing_; }
   [[nodiscard]] double angle() const noexcept { return angle_; }
 
-  void set_count(int value) noexcept { count_ = std::max(1, value); }
+  void set_count(int value) noexcept {
+    count_ = std::max(1, value);
+    if (count_ == 1 && !placements_)
+      placements_ = PatternPlacementOptions{};
+  }
+  void set_placements(PatternPlacementOptions value) {
+    placements_ = std::move(value);
+  }
+  [[nodiscard]] std::optional<BodyId> hole_target(const PartDocument& part) const noexcept {
+    if (kind_ == GuiPatternMirrorKind::Mirror)
+      return std::nullopt;
+    for (const auto& source : sources_)
+      if (const auto* id = std::get_if<FeatureId>(&source))
+        if (const auto* hole = part.find_hole_feature(*id))
+          return hole->target_body();
+    return std::nullopt;
+  }
   void set_spacing(double millimeters) noexcept { spacing_ = millimeters; }
   void set_angle(double degrees) noexcept { angle_ = degrees; }
   void set_extent_mode(LinearPatternExtentMode mode) noexcept { extent_mode_ = mode; }
@@ -188,7 +215,7 @@ public:
     }
     if (candidate.handle_id == kPatternCountHandleId &&
         candidate.value_kind == GuiViewportManipulatorValueKind::Count) {
-      count_ = std::max(1, candidate.count_value);
+      set_count(candidate.count_value);
       return true;
     }
     return false;
@@ -200,10 +227,10 @@ public:
     if (part == nullptr) return preview_fail("preview requires an active Part document");
     if (sources_.empty()) return preview_fail("pattern/mirror requires at least one source");
     if (kind_ != GuiPatternMirrorKind::Mirror &&
-        (count_ < 2 || count_ > 1000 ||
+        (count_ < 1 || count_ > 1000 ||
          sources_.size() > 10000U / static_cast<std::size_t>(count_)))
       return preview_fail(
-          "interactive pattern requires 2..1000 instances and at most 10000 source instances");
+          "interactive pattern requires 1..1000 instances and at most 10000 source instances");
     PartDocument candidate = *part;
     if (auto seeded = seed_parameters(candidate); seeded.has_error())
       return Result<GuiPartFeaturePreview>::failure(seeded.error());
@@ -226,7 +253,8 @@ public:
     auto added = add_feature(candidate);
     if (!added)
       return Result<geometry::GeometryShape>::failure(added.error());
-    return detail::preview_feature_body(session, candidate, feature_, result_body_);
+    return detail::preview_feature_body(session, candidate, feature_,
+                                        hole_target(candidate).value_or(result_body_));
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
@@ -253,6 +281,7 @@ private:
     sources_.clear();
     pending_parameters_.clear();
     pending_result_body_.reset();
+    placements_.reset();
     count_ = 1;
     spacing_ = 0.0;
     angle_ = 360.0;
@@ -306,13 +335,13 @@ private:
           cross(std::abs(frame_.axis.x) < 0.9 ? Vector3{1, 0, 0} : Vector3{0, 1, 0}, frame_.axis);
     handle.axis = normalized(perpendicular);
     handle.reference_value = static_cast<double>(count_);
-    handle.minimum_value = 2.0;
+    handle.minimum_value = 1.0;
     handle.maximum_value = 1000.0;
     return handle;
   }
 
   [[nodiscard]] Result<std::size_t> seed_parameters(PartDocument& part) const {
-    if (pending_result_body_) {
+    if (pending_result_body_ && !hole_target(part)) {
       auto added = part.add_body(*pending_result_body_);
       if (!added)
         return added;
@@ -341,7 +370,13 @@ private:
   }
 
   [[nodiscard]] Result<std::size_t> add_feature(PartDocument& part) const {
-    auto context = new_body_context();
+    const auto target = hole_target(part);
+    auto context = target ? FeatureBodyResultContext::create(FeatureBodyOperationMode::Cut, *target,
+                                                             std::nullopt)
+                          : new_body_context();
+    auto placements = placements_;
+    if (target && !placements)
+      placements = PatternPlacementOptions{};
     if (context.has_error()) return Result<std::size_t>::failure(context.error());
     if (kind_ == GuiPatternMirrorKind::Mirror) {
       std::vector<MirrorSourceReference> sources;
@@ -365,13 +400,13 @@ private:
     if (kind_ == GuiPatternMirrorKind::LinearPattern) {
       auto feature = LinearPatternFeature::create(feature_, name_, std::move(sources), *direction_,
                                                   count_parameter_, extent_mode_, extent_parameter_,
-                                                  direction_sign_, context.value());
+                                                  direction_sign_, context.value(), placements);
       if (feature.has_error()) return Result<std::size_t>::failure(feature.error());
       return part.add_linear_pattern_feature(std::move(feature.value()));
     }
     auto feature = CircularPatternFeature::create(feature_, name_, std::move(sources), *direction_,
                                                   count_parameter_, angle_, equal_spacing_,
-                                                  context.value());
+                                                  context.value(), placements);
     if (feature.has_error()) return Result<std::size_t>::failure(feature.error());
     return part.add_circular_pattern_feature(std::move(feature.value()));
   }
@@ -424,6 +459,7 @@ private:
   BodyId result_body_{""};
   std::vector<PatternSource> sources_;
   std::optional<AxisReference> direction_;
+  std::optional<PatternPlacementOptions> placements_;
   std::optional<PlaneReference> mirror_plane_;
   ParameterId count_parameter_{""};
   ParameterId extent_parameter_{""};

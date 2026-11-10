@@ -288,7 +288,8 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
   task_summary_->setObjectName(QStringLiteral("blcad.feature.summary"));
   task_summary_->setWordWrap(true);
   column->addWidget(task_summary_);
-  auto* form = new QFormLayout();
+  auto* form = primary_form_ = new QFormLayout();
+  primary_panel_ = panel;
   numeric_editor_ = new QLineEdit(panel);
   numeric_editor_->setObjectName(QStringLiteral("blcad.manipulator_numeric_hud"));
   value_label_ = new QLabel(QStringLiteral("Value"), panel);
@@ -1034,7 +1035,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   auto preview =
       pattern() && pattern_sources_->selectedItems().empty()
           ? Result<GuiPartFeaturePreview>::failure(
-                Error::validation("pattern", "Select at least one body."))
+                Error::validation("pattern", "Select at least one source."))
       : finishing() && finishing_targets_list_->selectedItems().empty()
           ? Result<GuiPartFeaturePreview>::failure(Error::validation(
                 "gui.shell.finishing", command_ == Command::Fillet || command_ == Command::Chamfer
@@ -1044,6 +1045,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   if (preview.has_error()) {
     viewport_.clear_feature_preview();
     task_summary_->setText(QString::fromStdString(preview.error().message()));
+    if (pattern())
+      window_.statusBar()->showMessage(task_summary_->text());
     if (command_ == Command::Extrude)
       extrude_behavior_group_->set_diagnostic(QString::fromStdString(preview.error().message()));
     refresh_enablement();
@@ -1072,6 +1075,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   if (!shapes) {
     viewport_.clear_feature_preview();
     task_summary_->setText(QString::fromStdString(shapes.error().message()));
+    if (pattern())
+      window_.statusBar()->showMessage(task_summary_->text());
     refresh_enablement();
     synchronize_overlay();
     return Result<GuiPartFeaturePreview>::failure(shapes.error());
@@ -1087,11 +1092,16 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     replacements.push_back("body/" + spatial_target_->currentData().toString().toStdString());
   else if (finishing())
     replacements.push_back("body/" + finishing_body_->currentData().toString().toStdString());
+  if (pattern() && session_.part_document())
+    if (const auto target = coordinator_.pattern_mirror().hole_target(*session_.part_document()))
+      replacements.push_back("body/" + target->value());
   auto published =
       viewport_.set_feature_previews(std::move(shapes.value()), std::move(replacements));
   if (published.has_error()) {
     viewport_.clear_feature_preview();
     task_summary_->setText(QString::fromStdString(published.error().message()));
+    if (pattern())
+      window_.statusBar()->showMessage(task_summary_->text());
     refresh_enablement();
     synchronize_overlay();
     return Result<GuiPartFeaturePreview>::failure(published.error());
@@ -1177,10 +1187,16 @@ Result<std::size_t> ShellFeatureTools::apply() {
     (void)session_.task().cancel();
   window_.finish_context_task(true);
   const bool was_finishing = finishing();
+  const bool was_pattern = pattern();
   const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
   const bool restore_scope = finishing() || pattern() || body_operation() || spatial() || surface();
   command_ = Command::None;
+  if (was_pattern) {
+    viewport_.clear_preview_selection_targets();
+    pattern_hole_picks_.clear();
+    pattern_second_reference_picking_ = false;
+  }
   if (was_extrude) {
     extrude_source_.reset();
     extrude_profile_picking_ = false;
@@ -1229,10 +1245,16 @@ void ShellFeatureTools::cancel() noexcept {
     (void)session_.task().cancel();
   const bool was_finishing = finishing();
   const bool was_surface = surface();
+  const bool was_pattern = pattern();
   const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
   const bool restore_scope = finishing() || pattern() || body_operation() || spatial() || surface();
   command_ = Command::None;
+  if (was_pattern) {
+    viewport_.clear_preview_selection_targets();
+    pattern_hole_picks_.clear();
+    pattern_second_reference_picking_ = false;
+  }
   if (was_extrude) {
     if (session_.part_history_command_active())
       session_.cancel_part_history_command();
@@ -1506,6 +1528,19 @@ void ShellFeatureTools::handle_escape() {
 }
 
 void ShellFeatureTools::show_task_panel(QString title, QString unit, double value) {
+  const bool group_numeric = pattern() && command_ != Command::BodyMirror;
+  if (group_numeric != pattern_numeric_grouped_) {
+    auto* from = pattern_numeric_grouped_ ? pattern_form_ : primary_form_;
+    auto row = from->takeRow(numeric_editor_);
+    delete row.labelItem;
+    delete row.fieldItem;
+    QWidget* parent = group_numeric ? static_cast<QWidget*>(pattern_controls_) : primary_panel_;
+    value_label_->setParent(parent);
+    numeric_editor_->setParent(parent);
+    auto* to = group_numeric ? pattern_form_ : primary_form_;
+    to->insertRow(group_numeric ? 3 : 0, value_label_, numeric_editor_);
+    pattern_numeric_grouped_ = group_numeric;
+  }
   extrude_controls_->setVisible(command_ == Command::Extrude);
   revolve_controls_->setVisible(command_ == Command::Revolve);
   finishing_controls_->setVisible(finishing());
