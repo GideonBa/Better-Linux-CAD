@@ -10,6 +10,7 @@
 #include <GeomAbs_SurfaceType.hxx>
 #include <Standard_Failure.hxx>
 #include <TopoDS.hxx>
+#include <gp_Cone.hxx>
 #include <gp_Cylinder.hxx>
 #include <gp_Pln.hxx>
 
@@ -83,6 +84,41 @@ GeometryShape ResultFaceSupportGeometry::tag_plane(const GeometryShape& shape, F
       backing->face_lineage,
       {{std::move(producer), std::move(role)}, matches.front(), origin, x_axis, selectable},
       backing->shape);
+  return GeometryShape(std::move(backing));
+}
+
+GeometryShape ResultFaceSupportGeometry::tag_conical_wall(const GeometryShape& shape,
+                                                          FeatureId producer, std::string role,
+                                                          Point3 center, Vector3 axis,
+                                                          Vector3 x_axis, double first_depth,
+                                                          double last_depth) {
+  if (shape.empty() || length(axis) < tolerance)
+    return shape;
+  axis = unit(axis);
+  std::vector<TopoDS_Face> matches;
+  for (TopExp_Explorer it(shape.impl_->shape, TopAbs_FACE); it.More(); it.Next()) {
+    const auto face = TopoDS::Face(it.Current());
+    BRepAdaptor_Surface surface(face);
+    if (surface.GetType() != GeomAbs_Cone)
+      continue;
+    const auto cone = surface.Cone();
+    const auto n = cone.Axis().Direction();
+    const auto location = cone.Location();
+    const Vector3 delta{location.X() - center.x, location.Y() - center.y, location.Z() - center.z};
+    const auto mid = surface.Value((surface.FirstUParameter() + surface.LastUParameter()) / 2,
+                                   (surface.FirstVParameter() + surface.LastVParameter()) / 2);
+    const double z = dot({mid.X() - center.x, mid.Y() - center.y, mid.Z() - center.z}, axis);
+    if (std::abs(std::abs(dot(axis, {n.X(), n.Y(), n.Z()})) - 1) <= tolerance &&
+        length(cross(delta, axis)) <= tolerance && z > first_depth + tolerance &&
+        z < last_depth - tolerance)
+      matches.push_back(face);
+  }
+  if (matches.size() != 1)
+    return shape;
+  auto backing = std::make_shared<GeometryShape::Impl>(*shape.impl_);
+  detail::append_lineage(backing->face_lineage,
+                         {{std::move(producer), std::move(role)}, matches.front(), center, x_axis},
+                         backing->shape);
   return GeometryShape(std::move(backing));
 }
 

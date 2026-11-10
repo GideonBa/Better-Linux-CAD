@@ -4,28 +4,30 @@
 
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepCheck_Analyzer.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
+#include <BRepPrimAPI_MakeCone.hxx>
 #include <BRep_Builder.hxx>
 #include <Bnd_Box.hxx>
 #include <IFSelect_ReturnStatus.hxx>
 #include <Interface_Static.hxx>
-#include <STEPCAFControl_Writer.hxx>
 #include <STEPCAFControl_Controller.hxx>
+#include <STEPCAFControl_Writer.hxx>
 #include <STEPConstruct_ExternRefs.hxx>
 #include <STEPControl_Reader.hxx>
 #include <STEPControl_StepModelType.hxx>
 #include <STEPControl_Writer.hxx>
 #include <StepBasic_ProductDefinition.hxx>
-#include <StepData_StepModel.hxx>
 #include <StepData_GlobalFactors.hxx>
+#include <StepData_StepModel.hxx>
 #include <StepGeom_CartesianPoint.hxx>
 #include <TCollection_ExtendedString.hxx>
 #include <TDataStd_Name.hxx>
 #include <TDocStd_Document.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Shell.hxx>
-#include <UnitsMethods_LengthUnit.hxx>
 #include <UnitsMethods.hxx>
+#include <UnitsMethods_LengthUnit.hxx>
 #include <XCAFDoc_DocumentTool.hxx>
 #include <XCAFDoc_ShapeTool.hxx>
 #include <XSAlgo.hxx>
@@ -642,4 +644,39 @@ TEST_CASE("STEP inspection preview rejects invalid graphs and non-rigid transfor
   }
   CHECK_FALSE(StepImportReader{}.preview_shapes(changed));
   CHECK(StepImportReader{}.preview_shapes(imported.value()));
+}
+
+TEST_CASE(
+    "STEP analytic seam and pole decoding preserves exact geometry and rejects displaced vertices",
+    "[geometry][parity-b154][step-import-reader]") {
+  const double small_radius = GENERATE(0., 1.);
+  const bool invalid = GENERATE(false, true);
+  Fixture fixture;
+  fixture.part(BRepPrimAPI_MakeCone(4, small_radius, 5).Shape(), "Analytic cone");
+  const auto path = fixture.write();
+  if (invalid) {
+    auto bytes = fixture.bytes(path);
+    const auto changed = std::regex_replace(
+        bytes, std::regex(R"(CARTESIAN_POINT\('[^']*',\(\s*4\.0*,)"), "CARTESIAN_POINT('',(40.,");
+    REQUIRE(changed != bytes);
+    fixture.replace(path, changed);
+  }
+  const auto source = fixture.bytes(path);
+  const auto result = StepImportReader{}.read(fixture.source(path), fixture.root);
+  INFO((result ? "ok" : result.error().message()));
+  CHECK(fixture.bytes(path) == source);
+  if (invalid) {
+    REQUIRE_FALSE(result);
+    return;
+  }
+  REQUIRE(result);
+  REQUIRE(result.value().body_count() == 1);
+  const auto& body = result.value().products.front().bodies.front();
+  REQUIRE(OcctShapeView::get(body.shape));
+  CHECK(BRepCheck_Analyzer(*OcctShapeView::get(body.shape), true).IsValid());
+  CHECK(body.volume_mm3 ==
+        Approx(std::acos(-1.) * 5 * (16 + 4 * small_radius + small_radius * small_radius) / 3));
+  CHECK(body.bounds_mm[0] == Approx(-4).margin(1e-7));
+  CHECK(body.bounds_mm[3] == Approx(4).margin(1e-7));
+  CHECK(body.bounds_mm[5] == Approx(5).margin(1e-7));
 }

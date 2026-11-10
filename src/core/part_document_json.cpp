@@ -32,6 +32,7 @@ constexpr int k_version = 1;
 constexpr int k_history_version = 2;
 constexpr int k_resource_version = 3;
 constexpr int k_hole_version = 4;
+constexpr int k_manufacturing_hole_version = 5;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -2274,17 +2275,55 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
       json_error("unsupported or malformed draft neutral plane"));
 }
 
-[[nodiscard]] json hole_feature_to_json(const HoleFeature& feature) {
+[[nodiscard]] json hole_dimension_to_json(const HoleDimension& dimension) {
   json diameter;
-  if (const auto* parameter = std::get_if<ParameterId>(&feature.diameter()))
+  if (const auto* parameter = std::get_if<ParameterId>(&dimension))
     diameter = {{"kind", "custom"}, {"parameter", parameter->value()}};
   else {
-    const auto& selected = std::get<HoleStandardSelection>(feature.diameter());
+    const auto& selected = std::get<HoleStandardSelection>(dimension);
     diameter = {{"kind", "standard"},
                 {"table", detail::engineering_resource_key_to_json(selected.table)},
                 {"row", selected.row},
                 {"diameter_column", selected.diameter_column}};
   }
+  return diameter;
+}
+[[nodiscard]] json hole_manufacturing_to_json(const HoleManufacturing& manufacturing) {
+  return std::visit(
+      [](const auto& value) -> json {
+        using T = std::decay_t<decltype(value)>;
+        if constexpr (std::is_same_v<T, std::monostate>)
+          return {{"kind", "simple"}};
+        else if constexpr (std::is_same_v<T, HoleCounterbore> || std::is_same_v<T, HoleSpotface>)
+          return {{"kind", std::is_same_v<T, HoleCounterbore> ? "counterbore" : "spotface"},
+                  {"diameter", hole_dimension_to_json(value.diameter)},
+                  {"depth", hole_dimension_to_json(value.depth)}};
+        else if constexpr (std::is_same_v<T, HoleCountersink> || std::is_same_v<T, HoleCenter>)
+          return {{"kind", std::is_same_v<T, HoleCountersink> ? "countersink" : "center"},
+                  {"diameter", hole_dimension_to_json(value.diameter)},
+                  {"included_angle", hole_dimension_to_json(value.included_angle)}};
+        else if constexpr (std::is_same_v<T, HoleStepped>) {
+          json steps = json::array();
+          for (const auto& step : value.steps)
+            steps.push_back({{"id", step.id},
+                             {"diameter", hole_dimension_to_json(step.diameter)},
+                             {"depth", hole_dimension_to_json(step.depth)}});
+          return {{"kind", "stepped"}, {"steps", std::move(steps)}};
+        } else if constexpr (std::is_same_v<T, HoleFitted>)
+          return {{"kind", "fitted"},
+                  {"designation", value.designation},
+                  {"minimum_diameter", hole_dimension_to_json(value.minimum_diameter)},
+                  {"maximum_diameter", hole_dimension_to_json(value.maximum_diameter)},
+                  {"process", value.process == HoleFitProcess::Reamed ? "reamed" : "fitted"}};
+        else
+          return {{"kind", "slot"},
+                  {"sketch", value.profile.sketch().value()},
+                  {"profile", value.profile.profile().value()}};
+      },
+      manufacturing);
+}
+[[nodiscard]] json hole_feature_to_json(const HoleFeature& feature) {
+  json diameter = hole_dimension_to_json(feature.diameter());
   json extent = std::visit(
       [](const auto& value) -> json {
         using T = std::decay_t<decltype(value)>;
@@ -2319,16 +2358,19 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
     }
     placements.push_back(std::move(value));
   }
-  return {{"id", feature.id().value()},
-          {"name", feature.name()},
-          {"kind", to_string(feature.kind())},
-          {"target_body", feature.target_body().value()},
-          {"support", plane_reference_to_json(feature.support())},
-          {"direction", to_string(feature.direction())},
-          {"diameter", std::move(diameter)},
-          {"placements", std::move(placements)},
-          {"extent", std::move(extent)},
-          {"tip", std::move(tip)}};
+  json result{{"id", feature.id().value()},
+              {"name", feature.name()},
+              {"kind", to_string(feature.kind())},
+              {"target_body", feature.target_body().value()},
+              {"support", plane_reference_to_json(feature.support())},
+              {"direction", to_string(feature.direction())},
+              {"diameter", std::move(diameter)},
+              {"placements", std::move(placements)},
+              {"extent", std::move(extent)},
+              {"tip", std::move(tip)}};
+  if (!std::holds_alternative<std::monostate>(feature.manufacturing()))
+    result["manufacturing"] = hole_manufacturing_to_json(feature.manufacturing());
+  return result;
 }
 
 [[nodiscard]] Result<HoleDiameter> hole_diameter_from_json(const json& value) {
@@ -2344,6 +2386,77 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
                               value.at("diameter_column").get<std::string>()});
   }
   return Result<HoleDiameter>::failure(json_error("Malformed Hole diameter selection"));
+}
+
+[[nodiscard]] Result<HoleManufacturing> hole_manufacturing_from_json(const json& value) {
+  const auto fail = [] {
+    return Result<HoleManufacturing>::failure(
+        json_error("Unknown or malformed manufacturing Hole variant"));
+  };
+  if (!value.is_object() || !value.contains("kind") || !value.at("kind").is_string())
+    return fail();
+  const auto kind = value.at("kind").get<std::string>();
+  if (kind == "counterbore" || kind == "spotface" || kind == "countersink" || kind == "center") {
+    const bool cone = kind == "countersink" || kind == "center";
+    if (!(cone ? has_exact_fields(value, {"kind", "diameter", "included_angle"})
+               : has_exact_fields(value, {"kind", "diameter", "depth"})))
+      return fail();
+    auto d = hole_diameter_from_json(value.at("diameter"));
+    auto z = hole_diameter_from_json(value.at(cone ? "included_angle" : "depth"));
+    if (!d)
+      return Result<HoleManufacturing>::failure(d.error());
+    if (!z)
+      return Result<HoleManufacturing>::failure(z.error());
+    if (kind == "counterbore")
+      return Result<HoleManufacturing>::success(HoleCounterbore{d.value(), z.value()});
+    if (kind == "spotface")
+      return Result<HoleManufacturing>::success(HoleSpotface{d.value(), z.value()});
+    if (kind == "countersink")
+      return Result<HoleManufacturing>::success(HoleCountersink{d.value(), z.value()});
+    return Result<HoleManufacturing>::success(HoleCenter{d.value(), z.value()});
+  }
+  if (kind == "stepped" && has_exact_fields(value, {"kind", "steps"}) &&
+      value.at("steps").is_array()) {
+    std::vector<HoleStep> steps;
+    for (const auto& step : value.at("steps")) {
+      if (!has_exact_fields(step, {"id", "diameter", "depth"}) || !step.at("id").is_string())
+        return fail();
+      auto d = hole_diameter_from_json(step.at("diameter")),
+           z = hole_diameter_from_json(step.at("depth"));
+      if (!d)
+        return Result<HoleManufacturing>::failure(d.error());
+      if (!z)
+        return Result<HoleManufacturing>::failure(z.error());
+      steps.push_back({step.at("id").get<std::string>(), d.value(), z.value()});
+    }
+    return Result<HoleManufacturing>::success(HoleStepped{std::move(steps)});
+  }
+  if (kind == "fitted" &&
+      has_exact_fields(
+          value, {"kind", "designation", "minimum_diameter", "maximum_diameter", "process"}) &&
+      value.at("designation").is_string()) {
+    const auto process = value.at("process").get<std::string>();
+    if (process != "fitted" && process != "reamed")
+      return fail();
+    auto low = hole_diameter_from_json(value.at("minimum_diameter")),
+         high = hole_diameter_from_json(value.at("maximum_diameter"));
+    if (!low)
+      return Result<HoleManufacturing>::failure(low.error());
+    if (!high)
+      return Result<HoleManufacturing>::failure(high.error());
+    return Result<HoleManufacturing>::success(
+        HoleFitted{value.at("designation").get<std::string>(), low.value(), high.value(),
+                   process == "reamed" ? HoleFitProcess::Reamed : HoleFitProcess::Fitted});
+  }
+  if (kind == "slot" && has_exact_fields(value, {"kind", "sketch", "profile"})) {
+    auto profile =
+        ProfileRegionReference::create(SketchId(value.at("sketch").get<std::string>()),
+                                       ProfileId(value.at("profile").get<std::string>()));
+    if (!profile)
+      return Result<HoleManufacturing>::failure(profile.error());
+    return Result<HoleManufacturing>::success(HoleSlot{profile.value()});
+  }
+  return fail();
 }
 
 [[nodiscard]] Result<HoleExtent> hole_extent_from_json(const json& value) {
@@ -2376,8 +2489,10 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
   const auto fail = [] {
     return Result<HoleFeature>::failure(json_error("Unknown or malformed Hole feature"));
   };
-  if (!has_exact_fields(value, {"id", "name", "kind", "target_body", "support", "direction",
-                                "diameter", "placements", "extent", "tip"}) ||
+  auto base_fields = value;
+  base_fields.erase("manufacturing");
+  if (!has_exact_fields(base_fields, {"id", "name", "kind", "target_body", "support", "direction",
+                                      "diameter", "placements", "extent", "tip"}) ||
       !value.at("placements").is_array())
     return fail();
   const auto kind = value.at("kind").get<std::string>();
@@ -2423,6 +2538,13 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
     } else
       return fail();
   }
+  HoleManufacturing manufacturing;
+  if (value.contains("manufacturing")) {
+    auto parsed = hole_manufacturing_from_json(value.at("manufacturing"));
+    if (!parsed)
+      return Result<HoleFeature>::failure(parsed.error());
+    manufacturing = std::move(parsed.value());
+  }
   return HoleFeature::create(
       FeatureId(value.at("id").get<std::string>()), value.at("name").get<std::string>(),
       kind == "plain" ? HoleKind::Plain : HoleKind::Clearance,
@@ -2430,7 +2552,7 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
       std::move(placements), std::move(diameter.value()), std::move(extent.value()),
       direction == "support_normal" ? HoleDirection::SupportNormal
                                     : HoleDirection::OppositeSupportNormal,
-      std::move(tip));
+      std::move(tip), std::move(manufacturing));
 }
 
 [[nodiscard]] json draft_feature_to_json(const DraftFeature& feature) {
@@ -4062,7 +4184,13 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
   if (!document.engineering_resources().entries().empty() || !document.hole_features().empty()) {
-    root["version"] = document.hole_features().empty() ? k_resource_version : k_hole_version;
+    const bool manufacturing = std::any_of(
+        document.hole_features().begin(), document.hole_features().end(), [](const auto& hole) {
+          return !std::holds_alternative<std::monostate>(hole.manufacturing());
+        });
+    root["version"] = manufacturing                      ? k_manufacturing_hole_version
+                      : document.hole_features().empty() ? k_resource_version
+                                                         : k_hole_version;
     root["history_version"] = document.authored_history_intent() ? k_history_version : k_version;
     root["engineering_resources"] =
         detail::engineering_resources_to_json(document.engineering_resources());
@@ -4477,12 +4605,14 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       return Result<PartDocument>::failure(json_error("unsupported part document json schema"));
     if (!root.at("version").is_number_integer() ||
         (root.at("version") != k_version && root.at("version") != k_history_version &&
-         root.at("version") != k_resource_version && root.at("version") != k_hole_version))
+         root.at("version") != k_resource_version && root.at("version") != k_hole_version &&
+         root.at("version") != k_manufacturing_hole_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
     const auto version = root.at("version").get<int>();
     int history_version = version;
-    const bool resource_envelope = version == k_resource_version || version == k_hole_version;
-    if (version == k_hole_version) {
+    const bool hole_envelope = version == k_hole_version || version == k_manufacturing_hole_version;
+    const bool resource_envelope = version == k_resource_version || hole_envelope;
+    if (hole_envelope) {
       if (!root.contains("hole_features") || !root.at("hole_features").is_array() ||
           root.at("hole_features").empty())
         return Result<PartDocument>::failure(
@@ -4490,6 +4620,15 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     } else if (root.contains("hole_features"))
       return Result<PartDocument>::failure(
           json_error("Semantic Hole intent requires Part version 4"));
+    if (hole_envelope) {
+      const bool manufacturing = std::any_of(
+          root.at("hole_features").begin(), root.at("hole_features").end(),
+          [](const auto& hole) { return hole.is_object() && hole.contains("manufacturing"); });
+      if (manufacturing != (version == k_manufacturing_hole_version))
+        return Result<PartDocument>::failure(
+            json_error("Manufacturing Hole intent requires Part version 5; legacy Hole intent "
+                       "remains version 4"));
+    }
     if (root.contains("engineering_resource_refs"))
       return Result<PartDocument>::failure(
           json_error("Standalone Part cannot resolve Project resource references"));
@@ -4588,11 +4727,11 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
           return Result<PartDocument>::failure(
               json_error("Reference Part cannot contain authored Part intent"));
     }
-    if (root.contains("result_face_workplanes") || version == k_hole_version) {
+    if (root.contains("result_face_workplanes") || hole_envelope) {
       const auto supports = root.value("result_face_workplanes", json::array());
       if (!supports.is_array())
         return Result<PartDocument>::failure(json_error("result_face_workplanes must be an array"));
-      if (supports.empty() && version != k_hole_version) {
+      if (supports.empty() && !hole_envelope) {
         auto legacy = root;
         legacy.erase("result_face_workplanes");
         return deserialize_part_document_from_json(legacy.dump(), mode);

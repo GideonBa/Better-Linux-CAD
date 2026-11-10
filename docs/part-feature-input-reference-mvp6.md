@@ -128,6 +128,15 @@ Sketch/free-or-projected-point identity. The referenced Sketch is a graph input;
 resolved from that source rather than copied. Missing point input is reported by Core reference
 validation and strict reopening; restoring the same source identity recovers the Hole. Generated
 result-edge and captured result-face producer validation recognizes the registered Hole family.
+
+154 manufacturing dimensions add all selected parameter and exact resource-revision dependencies
+to that same Hole node, including seat-only standard consumers. A Slot adds its existing profile
+source node, with no copied Sketch geometry. Primary round-wall origins retain placement identity
+across compatible mode edits. Seat origins append `seat/wall` or `seat/bottom`; stepped origins use
+`step/<step-ID byte length>:<step-ID>/wall|bottom`, and slot sides use
+`slot/<curve-ID byte length>:<curve-ID>`. These are authored tool-face lineage roots, never kernel
+traversal indices. Deleted/incompatible descendants fail the existing strict resolver; surviving
+planar shoulders can supply the existing result-face workplane and Sketch route.
 Physical support coplanarity, trimmed boundaries and generated bore references remain at 153.
 
 ## Current result Face inputs — Block 153C

@@ -105,8 +105,10 @@ template <typename Record> ExecutionContract execution_contract(const Record& re
       for (const auto& placement : record.placements())
         if (const auto* point = std::get_if<HoleSketchPointReference>(&placement.source))
           add_input(contract, point->sketch.value());
-      if (const auto* standard = std::get_if<HoleStandardSelection>(&record.diameter()))
-        add_input(contract, engineering_resource_node_id(standard->table));
+      for (const auto& standard : record.standard_dependencies())
+        add_input(contract, engineering_resource_node_id(standard));
+      if (const auto* slot = std::get_if<HoleSlot>(&record.manufacturing()))
+        add_input(contract, slot->profile.source_node_id());
       if (const auto* face = std::get_if<HoleToFaceExtent>(&record.extent()))
         add_input(contract, face->face.source_node_id());
       if (const auto* limit = std::get_if<HoleUpToBodyExtent>(&record.extent()))

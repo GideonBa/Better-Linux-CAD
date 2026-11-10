@@ -394,6 +394,26 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
   impossible depth/angle/seat size while showing nonblocking spacing recommendations as warnings.
 - Combine with existing Chamfer, material mass and imported targets; check supported metadata export.
 
+154 regression ownership (acceptance remains `mvp-plan.md`):
+
+- `hole_manufacturing_tests.cpp` owns strict discriminators, Part V4/V5 selection and canonical
+  reopen, Project V1/V2 hydration, seat-only resource pins and atomic multi-field revision adoption.
+  Include malformed/unknown fields, invalid Angle/Length selections, missing cells and incompatible
+  extent/tip/fit/profile intent. Custom metadata must never acquire invented normative provenance.
+- `hole_manufacturing_geometry_tests.cpp` owns independent annulus/frustum/step/capsule volume and
+  point-section oracles, seat shoulder/cone and primary-wall lineage, mode/reorder/pose edits,
+  insufficient/grazing material, seat-truncating limits and exact prior-cache rollback. Combine
+  actual STEP targets/source freshness, Chamfer, material mass, revision adoption, prefix/suppression
+  and independently reopened STEP geometry. STEP preserves evaluated solids; semantic fit/process
+  metadata is checked in native JSON, with no claim that STEP carries it.
+- `gui_shell_history_tests.cpp` owns existing shared task restoration for these variants, valid
+  preview/one Apply/Undo/Redo/Save/Open and direct planar shoulder Sketch selection. Repeat the
+  relevant native workflows at ordinary 100% and compact 150%, including actual OCCT geometry and
+  visible controls. Dedicated manufacturing selectors/layout authoring remain native gate 157.
+- Spacing recommendations use an explicit caller-provided web policy. Test actual versus recommended
+  distances, unchanged intent/cache and successful geometry despite advice; do not invent a default
+  norm value or weaken geometric errors into recommendations.
+
 ### B03 Internal external cosmetic and modeled threads
 
 - **First gate:** 155; native completion 157.

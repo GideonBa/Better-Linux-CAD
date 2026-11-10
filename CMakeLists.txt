@@ -514,6 +514,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/project_engineering_resources_tests.cpp
     tests/core/shell_feature_tests.cpp
     tests/core/hole_feature_tests.cpp
+    tests/core/hole_manufacturing_tests.cpp
     tests/core/part_hole_feature_tests.cpp
     tests/core/part_feature_input_reference_tests.cpp
     tests/core/part_pattern_feature_tests.cpp
@@ -567,6 +568,7 @@ if(BLCAD_BUILD_TESTS)
       blcad_geometry_tests
       tests/geometry/part_history_evaluation_boundary_tests.cpp
       tests/geometry/hole_feature_geometry_tests.cpp
+      tests/geometry/hole_manufacturing_geometry_tests.cpp
       tests/geometry/arc_closed_profile_pipeline_tests.cpp
       tests/geometry/assembly_angle_numeric_solver_tests.cpp
       tests/geometry/assembly_concentric_constraint_equation_builder_tests.cpp

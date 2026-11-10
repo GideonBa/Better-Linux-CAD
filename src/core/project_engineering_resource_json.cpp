@@ -39,7 +39,7 @@ Result<PartDocument> resource_part_from_project_json(const nlohmann::json& value
                                                      const EngineeringResourceCatalog& catalog) {
   try {
     if (!value.at("version").is_number_integer() ||
-        (value.at("version") != 3 && value.at("version") != 4))
+        (value.at("version") != 3 && value.at("version") != 4 && value.at("version") != 5))
       return deserialize_part_document_from_json(value.dump());
     if (value.contains("engineering_resources") || !value.contains("engineering_resource_refs") ||
         !value.at("engineering_resource_refs").is_array())

@@ -59,6 +59,47 @@ struct HoleConicalTip {
 };
 using HoleTip = std::variant<HoleFlatTip, HoleConicalTip>;
 
+// Reuse the existing pinned table-cell selection. Its legacy diameter_column
+// member names the selected column also for seat lengths and included angles.
+using HoleDimension = HoleDiameter;
+struct HoleCounterbore {
+  HoleDimension diameter;
+  HoleDimension depth;
+};
+struct HoleCountersink {
+  HoleDimension diameter;
+  HoleDimension included_angle;
+};
+struct HoleSpotface {
+  HoleDimension diameter;
+  HoleDimension depth;
+};
+struct HoleStep {
+  std::string id;
+  HoleDimension diameter;
+  // Absolute end depth from the authored support, never an incremental length.
+  HoleDimension depth;
+};
+struct HoleStepped {
+  std::vector<HoleStep> steps;
+};
+enum class HoleFitProcess { Fitted, Reamed };
+struct HoleFitted {
+  std::string designation;
+  HoleDimension minimum_diameter;
+  HoleDimension maximum_diameter;
+  HoleFitProcess process = HoleFitProcess::Fitted;
+};
+struct HoleCenter {
+  HoleDimension diameter;
+  HoleDimension included_angle;
+};
+struct HoleSlot {
+  ProfileRegionReference profile;
+};
+using HoleManufacturing = std::variant<std::monostate, HoleCounterbore, HoleCountersink,
+                                       HoleSpotface, HoleStepped, HoleFitted, HoleCenter, HoleSlot>;
+
 // Semantic intent only. This record does not create a sketch cut or an
 // independent placement-pattern interpreter.
 class HoleFeature {
@@ -68,7 +109,7 @@ public:
          std::vector<HolePlacement> placements, HoleDiameter diameter,
          HoleExtent extent = HoleThroughAllExtent{},
          HoleDirection direction = HoleDirection::OppositeSupportNormal,
-         HoleTip tip = HoleFlatTip{});
+         HoleTip tip = HoleFlatTip{}, HoleManufacturing manufacturing = {});
 
   [[nodiscard]] const FeatureId& id() const noexcept {
     return id_;
@@ -100,12 +141,20 @@ public:
   [[nodiscard]] const HoleTip& tip() const noexcept {
     return tip_;
   }
+  [[nodiscard]] const HoleManufacturing& manufacturing() const noexcept {
+    return manufacturing_;
+  }
   [[nodiscard]] std::vector<ParameterId> parameter_dependencies() const;
+  [[nodiscard]] std::vector<EngineeringResourceKey> standard_dependencies() const;
+  [[nodiscard]] Result<HoleFeature>
+  remap_standard_revision(const EngineeringResourceKey& source,
+                          const EngineeringResourceKey& next) const;
 
 private:
   HoleFeature(FeatureId id, std::string name, HoleKind kind, BodyId target_body,
               PlaneReference support, std::vector<HolePlacement> placements, HoleDiameter diameter,
-              HoleExtent extent, HoleDirection direction, HoleTip tip);
+              HoleExtent extent, HoleDirection direction, HoleTip tip,
+              HoleManufacturing manufacturing);
   FeatureId id_;
   std::string name_;
   HoleKind kind_;
@@ -116,6 +165,7 @@ private:
   HoleExtent extent_;
   HoleDirection direction_;
   HoleTip tip_;
+  HoleManufacturing manufacturing_;
 };
 
 struct ResolvedHoleDiameter {
@@ -126,6 +176,10 @@ struct ResolvedHoleDiameter {
 };
 [[nodiscard]] Result<ResolvedHoleDiameter> resolve_hole_diameter(const PartDocument& part,
                                                                  const HoleDiameter& diameter);
+// Angles select Angle cells/parameters; all other dimensions select positive Length.
+[[nodiscard]] Result<ResolvedHoleDiameter> resolve_hole_dimension(const PartDocument& part,
+                                                                  const HoleDimension& dimension,
+                                                                  bool angle = false);
 [[nodiscard]] Result<std::size_t> validate_hole_feature_inputs(const PartDocument& part,
                                                                const HoleFeature& feature);
 

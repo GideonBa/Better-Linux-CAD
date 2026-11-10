@@ -2,7 +2,8 @@
 
 History intent has the explicit Part-version-2 contract below. Revision-pinned resources use
 Part version 3 and Project version 2 as specified in the owning 149B sections. Semantic Hole intent
-uses the Part-version-4 extension owned by 152B below. Planned evolution
+uses the Part-version-4 extension owned by 152B below; manufacturing variants use Part V5 as
+specified in the 154 section. Planned evolution
 in [Blocks 145–204](inventor-parity-sequence.md) additionally assigns new feature families,
 equation/spatial constraints, model states, occurrence poses and cross-document references.
 Their future intent is not implied by the current JSON fields. Each owning block must specify
@@ -1450,3 +1451,36 @@ This is an additive input family under the existing version policy. Part documen
 Hole records remain V4; old inputs retain identical canonical JSON and older readers reject the
 new discriminator. Placement-owned Hole roots encode the placement ID byte length, preserving
 arbitrary delimiter bytes and avoiding order-dependent references.
+
+## Manufacturing Hole intent (Block 154)
+
+Part **V5** retains the V4 envelope and adds `manufacturing` to Hole records containing a
+manufacturing variant. The writer selects V5 only if at least one such record exists. Simple
+records in that same document omit the field. V4 rejects this field, V5 requires at least one
+manufacturing record, and unchanged simple-only documents retain their canonical V4 bytes.
+Neither version stores evaluated geometry or resolved dimension caches.
+
+Each nested dimension uses the existing `{kind: custom, parameter}` or
+`{kind: standard, table: {id, revision}, row, diameter_column}` grammar. For manufacturing
+dimensions the legacy `diameter_column` field identifies the selected Length or Angle column;
+its type must match the dimension. This shares exact revision identity and cell provenance with
+the nominal diameter rather than introducing another selector grammar.
+
+`manufacturing` is exactly one of:
+
+- `{kind: counterbore, diameter, depth}` or `{kind: spotface, diameter, depth}`;
+- `{kind: countersink, diameter, included_angle}` or `{kind: center, diameter, included_angle}`;
+- `{kind: stepped, steps: [{id, diameter, depth}, ...]}`, with unique nonempty authored step IDs;
+- `{kind: fitted, designation, minimum_diameter, maximum_diameter, process: fitted|reamed}`;
+- `{kind: slot, sketch, profile}`, referencing existing Sketch/profile identity.
+
+Unknown discriminators, extra/missing fields and invalid primitive types reject strict reopen.
+Depths are absolute from support, angles are included angles, fit bounds are absolute diameters,
+and slot position is owned by its existing profile. Structural and resolved-input validation share
+the same factory/validator used by edits and revision adoption.
+
+Resource-free Project V1 embeds standalone Part V5. Project V2 retains V5 member versions, replaces
+member catalogs with exact root resource references and hydrates the standalone snapshot before
+ordered replay, including seat-only revision consumers. Portable native Part/Project JSON retains
+fit/process/designation metadata. STEP export retains the evaluated solid geometry; it does not
+claim to transfer semantic fit, process, designation or table provenance.

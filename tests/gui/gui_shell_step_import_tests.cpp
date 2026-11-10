@@ -248,11 +248,26 @@ public:
         reveal(*button);
         bool chosen = false;
         bool timed_out = false;
+        QString popup_diagnostic;
         QTimer watchdog;
         watchdog.setSingleShot(true);
-        QObject::connect(&selected, &QAction::triggered, &watchdog, [&] { chosen = true; });
+        QObject::connect(&selected, &QAction::triggered, &watchdog, [&] {
+          chosen = true;
+          watchdog.stop();
+        });
+        // The popup watchdog ends at popup dismissal. The invoked modal
+        // command has its own dialog watchdog; native repaint/event draining
+        // must not time out a menu that has already closed successfully.
+        QObject::connect(menu, &QMenu::aboutToHide, &watchdog, &QTimer::stop);
         QObject::connect(&watchdog, &QTimer::timeout, menu, [&] {
           timed_out = true;
+          const auto* modal = QApplication::activeModalWidget();
+          const auto* current = menu->activeAction();
+          popup_diagnostic = QString("visible=%1 action=%2 modal=%3 title=%4")
+                                 .arg(menu->isVisible())
+                                 .arg(current ? current->objectName() : "none")
+                                 .arg(modal ? modal->metaObject()->className() : "none")
+                                 .arg(modal ? modal->windowTitle() : "none");
           menu->close();
         });
         QTimer::singleShot(0, menu, [&, menu] {
@@ -264,6 +279,7 @@ public:
         // Avoid draining events between scheduling menu input and that press.
         click_at(*button, button->rect().center());
         watchdog.stop();
+        INFO(popup_diagnostic.toStdString());
         REQUIRE_FALSE(timed_out);
         REQUIRE(chosen);
         return;
@@ -275,19 +291,28 @@ public:
   void dialog(const std::function<void()>& invoke, Respond respond) {
     bool handled = false;
     bool timeout = false;
+    QString dialog_diagnostic;
+    QTimer watchdog;
+    watchdog.setSingleShot(true);
     QTimer poll;
     poll.setInterval(5);
     QObject::connect(&poll, &QTimer::timeout, &window, [&] {
       if (auto* active = qobject_cast<Dialog*>(QApplication::activeModalWidget())) {
         poll.stop();
         handled = true;
+        QObject::connect(active, &QDialog::finished, &watchdog, &QTimer::stop);
         respond(*active);
       }
     });
-    QTimer watchdog;
-    watchdog.setSingleShot(true);
     QObject::connect(&watchdog, &QTimer::timeout, &window, [&] {
       timeout = true;
+      auto* modal = QApplication::activeModalWidget();
+      dialog_diagnostic = QString("handled=%1 modal=%2 title=%3")
+                              .arg(handled)
+                              .arg(modal ? modal->metaObject()->className() : "none")
+                              .arg(modal ? modal->windowTitle() : "none");
+      if (const auto* file = qobject_cast<QFileDialog*>(modal))
+        dialog_diagnostic += " files=" + file->selectedFiles().join("|");
       if (auto* active = qobject_cast<QDialog*>(QApplication::activeModalWidget()))
         active->reject();
     });
@@ -296,6 +321,7 @@ public:
     invoke();
     poll.stop();
     watchdog.stop();
+    INFO(dialog_diagnostic.toStdString());
     REQUIRE_FALSE(timeout);
     REQUIRE(handled);
     flush();

@@ -320,6 +320,17 @@ additional sewing are disabled; transferred BRep validity is checked rather than
 repairing geometry. Reader settings, processing policy, auto-naming and unit globals are scoped
 and restored after success and failure; no background Geometry worker is introduced.
 
+154 adds explicit analytic UV-boundary conversion before that same final BRep check. STEP's
+cylindrical/conical seam pcurves and zero-length cone-pole boundary can need completion when
+translated into OCCT's parametric topology. Only Cylinder/Cone face-unorientability and associated
+wire-closure statuses qualify; other transfer errors retain the original rejection. On a private
+copy, the decoder orders seam pcurves, shifts them by full surface periods and completes the
+parametric pole edge. It checks that every existing 3D edge/curve/range, surface, vertex and
+tolerance remains unchanged and retained. A changed or still-invalid result is rejected.
+The optional full ShapeFix/Perform sequence, sewing, curve fitting, vertex merging and general
+supplier healing remain disabled and owned by the later explicit healing workflow. This conversion
+does not alter source bytes, nominal geometry, source freshness or catalog identity rules.
+
 Definitions retain XDE sharing only in transient maps. Canonical recursive geometry/topology
 signatures and sorted direct child-transform signatures determine runtime ordering. Names are
 metadata/secondary presentation order, never unique product identity. Distinct equal products

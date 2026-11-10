@@ -142,6 +142,54 @@ with one shared support/Sketch Undo action. A face that becomes curved cannot su
 No extra Hole-reference table, duplicated Sketch geometry or new authoring panel is introduced.
 The dedicated Inventor-like Hole property workflow remains assigned to 157.
 
+## Manufacturing variants (Block 154 contract)
+
+`HoleManufacturing` is one validated discriminator: simple (omitted), Counterbore, Countersink,
+Spotface, Stepped, Fitted/Reamed, Center or Slot. It extends the existing Hole record, placement
+identity, Body modifier and revision catalog. It does not create a parallel cut or standards store.
+Counterbore and Spotface carry outer diameter and depth; Countersink and Center carry outer
+diameter and included angle. Stepped seats carry stable authored step IDs, outer diameters and
+absolute depths; evaluation orders steps by depth, requiring strictly decreasing diameters.
+
+Every manufacturing dimension selects either an existing typed parameter or an exact table
+revision/row/column. Length and Angle cells retain their actual cell provenance. All selected
+revisions, including seat-only revisions, participate in dependency edges, guarded removal and
+atomic revision adoption. Missing cells, incompatible types and invalid candidate dimensions are
+errors; they never fall back to a nominal value or a newer table. See the Part V5 spelling in
+`file-format.md`; ordinary semantic holes retain their V4 bytes.
+
+Seat depths use the authored support plane as zero, including a support above the material.
+Counterbore/Spotface shoulders must reach material, precede the termination and fit the target.
+Conical seat depth is `(outer_radius - nominal_radius) / tan(included_angle / 2)`; the angle must
+be strictly between 0° and 180°. Center holes require Blind; an optional existing conical drill
+tip remains separate from the entry cone. One-sided seats reject finite Symmetric extents.
+Intersecting entry geometry is evaluated against actual current material; partial side breakout,
+insufficient seat material or a limit truncating the seat prevents a successful candidate.
+
+Fitted/Reamed carries an explicit designation, process and absolute minimum/maximum diameter
+dimensions containing the nominal diameter. Geometry uses that nominal diameter. The designation
+is user/table intent, with no inferred ISO fit, machining allowance or invented normative table.
+Fit geometry may use existing symmetric extents because it adds no one-sided seat.
+
+Slot consumes one existing closed Sketch profile with two tangent parallel lines alternating with
+two equal outward semicircles. Inward caps remain valid Sketch curves but do not form a Slot.
+Its width must equal the nominal Hole diameter. The profile supplies position and
+orientation; the Hole therefore retains exactly one owned zero placement, Blind or ThroughAll,
+and a flat tip. Neither the executor nor mode edits create or duplicate Sketch entities.
+
+Generated primary round wall roots survive meaningful mode edits. Seat walls/shoulders use
+`seat/wall` and `seat/bottom`; stepped roots use authored step IDs and slot sides use the existing
+Sketch curve IDs. Missing seats fail reference resolution; consumers retain their actual geometry
+and capability checks rather than selecting a nearby face. Labels describe the seat, step or slot side in the existing selection
+and property surfaces. The shared history preview/Apply, Undo/Redo and Save/Open routes apply;
+the dedicated progressive Inventor-like Hole property panel remains scheduled for 157.
+
+`hole_spacing_advisories` is a read-only query for round holes using an explicit caller-provided
+minimum web recommendation. It reports actual and recommended web distances using the largest
+opening diameter, without changing intent or blocking otherwise valid geometry. Invalid geometry
+remains an error. No default spacing recommendation is fabricated or persisted as a standard.
+Slot spacing is outside this circular query's scope and is rejected explicitly.
+
 ## Why more than a cut
 
 ```text

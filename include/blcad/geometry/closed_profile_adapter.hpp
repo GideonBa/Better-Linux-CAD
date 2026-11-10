@@ -34,6 +34,10 @@ struct AxisProjectionSpan {
 
 class ClosedProfileAdapter {
 public:
+  [[nodiscard]] Result<std::size_t> validate_planar_tool_footprint(const GeometryShape& support,
+                                                                   const GeometryShape& tool,
+                                                                   Point3 origin,
+                                                                   Vector3 normal) const;
   [[nodiscard]] Result<GeometryShape> make_extruded_profile(const std::vector<Point3>& vertices,
                                                             Vector3 direction,
                                                             const Quantity& depth) const;

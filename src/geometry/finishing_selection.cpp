@@ -66,6 +66,23 @@ FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache&
       for (std::size_t index = 0; index < hole->placements().size(); ++index) {
         const auto& id = hole->placements()[index].id.value();
         const auto root = "hole/" + std::to_string(id.size()) + ":" + id + "/";
+        const auto name = hole->name() + " / Bohrung " + std::to_string(index + 1);
+        if (origin.role == root + "seat/wall")
+          return name + " / Senkung / Mantel";
+        if (origin.role == root + "seat/bottom")
+          return name + " / Sitzfläche";
+        if (const auto* steps = std::get_if<HoleStepped>(&hole->manufacturing()))
+          for (std::size_t j = 0; j < steps->steps.size(); ++j) {
+            const auto& id = steps->steps[j].id;
+            const auto role = root + "step/" + std::to_string(id.size()) + ":" + id;
+            if (origin.role == role + "/wall")
+              return name + " / Stufe " + std::to_string(j + 1) + " / Mantel";
+            if (origin.role == role + "/bottom")
+              return name + " / Stufe " + std::to_string(j + 1) + " / Sitzfläche";
+          }
+        if (std::holds_alternative<HoleSlot>(hole->manufacturing()) &&
+            origin.role.starts_with(root + "slot/"))
+          return name + " / Langlochseite";
         if (origin.role == root + "wall" || origin.role == root + "bottom")
           return hole->name() + " / Bohrung " + std::to_string(index + 1) +
                  (origin.role.ends_with("/bottom") ? " / Boden" : " / Wand");

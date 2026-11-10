@@ -671,6 +671,62 @@ ClosedProfileAdapter::validate_planar_circle_footprint(const GeometryShape& supp
   }
 }
 
+Result<std::size_t> ClosedProfileAdapter::validate_planar_tool_footprint(
+    const GeometryShape& support, const GeometryShape& tool, Point3 origin, Vector3 normal) const {
+  const auto fail = [] {
+    return Result<std::size_t>::failure(
+        make_geometry_error("Complete slot opening must fit one actual planar entry face"));
+  };
+  if (support.empty() || tool.empty() || !std::isfinite(length(normal)) || length(normal) <= 1e-7)
+    return fail();
+  const auto direction = normalize_axis(normal);
+  if (!direction)
+    return Result<std::size_t>::failure(direction.error());
+  try {
+    const gp_Pln plane(to_gp_point(origin),
+                       gp_Dir(direction.value().x, direction.value().y, direction.value().z));
+    const auto common = [](const TopoDS_Shape& a, const TopoDS_Shape& b) -> TopoDS_Shape {
+      BRepAlgoAPI_Common operation;
+      TopTools_ListOfShape args, tools;
+      args.Append(a);
+      tools.Append(b);
+      operation.SetArguments(args);
+      operation.SetTools(tools);
+      operation.SetNonDestructive(true);
+      operation.Build();
+      return operation.IsDone() && !operation.HasErrors() ? operation.Shape() : TopoDS_Shape{};
+    };
+    const auto section = common(tool.impl_->shape, BRepBuilderAPI_MakeFace(plane).Face());
+    if (section.IsNull())
+      return fail();
+    GProp_GProps area;
+    BRepGProp::SurfaceProperties(section, area);
+    if (!(area.Mass() > 1e-12))
+      return fail();
+    std::size_t matches = 0;
+    for (TopExp_Explorer it(support.impl_->shape, TopAbs_FACE); it.More(); it.Next()) {
+      BRepAdaptor_Surface surface(TopoDS::Face(it.Current()));
+      if (surface.GetType() != GeomAbs_Plane ||
+          surface.Plane().Distance(to_gp_point(origin)) > 1e-7 ||
+          std::abs(std::abs(surface.Plane().Axis().Direction().Dot(plane.Axis().Direction())) - 1) >
+              1e-7)
+        continue;
+      const auto overlap = common(section, it.Current());
+      if (overlap.IsNull())
+        continue;
+      GProp_GProps covered;
+      BRepGProp::SurfaceProperties(overlap, covered);
+      if (std::abs(covered.Mass() - area.Mass()) <= 1e-7 * area.Mass())
+        ++matches;
+    }
+    if (matches != 1)
+      return fail();
+    return Result<std::size_t>::success(matches);
+  } catch (const Standard_Failure& e) {
+    return Result<std::size_t>::failure(make_geometry_error(standard_failure_message(e)));
+  }
+}
+
 Result<GeometryShape> ClosedProfileAdapter::terminate_at_planar_face(
     const GeometryShape& tool, const GeometryShape& face_shape, Point3 kept_point) const {
   const auto fail = [&](const char* message) {

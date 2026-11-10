@@ -2921,8 +2921,10 @@ Result<std::size_t> PartDocument::add_hole_dependencies(const HoleFeature& featu
   for (const auto& placement : feature.placements())
     if (const auto* point = std::get_if<HoleSketchPointReference>(&placement.source))
       inputs.push_back(point->sketch.value());
-  if (const auto* standard = std::get_if<HoleStandardSelection>(&feature.diameter())) {
-    const auto node = engineering_resource_node_id(standard->table);
+  if (const auto* slot = std::get_if<HoleSlot>(&feature.manufacturing()))
+    inputs.push_back(slot->profile.source_node_id());
+  for (const auto& standard : feature.standard_dependencies()) {
+    const auto node = engineering_resource_node_id(standard);
     if (has_authored_node_identity(node) || is_imported_authority_node(node))
       return Result<std::size_t>::failure(
           Error::dependency(node, "Standard revision identity aliases model intent"));

@@ -6,9 +6,13 @@
 #include "geometry_shape_internal.hpp"
 #include "occt_failure_message.hpp"
 
+#include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepCheck_Result.hxx>
 #include <BRepGProp.hxx>
+#include <BRepTools_ReShape.hxx>
 #include <BRep_Tool.hxx>
 #include <Bnd_Box.hxx>
 #include <GProp_GProps.hxx>
@@ -21,6 +25,7 @@
 #include <STEPConstruct_ExternRefs.hxx>
 #include <STEPConstruct_UnitContext.hxx>
 #include <STEPControl_Reader.hxx>
+#include <ShapeFix_Wire.hxx>
 #include <Standard_Failure.hxx>
 #include <StepBasic_ConversionBasedUnitAndLengthUnit.hxx>
 #include <StepBasic_LengthUnit.hxx>
@@ -43,9 +48,13 @@
 #include <TDF_LabelSequence.hxx>
 #include <TDataStd_Name.hxx>
 #include <TDocStd_Document.hxx>
+#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS.hxx>
+#include <TopoDS_Edge.hxx>
 #include <TopoDS_Iterator.hxx>
+#include <TopoDS_Vertex.hxx>
 #include <Transfer_TransientProcess.hxx>
 #include <UnitsMethods.hxx>
 #include <UnitsMethods_LengthUnit.hxx>
@@ -84,7 +93,8 @@ void require(bool condition, const char* message) {
 }
 
 // OCCT's optional FromSTEP ShapeFix sequence is otherwise selected through mutable resource
-// files. This adapter accepts valid transferred topology and never silently repairs it.
+// files. Disable that sequence. Analytic UV-boundary conversion below is explicit
+// and may not alter any existing 3D geometry or tolerance.
 class UnhealedTransfer final : public XSAlgo_AlgoContainer {
 public:
   TopoDS_Shape ProcessShape(const TopoDS_Shape& shape, Standard_Real, Standard_Real,
@@ -394,8 +404,133 @@ struct BodyDraft {
   TopoDS_Shape shape;
 };
 
-BodyDraft body_draft(const TopoDS_Shape& shape, std::string name) {
-  require(!shape.IsNull() && BRepCheck_Analyzer(shape, true).IsValid(),
+// STEP loops do not carry OCCT's ordering of a seam's two pcurves or its
+// zero-length parametric edge at a cone pole. Complete only those analytic
+// representations, on a private copy, before the unchanged solid validator.
+// This is not a general ShapeFix/Perform pass: missing 3D curves, displaced
+// vertices, gaps, self-intersections and tolerance changes remain errors.
+TopoDS_Shape complete_analytic_uv_boundaries(const TopoDS_Shape& input) {
+  if (input.IsNull())
+    return {};
+  BRepCheck_Analyzer initial(input, true);
+  if (initial.IsValid())
+    return input;
+  const auto analytic = [](const TopoDS_Shape& shape) {
+    if (shape.ShapeType() != TopAbs_FACE)
+      return false;
+    const auto type = BRepAdaptor_Surface(TopoDS::Face(shape)).GetType();
+    return type == GeomAbs_Cylinder || type == GeomAbs_Cone;
+  };
+  const auto allowed = [&](const TopoDS_Shape& shape, const TopoDS_Shape& context,
+                           BRepCheck_Status status) {
+    return status == BRepCheck_NoError ||
+           (status == BRepCheck_UnorientableShape && analytic(shape)) ||
+           (status == BRepCheck_NotClosed && shape.ShapeType() == TopAbs_WIRE &&
+            !context.IsNull() && analytic(context));
+  };
+  TopTools_IndexedMapOfShape original;
+  TopExp::MapShapes(input, original);
+  for (int i = 1; i <= original.Extent(); ++i) {
+    const auto result = initial.Result(original(i));
+    if (result.IsNull())
+      continue;
+    for (const auto status : result->Status())
+      if (!allowed(original(i), {}, status))
+        return {};
+    for (result->InitContextIterator(); result->MoreShapeInContext(); result->NextShapeInContext())
+      for (const auto status : result->StatusOnShape())
+        if (!allowed(original(i), result->ContextualShape(), status))
+          return {};
+  }
+  auto candidate = BRepBuilderAPI_Copy(input, true, false).Shape();
+  TopTools_IndexedMapOfShape before;
+  TopExp::MapShapes(candidate, before);
+  struct EdgeEvidence {
+    TopoDS_Edge edge;
+    Handle(Geom_Curve) curve;
+    TopLoc_Location location;
+    double first, last, tolerance;
+    bool degenerated;
+  };
+  std::vector<EdgeEvidence> edges;
+  struct FaceEvidence {
+    TopoDS_Face face;
+    Handle(Geom_Surface) surface;
+    TopLoc_Location location;
+    double tolerance;
+  };
+  std::vector<FaceEvidence> faces;
+  std::vector<std::pair<TopoDS_Vertex, std::pair<gp_Pnt, double>>> vertices;
+  for (int i = 1; i <= before.Extent(); ++i) {
+    if (before(i).ShapeType() == TopAbs_EDGE) {
+      EdgeEvidence e{};
+      e.edge = TopoDS::Edge(before(i));
+      e.curve = BRep_Tool::Curve(e.edge, e.location, e.first, e.last);
+      e.tolerance = BRep_Tool::Tolerance(e.edge);
+      e.degenerated = BRep_Tool::Degenerated(e.edge);
+      edges.push_back(e);
+    } else if (before(i).ShapeType() == TopAbs_VERTEX) {
+      const auto vertex = TopoDS::Vertex(before(i));
+      vertices.push_back({vertex, {BRep_Tool::Pnt(vertex), BRep_Tool::Tolerance(vertex)}});
+    } else if (before(i).ShapeType() == TopAbs_FACE) {
+      FaceEvidence face;
+      face.face = TopoDS::Face(before(i));
+      face.surface = BRep_Tool::Surface(face.face, face.location);
+      face.tolerance = BRep_Tool::Tolerance(face.face);
+      faces.push_back(face);
+    }
+  }
+  BRepCheck_Analyzer copied(candidate, true);
+  Handle(BRepTools_ReShape) replacement = new BRepTools_ReShape;
+  for (TopExp_Explorer f(candidate, TopAbs_FACE); f.More(); f.Next()) {
+    if (!analytic(f.Current()) || copied.IsValid(f.Current()))
+      continue;
+    // Seam pcurve order is defined on the FORWARD face, independently of
+    // the final solid's outward orientation.
+    const auto face = TopoDS::Face(f.Current().Oriented(TopAbs_FORWARD));
+    for (TopExp_Explorer w(face, TopAbs_WIRE); w.More(); w.Next()) {
+      ShapeFix_Wire boundary(TopoDS::Wire(w.Current()), face, 1e-7);
+      boundary.ClosedWireMode() = true;
+      boundary.FixReorder();
+      for (int edge = 1; edge <= boundary.NbEdges(); ++edge)
+        boundary.FixSeam(edge);
+      boundary.FixShifted();
+      boundary.FixDegenerated();
+      replacement->Replace(w.Current(), boundary.WireAPIMake());
+    }
+  }
+  candidate = replacement->Apply(candidate);
+  TopTools_IndexedMapOfShape after;
+  TopExp::MapShapes(candidate, after);
+  for (const auto& e : edges) {
+    TopLoc_Location location;
+    double first = 0, last = 0;
+    const auto curve = BRep_Tool::Curve(e.edge, location, first, last);
+    if (!after.Contains(e.edge) || curve != e.curve || location != e.location || first != e.first ||
+        last != e.last || BRep_Tool::Tolerance(e.edge) != e.tolerance ||
+        BRep_Tool::Degenerated(e.edge) != e.degenerated)
+      return {};
+  }
+  for (const auto& [vertex, evidence] : vertices)
+    if (!after.Contains(vertex) || BRep_Tool::Pnt(vertex).Distance(evidence.first) != 0 ||
+        BRep_Tool::Tolerance(vertex) != evidence.second)
+      return {};
+  for (const auto& f : faces) {
+    const auto updated = replacement->Apply(f.face);
+    if (updated.ShapeType() != TopAbs_FACE || !after.Contains(updated))
+      return {};
+    const auto face = TopoDS::Face(updated);
+    TopLoc_Location location;
+    if (BRep_Tool::Surface(face, location) != f.surface || location != f.location ||
+        BRep_Tool::Tolerance(face) != f.tolerance)
+      return {};
+  }
+  return BRepCheck_Analyzer(candidate, true).IsValid() ? candidate : TopoDS_Shape{};
+}
+
+BodyDraft body_draft(const TopoDS_Shape& transferred, std::string name) {
+  const auto shape = complete_analytic_uv_boundaries(transferred);
+  require(!shape.IsNull(),
           "STEP transfer produced invalid body geometry; automatic healing is disabled");
   BodyDraft result;
   result.shape = shape;
