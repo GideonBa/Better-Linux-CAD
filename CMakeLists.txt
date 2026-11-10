@@ -107,6 +107,7 @@ add_library(
   src/core/sketch_repair_undo_stack_summary.cpp
   src/core/shell_feature.cpp
   src/core/hole_feature.cpp
+  src/core/thread_feature.cpp
   src/core/sweep_feature.cpp
   src/core/step_import_source.cpp
   src/core/step_import_freshness.cpp
@@ -514,6 +515,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/project_engineering_resources_tests.cpp
     tests/core/shell_feature_tests.cpp
     tests/core/hole_feature_tests.cpp
+    tests/core/thread_feature_tests.cpp
     tests/core/hole_manufacturing_tests.cpp
     tests/core/part_hole_feature_tests.cpp
     tests/core/part_feature_input_reference_tests.cpp

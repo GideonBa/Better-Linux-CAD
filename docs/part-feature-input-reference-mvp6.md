@@ -154,3 +154,10 @@ Draft's explicitly selected input faces also follow OCCT `Generated` replacement
 Draft reports the changed supporting surface through that history channel. This exception applies
 to the selected faces only; generated geometry does not inherit adjacent support identities.
 All descendants remain recorded so subsequent splits are ambiguous rather than guessed.
+
+## Shared Thread support input — Block 155A
+
+`ThreadSupportFace` adds role spelling `thread_support_face` with existing Face capability and
+source variants. Core validates reference membership; cylindrical/conical support compatibility,
+trimmed bounds and material participation require Geometry. `thread_feature.hpp` defines the
+standalone input record; Part/history/JSON registration and execution remain later steps in 155.

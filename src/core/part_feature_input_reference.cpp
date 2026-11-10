@@ -86,6 +86,8 @@ std::string_view to_string(PartFeatureInputRole role) noexcept {
     return "hole_support_plane";
   case PartFeatureInputRole::HoleLimitFace:
     return "hole_limit_face";
+  case PartFeatureInputRole::ThreadSupportFace:
+    return "thread_support_face";
   case PartFeatureInputRole::FilletEdge:
     return "fillet_edge";
   case PartFeatureInputRole::ChamferEdge:
@@ -160,6 +162,7 @@ bool part_feature_input_role_accepts(PartFeatureInputRole role,
     return capability == PartFeatureInputCapability::Plane;
   case PartFeatureInputRole::ExtrudeLimitFace:
   case PartFeatureInputRole::HoleLimitFace:
+  case PartFeatureInputRole::ThreadSupportFace:
   case PartFeatureInputRole::ShellRemovalFace:
   case PartFeatureInputRole::DraftFace:
     return capability == PartFeatureInputCapability::Face;

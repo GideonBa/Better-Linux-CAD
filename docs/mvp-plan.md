@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 154
 current_block: 155
-current_boundary: Block 154 accepted, delivery PR 170; Block 155 semantic threads planned
+current_boundary: Block 154 accepted; Block 155A shared Thread Core inputs verified; 155B next
 current_tag: "[parity-b155]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–154 accepted; Blocks 155–204 planned"
+  advanced_modeling_workflows: "Blocks 145–154 accepted; Block 155 in progress; Blocks 156–204 planned"
 ---
 
 # MVP Plan
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 154
-current block        Block 155 (planned)
+current block        Block 155 (155A verified; 155B next)
 current phase        Semantic holes and threads
-current boundary     Whole Block 154 accepted; semantic threads are next
+current boundary     Whole Block 154 accepted; shared Thread Core inputs verified
 ```
 
 The next assigned work is Block 155. [The consolidated sequence](inventor-parity-sequence.md)
@@ -133,7 +133,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 ## Blocks 145–204 — Advanced modeling workflows
 
 Status authority: Blocks 145–154 are **Implemented and accepted**;
-Blocks 155–204 are **Planned; not started**. The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
+Block 155 is **In progress**; Blocks 156–204 are **Planned; not started**.
+The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -143,7 +144,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
-| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152–154 accepted; 155–158 planned |
+| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152–154 accepted; 155 in progress; 156–158 planned |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
@@ -211,7 +212,7 @@ phase limits. Unrelated skipped native/optional tests are not claimed as rerun. 
 are original ordinary/compact screenshots. Delivery:
 [PR #170](https://github.com/GideonBa/Better-Linux-CAD/pull/170), implementation
 `dc8d40f50f6e8c11f62542448a494bfd8092be83`, reviewed implementation tree
-`7484af4d6386c1067a1bc8f7a3a2dc0b42803834`. Block 155 has not started.
+`7484af4d6386c1067a1bc8f7a3a2dc0b42803834`. Block 155 had not started at that acceptance.
 
 ### Retained extension boundaries
 
@@ -238,6 +239,26 @@ remain geometry inputs for their assigned later consumers.
 **Hole workflow:** Existing top-to-bottom property/preview/Apply/Undo contracts apply; dedicated authoring remains 157.
 
 Phase B stays open for 155–158.
+
+### Block 155 serial implementation
+
+The unchanged Block-155/B03 criteria remain in the sequence/test plan. Execute these steps in order;
+individual delivery does not close the whole block or advance 156. The dedicated authoring panel
+remains 157.
+
+| Slice | Scope and acceptance | Status |
+| --- | --- | --- |
+| 155A | One shared Thread definition, authored/pinned profiles with exact provenance, independent start/length, handedness/mode/taper, dependency/remap queries and standalone external input record. Read-only Core validation and negative tests. | Implemented and verified; delivery pending |
+| 155B | Internal Hole and standalone Thread registration in Part/Project persistence, Body history, dependency/removal/suppression and atomic resource adoption. Preserve legacy bytes; prove reopen, parameter edits and failed late consumers. | Planned |
+| 155C | Checked supports/material/depths, cosmetic geometry invariance and derived display, explicit modeled helical execution with cost/capability limits. Complete independent pitch/hand/radial/volume oracles, blind clearance, resources/history/material/import/STEP combinations and relevant native checks at both scales. | Planned |
+
+155A uses the existing parameter/resource and typed Face-reference authorities. `hole-wizard.md`
+owns its exact input contract. Core build passes; focused Thread proof **9 / 232**, combined
+Thread/Hole/resource proof **58 / 2,634**, full Core **689 / 26,531**, no skips/failures.
+All 1,031 runtime fingerprints remain frozen. Formatting, contract references and diff review pass.
+Geometry/Qt/native suites are not rerun for this Core-only input foundation; registered/executed/UI
+Threads remain open. Protected-PR delivery is pending on `feat/semantic-thread-definition` after
+verified merged PR #171 and refreshed main. Whole Block 155 remains incomplete.
 
 ## Later phases
 

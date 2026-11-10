@@ -190,6 +190,47 @@ opening diameter, without changing intent or blocking otherwise valid geometry. 
 remains an error. No default spacing recommendation is fabricated or persisted as a standard.
 Slot spacing is outside this circular query's scope and is rejected explicitly.
 
+## Shared Thread Core inputs (Block 155A)
+
+`ThreadDefinition` is the shared input value for internal Hole threads and standalone external
+`ThreadFeature` records (`thread_feature.hpp`). The default representation is Cosmetic; Modeled
+must be explicit. Handedness is Right or Left. Thread start and length are independent of Hole
+drill depth. Length references an existing positive Length parameter; an omitted start means zero,
+otherwise start also references a positive Length parameter. This reuses the existing parameter
+authority without inventing a zero-valued Length parameter.
+
+`ThreadParameterProfile` names an authored system, designation and tolerance plus existing typed
+parameters for major/minor diameter, pitch and included flank angle. Those labels do not assert
+normative conformity. `ThreadStandardProfile` selects one exact immutable table revision, row and
+explicit columns for all seven fields: metadata requires nonblank Text, diameters/pitch require
+Length, included angle requires Angle. Each selected cell retains its own provenance. A missing
+revision/row/cell, a Material resource or a mismatched type fails; there is no latest-revision,
+default-pitch or implicit tolerance lookup.
+
+The optional signed taper half-angle is an Angle parameter or a selected Angle column. Omission
+means cylindrical; an explicit taper must be nonzero and strictly between −90° and 90°. Positive
+taper widens along the threaded interval, negative taper narrows. Both diameters are measured at
+the start of that interval. Resolution requires major > minor > 0, pitch > 0, included angle in
+(0°,180°), finite start/end and turn count, and a positive minor diameter throughout the interval.
+It validates intent ranges, not support compatibility or manufacturability. Execution must still
+check the complete physical profile, target material, trimmed support and modeling limits.
+
+`resolve_thread_definition` is read-only: it returns current evaluated dimensions, labels, modes,
+the exact revision pin and field provenance without modifying Part intent, history or resources.
+Dependencies preserve field order and deduplicate repeated parameter identities. Explicit revision
+remapping returns a new definition; the caller must validate every candidate consumer before an
+atomic adoption. Standalone definitions do not themselves become registered resource consumers.
+
+The external `ThreadFeature` input owns its Feature ID/name, editable solid target, typed
+`thread_support_face`, definition and Along/OppositeSupportAxis direction. Core validates identity,
+reference existence, Body kind and dimensions; actual cylindrical/conical compatibility and axial
+placement require Geometry. Reference Parts reject authored Thread inputs.
+
+This foundation adds no Part/history/JSON registration, Hole field, visible command, thread display
+or thread geometry. Those integration/execution steps remain open within 155; the complete B03
+gate and dedicated Inventor-like authoring in 157 remain required. Focused tests:
+`tests/core/thread_feature_tests.cpp`, `[core][parity-b155]`.
+
 ## Why more than a cut
 
 ```text

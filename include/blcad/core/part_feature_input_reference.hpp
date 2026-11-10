@@ -40,6 +40,7 @@ enum class PartFeatureInputRole {
   SourceBody,
   HoleSupportPlane,
   HoleLimitFace,
+  ThreadSupportFace,
 };
 
 enum class PartFeatureInputSourceKind {
