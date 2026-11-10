@@ -1,5 +1,6 @@
 #include "../support/engineering_resource_fixture.hpp"
 #include "../support/hole_feature_fixture.hpp"
+#include "../support/hole_manufacturing_fixture.hpp"
 #include "../support/part_history_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/step_import_freshness.hpp"
@@ -1516,4 +1517,121 @@ TEST_CASE("A semantic bore wall follows the existing Draft selection preview and
   REQUIRE(reopened.open_file(w.session().file_path()));
   CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == after);
   CHECK(reopened.derived_results_fresh());
+}
+
+TEST_CASE("Manufacturing Hole restoration shares physical preview Apply Undo and portable reopen",
+          "[gui][parity-b154][hole-manufacturing-shell]") {
+  const int mode = GENERATE(1, 2, 3, 4, 5, 6, 7, 8);
+  auto part = blcad::test::manufacturing_fixture::part(mode, HoleThroughAllExtent{}, true);
+  REQUIRE(part.apply_history_intent({{"base", "hole"}, {"hole"}}));
+  ShellWindow w;
+  QTemporaryDir directory;
+  open(w, directory, part);
+  const auto before = snapshot(w);
+  context(w, "hole", w.history_tools().restore_action());
+  REQUIRE(control<QPushButton>(w, "blcad.history.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  CHECK_FALSE(w.session().can_undo());
+  if (mode == 1)
+    capture(w, "manufacturing-hole-preview");
+  click(control<QPushButton>(w, "blcad.history.apply"));
+  const auto after = snapshot(w);
+  REQUIRE(after != before);
+  REQUIRE(w.session().derived_results_fresh());
+  const double removed = mode == 1 || mode == 3 ? 14 * std::numbers::pi
+                         : mode == 2            ? (8 + 4. / 3) * std::numbers::pi
+                         : mode == 4            ? 19 * std::numbers::pi
+                         : mode == 7            ? (5 + 5. / 3) * std::numbers::pi
+                         : mode == 8            ? (8 + std::numbers::pi) * 8
+                                                : 8 * std::numbers::pi;
+  const auto check_volume = [&](const GuiDocumentSession& session, double expected) {
+    REQUIRE(session.part_shape_cache());
+    REQUIRE(
+        session.part_shape_cache()->validate_complete_geometry_result(*session.part_document()));
+    CHECK(geometry::RectangleExtrusionAdapter{}
+              .summarize(*session.part_shape_cache()->find_body_shape(BodyId("body.base")))
+              .volume_mm3 == Catch::Approx(expected).margin(1e-6));
+  };
+  check_volume(w.session(), 1600 - removed);
+  REQUIRE(w.save_to({}));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(w.session().file_path()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == after);
+  REQUIRE(reopened.derived_results_fresh());
+  check_volume(reopened, 1600 - removed);
+  REQUIRE(w.undo());
+  CHECK(snapshot(w) == before);
+  check_volume(w.session(), 1600);
+  CHECK_FALSE(w.session().can_undo());
+  REQUIRE(w.redo());
+  CHECK(snapshot(w) == after);
+  check_volume(w.session(), 1600 - removed);
+}
+
+TEST_CASE("A manufacturing seat shoulder offers the existing reversible face Sketch workflow",
+          "[gui][parity-b154][hole-manufacturing-shell]") {
+  ShellWindow w;
+  QTemporaryDir directory;
+  open(w, directory, blcad::test::manufacturing_fixture::part(1, HoleThroughAllExtent{}, true));
+  auto& filter = control<QComboBox>(w, "blcad.selection.filter");
+  const int row = filter.findData(selection_kind_bit(GuiSelectionKind::Face));
+  REQUIRE(row >= 0);
+  filter.setCurrentIndex(row);
+  const auto targets = checked(geometry::FinishingSelectionBuilder::build(
+      *w.session().part_document(), *w.session().part_shape_cache(), BodyId("body.base"),
+      PartFeatureInputRole::ShellRemovalFace));
+  const auto seat = std::find_if(targets.begin(), targets.end(), [](const auto& target) {
+    const auto* ref =
+        std::get_if<ResultFaceReference>(&std::get<FaceReference>(target.reference).source());
+    return ref && ref->origins().front().role.ends_with("/seat/bottom");
+  });
+  REQUIRE(seat != targets.end());
+  CHECK(seat->label.find("Sitzfläche") != std::string::npos);
+  REQUIRE(w.viewport().select_semantic(seat->semantic_id));
+  const auto before = snapshot(w);
+  REQUIRE(w.create_sketch_on_selection());
+  REQUIRE(w.active_sketch());
+  REQUIRE(w.session().part_document()->result_face_workplane_count() == 1);
+  CHECK(w.session()
+            .part_document()
+            ->result_face_workplanes()
+            .front()
+            .reference()
+            .origins()
+            .front()
+            .role == "hole/6:center/seat/bottom");
+  const auto after = snapshot(w);
+  capture(w, "manufacturing-seat-sketch");
+  REQUIRE(w.undo());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.redo());
+  CHECK(snapshot(w) == after);
+  REQUIRE(w.save_to({}));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(w.session().file_path()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == after);
+  CHECK(reopened.derived_results_fresh());
+}
+
+TEST_CASE("An impossible manufacturing seat blocks History Apply and retains the committed model",
+          "[gui][parity-b154][hole-manufacturing-shell]") {
+  auto part = blcad::test::manufacturing_fixture::part(1, HoleThroughAllExtent{}, true);
+  REQUIRE(part.set_parameter_value(ParameterId("seat.depth"), checked(Quantity::length_mm(9))));
+  REQUIRE(part.apply_history_intent({{"base", "hole"}, {"hole"}}));
+  ShellWindow w;
+  QTemporaryDir directory;
+  open(w, directory, part);
+  const auto before = snapshot(w);
+  context(w, "hole", w.history_tools().restore_action());
+  REQUIRE(w.history_tools().active());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.history.apply").isEnabled());
+  CHECK(control<QLabel>(w, "blcad.history.status").text().contains("Hole seat"));
+  CHECK_FALSE(w.history_tools().apply());
+  CHECK(snapshot(w) == before);
+  CHECK_FALSE(w.session().can_undo());
+  w.history_tools().cancel();
+  REQUIRE(w.session().derived_results_fresh());
+  REQUIRE(w.session().part_shape_cache()->validate_complete_geometry_result(
+      *w.session().part_document()));
+  CHECK(snapshot(w) == before);
 }

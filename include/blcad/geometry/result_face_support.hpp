@@ -29,6 +29,10 @@ struct ResolvedResultFace {
 // position or geometric proximity becomes persistent identity.
 class ResultFaceSupportGeometry {
 public:
+  [[nodiscard]] static GeometryShape tag_conical_wall(const GeometryShape& shape,
+                                                      FeatureId producer, std::string role,
+                                                      Point3 center, Vector3 axis, Vector3 x_axis,
+                                                      double first_depth, double last_depth);
   [[nodiscard]] static GeometryShape tag_hole_wall(const GeometryShape& shape, FeatureId producer,
                                                    std::string role, Point3 center, Vector3 axis,
                                                    Vector3 x_axis, double radius_mm);

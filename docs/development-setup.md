@@ -5505,3 +5505,171 @@ zero required approvals and no configured required status-check rule; deletion/n
 protections remain active. Delivery uses the normal protected squash merge with an exact expected
 head, followed by confirmed merged PR and refreshed-main tree comparison. This record changes docs
 only. Whole 153 is accepted, Phase B remains open, and work stops before starting 154.
+
+## Block 154 — manufacturing Hole variants, 2026-11-09
+
+The later user instruction resumes work after the 153 stop. PR #169 is confirmed merged as
+`5840dd9`; main was refreshed and its tree matched `147f6f427471c28848a230ff18d5228947cf1300`
+before creating `feat/hole-manufacturing-variants`. Numbered acceptance remains in `mvp-plan.md`.
+
+Extend the existing Hole variant, resource selectors, graph/history, strict Part/Project JSON and
+physical executor. New manufacturing dimensions select existing Length/Angle parameters or pinned
+table cells. V5 is selected only for manufacturing intent; unchanged ordinary Hole JSON stays V4.
+Seat depths are support-based; fitted/reamed metadata bounds nominal geometry; Slot consumes the
+existing capsule profile and retains its curve IDs. Stable primary/seat/step/slot face roots use
+the existing result-face lineage, finishing selection and face-supported Sketch authorities.
+The dedicated Inventor-like progressive Hole tool remains 157.
+
+Validation plan: focused `[parity-b154]` Core/Geometry first; independent analytic removed volumes
+and material sections for all variants, exact reopen, all-field revision adoption/rollback, native
+and imported targets, seat-limit/side-breakout negatives, Chamfer, material mass, suppression/prefix,
+portable STEP and stable meaningful references after edits/poses. Then full Core/Geometry/Qt on
+frozen runtime sources, focused native ordinary/compact 150% shared task/Sketch workflows, startup,
+capability inventory, diff/staged review and normal protected delivery.
+
+Initial build (`blcad154-review-build.log`) finds a test-helper mismatch: the existing parameter
+setter returns a vector result rather than the fixture's size-result helper. Correct the helper
+and rebuild (`blcad154-review-build2.log`). Review also requires checking full seat retention after
+oblique/Body-limit clipping, in addition to center-depth and material-containment validation.
+No 154 passing counts or whole-block acceptance are claimed before the corresponding runs finish.
+
+The rebuilt Core binary passes focused `[parity-b154]` **3 / 153**
+(`blcad154-core-focused.log`) and full Core **679 / 26,275**
+(`blcad154-core-full-initial.log`). This verifies all manufacturing discriminators, legacy V4/V5
+selection, resource-free/resource-bearing Project roundtrips, seat-only revision pins and atomic
+multi-field adoption. Geometry is still building; these Core results are not geometry acceptance.
+
+Expanded Core passes **4 / 177** (`blcad154-core-combined.log`). Initial combined Geometry exposes
+an undersized limit fixture, a fixture parameter/feature ID collision and two genuine strict STEP
+roundtrip failures for stepped and pointed center bores (`blcad154-geometry-combined.log`). Correct
+the fixtures and isolate STEP's analytic seam/pole UV-boundary conversion. The final implementation
+uses a private copy and explicit 2D boundary operations, with guards retaining every existing 3D
+curve/range, surface, vertex and tolerance; it never enables the optional broad healing sequence.
+The exact contract is recorded in `step-import-sequence-mvp10.md`.
+
+Combined Hole/STEP-reader checks then pass all manufacturing export/import combinations and the
+existing invalid-transfer suite; **20 / 21 cases, 1,287 / 1,288 assertions** pass
+(`blcad154-analytic-transfer.log`). The remaining failure is a new offset-support test that must
+restore its deliberately invalid dimension before changing to stepped mode. Correct that setup,
+add direct analytic cone/frustum supplier tests with displaced-vertex rejection, and build all four
+targets (`blcad154-final-build.log`). Native and full-suite counts follow only after execution.
+
+Frozen runtime inputs: **1,027** files, SHA-256
+`6fdcbd03b2ec65b7565ab75319e0c3c17bec5ee9a8fccd1889c1ab45c81967c6`
+(`/tmp/blcad154-runtime-freeze.json`). Full Core passes **680 / 26,299**
+(`blcad154-core-full.log`). No runtime source/test/CMake edits occur during the final build or
+subsequent acceptance runs. Documentation-only verification/delivery records may change.
+
+Final review makes the supplier-negative fixture independent of insignificant STEP coordinate
+formatting and avoids duplicate BRep validation on already-valid imports. Relative to the initial
+freeze only `step_import_reader.cpp` and its direct test change; Core and shared GUI sources remain
+unchanged. Final **1,027**-file runtime freeze is SHA-256
+`9c5b7e1fa914a8bceaa69d814fdf5f06a08821b04764301e9e2b2750dbfd1bc2`
+(`/tmp/blcad154-runtime-freeze.json`; initial manifest retained separately).
+Four-target final review build passes (`blcad154-final-review-build2.log`). Focused Geometry plus
+STEP-reader acceptance passes **22 / 1,370** (`blcad154-geometry-focused.log`), covering every
+manufacturing variant's actual STEP roundtrip, exact analytic cone/frustum suppliers and rejection
+of displaced 3D vertices. Full Geometry and shared Qt acceptance now run on that source state.
+
+Full Geometry passes **644 / 55,929** (`blcad154-geometry-full.log`), including all previous Hole,
+finishing, imported-source, history and exchange regressions. Focused shared Qt passes
+**12 / 1,309**, without failures/skips (`blcad154-gui-focused.log`): all eight manufacturing modes,
+impossible-seat Apply blocking, shoulder Sketch and existing Hole/browser/face-reference/inventory
+contracts. Full Qt runs serially next, before native ordinary/compact and startup.
+
+Final Slot review finds that valid inward semicircle Sketches could pass the manufacturing capsule
+check. The new regression first reproduces all three invalid cap combinations (**3 failing
+assertions**, `blcad154-slot-regression-red.log`). Stop the in-progress full Qt run with intentional
+SIGINT **130**; do not report it as a completed suite. Require alternating line/arc segments and
+outward caps, and validate the complete opening against the explicitly selected finite support as
+well as actual target entry material. A two-Body finite-support regression retains the support as a
+nonparticipant and verifies prior-cache rollback for insufficient support bounds.
+
+Final four-target build passes (`blcad154-final-slot-review-build.log`). Only the Geometry executor
+and manufacturing Geometry tests change relative to the previous freeze; Core and Qt sources stay
+unchanged. Final **1,027**-file runtime manifest SHA-256 is
+`7c14a6bed28d48c3df5a5cf0e097fb5cee2c473f6a6838a25beaade77dc41968`
+(`/tmp/blcad154-runtime-freeze.json`; prior manifests retained). Repeat focused and full Geometry/Qt
+on this final state, then native layout acceptance. The unchanged Core result remains **680 / 26,299**.
+
+Final focused Geometry/STEP-reader passes **24 / 1,426**
+(`blcad154-geometry-focused-slot-final.log`); full Geometry passes **646 / 55,985**
+(`blcad154-geometry-full-final.log`). Final focused Qt repeats **12 / 1,309**, without failures/skips
+(`blcad154-gui-focused-final.log`). This includes outward/one-inward/two-inward Slot profiles,
+explicit finite support on a separate nonparticipating Body, all manufacturing modes, exact STEP,
+standards/material/mass/history and stable downstream references. The final full Qt run is
+`blcad154-gui-full-final.log`; the earlier interrupted log is not acceptance evidence.
+
+Full Qt passes **767 cases: 728 passed / 39 skipped; 92,244 assertions**, no failures
+(`blcad154-gui-full-final.log`). The skips retain native-only/optional prerequisites; this is not
+full native-suite coverage. Relevant native ordinary/compact runs use
+`[hole-manufacturing-shell],[hole-result-reference-shell],[hole-history-shell],[result-face-sketch],[native-step-editable-parts],[block136-finishing]`,
+including all new manufacturing modes, invalid-seat Apply blocking and shoulder Sketch selection,
+plus the existing real editable-STEP and direct face workflows.
+
+First native 100% attempt reports **16 cases: 15 passed / 1 failed; 1,225 / 1,226 assertions**
+(`blcad154-native100.log`). The existing editable-STEP workflow times out in its native ribbon
+`save_as` menu watchdog (`gui_shell_step_import_tests.cpp:267`); all new manufacturing cases pass.
+Repeat the identical native selection on unchanged sources, recording the first attempt rather
+than treating it as a passing run. Original 100% captures are reviewed; the shared History task
+retains enabled pinned Apply/Cancel and the shoulder Sketch uses the existing face-normal ribbon/
+grid. Geometry remains small in the previously documented Fit All framing with datum planes.
+
+The repeated ordinary native attempt reproduces the same pre-existing `save_as` timeout (**15 /
+16 cases**, `blcad154-native100-repeat.log`). Isolate `[native-step-editable-parts]`: diagnostic
+state shows the popup already hidden with no active modal when its watchdog expires
+(`blcad154-native-menu-diagnostic.log`). Correct the shared STEP test helper so popup dismissal/
+observed action ends the popup watchdog and `QDialog::finished` ends its dialog watchdog. The
+intended action, handled dialog and all document/geometry assertions remain required; time limits
+are not enlarged and the test is not skipped. Retain failure diagnostics for future native timing
+issues. The isolated complete native STEP workflow passes **1 / 629** before the final dialog-timer
+scope refinement (`blcad154-native-dialog-diagnostic.log`). Rebuild and repeat the final native
+selection and full Qt; production sources and passing Core/Geometry binaries remain unchanged.
+
+Final native-harness build passes (`blcad154-final-native-harness-build.log`). Only
+`tests/gui/gui_shell_step_import_tests.cpp` changes relative to the prior frozen state; every
+production/Core/Geometry/Hole-test fingerprint remains unchanged. Final **1,027**-file manifest
+SHA-256 is `940542ec04338219b157a58ca4f738d3632bae0e15575a393a0a4bb0f8362813`
+(`/tmp/blcad154-runtime-freeze.json`). Native ordinary/compact, full Qt, startup and final inventory
+use this final test binary. Per-popup/per-dialog watchdog limits remain five seconds; the native
+process additionally has a 360-second CLI bound. The final ordinary run is `blcad154-native100-final.log`.
+
+Final ordinary native 100% passes **16 / 1,848**, without failures/skips
+(`blcad154-native100-final.log`), using the complete unchanged selection including the previously
+failing real editable-STEP workflow. Repeat at compact 150% before final full Qt/startup/inventory.
+The existing nonfailing OCCT visual/depth/stencil notices remain environment output.
+
+Final compact native 150% passes **16 / 1,866**, without failures/skips
+(`blcad154-native150-final.log`). Review both final ordinary and compact captures: Apply/Cancel
+remain visible in the shared History task; the shoulder Sketch retains the existing ribbon/grid,
+face-normal camera and scrollable browser/property panes. Unmodified PNGs copied byte-for-byte:
+
+| Image | Pixels | SHA-256 |
+| --- | --- | --- |
+| `manufacturing-hole-preview.png` | 1280×800 | `cf870ea18975fa1bb0653fb59184fd22faff8b723a1cc6443867475b74968119` |
+| `manufacturing-seat-sketch.png` | 1280×800 | `768737137eb0f99ea6691a77c85b3c4c955f4e97e2c41b9ae2aef670898fe115` |
+| `manufacturing-hole-preview-compact.png` | 1536×960 | `989033a3953d862c75bea125e58be85db2f6af8ceec78e412c105e20586b57d2` |
+| `manufacturing-seat-sketch-compact.png` | 1536×960 | `6e159c40e568b0e781342224d7bcbde8ee057cd869a36a771b5f2dc71f56ee1e` |
+
+Final full Qt after the test-helper correction is `blcad154-gui-full-delivery.log`. Existing wider
+native-only/optional skips remain explicitly retained coverage, not claimed as a full native run.
+
+Final full Qt also passes **767 cases: 728 passed / 39 skipped; 92,244 assertions**, no failures
+(`blcad154-gui-full-delivery.log`), using the final native-harness binary. All production/runtime
+fingerprints remain frozen; the broader native-only/optional skips are not falsely claimed as a
+full native-suite execution. Startup, final capability inventory and staged review precede delivery.
+
+Native startup reaches its window and ends at intentional timeout **124**
+(`blcad154-startup.log`). Accept whole 154 after all A/B/C proofs; retain Phase B/155–158 as open and
+Wizard authoring as 157. Full Qt is **728 passed / 39 native-only or optional skips, 92,244
+assertions** on the final test-helper state. No production/test/CMake sources change after the
+final freeze. Complete post-status inventory, whitespace/formatting and working/staged review,
+then deliver through a regular protected PR without direct-main pushes or bypass permissions.
+
+Post-status capability inventory passes **5 / 658** (`blcad154-inventory-final.log`). Working and
+staged whitespace checks, changed-line/new-file formatting and staged-content review pass. All
+**1,027** runtime fingerprints still match the final manifest. Reviewed 34 intended files, including
+four original native screenshots; no unrelated work is staged. Refreshed upstream main remains
+`5840dd9`; ruleset `18686807` still requires normal PR delivery (no required approving reviews or
+required status-check rule). Commit/push the implementation branch and merge only its exact reviewed
+head through the protected PR workflow, then compare refreshed main's tree.

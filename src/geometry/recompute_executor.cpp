@@ -4314,6 +4314,60 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_chamfer(const PartDocumen
   return stored;
 }
 
+Result<std::vector<HoleSpacingAdvisory>>
+GeometryRecomputeExecutor::hole_spacing_advisories(const PartDocument& document, FeatureId id,
+                                                   const ShapeCache& cache,
+                                                   double recommended_web_mm) const {
+  if (!std::isfinite(recommended_web_mm) || recommended_web_mm < 0)
+    return Result<std::vector<HoleSpacingAdvisory>>::failure(
+        geometry_error(id.value(), "Spacing recommendation must be finite and nonnegative"));
+  auto scope = detail::validate_history_modeling_scope(document, cache, std::nullopt);
+  if (!scope)
+    return Result<std::vector<HoleSpacingAdvisory>>::failure(scope.error());
+  const auto* hole = document.find_hole_feature(id);
+  if (!hole || std::holds_alternative<HoleSlot>(hole->manufacturing()))
+    return Result<std::vector<HoleSpacingAdvisory>>::failure(geometry_error(
+        id.value(), "Round Hole placements are required for pairwise spacing assessment"));
+  auto inputs = validate_hole_feature_inputs(document, *hole);
+  if (!inputs)
+    return Result<std::vector<HoleSpacingAdvisory>>::failure(inputs.error());
+  auto support = resolve_hole_plane(document, hole->support().source(), cache, workplane_resolver_,
+                                    import_context_, id);
+  if (!support)
+    return Result<std::vector<HoleSpacingAdvisory>>::failure(support.error());
+  double diameter =
+      resolve_hole_diameter(document, hole->diameter()).value().diameter.millimeters();
+  std::visit(
+      [&](const auto& value) {
+        using T = std::decay_t<decltype(value)>;
+        const auto include = [&](const auto& d) {
+          diameter = std::max(diameter,
+                              resolve_hole_dimension(document, d).value().diameter.millimeters());
+        };
+        if constexpr (std::is_same_v<T, HoleCounterbore> || std::is_same_v<T, HoleCountersink> ||
+                      std::is_same_v<T, HoleSpotface> || std::is_same_v<T, HoleCenter>)
+          include(value.diameter);
+        else if constexpr (std::is_same_v<T, HoleStepped>)
+          for (const auto& step : value.steps)
+            include(step.diameter);
+      },
+      hole->manufacturing());
+  auto centers = resolve_hole_centers(document, *hole, cache, support.value().plane,
+                                      Quantity::length_mm(diameter).value(), workplane_resolver_);
+  if (!centers)
+    return Result<std::vector<HoleSpacingAdvisory>>::failure(centers.error());
+  std::vector<HoleSpacingAdvisory> warnings;
+  for (std::size_t i = 0; i < centers.value().size(); ++i)
+    for (std::size_t j = i + 1; j < centers.value().size(); ++j) {
+      const auto a = centers.value()[i], b = centers.value()[j];
+      const double web = length({a.x - b.x, a.y - b.y, a.z - b.z}) - diameter;
+      if (web < recommended_web_mm)
+        warnings.push_back(
+            {hole->placements()[i].id, hole->placements()[j].id, web, recommended_web_mm});
+    }
+  return Result<std::vector<HoleSpacingAdvisory>>::success(std::move(warnings));
+}
+
 Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& document,
                                                             FeatureId feature_id,
                                                             ShapeCache& shape_cache) const {
@@ -4346,11 +4400,124 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
   auto diameter = resolve_hole_diameter(document, feature->diameter());
   if (!diameter)
     return Result<std::size_t>::failure(diameter.error());
-  auto centers = resolve_hole_centers(document, *feature, working, support,
-                                      diameter.value().diameter, workplane_resolver_);
+  const double radius = diameter.value().diameter.millimeters() / 2;
+  struct SeatStage {
+    std::string id;
+    double radius;
+    double depth;
+  };
+  std::vector<SeatStage> seats;
+  bool cone_seat = false;
+  const auto dimension_value = [&](const auto& input, bool angle = false) {
+    const auto value = resolve_hole_dimension(document, input, angle).value().diameter;
+    return angle ? value.degrees() : value.millimeters();
+  };
+  std::visit(
+      [&](const auto& value) {
+        using T = std::decay_t<decltype(value)>;
+        if constexpr (std::is_same_v<T, HoleCounterbore> || std::is_same_v<T, HoleSpotface>)
+          seats.push_back(
+              {"seat", dimension_value(value.diameter) / 2, dimension_value(value.depth)});
+        else if constexpr (std::is_same_v<T, HoleCountersink> || std::is_same_v<T, HoleCenter>) {
+          const double r = dimension_value(value.diameter) / 2;
+          seats.push_back(
+              {"seat", r,
+               (r - radius) / std::tan(dimension_value(value.included_angle, true) * k_pi / 360.)});
+          cone_seat = true;
+        } else if constexpr (std::is_same_v<T, HoleStepped>) {
+          for (const auto& step : value.steps)
+            seats.push_back({"step/" + std::to_string(step.id.size()) + ":" + step.id,
+                             dimension_value(step.diameter) / 2, dimension_value(step.depth)});
+          std::sort(seats.begin(), seats.end(),
+                    [](const auto& a, const auto& b) { return a.depth < b.depth; });
+        }
+      },
+      feature->manufacturing());
+  const double opening_radius = seats.empty() ? radius : seats.front().radius;
+  const auto* slot = std::get_if<HoleSlot>(&feature->manufacturing());
+  std::vector<ClosedProfileCurveSegment> slot_curves;
+  std::vector<std::pair<Point3, SketchEntityId>> slot_centers;
+  Result<std::vector<Point3>> centers = Result<std::vector<Point3>>::success({});
+  if (!slot)
+    centers =
+        resolve_hole_centers(document, *feature, working, support,
+                             Quantity::length_mm(opening_radius * 2).value(), workplane_resolver_);
+  else {
+    const auto* sketch = document.find_sketch(slot->profile.sketch());
+    const auto* profile = sketch->find_arc_closed_profile(slot->profile.profile());
+    auto frame = workplane_resolver_.resolve_for_sketch(document, *sketch, working);
+    if (!frame)
+      return Result<std::size_t>::failure(frame.error());
+    auto curves =
+        evaluate_bounded_arc_profile_curves(workplane_resolver_, frame.value(), *sketch, *profile);
+    if (!curves)
+      return Result<std::size_t>::failure(curves.error());
+    slot_curves = std::move(curves.value());
+    const auto fail_slot = [&] {
+      return Result<std::size_t>::failure(geometry_error(
+          feature_id.value(), "Slot must be a coplanar capsule of two tangent lines and equal "
+                              "semicircles; nominal diameter must match its Sketch width"));
+    };
+    const auto between = [](Point3 a, Point3 b) {
+      return Vector3{b.x - a.x, b.y - a.y, b.z - a.z};
+    };
+    const auto point_plus = [](Point3 a, Vector3 v) {
+      return Point3{a.x + v.x, a.y + v.y, a.z + v.z};
+    };
+    const auto scale = [](Vector3 v, double n) { return Vector3{v.x * n, v.y * n, v.z * n}; };
+    for (std::size_t i = 0; i < slot_curves.size(); ++i) {
+      const auto& curve = slot_curves[i];
+      if (curve.kind == slot_curves[(i + 1) % slot_curves.size()].kind)
+        return fail_slot();
+      if (length(between(curve.end, slot_curves[(i + 1) % slot_curves.size()].start)) > 1e-7)
+        return fail_slot();
+      for (const auto& point : {curve.start, curve.mid, curve.end})
+        if (std::abs(dot(between(support.origin, point), support.normal)) > 1e-7)
+          return fail_slot();
+      if (curve.kind != ClosedProfileCurveKind::CircularArc)
+        continue;
+      const auto a = between(curve.start, curve.mid), b = between(curve.start, curve.end),
+                 n = cross(a, b);
+      if (length(n) <= 1e-9)
+        return fail_slot();
+      const auto first = scale(cross(b, n), dot(a, a) / (2 * dot(n, n)));
+      const auto second = scale(cross(n, a), dot(b, b) / (2 * dot(n, n)));
+      const auto center = point_plus(point_plus(curve.start, first), second);
+      if (std::abs(length(between(center, curve.start)) - radius) > 1e-7 ||
+          std::abs(length(between(curve.start, curve.end)) - 2 * radius) > 1e-7)
+        return fail_slot();
+      slot_centers.push_back({center, profile->curve_segments()[i]});
+    }
+    if (slot_centers.size() != 2 ||
+        length(between(slot_centers[0].first, slot_centers[1].first)) <= 1e-7)
+      return fail_slot();
+    std::size_t arc_index = 0;
+    for (const auto& curve : slot_curves)
+      if (curve.kind == ClosedProfileCurveKind::CircularArc) {
+        const auto& center = slot_centers[arc_index].first;
+        if (dot(between(center, curve.mid), between(center, slot_centers[1 - arc_index].first)) >=
+            0)
+          return fail_slot();
+        ++arc_index;
+      }
+    const auto axis = between(slot_centers[0].first, slot_centers[1].first);
+    for (const auto& curve : slot_curves)
+      if (curve.kind == ClosedProfileCurveKind::Line) {
+        const auto line = between(curve.start, curve.end);
+        if (length(cross(line, axis)) > 1e-7 * length(axis) ||
+            std::abs(length(line) - length(axis)) > 1e-7)
+          return fail_slot();
+        if (std::abs(dot(between(slot_centers[0].first, curve.start), line)) >
+                1e-7 * length(line) &&
+            std::abs(dot(between(slot_centers[1].first, curve.start), line)) > 1e-7 * length(line))
+          return fail_slot();
+      }
+    const auto a = slot_centers[0].first, b = slot_centers[1].first;
+    centers =
+        Result<std::vector<Point3>>::success({{(a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2}});
+  }
   if (!centers)
     return Result<std::size_t>::failure(centers.error());
-  const double radius = diameter.value().diameter.millimeters() / 2;
   const double sign = feature->direction() == HoleDirection::SupportNormal ? 1. : -1.;
   const Vector3 direction{support.normal.x * sign, support.normal.y * sign,
                           support.normal.z * sign};
@@ -4370,9 +4537,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
     const std::string root =
         "hole/" + std::to_string(placement_id.size()) + ":" + placement_id + "/";
     std::optional<ResolvedResultFace> planar_limit;
-    if (!resolved_support.value().face.empty()) {
+    if (!slot && !resolved_support.value().face.empty()) {
       auto footprint = closed_profile_adapter_.validate_planar_circle_footprint(
-          resolved_support.value().face, center, support.normal, radius);
+          resolved_support.value().face, center, support.normal, opening_radius);
       if (!footprint)
         return Result<std::size_t>::failure(footprint.error());
     }
@@ -4476,18 +4643,139 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
                     center.y + direction.y * distance + support.x_axis.y * radial,
                     center.z + direction.z * distance + support.x_axis.z * radial};
     };
-    auto tool =
-        revolve_adapter_.revolve_profile(feature_id,
-                                         {along(start, 0), along(start, radius),
-                                          along(depth, radius), along(depth + cone_height, 0)},
-                                         center, direction, 0, 360);
+    if (!seats.empty()) {
+      auto material = forward_material(*target.value());
+      if (!material)
+        return Result<std::size_t>::failure(material.error());
+      entry = std::max(0., material.value().minimum);
+      const double limit = planar_limit ? dot(Vector3{planar_limit->plane.origin.x - center.x,
+                                                      planar_limit->plane.origin.y - center.y,
+                                                      planar_limit->plane.origin.z - center.z},
+                                              planar_limit->plane.normal) /
+                                              dot(direction, planar_limit->plane.normal)
+                                        : depth;
+      if (!std::isfinite(seats.back().depth) || seats.front().depth <= entry + 1e-7 ||
+          seats.back().depth >= std::min(limit, material.value().maximum) - 1e-7)
+        return Result<std::size_t>::failure(
+            geometry_error(feature_id.value(), "Hole seat must reach material and end before the "
+                                               "primary bore termination and material exit"));
+    }
+    std::vector<std::pair<double, double>> outline{{start, opening_radius}};
+    if (cone_seat)
+      outline.push_back({seats.front().depth, radius});
+    else
+      for (std::size_t i = 0; i < seats.size(); ++i) {
+        outline.push_back({seats[i].depth, seats[i].radius});
+        outline.push_back({seats[i].depth, i + 1 < seats.size() ? seats[i + 1].radius : radius});
+      }
+    outline.push_back({depth, radius});
+    outline.push_back({depth + cone_height, 0});
+    const auto radial_tool = [&](double from, const auto& source) -> Result<GeometryShape> {
+      auto points = source;
+      while (points.size() > 1 && points[1].first <= from)
+        points.erase(points.begin());
+      if (points.front().first < from) {
+        const auto [z0, r0] = points[0];
+        const auto [z1, r1] = points[1];
+        points[0] = {from, r0 + (r1 - r0) * (from - z0) / (z1 - z0)};
+      }
+      std::vector<Point3> vertices{along(from, 0)};
+      for (const auto& [z, r] : points)
+        vertices.push_back(along(z, r));
+      return revolve_adapter_.revolve_profile(feature_id, vertices, center, direction, 0, 360);
+    };
+    const auto slot_tool = [&](double from, double until) -> Result<GeometryShape> {
+      auto curves = slot_curves;
+      for (auto& curve : curves)
+        for (auto* point : {&curve.start, &curve.mid, &curve.end}) {
+          point->x += direction.x * from;
+          point->y += direction.y * from;
+          point->z += direction.z * from;
+        }
+      return closed_profile_adapter_.make_extruded_profile_from_curves(
+          curves, direction, Quantity::length_mm(until - from).value());
+    };
+    auto tool = slot ? slot_tool(start, depth) : radial_tool(start, outline);
     if (!tool)
       return Result<std::size_t>::failure(tool.error());
-    tool.value() = ResultFaceSupportGeometry::tag_hole_wall(
-        tool.value(), feature_id, root + "wall", center, direction, support.x_axis, radius);
+    if (slot) {
+      if (!resolved_support.value().face.empty()) {
+        const auto selected_footprint = closed_profile_adapter_.validate_planar_tool_footprint(
+            resolved_support.value().face, tool.value(), center, support.normal);
+        if (!selected_footprint)
+          return Result<std::size_t>::failure(selected_footprint.error());
+      }
+      auto material = forward_material(*target.value());
+      if (!material)
+        return Result<std::size_t>::failure(material.error());
+      entry = std::max(0., material.value().minimum);
+      const auto footprint = closed_profile_adapter_.validate_planar_tool_footprint(
+          *target.value(), tool.value(), along(entry, 0), support.normal);
+      if (!footprint)
+        return Result<std::size_t>::failure(footprint.error());
+      for (const auto& [arc_center, id] : slot_centers)
+        tool.value() = ResultFaceSupportGeometry::tag_hole_wall(
+            tool.value(), feature_id,
+            root + "slot/" + std::to_string(id.value().size()) + ":" + id.value(), arc_center,
+            direction, support.x_axis, radius);
+      const auto* sketch = document.find_sketch(slot->profile.sketch());
+      const auto* profile = sketch->find_arc_closed_profile(slot->profile.profile());
+      for (std::size_t i = 0; i < slot_curves.size(); ++i) {
+        const auto& curve = slot_curves[i];
+        if (curve.kind != ClosedProfileCurveKind::Line)
+          continue;
+        const Vector3 edge{curve.end.x - curve.start.x, curve.end.y - curve.start.y,
+                           curve.end.z - curve.start.z};
+        const auto& id = profile->curve_segments()[i].value();
+        tool.value() = ResultFaceSupportGeometry::tag_plane(
+            tool.value(), feature_id, root + "slot/" + std::to_string(id.size()) + ":" + id,
+            curve.start, direction, cross(edge, direction));
+      }
+    } else
+      tool.value() = ResultFaceSupportGeometry::tag_hole_wall(
+          tool.value(), feature_id, root + "wall", center, direction, support.x_axis, radius);
+    for (const auto& seat : seats) {
+      if (cone_seat)
+        tool.value() = ResultFaceSupportGeometry::tag_conical_wall(
+            tool.value(), feature_id, root + seat.id + "/wall", center, direction, support.x_axis,
+            0, seat.depth);
+      else {
+        tool.value() = ResultFaceSupportGeometry::tag_hole_wall(
+            tool.value(), feature_id, root + seat.id + "/wall", center, direction, support.x_axis,
+            seat.radius);
+        tool.value() = ResultFaceSupportGeometry::tag_plane(
+            tool.value(), feature_id, root + seat.id + "/bottom", along(seat.depth, 0),
+            support.x_axis, direction);
+      }
+    }
     if (blind && cone_height == 0)
       tool.value() = ResultFaceSupportGeometry::tag_plane(
           tool.value(), feature_id, root + "bottom", along(depth, 0), support.x_axis, direction);
+    std::optional<GeometryShape> seat_validation_tool;
+    if (!seats.empty() && !blind) {
+      // The full seat volume after material entry must fit; an intersecting
+      // entry plane is explicit, never permission to break through side walls.
+      auto seat_outline = outline;
+      seat_outline.erase(
+          std::remove_if(seat_outline.begin(), seat_outline.end(),
+                         [&](const auto& p) { return p.first > seats.back().depth; }),
+          seat_outline.end());
+      seat_outline.push_back({seats.back().depth, 0});
+      auto check = radial_tool(entry, seat_outline);
+      if (!check)
+        return Result<std::size_t>::failure(check.error());
+      auto contained = body_boolean_adapter_.combine(feature_id, BodyBooleanOperation::Intersect,
+                                                     check.value(), {*target.value()});
+      if (!contained)
+        return Result<std::size_t>::failure(contained.error());
+      const double expected = rectangle_extrusion_adapter_.summarize(check.value()).volume_mm3;
+      if (std::abs(rectangle_extrusion_adapter_.summarize(contained.value()).volume_mm3 -
+                   expected) > 1e-8 * std::max(1., expected))
+        return Result<std::size_t>::failure(
+            geometry_error(feature_id.value(),
+                           "Hole seat must fit current target material without side breakout"));
+      seat_validation_tool = std::move(check.value());
+    }
     if (planar_limit) {
       tool = closed_profile_adapter_.terminate_at_planar_face(tool.value(), planar_limit->face,
                                                               center);
@@ -4508,13 +4796,22 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
       if (!tool)
         return Result<std::size_t>::failure(tool.error());
     }
+    if (seat_validation_tool && (planar_limit || to_next || limit_body)) {
+      const auto retained = body_boolean_adapter_.combine(
+          feature_id, BodyBooleanOperation::Intersect, tool.value(), {*seat_validation_tool});
+      if (!retained)
+        return Result<std::size_t>::failure(retained.error());
+      const double expected =
+          rectangle_extrusion_adapter_.summarize(*seat_validation_tool).volume_mm3;
+      if (std::abs(rectangle_extrusion_adapter_.summarize(retained.value()).volume_mm3 - expected) >
+          1e-8 * std::max(1., expected))
+        return Result<std::size_t>::failure(
+            geometry_error(feature_id.value(), "Hole limit must retain the complete seat."));
+    }
     if (blind) {
-      auto material_tool = entry > 1e-7 ? revolve_adapter_.revolve_profile(
-                                              feature_id,
-                                              {along(entry, 0), along(entry, radius),
-                                               along(depth, radius), along(depth + cone_height, 0)},
-                                              center, direction, 0, 360)
-                                        : Result<GeometryShape>::success(tool.value());
+      auto material_tool = entry > 1e-7
+                               ? (slot ? slot_tool(entry, depth) : radial_tool(entry, outline))
+                               : Result<GeometryShape>::success(tool.value());
       if (!material_tool)
         return Result<std::size_t>::failure(material_tool.error());
       auto contained = body_boolean_adapter_.combine(feature_id, BodyBooleanOperation::Intersect,

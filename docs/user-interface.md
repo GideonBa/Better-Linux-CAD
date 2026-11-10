@@ -425,6 +425,14 @@ the existing finishing face selector and can drive Draft; curved walls do not of
 creation. Placement identity follows the authored Hole position when dimensions or poses change.
 Deleted or split source faces require correction through the existing reference diagnostics.
 
+154 manufacturing variants use the same browser, property inspector and History preview/Apply
+transaction. Selection labels name Senkung, Sitzfläche, Stufe or Langlochseite; stable placement,
+step and Sketch-curve identities drive references. Planar shoulders offer the existing direct
+2D Sketch action; conical seats remain curved face selections. Invalid seat dimensions, material
+breakout and truncated seats block the candidate. Explicit spacing recommendations are advisory
+and carry both actual and recommended distance. The progressive positions/type/termination fields
+and dedicated Hole editing panel remain owned by 157; this stage does not introduce another layout.
+
 The unmodified native [bore-wall Draft preview](images/semantic-hole-wall-draft.png) and
 [compact 150% preview](images/semantic-hole-wall-draft-compact.png) show the existing face list,
 valid preview, angle and pinned Apply/Cancel controls. The [bottom-supported Sketch](images/semantic-hole-bottom-sketch.png)
@@ -432,6 +440,14 @@ and [compact Sketch view](images/semantic-hole-bottom-sketch-compact.png) use th
 ribbon and face-normal camera. Ordinary captures are 1280×800; compact captures are 1536×960
 physical pixels for 1024×640 DIP. Model geometry stays small in the existing Fit All framing with
 origin geometry. These are actual UI captures, without image edits.
+
+154's unmodified native [manufacturing preview](images/manufacturing-hole-preview.png) and
+[compact 150% preview](images/manufacturing-hole-preview-compact.png) use that same History task
+with pinned Apply/Cancel. The [seat-supported Sketch](images/manufacturing-seat-sketch.png) and
+[compact Sketch](images/manufacturing-seat-sketch-compact.png) retain the existing face-normal
+camera, Sketch ribbon and browser/property panes. Ordinary captures are 1280×800; compact captures
+are 1536×960 physical pixels for 1024×640 DIP. Existing datum-inclusive Fit All framing keeps the
+model small. These captures verify the shared workflow; dedicated manufacturing authoring is 157.
 
 For Hole, use the familiar top-to-bottom order: positions → target/direction → bore/seat type →
 termination → thread → advanced checks. For Fillet, keep constant/variable/face/full-round as modes

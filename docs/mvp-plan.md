@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 153
-current_block: 154
-current_boundary: Block 153 accepted, delivery PR 169; stopped at user request; Block 154 not started
-current_tag: "[parity-b154]"
+implemented_through: Block 154
+current_block: 155
+current_boundary: Block 154 accepted; Block 155 semantic threads planned
+current_tag: "[parity-b155]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–153 accepted; Blocks 154–204 planned; stopped after 153"
+  advanced_modeling_workflows: "Blocks 145–154 accepted; Blocks 155–204 planned"
 ---
 
 # MVP Plan
@@ -33,10 +33,10 @@ mathematics, persistence spellings, migration rules, ordering, and failure polic
 ## Current status
 
 ```text
-implemented through  Block 153
-current block        Block 154 (planned; not started)
+implemented through  Block 154
+current block        Block 155 (planned)
 current phase        Semantic holes and threads
-current boundary     Stopped after completed Block 153 at the user’s request
+current boundary     Whole Block 154 accepted; semantic threads are next
 ```
 
 The 2026-11-04 GUI request is complete through Block 144. The 2026-11-06 request assigns a
@@ -1776,8 +1776,8 @@ Previously deferred modeling capabilities remain scoped by their feature contrac
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–153 are **Implemented and accepted**;
-Blocks 154–204 are **Planned; not started**. Work stops after 153 at the user’s request.
+Status authority: Blocks 145–154 are **Implemented and accepted**;
+Blocks 155–204 are **Planned; not started**. The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
 negative cases, combination matrix, native proof and performance protocol live in
@@ -1787,7 +1787,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
-| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152–153 accepted; 154–158 planned |
+| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152–154 accepted; 155–158 planned |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
@@ -2701,7 +2701,8 @@ open, implemented-through stays 152 and Wizard authoring remains 157.
 `1d19e550c79cf8e2b1b39ba6aaa7cfbe3ee5fd23`. Final inventory is **5 / 658** and all
 1,023 runtime fingerprints remain unchanged. Confirm the exact final head and normal protected
 merge, then compare refreshed main before C. The user requests completion of whole Block 153
-and an immediate stop afterward; do not begin Block 154.
+and an immediate stop afterward. That historical stop was observed; the later explicit resume
+is recorded in the 154 section below.
 
 153C begins after confirmed PR #168 merge `8535f71` and an exact refreshed-main tree match
 `eba2925eddabf474b8573dec604a73e6b8dc2590`. Extend the existing result-face origin authority
@@ -2723,16 +2724,56 @@ ordinary **13 / 1,457** and compact 150% **13 / 1,471** have no failures/skips. 
 window, intentional timeout 124. Broader native-only/optional offscreen skips remain reported,
 not claimed as fully rerun. Final inventory, runtime freeze and reviewed protected delivery follow.
 
-Whole Block 153 is accepted; Phase B remains open for 154–158. The user’s explicit stop applies
-after delivery of 153: **do not start Block 154 or create its implementation branch**. Next work
-requires a later user instruction. The semantic Hole Wizard remains assigned to 157.
+Whole Block 153 is accepted. At its 2026-11-08 delivery the user required a stop before 154;
+that stop was observed. The explicit 2026-11-09 resume authorizes 154 as recorded below. The
+semantic Hole Wizard remains assigned to 157.
 
 153C delivery: [PR #169](https://github.com/GideonBa/Better-Linux-CAD/pull/169), implementation
 `bf3372ef156f47f2201e03d9f1168ad4988dab18`, reviewed implementation tree
 `37b6894f214cebb8bfe8c8317bf1d2032a244fbd`. Final inventory passes **5 / 658** and all
 1,024 final runtime fingerprints match their tested source state. The delivery record changes
 only documentation. Finish with the exact-head protected merge and refreshed-main tree comparison;
-retain the explicit stop after 153 without opening a 154 branch.
+the 153 delivery ended at the then-requested stop; the subsequent resume is recorded below.
+
+### Block 154 serial implementation — 2026-11-09
+
+The user explicitly resumes after the requested 153 stop. PR #169 is confirmed merged as
+`5840dd9`; refreshed main matches reviewed tree `147f6f427471c28848a230ff18d5228947cf1300`.
+Work proceeds on `feat/hole-manufacturing-variants`; do not infer whole-block completion from slices.
+
+| Slice | Deliverable | Status |
+| --- | --- | --- |
+| 154A | Discriminated counterbore/countersink/spotface/stepped/fitted/center/slot intent, typed parameter/table validation, graph/pins/revision adoption and strict portable persistence with legacy bytes retained | Accepted |
+| 154B | Existing-tool physical execution, full seat/step finite-support and remaining-material checks, slot-profile consumption and stable meaningful downstream roots | Accepted |
+| 154C | Formula/section/invalid-mode tests, material/mass/import/history/exchange combinations and existing native task restoration at ordinary/compact layouts | Accepted |
+
+Seat depths measure from the authored support, matching existing Hole depth origin. No automatic
+material-entry depth or hidden extension is inferred. A seat must intersect and fit current target
+material, remain before termination, and have a larger diameter than the primary bore. Step IDs are
+stable across reordering/mode edits. Fits carry explicit authored tolerance metadata and preserve
+nominal geometry. Slot intent references the existing arc-closed Sketch profile; it never creates
+Sketch entities. Reject incompatible extent/tip combinations explicitly. Recommendations, if
+supplied by the user, are reported separately from geometric validity; no invented standards data.
+Existing top-to-bottom property/preview/Apply/Undo contracts apply; dedicated authoring remains 157.
+All slices and B02 combined acceptance must pass before advancing implemented-through beyond 153.
+
+154/whole-block acceptance — 2026-11-10: all A/B/C gates pass. Typed manufacturing intent,
+all-field resource pins/adoption and strict Part V5/Project persistence retain ordinary V4 bytes.
+Physical seats/steps/cones and existing-profile outward-capsule Slots use support-based depths,
+complete selected-support/material/limit checks, explicit nonparticipants and atomic failure.
+Primary/seat/step/curve face origins support meaningful edits, poses and existing shoulder Sketches.
+Exact STEP roundtrip completes only analytic UV-boundary representation while retaining every
+existing 3D curve/range, surface, vertex and tolerance; broader healing remains a later workflow.
+
+Full Core **680 / 26,299**, full Geometry **646 / 55,985**; final focused Qt **12 / 1,309**;
+full Qt **728 passed / 39 native-only or optional skips, 92,244 assertions**. Relevant native 100%
+**16 / 1,848** and compact 150% **16 / 1,866** have no failures/skips. Earlier native STEP-menu
+watchdog failures are retained in `development-setup.md`; the corrected test helper still requires
+actual action/dialog and geometry outcomes, with unchanged five-second phase limits. Startup
+reaches the native window and exits at intentional timeout **124**. All **1,027** runtime fingerprints
+match the final tested state. Shared UI captures are original ordinary/compact screenshots; the
+progressive Inventor-like authoring panel remains 157. Phase B stays open for 155–158. Final
+inventory, staged review and regular protected PR delivery follow; 155 has not started.
 
 ## Later phases
 

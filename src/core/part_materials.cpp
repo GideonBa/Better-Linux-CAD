@@ -40,14 +40,10 @@ PartDocument::adopt_engineering_resource_revision(const EngineeringResourceKey& 
     // back the catalog insertion and all previously remapped consumers.
     const auto holes = candidate.hole_features_;
     for (const auto& hole : holes) {
-      const auto* selected = std::get_if<HoleStandardSelection>(&hole.diameter());
-      if (!selected || selected->table != source)
+      const auto dependencies = hole.standard_dependencies();
+      if (std::find(dependencies.begin(), dependencies.end(), source) == dependencies.end())
         continue;
-      auto selection = *selected;
-      selection.table = next;
-      auto replacement_hole = HoleFeature::create(
-          hole.id(), hole.name(), hole.kind(), hole.target_body(), hole.support(),
-          hole.placements(), std::move(selection), hole.extent(), hole.direction(), hole.tip());
+      auto replacement_hole = hole.remap_standard_revision(source, next);
       if (!replacement_hole)
         return Result<std::size_t>::failure(replacement_hole.error());
       auto updated = candidate.update_hole_feature(std::move(replacement_hole.value()));
@@ -67,11 +63,12 @@ Result<std::size_t> PartDocument::remove_engineering_resource(const EngineeringR
                   [&](const auto& entry) { return entry.material == key; }))
     return Result<std::size_t>::failure(Error::validation(
         id_.value(), "Material revision is still assigned to the Part or a Body"));
-  for (const auto& hole : hole_features_)
-    if (const auto* selected = std::get_if<HoleStandardSelection>(&hole.diameter());
-        selected && selected->table == key)
+  for (const auto& hole : hole_features_) {
+    const auto keys = hole.standard_dependencies();
+    if (std::find(keys.begin(), keys.end(), key) != keys.end())
       return Result<std::size_t>::failure(Error::dependency(
           hole.id().value(), "Standard revision is still referenced by Hole intent"));
+  }
   auto candidate = *this;
   auto removed = candidate.engineering_resources_.remove(key);
   if (!removed)

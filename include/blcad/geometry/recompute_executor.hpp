@@ -36,9 +36,21 @@ struct GeometryRecomputeSummary {
   bool reused_complete_geometry = false;
 };
 
+struct HoleSpacingAdvisory {
+  HolePlacementId first;
+  HolePlacementId second;
+  double actual_web_mm;
+  double recommended_web_mm;
+};
+
 class GeometryRecomputeExecutor {
 public:
   GeometryRecomputeExecutor() = default;
+  // Explicit caller-supplied recommendation, never a normative default or a
+  // geometric validity condition. The query cannot mutate intent or Apply state.
+  [[nodiscard]] Result<std::vector<HoleSpacingAdvisory>>
+  hole_spacing_advisories(const PartDocument& document, FeatureId hole, const ShapeCache& cache,
+                          double recommended_web_mm) const;
   explicit GeometryRecomputeExecutor(StepImportTopologyContext* import_context)
       : import_context_(import_context) {}
   // The same resolved, transformed axis used by feature execution. Interactive
