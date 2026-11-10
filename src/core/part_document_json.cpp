@@ -4,6 +4,7 @@
 #include "imported_topology_json.hpp"
 #include "part_material_json.hpp"
 #include "step_import_json.hpp"
+#include "thread_json.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -33,6 +34,7 @@ constexpr int k_history_version = 2;
 constexpr int k_resource_version = 3;
 constexpr int k_hole_version = 4;
 constexpr int k_manufacturing_hole_version = 5;
+constexpr int k_thread_version = 6;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -2370,7 +2372,41 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
               {"tip", std::move(tip)}};
   if (!std::holds_alternative<std::monostate>(feature.manufacturing()))
     result["manufacturing"] = hole_manufacturing_to_json(feature.manufacturing());
+  if (feature.thread())
+    result["thread"] = detail::thread_definition_to_json(*feature.thread());
   return result;
+}
+
+[[nodiscard]] json thread_feature_to_json(const ThreadFeature& feature) {
+  return {{"id", feature.id().value()},
+          {"name", feature.name()},
+          {"target_body", feature.target_body().value()},
+          {"support", face_reference_to_json(feature.support())},
+          {"direction", to_string(feature.direction())},
+          {"thread", detail::thread_definition_to_json(feature.thread())}};
+}
+[[nodiscard]] Result<ThreadFeature> thread_feature_from_json(const json& value) {
+  const auto fail = [] {
+    return Result<ThreadFeature>::failure(json_error("Unknown or malformed Thread feature"));
+  };
+  if (!has_exact_fields(value, {"id", "name", "target_body", "support", "direction", "thread"}))
+    return fail();
+  const auto direction = value.at("direction").get<std::string>();
+  if (direction != "along_support_axis" && direction != "opposite_support_axis")
+    return fail();
+  auto support =
+      face_reference_from_json(value.at("support"), PartFeatureInputRole::ThreadSupportFace);
+  if (!support)
+    return Result<ThreadFeature>::failure(support.error());
+  auto thread = detail::thread_definition_from_json(value.at("thread"));
+  if (!thread)
+    return Result<ThreadFeature>::failure(thread.error());
+  return ThreadFeature::create(
+      FeatureId(value.at("id").get<std::string>()), value.at("name").get<std::string>(),
+      BodyId(value.at("target_body").get<std::string>()), std::move(support.value()),
+      std::move(thread.value()),
+      direction == "along_support_axis" ? ThreadDirection::AlongSupportAxis
+                                        : ThreadDirection::OppositeSupportAxis);
 }
 
 [[nodiscard]] Result<HoleDiameter> hole_diameter_from_json(const json& value) {
@@ -2491,6 +2527,7 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
   };
   auto base_fields = value;
   base_fields.erase("manufacturing");
+  base_fields.erase("thread");
   if (!has_exact_fields(base_fields, {"id", "name", "kind", "target_body", "support", "direction",
                                       "diameter", "placements", "extent", "tip"}) ||
       !value.at("placements").is_array())
@@ -2545,6 +2582,13 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
       return Result<HoleFeature>::failure(parsed.error());
     manufacturing = std::move(parsed.value());
   }
+  std::optional<ThreadDefinition> thread;
+  if (value.contains("thread")) {
+    auto parsed = detail::thread_definition_from_json(value.at("thread"));
+    if (!parsed)
+      return Result<HoleFeature>::failure(parsed.error());
+    thread = std::move(parsed.value());
+  }
   return HoleFeature::create(
       FeatureId(value.at("id").get<std::string>()), value.at("name").get<std::string>(),
       kind == "plain" ? HoleKind::Plain : HoleKind::Clearance,
@@ -2552,7 +2596,7 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
       std::move(placements), std::move(diameter.value()), std::move(extent.value()),
       direction == "support_normal" ? HoleDirection::SupportNormal
                                     : HoleDirection::OppositeSupportNormal,
-      std::move(tip), std::move(manufacturing));
+      std::move(tip), std::move(manufacturing), std::move(thread));
 }
 
 [[nodiscard]] json draft_feature_to_json(const DraftFeature& feature) {
@@ -4183,12 +4227,18 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   json root;
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
-  if (!document.engineering_resources().entries().empty() || !document.hole_features().empty()) {
+  if (!document.engineering_resources().entries().empty() || !document.hole_features().empty() ||
+      !document.thread_features().empty()) {
     const bool manufacturing = std::any_of(
         document.hole_features().begin(), document.hole_features().end(), [](const auto& hole) {
           return !std::holds_alternative<std::monostate>(hole.manufacturing());
         });
-    root["version"] = manufacturing                      ? k_manufacturing_hole_version
+    const bool threads =
+        !document.thread_features().empty() ||
+        std::any_of(document.hole_features().begin(), document.hole_features().end(),
+                    [](const auto& hole) { return hole.thread().has_value(); });
+    root["version"] = threads                            ? k_thread_version
+                      : manufacturing                    ? k_manufacturing_hole_version
                       : document.hole_features().empty() ? k_resource_version
                                                          : k_hole_version;
     root["history_version"] = document.authored_history_intent() ? k_history_version : k_version;
@@ -4483,6 +4533,12 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     for (const auto& hole : document.hole_features())
       root["hole_features"].push_back(hole_feature_to_json(hole));
   }
+  if (!document.thread_features().empty()) {
+    root["thread_features"] = json::array();
+    for (const auto& node : pattern_order.value())
+      if (const auto* thread = document.find_thread_feature(FeatureId(node)))
+        root["thread_features"].push_back(thread_feature_to_json(*thread));
+  }
   root["draft_features"] = json::array();
   for (const std::string& node : pattern_order.value())
     if (const auto* draft = document.find_draft_feature(FeatureId(node)))
@@ -4556,7 +4612,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   for (const auto* family :
        {"imported_body_features", "features", "revolve_features", "sweep_features", "loft_features",
         "surface_features", "body_booleans", "part_patterns", "mirror_features", "edge_treatments",
-        "shell_features", "hole_features", "draft_features", "body_transforms"})
+        "shell_features", "hole_features", "thread_features", "draft_features", "body_transforms"})
     for (const auto& feature : root.value(family, json::array()))
       historical_positions.emplace(feature.at("id").get<std::string>(),
                                    historical_positions.size() + 1U);
@@ -4575,7 +4631,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     latest_ancestor_position[node] = latest;
   }
   if (interleaved || !document.result_face_workplanes().empty() ||
-      !document.hole_features().empty() || document.authored_history_intent())
+      !document.hole_features().empty() || !document.thread_features().empty() ||
+      document.authored_history_intent())
     root["feature_order"] = std::move(feature_order);
   if (document.authored_history_intent())
     root["suppressed_features"] = document.authored_history_intent()->suppressed;
@@ -4606,18 +4663,21 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
     if (!root.at("version").is_number_integer() ||
         (root.at("version") != k_version && root.at("version") != k_history_version &&
          root.at("version") != k_resource_version && root.at("version") != k_hole_version &&
-         root.at("version") != k_manufacturing_hole_version))
+         root.at("version") != k_manufacturing_hole_version &&
+         root.at("version") != k_thread_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
     const auto version = root.at("version").get<int>();
     int history_version = version;
     const bool hole_envelope = version == k_hole_version || version == k_manufacturing_hole_version;
-    const bool resource_envelope = version == k_resource_version || hole_envelope;
+    const bool thread_envelope = version == k_thread_version;
+    const bool resource_envelope =
+        version == k_resource_version || hole_envelope || thread_envelope;
     if (hole_envelope) {
       if (!root.contains("hole_features") || !root.at("hole_features").is_array() ||
           root.at("hole_features").empty())
         return Result<PartDocument>::failure(
             json_error("Part version 4 requires nonempty hole_features"));
-    } else if (root.contains("hole_features"))
+    } else if (root.contains("hole_features") && !thread_envelope)
       return Result<PartDocument>::failure(
           json_error("Semantic Hole intent requires Part version 4"));
     if (hole_envelope) {
@@ -4629,6 +4689,22 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
             json_error("Manufacturing Hole intent requires Part version 5; legacy Hole intent "
                        "remains version 4"));
     }
+    if (thread_envelope && root.contains("hole_features") &&
+        (!root.at("hole_features").is_array() || root.at("hole_features").empty()))
+      return Result<PartDocument>::failure(
+          json_error("Thread Part hole_features must be a nonempty array when present"));
+    const auto holes = root.value("hole_features", json::array());
+    const bool internal_thread =
+        holes.is_array() && std::any_of(holes.begin(), holes.end(), [](const auto& hole) {
+          return hole.is_object() && hole.contains("thread");
+        });
+    const bool external_thread = root.contains("thread_features") &&
+                                 root.at("thread_features").is_array() &&
+                                 !root.at("thread_features").empty();
+    if (thread_envelope != (internal_thread || external_thread) ||
+        (root.contains("thread_features") && (!thread_envelope || !external_thread)))
+      return Result<PartDocument>::failure(
+          json_error("Thread intent requires canonical Part version 6"));
     if (root.contains("engineering_resource_refs"))
       return Result<PartDocument>::failure(
           json_error("Standalone Part cannot resolve Project resource references"));
@@ -4714,6 +4790,8 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
                                 "mirror_features",
                                 "edge_treatments",
                                 "shell_features",
+                                "hole_features",
+                                "thread_features",
                                 "draft_features",
                                 "body_booleans",
                                 "sketch_ownerships",
@@ -4727,11 +4805,11 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
           return Result<PartDocument>::failure(
               json_error("Reference Part cannot contain authored Part intent"));
     }
-    if (root.contains("result_face_workplanes") || hole_envelope) {
+    if (root.contains("result_face_workplanes") || hole_envelope || thread_envelope) {
       const auto supports = root.value("result_face_workplanes", json::array());
       if (!supports.is_array())
         return Result<PartDocument>::failure(json_error("result_face_workplanes must be an array"));
-      if (supports.empty() && !hole_envelope) {
+      if (supports.empty() && !hole_envelope && !thread_envelope) {
         auto legacy = root;
         legacy.erase("result_face_workplanes");
         return deserialize_part_document_from_json(legacy.dump(), mode);
@@ -4765,6 +4843,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
                                                       "body_transforms",
                                                       "sketch_ownerships",
                                                       "hole_features",
+                                                      "thread_features",
                                                       "reference_statuses",
                                                       "reference_remaps",
                                                       "sketch_origin_overrides",
@@ -4782,6 +4861,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         prelude[key] = json::array();
       }
       prelude.erase("hole_features");
+      prelude.erase("thread_features");
       auto document = deserialize_part_document_from_json(prelude.dump(), mode);
       if (!document)
         return document;
@@ -4934,6 +5014,9 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
           "hole_features", hole_feature_from_json,
           [](auto& doc, const auto& value) { return doc.add_hole_feature(value); }, true);
       enqueue(
+          "thread_features", thread_feature_from_json,
+          [](auto& doc, const auto& value) { return doc.add_thread_feature(value); }, true);
+      enqueue(
           "draft_features", draft_feature_from_json,
           [](auto& doc, const auto& value) { return doc.add_draft_feature(value); }, true);
       enqueue(
@@ -5029,6 +5112,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       restore(part.chamfer_features_, "edge_treatments");
       restore(part.shell_features_, "shell_features");
       restore(part.hole_features_, "hole_features");
+      restore(part.thread_features_, "thread_features");
       restore(part.draft_features_, "draft_features");
       restore(part.body_transforms_, "body_transforms");
       if (!retained) {

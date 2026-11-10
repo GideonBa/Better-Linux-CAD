@@ -54,6 +54,9 @@ template <typename FeatureT>
 [[nodiscard]] inline BodyId record_result_body(const HoleFeature& f) {
   return f.target_body();
 }
+[[nodiscard]] inline BodyId record_result_body(const ThreadFeature& f) {
+  return f.target_body();
+}
 [[nodiscard]] inline BodyId record_result_body(const DraftFeature& f) { return f.target_body(); }
 [[nodiscard]] inline BodyId record_result_body(const BodyBooleanFeature& f) {
   return f.effective_result_body();
@@ -79,7 +82,8 @@ template <typename FeatureT>
       matches(part.circular_pattern_features()) || matches(part.mirror_features()) ||
       matches(part.fillet_features()) || matches(part.chamfer_features()) ||
       matches(part.shell_features()) || matches(part.hole_features()) ||
-      matches(part.draft_features()) || matches(part.body_boolean_features()))
+      matches(part.thread_features()) || matches(part.draft_features()) ||
+      matches(part.body_boolean_features()))
     return true;
   const auto* transform = part.find_body_transform(BodyTransformId(node));
   return transform && transform->body() == body;
@@ -142,6 +146,7 @@ validate_result_face_source(const PartDocument& document, const ResultFaceRefere
         document.find_fillet_feature(origin.feature) ||
         document.find_chamfer_feature(origin.feature) ||
         document.find_shell_feature(origin.feature) || document.find_hole_feature(origin.feature) ||
+        document.find_thread_feature(origin.feature) ||
         document.find_draft_feature(origin.feature) ||
         document.find_body_boolean_feature(origin.feature);
     if (!exists && !may_retain(origin.feature.value()))
@@ -1567,6 +1572,11 @@ Result<std::size_t> PartDocument::validate_reference_sources() const {
     if (!valid)
       return valid;
   }
+  for (const auto& thread : thread_features_) {
+    auto valid = validate_thread_feature_inputs(*this, thread);
+    if (!valid)
+      return valid;
+  }
   for (const auto& plane : result_face_workplanes_) {
     auto valid = validate_result_face_source(*this, plane.reference(), plane.id().value());
     if (!valid)
@@ -2989,6 +2999,76 @@ Result<std::size_t> PartDocument::add_hole_feature(HoleFeature feature) {
   return Result<std::size_t>::success(index);
 }
 
+Result<std::size_t> PartDocument::add_thread_dependencies(const ThreadFeature& feature) {
+  auto graph = dependency_graph_;
+  auto added = add_authored_graph_node(graph, feature.id().value());
+  if (!added)
+    return added;
+  std::vector<std::string> inputs{feature.support().source_node_id()};
+  for (const auto& parameter : feature.parameter_dependencies())
+    inputs.push_back(parameter.value());
+  for (const auto& standard : feature.standard_dependencies()) {
+    const auto node = engineering_resource_node_id(standard);
+    if (has_authored_node_identity(node) || is_imported_authority_node(node))
+      return Result<std::size_t>::failure(
+          Error::dependency(node, "Standard revision identity aliases model intent"));
+    if (!graph.has_node(node)) {
+      auto resource = graph.add_node(node);
+      if (!resource)
+        return resource;
+    }
+    inputs.push_back(node);
+  }
+  for (const auto& input : inputs) {
+    auto dependency = add_dependency_if_missing(graph, input, feature.id().value());
+    if (!dependency)
+      return dependency;
+  }
+  const auto body_node = body_dependency_node_id(feature.target_body());
+  const auto previous = dependency_sources_of(graph, body_node);
+  if (previous.empty())
+    return Result<std::size_t>::failure(Error::dependency(
+        feature.id().value(), "Thread target requires an upstream Body producer"));
+  graph.remove_dependencies_of_dependent(body_node);
+  for (const auto& producer : previous) {
+    auto dependency = add_dependency_if_missing(graph, producer, feature.id().value());
+    if (!dependency)
+      return dependency;
+  }
+  auto output = add_dependency_if_missing(graph, feature.id().value(), body_node);
+  if (!output)
+    return output;
+  if (graph.has_cycle())
+    return Result<std::size_t>::failure(
+        Error::dependency(feature.id().value(), "Thread inputs create a dependency cycle"));
+  auto invalidation = invalidation_state_;
+  auto synced = sync_graph(std::move(graph), invalidation, dependency_graph_, feature.id().value());
+  if (!synced)
+    return synced;
+  invalidation_state_ = std::move(invalidation);
+  return Result<std::size_t>::success(1);
+}
+
+Result<std::size_t> PartDocument::add_thread_feature(ThreadFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "Feature identity must be unique within Part"));
+  auto valid = validate_thread_feature_inputs(*this, feature);
+  if (!valid)
+    return valid;
+  auto candidate = *this;
+  auto dependencies = candidate.add_thread_dependencies(feature);
+  if (!dependencies)
+    return dependencies;
+  candidate.thread_features_.push_back(std::move(feature));
+  candidate.append_history_executable(candidate.thread_features_.back().id().value());
+  const auto index = candidate.thread_features_.size() - 1;
+  *this = std::move(candidate);
+  return Result<std::size_t>::success(index);
+}
+
 Result<std::size_t> PartDocument::add_shell_feature(ShellFeature feature) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
@@ -3444,6 +3524,10 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
          std::get<HoleUpToBodyExtent>(feature.extent()).body == id))
       return Result<std::size_t>::failure(
           Error::dependency(id.value(), "Body is referenced by Hole intent"));
+  for (const auto& feature : thread_features_)
+    if (feature.target_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "Body is referenced by Thread intent"));
   for (const auto& feature : shell_features_)
     if (feature.target_body() == id)
       return Result<std::size_t>::failure(
@@ -3855,6 +3939,9 @@ const std::vector<ShellFeature>& PartDocument::shell_features() const noexcept {
 const std::vector<HoleFeature>& PartDocument::hole_features() const noexcept {
   return hole_features_;
 }
+const std::vector<ThreadFeature>& PartDocument::thread_features() const noexcept {
+  return thread_features_;
+}
 const std::vector<DraftFeature>& PartDocument::draft_features() const noexcept {
   return draft_features_;
 }
@@ -3953,6 +4040,9 @@ std::size_t PartDocument::shell_feature_count() const noexcept {
 }
 std::size_t PartDocument::hole_feature_count() const noexcept {
   return hole_features_.size();
+}
+std::size_t PartDocument::thread_feature_count() const noexcept {
+  return thread_features_.size();
 }
 std::size_t PartDocument::draft_feature_count() const noexcept {
   return draft_features_.size();
@@ -4121,6 +4211,12 @@ const HoleFeature* PartDocument::find_hole_feature(FeatureId id) const noexcept 
       return &feature;
   return nullptr;
 }
+const ThreadFeature* PartDocument::find_thread_feature(FeatureId id) const noexcept {
+  for (const auto& feature : thread_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
 const DraftFeature* PartDocument::find_draft_feature(FeatureId id) const noexcept {
   for (const auto& feature : draft_features_)
     if (feature.id() == id)
@@ -4250,6 +4346,9 @@ bool PartDocument::has_shell_feature_id(const FeatureId& id) const noexcept {
 bool PartDocument::has_hole_feature_id(const FeatureId& id) const noexcept {
   return find_hole_feature(id) != nullptr;
 }
+bool PartDocument::has_thread_feature_id(const FeatureId& id) const noexcept {
+  return find_thread_feature(id) != nullptr;
+}
 bool PartDocument::has_draft_feature_id(const FeatureId& id) const noexcept {
   return find_draft_feature(id) != nullptr;
 }
@@ -4271,8 +4370,8 @@ bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
          has_loft_feature_id(id) || has_surface_feature_id(id) ||
          has_linear_pattern_feature_id(id) || has_circular_pattern_feature_id(id) ||
          has_mirror_feature_id(id) || has_fillet_feature_id(id) || has_chamfer_feature_id(id) ||
-         has_shell_feature_id(id) || has_hole_feature_id(id) || has_draft_feature_id(id) ||
-         has_body_boolean_feature_id(id);
+         has_shell_feature_id(id) || has_hole_feature_id(id) || has_thread_feature_id(id) ||
+         has_draft_feature_id(id) || has_body_boolean_feature_id(id);
 }
 
 bool PartDocument::has_authored_node_identity(std::string_view node) const {
@@ -4292,8 +4391,8 @@ bool PartDocument::has_authored_node_identity(std::string_view node) const {
       contains(loft_features_) || contains(surface_features_) ||
       contains(linear_pattern_features_) || contains(circular_pattern_features_) ||
       contains(mirror_features_) || contains(fillet_features_) || contains(chamfer_features_) ||
-      contains(shell_features_) || contains(hole_features_) || contains(draft_features_) ||
-      contains(body_boolean_features_) || contains(body_transforms_) ||
+      contains(shell_features_) || contains(hole_features_) || contains(thread_features_) ||
+      contains(draft_features_) || contains(body_boolean_features_) || contains(body_transforms_) ||
       contains(reference_statuses_) || contains(reference_remaps_))
     return true;
   for (const auto& sketch : sketches_)
@@ -4603,6 +4702,19 @@ Result<std::size_t> PartDocument::update_hole_feature(HoleFeature feature) {
 }
 Result<std::size_t> PartDocument::remove_hole_feature(FeatureId id) {
   auto removed = remove_feature_record(&PartDocument::hole_features_, id);
+  if (removed)
+    prune_unused_engineering_resource_nodes();
+  return removed;
+}
+Result<std::size_t> PartDocument::update_thread_feature(ThreadFeature feature) {
+  auto updated = update_feature_record(&PartDocument::thread_features_, std::move(feature),
+                                       &PartDocument::add_thread_feature);
+  if (updated)
+    prune_unused_engineering_resource_nodes();
+  return updated;
+}
+Result<std::size_t> PartDocument::remove_thread_feature(FeatureId id) {
+  auto removed = remove_feature_record(&PartDocument::thread_features_, id);
   if (removed)
     prune_unused_engineering_resource_nodes();
   return removed;

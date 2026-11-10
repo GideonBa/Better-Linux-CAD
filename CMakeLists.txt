@@ -108,6 +108,7 @@ add_library(
   src/core/shell_feature.cpp
   src/core/hole_feature.cpp
   src/core/thread_feature.cpp
+  src/core/thread_json.cpp
   src/core/sweep_feature.cpp
   src/core/step_import_source.cpp
   src/core/step_import_freshness.cpp
@@ -516,6 +517,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/shell_feature_tests.cpp
     tests/core/hole_feature_tests.cpp
     tests/core/thread_feature_tests.cpp
+    tests/core/part_thread_feature_tests.cpp
     tests/core/hole_manufacturing_tests.cpp
     tests/core/part_hole_feature_tests.cpp
     tests/core/part_feature_input_reference_tests.cpp
@@ -570,6 +572,7 @@ if(BLCAD_BUILD_TESTS)
       blcad_geometry_tests
       tests/geometry/part_history_evaluation_boundary_tests.cpp
       tests/geometry/hole_feature_geometry_tests.cpp
+      tests/geometry/thread_feature_geometry_tests.cpp
       tests/geometry/hole_manufacturing_geometry_tests.cpp
       tests/geometry/arc_closed_profile_pipeline_tests.cpp
       tests/geometry/assembly_angle_numeric_solver_tests.cpp

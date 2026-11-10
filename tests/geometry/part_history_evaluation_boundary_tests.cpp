@@ -228,6 +228,8 @@ void add_operation(PartDocument& part, PartFeatureFamily family) {
   }
   case PartFeatureFamily::ImportedBody:
     FAIL("Imported source uses a real STEP asset fixture in a separate test");
+  case PartFeatureFamily::Thread:
+    FAIL("Thread execution boundaries use their dedicated fixtures");
   }
 }
 } // namespace

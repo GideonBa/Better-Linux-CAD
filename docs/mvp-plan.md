@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 154
 current_block: 155
-current_boundary: Block 154 accepted; Block 155A shared Thread Core inputs verified; 155B next
+current_boundary: Block 154 accepted; 155A delivered in PR 172; 155B verified in PR 173; 155C planned
 current_tag: "[parity-b155]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 154
-current block        Block 155 (155A verified; 155B next)
+current block        Block 155 (155B verified; 155C next)
 current phase        Semantic holes and threads
-current boundary     Whole Block 154 accepted; shared Thread Core inputs verified
+current boundary     Whole Block 154 accepted; Thread document integration verified; execution/display open
 ```
 
 The next assigned work is Block 155. [The consolidated sequence](inventor-parity-sequence.md)
@@ -249,18 +249,25 @@ remains 157.
 | Slice | Scope and acceptance | Status |
 | --- | --- | --- |
 | 155A | One shared Thread definition, authored/pinned profiles with exact provenance, independent start/length, handedness/mode/taper, dependency/remap queries and standalone external input record. Read-only Core validation and negative tests. | Implemented and verified; [PR #172](https://github.com/GideonBa/Better-Linux-CAD/pull/172) |
-| 155B | Internal Hole and standalone Thread registration in Part/Project persistence, Body history, dependency/removal/suppression and atomic resource adoption. Preserve legacy bytes; prove reopen, parameter edits and failed late consumers. | Planned |
+| 155B | Internal Hole and standalone Thread registration in Part/Project persistence, Body history, dependency/removal/suppression and atomic resource adoption. Preserve legacy bytes; prove reopen, parameter edits and failed late consumers. | Implemented and verified; [PR #173](https://github.com/GideonBa/Better-Linux-CAD/pull/173) |
 | 155C | Checked supports/material/depths, cosmetic geometry invariance and derived display, explicit modeled helical execution with cost/capability limits. Complete independent pitch/hand/radial/volume oracles, blind clearance, resources/history/material/import/STEP combinations and relevant native checks at both scales. | Planned |
 
-155A uses the existing parameter/resource and typed Face-reference authorities. `hole-wizard.md`
-owns its exact input contract. Core build passes; focused Thread proof **9 / 232**, combined
-Thread/Hole/resource proof **58 / 2,634**, full Core **689 / 26,531**, no skips/failures.
-All 1,031 runtime fingerprints remain frozen. Formatting, contract references and diff review pass.
-Geometry/Qt/native suites are not rerun for this Core-only input foundation; registered/executed/UI
-Threads remain open. Delivery: [PR #172](https://github.com/GideonBa/Better-Linux-CAD/pull/172),
-reviewed implementation `3f3d707`, on `feat/semantic-thread-definition` after verified merged
-PR #171 and refreshed main. This delivery-record update leaves runtime inputs unchanged.
-Whole Block 155 remains incomplete; continue with 155B after the protected merge.
+The shared contract lives in `hole-wizard.md`; V6 spelling lives in `file-format.md`. 155A was
+merged in [PR #172](https://github.com/GideonBa/Better-Linux-CAD/pull/172). Main was verified/refreshed
+before 155B began on `feat/semantic-thread-persistence`.
+
+155B validation (cases / assertions): focused Core **17 / 382**, full Core **697 / 26,681**;
+focused Geometry failure boundaries **2 / 13**, full Geometry **648 / 55,998**; focused offscreen Qt
+**9 / 991**. Full offscreen Qt: **768 cases, 729 passed, 39 native-only skips; 92,292 assertions
+passed**. Affected native filters pass with no skips at ordinary 100% (**9 / 1,013**) and compact 150%
+(**9 / 1,027**); original captures are inspected. The Thread/Hole failure regressions also prevent
+stale History success messages in the status bar. Five affected targets build; formatting/diff review
+pass. All 1,035 runtime inputs remain frozen; unchanged Core/Geometry binaries retain their full-run
+proof after the final GUI-only correction. Separate native app startup passes: a PID-matched X11
+window is viewable before the intentional six-second timeout (124). Delivery:
+[PR #173](https://github.com/GideonBa/Better-Linux-CAD/pull/173), reviewed implementation `b5b52b3`;
+this delivery-record update leaves runtime inputs unchanged.
+Whole Block 155 and the full B03 gate remain open; 155C is next, dedicated authoring remains 157.
 
 ## Later phases
 

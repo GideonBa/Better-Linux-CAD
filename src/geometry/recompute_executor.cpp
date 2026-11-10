@@ -4378,6 +4378,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
   if (!feature)
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "Hole feature is unavailable"));
+  if (feature->thread())
+    return Result<std::size_t>::failure(
+        validation_error(feature_id.value(), "Thread geometry is unavailable"));
   auto valid = validate_hole_feature_inputs(document, *feature);
   if (!valid)
     return valid;
@@ -5167,7 +5170,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_imported_body_feature(
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const RecomputePlan& plan,
                                         ShapeCache& shape_cache) const {
-  if (document.authored_history_intent() || !document.hole_features().empty())
+  if (document.authored_history_intent() || !document.hole_features().empty() ||
+      !document.thread_features().empty())
     return execute_history(document, std::nullopt, shape_cache);
   if (shape_cache.has_history_scope()) {
     auto fresh_cache = ShapeCache::create(shape_cache.id());
@@ -5308,7 +5312,8 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_document(const PartDocument& document,
                                             ShapeCache& shape_cache) const {
-  if (document.authored_history_intent() || !document.hole_features().empty())
+  if (document.authored_history_intent() || !document.hole_features().empty() ||
+      !document.thread_features().empty())
     return execute_history(document, std::nullopt, shape_cache);
   if (shape_cache.has_history_scope()) {
     auto fresh_cache = ShapeCache::create(shape_cache.id());
@@ -5641,6 +5646,8 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
         return execute_shell(document, feature, working);
       case PartFeatureFamily::Hole:
         return execute_hole(document, feature, working);
+      case PartFeatureFamily::Thread:
+        return Result<std::size_t>::failure(validation_error(id, "Thread geometry is unavailable"));
       case PartFeatureFamily::Draft:
         return execute_draft(document, feature, working);
       case PartFeatureFamily::BodyBoolean:

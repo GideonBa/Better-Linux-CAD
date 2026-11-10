@@ -88,18 +88,18 @@ std::string_view to_string(HoleDirection direction) noexcept {
 HoleFeature::HoleFeature(FeatureId id, std::string name, HoleKind kind, BodyId target_body,
                          PlaneReference support, std::vector<HolePlacement> placements,
                          HoleDiameter diameter, HoleExtent extent, HoleDirection direction,
-                         HoleTip tip, HoleManufacturing manufacturing)
+                         HoleTip tip, HoleManufacturing manufacturing,
+                         std::optional<ThreadDefinition> thread)
     : id_(std::move(id)), name_(std::move(name)), kind_(kind), target_body_(std::move(target_body)),
       support_(std::move(support)), placements_(std::move(placements)),
       diameter_(std::move(diameter)), extent_(std::move(extent)), direction_(direction),
-      tip_(std::move(tip)), manufacturing_(std::move(manufacturing)) {}
+      tip_(std::move(tip)), manufacturing_(std::move(manufacturing)), thread_(std::move(thread)) {}
 
-Result<HoleFeature> HoleFeature::create(FeatureId id, std::string name, HoleKind kind,
-                                        BodyId target_body, PlaneReference support,
-                                        std::vector<HolePlacement> placements,
-                                        HoleDiameter diameter, HoleExtent extent,
-                                        HoleDirection direction, HoleTip tip,
-                                        HoleManufacturing manufacturing) {
+Result<HoleFeature>
+HoleFeature::create(FeatureId id, std::string name, HoleKind kind, BodyId target_body,
+                    PlaneReference support, std::vector<HolePlacement> placements,
+                    HoleDiameter diameter, HoleExtent extent, HoleDirection direction, HoleTip tip,
+                    HoleManufacturing manufacturing, std::optional<ThreadDefinition> thread) {
   const auto fail = [&](std::string message) {
     return Result<HoleFeature>::failure(
         Error::validation(id.empty() ? "hole" : id.value(), std::move(message)));
@@ -170,10 +170,16 @@ Result<HoleFeature> HoleFeature::create(FeatureId id, std::string name, HoleKind
       return fail("Slot Hole consumes one existing profile at its authored position with flat "
                   "Blind or ThroughAll extent");
   }
+  if (thread &&
+      (kind != HoleKind::Plain || fitted || std::holds_alternative<HoleSlot>(manufacturing) ||
+       std::holds_alternative<HoleCenter>(manufacturing) ||
+       std::holds_alternative<HoleSymmetricExtent>(extent)))
+    return fail(
+        "Threaded Hole requires a plain round one-direction bore, without fit/center/slot intent");
   return Result<HoleFeature>::success(
       HoleFeature(std::move(id), std::move(name), kind, std::move(target_body), std::move(support),
                   std::move(placements), std::move(diameter), std::move(extent), direction,
-                  std::move(tip), std::move(manufacturing)));
+                  std::move(tip), std::move(manufacturing), std::move(thread)));
 }
 
 std::vector<ParameterId> HoleFeature::parameter_dependencies() const {
@@ -194,6 +200,9 @@ std::vector<ParameterId> HoleFeature::parameter_dependencies() const {
     if (const auto* id = std::get_if<ParameterId>(&dim))
       append(*id);
   });
+  if (thread_)
+    for (const auto& id : thread_->parameter_dependencies())
+      append(id);
   return result;
 }
 
@@ -206,6 +215,10 @@ std::vector<EngineeringResourceKey> HoleFeature::standard_dependencies() const {
   };
   append(diameter_, false);
   visit_manufacturing_dimensions(manufacturing_, append);
+  if (thread_)
+    for (const auto& key : thread_->standard_dependencies())
+      if (std::find(keys.begin(), keys.end(), key) == keys.end())
+        keys.push_back(key);
   return keys;
 }
 Result<HoleFeature> HoleFeature::remap_standard_revision(const EngineeringResourceKey& source,
@@ -219,8 +232,15 @@ Result<HoleFeature> HoleFeature::remap_standard_revision(const EngineeringResour
   };
   remap(diameter, false);
   visit_manufacturing_dimensions(manufacturing, remap);
+  auto thread = thread_;
+  if (thread) {
+    auto next_thread = thread->remap_standard_revision(source, next);
+    if (!next_thread)
+      return Result<HoleFeature>::failure(next_thread.error());
+    thread = std::move(next_thread.value());
+  }
   return create(id_, name_, kind_, target_body_, support_, placements_, std::move(diameter),
-                extent_, direction_, tip_, std::move(manufacturing));
+                extent_, direction_, tip_, std::move(manufacturing), std::move(thread));
 }
 
 Result<ResolvedHoleDiameter> resolve_hole_diameter(const PartDocument& part,
@@ -381,6 +401,17 @@ Result<std::size_t> validate_hole_feature_inputs(const PartDocument& part,
         angle->value().degrees() >= 180)
       return fail(
           "Conical drill included angle must be an Angle strictly between 0 and 180 degrees");
+  }
+  if (feature.thread()) {
+    auto thread = resolve_thread_definition(part, *feature.thread(), feature.id().value());
+    if (!thread)
+      return Result<std::size_t>::failure(thread.error());
+    if (std::abs(thread.value().minor_diameter_mm - nominal) > 1e-7)
+      return fail("Thread minor diameter must equal the explicit Hole pilot diameter");
+    if (const auto* blind = std::get_if<HoleBlindExtent>(&feature.extent());
+        blind && thread.value().start_mm + thread.value().length_mm >
+                     part.find_parameter(blind->depth)->value().millimeters() + 1e-7)
+      return fail("Thread start and length must fit before the full-diameter blind drill bottom");
   }
   return Result<std::size_t>::success(1);
 }

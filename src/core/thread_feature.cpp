@@ -235,6 +235,14 @@ Result<ThreadFeature> ThreadFeature::create(FeatureId id, std::string name, Body
                                                       std::move(target_body), std::move(support),
                                                       std::move(thread), direction));
 }
+Result<ThreadFeature>
+ThreadFeature::remap_standard_revision(const EngineeringResourceKey& source,
+                                       const EngineeringResourceKey& next) const {
+  auto definition = thread_.remap_standard_revision(source, next);
+  if (!definition)
+    return Result<ThreadFeature>::failure(definition.error());
+  return create(id_, name_, target_body_, support_, std::move(definition.value()), direction_);
+}
 Result<std::size_t> validate_thread_feature_inputs(const PartDocument& part,
                                                    const ThreadFeature& feature) {
   const auto* body = part.find_body(feature.target_body());
@@ -244,6 +252,10 @@ Result<std::size_t> validate_thread_feature_inputs(const PartDocument& part,
   auto support = validate_part_feature_input_reference(part, feature.support());
   if (!support)
     return support;
+  if (const auto* captured = std::get_if<ResultFaceReference>(&feature.support().source());
+      captured && captured->body() != feature.target_body())
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "Thread support must belong to the explicit target Body"));
   auto thread = resolve_thread_definition(part, feature.thread(), feature.id().value());
   if (!thread)
     return Result<std::size_t>::failure(thread.error());

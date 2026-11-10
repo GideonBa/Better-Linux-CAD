@@ -34,6 +34,7 @@
 #include "blcad/core/step_import_source.hpp"
 #include "blcad/core/surface_feature.hpp"
 #include "blcad/core/sweep_feature.hpp"
+#include "blcad/core/thread_feature.hpp"
 
 #include "blcad/core/engineering_resource.hpp"
 
@@ -141,6 +142,7 @@ public:
   [[nodiscard]] Result<std::size_t> add_chamfer_feature(ChamferFeature feature);
   [[nodiscard]] Result<std::size_t> add_shell_feature(ShellFeature feature);
   [[nodiscard]] Result<std::size_t> add_hole_feature(HoleFeature feature);
+  [[nodiscard]] Result<std::size_t> add_thread_feature(ThreadFeature feature);
   [[nodiscard]] Result<std::size_t> add_draft_feature(DraftFeature feature);
   [[nodiscard]] Result<std::size_t> add_body_boolean_feature(BodyBooleanFeature feature);
 
@@ -173,6 +175,8 @@ public:
   [[nodiscard]] Result<std::size_t> remove_shell_feature(FeatureId id);
   [[nodiscard]] Result<std::size_t> update_hole_feature(HoleFeature feature);
   [[nodiscard]] Result<std::size_t> remove_hole_feature(FeatureId id);
+  [[nodiscard]] Result<std::size_t> update_thread_feature(ThreadFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_thread_feature(FeatureId id);
   [[nodiscard]] Result<std::size_t> update_draft_feature(DraftFeature feature);
   [[nodiscard]] Result<std::size_t> remove_draft_feature(FeatureId id);
   [[nodiscard]] Result<std::size_t> update_body_boolean_feature(BodyBooleanFeature feature);
@@ -281,6 +285,7 @@ public:
   [[nodiscard]] const std::vector<ChamferFeature>& chamfer_features() const noexcept;
   [[nodiscard]] const std::vector<ShellFeature>& shell_features() const noexcept;
   [[nodiscard]] const std::vector<HoleFeature>& hole_features() const noexcept;
+  [[nodiscard]] const std::vector<ThreadFeature>& thread_features() const noexcept;
   [[nodiscard]] const std::vector<DraftFeature>& draft_features() const noexcept;
   [[nodiscard]] const std::vector<BodyBooleanFeature>& body_boolean_features() const noexcept;
   [[nodiscard]] const std::vector<SketchOwnership>& sketch_ownerships() const noexcept;
@@ -315,6 +320,7 @@ public:
   [[nodiscard]] std::size_t chamfer_feature_count() const noexcept;
   [[nodiscard]] std::size_t shell_feature_count() const noexcept;
   [[nodiscard]] std::size_t hole_feature_count() const noexcept;
+  [[nodiscard]] std::size_t thread_feature_count() const noexcept;
   [[nodiscard]] std::size_t draft_feature_count() const noexcept;
   [[nodiscard]] std::size_t body_boolean_feature_count() const noexcept;
   [[nodiscard]] std::size_t sketch_ownership_count() const noexcept;
@@ -352,6 +358,7 @@ public:
   [[nodiscard]] const ChamferFeature* find_chamfer_feature(FeatureId id) const noexcept;
   [[nodiscard]] const ShellFeature* find_shell_feature(FeatureId id) const noexcept;
   [[nodiscard]] const HoleFeature* find_hole_feature(FeatureId id) const noexcept;
+  [[nodiscard]] const ThreadFeature* find_thread_feature(FeatureId id) const noexcept;
   [[nodiscard]] const DraftFeature* find_draft_feature(FeatureId id) const noexcept;
   [[nodiscard]] const BodyBooleanFeature* find_body_boolean_feature(FeatureId id) const noexcept;
   [[nodiscard]] const SketchOwnership* find_sketch_ownership(SketchId id) const noexcept;
@@ -434,6 +441,7 @@ private:
   [[nodiscard]] bool has_chamfer_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_shell_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_hole_feature_id(const FeatureId& id) const noexcept;
+  [[nodiscard]] bool has_thread_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_draft_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_body_boolean_feature_id(const FeatureId& id) const noexcept;
   [[nodiscard]] bool has_sketch_ownership_id(const SketchId& id) const noexcept;
@@ -453,6 +461,7 @@ private:
                                   const std::vector<ParameterId>& parameters);
   [[nodiscard]] Result<std::size_t> add_shell_dependencies(const ShellFeature& feature);
   [[nodiscard]] Result<std::size_t> add_hole_dependencies(const HoleFeature& feature);
+  [[nodiscard]] Result<std::size_t> add_thread_dependencies(const ThreadFeature& feature);
   void prune_unused_engineering_resource_nodes();
   [[nodiscard]] Result<std::size_t> add_draft_dependencies(const DraftFeature& feature);
 
@@ -502,6 +511,7 @@ private:
   std::vector<ChamferFeature> chamfer_features_;
   std::vector<ShellFeature> shell_features_;
   std::vector<HoleFeature> hole_features_;
+  std::vector<ThreadFeature> thread_features_;
   std::vector<DraftFeature> draft_features_;
   std::vector<BodyBooleanFeature> body_boolean_features_;
   std::vector<SketchOwnership> sketch_ownerships_;
