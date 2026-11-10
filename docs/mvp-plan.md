@@ -262,5 +262,7 @@ The existing `[gui][shell-coverage]` gate with `BLCAD_REQUIRE_SHELL_ACCEPTANCE=1
 659 assertions**, no skips. All 1,027 previously verified runtime inputs are unchanged; no fresh
 CAD build, full regression or native run is needed or claimed for this documentation-only change.
 
-Delivery prepared on `docs/compact-implemented-documentation` after verifying PR #170 merged and
-refreshing main. This maintenance advances no implementation block.
+Delivery: [PR #171](https://github.com/GideonBa/Better-Linux-CAD/pull/171), prepared on
+`docs/compact-implemented-documentation` after verifying PR #170 merged and refreshing main.
+Reviewed compaction commit: `7e71e9841177b99381eae07415c94251e2b9cb47`; this delivery-record
+update changes no runtime input or numbered implementation status.
