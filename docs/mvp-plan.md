@@ -390,6 +390,10 @@ focused Qt regression execute in the native combination. Changed formatting, loc
 fences, raw captures and working/staged content are reviewed. The branch starts from refreshed main
 `e3729a1`, after verified merged PR #177, and uses normal PR delivery.
 
+Delivery: [PR #178](https://github.com/GideonBa/Better-Linux-CAD/pull/178), reviewed implementation
+`7e107b7`. This final delivery record changes documentation only; verified runtime inputs/binaries
+remain unchanged. Verify the merged tree and refresh main before starting the next branch.
+
 Next: 157B2b completes Thread profiles/start/taper, external Thread creation and native/imported/result
 support/limit collection. Then 157B3/C and full 158–165 remain assigned. Acceptance of 157B2a does
 not close its parent 157B2 or Block 157.
