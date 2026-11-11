@@ -350,6 +350,10 @@ Qt regression execute in the native combination. Changed formatting, local docum
 anchors / fences, original captures and working/staged content are reviewed. The branch starts at
 refreshed main `5dce938`, after verified merged PR #176. Delivery is through the normal PR rules.
 
+Delivery: [PR #177](https://github.com/GideonBa/Better-Linux-CAD/pull/177), reviewed implementation
+`8da8ef7`. The delivery record changes documentation only; runtime inputs and verified binaries
+remain frozen. Verify the merged tree and refresh main before beginning the next branch.
+
 Next: 157B2 completes recipe, source and internal/external Thread selectors, followed by 157B3 and
 157C. Parent 157, 158 acceptance and the assigned 159–165 sequence remain open in full.
 
