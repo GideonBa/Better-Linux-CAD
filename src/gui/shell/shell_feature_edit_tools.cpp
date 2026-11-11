@@ -4,6 +4,7 @@
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
+#include "blcad/gui/gui_hole_recipe.hpp"
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
@@ -11,6 +12,7 @@
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 #include <QAction>
+#include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDockWidget>
@@ -34,6 +36,7 @@
 #include <map>
 #include <nlohmann/json.hpp>
 #include <set>
+#include <utility>
 
 namespace blcad::gui {
 namespace {
@@ -340,6 +343,7 @@ struct ShellFeatureEditTools::Impl {
   bool support_chosen{};
   std::optional<Error> support_error;
   std::vector<Parameter> pending_parameters;
+  std::string recipe_namespace;
   QComboBox *target_field{}, *support_field{};
   ShellPropertySelector *target_selector{}, *support_selector{};
   std::optional<double> next_diameter;
@@ -364,6 +368,7 @@ struct ShellFeatureEditTools::Impl {
   std::optional<double> drag_start;
   GuiSketchScreenPoint last_pointer{};
   QString buffer;
+  QString pending_focus_id;
 
   Impl(ShellFeatureEditTools& owner_, ShellWindow& window_)
       : owner(owner_), window(window_), session(window.session()), viewport(window.viewport()) {
@@ -729,7 +734,16 @@ struct ShellFeatureEditTools::Impl {
                        (void)preview();
                      });
   }
+  QString retained_focus_id() const {
+    for (auto* focused = QApplication::focusWidget(); focused && scroll->isAncestorOf(focused);
+         focused = focused->parentWidget())
+      if (focused->property("blcad.restoreFocusAfterRebuild").toBool())
+        return focused->objectName();
+    return {};
+  }
   void deferred_rebuild() {
+    if (const auto focus = retained_focus_id(); !focus.isEmpty())
+      pending_focus_id = focus;
     scroll->widget()->setEnabled(false);
     QTimer::singleShot(0, &owner, [this] {
       if (edit.active()) {
@@ -741,6 +755,241 @@ struct ShellFeatureEditTools::Impl {
         (void)preview();
       }
     });
+  }
+  Result<PartDocument> recipe_document() const {
+    auto part = decode();
+    if (!part || edit.kind() != Kind::Hole)
+      return part;
+    auto hole = selected_record(*part.value().find_hole_feature(edit.feature()));
+    if (!hole)
+      return Result<PartDocument>::failure(hole.error());
+    auto updated = part.value().update_hole_feature(std::move(hole.value()));
+    if (!updated)
+      return Result<PartDocument>::failure(updated.error());
+    return part;
+  }
+  void adopt_recipe(Result<PartDocument> candidate) {
+    if (!candidate) {
+      const auto failure = candidate.error();
+      build_form();
+      (void)reject(failure);
+      return;
+    }
+    auto encoded = serialize_part_document_to_json(candidate.value());
+    if (!encoded) {
+      (void)reject(encoded.error());
+      return;
+    }
+    pending_parameters.clear();
+    std::erase_if(parameter_values, [this](const auto& entry) {
+      return !session.part_document()->find_parameter(ParameterId(entry.first));
+    });
+    for (const auto& parameter : candidate.value().parameters())
+      if (!session.part_document()->find_parameter(parameter.id()))
+        pending_parameters.push_back(parameter);
+    source = Json::parse(encoded.value());
+    record = source.at(collection).at(record_index);
+    deferred_rebuild();
+  }
+  template <class Command> void recipe_command(Command command) {
+    auto part = recipe_document();
+    if (!part) {
+      (void)reject(part.error());
+      return;
+    }
+    adopt_recipe(command(std::move(part.value())));
+  }
+  static std::optional<GuiHoleDimensionSlot> dimension_slot(const QString& path) {
+    using R = GuiHoleDimensionRole;
+    if (path == "/diameter")
+      return GuiHoleDimensionSlot{R::Bore};
+    if (path == "/manufacturing/diameter")
+      return GuiHoleDimensionSlot{R::SeatDiameter};
+    if (path == "/manufacturing/depth")
+      return GuiHoleDimensionSlot{R::SeatDepth};
+    if (path == "/manufacturing/included_angle")
+      return GuiHoleDimensionSlot{R::SeatAngle};
+    if (path == "/manufacturing/minimum_diameter")
+      return GuiHoleDimensionSlot{R::Minimum};
+    if (path == "/manufacturing/maximum_diameter")
+      return GuiHoleDimensionSlot{R::Maximum};
+    const auto parts = path.split('/', Qt::SkipEmptyParts);
+    if (parts.size() == 4 && parts[0] == "manufacturing" && parts[1] == "steps") {
+      bool ok = false;
+      const auto step = parts[2].toULongLong(&ok);
+      if (ok && (parts[3] == "diameter" || parts[3] == "depth"))
+        return GuiHoleDimensionSlot{parts[3] == "diameter" ? R::StepDiameter : R::StepDepth,
+                                    std::size_t(step)};
+    }
+    return {};
+  }
+  void build_dimension_source(QFormLayout* form, const QString& path, GuiHoleDimensionSlot slot) {
+    auto part = recipe_document();
+    if (!part)
+      return;
+    auto current = GuiHoleRecipeCommands::dimension_source(
+        *part.value().find_hole_feature(edit.feature()), slot);
+    if (!current)
+      return;
+    auto* input = combo(form->parentWidget());
+    input->setObjectName("blcad.hole.source" + path);
+    input->setProperty("blcad.restoreFocusAfterRebuild", true);
+    input->addItem("Custom parameter", "custom");
+    std::vector<HoleStandardSelection> choices;
+    int selected = 0;
+    const bool angle = slot.role == GuiHoleDimensionRole::SeatAngle;
+    for (const auto& resource : part.value().engineering_resources().entries())
+      if (const auto* table = std::get_if<EngineeringStandardTable>(&resource))
+        for (const auto& row : table->rows())
+          for (const auto& cell : row.cells)
+            if (const auto* quantity = std::get_if<Quantity>(&cell.value);
+                quantity &&
+                quantity->kind() == (angle ? QuantityKind::AngleDeg : QuantityKind::LengthMm) &&
+                (angle || quantity->is_positive_length())) {
+              choices.push_back({table->key(), row.key, cell.column});
+              const auto label = table->name() + " / " + table->key().revision() + " / " +
+                                 row.name + " / " + cell.column;
+              input->addItem(QString::fromStdString(label));
+              input->setItemData(input->count() - 1,
+                                 QStringList{QString::fromStdString(table->key().id().value()),
+                                             QString::fromStdString(table->key().revision()),
+                                             QString::fromStdString(row.key),
+                                             QString::fromStdString(cell.column)});
+              input->setItemData(input->count() - 1,
+                                 QString::fromStdString(cell.provenance.source()), Qt::ToolTipRole);
+              if (const auto* pinned = std::get_if<HoleStandardSelection>(&current.value());
+                  pinned && *pinned == choices.back())
+                selected = input->count() - 1;
+            }
+    input->setCurrentIndex(selected);
+    form->addRow("Size Source", input);
+    if (std::holds_alternative<HoleStandardSelection>(current.value())) {
+      const auto resolved = resolve_hole_dimension(part.value(), current.value(), angle);
+      if (resolved) {
+        auto* output = new QLabel(QString::number(angle ? resolved.value().diameter.degrees()
+                                                        : resolved.value().diameter.millimeters()) +
+                                      (angle ? " deg" : " mm"),
+                                  form->parentWidget());
+        output->setObjectName("blcad.hole.resolved" + path);
+        output->setWordWrap(true);
+        output->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+        if (resolved.value().provenance)
+          output->setToolTip(QString::fromStdString(resolved.value().provenance->source()));
+        form->addRow("Resolved Size", output);
+      }
+    }
+    QObject::connect(
+        input, &QComboBox::currentIndexChanged, &owner, [this, slot, choices](int index) {
+          recipe_command([&](PartDocument part) {
+            return index == 0
+                       ? GuiHoleRecipeCommands::custom_dimension(std::move(part), edit.feature(),
+                                                                 recipe_namespace, slot)
+                       : GuiHoleRecipeCommands::dimension(std::move(part), edit.feature(), slot,
+                                                          choices.at(std::size_t(index - 1)));
+          });
+        });
+  }
+  void build_hole_modes(QFormLayout* form, const std::string& key) {
+    if (edit.kind() != Kind::Hole)
+      return;
+    const auto add = [&](const char* name, const QString& title, const QStringList& labels,
+                         int selected, auto changed) {
+      auto* input = combo(form->parentWidget());
+      input->setObjectName(QString::fromLatin1(name));
+      input->setProperty("blcad.restoreFocusAfterRebuild", true);
+      input->addItems(labels);
+      input->setCurrentIndex(selected);
+      form->addRow(title, input);
+      QObject::connect(input, &QComboBox::currentIndexChanged, &owner, changed);
+    };
+    if (key == "manufacturing") {
+      const auto mode = record.contains("manufacturing")
+                            ? record["manufacturing"].value("kind", "simple")
+                            : "simple";
+      int selected = QStringList{"simple", "counterbore", "countersink", "spotface", "stepped",
+                                 "fitted", "reamed",      "center",      "slot"}
+                         .indexOf(QString::fromStdString(mode));
+      if (mode == "fitted" && record["manufacturing"].value("process", "fitted") == "reamed")
+        selected = 6;
+      add("blcad.hole.recipe", "Seat / Manufacturing",
+          {"Simple", "Counterbore", "Countersink", "Spotface", "Stepped", "Fitted", "Reamed",
+           "Center", "Slot"},
+          selected, [this](int index) {
+            recipe_command([&](PartDocument part) {
+              std::optional<ProfileRegionReference> slot;
+              for (const auto& sketch : part.sketches())
+                if (!sketch.arc_closed_profiles().empty()) {
+                  auto region = ProfileRegionReference::create(
+                      sketch.id(), sketch.arc_closed_profiles().front().id());
+                  if (region) {
+                    slot = region.value();
+                    break;
+                  }
+                }
+              return GuiHoleRecipeCommands::recipe(std::move(part), edit.feature(),
+                                                   recipe_namespace, GuiHoleRecipe(index), slot);
+            });
+          });
+    } else if (key == "extent") {
+      const auto mode = record["extent"].value("kind", "through_all");
+      add("blcad.hole.extent", "Termination",
+          {"Blind", "Through All", "To Next", "To Face", "Up to Body", "Symmetric"},
+          QStringList{"blind", "through_all", "to_next", "to_face", "up_to_body", "symmetric"}
+              .indexOf(QString::fromStdString(mode)),
+          [this](int index) {
+            recipe_command([&](PartDocument part) -> Result<PartDocument> {
+              std::optional<FaceReference> face;
+              std::optional<BodyId> body;
+              const auto* hole = part.find_hole_feature(edit.feature());
+              if (index == int(GuiHoleExtentChoice::ToFace)) {
+                auto context = make_step_import_context(session);
+                if (!context)
+                  return Result<PartDocument>::failure(context.error());
+                auto targets = geometry::FinishingSelectionBuilder::build(
+                    *session.part_document(), *session.part_shape_cache(), hole->target_body(),
+                    PartFeatureInputRole::ShellRemovalFace, context.value().get());
+                if (!targets)
+                  return Result<PartDocument>::failure(targets.error());
+                for (const auto& target : targets.value())
+                  if (const auto* ref = std::get_if<FaceReference>(&target.reference))
+                    if (const auto* native = std::get_if<SemanticFaceReference>(&ref->source());
+                        native && native->face() == SemanticFace::Bottom) {
+                      auto limit = FaceReference::create_planar(PartFeatureInputRole::HoleLimitFace,
+                                                                *native);
+                      if (!limit)
+                        return Result<PartDocument>::failure(limit.error());
+                      face = std::move(limit.value());
+                      break;
+                    }
+              }
+              if (index == int(GuiHoleExtentChoice::UpToBody))
+                for (const auto& candidate : part.bodies())
+                  if (candidate.id() != hole->target_body() && body_available(candidate)) {
+                    body = candidate.id();
+                    break;
+                  }
+              return GuiHoleRecipeCommands::extent(std::move(part), edit.feature(),
+                                                   recipe_namespace, GuiHoleExtentChoice(index),
+                                                   face, body);
+            });
+          });
+    } else if (key == "tip") {
+      add("blcad.hole.tip", "Drill Tip", {"Flat", "Conical"},
+          record["tip"].value("kind", "flat") == "conical" ? 1 : 0, [this](int index) {
+            recipe_command([&](PartDocument part) {
+              return GuiHoleRecipeCommands::tip(std::move(part), edit.feature(), recipe_namespace,
+                                                index == 1);
+            });
+          });
+    } else if (key == "thread") {
+      add("blcad.hole.internal_thread", "Internal Thread", {"None", "Enabled"},
+          record.contains("thread") ? 1 : 0, [this](int index) {
+            recipe_command([&](PartDocument part) {
+              return GuiHoleRecipeCommands::internal_thread(std::move(part), edit.feature(),
+                                                            recipe_namespace, index == 1);
+            });
+          });
+    }
   }
   void build_support_selector(QFormLayout* form) {
     auto* input = combo(form->parentWidget());
@@ -786,6 +1035,10 @@ struct ShellFeatureEditTools::Impl {
         continue;
       const auto path = prefix + "/" + QString::fromStdString(key);
       const auto& item = it.value();
+      if (edit.kind() == Kind::Hole && key == "kind" &&
+          (dimension_slot(prefix) || prefix == "/manufacturing" || prefix == "/extent" ||
+           prefix == "/tip"))
+        continue;
       if (creating && prefix.isEmpty() && key == "support") {
         build_support_selector(form);
         continue;
@@ -830,6 +1083,9 @@ struct ShellFeatureEditTools::Impl {
       if (item.is_object()) {
         auto* group = new QGroupBox(label(key), form->parentWidget());
         auto* nested = make_form(group);
+        if (edit.kind() == Kind::Hole)
+          if (const auto slot = dimension_slot(path))
+            build_dimension_source(nested, path, *slot);
         build_fields(nested, item, path);
         form->addRow(group);
       } else if (item.is_array()) {
@@ -926,9 +1182,10 @@ struct ShellFeatureEditTools::Impl {
         parameter_field(form, key, path, *p);
         return;
       }
-      const bool fixed = key == "kind" || key == "source_kind" || key == "result_mode" ||
-                         key == "operation_mode" || key == "produced_body" ||
-                         key == "result_body" || key == "mode" || key == "extent";
+      const bool fixed = (key == "kind" && !(edit.kind() == Kind::Hole && path == "/kind")) ||
+                         key == "source_kind" || key == "result_mode" || key == "operation_mode" ||
+                         key == "produced_body" || key == "result_body" || key == "mode" ||
+                         key == "extent";
       auto choices =
           fixed ? std::vector<std::pair<std::string, std::string>>{} : references(key, path);
       if (!fixed && (key == "side" || key == "direction")) {
@@ -954,6 +1211,8 @@ struct ShellFeatureEditTools::Impl {
                             {"opposite_support_axis", "Reverse Support Axis"}};
       if (hole_thread() && key == "handedness")
         choices = {{"right", "Right Hand"}, {"left", "Left Hand"}};
+      if (edit.kind() == Kind::Hole && path == "/kind")
+        choices = {{"plain", "Plain"}, {"clearance", "Clearance"}};
       if (hole_thread() && key == "representation")
         choices = {{"cosmetic", "Cosmetic"}, {"modeled", "Modeled"}};
       if (!choices.empty()) {
@@ -980,7 +1239,9 @@ struct ShellFeatureEditTools::Impl {
               parent);
           form->addRow(target_selector);
         } else
-          form->addRow(label(key), input);
+          form->addRow(edit.kind() == Kind::Hole && path == "/kind" ? QString("Hole Type")
+                                                                    : label(key),
+                       input);
         QObject::connect(input, &QComboBox::currentIndexChanged, &owner, [this, path, input] {
           value(path) = input->currentData().toString().toStdString();
           if (creating && path == "/target_body") {
@@ -1050,6 +1311,9 @@ struct ShellFeatureEditTools::Impl {
     }
   }
   void build_form() {
+    auto focus_id = std::exchange(pending_focus_id, QString{});
+    if (focus_id.isEmpty())
+      focus_id = retained_focus_id();
     building = true;
     target_field = support_field = nullptr;
     target_selector = support_selector = nullptr;
@@ -1066,9 +1330,11 @@ struct ShellFeatureEditTools::Impl {
     column->addStretch();
     if (hole_thread()) {
       for (const auto* key : {"name", "placements", "target_body", "support", "direction", "kind",
-                              "diameter", "manufacturing", "extent", "tip", "thread"})
+                              "diameter", "manufacturing", "extent", "tip", "thread"}) {
+        build_hole_modes(form, key);
         if (record.contains(key))
           build_fields(form, Json{{key, record.at(key)}}, {});
+      }
     } else
       build_fields(form, record, {});
     auto* old = scroll->takeWidget();
@@ -1081,14 +1347,23 @@ struct ShellFeatureEditTools::Impl {
     const int retained = dynamic->findData(selected);
     dynamic->setCurrentIndex(retained > 0 ? retained : dynamic->count() > 1 ? 1 : 0);
     building = false;
+    if (!focus_id.isEmpty())
+      QTimer::singleShot(0, &owner, [this, focus_id, draft = recipe_namespace] {
+        if (!edit.active() || recipe_namespace != draft || !scroll->widget())
+          return;
+        if (auto* focused = scroll->widget()->findChild<QWidget*>(focus_id);
+            focused && focused->isEnabled()) {
+          scroll->ensureWidgetVisible(focused);
+          focused->setFocus(Qt::OtherFocusReason);
+        }
+      });
   }
   GuiPartMutation parameter_updates(const PartDocument& decoded) const {
     std::vector<Parameter> changes, added;
     const auto used = bound_parameters(record);
-    if (creating)
-      for (const auto& p : decoded.parameters())
-        if (used.contains(p.id().value()) && !session.part_document()->find_parameter(p.id()))
-          added.push_back(p);
+    for (const auto& p : decoded.parameters())
+      if (used.contains(p.id().value()) && !session.part_document()->find_parameter(p.id()))
+        added.push_back(p);
     for (const auto& [id, scalar] : parameter_values) {
       (void)scalar;
       if (used.contains(id) && session.part_document()->find_parameter(ParameterId(id)))
@@ -1221,9 +1496,8 @@ struct ShellFeatureEditTools::Impl {
         session.history_prefix_count()
             ? "Prefix preview valid. Apply stages this edit; finish End of Part to validate the "
               "complete model."
-        : creating
-            ? "Plain through hole preview valid. Apply creates the Hole and its required inputs."
-            : "Preview valid, including downstream features. Commit changes with Apply.");
+        : creating ? "Hole preview valid. Apply creates the Hole and its required inputs."
+                   : "Preview valid, including downstream features. Commit changes with Apply.");
     if (layer.active_handle_id().empty())
       publish_handle();
     owner.refresh_presentation();
@@ -1308,6 +1582,7 @@ struct ShellFeatureEditTools::Impl {
     fields.clear();
     numbers.clear();
     pending_parameters.clear();
+    pending_focus_id.clear();
     supports.clear();
     support_override.reset();
     support_error.reset();
@@ -1347,7 +1622,7 @@ ShellFeatureEditTools::ShellFeatureEditTools(ShellWindow& window, ShellRibbon& r
   impl_->hole_action = new QAction("Hole", this);
   impl_->hole_action->setObjectName("blcad.action.semantic_hole");
   impl_->hole_action->setToolTip(
-      "Create a plain through hole with stable positions and editable Hole properties.");
+      "Create a semantic Hole with stable positions, seats and optional internal threads.");
   apply_gui_action_icon(*impl_->hole_action);
   ribbon.add_button(ribbon.add_group(model_tab, "Design"), impl_->hole_action);
   connect(impl_->hole_action, &QAction::triggered, this, [this] {
@@ -1387,6 +1662,8 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   if (!begun)
     return begun;
   p.creating = false;
+  p.recipe_namespace =
+      "hole.draft." + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
   p.pending_parameters.clear();
   p.supports.clear();
   p.support_override.reset();
@@ -1570,6 +1847,8 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
   p.previous_mask = p.viewport.selection_filter_mask();
   p.previous_scope = p.viewport.selection_semantic_scope();
   p.creating = true;
+  p.recipe_namespace =
+      "hole.draft." + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
   p.picking = Impl::Pick::None;
   p.support_override = support;
   p.support_chosen = true;
@@ -1594,7 +1873,7 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
   p.dynamic_label->hide();
   p.another->show();
   p.guidance->setText(
-      "Plain through hole. Choose target and support, then edit local X/Y positions and diameter. "
+      "Choose target and support, then edit local X/Y positions, recipe and dimensions. "
       "Apply creates one Hole; Create Another opens a fresh draft.");
   p.build_form();
   p.pick_mode();

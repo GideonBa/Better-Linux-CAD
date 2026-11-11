@@ -140,6 +140,7 @@ Representative entry points (select the layer where the tag exists):
 | Shared Thread definitions, persistence and execution | `[parity-b155]`; `hole-wizard.md`, `tests/core/{thread_feature,part_thread_feature}_tests.cpp`, `tests/geometry/thread_feature_*tests.cpp`; `[thread-history-shell]` / `[thread-geometry-shell]` in `tests/gui/gui_shell_history_tests.cpp` |
 | Existing Hole/Thread property editing | `[parity-b157]`, `[hole-thread-edit-shell]`, `[native-hole-thread-edit]`; `hole-wizard.md`, `gui-feature-edit-mvp9.md`; combine with `[block136-feature-edit]` and `[history-prefix-session]` for the shared editor regression. Full Wizard authoring remains 157B/C. |
 | Semantic Plain Hole creation | `[hole-create-shell]`, `[native-hole-create]`; the same current shell test file covers pending inputs, target/support changes, physical cuts, exact history/reopen and scoped native model picks. Combine with the existing edit/Pattern/prefix/inventory regression; full Wizard remains 157B/C. |
+| Hole recipes and dimensional sources | `[hole-recipe-shell]`, `[native-hole-recipe]`; independent physical volume oracles cover nine recipes and six extents, pinned/custom and Angle sources, unused inputs and exact history/reopen. Combine with existing creation/edit regressions. Full Thread/support selectors remain 157B2b. |
 | Explicit Pattern placements and Hole consumers | `[parity-b156]`, `[pattern-placement]`, `[hole-pattern-combined]`; `part-pattern-core-mvp6.md`, `hole-wizard.md`, `file-format.md`; `[hole-pattern-consumer-shell]` exercises the existing Assembly task |
 
 The shared GUI executable owns one Qt application instance. `ShellWindow` consumes the existing
@@ -152,6 +153,11 @@ transaction authorities; consult the feature contracts before introducing persis
 Offscreen GUI tests use a logical viewport without X11/GLX. Rendering and interaction changes also
 need the directly invoked test binary under `QT_QPA_PLATFORM=xcb`, with a working `DISPLAY`, and a
 separate app-startup smoke run. CTest's offscreen environment cannot prove native rendering.
+
+Native fixtures must fit the available screen in device-independent coordinates. At 150%, an
+unbounded 1280×800-DIP request exceeds a 1920×1080 display. The STEP Source fixture honors compact
+mode/screen bounds, synchronizes native layout before projection, and asserts that imported topology
+pick targets are actually on screen; keep the physical selection assertions intact.
 
 Use the relevant focused filter at ordinary 100% and compact 150% scale. This runnable example
 covers the existing Hole/shared-History UI; select additional affected families from their tests:

@@ -21,22 +21,22 @@
 #include "blcad/gui/shell/shell_window.hpp"
 #include "gui_step_structured_import_fixture.hpp"
 
-#include <QAction>
 #include <QAbstractItemModel>
+#include <QAction>
 #include <QApplication>
-#include <QComboBox>
 #include <QCheckBox>
-#include <QDoubleSpinBox>
+#include <QComboBox>
 #include <QCryptographicHash>
 #include <QCursor>
 #include <QDialog>
 #include <QDir>
 #include <QDockWidget>
+#include <QDoubleSpinBox>
 #include <QEventLoop>
 #include <QFile>
 #include <QFileDialog>
-#include <QInputDialog>
 #include <QHeaderView>
+#include <QInputDialog>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -46,6 +46,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSaveFile>
+#include <QScreen>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QTableWidget>
@@ -121,7 +122,13 @@ class SourceUi {
 public:
   SourceUi() : original_dialog_setting_(QApplication::testAttribute(Qt::AA_DontUseNativeDialogs)) {
     QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
-    window.resize(1280, 800);
+    auto size = qEnvironmentVariableIsSet("BLCAD_UI_COMPACT") ? QSize(1024, 640) : QSize(1280, 800);
+    if (QApplication::platformName() == "xcb") {
+      const auto available = window.screen()->availableGeometry();
+      size = size.boundedTo(available.size() - QSize(48, 48));
+      window.move(available.topLeft() + QPoint(24, 24));
+    }
+    window.resize(size);
     window.show();
     flush();
     if (QApplication::platformName() == "xcb")
@@ -1970,10 +1977,18 @@ TEST_CASE(
                              << ", expected kind: " << static_cast<int>(kind));
     auto& filter = ui.field<QComboBox>("topology_filter");
     ui.choose(filter, filter.findData(static_cast<int>(capability)));
+    QGuiApplication::sync();
+    ui.flush();
     const auto left = checked(ui.window.viewport().model_to_screen({990, 2000, 3002.5}));
     const auto right = checked(ui.window.viewport().model_to_screen({1010, 2000, 3002.5}));
     REQUIRE(std::hypot(right.x - left.x, right.y - left.y) >= 80);
     const auto screen = checked(ui.window.viewport().model_to_screen(point));
+    const auto global =
+        ui.window.viewport().mapToGlobal(QPoint(qRound(screen.x), qRound(screen.y)));
+    INFO("Native viewport " << ui.window.viewport().width() << " x "
+                            << ui.window.viewport().height() << ", target " << global.x() << ", "
+                            << global.y());
+    REQUIRE(ui.window.screen()->availableGeometry().contains(global));
     REQUIRE(screen.x > 3);
     REQUIRE(screen.x < ui.window.viewport().width() - 3);
     REQUIRE(screen.y > 3);
