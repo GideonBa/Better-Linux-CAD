@@ -342,8 +342,8 @@ they never silently bind another Hole. Canonical endpoint spelling is owned by C
 Numeric solver iterations reuse at most 16 Part results within one request, keyed by exact canonical
 intent and import context with current supplier-byte checks; nested solves share that request and
 no derived geometry survives its scope. Component pose changes do not rebuild identical Hole solids.
-Native Pattern authoring controls and whole B04 acceptance remain open in Block 156; dedicated Hole/Thread authoring
-remains 157.
+Native Pattern authoring controls and whole B04 acceptance are verified in Block 156; dedicated
+Hole/Thread authoring remains 157.
 
 Proof owners: `tests/core/pattern_placement_tests.cpp`,
 `tests/geometry/hole_pattern_{geometry,combined}_tests.cpp`, and

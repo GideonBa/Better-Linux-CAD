@@ -66,8 +66,10 @@ losing the source set. The same chooser remains available for precise reference 
 Linear patterns support spacing per instance or total extent, positive/negative direction, and an
 integer count including the starting placement. Circular patterns use equal angular spacing over a
 positive total angle up to 360 degrees; a full circle omits the duplicated final position. Counts
-range from 2 to 1000, with at most 10000 selected-Body instances per interactive operation. This is
-a GUI authoring bound; the persisted feature authority is unchanged. Mirror reflects the source
+range from 1 to 1000, with at most 10000 selected-Body instances per interactive operation.
+Count one uses the explicit shared placement intent introduced in Block 156; older records keep
+their historical count validation. Explicit layouts additionally obey the shared Core placement
+limit described below. Mirror reflects the source
 Bodies across the chosen plane and exposes no scalar handle.
 
 Spacing and circular angle use the shared numeric editor with `mm`/`deg` and viewport handles.
