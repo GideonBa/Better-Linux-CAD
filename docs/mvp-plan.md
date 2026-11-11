@@ -52,6 +52,27 @@ the complete issue, inspect the staged diff, run appropriate headless/native che
 contracts and evidence, commit and normally push, then merge its PR through main's rules. Fetch and
 verify the delivered tree before starting the next issue from main. Do not stack unfinished PRs.
 
+### Assigned continuation through Block 165 — 2026-11-11
+
+The current request assigns the complete sequence through 165. Execute each delivery serially;
+this assignment does not change acceptance status. Keep the detailed requirements in
+[the sequence](inventor-parity-sequence.md) and the scenario oracles in
+[the test plan](inventor-parity-test-plan.md).
+
+| Next delivery | Completion boundary / proof |
+| --- | --- |
+| 156 | Native exclusion-checkbox crash repaired; native 100%/150% and startup verified. Complete full Qt acceptance and PR #175 before a successor branch. |
+| 157 | Semantic Hole/Thread creation and editing in the shared property workflow, explicit legacy conversion, presets and native B01–B04/UI01. |
+| 158 | Phase A/B integrated acceptance, exact history/reopen/STEP and incremental-versus-fresh measurements. |
+| 159 | Persistent oriented planar G2 constraints, solver/drag integration and independent S01 derivative/rank oracles. |
+| 160–161 | Safe typed equation intent/persistence, then tolerance-controlled Geometry and real downstream S02/G01 consumers. |
+| 162 | Native Smooth/equation authoring, conflict correction, closed profiles and persisted history. |
+| 163–164 | Existing Sketch3D constraint schema, then deterministic solver/DOF/conflict diagnostics with S03 independent oracles. |
+| 165 | Solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 downstream acceptance. |
+
+Each row retains its full numbered prerequisites and acceptance criteria; grouped rows do not
+authorize partial acceptance of either block. Preserve all planned scope after 165.
+
 ## Completed blocks through 144
 
 Every row below is implemented and accepted within its linked contract's bounds. A completed phase
@@ -250,7 +271,7 @@ only after PR #174 was confirmed merged and main refreshed. Whole-block acceptan
 | --- | --- |
 | Shared placements — 156A verified | Stable two-coordinate occurrence identity, dormant skips, optional second linear direction, bounded layout/count one; Part V7/Project snapshots and dependency rollback. Legacy V1–V6 bytes/count validation retained. |
 | Hole execution and consumers — 156B verified | Repeat the actual seed cut once per active copy; current per-instance axes/seats, transformed seeds, native/imported entry/termination checks, Thread/finishing/material/resource/history/STEP combinations and downstream Insert. Limits in `hole-wizard.md`. |
-| UI and combined acceptance — 156C in progress | Existing Pattern controls now collect Hole sources, direction two and retained exclusions; existing Feature editing preserves integer coordinates. Build and focused offscreen tests pass; native acceptance is blocked by a SIGSEGV in the new Hole Pattern interaction test. Dedicated Hole/Thread authoring remains 157. |
+| UI and combined acceptance — 156C verification | Existing Pattern controls collect Hole sources, direction two and retained exclusions; Feature editing preserves integer coordinates. Preview now retains unchanged exclusion rows throughout checkbox dispatch. Native 100%/150% passes; full Qt acceptance remains pending. Dedicated Hole/Thread authoring remains 157. |
 
 156A/B verification: full Core **706 cases / 26,802 assertions**, full Geometry **670 / 57,533**,
 focused Geometry **13 / 689**, focused Qt **5 / 187**, new native Assembly consumer **1 / 67** at
@@ -260,18 +281,24 @@ Numeric solve requests reuse at most 16 exact-intent Part results only within th
 freshness is revalidated and no geometry survives the request. Whole-block native/layout and full
 GUI acceptance remain open with the Pattern authoring controls.
 
-156C checkpoint verification: all five targets build; full Geometry **671 cases / 57,576 assertions**;
-focused Qt **24 passed / 3 skipped / 2,865 assertions**; B04 plate/cover combination **1 / 43**.
-The native 100% run stopped at **12 passed / 1 failed** with a SIGSEGV in
-`[native-hole-pattern-shell]`; its cause is not yet diagnosed. Native 150%, separate app startup and
-full Qt acceptance remain pending. Runtime inputs: **1,052 files**, SHA-256
-`8bca233ddf6f243003c7bd86e6ff5a94a0f3a112cde255c5aaf34fbc5572bb67`.
-Next: diagnose the native crash, rebuild affected targets and complete the remaining acceptance
-checks before marking the block complete or merging its draft PR.
+156C current verification (2026-11-11): all five targets build; full Core **706 cases / 26,802
+assertions** and full Geometry **671 / 57,576** pass. Focused Qt: **14 passed / 2 native-only
+skips / 677 assertions**. Relevant native 100%: **26 / 1,876**; compact 150%: **26 / 1,892**,
+no failures/skips. Separate startup confirms a PID-matched viewable X11 window before the intentional
+six-second timeout (124). Original captures and the working diff are reviewed; full Qt is running.
+
+The previous native crash was a freed exclusion row: synchronous preview synchronization cleared
+the list from its own checkbox signal. The [row-lifetime regression](../tests/gui/gui_shell_hole_pattern_tests.cpp)
+checks persistent model-index validity across repeated toggles and exact Apply/history/reopen.
+The [Pattern UI contract](gui-interactive-pattern-body-mvp9.md#hole-placement-patterns--block-156)
+owns the retained-row behavior. Runtime manifest: **1,050 files** under `src/`, `include/`, `tests/`,
+`assets/`, `cmake/` and the two root CMake files; SHA-256
+`7829ca89aca52f8d224489dc63e64a0396a7251966439c8feb839c0a4e7fb7e9`.
+All five binary hashes and runtime inputs remain unchanged during verification.
 
 Delivery in progress: [draft PR #175](https://github.com/GideonBa/Better-Linux-CAD/pull/175),
-verified 156A/B commit `d49cb89`; 156C is committed as a work-in-progress checkpoint on the same
-branch at the user's request, with the native failure and remaining checks recorded above.
+with 156A/B and the 156C checkpoint already committed. Keep the whole block and PR open until the
+full Qt run and final staged review pass; then merge through main's rules before starting 157.
 
 ## Later phases
 

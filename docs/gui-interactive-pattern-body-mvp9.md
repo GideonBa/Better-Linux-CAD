@@ -336,6 +336,12 @@ unsupported recipes or geometric overlap disable Apply with the current diagnost
 sources and exclusions. The preview replaces the affected Body instead of overlaying another solid.
 No provisional result Body is persisted for a Hole Cut.
 
+Preview synchronization preserves exclusion rows whose logical coordinates are unchanged. A
+checkbox event must finish against the same live row; rebuilding the list from its own change
+signal must not invalidate Qt's active item, focus or scroll position. Count/layout changes may
+rebuild rows while retaining the authored exclusions. `[hole-pattern-shell]` checks persistent
+model-index validity through repeated toggles; the native case dispatches actual checkbox input.
+
 The existing Feature editor retains V7 placement structure and parameter bindings. Its exclusion
 column/row fields also display one-based integers and write canonical zero-based integer intent.
 Count edits preserve dormant exclusions. Creation/editing/Apply remain one existing Part transaction;

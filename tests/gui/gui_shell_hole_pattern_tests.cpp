@@ -14,6 +14,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
+#include <QPersistentModelIndex>
 #include <QPushButton>
 #include <QScreen>
 #include <QScrollArea>
@@ -137,6 +138,30 @@ void replay(ShellWindow& w, QTemporaryDir& dir, const std::string& before) {
   CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == after);
 }
 } // namespace
+TEST_CASE("Hole Pattern preview retains the active exclusion row throughout checkbox dispatch",
+          "[gui][parity-b156][hole-pattern-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir);
+  const auto before = snapshot(w);
+  begin(w);
+  second(w);
+  auto& list = control<QListWidget>(w, "blcad.pattern.skipped");
+  auto& item = occurrence(w, 2, 1);
+  const QPersistentModelIndex index(list.model()->index(list.row(&item), 0));
+  for (const auto state : {Qt::Checked, Qt::Unchecked, Qt::Checked}) {
+    item.setCheckState(state);
+    REQUIRE(index.isValid());
+    REQUIRE(&occurrence(w, 2, 1) == &item);
+    CHECK(item.checkState() == state);
+    REQUIRE(w.viewport().feature_preview_active());
+  }
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_tools().apply());
+  CHECK((w.session().part_document()->linear_pattern_features().front().placements()->skipped ==
+         std::vector<PatternOccurrenceIndex>{{2, 1}}));
+  replay(w, dir, before);
+}
 TEST_CASE("Pattern task authors Hole directions dormant exclusions and one atomic in-place result",
           "[gui][parity-b156][hole-pattern-shell]") {
   ShellWindow w;

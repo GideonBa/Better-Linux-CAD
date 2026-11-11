@@ -344,7 +344,6 @@ void ShellFeatureTools::populate_pattern_sources() {
 }
 void ShellFeatureTools::rebuild_pattern_skip_list() {
   const QSignalBlocker block(pattern_skip_editor_);
-  pattern_skip_editor_->clear();
   const unsigned first = pattern_count_editor_->value();
   const unsigned second = command_ == Command::LinearPattern && pattern_second_group_->isChecked()
                               ? pattern_second_count_->value()
@@ -354,11 +353,27 @@ void ShellFeatureTools::rebuild_pattern_skip_list() {
     for (unsigned i = 0; i < first; ++i)
       for (unsigned j = 0; j < second; ++j)
         indices.insert({i, j});
-  else {
+  const bool over_limit = first > pattern_placement_limit / second;
+  // Preview publication also synchronizes these controls during itemChanged.
+  // Keep unchanged rows alive until Qt has finished dispatching the input event.
+  bool same_rows =
+      pattern_skip_editor_->count() == static_cast<int>(indices.size()) + (over_limit ? 1 : 0);
+  int row = over_limit ? 1 : 0;
+  for (const auto index : indices) {
+    if (!same_rows)
+      break;
+    const auto* item = pattern_skip_editor_->item(row++);
+    same_rows = item->data(Qt::UserRole).toUInt() == index.first &&
+                item->data(Qt::UserRole + 1).toUInt() == index.second;
+  }
+  if (!same_rows)
+    pattern_skip_editor_->clear();
+  if (over_limit && !same_rows) {
     auto* message = new QListWidgetItem(
         QStringLiteral("Reduce counts to at most 1024 occurrences."), pattern_skip_editor_);
     message->setFlags(Qt::NoItemFlags);
   }
+  row = over_limit ? 1 : 0;
   for (const auto index : indices) {
     const bool dormant = index.first >= first || index.second >= second;
     auto text = QStringLiteral("Occurrence (%1, %2)").arg(index.first + 1).arg(index.second + 1);
@@ -366,7 +381,9 @@ void ShellFeatureTools::rebuild_pattern_skip_list() {
       text += QStringLiteral(" — Source");
     else if (dormant)
       text += QStringLiteral(" — Outside current counts");
-    auto* item = new QListWidgetItem(text, pattern_skip_editor_);
+    auto* item =
+        same_rows ? pattern_skip_editor_->item(row++) : new QListWidgetItem(pattern_skip_editor_);
+    item->setText(text);
     item->setData(Qt::UserRole, static_cast<unsigned>(index.first));
     item->setData(Qt::UserRole + 1, static_cast<unsigned>(index.second));
     item->setFlags(index == PatternOccurrenceIndex{} ? Qt::NoItemFlags
