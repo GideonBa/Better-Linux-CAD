@@ -332,7 +332,7 @@ ShellWindow::ShellWindow() {
       std::make_unique<ShellMeasureTools>(*this, session_, *viewport_, *ribbon_, tab_inspect_);
   assembly_tools_ =
       std::make_unique<ShellAssemblyTools>(*this, session_, *viewport_, *ribbon_, tab_assembly_);
-  feature_edit_tools_ = std::make_unique<ShellFeatureEditTools>(*this);
+  feature_edit_tools_ = std::make_unique<ShellFeatureEditTools>(*this, *ribbon_, tab_model_);
   history_tools_ = std::make_unique<ShellHistoryTools>(*this, *ribbon_, tab_model_);
   inspect_tools_ = std::make_unique<ShellInspectTools>(*this, *ribbon_, tab_manage_, tab_inspect_);
   construction_tools_ = std::make_unique<ShellConstructionTools>(*this, *ribbon_, tab_model_);
@@ -1455,7 +1455,8 @@ bool ShellWindow::redo() {
   return true;
 }
 
-void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& selection) {
+void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& incoming) {
+  const auto selection = incoming;
   if (synchronizing_selection_)
     return;
   if (!selection && step_import_tools_)
@@ -1465,6 +1466,11 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& se
   selected_semantic_id_.clear();
   bool selected_feature_profile = false;
   if (selection && session_.selection().add(*selection)) {
+    if (feature_edit_tools_ && feature_edit_tools_->accept_selection(*selection)) {
+      selected_semantic_id_.clear();
+      refresh();
+      return;
+    }
     if (step_import_tools_)
       (void)step_import_tools_->accept_selection(*selection);
     if (hole_tools_)
@@ -1525,6 +1531,11 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
     if (hole_tools_)
       for (const auto& selected : session_.selection().entries())
         (void)hole_tools_->accept_selection(selected);
+    if (feature_edit_tools_) {
+      const auto selected = session_.selection().entries();
+      for (const auto& selection : selected)
+        (void)feature_edit_tools_->accept_selection(selection);
+    }
     if (assembly_tools_) {
       const auto selected = session_.selection().entries();
       for (const auto& selection : selected)

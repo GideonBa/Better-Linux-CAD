@@ -274,8 +274,12 @@ committed graphics without adding Body results or changing Body-preview counts; 
 Undo/Redo and reopen regenerate the appropriate display. Existing Hole/Thread definitions use the
 [157A property-edit bridge](gui-feature-edit-mvp9.md#hole-and-thread-property-bridge--157a) through
 browser activation or History Edit: numeric fields retain units/formula bindings, table pins remain
-read-only and failed full downstream previews block Apply. New-feature selectors, support-anchored
-grips and the complete Inventor-like authoring workflow remain assigned to 157B/C.
+read-only and failed full downstream previews block Apply. Model → Design → Hole now creates a
+semantic Plain / Through All Hole in the same panel. Target/support selectors accept typed choices
+or scoped model picks; changing the target requires a fresh support. Owned positions use local
+millimeters. Apply commits once; Create Another opens a fresh draft. The current entry context is a
+complete editable Part with a visible solid and no other active task/workflow. Manufacturing/thread
+creation, support-anchored grips and the complete Inventor-like workflow remain assigned to 157B/C.
 
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
 [compact suppression at 150%](images/history-suppression-compact.png) and
@@ -413,8 +417,10 @@ cut in the same History task, and Apply commits one reversible update. Unsupport
 combinations remain correctable diagnostics with Apply blocked and committed intent preserved.
 153B1 adds ToNext/ToFace/UpToBody and finite symmetric intent to that same history workflow;
 153B2 extends physical restoration to current posed/imported/result supports and oblique planar
-limits. The dedicated semantic authoring tool remains assigned to 157. The existing bounded single/
-circular Sketch-cut Hole command stays usable; semantic Wizard authoring remains assigned to 157.
+limits. The bounded Plain / Through All creation path is described
+[in the Hole contract](hole-wizard.md#semantic-creation--157b1-bounded-design); the full semantic
+Wizard remains assigned to 157.
+The existing bounded single/circular Sketch-cut Holes command stays usable.
 The [ordinary browser view](images/semantic-hole-history.png) is an unmodified 1280×800 capture;
 the [compact view](images/semantic-hole-history-compact.png) is unmodified 1536×960 physical pixels
 for 1024×640 DIP at 150%. The feature keeps the shared suppressed styling and existing property

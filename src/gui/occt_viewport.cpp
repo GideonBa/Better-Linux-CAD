@@ -1601,9 +1601,12 @@ void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
       // OCCT may rank a datum plane/axis ahead of a coplanar translucent
       // Sketch face, especially where all origin planes cross. Inspect the
       // complete hit stack and prefer a bounded profile face whenever one is
-      // under the pointer; otherwise preserve OCCT's normal nearest-hit rule.
+      // under the pointer. A task's bounded preview face also takes precedence
+      // over a datum; the normal nearest-face rule still orders model faces.
       Handle(SelectMgr_EntityOwner) profile_owner;
       std::optional<GuiSelection> profile_selection;
+      Handle(SelectMgr_EntityOwner) preview_face_owner;
+      std::optional<GuiSelection> preview_face_selection;
       impl_->context->InitDetected();
       for (; impl_->context->MoreDetected(); impl_->context->NextDetected()) {
         const Handle(SelectMgr_EntityOwner) owner =
@@ -1614,6 +1617,15 @@ void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
             Handle(AIS_InteractiveObject)::DownCast(owner->Selectable());
         if (interactive.IsNull())
           continue;
+        const auto preview = impl_->preview_owner_to_index.find(interactive.get());
+        if (preview != impl_->preview_owner_to_index.end() && preview_face_owner.IsNull()) {
+          const auto& item = impl_->preview_selection_targets[preview->second].item;
+          GuiSelection selection{selection_kind(item.kind), item.semantic_id};
+          if (item.kind == geometry::ViewportSceneKind::Face && selection_allowed(selection)) {
+            preview_face_owner = owner;
+            preview_face_selection = std::move(selection);
+          }
+        }
         const auto found = impl_->owner_to_index.find(interactive.get());
         if (found == impl_->owner_to_index.end())
           continue;
@@ -1630,6 +1642,11 @@ void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
       if (!profile_owner.IsNull()) {
         impl_->context->SetSelected(profile_owner, false);
         publish_selection(std::move(profile_selection));
+      } else if (const auto detected = detected_selection();
+                 !preview_face_owner.IsNull() && detected &&
+                 detected->kind == GuiSelectionKind::Datum) {
+        impl_->context->SetSelected(preview_face_owner, false);
+        publish_selection(std::move(preview_face_selection));
       } else {
         impl_->context->SelectDetected(AIS_SelectionScheme_Replace);
         publish_selection(detected_selection());

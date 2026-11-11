@@ -385,6 +385,44 @@ that nested forms need no horizontal scrolling and dispatch keyboard/numeric inp
 The ordinary fit includes datum planes; these captures remain unmodified. Numbered acceptance and
 executed counts are recorded only in `mvp-plan.md`.
 
+## Semantic creation — 157B1 bounded design
+
+`begin_new_hole` extends the existing GUI edit lifecycle with a Model Hole action through
+explicit `ShellWindow`/ribbon ownership. The same panel creates actual `HoleFeature` Plain /
+ThroughAll intent; the legacy Sketch-cut command remains available. This slice starts in a complete
+editable Part without another task/workflow/End of Part context. Broader contexts remain 157B3.
+
+Creation generates a fresh feature/placement identity and a pending custom Length dimension.
+Pending inputs belong only to the candidate; rebinding to an existing parameter does not publish an
+unused generated parameter. The existing canonical Part serializer seeds the form. A typed support override feeds the
+Core Hole factory, avoiding another reference serializer. Existing Core add/update, session commit,
+geometry execution and freshness checks remain authoritative; there is no JSON/schema change.
+
+Target choices contain current visible solids. Support collection offers current resolvable datum /
+construction planes and native semantic planar faces on the chosen Body. Lost/unsupported choices
+produce explicit diagnostics. Imported/result-face workplane provision remains 157B2. Body changes
+clear the required support choice; mismatched roles, invalid positions and ineffective cuts block
+Apply while preserving the draft. Face/datum preselection and command-first collection converge on
+one typed definition. A task-owned preview-selection scope routes actual model picks and restores
+previous filters/scope on Apply/Cancel. Incoming selections must be copied before callbacks can
+change shared selection state. When an enabled datum overlaps a task's bounded face hit, prefer the
+bounded face; existing Sketch profile precedence and nearest-face ordering remain authoritative.
+Datum support is also available explicitly in the selector.
+
+Preview and Save leave the committed Part unchanged. Apply adds only the required new dimensions
+and Hole in one transaction, with exact Undo/Redo/reopen. Create Another publishes that candidate
+once, then opens a new fresh draft retaining its custom diameter and revalidating its target. Cancel
+restores consumed preselection and camera. Focused tests cover physical cut volumes, invalid
+corrections, existing-parameter ownership, preselection versus collection, multiple Bodies, nested
+form layout and actual native keyboard/model/mouse workflows at 100%/150%. Creation does not close
+157B or parent 157; all remaining recipe/thread/source/preset/manipulator/conversion scope is retained.
+
+Original native captures: [ordinary creation](images/hole-creation.png), 1280×800, and
+[compact creation](images/hole-creation-compact.png), 1536×960 physical pixels / 1024×640 DIP at
+150%. Numeric keyboard input follows actual target/face mouse picks. Apply and Create Another
+remain visible below the scrolling form; tests reject horizontal form overflow. The shared native
+regression also covers existing Sketch profile and imported STEP selection after the datum-overlap fix.
+
 ## Why more than a cut
 
 ```text

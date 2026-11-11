@@ -182,3 +182,17 @@ Focused proof: `[hole-thread-edit-shell]` in
 [the current shell tests](../tests/gui/gui_shell_hole_thread_edit_tests.cpp), including actual
 native keyboard/Apply input under `[native-hole-thread-edit]`. `mvp-plan.md` owns the executed
 verification and parent-block status; this bridge alone does not close Block 157.
+
+### Semantic Plain Hole creation — 157B1
+
+Model → Design → Hole uses the same panel/controller with the typed Core add command. A canonical
+serialized candidate supplies the initial form; the committed Part remains the freshness authority.
+Only used pending dimensions are added on Apply. The draft's support is a typed PlaneReference;
+changing target clears it and requires another compatible choice. Body/support pick scopes are
+owned by this task, and callbacks copy incoming selections before changing viewport state.
+
+Create Another commits once and opens a fresh identity. Cancel restores the consumed selection,
+camera and previous pick scope when the entry model revision is still current. Existing edits keep
+their update path and pinned fields. The [Hole contract](hole-wizard.md#semantic-creation--157b1-bounded-design)
+owns the current creation limits. Focused proof is `[hole-create-shell]` /
+`[native-hole-create]` in the same current shell test file; numbered acceptance remains in the plan.

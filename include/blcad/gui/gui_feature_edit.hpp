@@ -71,6 +71,20 @@ public:
     else
       return fail("feature to edit does not exist in the active Part document");
     feature_ = std::move(feature);
+    creating_ = false;
+    active_ = true;
+    return Result<std::size_t>::success(1);
+  }
+
+  [[nodiscard]] Result<std::size_t> begin_new_hole(const GuiDocumentSession& session,
+                                                   FeatureId feature) {
+    const auto* part = session.part_document();
+    if (!part || part->is_reference_part() || active_ || feature.empty() ||
+        part->dependency_graph().has_node(feature.value()))
+      return fail("new Hole requires an editable Part and a fresh feature identity");
+    feature_ = std::move(feature);
+    kind_ = GuiFeatureEditKind::Hole;
+    creating_ = true;
     active_ = true;
     return Result<std::size_t>::success(1);
   }
@@ -89,6 +103,10 @@ public:
     if (!active_ || !session.part_document())
       return Result<PartDocument>::failure(
           Error::validation("gui.feature_edit", "no active Part feature edit"));
+    if constexpr (!std::is_same_v<FeatureT, HoleFeature>)
+      if (creating_)
+        return Result<PartDocument>::failure(
+            Error::validation("gui.feature_edit", "new Hole requires typed Hole intent"));
     const auto id = [&] {
       if constexpr (std::is_same_v<FeatureT, SurfaceFeature>)
         return surface_feature_id(replacement);
@@ -124,7 +142,7 @@ public:
     auto plan = draft.value().create_recompute_plan();
     if (plan.has_error()) return Result<GuiPartFeaturePreview>::failure(plan.error());
     return Result<GuiPartFeaturePreview>::success(
-        {feature_, "edit feature", plan.value().step_count()});
+        {feature_, creating_ ? "create Hole" : "edit feature", plan.value().step_count()});
   }
 
   // Commit the edit as one transaction. The session recompute makes any
@@ -136,7 +154,7 @@ public:
     auto checked = preview(session, replacement, updater, prepare);
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
     auto committed = session.commit_part_transaction(
-        "Edit feature",
+        creating_ ? "Create Hole" : "Edit feature",
         [replacement = std::move(replacement), updater, prepare](PartDocument& part) mutable {
           if (prepare) {
             auto prepared = prepare(part);
@@ -149,7 +167,10 @@ public:
     return committed;
   }
 
-  void cancel() noexcept { active_ = false; }
+  void cancel() noexcept {
+    active_ = false;
+    creating_ = false;
+  }
 
 private:
   [[nodiscard]] static Result<std::size_t> fail(std::string message) {
@@ -161,6 +182,7 @@ private:
   }
 
   bool active_{false};
+  bool creating_{false};
   GuiFeatureEditKind kind_{GuiFeatureEditKind::Extrude};
   FeatureId feature_{""};
 };

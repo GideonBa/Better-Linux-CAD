@@ -101,6 +101,7 @@
     "blcad.action.repeat_last_command": "repeat",
     "blcad.action.save": "save",
     "blcad.action.save_as": "save",
+    "blcad.action.semantic_hole": "circle",
     "blcad.action.undo": "undo",
     "blcad.action.view_home": "home"
   },

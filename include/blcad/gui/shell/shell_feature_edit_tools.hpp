@@ -8,12 +8,15 @@
 class QWidget;
 namespace blcad::gui {
 class ShellWindow;
+class ShellRibbon;
 class ShellFeatureEditTools final : public QObject {
 public:
-  explicit ShellFeatureEditTools(ShellWindow&);
+  ShellFeatureEditTools(ShellWindow&, ShellRibbon&, int model_tab);
   ~ShellFeatureEditTools() override;
   [[nodiscard]] Result<std::size_t> begin(FeatureId);
-  [[nodiscard]] Result<std::size_t> apply();
+  [[nodiscard]] Result<std::size_t> begin_new_hole();
+  [[nodiscard]] Result<std::size_t> apply(bool create_another = false);
+  [[nodiscard]] bool accept_selection(const GuiSelection&);
   void cancel();
   void refresh();
   void refresh_presentation();
