@@ -166,3 +166,19 @@ ordered Loft sections, Fillet edge membership, optional Sweep twist, stale input
 and Save/Open. Native proof performs actual tree mouse double-clicks, drags the scalar handle, refines
 it numerically, restores another drag with Escape and clicks the visible Apply button at 1280×800.
 Whole-block replacement-shell acceptance remains separate work.
+
+## Hole and Thread property bridge — 157A
+
+The existing editor now identifies typed Hole/Thread records and calls `update_hole_feature` /
+`update_thread_feature`; browser double-click and History Edit share this boundary. Existing
+thirteen-family behavior and legacy cuts retain their own editing path. Current 157A scope and
+fixed support/resource fields are owned by [Hole/Thread](hole-wizard.md#property-editing--157a-design-and-boundary).
+The full Wizard remains 157B/C. Numerical controls follow parameter units/formulas, and complete
+Geometry preview/Apply preserves downstream validation and one transaction. Existing viewport
+preview authority regenerates cosmetic graphics from the candidate Bodies and hides replaced
+annotations. Support-anchored grips remain assigned to 157B.
+
+Focused proof: `[hole-thread-edit-shell]` in
+[the current shell tests](../tests/gui/gui_shell_hole_thread_edit_tests.cpp), including actual
+native keyboard/Apply input under `[native-hole-thread-edit]`. `mvp-plan.md` owns the executed
+verification and parent-block status; this bridge alone does not close Block 157.

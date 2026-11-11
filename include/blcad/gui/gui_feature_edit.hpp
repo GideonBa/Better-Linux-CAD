@@ -28,6 +28,8 @@ enum class GuiFeatureEditKind {
   Shell,
   Draft,
   BodyBoolean,
+  Hole,
+  Thread,
 };
 
 // Block 129 feature edit lifecycle. Double-clicking a feature begins an edit:
@@ -62,6 +64,10 @@ public:
     else if (part->find_draft_feature(feature) != nullptr) kind_ = GuiFeatureEditKind::Draft;
     else if (part->find_body_boolean_feature(feature) != nullptr)
       kind_ = GuiFeatureEditKind::BodyBoolean;
+    else if (part->find_hole_feature(feature) != nullptr)
+      kind_ = GuiFeatureEditKind::Hole;
+    else if (part->find_thread_feature(feature) != nullptr)
+      kind_ = GuiFeatureEditKind::Thread;
     else
       return fail("feature to edit does not exist in the active Part document");
     feature_ = std::move(feature);

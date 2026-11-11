@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 156
 current_block: 157
-current_boundary: Block 156 accepted; semantic Hole/Thread authoring is next in Block 157
+current_boundary: Block 156 accepted; 157A property editing verified; full Wizard remains 157B/C
 current_tag: "[parity-b157]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–156 accepted; Blocks 157–204 planned"
+  advanced_modeling_workflows: "Blocks 145–156 accepted; Block 157 in progress; Blocks 158–204 planned"
 ---
 
 # MVP Plan
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 156
-current block        Block 157 (next)
+current block        Block 157 (157A verified; 157B next)
 current phase        Semantic holes and threads
-current boundary     Placement patterns and stable Hole consumers accepted; semantic property authoring remains 157
+current boundary     Existing Hole/Thread property editing verified; full Wizard and combined acceptance remain open
 ```
 
 The next assigned work is Block 157. [The consolidated sequence](inventor-parity-sequence.md)
@@ -61,7 +61,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 
 | Next delivery | Completion boundary / proof |
 | --- | --- |
-| 156 | Accepted: shared placements, Hole consumers, full suites, native 100%/150% and startup verified. Deliver through PR #175 before a successor branch. |
+| 156 | Delivered in PR #175: shared placements, Hole consumers, full suites, native 100%/150% and startup verified. |
 | 157 | Semantic Hole/Thread creation and editing in the shared property workflow, explicit legacy conversion, presets and native B01–B04/UI01. |
 | 158 | Phase A/B integrated acceptance, exact history/reopen/STEP and incremental-versus-fresh measurements. |
 | 159 | Persistent oriented planar G2 constraints, solver/drag integration and independent S01 derivative/rank oracles. |
@@ -154,7 +154,7 @@ raw samples, benchmark limits and future performance scope remain in their exist
 ## Blocks 145–204 — Advanced modeling workflows
 
 Status authority: Blocks 145–156 are **Implemented and accepted**;
-Blocks 157–204 are **Planned; not started**.
+Block 157 is **In progress**; Blocks 158–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -165,7 +165,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
-| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152–156 accepted; 157–158 planned |
+| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152–156 accepted; 157 in progress; 158 planned |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
@@ -239,8 +239,8 @@ Proof: [Core placements](../tests/core/pattern_placement_tests.cpp),
 [row lifetime/native authoring](../tests/gui/gui_shell_hole_pattern_tests.cpp) and
 [Assembly task consumers](../tests/gui/gui_shell_assembly_tools_tests.cpp).
 Delivery: [PR #175](https://github.com/GideonBa/Better-Linux-CAD/pull/175), correction `5b5a05f`;
-final acceptance is ready for normal protected merge. Verify the merged tree and refresh main
-before starting the successor branch.
+merged normally as `5c669d0`. The merged tree matches the reviewed delivery, and main was
+refreshed before creating `feat/hole-thread-property-editing` for 157A.
 
 ### Retained extension boundaries
 
@@ -271,20 +271,51 @@ remain geometry inputs for their assigned later consumers.
 
 Phase B stays open for 157–158.
 
-### Next implementation — Block 157
+### Block 157 implementation
 
 All [157/B01–B04/UI01 requirements](inventor-parity-sequence.md#block-157-hole-and-thread-property-panel-workflow)
 remain assigned. Deliver named slices serially, with the parent block open until all criteria pass:
 
-| Slice | Planned boundary |
+| Slice | Delivery boundary |
 | --- | --- |
-| 157A | Typed Hole/Thread property editing over existing Core update commands, stable IDs/history, formula and pinned-resource ownership, whole downstream preview and rollback. |
+| 157A — verified | Typed Hole/Thread property editing over existing Core update commands, stable IDs/history, formula and pinned-resource ownership, whole downstream preview and rollback. |
 | 157B | Shared create/edit panel with ordered selectors, source/custom dimensions, all supported recipes, position/depth/diameter interaction, Sketch return, explicit legacy conversion, presets and Create Another. |
 | 157C | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
 
 No new Hole/Thread persistence authority or independent pattern evaluator is planned. Preserve
 legacy cut editing and all subsequent 158–204 requirements. Acceptance of 157A alone does not
 close 157 or provide the complete Wizard workflow.
+
+### 157A verification — 2026-11-11
+
+Existing semantic records now share the typed Feature editor and History Edit. Focused proof covers
+all nine manufacturing variants, Pattern seats after diameter changes, formula rebinds, immutable
+resource pins, retired placement references, drill/thread depth, full rollback and exact history/reopen.
+Native keyboard/representation/mouse Apply produces a real modeled Thread cut. The
+[Hole contract](hole-wizard.md#property-editing--157a-design-and-boundary),
+[Feature edit contract](gui-feature-edit-mvp9.md#hole-and-thread-property-bridge--157a) and
+[current tests](../tests/gui/gui_shell_hole_thread_edit_tests.cpp) own behavior/proof.
+
+| Verification | Result |
+| --- | --- |
+| GUI/app/STEP-export targets | Built; final runtime inputs frozen |
+| Current editor/Pattern/prefix/inventory Qt regression | 41 passed / 3 native-only skips / 3,507 assertions |
+| Relevant native 100% | 44 cases / 3,705 assertions; no failures/skips |
+| Native 150%, new property fixture compact | 44 / 3,705; no failures/skips; no horizontal form overflow |
+| Separate startup | PID-matched X11 window viewable; intentional six-second timeout 124 |
+| Retained backend acceptance | Both Core/Geometry test binaries and 663 backend/support inputs match the complete Block 156 evidence |
+| Runtime manifest | 1,051 files; SHA256 `cb1a1dbd3837bc22da6ef1264cca2190bfcac014db88537c7e0503ac98bc06f5` |
+
+All five binary hashes are verified (three current targets plus the unchanged two backend suites).
+The full Core/Geometry and full Qt suites are not rerun for this UI-only slice; their latest complete
+run is recorded under 156. Current native filters execute all three native-only cases in the focused
+regression, not every skip from that full Qt run. Original ordinary/compact captures, changed C++
+formatting, Markdown links/anchors/fences and working/staged diffs are reviewed.
+
+Delivery: [PR #176](https://github.com/GideonBa/Better-Linux-CAD/pull/176), reviewed implementation
+`456e5ec`, based on refreshed main `5c669d0` after verified merged PR #175. The final delivery record
+changes documentation only. Parent 157 and the full assigned continuation through 165 remain open;
+157B/C are next.
 
 ## Later phases
 
