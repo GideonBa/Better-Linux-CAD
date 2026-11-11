@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 156
 current_block: 157
-current_boundary: Block 156 accepted; 157A delivered; 157B1 creation verified; full Wizard remains open
+current_boundary: Block 156 accepted; 157A/B1 delivered; 157B2a verified; 157B2b next
 current_tag: "[parity-b157]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 156
-current block        Block 157 (157B1 verified; 157B2 next)
+current block        Block 157 (157B2a verified; 157B2b next)
 current phase        Semantic holes and threads
-current boundary     Existing editing and Plain Hole creation verified; full Wizard and combined acceptance remain open
+current boundary     Editing, recipes and dimensional sources verified; full Wizard and combined acceptance remain open
 ```
 
 The next assigned work is Block 157. [The consolidated sequence](inventor-parity-sequence.md)
@@ -280,8 +280,10 @@ remain assigned. Deliver named slices serially, with the parent block open until
 | --- | --- |
 | 157A — verified | Typed Hole/Thread property editing over existing Core update commands, stable IDs/history, formula and pinned-resource ownership, whole downstream preview and rollback. |
 | 157B1 — verified | Semantic Plain/ThroughAll Hole creation in the existing panel, target/support selection, pending dimensional ownership, Create Another and one final publication. Normal complete Part context first; no new Hole schema or cut interpreter. |
-| 157B2 | Complete recipe/custom-standard/internal-external Thread selectors and native/imported support collection; keep 157A editing compatible. |
-| 157B3 | In-canvas position/depth/diameter interaction, referenced Sketch points and breadcrumb return, presets, explicit legacy conversion and extended shared context lifecycle. |
+| 157B2 — in progress | Complete recipe/custom-standard/internal-external Thread selectors and native/imported support collection; keep 157A editing compatible. |
+| 157B2a — verified | Nine recipes, six extent transitions, tip and custom internal Thread controls, typed dimensional table/custom sources, stable owned inputs and existing-feature recipe changes. |
+| 157B2b | Complete standard Thread profile mappings, optional start/taper authoring, external Thread creation and scoped native/imported/result support and limit collection. |
+| 157B3 | In-canvas position/depth/diameter interaction, referenced Sketch points and breadcrumb return, presets, explicit legacy conversion, full recipe/thread Create Another ownership and extended shared context lifecycle. |
 | 157C | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
 
 No new Hole/Thread persistence authority or independent pattern evaluator is planned. Preserve
@@ -352,10 +354,49 @@ refreshed main `5dce938`, after verified merged PR #176. Delivery is through the
 
 Delivery: [PR #177](https://github.com/GideonBa/Better-Linux-CAD/pull/177), reviewed implementation
 `8da8ef7`. The delivery record changes documentation only; runtime inputs and verified binaries
-remain frozen. Verify the merged tree and refresh main before beginning the next branch.
+remain frozen. PR #177 is verified merged as `e3729a1`; its tree matches the reviewed delivery.
+Main was refreshed before starting `feat/hole-recipe-authoring`.
 
-Next: 157B2 completes recipe, source and internal/external Thread selectors, followed by 157B3 and
-157C. Parent 157, 158 acceptance and the assigned 159–165 sequence remain open in full.
+Parent 157, 158 acceptance and the assigned 159–165 sequence remain open in full.
+
+### 157B2a verification — 2026-11-12
+
+The shared panel now composes typed recipe, extent, tip, dimensional source and custom internal
+Thread transitions. Independent physical oracles cover all nine recipes and six extents; the limit
+Body remains unchanged. Proof also covers pin/custom and Angle sources, shared bindings, new recipe
+inputs on existing features, retired step IDs, unused inputs and exact history/reopen. Core role
+translation, fresh custom ownership and retained keyboard focus are checked explicitly.
+
+Contracts/proof: [Hole](hole-wizard.md#recipe-and-dimensional-source-controls--157b2a),
+[Feature editor](gui-feature-edit-mvp9.md#recipe-transitions-and-dimension-sources--157b2a),
+[shell regressions](../tests/gui/gui_shell_hole_thread_edit_tests.cpp) and
+[native imported selection](../tests/gui/gui_shell_step_import_tests.cpp). The native STEP fixture
+now fits the available screen and verifies actual on-screen targets before exact analytic picks.
+Original recipe captures are linked from the Hole contract. No Core/Geometry model/schema changed.
+
+| Verification | Result |
+| --- | --- |
+| GUI/app/STEP-export targets | Built from final frozen inputs |
+| Shared recipe/creation/editor/Pattern/prefix/inventory/viewport Qt regression | 63 passed / 6 native-only skips / 4,745 assertions |
+| Native 100%, including existing profile/History/imported STEP selection | 72 cases / 6,173 assertions; no failures/skips |
+| Same native combination at compact 150% | 72 / 6,175; no failures/skips; all physical selection assertions retained |
+| Separate startup | PID-matched X11 window viewable; intentional six-second timeout 124 |
+| Retained backend acceptance | Both backend test binaries and 663 backend/support inputs match complete Block 156 evidence |
+| Runtime manifest | 1,053 files; SHA256 `eb3145b2ad9e0013cd40759e88516d8ed9ff661e6efe30f737bdbf7c74546375` |
+
+All five binary hashes match verified artifacts. Full Core/Geometry and full Qt are not rerun for
+this GUI-only slice; the last complete runs remain under 156. All six native-only cases in the
+focused Qt regression execute in the native combination. Changed formatting, local links / anchors /
+fences, raw captures and working/staged content are reviewed. The branch starts from refreshed main
+`e3729a1`, after verified merged PR #177, and uses normal PR delivery.
+
+Delivery: [PR #178](https://github.com/GideonBa/Better-Linux-CAD/pull/178), reviewed implementation
+`7e107b7`. This final delivery record changes documentation only; verified runtime inputs/binaries
+remain unchanged. Verify the merged tree and refresh main before starting the next branch.
+
+Next: 157B2b completes Thread profiles/start/taper, external Thread creation and native/imported/result
+support/limit collection. Then 157B3/C and full 158–165 remain assigned. Acceptance of 157B2a does
+not close its parent 157B2 or Block 157.
 
 ## Later phases
 

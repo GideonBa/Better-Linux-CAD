@@ -275,11 +275,14 @@ Undo/Redo and reopen regenerate the appropriate display. Existing Hole/Thread de
 [157A property-edit bridge](gui-feature-edit-mvp9.md#hole-and-thread-property-bridge--157a) through
 browser activation or History Edit: numeric fields retain units/formula bindings, table pins remain
 read-only and failed full downstream previews block Apply. Model → Design → Hole now creates a
-semantic Plain / Through All Hole in the same panel. Target/support selectors accept typed choices
+semantic Hole in the same panel. Target/support selectors accept typed choices
 or scoped model picks; changing the target requires a fresh support. Owned positions use local
-millimeters. Apply commits once; Create Another opens a fresh draft. The current entry context is a
-complete editable Part with a visible solid and no other active task/workflow. Manufacturing/thread
-creation, support-anchored grips and the complete Inventor-like workflow remain assigned to 157B/C.
+millimeters. Recipe, termination, tip, dimensional source and custom internal Thread controls use
+[the 157B2a contract](hole-wizard.md#recipe-and-dimensional-source-controls--157b2a). Pinned dimensions
+show their resolved value/units and source; returning to Custom is explicit. Apply commits once;
+Create Another opens a fresh draft. The current entry context is a
+complete editable Part with a visible solid and no other active task/workflow. Complete Thread and
+imported/result support selectors, support-anchored grips and the full workflow remain 157B2b/B3/C.
 
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
 [compact suppression at 150%](images/history-suppression-compact.png) and

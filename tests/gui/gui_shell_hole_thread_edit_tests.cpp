@@ -26,6 +26,7 @@
 #include <QTreeWidget>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <numbers>
 
 using namespace blcad;
@@ -144,8 +145,8 @@ void key(QWidget& widget, int code, const QString& text = {}) {
   for (auto type : {QEvent::KeyPress, QEvent::KeyRelease}) {
     QKeyEvent event(type, code, Qt::NoModifier, text);
     QApplication::sendEvent(&widget, &event);
-    settle();
   }
+  settle();
 }
 void capture(ShellWindow& w, const char* name) {
   const auto dir = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
@@ -168,7 +169,196 @@ void create_hole(ShellWindow& w) {
   REQUIRE(w.feature_edit_tools().active());
   REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
 }
+void choose_hole_mode(ShellWindow& w, const char* name, int index) {
+  control<QComboBox>(w, name).setCurrentIndex(index);
+  settle();
+}
 } // namespace
+
+TEST_CASE("Hole recipe creation matches independent seat step cone fit and slot volumes",
+          "[gui][parity-b157][hole-recipe-shell]") {
+  const int mode = GENERATE(0, 1, 2, 3, 4, 5, 6, 7, 8);
+  CAPTURE(mode);
+  auto p = manufacture::seed();
+  REQUIRE(p.set_parameter_value(ParameterId("width"), checked(Quantity::length_mm(80))));
+  REQUIRE(p.set_parameter_value(ParameterId("height"), checked(Quantity::length_mm(60))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.recipe", mode);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  const double removed[] = {8, 24, 44. / 3, 16, 31, 8, 8, 12};
+  const double cut = mode == 8 ? (8 + std::numbers::pi) * 8 : removed[mode] * std::numbers::pi;
+  CHECK(volume(w) == Catch::Approx(38400 - cut).margin(1e-6));
+  REQUIRE(w.session().part_document()->hole_features().size() == 1);
+  CHECK(w.session().part_document()->sketches().size() == p.sketches().size());
+  replay(w, dir, before);
+}
+
+TEST_CASE("An existing Hole acquires only the required recipe dimensions in its original slot",
+          "[gui][parity-b157][hole-recipe-shell]") {
+  auto p = holes::part(false, false);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  begin(w, "holes");
+  choose_hole_mode(w, "blcad.hole.recipe", 1);
+  auto& diameter = field<QDoubleSpinBox>(w, "/manufacturing/diameter/parameter");
+  diameter.setValue(2);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  diameter.setValue(5);
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(w.session().part_document()->hole_features().front().id() == FeatureId("holes"));
+  CHECK(w.session().part_document()->parameters().size() == p.parameters().size() + 2);
+  CHECK(volume(w) == Catch::Approx(38400 - 21.5 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("A sourced Hole seat discloses its pin and converts explicitly to a custom dimension",
+          "[gui][parity-b157][hole-recipe-shell]") {
+  const bool custom = GENERATE(false, true);
+  auto p = plate();
+  REQUIRE(p.add_engineering_resource(manufacture::table()));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.recipe", 1);
+  auto& source = control<QComboBox>(w, "blcad.hole.source/manufacturing/diameter");
+  const QStringList pin{"synthetic.holes", "r1", "small", "seat.diameter"};
+  const int selected = source.findData(pin);
+  REQUIRE(selected > 0);
+  CHECK_FALSE(source.itemData(selected, Qt::ToolTipRole).toString().isEmpty());
+  source.setCurrentIndex(selected);
+  settle();
+  CHECK(control<QLabel>(w, "blcad.hole.resolved/manufacturing/diameter").text() == "4 mm");
+  CHECK(field<QLabel>(w, "/manufacturing/diameter/table/revision").text() == "r1");
+  if (custom) {
+    choose_hole_mode(w, "blcad.hole.source/manufacturing/diameter", 0);
+    CHECK(field<QDoubleSpinBox>(w, "/manufacturing/diameter/parameter").value() == 4);
+    field<QDoubleSpinBox>(w, "/manufacturing/diameter/parameter").setValue(5);
+  }
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& seat = std::get<HoleCounterbore>(
+      w.session().part_document()->hole_features().front().manufacturing());
+  CHECK(std::holds_alternative<ParameterId>(seat.diameter) == custom);
+  if (!custom)
+    CHECK(std::get<HoleStandardSelection>(seat.diameter).table == manufacture::table().key());
+  CHECK(w.session().part_document()->parameters().size() ==
+        p.parameters().size() + (custom ? 3 : 2));
+  CHECK(volume(w) == Catch::Approx(38400 - (custom ? 18.5 : 14) * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Recipe transitions retire step identities and invalid tip changes remain correctable",
+          "[gui][parity-b157][hole-recipe-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.recipe", 4);
+  const auto old_id = control<QGroupBox>(w, "blcad.feature_edit.entry/manufacturing/steps/0")
+                          .property("semanticId");
+  choose_hole_mode(w, "blcad.hole.recipe", 0);
+  choose_hole_mode(w, "blcad.hole.recipe", 4);
+  CHECK(control<QGroupBox>(w, "blcad.feature_edit.entry/manufacturing/steps/0")
+            .property("semanticId") != old_id);
+  choose_hole_mode(w, "blcad.hole.recipe", 0);
+  choose_hole_mode(w, "blcad.hole.tip", 1);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QComboBox>(w, "blcad.hole.tip").currentIndex() == 0);
+  choose_hole_mode(w, "blcad.hole.extent", 0);
+  choose_hole_mode(w, "blcad.hole.tip", 1);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const double cone = 1 / std::tan(59 * std::numbers::pi / 180) / 3;
+  CHECK(volume(w) == Catch::Approx(38400 - (5 + cone) * std::numbers::pi).margin(1e-6));
+  CHECK(w.session().part_document()->parameters().size() == plate().parameters().size() + 3);
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Internal Thread creation distinguishes drill and thread dimensions and cancels unused inputs",
+    "[gui][parity-b157][hole-recipe-shell]") {
+  const bool enabled = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  auto p = plate();
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  choose_hole_mode(w, "blcad.hole.internal_thread", 1);
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/minor_diameter").value() == 4);
+  CHECK(field<QDoubleSpinBox>(w, "/thread/length").value() == 4);
+  field<QDoubleSpinBox>(w, "/thread/length").setValue(20);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  field<QDoubleSpinBox>(w, "/thread/length").setValue(3);
+  if (!enabled)
+    choose_hole_mode(w, "blcad.hole.internal_thread", 0);
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(w.session().part_document()->hole_features().front().thread().has_value() == enabled);
+  CHECK(w.session().part_document()->parameters().size() ==
+        p.parameters().size() + (enabled ? 6 : 1));
+  CHECK(volume(w) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Native Hole recipe fields support keyboard transitions numeric correction and mouse Apply",
+    "[gui][parity-b157][hole-recipe-shell][native-hole-recipe]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native recipe controls and OCCT rendering");
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  auto& recipe = control<QComboBox>(w, "blcad.hole.recipe");
+  auto& scroll = control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll");
+  scroll.ensureWidgetVisible(&recipe);
+  w.raise();
+  w.activateWindow();
+  settle();
+  recipe.setFocus();
+  settle();
+  REQUIRE(QApplication::focusWidget() == &recipe);
+  key(recipe, Qt::Key_Down);
+  REQUIRE(control<QComboBox>(w, "blcad.hole.recipe").currentIndex() == 1);
+  REQUIRE(QApplication::focusWidget() == &control<QComboBox>(w, "blcad.hole.recipe"));
+  key(control<QComboBox>(w, "blcad.hole.recipe"), Qt::Key_Down);
+  REQUIRE(control<QComboBox>(w, "blcad.hole.recipe").currentIndex() == 2);
+  REQUIRE(QApplication::focusWidget() == &control<QComboBox>(w, "blcad.hole.recipe"));
+  key(control<QComboBox>(w, "blcad.hole.recipe"), Qt::Key_Up);
+  REQUIRE(control<QComboBox>(w, "blcad.hole.recipe").currentIndex() == 1);
+  auto& diameter = field<QDoubleSpinBox>(w, "/manufacturing/diameter/parameter");
+  scroll.ensureWidgetVisible(&diameter);
+  diameter.setFocus();
+  diameter.selectAll();
+  key(diameter, Qt::Key_5, "5");
+  key(diameter, Qt::Key_Return);
+  CHECK(diameter.value() == 5);
+  CHECK(scroll.horizontalScrollBar()->maximum() == 0);
+  CHECK(snapshot(w) == before);
+  capture(w, "hole-recipe-preview");
+  auto& apply = control<QPushButton>(w, "blcad.feature_edit.apply");
+  REQUIRE(w.rect().contains(apply.mapTo(&w, apply.rect().center())));
+  click(apply);
+  CHECK(volume(w) == Catch::Approx(38400 - 18.5 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
 
 TEST_CASE("Semantic Hole creation previews disposable inputs and publishes one typed transaction",
           "[gui][parity-b157][hole-create-shell]") {
@@ -675,5 +865,126 @@ TEST_CASE("Native semantic Thread property input edits real geometry with one re
             ->value()
             .millimeters() == 3);
   capture(w, "thread-property-modeled-applied");
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Hole termination choices execute the selected limit and preserve the separate limit body",
+    "[gui][parity-b157][hole-recipe-shell]") {
+  const int extent = GENERATE(0, 1, 2, 3, 4, 5);
+  CAPTURE(extent);
+  auto p = plate();
+  REQUIRE(p.add_construction_plane(
+      checked(ConstructionPlane::create_explicit(ConstructionPlaneId("limit.plane"), "Limit plane",
+                                                 {0, 0, -4}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}))));
+  blcad::test::history_fixture::rectangle(p, "limit.profile", "limit.plane");
+  auto body = blcad::test::history_fixture::new_body(p, "limit");
+  auto extrude = checked(Feature::create_additive_extrude(
+      FeatureId("limit"), "Limit", SketchId("limit.profile"), ParameterId("depth")));
+  REQUIRE(p.add_feature(checked(extrude.with_body_result_context(body))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.extent", extent);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  const double depths[] = {5, 8, 8, 8, 4, 4};
+  if (extent == 3)
+    CHECK(std::get<HoleToFaceExtent>(w.session().part_document()->hole_features().front().extent())
+              .face.role() == PartFeatureInputRole::HoleLimitFace);
+  CHECK(volume(w) == Catch::Approx(38400 - depths[extent] * std::numbers::pi).margin(1e-6));
+  CHECK(volume(w, "body.limit") == Catch::Approx(38400).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Recipe adoption retains explicitly edited shared parameters and prunes the unused seed",
+          "[gui][parity-b157][hole-recipe-shell]") {
+  auto p = plate();
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  create_hole(w);
+  auto& binding = control<QComboBox>(w, "blcad.feature_edit.binding/diameter/parameter");
+  binding.setCurrentIndex(binding.findData("diameter"));
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.recipe", 1);
+  field<QDoubleSpinBox>(w, "/manufacturing/diameter/parameter").setValue(4);
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(
+      w.session().part_document()->find_parameter(ParameterId("diameter"))->value().millimeters() ==
+      2);
+  CHECK(w.session().part_document()->parameters().size() == p.parameters().size() + 2);
+  CHECK(volume(w) == Catch::Approx(38400 - 14 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Seat angle sources offer angle cells and preserve their dimensional meaning",
+          "[gui][parity-b157][hole-recipe-shell]") {
+  auto p = plate();
+  REQUIRE(p.add_engineering_resource(manufacture::table()));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.recipe", 2);
+  CHECK(field<QDoubleSpinBox>(w, "/manufacturing/included_angle/parameter").suffix() == " deg");
+  auto& source = control<QComboBox>(w, "blcad.hole.source/manufacturing/included_angle");
+  REQUIRE(source.count() == 2);
+  source.setCurrentIndex(1);
+  settle();
+  CHECK(control<QLabel>(w, "blcad.hole.resolved/manufacturing/included_angle").text() == "90 deg");
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(volume(w) == Catch::Approx(38400 - 44. / 3 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Returning to a custom seat preserves a dimension deliberately shared by another field",
+          "[gui][parity-b157][hole-recipe-shell]") {
+  auto p = plate();
+  REQUIRE(p.add_engineering_resource(manufacture::table()));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.recipe", 1);
+  const QStringList pin{"synthetic.holes", "r1", "small", "seat.diameter"};
+  auto select_standard = [&] {
+    auto& source = control<QComboBox>(w, "blcad.hole.source/manufacturing/diameter");
+    const auto index = source.findData(pin);
+    REQUIRE(index > 0);
+    source.setCurrentIndex(index);
+    settle();
+  };
+  select_standard();
+  choose_hole_mode(w, "blcad.hole.source/manufacturing/diameter", 0);
+  field<QDoubleSpinBox>(w, "/manufacturing/diameter/parameter").setValue(5);
+  const auto shared =
+      control<QComboBox>(w, "blcad.feature_edit.binding/manufacturing/diameter/parameter")
+          .currentData();
+  auto& depth = control<QComboBox>(w, "blcad.feature_edit.binding/manufacturing/depth/parameter");
+  REQUIRE(depth.findData(shared) >= 0);
+  depth.setCurrentIndex(depth.findData(shared));
+  REQUIRE(field<QDoubleSpinBox>(w, "/manufacturing/depth/parameter").value() == 5);
+  select_standard();
+  choose_hole_mode(w, "blcad.hole.source/manufacturing/diameter", 0);
+  CHECK(field<QDoubleSpinBox>(w, "/manufacturing/diameter/parameter").value() == 4);
+  CHECK(field<QDoubleSpinBox>(w, "/manufacturing/depth/parameter").value() == 5);
+  CHECK(control<QComboBox>(w, "blcad.feature_edit.binding/manufacturing/diameter/parameter")
+            .currentData() != shared);
+  CHECK(control<QComboBox>(w, "blcad.feature_edit.binding/manufacturing/depth/parameter")
+            .currentData() == shared);
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(w.session().part_document()->parameters().size() == p.parameters().size() + 3);
+  CHECK(volume(w) == Catch::Approx(38400 - 23 * std::numbers::pi).margin(1e-6));
   replay(w, dir, before);
 }

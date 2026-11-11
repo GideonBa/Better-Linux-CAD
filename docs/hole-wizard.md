@@ -423,6 +423,76 @@ Original native captures: [ordinary creation](images/hole-creation.png), 1280×8
 remain visible below the scrolling form; tests reject horizontal form overflow. The shared native
 regression also covers existing Sketch profile and imported STEP selection after the datum-overlap fix.
 
+### 157B2 implementation plan
+
+Extend the same create/edit lifecycle with explicit recipe/extent/tip choices and sourced/custom
+dimensions. Form transitions operate on disposable typed Core records and reseed through the
+canonical serializer. Keep role-specific pending dimensions stable within a draft and publish only
+used inputs, including when an existing Hole acquires a new recipe. Explicit sources select an
+existing pinned resource revision, row and compatible column with disclosed provenance; no guessed
+normative mapping. Internal threads reuse ThreadDefinition and distinguish drill depth from thread
+length/start. Preserve IDs, existing formula ownership and the current feature/history slot.
+
+Complete external Thread authoring and native/imported/result support collection in the same assigned
+157B2 scope. Geometry and supplier freshness decide capability; invalid transitions remain editable
+and never publish incomplete inputs. Native acceptance includes source changes, recipe correction,
+physical geometry and exact undo/reopen. All 157B3/C and subsequent numbered scope remains assigned.
+
+157B2b support plan: translate selection roles explicitly into Hole support/limit or Thread support
+references. Keep imported references tied to current supplier bytes and capability. A newly required
+result-face workplane belongs to the candidate and is published only when used. Initial external
+Thread dimensions need current analytic axis/radius/interval information from Geometry, sharing
+the execution frame rules; Qt must not duplicate OCCT topology interpretation.
+
+Standard Thread authoring must explicitly select revision, row and typed column mappings for each
+profile field. Incomplete mappings block Apply while preserving the current committed definition.
+Start omission remains zero; optional start/taper controls and cone interval/radius consistency must
+preview through the same Thread execution. These are planned requirements, not 157B2a acceptance.
+New modeled-thread templates must satisfy the separated-flank/turn limits themselves; a valid
+cosmetic default does not establish a valid modeled profile. The current custom internal template
+uses cosmetic representation; the full new-feature modeled workflow is part of 157B2b/C.
+
+### Recipe and dimensional source controls — 157B2a
+
+The shared Hole panel adds Plain/Clearance intent and explicit Simple, Counterbore, Countersink,
+Spotface, Stepped, Fitted, Reamed, Center and Slot choices. The Slot transition starts from an existing
+arc-closed profile and keeps its typed profile selector; an unavailable profile is diagnosed. Blind,
+Through All, To Next, To Face, Up to Body and Symmetric choices use the existing extent definitions.
+The initial To Face limit is a current native bottom face; its existing typed reference fields remain
+editable. Up to Body begins with another visible solid. Scoped imported/result limit collection is
+still 157B2b. Flat/Conical tip transitions enforce the existing Blind-only cone contract.
+
+`GuiHoleRecipeCommands` operates only on disposable Part clones through Core factories and update
+commands. The shell reseeds its form through the canonical serializer while retaining committed
+freshness and shared-parameter edits. Fresh draft namespaces keep recipe role dimensions stable; unused
+roles are reset to defaults when reintroduced. Recreated steps receive fresh IDs. Only inputs used
+by the final definition are published, including new dimensions added while editing an existing Hole.
+Rejected Core transitions restore the actual prior choice and block Apply until correction.
+Recipe/source controls retain keyboard focus across the deferred form rebuild, including successive
+arrow-key changes; Cancel/finish discard pending focus restoration for the old draft.
+
+Every bore/seat/step dimension offers Custom or an explicit cell from an existing pinned table
+revision. Choices disclose table, revision, row, column and provenance, and restrict Length versus
+Angle cells. The resolved value and units are visible. Raw pin fields remain read-only. Returning
+to Custom creates a fresh owned dimension initialized from the resolved cell; it does not edit the
+table or overwrite another field's deliberate binding to an earlier custom dimension.
+An internal Thread toggle creates the existing custom ThreadDefinition with separate bore, major /
+minor diameter, pitch, angle and length controls. Omitted start is zero; creation of optional start /
+taper, explicit standard Thread mappings and external Thread creation remain 157B2b.
+
+Focused proof is `[hole-recipe-shell]` / `[native-hole-recipe]` in the current shell test file. It uses
+independent analytic volumes for all nine recipes and six extent choices, separate limit-Body
+invariance, pin/custom changes, angle units, invalid correction, new dimensions on existing features,
+retired steps, unused Thread inputs and exact history/reopen. Parent 157B2 and 157 remain open.
+Create Another retains the B1 numeric diameter/target behavior and starts a fresh Plain draft;
+retaining the full recipe/thread configuration with fresh owned inputs remains assigned to 157B3.
+
+Original native recipe captures: [ordinary](images/hole-recipe.png), 1280×800, and
+[compact](images/hole-recipe-compact.png), 1536×960 physical pixels at 150%. They follow repeated
+keyboard recipe changes, numeric seat input and mouse Apply. Tests assert focus retention, footer
+reachability and absence of horizontal form overflow. Numbered status and executed counts remain
+in `mvp-plan.md`.
+
 ## Why more than a cut
 
 ```text

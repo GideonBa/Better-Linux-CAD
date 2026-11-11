@@ -196,3 +196,14 @@ camera and previous pick scope when the entry model revision is still current. E
 their update path and pinned fields. The [Hole contract](hole-wizard.md#semantic-creation--157b1-bounded-design)
 owns the current creation limits. Focused proof is `[hole-create-shell]` /
 `[native-hole-create]` in the same current shell test file; numbered acceptance remains in the plan.
+
+### Recipe transitions and dimension sources — 157B2a
+
+The same editor composes Hole recipe, termination, tip and custom internal Thread transitions using
+`GuiHoleRecipeCommands`. Its disposable typed Part result reseeds the canonical form; committed
+freshness remains unchanged. Required pending dimensions are added for creation and existing-feature
+editing, while explicit changes to shared parameters remain part of that same transaction. Source
+controls select compatible pinned cells or convert a resolved source to an owned custom dimension.
+[The Hole contract](hole-wizard.md#recipe-and-dimensional-source-controls--157b2a) owns exact limits;
+the existing recipe/source and native test tags provide focused proof. Full Thread/support selectors,
+manipulators, Sketch return, presets and legacy conversion remain assigned to 157B2b/B3/C.
