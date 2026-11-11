@@ -766,6 +766,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_assembly_advanced_tests.cpp
       tests/gui/gui_shell_assembly_analysis_tests.cpp
       tests/gui/gui_shell_feature_edit_tests.cpp
+      tests/gui/gui_shell_hole_thread_edit_tests.cpp
       tests/gui/gui_shell_navigation_tests.cpp
       tests/gui/gui_shell_selection_filter_tests.cpp
       tests/gui/gui_shell_repeat_tests.cpp

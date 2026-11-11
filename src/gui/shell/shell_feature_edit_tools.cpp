@@ -22,6 +22,7 @@
 #include <QSpinBox>
 #include <QStatusBar>
 #include <QTimer>
+#include <QUuid>
 #include <QVBoxLayout>
 #include <algorithm>
 #include <cmath>
@@ -34,10 +35,10 @@ namespace {
 using Json = nlohmann::json;
 using Kind = GuiFeatureEditKind;
 constexpr const char* task_id = "part.feature_edit";
-constexpr const char* collections[] = {"features",        "revolve_features", "sweep_features",
-                                       "loft_features",   "surface_features", "part_patterns",
-                                       "mirror_features", "edge_treatments",  "shell_features",
-                                       "draft_features",  "body_booleans"};
+constexpr const char* collections[] = {
+    "features",      "revolve_features", "sweep_features",  "loft_features",  "surface_features",
+    "part_patterns", "mirror_features",  "edge_treatments", "shell_features", "draft_features",
+    "body_booleans", "hole_features",    "thread_features"};
 QString label(const std::string& key) {
   static const std::map<std::string, QString> labels = {
       {"id", "Identifier"},
@@ -72,6 +73,29 @@ QString label(const std::string& key) {
       {"removed_faces", "Removed Faces"},
       {"sources", "Sources"},
       {"placements", "Placements"},
+      {"position", "Position"},
+      {"diameter", "Diameter"},
+      {"manufacturing", "Seat / Manufacturing"},
+      {"tip", "Drill Tip"},
+      {"support", "Support"},
+      {"handedness", "Handedness"},
+      {"representation", "Representation"},
+      {"major_diameter", "Major Diameter"},
+      {"minor_diameter", "Minor Diameter"},
+      {"pitch", "Pitch"},
+      {"included_angle", "Included Angle"},
+      {"taper_angle", "Taper Angle"},
+      {"start", "Start Offset"},
+      {"length", "Length"},
+      {"total_depth", "Total Depth"},
+      {"table", "Pinned Table"},
+      {"revision", "Revision"},
+      {"row", "Source Row"},
+      {"columns", "Source Columns"},
+      {"diameter_column", "Source Column"},
+      {"system", "Thread System"},
+      {"designation", "Designation"},
+      {"tolerance", "Tolerance"},
       {"second_direction", "Direction 2"},
       {"skipped", "Skipped Occurrences"},
       {"first", "Column"},
@@ -195,6 +219,10 @@ QString family(Kind kind) {
     return "Draft";
   case Kind::BodyBoolean:
     return "Boolean Operation";
+  case Kind::Hole:
+    return "Hole";
+  case Kind::Thread:
+    return "Thread";
   }
   return {};
 }
@@ -218,6 +246,8 @@ auto with_record(const PartDocument& part, FeatureId id, Kind kind, Callback cal
     BLCAD_EDIT_RECORD(Shell, find_shell_feature, update_shell_feature)
     BLCAD_EDIT_RECORD(Draft, find_draft_feature, update_draft_feature)
     BLCAD_EDIT_RECORD(BodyBoolean, find_body_boolean_feature, update_body_boolean_feature)
+    BLCAD_EDIT_RECORD(Hole, find_hole_feature, update_hole_feature)
+    BLCAD_EDIT_RECORD(Thread, find_thread_feature, update_thread_feature)
 #undef BLCAD_EDIT_RECORD
   }
   return callback(*part.find_feature(id), &PartDocument::update_feature);
@@ -230,12 +260,17 @@ bool body_item(const geometry::ViewportSceneItem& item) {
          item.kind == geometry::ViewportSceneKind::SurfaceBody;
 }
 bool parameter_key(std::string_view key) {
-  return key.ends_with("_parameter") || key == "parameter" || key == "rotation_offset";
+  return key.ends_with("_parameter") || key == "parameter" || key == "rotation_offset" ||
+         key == "major_diameter" || key == "minor_diameter" || key == "pitch" ||
+         key == "included_angle" || key == "taper_angle" || key == "start" || key == "length" ||
+         key == "depth" || key == "total_depth";
 }
 std::set<std::string> bound_parameters(const Json& value) {
   std::set<std::string> result;
   if (value.is_object()) {
     for (auto it = value.begin(); it != value.end(); ++it) {
+      if (it.key() == "table" || it.key() == "columns")
+        continue;
       if (parameter_key(it.key()) && it.value().is_string())
         result.insert(it.value().get<std::string>());
       else {
@@ -264,6 +299,8 @@ struct ShellFeatureEditTools::Impl {
   QScrollArea* scroll{};
   QLabel* status{};
   QComboBox* dynamic{};
+  QLabel* dynamic_label{};
+  QLabel* guidance{};
   QPushButton* apply{};
   QWidget* overlay{};
   Json source, record;
@@ -295,7 +332,8 @@ struct ShellFeatureEditTools::Impl {
     dynamic = new QComboBox(content);
     dynamic->setObjectName("blcad.feature_edit.dynamic");
     dynamic->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
-    column->addWidget(new QLabel("Dynamic Value", content));
+    dynamic_label = new QLabel("Dynamic Value", content);
+    column->addWidget(dynamic_label);
     column->addWidget(dynamic);
     scroll = new QScrollArea(content);
     scroll->setObjectName("blcad.feature_edit.inputs_scroll");
@@ -303,12 +341,9 @@ struct ShellFeatureEditTools::Impl {
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
     column->addWidget(scroll, 1);
-    auto* hint = new QLabel("The preview also checks downstream features. Shared parameters "
-                            "affect every use; formula values are determined by their formulas. "
-                            "Escape resets a drag; press Escape again to cancel.",
-                            content);
-    hint->setWordWrap(true);
-    column->addWidget(hint);
+    guidance = new QLabel(content);
+    guidance->setWordWrap(true);
+    column->addWidget(guidance);
     auto* footer = new QHBoxLayout;
     apply = make_gui_button("Apply", content);
     apply->setObjectName("blcad.feature_edit.apply");
@@ -342,6 +377,22 @@ struct ShellFeatureEditTools::Impl {
 
   Json& value(const QString& path) {
     return record.at(Json::json_pointer(path.toStdString()));
+  }
+  bool hole_thread() const noexcept {
+    return edit.kind() == Kind::Hole || edit.kind() == Kind::Thread;
+  }
+  QFormLayout* make_form(QWidget* parent = nullptr) const {
+    auto* form = new QFormLayout(parent);
+    if (hole_thread()) {
+      form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+      form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    }
+    return form;
+  }
+  bool immutable_field(const QString& path) const {
+    return hole_thread() && (path.startsWith("/support/") || path.contains("/table/") ||
+                             path.contains("/columns/") || path.endsWith("/row") ||
+                             path.endsWith("/diameter_column"));
   }
   const Parameter* parameter(const std::string& id) const {
     return session.part_document()->find_parameter(ParameterId(id));
@@ -509,7 +560,7 @@ struct ShellFeatureEditTools::Impl {
   void build_fields(QFormLayout* form, const Json& object, const QString& prefix) {
     for (auto it = object.begin(); it != object.end(); ++it) {
       const auto key = it.key();
-      if (key == "id" || key == "type")
+      if ((key == "id" && !prefix.endsWith("/table")) || key == "type")
         continue;
       const auto path = prefix + "/" + QString::fromStdString(key);
       const auto& item = it.value();
@@ -552,20 +603,26 @@ struct ShellFeatureEditTools::Impl {
         continue;
       if (item.is_object()) {
         auto* group = new QGroupBox(label(key), form->parentWidget());
-        auto* nested = new QFormLayout(group);
+        auto* nested = make_form(group);
         build_fields(nested, item, path);
         form->addRow(group);
       } else if (item.is_array()) {
+        const bool stable_ids =
+            edit.kind() == Kind::Hole && (path == "/placements" || path == "/manufacturing/steps");
         if (item.empty() && key != "guide_curves" && !array_templates.contains(path))
           continue;
         if (!item.empty())
           array_templates[path] = item.back();
         auto* group = new QGroupBox(label(key), form->parentWidget());
-        auto* nested = new QFormLayout(group);
+        auto* nested = make_form(group);
         for (std::size_t index = 0; index < item.size(); ++index) {
           const auto entry = path + "/" + QString::number(index);
           auto* box = new QGroupBox(QString::number(index + 1), group);
-          auto* inputs = new QFormLayout(box);
+          box->setObjectName("blcad.feature_edit.entry" + entry);
+          if (stable_ids)
+            box->setProperty("semanticId",
+                             QString::fromStdString(item[index].at("id").get<std::string>()));
+          auto* inputs = make_form(box);
           if (item[index].is_object())
             build_fields(inputs, item[index], entry);
           else
@@ -577,9 +634,10 @@ struct ShellFeatureEditTools::Impl {
             const QString identity =
                 operation == "Remove" ? QStringLiteral("Entfernen") : operation;
             button->setObjectName("blcad.feature_edit." + identity + entry);
-            button->setEnabled(operation == "↑"   ? index > 0
-                               : operation == "↓" ? index + 1 < item.size()
-                                                  : true);
+            button->setEnabled(!immutable_field(path + "/") &&
+                               (operation == "↑"   ? index > 0
+                                : operation == "↓" ? index + 1 < item.size()
+                                                   : true));
             buttons->addWidget(button);
             QObject::connect(button, &QPushButton::clicked, &owner, [this, path, index, operation] {
               auto& array = value(path);
@@ -596,8 +654,9 @@ struct ShellFeatureEditTools::Impl {
         auto* add = make_gui_button("Add Entry", group);
         add->setObjectName("blcad.feature_edit.add" + path);
         const auto choices = references(key, path);
-        add->setEnabled(!item.empty() || array_templates.contains(path) || !choices.empty());
-        QObject::connect(add, &QPushButton::clicked, &owner, [this, path, choices] {
+        add->setEnabled(!immutable_field(path + "/") &&
+                        (!item.empty() || array_templates.contains(path) || !choices.empty()));
+        QObject::connect(add, &QPushButton::clicked, &owner, [this, path, choices, stable_ids] {
           auto& array = value(path);
           if (!array.empty())
             array.push_back(array.back());
@@ -605,6 +664,16 @@ struct ShellFeatureEditTools::Impl {
             array.push_back(previous->second);
           else if (!choices.empty())
             array.push_back(choices.front().first);
+          if (stable_ids && !array.empty()) {
+            const std::string prefix = path == "/placements" ? "placement." : "step.";
+            std::string id;
+            do {
+              id = prefix + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+            } while (std::any_of(array.begin(), array.end(), [&](const auto& old) {
+              return old.at("id").template get<std::string>() == id;
+            }));
+            array.back()["id"] = id;
+          }
           deferred_rebuild();
         });
         nested->addRow(add);
@@ -618,6 +687,15 @@ struct ShellFeatureEditTools::Impl {
     auto* parent = form->parentWidget();
     if (item.is_string()) {
       const auto text = item.get<std::string>();
+      if (immutable_field(path)) {
+        auto* output = new QLabel(QString::fromStdString(text), parent);
+        output->setWordWrap(true);
+        output->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+        output->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        register_field(output, path);
+        form->addRow(label(key), output);
+        return;
+      }
       if (const auto* p = parameter_key(key) ? parameter(text) : nullptr) {
         parameter_field(form, key, path, *p);
         return;
@@ -639,6 +717,19 @@ struct ShellFeatureEditTools::Impl {
         choices = {{"c0", "C0"}, {"g1", "G1"}, {"g2", "G2"}};
       if (key == "operation")
         choices = {{"add", "Union"}, {"subtract", "Subtract"}, {"intersect", "Intersect"}};
+      if (hole_thread() && key == "direction")
+        choices = edit.kind() == Kind::Hole
+                      ? std::vector<std::pair<std::string, std::string>>{{"support_normal",
+                                                                          "Support Normal"},
+                                                                         {"opposite_support_normal",
+                                                                          "Reverse Support Normal"}}
+                      : std::vector<std::pair<std::string, std::string>>{
+                            {"along_support_axis", "Along Support Axis"},
+                            {"opposite_support_axis", "Reverse Support Axis"}};
+      if (hole_thread() && key == "handedness")
+        choices = {{"right", "Right Hand"}, {"left", "Left Hand"}};
+      if (hole_thread() && key == "representation")
+        choices = {{"cosmetic", "Cosmetic"}, {"modeled", "Modeled"}};
       if (!choices.empty()) {
         auto* input = combo(parent);
         for (const auto& [id, name] : choices)
@@ -700,8 +791,8 @@ struct ShellFeatureEditTools::Impl {
     } else if (item.is_number()) {
       const auto unit =
           key.find("angle") != std::string::npos ? QuantityKind::AngleDeg : QuantityKind::LengthMm;
-      auto* input =
-          number(parent, path, item.get<double>(), unit, key == "x" || key == "y" || key == "z");
+      auto* input = number(parent, path, item.get<double>(), unit,
+                           !hole_thread() && (key == "x" || key == "y" || key == "z"));
       form->addRow(label(key), input);
       QObject::connect(input, &QDoubleSpinBox::valueChanged, &owner, [this, path](double scalar) {
         value(path) = scalar;
@@ -719,10 +810,16 @@ struct ShellFeatureEditTools::Impl {
     dynamic->addItem("No Handle", QString());
     auto* panel = new QWidget;
     auto* column = new QVBoxLayout(panel);
-    auto* form = new QFormLayout;
+    auto* form = make_form();
     column->addLayout(form);
     column->addStretch();
-    build_fields(form, record, {});
+    if (hole_thread()) {
+      for (const auto* key : {"name", "placements", "target_body", "support", "direction", "kind",
+                              "diameter", "manufacturing", "extent", "tip", "thread"})
+        if (record.contains(key))
+          build_fields(form, Json{{key, record.at(key)}}, {});
+    } else
+      build_fields(form, record, {});
     auto* old = scroll->takeWidget();
     scroll->setWidget(panel);
     if (old) {
@@ -855,6 +952,12 @@ struct ShellFeatureEditTools::Impl {
     if (!edit.active() || building)
       return;
     std::vector<GuiViewportManipulatorHandle> handles;
+    // Hole/Thread need support-anchored grips in 157B. Keep this slice numeric.
+    if (hole_thread()) {
+      (void)layer.set_handles({});
+      owner.refresh_presentation();
+      return;
+    }
     const auto path = dynamic->currentData().toString();
     if (auto selected = numbers.find(path);
         selected != numbers.end() && selected->second->isEnabled()) {
@@ -997,6 +1100,16 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   p.parameter_values.clear();
   p.array_templates.clear();
   p.dock->setWindowTitle(family(p.edit.kind()) + " Edit");
+  p.dynamic->setVisible(!p.hole_thread());
+  p.dynamic_label->setVisible(!p.hole_thread());
+  p.guidance->setText(
+      p.hole_thread()
+          ? "The preview checks downstream features. Shared parameters affect every use. "
+            "Formula values follow their expressions; select another binding to rebind. "
+            "Escape cancels editing."
+          : "The preview also checks downstream features. Shared parameters affect every use; "
+            "formula values are determined by their formulas. Escape resets a drag; press "
+            "Escape again to cancel.");
   p.build_form();
   p.dock->show();
   p.dock->raise();

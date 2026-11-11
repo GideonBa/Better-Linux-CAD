@@ -350,6 +350,41 @@ Proof owners: `tests/core/pattern_placement_tests.cpp`,
 `[hole-pattern-consumer-shell]` in `tests/gui/gui_shell_assembly_tools_tests.cpp`.
 `mvp-plan.md` records actual slice verification and whole-block status.
 
+## Property editing — 157A design and boundary
+
+Extend `GuiFeatureEditController` and the existing `ShellFeatureEditTools` with Hole and Thread
+families; browser activation and History Edit use those same Core update commands. No save-schema,
+resource-store, pattern or transaction authority changes. Preserve the feature/history slot and
+placement/step IDs. Existing custom dimensions retain their parameter bindings; formula values
+remain read-only until an explicit rebind. Pinned table keys, revisions, row and column mappings
+are immutable in this slice; adoption continues through Manage resources.
+
+Property rows wrap to the available panel width; nested source/profile groups must not require
+horizontal scrolling at ordinary or compact high-DPI sizes. Present existing intent in the Hole order: name/positions, target/support/direction, bore/seat,
+extent/tip, thread. Thread uses target/support/direction then its definition. Numeric fields use
+the actual Length/Angle parameter type, including thread start/length/pitch and drill depth.
+Handedness and cosmetic/modeled representation are explicit choices; geometry/cost failures clear
+the candidate and block Apply. Retained unsupported recipe discriminants remain visible and fixed.
+Adding a position or step assigns a fresh opaque UUID-based identity, retained through Apply and
+reopen. New entries never recycle deleted identities across drafts or committed edits. Removing a consumed position must
+fail through downstream validation rather than bind another one.
+
+The existing complete candidate recompute validates downstream patterns/finishing and Thread
+execution, with current supplier freshness. Previews include derived cosmetic graphics and replace
+the old annotations; no preview graphic becomes selectable or persisted. Apply is one transaction;
+Cancel, failed edits, Save during preview, Undo/Redo and reopen retain the existing contracts.
+A native numeric-field/representation workflow and independent physical volume/reference checks
+must prove the bridge before delivery. Full creation, recipe switching, source/preset selectors,
+Sketch return, anchored manipulators, legacy conversion and Create Another remain 157B/C.
+
+157A visual proof: original [Hole/Pattern property preview](images/hole-property-edit.png),
+[modeled Thread preview at 100%](images/thread-property-edit.png) and
+[compact 150% Thread preview](images/thread-property-edit-compact.png). The native tests assert
+that nested forms need no horizontal scrolling and dispatch keyboard/numeric input and mouse Apply.
+The ordinary fit includes datum planes; these captures remain unmodified. Numbered acceptance and
+executed counts are recorded only in `mvp-plan.md`.
+
+
 ## Why more than a cut
 
 ```text

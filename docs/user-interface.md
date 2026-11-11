@@ -271,8 +271,11 @@ valid" banner must not contradict a failed candidate (155B Thread/Hole regressio
 Cosmetic Thread graphics show derived interval rims and a bounded illustrative helix. They remain
 nonselectable and follow Body/component visibility and placements. History previews replace the
 committed graphics without adding Body results or changing Body-preview counts; Apply, Cancel,
-Undo/Redo and reopen regenerate the appropriate display. The dedicated Hole/Thread selectors and
-Inventor-like authoring remain assigned to 157.
+Undo/Redo and reopen regenerate the appropriate display. Existing Hole/Thread definitions use the
+[157A property-edit bridge](gui-feature-edit-mvp9.md#hole-and-thread-property-bridge--157a) through
+browser activation or History Edit: numeric fields retain units/formula bindings, table pins remain
+read-only and failed full downstream previews block Apply. New-feature selectors, support-anchored
+grips and the complete Inventor-like authoring workflow remain assigned to 157B/C.
 
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
 [compact suppression at 150%](images/history-suppression-compact.png) and
