@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 155
-current_block: 156
-current_boundary: Block 155 accepted within its contract; 156 not started; dedicated Hole/Thread authoring remains 157
-current_tag: "[parity-b156]"
+implemented_through: Block 156
+current_block: 157
+current_boundary: Block 156 accepted; semantic Hole/Thread authoring is next in Block 157
+current_tag: "[parity-b157]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–155 accepted; Blocks 156–204 planned"
+  advanced_modeling_workflows: "Blocks 145–156 accepted; Blocks 157–204 planned"
 ---
 
 # MVP Plan
@@ -34,13 +34,13 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 155
-current block        Block 156 (not started)
+implemented through  Block 156
+current block        Block 157 (next)
 current phase        Semantic holes and threads
-current boundary     Thread backend/display accepted; placement patterns next; dedicated authoring remains 157
+current boundary     Placement patterns and stable Hole consumers accepted; semantic property authoring remains 157
 ```
 
-The next assigned work is Block 156. [The consolidated sequence](inventor-parity-sequence.md)
+The next assigned work is Block 157. [The consolidated sequence](inventor-parity-sequence.md)
 contains dependencies and implementation criteria; [the test plan](inventor-parity-test-plan.md)
 contains individual and combined acceptance; [the UI contract](user-interface.md) owns the
 Inventor-like workflows and layout. These plans retain their full unimplemented scope.
@@ -51,6 +51,27 @@ The authorized delivery order is one active implementation branch and at most on
 the complete issue, inspect the staged diff, run appropriate headless/native checks, update existing
 contracts and evidence, commit and normally push, then merge its PR through main's rules. Fetch and
 verify the delivered tree before starting the next issue from main. Do not stack unfinished PRs.
+
+### Assigned continuation through Block 165 — 2026-11-11
+
+The current request assigns the complete sequence through 165. Execute each delivery serially;
+this assignment does not change acceptance status. Keep the detailed requirements in
+[the sequence](inventor-parity-sequence.md) and the scenario oracles in
+[the test plan](inventor-parity-test-plan.md).
+
+| Next delivery | Completion boundary / proof |
+| --- | --- |
+| 156 | Accepted: shared placements, Hole consumers, full suites, native 100%/150% and startup verified. Deliver through PR #175 before a successor branch. |
+| 157 | Semantic Hole/Thread creation and editing in the shared property workflow, explicit legacy conversion, presets and native B01–B04/UI01. |
+| 158 | Phase A/B integrated acceptance, exact history/reopen/STEP and incremental-versus-fresh measurements. |
+| 159 | Persistent oriented planar G2 constraints, solver/drag integration and independent S01 derivative/rank oracles. |
+| 160–161 | Safe typed equation intent/persistence, then tolerance-controlled Geometry and real downstream S02/G01 consumers. |
+| 162 | Native Smooth/equation authoring, conflict correction, closed profiles and persisted history. |
+| 163–164 | Existing Sketch3D constraint schema, then deterministic solver/DOF/conflict diagnostics with S03 independent oracles. |
+| 165 | Solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 downstream acceptance. |
+
+Each row retains its full numbered prerequisites and acceptance criteria; grouped rows do not
+authorize partial acceptance of either block. Preserve all planned scope after 165.
 
 ## Completed blocks through 144
 
@@ -132,8 +153,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–154 are **Implemented and accepted**;
-Block 155 is **In progress**; Blocks 156–204 are **Planned; not started**.
+Status authority: Blocks 145–156 are **Implemented and accepted**;
+Blocks 157–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -144,7 +165,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
-| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152–155 accepted; 156–158 planned |
+| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152–156 accepted; 157–158 planned |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
@@ -158,9 +179,9 @@ PR/merge discipline applies to implementation and planning deliveries; no succes
 before the preceding PR is merged and main refreshed. Deferred drawings/BOMs, sheet metal,
 CAM/FEM, automatic fastener libraries and general physical dynamics are not assigned here.
 
-### Accepted Blocks 145–155
+### Accepted Blocks 145–156
 
-The historical request above has been implemented through 155; the completed slice logs are
+The historical request above has been implemented through 156; the completed slice logs are
 replaced by this accepted block index and its PR references.
 
 All rows are implemented and accepted. The [sequence](inventor-parity-sequence.md) retains detailed
@@ -180,37 +201,46 @@ PR links preserve individual slice provenance without copying intermediate compl
 | 153 | Physical Hole tools, six bounded extent modes, finite native/imported/posed support, material checks and stable bore/bottom origins for finishing/Sketch consumers; atomic failure | [Hole](hole-wizard.md); B01 combined geometry/history/material/import/exchange gate | [166](https://github.com/GideonBa/Better-Linux-CAD/pull/166), [167](https://github.com/GideonBa/Better-Linux-CAD/pull/167), [168](https://github.com/GideonBa/Better-Linux-CAD/pull/168), [169](https://github.com/GideonBa/Better-Linux-CAD/pull/169) |
 | 154 | Counterbore/countersink/spotface/stepped/fitted/reamed/center/slot intent, table/parameter/resource integration and Part V5 persistence; physical seats/steps/cones/slots and stable seat/step/curve roots | [Hole](hole-wizard.md), [file format](file-format.md); B02 combined acceptance | [170](https://github.com/GideonBa/Better-Linux-CAD/pull/170) |
 | 155 | Shared internal/external Thread definitions, Part V6/Project snapshots and resource/history integration; cosmetic invariance/derived graphics and checked ideal-V helical cuts with explicit limits | [Hole/Thread](hole-wizard.md), [file format](file-format.md); B03 first gate, native authoring completion remains 157 | [172](https://github.com/GideonBa/Better-Linux-CAD/pull/172), [173](https://github.com/GideonBa/Better-Linux-CAD/pull/173), [174](https://github.com/GideonBa/Better-Linux-CAD/pull/174) |
+| 156 | Shared two-direction placements, dormant exclusions and Part V7; physical Hole operation copies, per-instance axes/seats and Assembly consumers; current Pattern authoring with stable checkbox rows | [Pattern](part-pattern-core-mvp6.md), [Hole](hole-wizard.md), [Pattern UI](gui-interactive-pattern-body-mvp9.md); B04 / native 100%–150% | [175](https://github.com/GideonBa/Better-Linux-CAD/pull/175) |
 
 The initial full parity plan was delivered in [PR #138](https://github.com/GideonBa/Better-Linux-CAD/pull/138).
 
-### Latest implementation acceptance — Block 155, 2026-11-10
+### Latest implementation acceptance — Block 156, 2026-11-11
 
-155A/B delivered shared authored/pinned Thread definitions, independent start/length/hand/mode,
-Part V6/Project persistence, history and atomic resource adoption. 155C adds checked physical
-execution and derived graphics under [Hole/Thread limits](hole-wizard.md). B03 combinations cover
-independent pitch/hand/radial/volume oracles, blind clearance, mode switching, revisions/mass,
-history/reopen, immutable imports, conical cosmetic supports, rotated shafts and actual STEP readback.
-The dedicated authoring panel and B03 native authoring completion remain 157.
+Shared linear/circular placement intent, stable logical exclusions and per-copy Hole consumers are
+accepted within the [Hole execution limits](hole-wizard.md#shared-placement-execution-and-assembly-consumers-156).
+The current Pattern task authors both directions and retained exclusions; repeated checkbox input
+preserves live Qt rows through synchronous preview. B04 combines bound plate/cover counts, physical
+seats, materials/mass, finishing, Assembly Insert, exact reopen and structured STEP readback.
+Dedicated semantic Hole/Thread creation and editing remain assigned to 157.
 
 | Verification | Result |
 | --- | --- |
-| Full Core | 697 cases / 26,681 assertions; passed |
-| Full Geometry | 657 / 56,844; passed |
-| Focused Geometry | 11 / 859; passed |
-| Full Qt | 770 cases: 731 passed / 39 native-only skips; 92,409 assertions passed |
-| Relevant native 100% | 11 / 1,139; no failures/skips |
-| Compact native 150% | 11 / 1,157; no failures/skips |
+| Five build targets | Core/Geometry/Qt tests, app and STEP exporter built |
+| Full Core | 706 cases / 26,802 assertions; passed |
+| Full Geometry, including B04 | 671 / 57,576; passed |
+| Focused Qt | 14 passed / 2 native-only skips / 677 assertions |
+| Full Qt with required filesystem access | 778 cases: 738 passed / 40 native-only skips; 92,738 assertions passed |
+| Relevant native 100% | 26 / 1,876; no failures/skips |
+| Compact native 150% | 26 / 1,892; no failures/skips |
 | Native startup | PID-matched X11 window viewable; intentional six-second timeout 124 |
-| Frozen runtime | 1,039 files; final manifest SHA256 `c41d72f83a8c70f35aec11c9efedcba616bd1a8aba13bff17553f41122be3ebc` |
+| Frozen runtime | 1,050 files; SHA256 `7829ca89aca52f8d224489dc63e64a0396a7251966439c8feb839c0a4e7fb7e9` |
 
-Five targets build; new files and changed C++ ranges pass formatting. All 1,039 frozen runtime
-inputs and five verified binary hashes match. Working/staged diffs and original 100%/150% captures
-are reviewed. Focused native filters cover the affected Thread/Hole/History/resource/inventory
-workflows; this is not a full native-suite claim for the 39 offscreen skips.
-Delivery: [PR #174](https://github.com/GideonBa/Better-Linux-CAD/pull/174), reviewed implementation
-`28ae194`; this delivery-record update leaves runtime inputs unchanged. `feat/thread-geometry`
-began only after PR #173 was verified merged and main refreshed. Earlier slice evidence remains
-in PRs #172/#173.
+The manifest covers `src/`, `include/`, `tests/`, `assets/`, `cmake/` and both root CMake files.
+All five binary hashes and runtime inputs remain unchanged. Changed C++ formatting, working/staged
+diffs and original 100%/150% captures are reviewed. The relevant native filter covers affected
+Pattern/Hole/Thread/Assembly/inventory workflows; it does not prove every offscreen skip.
+The restricted full-Qt attempt was interrupted after atomic-publication failures; an isolated
+`QSaveFile` probe confirmed the filesystem restriction, and the complete rerun above passes with
+the needed access. No export assertion was changed.
+
+Proof: [Core placements](../tests/core/pattern_placement_tests.cpp),
+[Hole Pattern combinations/B04](../tests/geometry/hole_pattern_combined_tests.cpp),
+[row lifetime/native authoring](../tests/gui/gui_shell_hole_pattern_tests.cpp) and
+[Assembly task consumers](../tests/gui/gui_shell_assembly_tools_tests.cpp).
+Delivery: [PR #175](https://github.com/GideonBa/Better-Linux-CAD/pull/175), correction `5b5a05f`;
+final acceptance is ready for normal protected merge. Verify the merged tree and refresh main
+before starting the successor branch.
 
 ### Retained extension boundaries
 
@@ -239,7 +269,22 @@ remain geometry inputs for their assigned later consumers.
 
 **Hole workflow:** Existing top-to-bottom property/preview/Apply/Undo contracts apply; dedicated authoring remains 157.
 
-Phase B stays open for 156–158.
+Phase B stays open for 157–158.
+
+### Next implementation — Block 157
+
+All [157/B01–B04/UI01 requirements](inventor-parity-sequence.md#block-157-hole-and-thread-property-panel-workflow)
+remain assigned. Deliver named slices serially, with the parent block open until all criteria pass:
+
+| Slice | Planned boundary |
+| --- | --- |
+| 157A | Typed Hole/Thread property editing over existing Core update commands, stable IDs/history, formula and pinned-resource ownership, whole downstream preview and rollback. |
+| 157B | Shared create/edit panel with ordered selectors, source/custom dimensions, all supported recipes, position/depth/diameter interaction, Sketch return, explicit legacy conversion, presets and Create Another. |
+| 157C | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
+
+No new Hole/Thread persistence authority or independent pattern evaluator is planned. Preserve
+legacy cut editing and all subsequent 158–204 requirements. Acceptance of 157A alone does not
+close 157 or provide the complete Wizard workflow.
 
 ## Later phases
 

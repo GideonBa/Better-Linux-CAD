@@ -11,6 +11,7 @@
 namespace blcad::geometry {
 
 class StepImportTopologyContext;
+class ShapeCache;
 
 struct ComponentLocalPlanarDescriptor {
   Point3 origin;
@@ -79,7 +80,8 @@ public:
   explicit AssemblyConstraintTargetResolver(StepImportTopologyContext* import_context)
       : import_context_(import_context) {}
   [[nodiscard]] Result<AssemblyResolvedGeometricTarget>
-  resolve_geometric(const Project& project, const AssemblyConstraintTarget& target) const;
+  resolve_geometric(const Project& project, const AssemblyConstraintTarget& target,
+                    const ShapeCache* verified_part_cache = nullptr) const;
 
   [[nodiscard]] Result<ResolvedAssemblyConstraintTarget>
   resolve(const Project& project, const AssemblyConstraintTarget& target) const;

@@ -1,11 +1,14 @@
 #include "blcad/geometry/assembly_constraint_target_resolver.hpp"
+#include "assembly_hole_geometry_scope.hpp"
 
 #include "blcad/core/assembly_reference_target.hpp"
 #include "blcad/core/generated_topology_reference.hpp"
 #include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
-#include "blcad/geometry/workplane_resolver.hpp"
+#include "blcad/geometry/hole_instance_geometry.hpp"
+#include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
+#include "blcad/geometry/workplane_resolver.hpp"
 
 #include <algorithm>
 #include <array>
@@ -594,7 +597,8 @@ resolve_generated_topology_target(const ResolvedTargetContext& context,
 
 Result<AssemblyResolvedGeometricTarget>
 AssemblyConstraintTargetResolver::resolve_geometric(const Project& project,
-                                                    const AssemblyConstraintTarget& target) const {
+                                                    const AssemblyConstraintTarget& target,
+                                                    const ShapeCache* verified_part_cache) const {
   auto context = resolve_target_context(project, target);
   if (context.has_error()) {
     return Result<AssemblyResolvedGeometricTarget>::failure(context.error());
@@ -605,6 +609,46 @@ AssemblyConstraintTargetResolver::resolve_geometric(const Project& project,
   auto imported = observe_imported_part_sources(*context.value().part, import_context_);
   if (!imported)
     return Result<AssemblyResolvedGeometricTarget>::failure(imported.error());
+
+  if (is_hole_target_spelling(target.semantic_reference())) {
+    auto identity = parse_hole_target_spelling(target.semantic_reference());
+    if (!identity)
+      return Result<AssemblyResolvedGeometricTarget>::failure(identity.error());
+    const auto& part = *context.value().part;
+    std::shared_ptr<const ShapeCache> owned;
+    if (!verified_part_cache) {
+      auto evaluated = detail::assembly_hole_part_geometry(part, import_context_);
+      if (!evaluated)
+        return Result<AssemblyResolvedGeometricTarget>::failure(evaluated.error());
+      owned = std::move(evaluated.value());
+      verified_part_cache = owned.get();
+    }
+    auto frame = HoleInstanceGeometry::resolve(part, identity.value(), *verified_part_cache);
+    if (!frame)
+      return Result<AssemblyResolvedGeometricTarget>::failure(frame.error());
+    const auto& f = frame.value().frame;
+    const auto kind = identity.value().role() == HoleReferenceRole::Axis
+                          ? AssemblyGeometricTargetSourceKind::GeneratedHoleAxis
+                          : AssemblyGeometricTargetSourceKind::GeneratedHoleSeat;
+    AssemblyGeometricTargetDescriptor descriptor =
+        kind == AssemblyGeometricTargetSourceKind::GeneratedHoleAxis
+            ? AssemblyGeometricTargetDescriptor{AssemblyAxisTargetDescriptor{f.origin, f.normal}}
+            : AssemblyGeometricTargetDescriptor{
+                  AssemblyFrameTargetDescriptor{f.origin, f.x_axis, f.y_axis, f.normal}};
+    AssemblyGeometricTargetSourceMetadata metadata;
+    metadata.referenced_part_document = part.id();
+    metadata.source_feature = identity.value().producer();
+    metadata.hole_instance = identity.value();
+    return validated_geometric_target(AssemblyResolvedGeometricTarget{
+        AssemblyLocalGeometricTargetEndpointIdentity{target.component_instance(),
+                                                     target.semantic_reference()},
+        kind,
+        metadata,
+        descriptor,
+        assembly_geometric_target_capabilities(kind),
+        AssemblyGeometricTargetCoordinateSpace::ComponentLocal,
+        {context.value().component->transform()}});
+  }
 
   if (is_imported_topology_target_spelling(target.semantic_reference())) {
     auto identity = parse_imported_topology_target_spelling(target.semantic_reference());

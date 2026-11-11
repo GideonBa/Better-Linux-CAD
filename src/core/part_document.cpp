@@ -89,6 +89,81 @@ template <typename FeatureT>
   return transform && transform->body() == body;
 }
 
+template <class Pattern>
+Result<std::size_t> validate_pattern_inputs(const PartDocument& part, const Pattern& feature) {
+  // Legacy records retain their original validation and unrestricted persisted
+  // counts. Only explicit placement intent opts into the bounded new layout.
+  std::size_t placement_count = 0;
+  if (feature.placements()) {
+    auto layout = evaluate_pattern_placements(part, feature);
+    if (!layout)
+      return Result<std::size_t>::failure(layout.error());
+    placement_count = layout.value().size();
+  } else {
+    const auto* count = part.find_parameter(feature.count_parameter());
+    if (!count || count->type() != ParameterType::Count || count->value().count_value() < 2)
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "Legacy Pattern requires an existing Count of at least two"));
+    if constexpr (std::is_same_v<Pattern, LinearPatternFeature>) {
+      const auto* extent = part.find_parameter(feature.extent_parameter());
+      if (!extent || extent->type() != ParameterType::Length)
+        return Result<std::size_t>::failure(Error::validation(
+            feature.id().value(), "Legacy Linear Pattern requires an existing Length extent"));
+    }
+  }
+  if (feature.placements() && feature.placements()->second_direction) {
+    auto valid = validate_part_feature_input_reference(
+        part, feature.placements()->second_direction->direction);
+    if (!valid)
+      return valid;
+  }
+  bool holes = false;
+  for (const auto& source : feature.sources()) {
+    holes |= source.kind() == PatternSourceKind::Feature &&
+             part.find_hole_feature(std::get<FeatureId>(source.source()));
+    if (source.kind() != PatternSourceKind::Feature)
+      continue;
+    const auto& id = std::get<FeatureId>(source.source());
+    const auto hole_operation = [&](const auto* pattern) {
+      return pattern &&
+             std::any_of(pattern->sources().begin(), pattern->sources().end(),
+                         [&](const auto& seed) {
+                           return seed.kind() == PatternSourceKind::Feature &&
+                                  part.find_hole_feature(std::get<FeatureId>(seed.source()));
+                         });
+    };
+    if (hole_operation(part.find_linear_pattern_feature(id)) ||
+        hole_operation(part.find_circular_pattern_feature(id)))
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "Nested Hole operation Patterns require explicit recipe support; "
+                                "select the finished Body to copy the whole solid"));
+  }
+  if (holes) {
+    const auto& context = feature.body_result_context();
+    for (const auto& source : feature.sources()) {
+      const auto* hole = source.kind() == PatternSourceKind::Feature
+                             ? part.find_hole_feature(std::get<FeatureId>(source.source()))
+                             : nullptr;
+      if (!hole || !feature.placements() ||
+          context.operation_mode() != FeatureBodyOperationMode::Cut ||
+          context.target_body() != std::optional(hole->target_body()) ||
+          context.effective_produced_body() != hole->target_body())
+        return Result<std::size_t>::failure(Error::validation(
+            feature.id().value(),
+            "Hole operation patterns require explicit placements, only Hole sources and an "
+            "in-place Cut on their common target Body"));
+    }
+  }
+  return Result<std::size_t>::success(placement_count);
+}
+template <class Pattern>
+std::vector<std::string> second_pattern_dependencies(const Pattern& feature) {
+  if (!feature.placements() || !feature.placements()->second_direction)
+    return {};
+  const auto& direction = *feature.placements()->second_direction;
+  return {direction.direction.source_node_id(), direction.count.value(), direction.extent.value()};
+}
+
 [[nodiscard]] Result<std::size_t>
 validate_result_face_source(const PartDocument& document, const ResultFaceReference& reference,
                             const std::string& object_id,
@@ -2498,16 +2573,9 @@ Result<std::size_t> PartDocument::add_linear_pattern_feature(LinearPatternFeatur
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
-  const Parameter* count = find_parameter(feature.count_parameter());
-  if (count == nullptr || count->type() != ParameterType::Count ||
-      count->value().count_value() < 2U)
-    return Result<std::size_t>::failure(Error::validation(
-        feature.id().value(),
-        "linear pattern count must reference an existing count parameter of at least 2"));
-  const Parameter* extent = find_parameter(feature.extent_parameter());
-  if (extent == nullptr || extent->type() != ParameterType::Length)
-    return Result<std::size_t>::failure(Error::validation(
-        feature.id().value(), "linear pattern extent must reference an existing length parameter"));
+  auto valid = validate_pattern_inputs(*this, feature);
+  if (!valid)
+    return valid;
   auto direction_valid = validate_part_feature_input_reference(*this, feature.direction());
   if (direction_valid.has_error())
     return Result<std::size_t>::failure(direction_valid.error());
@@ -2548,6 +2616,11 @@ Result<std::size_t> PartDocument::add_linear_pattern_feature(LinearPatternFeatur
         feature.extent_parameter().value()}) {
     auto dependency = add_dependency_if_missing(graph, source, feature.id().value());
     if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  for (const auto& source : second_pattern_dependencies(feature)) {
+    auto dependency = add_dependency_if_missing(graph, source, feature.id().value());
+    if (!dependency)
       return Result<std::size_t>::failure(dependency.error());
   }
   const std::string result_node = body_dependency_node_id(context.effective_produced_body());
@@ -2593,12 +2666,9 @@ Result<std::size_t> PartDocument::add_circular_pattern_feature(CircularPatternFe
   if (has_any_feature_id(feature.id()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "feature id must be unique within part document"));
-  const Parameter* count = find_parameter(feature.count_parameter());
-  if (count == nullptr || count->type() != ParameterType::Count ||
-      count->value().count_value() < 2U)
-    return Result<std::size_t>::failure(Error::validation(
-        feature.id().value(),
-        "circular pattern count must reference an existing count parameter of at least 2"));
+  auto valid = validate_pattern_inputs(*this, feature);
+  if (!valid)
+    return valid;
   auto axis_valid = validate_part_feature_input_reference(*this, feature.axis());
   if (axis_valid.has_error())
     return Result<std::size_t>::failure(axis_valid.error());
@@ -2638,6 +2708,11 @@ Result<std::size_t> PartDocument::add_circular_pattern_feature(CircularPatternFe
        {feature.axis().source_node_id(), feature.count_parameter().value()}) {
     auto dependency = add_dependency_if_missing(graph, source, feature.id().value());
     if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  for (const auto& source : second_pattern_dependencies(feature)) {
+    auto dependency = add_dependency_if_missing(graph, source, feature.id().value());
+    if (!dependency)
       return Result<std::size_t>::failure(dependency.error());
   }
   const std::string result_node = body_dependency_node_id(context.effective_produced_body());

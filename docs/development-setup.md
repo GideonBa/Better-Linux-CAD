@@ -138,6 +138,7 @@ Representative entry points (select the layer where the tag exists):
 | Engineering resources and physical properties | `[parity-b149]`, `[parity-b150]`, `[parity-b151]`, `[material-physical-combined]`; `engineering-modules.md` |
 | Semantic and manufacturing Holes | `[parity-b152]`, `[parity-b153]`, `[parity-b154]`; `hole-wizard.md`, `tests/support/hole_*`, `tests/{core,geometry}/*hole*`, `tests/gui/gui_shell_history_tests.cpp` |
 | Shared Thread definitions, persistence and execution | `[parity-b155]`; `hole-wizard.md`, `tests/core/{thread_feature,part_thread_feature}_tests.cpp`, `tests/geometry/thread_feature_*tests.cpp`; `[thread-history-shell]` / `[thread-geometry-shell]` in `tests/gui/gui_shell_history_tests.cpp` |
+| Explicit Pattern placements and Hole consumers | `[parity-b156]`, `[pattern-placement]`, `[hole-pattern-combined]`; `part-pattern-core-mvp6.md`, `hole-wizard.md`, `file-format.md`; `[hole-pattern-consumer-shell]` exercises the existing Assembly task |
 
 The shared GUI executable owns one Qt application instance. `ShellWindow` consumes the existing
 headless controllers under `include/blcad/gui/gui_interactive_*`; new tests must exercise current

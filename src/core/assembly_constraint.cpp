@@ -1,5 +1,6 @@
 #include "blcad/core/assembly_constraint.hpp"
 #include "blcad/core/assembly_reference_target.hpp"
+#include "blcad/core/hole_instance_reference.hpp"
 
 #include <utility>
 
@@ -54,6 +55,11 @@ AssemblyConstraintTarget::create(ComponentInstanceId component_instance,
     auto frame = parse_assembly_frame_target_spelling(semantic_reference);
     if (!frame)
       return Result<AssemblyConstraintTarget>::failure(frame.error());
+  }
+  if (is_hole_target_spelling(semantic_reference)) {
+    auto hole = parse_hole_target_spelling(semantic_reference);
+    if (!hole)
+      return Result<AssemblyConstraintTarget>::failure(hole.error());
   }
   return Result<AssemblyConstraintTarget>::success(
       AssemblyConstraintTarget(std::move(component_instance), std::move(semantic_reference)));

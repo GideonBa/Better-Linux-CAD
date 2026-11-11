@@ -1,5 +1,6 @@
 #include "assembly_numeric_solve_engine.hpp"
 
+#include "assembly_hole_geometry_scope.hpp"
 #include "assembly_semantic_target_freshness.hpp"
 
 #include <algorithm>
@@ -197,6 +198,7 @@ constexpr double kPivotTolerance = 1.0e-14;
 Result<AssemblyNumericSolveOutcome> solve_numeric_variables(
     const NumericVector& initial_variables, bool has_fixed_reference,
     const AssemblyNumericResidualEvaluator& evaluator, AssemblyRigidBodySolverOptions options) {
+  const AssemblyHoleGeometryScope hole_geometry;
   auto options_validation = validate_options(options);
   if (options_validation.has_error()) {
     return Result<AssemblyNumericSolveOutcome>::failure(options_validation.error());

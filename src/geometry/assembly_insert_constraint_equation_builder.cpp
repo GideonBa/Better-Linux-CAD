@@ -26,7 +26,8 @@ struct ResolvedAssemblySpaceGeometricTarget {
 
 [[nodiscard]] bool legacy_feature_target(std::string_view semantic_reference) noexcept {
   return !semantic_reference.starts_with("ref:") && !semantic_reference.starts_with("topo:") &&
-         !semantic_reference.starts_with("imported:") && !semantic_reference.starts_with("frame:");
+         !semantic_reference.starts_with("imported:") &&
+         !semantic_reference.starts_with("frame:") && !semantic_reference.starts_with("hole:");
 }
 
 [[nodiscard]] Result<ResolvedAssemblySpaceGeometricTarget>

@@ -305,6 +305,51 @@ immutable imports, conical cosmetic supports, rotated shafts and atomic cost fai
 visibility; `[thread-history-shell]` retains failed-preview rollback. `mvp-plan.md` owns acceptance
 and native proof. B03's dedicated keyboard/mouse authoring completion remains assigned to 157.
 
+## Shared placement execution and Assembly consumers (156)
+
+Explicit placements extend the existing Linear/Circular Pattern classes; `part-pattern-core-mvp6.md`
+owns layout/identity and `file-format.md` owns V7. A Hole source repeats the actual removed solid
+(`predecessor − completed seed`), including all owned placements, seats, tips and modeled threads.
+Occurrence `(0,0)` aliases surviving seed origins without another cut or duplicate cosmetic symbol.
+Additional occurrences scope every origin by Pattern, source and both logical coordinates. Whole-Body
+copies remain Body-source operations. Nested negative-operation Pattern sources reject explicitly.
+
+The identical-cut path supports round Blind and ThroughAll seeds. Slots, ToNext/ToFace/UpToBody/
+Symmetric recipes need a separately recomputed recipe and reject here; their original Hole execution
+is unchanged. Actual seed/copy openings must remain complete and exposed. Each copied removed solid
+must fit current material without breakout, overlap or duplicate cuts. Current pilot clearance proves
+termination: a ThroughAll copy cannot silently become Blind in thicker local stock. Covered entries,
+detached starts or changed ends reject atomically. Later seed Body translation/rotation/positive uniform
+scale is mapped from current authored bore frames; incompatible placement transforms reject.
+
+Limits are 1024 source-occurrences in the shared explicit layout and 256 actual Hole bores, including
+seed/multiple placements. Modeled patterns retain the 16-bore/128-aggregate-turn budget and 1e-4 mm
+actual tolerance cap from Thread execution. Cost/geometry/source-freshness failures publish no partial
+Body/cache. Booleans retain non-destructive inputs and do not simplify helical copied cuts.
+
+`HoleInstanceReference` separates HolePlacementId from Pattern coordinates and addresses axis, entry,
+counterbore/spotface seat or authored Step ID. Resolution uses surviving actual Body faces: coaxial
+cylindrical descendants may jointly prove one axis; a seat must be one planar descendant normal to
+that axis. No nearest-face fallback or persisted coordinates exist. Bore frames follow later Body
+poses, radius edits and unconsumed finishing. Consumed/ambiguous seats or entry rims diagnose explicitly.
+
+The existing Assembly target catalog exposes each physical Hole once, with per-copy axis/entry/seat/
+Step labels and component poses. Axis targets provide Axis capability; entry/seat/Step frames also
+provide Plane and Frame. Existing Insert/Concentric/planar consumers share these typed descriptors.
+Saved endpoints retain missing/excluded occurrence intent and diagnose the affected relationships;
+they never silently bind another Hole. Canonical endpoint spelling is owned by Core.
+
+Numeric solver iterations reuse at most 16 Part results within one request, keyed by exact canonical
+intent and import context with current supplier-byte checks; nested solves share that request and
+no derived geometry survives its scope. Component pose changes do not rebuild identical Hole solids.
+Native Pattern authoring controls and whole B04 acceptance are verified in Block 156; dedicated
+Hole/Thread authoring remains 157.
+
+Proof owners: `tests/core/pattern_placement_tests.cpp`,
+`tests/geometry/hole_pattern_{geometry,combined}_tests.cpp`, and
+`[hole-pattern-consumer-shell]` in `tests/gui/gui_shell_assembly_tools_tests.cpp`.
+`mvp-plan.md` records actual slice verification and whole-block status.
+
 ## Why more than a cut
 
 ```text

@@ -8,7 +8,9 @@
 #include <QObject>
 
 #include <array>
+#include <map>
 #include <optional>
+#include <set>
 #include <utility>
 
 class QAction;
@@ -20,6 +22,7 @@ class QDockWidget;
 class QEvent;
 class QLabel;
 class QFormLayout;
+class QGroupBox;
 class QLineEdit;
 class QSpinBox;
 class QPushButton;
@@ -411,6 +414,9 @@ private:
   [[nodiscard]] Result<std::size_t> rebuild_pattern_controller();
   void update_pattern_pick_mode();
   void synchronize_pattern_editors();
+  void populate_pattern_sources();
+  void rebuild_pattern_skip_list();
+  [[nodiscard]] bool pattern_holes_mode() const noexcept;
   [[nodiscard]] double value_for_handle(std::string_view handle) const noexcept;
   [[nodiscard]] std::string_view command_id() const noexcept;
   [[nodiscard]] bool angular_value() const noexcept;
@@ -459,6 +465,9 @@ private:
   QAction* action_apply_{nullptr};
   QLabel* value_label_{nullptr};
   QLineEdit* numeric_editor_{nullptr};
+  QFormLayout* primary_form_{nullptr};
+  QWidget* primary_panel_{nullptr};
+  bool pattern_numeric_grouped_{false};
   QWidget* extrude_controls_{nullptr};
   ShellPropertyGroup* extrude_geometry_group_{nullptr};
   ShellPropertyGroup* extrude_behavior_group_{nullptr};
@@ -535,6 +544,21 @@ private:
   std::vector<std::pair<Command, QAction*>> pattern_actions_;
   QWidget* pattern_controls_{nullptr};
   QFormLayout* pattern_form_{nullptr};
+  QFormLayout* pattern_sources_form_{nullptr};
+  QComboBox* pattern_source_mode_{nullptr};
+  QLabel* pattern_hint_{nullptr};
+  QGroupBox* pattern_first_group_{nullptr};
+  QGroupBox* pattern_second_group_{nullptr};
+  QGroupBox* pattern_skip_group_{nullptr};
+  QComboBox* pattern_second_reference_{nullptr};
+  QPushButton* pattern_second_reference_button_{nullptr};
+  QSpinBox* pattern_second_count_{nullptr};
+  QDoubleSpinBox* pattern_second_value_{nullptr};
+  QComboBox* pattern_second_extent_{nullptr};
+  QComboBox* pattern_second_direction_{nullptr};
+  QListWidget* pattern_skip_editor_{nullptr};
+  std::set<PatternOccurrenceIndex> pattern_skipped_;
+  std::map<std::string, FeatureId> pattern_hole_picks_;
   QListWidget* pattern_sources_{nullptr};
   QComboBox* pattern_reference_{nullptr};
   QComboBox* pattern_extent_{nullptr};
@@ -546,9 +570,12 @@ private:
   std::string pattern_name_;
   ParameterId pattern_count_parameter_{""};
   ParameterId pattern_extent_parameter_{""};
+  ParameterId pattern_second_count_parameter_{""};
+  ParameterId pattern_second_extent_parameter_{""};
   double pattern_value_{40};
   int pattern_count_{3};
   bool pattern_reference_picking_{false};
+  bool pattern_second_reference_picking_{false};
 
   struct BodyAxisChoice {
     BodyTransformRotationAxis reference;

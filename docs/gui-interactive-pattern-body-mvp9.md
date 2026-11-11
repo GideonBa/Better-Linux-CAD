@@ -66,8 +66,10 @@ losing the source set. The same chooser remains available for precise reference 
 Linear patterns support spacing per instance or total extent, positive/negative direction, and an
 integer count including the starting placement. Circular patterns use equal angular spacing over a
 positive total angle up to 360 degrees; a full circle omits the duplicated final position. Counts
-range from 2 to 1000, with at most 10000 selected-Body instances per interactive operation. This is
-a GUI authoring bound; the persisted feature authority is unchanged. Mirror reflects the source
+range from 1 to 1000, with at most 10000 selected-Body instances per interactive operation.
+Count one uses the explicit shared placement intent introduced in Block 156; older records keep
+their historical count validation. Explicit layouts additionally obey the shared Core placement
+limit described below. Mirror reflects the source
 Bodies across the chosen plane and exposes no scalar handle.
 
 Spacing and circular angle use the shared numeric editor with `mm`/`deg` and viewport handles.
@@ -313,3 +315,40 @@ collection scope. Geometry resolves the current transformed Sketch plane and end
 authority. Source edits invalidate the transform through the Sketch dependency. Missing/invalid
 line sources fail with repair diagnostics, without copying coordinates or retargeting another line.
 See `gui-interactive-extrude-revolve-mvp9.md` for the common authoring and native workflow proof.
+
+## Hole placement patterns — Block 156
+
+The existing Linear/Circular task adds ordered **Sources → Direction 1 / Axis → Direction 2 →
+Occurrences to Skip** groups in the shared scroll area, with pinned Apply/Cancel. The same primary
+numeric editor moves into Direction 1 and returns to its original row for other commands. No second
+numeric-input or transaction authority is introduced.
+
+Sources chooses Bodies (the existing NewBody behavior) or Hole Features (an in-place Cut on their
+common current target). A preselected Hole browser node starts the latter mode. The list/model picks
+select the whole Hole Feature, including all its placements. Disposable face presentations use the
+actual current bore descendants and a scoped Face filter; choosing either direction temporarily
+scopes Datum picks to the axis chooser, suspends handles and then restores Hole collection. No
+kernel identity is persisted. Apply/Cancel remove these presentations and restore prior masks/scope.
+
+Direction two reuses the same axis, Count, Spacing/Overall Length and sign types as direction one.
+Each interactive count accepts 1–1000; the shared Core layout and Hole workload caps remain enforced
+before publication. Exclusion checkboxes display one-based column/row coordinates, retain dormant
+entries after count reduction and keep the original source included. Parallel axes, excessive counts,
+unsupported recipes or geometric overlap disable Apply with the current diagnostic; correction retains
+sources and exclusions. The preview replaces the affected Body instead of overlaying another solid.
+No provisional result Body is persisted for a Hole Cut.
+
+Preview synchronization preserves exclusion rows whose logical coordinates are unchanged. A
+checkbox event must finish against the same live row; rebuilding the list from its own change
+signal must not invalidate Qt's active item, focus or scroll position. Count/layout changes may
+rebuild rows while retaining the authored exclusions. `[hole-pattern-shell]` checks persistent
+model-index validity through repeated toggles; the native case dispatches actual checkbox input.
+
+The existing Feature editor retains V7 placement structure and parameter bindings. Its exclusion
+column/row fields also display one-based integers and write canonical zero-based integer intent.
+Count edits preserve dormant exclusions. Creation/editing/Apply remain one existing Part transaction;
+Save during a task writes the committed snapshot. Dedicated Hole/Thread authoring remains Block 157.
+Core/Geometry contracts and limits are in `part-pattern-core-mvp6.md`, `hole-wizard.md` and
+`file-format.md`. Tests: `[hole-pattern-shell]` / `[native-hole-pattern-shell]` in
+`tests/gui/gui_shell_hole_pattern_tests.cpp`; `[hole-pattern-consumer-shell]` covers Assembly Insert.
+`mvp-plan.md` alone owns actual verification and completion status.

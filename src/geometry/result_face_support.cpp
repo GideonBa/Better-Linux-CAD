@@ -117,9 +117,10 @@ GeometryShape ResultFaceSupportGeometry::tag_conical_wall(const GeometryShape& s
   if (matches.size() != 1)
     return shape;
   auto backing = std::make_shared<GeometryShape::Impl>(*shape.impl_);
-  detail::append_lineage(backing->face_lineage,
-                         {{std::move(producer), std::move(role)}, matches.front(), center, x_axis},
-                         backing->shape);
+  detail::append_lineage(
+      backing->face_lineage,
+      {{std::move(producer), std::move(role)}, matches.front(), center, x_axis, true, axis},
+      backing->shape);
   return GeometryShape(std::move(backing));
 }
 
@@ -292,13 +293,25 @@ GeometryShape ResultFaceSupportGeometry::scope_copy(const GeometryShape& shape, 
   if (shape.empty())
     return shape;
   auto backing = std::make_shared<GeometryShape::Impl>(*shape.impl_);
-  const auto segment = [](const std::string& value) {
-    return std::to_string(value.size()) + ":" + value + "/";
-  };
   for (auto& entry : backing->face_lineage) {
-    entry.origin.role = "copy/" + segment(instance) + segment(entry.origin.feature.value()) +
-                        segment(entry.origin.role);
-    entry.origin.feature = producer;
+    entry.origin = copy_result_face_origin(producer, instance, entry.origin);
+  }
+  return GeometryShape(std::move(backing));
+}
+
+GeometryShape ResultFaceSupportGeometry::alias_copy(const GeometryShape& shape, FeatureId producer,
+                                                    std::string instance,
+                                                    std::optional<FeatureId> source) {
+  if (shape.empty())
+    return shape;
+  auto backing = std::make_shared<GeometryShape::Impl>(*shape.impl_);
+  for (auto entry : shape.impl_->face_lineage) {
+    // One cosmetic symbol continues to own the already-authored seed. Public
+    // face aliases must not create duplicate derived Thread graphics.
+    if (!entry.selectable || entry.cosmetic_thread || (source && entry.origin.feature != *source))
+      continue;
+    entry.origin = copy_result_face_origin(producer, instance, entry.origin);
+    detail::append_lineage(backing->face_lineage, std::move(entry), backing->shape);
   }
   return GeometryShape(std::move(backing));
 }

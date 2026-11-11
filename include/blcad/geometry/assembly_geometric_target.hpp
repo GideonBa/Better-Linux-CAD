@@ -2,6 +2,7 @@
 
 #include "blcad/core/assembly_document.hpp"
 #include "blcad/core/datum_plane.hpp"
+#include "blcad/core/hole_instance_reference.hpp"
 #include "blcad/core/id.hpp"
 #include "blcad/core/imported_topology.hpp"
 #include "blcad/core/result.hpp"
@@ -33,6 +34,8 @@ enum class AssemblyGeometricTargetSourceKind {
   ConstructionLine,
   ConstructionPoint,
   CircularFeatureSeat,
+  GeneratedHoleAxis,
+  GeneratedHoleSeat,
 };
 
 [[nodiscard]] std::string_view to_string(AssemblyGeometricTargetSourceKind kind) noexcept;
@@ -89,6 +92,7 @@ struct AssemblyGeometricTargetSourceMetadata {
   std::optional<SemanticAxis> semantic_axis;
   std::optional<SemanticSeatingPlane> semantic_seating_plane;
   std::optional<ImportedTopologyReference> imported_topology{};
+  std::optional<HoleInstanceReference> hole_instance{};
 
   friend bool operator==(const AssemblyGeometricTargetSourceMetadata&,
                          const AssemblyGeometricTargetSourceMetadata&) = default;

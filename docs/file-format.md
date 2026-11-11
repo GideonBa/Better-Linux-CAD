@@ -3,7 +3,8 @@
 History intent has the explicit Part-version-2 contract below. Revision-pinned resources use
 Part version 3 and Project version 2 as specified in the owning 149B sections. Semantic Hole intent
 uses the Part-version-4 extension owned by 152B below; manufacturing variants use Part V5 as
-specified in the 154 section. Thread integration uses Part V6 (155B) below. Planned evolution
+specified in the 154 section. Thread integration uses Part V6 (155B); explicit Pattern placements
+use Part V7 (156) below. Planned evolution
 in [Blocks 145–204](inventor-parity-sequence.md) additionally assigns new feature families,
 equation/spatial constraints, model states, occurrence poses and cross-document references.
 Their future intent is not implied by the current JSON fields. Each owning block must specify
@@ -1522,3 +1523,35 @@ standalone offline snapshot. No derived display/helix, OCCT topology or exchange
 persisted. STEP writes evaluated Body geometry/names: modeled cuts are physical; cosmetic graphics
 are excluded. Thread system/designation, hand/class and resource provenance are not semantic STEP
 metadata. `hole-wizard.md` owns execution limits and actual geometry-roundtrip proofs.
+
+## Explicit Pattern placement intent — Block 156
+
+Part **V7** is selected exactly when a Linear/Circular Pattern has `placements`. It retains the
+resource/history envelope (including empty catalogs) and complete interleaved `feature_order`.
+Parts without this intent retain their canonical V1–V6 bytes. V1–V6 reject `placements`; V7 requires
+at least one such record. This prevents older readers from dropping exclusions or direction two.
+
+`placements` has mandatory `skipped`, an array of `{first, second}` unsigned zero-based occurrence
+coordinates, and optional `second_direction` for Linear Patterns only. Direction two contains
+`direction` (the existing typed PatternAxis payload), `count_parameter`, and `extent` with existing
+`mode`, `parameter`, `direction` fields. Counts/extents reference ordinary parameters; evaluated
+positions, transforms, faces and per-instance Feature records are never serialized.
+
+Coordinates are unique, bounded below 1024 and canonically sorted; `(0,0)` cannot be skipped.
+Exclusions outside the current counts remain authored intent, becoming active again when counts
+are restored. Circular and one-direction Linear Patterns reject nonzero second coordinates.
+Unknown fields, fractional/negative/overflowing coordinates and incompatible direction payloads
+reject strict loading. An explicit empty `placements` object is represented as `{"skipped":[]}`;
+it enables count one. Absence preserves the legacy minimum count of two and legacy identity grammar.
+
+Resource-free Project V1 embeds standalone V7 Parts. Project V2 retains member V7, replaces its
+catalog with root-owned `engineering_resource_refs` (including an empty array), hydrates the snapshot
+and uses the same interleaved reader. Hole manufacturing, Thread and history intent may coexist.
+
+Assembly endpoints use canonical reserved `hole:` spellings owned by
+`core/hole_instance_reference.hpp`: Hole Feature ID, placement ID, role (`axis`, `entry`, `seat`,
+`step`), optional Step ID and optional Pattern ID plus both occurrence coordinates. IDs use canonical
+uppercase percent encoding of bytes outside ASCII letters/digits/underscore/hyphen. Direct Hole
+endpoints have no Pattern ID and zero coordinates. No resolved dimensions/coordinates are stored.
+Endpoint creation/loading validates syntax; current geometry resolution diagnoses removed/excluded
+occurrences without deleting relationships or redirecting them to another occurrence.
