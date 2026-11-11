@@ -276,7 +276,7 @@ Phase B stays open for 157–158.
 All [157/B01–B04/UI01 requirements](inventor-parity-sequence.md#block-157-hole-and-thread-property-panel-workflow)
 remain assigned. Deliver named slices serially, with the parent block open until all criteria pass:
 
-| Slice | Planned boundary |
+| Slice | Delivery boundary |
 | --- | --- |
 | 157A — verified | Typed Hole/Thread property editing over existing Core update commands, stable IDs/history, formula and pinned-resource ownership, whole downstream preview and rollback. |
 | 157B | Shared create/edit panel with ordered selectors, source/custom dimensions, all supported recipes, position/depth/diameter interaction, Sketch return, explicit legacy conversion, presets and Create Another. |
@@ -285,7 +285,6 @@ remain assigned. Deliver named slices serially, with the parent block open until
 No new Hole/Thread persistence authority or independent pattern evaluator is planned. Preserve
 legacy cut editing and all subsequent 158–204 requirements. Acceptance of 157A alone does not
 close 157 or provide the complete Wizard workflow.
-
 
 ### 157A verification — 2026-11-11
 
@@ -313,8 +312,10 @@ run is recorded under 156. Current native filters execute all three native-only 
 regression, not every skip from that full Qt run. Original ordinary/compact captures, changed C++
 formatting, Markdown links/anchors/fences and working/staged diffs are reviewed.
 
-Delivery: `feat/hole-thread-property-editing`, based on refreshed main `5c669d0` after verified merged
-PR #175. Parent 157 and the full assigned continuation through 165 remain open; 157B/C are next.
+Delivery: [PR #176](https://github.com/GideonBa/Better-Linux-CAD/pull/176), reviewed implementation
+`456e5ec`, based on refreshed main `5c669d0` after verified merged PR #175. The final delivery record
+changes documentation only. Parent 157 and the full assigned continuation through 165 remain open;
+157B/C are next.
 
 ## Later phases
 
