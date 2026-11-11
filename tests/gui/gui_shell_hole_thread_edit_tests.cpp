@@ -2,6 +2,7 @@
 #include "../support/hole_pattern_fixture.hpp"
 #include "../support/thread_feature_fixture.hpp"
 #include "blcad/core/hole_instance_reference.hpp"
+#include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/hole_instance_geometry.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_history_tools.hpp"
@@ -21,6 +22,7 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QTemporaryDir>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -124,17 +126,19 @@ void rename(ShellWindow& w) {
   name.setText("Edited semantic feature");
   REQUIRE(QMetaObject::invokeMethod(&name, "editingFinished"));
 }
-void click(QWidget& widget) {
+void click_at(QWidget& widget, QPointF point) {
   REQUIRE(widget.isVisible());
   REQUIRE(widget.isEnabled());
-  const auto point = widget.rect().center();
   for (auto type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
-    QMouseEvent event(type, point, widget.mapToGlobal(point), Qt::LeftButton,
+    QMouseEvent event(type, point, widget.mapToGlobal(point.toPoint()), Qt::LeftButton,
                       type == QEvent::MouseButtonPress ? Qt::LeftButton : Qt::NoButton,
                       Qt::NoModifier);
     QApplication::sendEvent(&widget, &event);
     settle();
   }
+}
+void click(QWidget& widget) {
+  click_at(widget, widget.rect().center());
 }
 void key(QWidget& widget, int code, const QString& text = {}) {
   for (auto type : {QEvent::KeyPress, QEvent::KeyRelease}) {
@@ -150,7 +154,258 @@ void capture(ShellWindow& w, const char* name) {
   REQUIRE(QDir().mkpath(dir));
   REQUIRE(w.grab().save(QDir(dir).filePath(QString::fromLatin1(name) + ".png")));
 }
+PartDocument plate() {
+  auto p = holes::part(false, false);
+  REQUIRE(p.remove_hole_feature(FeatureId("holes")));
+  return p;
+}
+void create_hole(ShellWindow& w) {
+  auto& action = control<QAction>(w, "blcad.action.semantic_hole");
+  REQUIRE(action.isEnabled());
+  CHECK_FALSE(action.icon().isNull());
+  action.trigger();
+  settle();
+  REQUIRE(w.feature_edit_tools().active());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+}
 } // namespace
+
+TEST_CASE("Semantic Hole creation previews disposable inputs and publishes one typed transaction",
+          "[gui][parity-b157][hole-create-shell]") {
+  const auto p = plate();
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(10);
+  CHECK(snapshot(w) == before);
+  const auto during = dir.filePath("creation-preview.blcad.json");
+  REQUIRE(w.save_to(during));
+  GuiDocumentSession saved;
+  REQUIRE(saved.open_file(during.toStdString()));
+  CHECK(checked(serialize_part_document_to_json(*saved.part_document())) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  REQUIRE(result.hole_features().size() == 1);
+  CHECK(result.features().size() == p.features().size());
+  CHECK(result.sketches().size() == p.sketches().size());
+  CHECK(result.parameters().size() == p.parameters().size() + 1);
+  const auto& hole = result.hole_features().front();
+  CHECK(hole.kind() == HoleKind::Plain);
+  CHECK(std::holds_alternative<HoleThroughAllExtent>(hole.extent()));
+  CHECK(std::get<Point2>(hole.placements().front().source).x == 10);
+  CHECK_FALSE(hole.placements().front().id.empty());
+  CHECK(volume(w) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  CHECK(w.session().undo_label() == "Create Hole");
+  replay(w, dir, before);
+  auto& repeat = control<QAction>(w, "blcad.action.repeat_last_command");
+  REQUIRE(repeat.isEnabled());
+  repeat.trigger();
+  REQUIRE(w.feature_edit_tools().active());
+  w.feature_edit_tools().cancel();
+}
+
+TEST_CASE("Semantic Hole creation only publishes used pending parameters",
+          "[gui][parity-b157][hole-create-shell]") {
+  const auto p = plate();
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  create_hole(w);
+  auto& binding = control<QComboBox>(w, "blcad.feature_edit.binding/diameter/parameter");
+  binding.setCurrentIndex(binding.findData("diameter"));
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(w.session().part_document()->parameters().size() == p.parameters().size());
+  CHECK(std::get<ParameterId>(w.session().part_document()->hole_features().front().diameter()) ==
+        ParameterId("diameter"));
+  CHECK(volume(w) == Catch::Approx(38400 - 18 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Invalid Hole creation remains correctable and Cancel restores the consumed context",
+          "[gui][parity-b157][hole-create-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  REQUIRE(w.session().selection().add({GuiSelectionKind::Body, "body/body.base"}));
+  REQUIRE(w.viewport().select_semantic("body/body.base"));
+  const auto before = snapshot(w);
+  const auto undo = std::string(w.session().undo_label());
+  const auto mask = w.viewport().selection_filter_mask();
+  const auto scope = w.viewport().selection_semantic_scope();
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(800);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK_FALSE(w.viewport().feature_preview_active());
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  CHECK(snapshot(w) == before);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  w.feature_edit_tools().cancel();
+  CHECK(snapshot(w) == before);
+  CHECK(w.session().undo_label() == undo);
+  CHECK(w.viewport().selection_filter_mask() == mask);
+  CHECK(w.viewport().selection_semantic_scope() == scope);
+  REQUIRE(w.session().selection().entries().size() == 1);
+  CHECK(w.session().selection().entries().front().semantic_id == "body/body.base");
+  CHECK_FALSE(w.viewport().feature_preview_active());
+  CHECK_FALSE(w.session().task().active());
+}
+
+TEST_CASE("Create Another owns a fresh identity and one undo step per published Hole",
+          "[gui][parity-b157][hole-create-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(-10);
+  REQUIRE(w.feature_edit_tools().apply(true));
+  REQUIRE(w.feature_edit_tools().active());
+  const auto first = snapshot(w);
+  const auto first_hole = w.session().part_document()->hole_features().front();
+  REQUIRE(w.session().part_document()->hole_features().size() == 1);
+  CHECK(field<QDoubleSpinBox>(w, "/diameter/parameter").value() == 4);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(10);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& last = w.session().part_document()->hole_features().back();
+  CHECK(last.id() != first_hole.id());
+  CHECK(last.placements().front().id != first_hole.placements().front().id);
+  CHECK(volume(w) == Catch::Approx(38400 - 64 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, first);
+  REQUIRE(w.undo());
+  REQUIRE(w.undo());
+  CHECK(snapshot(w) == before);
+}
+
+TEST_CASE("Semantic Hole action rejects unavailable targets and an existing command",
+          "[gui][parity-b157][hole-create-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  const auto before = snapshot(w);
+  REQUIRE(w.session().set_presentation_visible("body/body.base", false));
+  w.refresh();
+  CHECK_FALSE(control<QAction>(w, "blcad.action.semantic_hole").isEnabled());
+  CHECK_FALSE(w.feature_edit_tools().begin_new_hole());
+  REQUIRE(w.session().set_presentation_visible("body/body.base", true));
+  w.refresh();
+  REQUIRE(w.session().task().begin("other.command"));
+  CHECK_FALSE(w.feature_edit_tools().begin_new_hole());
+  REQUIRE(w.session().task().cancel());
+  CHECK(snapshot(w) == before);
+}
+
+TEST_CASE("Changing the Hole target requires a new support and cuts only the chosen body",
+          "[gui][parity-b157][hole-create-shell]") {
+  auto p = plate();
+  const auto context = blcad::test::history_fixture::new_body(p, "other");
+  const auto extrude = checked(Feature::create_additive_extrude(
+      FeatureId("other"), "Other", SketchId("profile"), ParameterId("depth")));
+  REQUIRE(p.add_feature(checked(extrude.with_body_result_context(context))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  create_hole(w);
+  auto& target = field<QComboBox>(w, "/target_body");
+  target.setCurrentIndex(target.findData("body.other"));
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  settle();
+  auto& support = field<QComboBox>(w, "/support");
+  CHECK(support.currentIndex() == -1);
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  int top = -1;
+  for (int i = 0; i < support.count(); ++i)
+    if (support.itemData(i).toString().contains("other") &&
+        support.itemData(i).toString().contains("top"))
+      top = i;
+  REQUIRE(top >= 0);
+  support.setCurrentIndex(top);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(w.session().part_document()->hole_features().front().target_body() == BodyId("body.other"));
+  CHECK(std::get<SemanticFaceReference>(
+            w.session().part_document()->hole_features().front().support().source())
+            .source_feature() == FeatureId("other"));
+  CHECK(volume(w) == Catch::Approx(38400).margin(1e-6));
+  CHECK(volume(w, "body.other") == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Hole face preselection resolves the same typed support and rejects a nonplanar datum",
+          "[gui][parity-b157][hole-create-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  const auto before = snapshot(w);
+  const auto faces = checked(geometry::FinishingSelectionBuilder::build(
+      *w.session().part_document(), *w.session().part_shape_cache(), BodyId("body.base"),
+      PartFeatureInputRole::ShellRemovalFace));
+  auto top = std::find_if(faces.begin(), faces.end(), [](const auto& face) {
+    const auto* ref = std::get_if<FaceReference>(&face.reference);
+    const auto* semantic = ref ? std::get_if<SemanticFaceReference>(&ref->source()) : nullptr;
+    return semantic && semantic->face() == SemanticFace::Top;
+  });
+  REQUIRE(top != faces.end());
+  REQUIRE(w.session().selection().add({GuiSelectionKind::Face, top->semantic_id}));
+  create_hole(w);
+  CHECK(field<QComboBox>(w, "/support").currentData().toString().toStdString() == top->semantic_id);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& support = std::get<SemanticFaceReference>(
+      w.session().part_document()->hole_features().front().support().source());
+  CHECK(support.source_feature() == FeatureId("base"));
+  CHECK(support.face() == SemanticFace::Top);
+  replay(w, dir, before);
+  w.session().selection().clear();
+  REQUIRE(w.session().selection().add({GuiSelectionKind::Datum, "datum-axis/axis"}));
+  CHECK_FALSE(w.feature_edit_tools().begin_new_hole());
+  CHECK_FALSE(w.feature_edit_tools().active());
+  CHECK_FALSE(w.session().task().active());
+}
+
+TEST_CASE("Native semantic Hole creation supports scoped picking keyboard input and mouse Apply",
+          "[gui][parity-b157][hole-create-shell][native-hole-create]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native Hole creation and OCCT rendering");
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  const auto before = snapshot(w);
+  create_hole(w);
+  click(control<QToolButton>(w, "blcad.hole.target.pick"));
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  const auto screen = checked(w.viewport().model_to_screen({8, 6, 8}));
+  click_at(w.viewport(), {screen.x, screen.y});
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  click(control<QToolButton>(w, "blcad.hole.support.pick"));
+  const auto face_screen = checked(w.viewport().model_to_screen({8, 6, 8}));
+  click_at(w.viewport(), {face_screen.x, face_screen.y});
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(field<QComboBox>(w, "/support").currentData() == "finishing/face/4:base/top");
+  auto& diameter = field<QDoubleSpinBox>(w, "/diameter/parameter");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&diameter);
+  diameter.setFocus();
+  diameter.selectAll();
+  key(diameter, Qt::Key_4, "4");
+  key(diameter, Qt::Key_Return);
+  CHECK(diameter.value() == 4);
+  CHECK(control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll")
+            .horizontalScrollBar()
+            ->maximum() == 0);
+  CHECK(snapshot(w) == before);
+  capture(w, "hole-creation-preview");
+  auto& apply = control<QPushButton>(w, "blcad.feature_edit.apply");
+  CHECK(w.rect().contains(apply.mapTo(&w, apply.rect().center())));
+  click(apply);
+  REQUIRE(w.session().part_document()->hole_features().size() == 1);
+  CHECK(volume(w) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
 
 TEST_CASE("Hole property editing validates complete Pattern geometry and retains instance seats",
           "[gui][parity-b157][hole-thread-edit-shell]") {

@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 156
 current_block: 157
-current_boundary: Block 156 accepted; 157A property editing verified; full Wizard remains 157B/C
+current_boundary: Block 156 accepted; 157A delivered; 157B1 creation verified; full Wizard remains open
 current_tag: "[parity-b157]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 156
-current block        Block 157 (157A verified; 157B next)
+current block        Block 157 (157B1 verified; 157B2 next)
 current phase        Semantic holes and threads
-current boundary     Existing Hole/Thread property editing verified; full Wizard and combined acceptance remain open
+current boundary     Existing editing and Plain Hole creation verified; full Wizard and combined acceptance remain open
 ```
 
 The next assigned work is Block 157. [The consolidated sequence](inventor-parity-sequence.md)
@@ -279,7 +279,9 @@ remain assigned. Deliver named slices serially, with the parent block open until
 | Slice | Delivery boundary |
 | --- | --- |
 | 157A — verified | Typed Hole/Thread property editing over existing Core update commands, stable IDs/history, formula and pinned-resource ownership, whole downstream preview and rollback. |
-| 157B | Shared create/edit panel with ordered selectors, source/custom dimensions, all supported recipes, position/depth/diameter interaction, Sketch return, explicit legacy conversion, presets and Create Another. |
+| 157B1 — verified | Semantic Plain/ThroughAll Hole creation in the existing panel, target/support selection, pending dimensional ownership, Create Another and one final publication. Normal complete Part context first; no new Hole schema or cut interpreter. |
+| 157B2 | Complete recipe/custom-standard/internal-external Thread selectors and native/imported support collection; keep 157A editing compatible. |
+| 157B3 | In-canvas position/depth/diameter interaction, referenced Sketch points and breadcrumb return, presets, explicit legacy conversion and extended shared context lifecycle. |
 | 157C | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
 
 No new Hole/Thread persistence authority or independent pattern evaluator is planned. Preserve
@@ -314,8 +316,42 @@ formatting, Markdown links/anchors/fences and working/staged diffs are reviewed.
 
 Delivery: [PR #176](https://github.com/GideonBa/Better-Linux-CAD/pull/176), reviewed implementation
 `456e5ec`, based on refreshed main `5c669d0` after verified merged PR #175. The final delivery record
-changes documentation only. Parent 157 and the full assigned continuation through 165 remain open;
-157B/C are next.
+changes documentation only. PR #176 is verified merged as `5dce938`; its tree matches the reviewed
+delivery. Main was refreshed before starting `feat/semantic-hole-creation`. Parent 157 and the full
+assigned continuation through 165 remain open.
+
+### 157B1 verification — 2026-11-11
+
+The shared property lifecycle now creates actual Plain / Through All Hole intent. Focused proof covers
+disposable inputs and committed Save during preview, existing-parameter rebinding, invalid/corrected
+diameters, context restoration, fresh Create Another identities, target/support invalidation, face
+preselection, physical per-Body cuts and exact Undo/Redo/reopen. Native mouse picks and numeric keys
+select the actual top support and create the expected cut. The datum-overlap correction retains
+existing profile/History/imported-topology selection in the same native run.
+
+Behavior and proof: [Hole contract](hole-wizard.md#semantic-creation--157b1-bounded-design),
+[Feature editor](gui-feature-edit-mvp9.md#semantic-plain-hole-creation--157b1),
+[current shell tests](../tests/gui/gui_shell_hole_thread_edit_tests.cpp) and original ordinary/compact
+captures linked from the Hole contract. No Core/Geometry model or persistence schema changed.
+
+| Verification | Result |
+| --- | --- |
+| GUI/app/STEP-export targets | Built from frozen final runtime inputs |
+| Shared editor/creation/Pattern/prefix/inventory/viewport Qt regression | 54 passed / 5 native-only skips / 3,845 assertions |
+| Native 100%, plus profile/History/imported STEP selection | 62 cases / 5,208 assertions; no failures/skips |
+| Same native combination at 150%, creation/edit fixtures compact | 62 / 5,210; no failures/skips; form overflow and footer reachability checked |
+| Separate startup | PID-matched X11 window viewable; intentional six-second timeout 124 |
+| Retained backend acceptance | Both backend test binaries and 663 backend/support inputs match complete Block 156 evidence |
+| Runtime manifest | 1,051 files; SHA256 `4786a01fd73ead9b87503ad218cb1c330bbc844efebb4a72bb4dca370a094cf9` |
+
+All five binary hashes match the verified artifacts. Full Core/Geometry and full Qt are not rerun for
+this GUI-only slice; the latest full runs remain under 156. All five native-only cases in the current
+Qt regression execute in the native combination. Changed formatting, local documentation links /
+anchors / fences, original captures and working/staged content are reviewed. The branch starts at
+refreshed main `5dce938`, after verified merged PR #176. Delivery is through the normal PR rules.
+
+Next: 157B2 completes recipe, source and internal/external Thread selectors, followed by 157B3 and
+157C. Parent 157, 158 acceptance and the assigned 159–165 sequence remain open in full.
 
 ## Later phases
 

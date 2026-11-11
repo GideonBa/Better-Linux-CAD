@@ -139,6 +139,7 @@ Representative entry points (select the layer where the tag exists):
 | Semantic and manufacturing Holes | `[parity-b152]`, `[parity-b153]`, `[parity-b154]`; `hole-wizard.md`, `tests/support/hole_*`, `tests/{core,geometry}/*hole*`, `tests/gui/gui_shell_history_tests.cpp` |
 | Shared Thread definitions, persistence and execution | `[parity-b155]`; `hole-wizard.md`, `tests/core/{thread_feature,part_thread_feature}_tests.cpp`, `tests/geometry/thread_feature_*tests.cpp`; `[thread-history-shell]` / `[thread-geometry-shell]` in `tests/gui/gui_shell_history_tests.cpp` |
 | Existing Hole/Thread property editing | `[parity-b157]`, `[hole-thread-edit-shell]`, `[native-hole-thread-edit]`; `hole-wizard.md`, `gui-feature-edit-mvp9.md`; combine with `[block136-feature-edit]` and `[history-prefix-session]` for the shared editor regression. Full Wizard authoring remains 157B/C. |
+| Semantic Plain Hole creation | `[hole-create-shell]`, `[native-hole-create]`; the same current shell test file covers pending inputs, target/support changes, physical cuts, exact history/reopen and scoped native model picks. Combine with the existing edit/Pattern/prefix/inventory regression; full Wizard remains 157B/C. |
 | Explicit Pattern placements and Hole consumers | `[parity-b156]`, `[pattern-placement]`, `[hole-pattern-combined]`; `part-pattern-core-mvp6.md`, `hole-wizard.md`, `file-format.md`; `[hole-pattern-consumer-shell]` exercises the existing Assembly task |
 
 The shared GUI executable owns one Qt application instance. `ShellWindow` consumes the existing
