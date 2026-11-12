@@ -417,7 +417,8 @@ Full backend/full Qt are not rerun. Frozen inputs: 1,053 files, SHA256
 `73697c1b689d6ba5e755ad40ae8969ee4df4d3928bffb76a8905b34314f1ae9b`.
 
 This is a verified intermediate change on `feat/hole-thread-support-authoring`, based on merged
-`1348d19`. Keep the branch open for Thread profiles/start/taper, external creation, complete limit
+`1348d19`, pushed as reviewed `3c0b01c` in [draft PR #179](https://github.com/GideonBa/Better-Linux-CAD/pull/179).
+Keep that PR/branch open for Thread profiles/start/taper, external creation, complete limit
 collection and existing-support editing. 157B2b, parent 157 and the sequence through 165 stay open.
 
 ## Later phases
