@@ -308,6 +308,12 @@ snapshots and current targets/positions/limits/profiles remain selected. A faile
 and retains the draft; active picking, source visits and dragging suspend these controls. See the
 [preset contract](hole-wizard.md#property-presets--157b3). Combined acceptance remains assigned to 157C.
 
+Hole/Thread task fields support Enter and Tab for local input and preview. Ctrl+Enter validates the
+focused number or text field, then applies one operation. Incomplete or geometrically invalid
+values keep the draft active with inline feedback and reachable correction controls. Escape from
+an input cancels the owned task; an active canvas drag retains its existing reset gesture. Source
+Sketch input keeps the Sketch command owner until return.
+
 In End of Part, Hole/Thread Apply stages one local change and Create Another opens the next child.
 The outer context row keeps Save/Cancel/final Apply ownership; final Apply remains disabled during
 feature input or a Source Sketch visit. Referenced Hole positions can enter their Sketch and return

@@ -348,3 +348,13 @@ The source template's array index is retained only inside that template. This pr
 Hole's recipe/name/bindings after Source Sketch return when executable order places it before an
 existing Hole suffix. `[hole-canonical-rebase-shell]` checks both Through All and To Face with
 unchanged suffix intent, independent material, exact history and native source/keyboard input.
+
+### Hole/Thread focused keyboard input — 157C
+
+Owned form inputs route Ctrl+Enter through their Qt validator/interpretation and existing
+`editingFinished` callback before the same typed Apply operation. Enter/Tab retain local editing;
+finishing a number refreshes preview even when its accepted value equals the preceding value.
+Incomplete input and candidate failures retain focus/draft and inline task feedback. Escape from
+an input uses the existing task/drag cancellation boundary. The handlers remain scoped to owned
+Hole/Thread widgets and suspend during Source Sketch editing. The
+[keyboard contract](hole-wizard.md#keyboard-input-and-correction--157c) owns focused and native proof.
