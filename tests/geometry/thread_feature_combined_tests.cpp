@@ -340,6 +340,28 @@ TEST_CASE("Imported cylinder modeled Threads and conical cosmetic Threads retain
           PartFeatureInputRole::ThreadSupportFace,
           checked(ImportedTopologyReference::create(catalog.id(), wall->id,
                                                     ImportedTopologyCapability::Face))));
+      const auto before_query = checked(serialize_part_document_to_json(p));
+      const auto before_shape = brep(*cache.find_body_shape(body));
+      for (bool reverse : {false, true}) {
+        const bool positive_axis = (axis_z > 0) != reverse;
+        const auto inspected = checked(
+            ThreadAdapter::inspect_support(p, body, support, cache,
+                                           positive_axis ? ThreadDirection::AlongSupportAxis
+                                                         : ThreadDirection::OppositeSupportAxis,
+                                           &context));
+        CHECK(inspected.origin.x == Catch::Approx(0).margin(1e-6));
+        CHECK(inspected.origin.y == Catch::Approx(0).margin(1e-6));
+        CHECK(inspected.origin.z == Catch::Approx(reverse ? 8 : 0).margin(1e-6));
+        CHECK(inspected.axis.z == Catch::Approx(reverse ? -1 : 1).margin(1e-7));
+        CHECK(inspected.radius_mm ==
+              Catch::Approx(reverse && taper ? 5 + 8 * slope : 5).margin(1e-6));
+        CHECK(inspected.axial_length_mm == Catch::Approx(8).margin(1e-6));
+        CHECK(inspected.taper_angle_deg ==
+              Catch::Approx(taper ? (reverse ? 2 : -2) : 0).margin(1e-7));
+      }
+      CHECK(checked(serialize_part_document_to_json(p)) == before_query);
+      CHECK(brep(*cache.find_body_shape(body)) == before_shape);
+      CHECK(input.source_bytes() == supplier);
       const auto definition =
           f::definition(f::custom(taper), false, hand,
                         taper ? ThreadRepresentation::Cosmetic : ThreadRepresentation::Modeled);
@@ -383,6 +405,41 @@ TEST_CASE("Imported cylinder modeled Threads and conical cosmetic Threads retain
                    .shape) == original);
       CHECK(input.source_bytes() == supplier);
     }
+}
+
+TEST_CASE("Thread support inspection rejects changed supplier bytes on an already resolved context",
+          "[geometry][parity-b157][thread-support-query][thread-import]") {
+  imported_body_test::Fixture input;
+  input.write(BRepPrimAPI_MakeCylinder(5, 8).Shape());
+  const auto supplier = input.source_bytes();
+  const auto part = input.editable();
+  StepImportTopologyContext context(input.root);
+  const auto cache = evaluate(part, &context);
+  const auto body = part.bodies().front().id();
+  const auto& catalog = part.imported_topology_catalogs().front();
+  const ImportedTopologyEntry* wall = nullptr;
+  for (const auto& entry : catalog.entries())
+    if (entry.descriptor.kind == ImportedTopologyKind::Face &&
+        entry.descriptor.geometry == ImportedGeometryClass::Cylinder)
+      wall = &entry;
+  REQUIRE(wall);
+  const auto support = checked(FaceReference::create_imported(
+      PartFeatureInputRole::ThreadSupportFace,
+      checked(ImportedTopologyReference::create(catalog.id(), wall->id,
+                                                ImportedTopologyCapability::Face))));
+  REQUIRE(ThreadAdapter::inspect_support(part, body, support, cache,
+                                         ThreadDirection::AlongSupportAxis, &context));
+  const auto before = checked(serialize_part_document_to_json(part));
+  const auto shape = brep(*cache.find_body_shape(body));
+  input.write_bytes(supplier + "\n");
+  CHECK_FALSE(ThreadAdapter::inspect_support(part, body, support, cache,
+                                             ThreadDirection::AlongSupportAxis, &context));
+  CHECK(checked(serialize_part_document_to_json(part)) == before);
+  CHECK(brep(*cache.find_body_shape(body)) == shape);
+  input.write_bytes(supplier);
+  StepImportTopologyContext restored(input.root);
+  CHECK(ThreadAdapter::inspect_support(part, body, support, cache,
+                                       ThreadDirection::AlongSupportAxis, &restored));
 }
 
 TEST_CASE("Explicit modeled switches return both Thread consumers to identical cosmetic intent",

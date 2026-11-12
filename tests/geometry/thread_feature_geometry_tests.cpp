@@ -193,3 +193,85 @@ TEST_CASE("An outward blind Threaded Hole cannot silently drop metadata or repla
       *OcctShapeView::get(*cache.find_body_shape(BodyId("body.base")))));
   CHECK(checked(serialize_part_document_to_json(part)) == intent);
 }
+
+TEST_CASE("External Thread support inspection has independent axis radius and interval oracles",
+          "[geometry][parity-b157][thread-support-query]") {
+  const auto part = f::pair_part();
+  const auto before = checked(serialize_part_document_to_json(part));
+  const auto cache = evaluate(part);
+  const auto support = f::external().support();
+  for (const bool reverse : {false, true}) {
+    auto result = ThreadAdapter::inspect_support(part, BodyId("body.shaft"), support, cache,
+                                                 reverse ? ThreadDirection::OppositeSupportAxis
+                                                         : ThreadDirection::AlongSupportAxis);
+    INFO((result ? "ok" : result.error().message()));
+    REQUIRE(result);
+    const auto& value = result.value();
+    CHECK(value.origin.x == Catch::Approx(30).margin(1e-7));
+    CHECK(value.origin.y == Catch::Approx(0).margin(1e-7));
+    CHECK(value.origin.z == Catch::Approx(reverse ? 8 : 0).margin(1e-7));
+    CHECK(value.axis.x == Catch::Approx(0).margin(1e-7));
+    CHECK(value.axis.y == Catch::Approx(0).margin(1e-7));
+    CHECK(value.axis.z == Catch::Approx(reverse ? -1 : 1).margin(1e-7));
+    CHECK(value.radius_mm == Catch::Approx(5).margin(1e-7));
+    CHECK(value.axial_length_mm == Catch::Approx(8).margin(1e-7));
+    CHECK(value.taper_angle_deg == Catch::Approx(0).margin(1e-7));
+    CHECK(dot(value.axis, value.x_axis) == Catch::Approx(0).margin(1e-7));
+    CHECK(length(value.x_axis) == Catch::Approx(1).margin(1e-7));
+  }
+  CHECK(checked(serialize_part_document_to_json(part)) == before);
+  CHECK(volume(*cache.find_body_shape(BodyId("body.shaft"))) ==
+        Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+}
+
+TEST_CASE("External Thread inspection follows actual rigid Body placement and direction",
+          "[geometry][parity-b157][thread-support-query]") {
+  auto part = f::pair_part();
+  REQUIRE(part.add_body_transform(checked(BodyTransform::create_translate(
+      BodyTransformId("move"), BodyId("body.shaft"), BodyTransformCoordinateSpace::World, {},
+      {7, -2, 3}, false, false))));
+  auto axis = checked(BodyTransformRotationAxis::create_explicit({}, {1, 0, 0}));
+  REQUIRE(part.add_body_transform(checked(BodyTransform::create_rotate(
+      BodyTransformId("turn"), BodyId("body.shaft"), BodyTransformCoordinateSpace::World, {}, axis,
+      90, false, false))));
+  const auto cache = evaluate(part);
+  for (const bool reverse : {false, true}) {
+    const auto value = checked(ThreadAdapter::inspect_support(
+        part, BodyId("body.shaft"), f::external().support(), cache,
+        reverse ? ThreadDirection::OppositeSupportAxis : ThreadDirection::AlongSupportAxis));
+    CHECK(value.origin.x == Catch::Approx(37).margin(1e-7));
+    CHECK(value.origin.y == Catch::Approx(reverse ? -11 : -3).margin(1e-7));
+    CHECK(value.origin.z == Catch::Approx(-2).margin(1e-7));
+    CHECK(value.axis.x == Catch::Approx(0).margin(1e-7));
+    CHECK(value.axis.y == Catch::Approx(reverse ? 1 : -1).margin(1e-7));
+    CHECK(value.axis.z == Catch::Approx(0).margin(1e-7));
+    CHECK(value.radius_mm == Catch::Approx(5).margin(1e-7));
+    CHECK(value.axial_length_mm == Catch::Approx(8).margin(1e-7));
+  }
+}
+
+TEST_CASE("External Thread inspection rejects planar wrong-body internal and stale supports",
+          "[geometry][parity-b157][thread-support-query]") {
+  auto part = f::pair_part();
+  REQUIRE(part.add_hole_feature(f::internal()));
+  const auto cache = evaluate(part);
+  const auto top = checked(FaceReference::create_planar(
+      PartFeatureInputRole::ThreadSupportFace,
+      checked(SemanticFaceReference::create(FeatureId("shaft"), SemanticFace::Top))));
+  CHECK_FALSE(ThreadAdapter::inspect_support(part, BodyId("body.shaft"), top, cache));
+  CHECK_FALSE(
+      ThreadAdapter::inspect_support(part, BodyId("body.base"), f::external().support(), cache));
+  const auto wall = checked(FaceReference::create_result(
+      PartFeatureInputRole::ThreadSupportFace,
+      checked(ResultFaceReference::create(FeatureId("internal"), BodyId("body.base"),
+                                          {{FeatureId("internal"), "hole/6:center/wall"}}))));
+  CHECK_FALSE(ThreadAdapter::inspect_support(part, BodyId("body.base"), wall, cache));
+  const auto before = checked(serialize_part_document_to_json(part));
+  auto valid =
+      ThreadAdapter::inspect_support(part, BodyId("body.shaft"), f::external().support(), cache);
+  REQUIRE(valid);
+  CHECK(checked(serialize_part_document_to_json(part)) == before);
+  REQUIRE(part.set_parameter_value(ParameterId("depth"), checked(Quantity::length_mm(9))));
+  CHECK_FALSE(
+      ThreadAdapter::inspect_support(part, BodyId("body.shaft"), f::external().support(), cache));
+}

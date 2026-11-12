@@ -421,6 +421,26 @@ This is a verified intermediate change on `feat/hole-thread-support-authoring`, 
 Keep that PR/branch open for Thread profiles/start/taper, external creation, complete limit
 collection and existing-support editing. 157B2b, parent 157 and the sequence through 165 stay open.
 
+### 157B2b progress — exterior Thread support query
+
+Geometry now supplies a read-only exterior cylinder/cone inspection sharing the actual Thread
+execution resolver. [Contract and focused proof](hole-wizard.md#exterior-thread-support-inspection--157b2b)
+cover entry frame/radius/span/signed taper in both directions, rigid placement, supplier freshness
+and rejection of stale/wrong/inner supports. This provides the required input for external authoring;
+the complete authoring UI and the remaining 157B2b/B3/C requirements stay open in draft PR #179.
+
+GUI/app/export/Core/Geometry targets built. Focused query/import proof passes **5 cases / 302
+assertions**; the complete existing Thread Geometry group passes **11 cases / 931 assertions**.
+The selected Qt creation/recipe/support/edit/prefix/inventory regression passes **53 cases / 6 native
+skips / 4,586 assertions**. The existing native modeled Thread edit passes **1 case / 46
+assertions at each of 100% and compact 150%**, without skips. This executes one of the six native
+cases skipped by that Qt selection. Core's 320 source/header/test/shared-fixture inputs are unchanged
+from retained 156 evidence; full Core, full Geometry, full Qt and additional Pattern coverage are
+not rerun for this component. A separate PID-matched app startup is viewable (intentional timeout
+124).
+Frozen runtime inputs: 1,053 files, SHA256
+`61137aa67d57872682a95c05ccad144db0fdd9fcba8bb4afc4527392ce1ff01e`.
+
 ## Later phases
 
 Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R

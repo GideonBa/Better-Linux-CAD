@@ -515,6 +515,23 @@ Original captures: [derived bottom](images/hole-derived-support.png), 1280×800,
 [placed imported plane at compact 150%](images/hole-imported-support-compact.png), 1536×960.
 Native helpers reveal the scrolled controls and verify hit ownership and on-screen coordinates.
 
+### Exterior Thread support inspection — 157B2b
+
+The Geometry authoring query `ThreadAdapter::inspect_support` is read-only and requires an editable
+Part, a typed `ThreadSupportFace`, a solid target and a complete cache for the exact document.
+It shares the execution resolver and producer-axis/seam rules, returning the entry origin, unit
+axis/seam, entry radius, finite axial span and signed taper in the selected direction. It rejects
+planar faces, another Body's faces and inward-facing bore walls. Reversing direction moves the
+origin to the other end and reverses the taper sign; the query does not create parameters or
+claim that a complete thread profile fits. Execution still checks the authored interval, material,
+breakout, overlap and representation limits. Imported support inspection checks supplier freshness.
+
+Independent `[thread-support-query]` / `[thread-import]` Geometry tests cover both directions,
+native rigid placement, imported cylinders/cones, radius/span/taper, stale caches, wrong targets,
+bore rejection and changed supplier bytes after initial resolution. Queries preserve exact Part
+intent, current BRep and supplier bytes. The full `[parity-b155]` regression protects execution
+after sharing the resolver. External creation and complete Thread selectors remain assigned here.
+
 ## Why more than a cut
 
 ```text
