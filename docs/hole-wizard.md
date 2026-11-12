@@ -1,7 +1,10 @@
 # Hole Wizard
 
-Status: staged target architecture. Numbered implementation and delivery status belong to
-`mvp-plan.md`; the semantic Core foundation starts at 152, execution at 153 and Wizard UI at 157.
+Status: supported semantic Part Hole/Thread intent, execution and shared property authoring are
+accepted through 157; [the final workflow proof](#whole-workflow-acceptance--157c) records the
+current boundary. Numbered implementation and delivery status belong to `mvp-plan.md`. Earlier
+staged sections retain their original component boundaries; conceptual and coordinated Assembly
+scope remains assigned to later blocks. Whole Phase A/B integration remains 158.
 
 Execution planning is consolidated in [Blocks 152–157 and 196–198](inventor-parity-sequence.md).
 Blocks 149–151 own shared revisioned resources/materials; Block 156 owns integration with the existing
@@ -10,10 +13,10 @@ executor. The original MVP sequence below is superseded for scheduling by those 
 retains Hole/Thread semantics and standards provenance. The new plan explicitly brings seat types
 into the Part phase and coordinated Assembly holes into their later cross-document phase.
 
-The replacement shell implements bounded plain cylindrical through-all single/bolt-circle cuts
-through `CircleProfile` / `CircularHolePattern` and `SubtractiveExtrude`; see
-`docs/gui-part-foundation-workbench-mvp7.md`. Those commands do not introduce the semantic
-standards-oriented `HoleFeature`, threads, countersinks or assembly hole features described here.
+Legacy plain cylindrical through-all single/bolt-circle cuts retain `CircleProfile` /
+`CircularHolePattern` and `SubtractiveExtrude`; see `docs/gui-part-foundation-workbench-mvp7.md`.
+The shared property workflow separately authors semantic `HoleFeature` and `ThreadFeature` records,
+with explicit supported legacy conversion. Coordinated Assembly holes remain 196–198.
 
 The hole wizard creates holes as semantic, parametric, standards-oriented features, not as a bare circle plus cut. A `HoleFeature` carries hole type, standard, diameter, depth, thread, counterbore/countersink, fit, fastener type, and manufacturing intent. This makes later drawings, BOMs, fastener placement, collision checks, and manufacturing notes possible.
 
@@ -850,7 +853,7 @@ Proof sources: [typed preset/storage regression](../tests/gui/gui_hole_thread_pr
 `[hole-thread-presets]`, `[hole-preset-shell]` and `[native-hole-preset]`. The broader regression passes
 122 cases / 10,463 assertions with 22 native skips; the focused native preset/canvas/source/repeat selection passes 10 cases / 824 assertions at both scales. This is targeted
 native coverage. Runtime and delivery evidence is indexed in
-the [current implementation plan](mvp-plan.md#current-implementation--157b3). Presets alone do not
+the [workflow lifecycle record](mvp-plan.md#157b3-workflow-lifecycle--delivered). Presets alone do not
 accept parent 157; explicit conversion and extended contexts are described below, while combined
 acceptance remains 157C.
 
@@ -901,7 +904,7 @@ tags `[hole-conversion]`, `[hole-conversion-shell]`, `[native-hole-conversion]` 
 passes 26 / 2,186; final focused Qt passes seven / 670 with one native skip. The broader Qt selection
 passes 150 / 12,297 with 25 native skips. Targeted native conversion/context/editor/preset/source/
 History regression passes 14 / 920 at 100% and 14 / 926 at compact 150%. The
-[implementation plan](mvp-plan.md#current-implementation--157b3) owns delivery/runtime evidence;
+[workflow lifecycle record](mvp-plan.md#157b3-workflow-lifecycle--delivered) owns delivery/runtime evidence;
 these focused results retain their component boundary; combined acceptance remains 157C.
 
 ### Hidden and consumed input Bodies — 157B3
@@ -929,7 +932,7 @@ user-prefix edits use the same predecessor query within the enclosing prefix bou
 Proof sources: [input-history shell/native regression](../tests/gui/gui_shell_hole_thread_edit_tests.cpp)
 and [explicit Geometry visibility/scope regression](../tests/geometry/finishing_selection_tests.cpp),
 tags `[hole-input-history-shell]`, `[native-hole-input-history]` and `[hidden-input-selection]`. The
-[implementation plan](mvp-plan.md#current-implementation--157b3) records verification and delivery.
+[workflow lifecycle record](mvp-plan.md#157b3-workflow-lifecycle--delivered) records verification and delivery.
 Focused Geometry passes 11 cases / 801 assertions; focused Qt passes two / 246 with two native skips.
 The broader relevant Qt selection passes 82 / 6,200 with 15 native skips. Targeted native input/
 support/source/limit/context regression passes seven / 763 at each scale. These are bounded proofs;
@@ -969,7 +972,7 @@ Focused Qt passes five cases / 582 assertions with one native skip. Native prefi
 source/input/conversion-context selections pass ten cases / 1,134 assertions at each of 100% and
 compact 150%, in disjoint six-plus-four runs with clean exits. Full Core passes 708 cases / 27,016
 assertions; focused Geometry passes 37 / 2,987. These are targeted lifecycle proofs; the
-[implementation plan](mvp-plan.md#current-implementation--157b3) records the broader regression and
+[workflow lifecycle record](mvp-plan.md#157b3-workflow-lifecycle--delivered) records the broader regression and
 delivery boundary separately from the remaining 157C combined gates.
 
 Recipe/support/limit handoffs reselect the active feature by stable ID whenever Core returns
@@ -1014,7 +1017,7 @@ PID-matched native startup reached `IsViewable` before its intentional timeout (
 All 156 GUI/app dependency records are valid. Frozen runtime: **1,063 files**, SHA256
 `3867fa78784cbbce25642e22e2f17e40672c46cf4b717e3868c49d49760dc3eb`.
 Failed and superseded runs contribute no proof. This component alone does not accept parent 157;
-the combined authoring, Pattern/Assembly/STEP and inventory gates remain assigned in the plan.
+the combined authoring/consumer and final inventory proofs below own whole-block closure.
 
 ### Combined authored Hole and Thread workflows — 157C
 
@@ -1053,9 +1056,38 @@ Frozen runtime: **1,063 files**, SHA256
 `d4efa49f338b0b86b262de0ad31063631dadee6b1367b9e6a8aa24840e205fa9`; all 156 current GUI/app
 dependency records are valid and nonempty. Failed/interrupted and superseded runs contribute no
 proof. Shared keyboard/Extrude/Source Sketch offscreen regression passes **5 cases / 488 assertions**
-with no skips and exit 0. Whole 157 still requires the
-remaining native workflow reconciliation and capability-inventory checks; 158 retains full Phase
-A/B integration, migrated/fresh documents, suppression/reorder and recompute measurements.
+with no skips and exit 0. The final workflow reconciliation and capability audit below close 157;
+158 retains full Phase A/B integration, migrated/fresh documents, suppression/reorder and recompute
+measurements.
+
+### Whole workflow acceptance — 157C
+
+The current shell's B01/B02/UI01 proof combines the existing native recipe, typed source, support,
+limit, position/Source Sketch, canvas, preset, repeat, conversion and input-history/prefix cases with
+the focused keyboard and Extrude baseline. B03 adds the combined pinned internal/external Thread
+case above; B04 adds the authored Pattern/Assembly/physical STEP/reimport chain. These use existing
+Core/Geometry and task authorities, retain explicit supported/imported capability limits and
+preserve later coordinated-Assembly scope.
+
+| Final verification | Result |
+| --- | --- |
+| Native authoring/context/compatibility selection | **30 cases / 2,778 assertions**, no skips, exit 0 at both 100% and compact 150% |
+| Combined B03/B04 | **645 + 309 assertions** at 100%; both included in the **6 / 1,279** compact 150% selection above |
+| Broad Hole/Thread, property, source and coverage Qt | **128 cases: 102 passed, 26 native skips / 9,421 assertions**, exit 0 |
+| Additional native Extrude breadcrumb baseline | **1 case / 232 assertions** at each scale, exit 0; screen-bounded baseline layout |
+| Native-only skip reconciliation | Every skipped case name in the broad selection has a completed native execution at both scales |
+| App startup | PID **213226** matched to an `IsViewable` native window; intentional timeout 124, wrapper exit 0 |
+
+Original captures above and the existing component contracts retain their proof links; current
+ordinary source/canvas and compact preset/Source Sketch captures were inspected with no CAD
+process active. The frozen **1,063-file** runtime and GUI/app/export binary hashes remain identical
+to the combined workflow proof; all **156** GUI/app dependency records are valid and nonempty.
+The strict `[shell-coverage]` command/API/proof audit passes **5 cases / 705 assertions**, exit 0,
+after promoting only Hole and Thread under the completed 157 GUI owner. All other capability data,
+including every later planned capability, is unchanged.
+
+These are whole-157 workflow proofs. Block 158 still owns complete Phase A/B integrated acceptance,
+full suites, migrated/fresh fixtures, suppression/reorder/finishing and isolated recompute timings.
 
 ## Why more than a cut
 

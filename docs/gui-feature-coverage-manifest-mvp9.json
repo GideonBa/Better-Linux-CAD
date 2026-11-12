@@ -1630,26 +1630,86 @@
       {
         "capability": "semantic-holes",
         "owner": 157,
-        "disposition": "planned",
+        "disposition": "implemented",
         "contract": "docs/hole-wizard.md",
-        "planned_commands": [
-          "Hole Wizard"
+        "commands": [
+          "blcad.action.semantic_hole"
         ],
-        "commands": [],
-        "apis": [],
-        "proofs": []
+        "apis": [
+          {
+            "source": "include/blcad/gui/shell/shell_feature_edit_tools.hpp",
+            "type": "ShellFeatureEditTools",
+            "methods": [
+              "begin_new_hole",
+              "begin",
+              "apply",
+              "cancel",
+              "edit_source_sketch"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[gui][hole-thread-keyboard-shell]",
+            "source": "tests/gui/gui_shell_hole_thread_acceptance_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][native-hole-thread-combined]",
+            "source": "tests/gui/gui_shell_hole_thread_acceptance_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][native-hole-recipe]",
+            "source": "tests/gui/gui_shell_hole_thread_edit_tests.cpp"
+          }
+        ]
       },
       {
         "capability": "threads",
-        "owner": 155,
-        "disposition": "planned",
+        "owner": 157,
+        "disposition": "implemented",
         "contract": "docs/hole-wizard.md",
-        "planned_commands": [
-          "Thread"
+        "commands": [
+          "blcad.action.semantic_thread"
         ],
-        "commands": [],
-        "apis": [],
-        "proofs": []
+        "apis": [
+          {
+            "source": "include/blcad/gui/shell/shell_feature_edit_tools.hpp",
+            "type": "ShellFeatureEditTools",
+            "methods": [
+              "begin_new_thread",
+              "begin",
+              "apply",
+              "cancel",
+              "set_drag_text"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[gui][hole-thread-keyboard-shell]",
+            "source": "tests/gui/gui_shell_hole_thread_acceptance_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][native-hole-thread-combined]",
+            "source": "tests/gui/gui_shell_hole_thread_acceptance_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][native-thread-source]",
+            "source": "tests/gui/gui_shell_hole_thread_edit_tests.cpp"
+          }
+        ]
       },
       {
         "capability": "planar-g2",
