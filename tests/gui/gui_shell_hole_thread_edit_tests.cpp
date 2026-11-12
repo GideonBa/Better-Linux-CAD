@@ -11,6 +11,7 @@
 #include "blcad/geometry/step_import_reader.hpp"
 #include "blcad/geometry/step_import_topology.hpp"
 #include "blcad/geometry/thread_adapter.hpp"
+#include "blcad/gui/gui_hole_thread_preset.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_history_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -3652,4 +3653,195 @@ TEST_CASE("Profile-driven Slot placement and width do not expose ineffective can
   canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
   REQUIRE(w.feature_edit_tools().apply());
   CHECK(volume(w) == Catch::Approx(1600 - (8 + std::numbers::pi) * 3).margin(1e-6));
+}
+
+namespace {
+struct PresetFile {
+  QTemporaryDir directory;
+  QByteArray previous = qgetenv("BLCAD_PRESETS_PATH");
+  PresetFile() {
+    REQUIRE(directory.isValid());
+    qputenv("BLCAD_PRESETS_PATH", path().toUtf8());
+  }
+  ~PresetFile() {
+    qputenv("BLCAD_PRESETS_PATH", previous);
+  }
+  QString path() const {
+    return directory.filePath("presets.json");
+  }
+};
+void preset_name(ShellWindow& w, const char* name) {
+  control<QComboBox>(w, "blcad.feature_preset.name").setCurrentText(QString::fromUtf8(name));
+}
+} // namespace
+
+TEST_CASE("Native Hole presets snapshot values and retain a new document's placement and target",
+          "[gui][parity-b157][hole-preset-shell][native-hole-preset]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native preset controls and compact layout");
+  PresetFile presets;
+  QTemporaryDir dir;
+  ShellWindow w;
+  open(w, dir, plate());
+  const auto initial = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.recipe", 1);
+  field<QDoubleSpinBox>(w, "/manufacturing/diameter/parameter").setValue(4);
+  field<QDoubleSpinBox>(w, "/manufacturing/depth/parameter").setValue(2);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(-15);
+  preset_name(w, "Ø2 counterbore");
+  activate(w);
+  click(control<QPushButton>(w, "blcad.feature_preset.save"));
+  REQUIRE(checked(GuiHoleThreadPresetCommands::load(presets.path())).size() == 1);
+  CHECK(snapshot(w) == initial);
+  w.feature_edit_tools().cancel();
+  CHECK(snapshot(w) == initial);
+  open(w, dir, threads::pair_part("preset.destination", false));
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(3);
+  preset_name(w, "Ø2 counterbore");
+  click(control<QPushButton>(w, "blcad.feature_preset.load"));
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(field<QDoubleSpinBox>(w, "/placements/0/position/x").value() == 3);
+  CHECK(field<QDoubleSpinBox>(w, "/diameter/parameter").value() == 2);
+  CHECK(control<QComboBox>(w, "blcad.hole.recipe").currentIndex() == 1);
+  CHECK(control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll")
+            .horizontalScrollBar()
+            ->maximum() == 0);
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll")
+      .ensureWidgetVisible(&control<QComboBox>(w, "blcad.feature_preset.name"));
+  settle();
+  capture(w, "hole-preset-preview");
+  const auto original_volume = volume(w);
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  const auto& hole = w.session().part_document()->hole_features().front();
+  CHECK(hole.target_body() == BodyId("body.base"));
+  CHECK(volume(w) == Catch::Approx(original_volume - 14 * std::numbers::pi).margin(1e-6));
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native Thread presets bring their exact revision into the current draft with one Apply",
+          "[gui][parity-b157][hole-preset-shell][native-hole-preset]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native Thread preset controls");
+  PresetFile presets;
+  auto source = threads::pair_part();
+  REQUIRE(source.add_thread_feature(
+      threads::external(threads::definition(threads::selected(), true, ThreadHandedness::Left))));
+  REQUIRE(GuiHoleThreadPresetCommands::save(
+      presets.path(),
+      checked(GuiHoleThreadPresetCommands::capture(source, FeatureId("external"), "Pinned left"))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part("current.shaft", false));
+  const auto before = snapshot(w);
+  create_thread(w);
+  preset_name(w, "Pinned left");
+  activate(w);
+  click(control<QPushButton>(w, "blcad.feature_preset.load"));
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.table").currentIndex() > 0);
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.row").currentData().toString() ==
+        "synthetic.row");
+  CHECK(w.session().part_document()->engineering_resources().entries().empty());
+  CHECK(snapshot(w) == before);
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll")
+      .ensureWidgetVisible(&control<QComboBox>(w, "blcad.feature_preset.name"));
+  settle();
+  capture(w, "thread-preset-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  const auto& part = *w.session().part_document();
+  REQUIRE(part.engineering_resources().entries().size() == 1);
+  CHECK(part.engineering_resources().find_table(threads::selected().table));
+  CHECK_FALSE(part.engineering_resources().find_table(threads::selected("r2").table));
+  const auto& thread = part.thread_features().front();
+  CHECK(nlohmann::json::parse(snapshot(w)).at("thread_features").at(0).at("support") ==
+        nlohmann::json::parse(checked(serialize_part_document_to_json(source)))
+            .at("thread_features")
+            .at(0)
+            .at("support"));
+  CHECK(thread.thread().handedness() == ThreadHandedness::Left);
+  CHECK(part.find_parameter(thread.thread().length())->value().millimeters() == 4);
+  CHECK(part.find_parameter(*thread.thread().start())->value().millimeters() == 1);
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Preset load failures preserve valid settings and unused imported revisions are pruned",
+          "[gui][parity-b157][hole-preset-shell]") {
+  const bool conflict = GENERATE(false, true);
+  PresetFile presets;
+  auto source = manufacture::seed();
+  REQUIRE(source.add_engineering_resource(manufacture::table()));
+  REQUIRE(source.add_hole_feature(manufacture::feature(1, HoleThroughAllExtent{}, true)));
+  REQUIRE(GuiHoleThreadPresetCommands::save(
+      presets.path(),
+      checked(GuiHoleThreadPresetCommands::capture(source, FeatureId("hole"), "Pinned seat"))));
+  auto destination = plate();
+  if (conflict)
+    REQUIRE(destination.add_engineering_resource(manufacture::table("r1", false, 6)));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, destination);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  preset_name(w, "Pinned seat");
+  control<QPushButton>(w, "blcad.feature_preset.load").click();
+  settle();
+  CHECK(snapshot(w) == before);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  if (conflict) {
+    CHECK(
+        control<QLabel>(w, "blcad.feature_preset.status").text().startsWith("Preset not loaded:"));
+    CHECK(control<QComboBox>(w, "blcad.hole.recipe").currentIndex() == 0);
+  } else {
+    CHECK(field<QLabel>(w, "/manufacturing/diameter/table/revision").text() == "r1");
+    choose_hole_mode(w, "blcad.hole.recipe", 0);
+  }
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(w.session().part_document()->engineering_resources() ==
+        destination.engineering_resources());
+  CHECK(volume(w) == Catch::Approx(38400 - 8 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Preset name replacement and removal stay outside model history and lock during canvas input",
+    "[gui][parity-b157][hole-preset-shell]") {
+  PresetFile presets;
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  const auto before = snapshot(w);
+  create_hole(w);
+  preset_name(w, "Everyday hole");
+  control<QPushButton>(w, "blcad.feature_preset.save").click();
+  settle();
+  REQUIRE(checked(GuiHoleThreadPresetCommands::load(presets.path())).size() == 1);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  control<QPushButton>(w, "blcad.feature_preset.save").click();
+  settle();
+  const auto saved = checked(GuiHoleThreadPresetCommands::load(presets.path()));
+  REQUIRE(saved.size() == 1);
+  CHECK(checked(resolve_hole_diameter(saved.front().values,
+                                      saved.front().values.hole_features().front().diameter()))
+            .diameter.millimeters() == 4);
+  (void)canvas(w, "/diameter/parameter");
+  const auto pointer = start_canvas(w);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_preset.load").isEnabled());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_preset.save").isEnabled());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_preset.remove").isEnabled());
+  canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_preset.remove").isEnabled());
+  control<QPushButton>(w, "blcad.feature_preset.remove").click();
+  settle();
+  CHECK(checked(GuiHoleThreadPresetCommands::load(presets.path())).empty());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_preset.load").isEnabled());
+  CHECK(snapshot(w) == before);
+  w.feature_edit_tools().cancel();
+  CHECK(snapshot(w) == before);
 }

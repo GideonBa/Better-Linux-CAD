@@ -302,7 +302,12 @@ mapping retries when its used numeric input or binding is corrected.
 Create Another in both Hole and Thread retains the complete recipe and uses fresh owned inputs.
 The [new draft](hole-wizard.md#complete-create-another--157b3) keeps its positions/interval and
 reports overlap or ineffective cuts until corrected. Cancel preserves the preceding committed
-feature. Presets and the remaining advanced workflow remain assigned to 157B3/C.
+feature. The scrolling Property Presets group now manages named Hole/Thread value snapshots through
+Save Values, Load Values and Remove. Its hint explains that dimensions and pinned revisions are
+snapshots and current targets/positions/limits/profiles remain selected. A failed load reports inline
+and retains the draft; active picking, source visits and dragging suspend these controls. See the
+[preset contract](hole-wizard.md#property-presets--157b3). Legacy conversion, extended contexts and
+combined acceptance remain assigned to 157B3/C.
 Hole position controls choose independent support-local points or existing scoped Sketch points.
 They retain placement identity across source changes and support actual point picking. Edit Source
 Sketch and the return breadcrumb use the same Sketch workspace as the shared feature workflow;

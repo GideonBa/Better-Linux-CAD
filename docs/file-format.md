@@ -1442,6 +1442,17 @@ Canvas frames and world/value scale are transient. Make Independent writes only 
 owned typed parameter and explicit binding when required by the accepted Hole/Thread; the original
 shared/formula/resource source remains unchanged.
 
+Application Hole/Thread presets are separate preferences, not Part intent. Their version-1 wrapper
+is `{schema: "blcad.feature_presets", version: 1, presets: [{name, values: <canonical Part>}]}`.
+`values` contains a validated canonical fixed-placeholder Core template, literal dimensions and
+only required pinned resource snapshots. It contains no source document targets, positions,
+parameter names/identities or formulas. Re-capture must reproduce the template exactly; unknown,
+duplicate or noncanonical data rejects the library. Names are unique within each Hole/Thread kind.
+QSaveFile atomically replaces the library; malformed existing data is preserved on failed writes.
+Loading creates ordinary fresh owned dimensions and required catalog entries only when the normal
+model Apply accepts them. Current live references are retained under the
+[preset contract](hole-wizard.md#property-presets--157b3); the Part schema remains unchanged.
+
 Extent is exactly one of `{kind: blind, depth}`, `{kind: through_all}`, `{kind: to_next}`,
 `{kind: to_face, face}`, `{kind: up_to_body, body}` or `{kind: symmetric, total_depth}`. Depths and
 included angle reference existing typed parameters. The shared Face spelling for `to_face` requires

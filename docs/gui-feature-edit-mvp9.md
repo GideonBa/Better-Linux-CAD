@@ -297,3 +297,14 @@ the source and publishes only when the owning feature requires the new input. Pi
 and profiles keep their existing explicit Custom transitions. The support query, canonical
 factories, full preview and existing transaction/workflow authority still decide validity. See the
 [canvas contract](hole-wizard.md#support-anchored-canvas-controls--157b3) for scope and proof.
+
+### Hole/Thread property presets — 157B3
+
+The scrolling form shares Save Values/Load Values/Remove through `GuiHoleThreadPresetCommands`.
+Canonical Core templates capture literal values and exact pinned snapshots while loading retains
+the destination's live references. Failed loads preserve the existing draft and report inline;
+successful loads use the ordinary full preview and one Apply. Preset preference writes do not add
+model history. Newly imported required resources join the disposable candidate's input mutation;
+unused revisions are pruned before publication. Thread source selectors read this candidate catalog.
+The [preset contract](hole-wizard.md#property-presets--157b3) owns reference prerequisites, explicit
+snapshot semantics, storage validation and proof tags.

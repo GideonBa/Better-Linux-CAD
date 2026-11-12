@@ -8,6 +8,7 @@
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 #include "blcad/gui/gui_hole_recipe.hpp"
+#include "blcad/gui/gui_hole_thread_preset.hpp"
 #include "blcad/gui/gui_hole_thread_repeat.hpp"
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
@@ -32,6 +33,7 @@
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QStandardPaths>
 #include <QStatusBar>
 #include <QTimer>
 #include <QUuid>
@@ -396,6 +398,12 @@ struct ShellFeatureEditTools::Impl {
   std::optional<Error> support_error;
   std::vector<Parameter> pending_parameters;
   std::string recipe_namespace;
+  QComboBox* preset_name{};
+  QPushButton *preset_load{}, *preset_save{}, *preset_remove{};
+  QLabel* preset_status{};
+  bool preset_library_valid{};
+  QString retained_preset_name;
+  std::vector<GuiHoleThreadPreset> presets;
   QComboBox *target_field{}, *support_field{}, *limit_field{};
   ShellPropertySelector *target_selector{}, *support_selector{}, *limit_selector{};
   std::size_t entry_revision{};
@@ -1026,6 +1034,7 @@ struct ShellFeatureEditTools::Impl {
     return viewport.set_feature_previews(std::move(shapes), std::move(replaced));
   }
   void pick_mode() {
+    refresh_preset_actions();
     if (!input_selection() || !edit.active())
       return;
     if (picking != Pick::None && layer.active_handle_id().empty()) {
@@ -1531,7 +1540,9 @@ struct ShellFeatureEditTools::Impl {
   }
   void build_thread_mapping(QFormLayout* form) {
     auto& draft = *thread_mapping;
-    const auto& resources = session.part_document()->engineering_resources();
+    auto pending = deserialize_part_document_from_json(source.dump());
+    const auto& resources = pending ? pending.value().engineering_resources()
+                                    : session.part_document()->engineering_resources();
     const auto add = [&](const char* field, const QString& title) {
       auto* input = combo(form->parentWidget());
       input->setObjectName("blcad.thread.standard." + QString::fromLatin1(field));
@@ -2466,11 +2477,128 @@ struct ShellFeatureEditTools::Impl {
       });
     }
   }
+  QString preset_path() const {
+    const auto override = qEnvironmentVariable("BLCAD_PRESETS_PATH");
+    return override.isEmpty()
+               ? QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) +
+                     "/feature-presets.json"
+               : override;
+  }
+  const GuiHoleThreadPreset* selected_preset() const {
+    const auto name = retained_preset_name.trimmed().toStdString();
+    const auto found = std::find_if(presets.begin(), presets.end(), [&](const auto& preset) {
+      return preset.name == name && preset.hole() == (edit.kind() == Kind::Hole);
+    });
+    return found == presets.end() ? nullptr : &*found;
+  }
+  void refresh_preset_actions() {
+    if (!preset_name)
+      return;
+    const bool idle = edit.active() && !building && !editing_source && picking == Pick::None &&
+                      layer.active_handle_id().empty();
+    preset_name->setEnabled(idle);
+    preset_load->setEnabled(idle && preset_library_valid && selected_preset());
+    preset_remove->setEnabled(idle && preset_library_valid && selected_preset());
+    preset_save->setEnabled(idle && preset_library_valid && valid &&
+                            !retained_preset_name.trimmed().isEmpty());
+  }
+  void build_presets(QVBoxLayout* column) {
+    auto* group = new QGroupBox("Property Presets");
+    auto* form = make_form(group);
+    preset_name = combo(group);
+    preset_name->setEditable(true);
+    preset_name->setObjectName("blcad.feature_preset.name");
+    auto loaded = GuiHoleThreadPresetCommands::load(preset_path());
+    preset_library_valid = bool(loaded);
+    presets = loaded ? std::move(loaded.value()) : std::vector<GuiHoleThreadPreset>{};
+    for (const auto& preset : presets)
+      if (preset.hole() == (edit.kind() == Kind::Hole))
+        preset_name->addItem(QString::fromStdString(preset.name));
+    preset_name->setCurrentText(retained_preset_name);
+    form->addRow("Name", preset_name);
+    auto* buttons = new QWidget(group);
+    auto* row = new QHBoxLayout(buttons);
+    row->setContentsMargins(0, 0, 0, 0);
+    const auto button = [&](const char* text, const char* id) {
+      auto* result = new QPushButton(QString::fromLatin1(text), buttons);
+      result->setObjectName(QString::fromLatin1(id));
+      row->addWidget(result);
+      return result;
+    };
+    preset_load = button("Load Values", "blcad.feature_preset.load");
+    preset_save = button("Save Values", "blcad.feature_preset.save");
+    preset_remove = button("Remove", "blcad.feature_preset.remove");
+    form->addRow(buttons);
+    auto* hint = new QLabel("Save Values snapshots dimensions and pinned revisions. Load Values "
+                            "keeps this feature's targets, positions and limit/profile references.",
+                            group);
+    hint->setWordWrap(true);
+    form->addRow(hint);
+    preset_status = new QLabel(group);
+    preset_status->setObjectName("blcad.feature_preset.status");
+    preset_status->setWordWrap(true);
+    if (!loaded)
+      preset_status->setText(QString::fromStdString(loaded.error().message()));
+    form->addRow(preset_status);
+    column->addWidget(group);
+    QObject::connect(preset_name, &QComboBox::currentTextChanged, &owner,
+                     [this](const QString& text) {
+                       retained_preset_name = text;
+                       refresh_preset_actions();
+                     });
+    QObject::connect(preset_load, &QPushButton::clicked, &owner, [this] {
+      const auto* selected = selected_preset();
+      if (!selected)
+        return;
+      auto destination = recipe_document(false, true);
+      auto candidate =
+          destination ? GuiHoleThreadPresetCommands::apply(
+                            *selected, std::move(destination.value()), edit.feature(),
+                            "preset.draft." +
+                                QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString())
+                      : Result<PartDocument>::failure(destination.error());
+      if (!candidate) {
+        preset_status->setText("Preset not loaded: " +
+                               QString::fromStdString(candidate.error().message()));
+        return;
+      }
+      thread_mapping.reset();
+      thread_mapping_pending = false;
+      thread_mapping_error.reset();
+      adopt_recipe(std::move(candidate));
+    });
+    QObject::connect(preset_save, &QPushButton::clicked, &owner, [this] {
+      auto candidate = recipe_document();
+      auto captured = candidate
+                          ? GuiHoleThreadPresetCommands::capture(candidate.value(), edit.feature(),
+                                                                 retained_preset_name.toStdString())
+                          : Result<GuiHoleThreadPreset>::failure(candidate.error());
+      auto saved =
+          captured ? GuiHoleThreadPresetCommands::save(preset_path(), std::move(captured.value()))
+                   : Result<std::size_t>::failure(captured.error());
+      if (!saved) {
+        preset_status->setText(QString::fromStdString(saved.error().message()));
+        return;
+      }
+      deferred_rebuild();
+    });
+    QObject::connect(preset_remove, &QPushButton::clicked, &owner, [this] {
+      auto removed = GuiHoleThreadPresetCommands::remove(
+          preset_path(), retained_preset_name.trimmed().toStdString(), edit.kind() == Kind::Hole);
+      if (!removed) {
+        preset_status->setText(QString::fromStdString(removed.error().message()));
+        return;
+      }
+      retained_preset_name.clear();
+      deferred_rebuild();
+    });
+  }
   void build_form() {
     auto focus_id = std::exchange(pending_focus_id, QString{});
     if (focus_id.isEmpty())
       focus_id = retained_focus_id();
     building = true;
+    preset_name = nullptr;
     target_field = support_field = limit_field = nullptr;
     target_selector = support_selector = limit_selector = nullptr;
     const auto selected = dynamic->currentData();
@@ -2483,7 +2611,6 @@ struct ShellFeatureEditTools::Impl {
     auto* column = new QVBoxLayout(panel);
     auto* form = make_form();
     column->addLayout(form);
-    column->addStretch();
     if (hole_thread()) {
       for (const auto* key : {"name", "placements", "target_body", "support", "direction", "kind",
                               "diameter", "manufacturing", "extent", "tip", "thread"}) {
@@ -2495,6 +2622,9 @@ struct ShellFeatureEditTools::Impl {
       }
     } else
       build_fields(form, record, {});
+    if (hole_thread())
+      build_presets(column);
+    column->addStretch();
     auto* old = scroll->takeWidget();
     scroll->setWidget(panel);
     if (old) {
@@ -2519,6 +2649,16 @@ struct ShellFeatureEditTools::Impl {
   }
   GuiPartMutation input_updates(const PartDocument& decoded) const {
     std::vector<Parameter> changes, added;
+    std::vector<EngineeringResource> resources;
+    std::vector<EngineeringResourceKey> required;
+    if (const auto* hole = decoded.find_hole_feature(edit.feature()))
+      required = hole->standard_dependencies();
+    else if (const auto* thread = decoded.find_thread_feature(edit.feature()))
+      required = thread->thread().standard_dependencies();
+    for (const auto& key : required)
+      if (!session.part_document()->engineering_resources().find(key))
+        if (const auto* resource = decoded.engineering_resources().find(key))
+          resources.push_back(*resource);
     const auto used = bound_parameters(record);
     for (const auto& p : decoded.parameters())
       if (used.contains(p.id().value()) && !session.part_document()->find_parameter(p.id()))
@@ -2533,7 +2673,14 @@ struct ShellFeatureEditTools::Impl {
       if (const auto* selected = std::get_if<DatumPlaneId>(&support_override->source());
           selected && *selected == pending_support_plane->id())
         plane = pending_support_plane;
-    return [changes, added, plane](PartDocument& part) -> Result<std::size_t> {
+    return [changes, added, plane, resources](PartDocument& part) -> Result<std::size_t> {
+      std::size_t resource_count = 0;
+      for (const auto& resource : resources) {
+        auto inserted = part.add_engineering_resource(resource);
+        if (!inserted)
+          return inserted;
+        resource_count += inserted.value();
+      }
       std::size_t plane_count = 0;
       if (plane && !part.find_result_face_workplane(plane->id())) {
         auto inserted = part.add_result_face_workplane(*plane);
@@ -2551,7 +2698,8 @@ struct ShellFeatureEditTools::Impl {
         if (!set)
           return Result<std::size_t>::failure(set.error());
       }
-      return Result<std::size_t>::success(changes.size() + added.size() + plane_count);
+      return Result<std::size_t>::success(changes.size() + added.size() + plane_count +
+                                          resource_count);
     };
   }
   Result<PartDocument> decode(bool parameter_edits = true,
@@ -2581,6 +2729,7 @@ struct ShellFeatureEditTools::Impl {
     valid = false;
     apply->setEnabled(false);
     another->setEnabled(false);
+    refresh_preset_actions();
     viewport.clear_feature_preview();
     status->setText(QString::fromStdString(failure.message()));
     overlay->hide();
@@ -2965,6 +3114,9 @@ struct ShellFeatureEditTools::Impl {
     numbers.clear();
     pending_parameters.clear();
     pending_focus_id.clear();
+    preset_name = nullptr;
+    retained_preset_name.clear();
+    presets.clear();
     supports.clear();
     limit_faces.clear();
     limit_chosen = true;
@@ -3612,6 +3764,7 @@ void ShellFeatureEditTools::refresh() {
 }
 void ShellFeatureEditTools::refresh_presentation() {
   auto& p = *impl_;
+  p.refresh_preset_actions();
   auto mapping = GuiViewportManipulatorMapping::create(
       [&p](GuiSketchScreenPoint point) { return p.viewport.screen_to_view_ray(point); },
       [&p](Point3 point) { return p.viewport.model_to_screen(point); });
@@ -3689,6 +3842,7 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
           p.viewport.grab_interaction_mouse();
           p.apply->setEnabled(false);
           p.another->setEnabled(false);
+          p.refresh_preset_actions();
           return true;
         }
       }

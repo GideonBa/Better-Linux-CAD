@@ -730,7 +730,7 @@ continues to save the previously committed model. Each later Apply is one indepe
 steps, internal bore aliases, custom/pinned external profiles, shared lengths, formula/pinned seat
 bindings, physical cuts, unchanged limit Bodies and exact history/reopen. `[native-hole-repeat]`
 uses mouse Create Another, numeric keyboard correction and a second mouse Apply. Full remaining
-157B3 interactions, referenced positions, presets, conversion and extended contexts remain assigned.
+The remaining 157B3 conversion and extended contexts, plus 157C combinations, remain assigned.
 
 Native evidence: [second Counterbore position](images/hole-repeat.png) and
 [second Thread interval at compact 150%](images/thread-repeat-compact.png). The captures are
@@ -769,7 +769,7 @@ Geometry `[hole-support-query]` plus current support/Thread/scene regression pas
 assertions at each of 100% and compact 150%, including real point picking, source point creation,
 breadcrumb return and Apply. Unmodified captures show the [source visit](images/hole-source-sketch.png)
 and [compact return](images/hole-position-return-compact.png). Full 157B3 acceptance still requires
-the remaining interactions, presets, conversion and extended contexts.
+legacy conversion, extended contexts and the complete native combination gate.
 
 The shared Window keeps the idle model selection filter when entering a feature's source Sketch;
 the task's temporary pick mask never becomes the idle filter. Hole Cancel restores the entry
@@ -813,6 +813,44 @@ Unmodified captures show [posed Hole depth](images/hole-canvas.png),
 Proof sources: [shell/native interactions](../tests/gui/gui_shell_hole_thread_edit_tests.cpp),
 [value mapping](../tests/gui/gui_shell_feature_tools_tests.cpp) and
 [pose inversion](../tests/geometry/body_transform_pipeline_tests.cpp).
+
+### Property presets — 157B3
+
+Hole and Thread share the Property Presets group after the ordinary inputs in the scrolling form. An editable name,
+Save Values, Load Values and Remove manage application preferences independently of model history.
+Names are scoped by Hole/Thread kind; Save Values explicitly replaces the same kind/name. Cancel
+discards the model draft while retaining an explicitly saved preset. Active canvas input, model
+picking and source-Sketch visits suspend preset actions. Invalid model preview disables Save Values;
+loading can correct scalar input without publishing a feature.
+
+Save Values captures all recipe/extent/tip or Thread profile/interval/hand/direction/representation
+properties. Numeric parameters, including formulas and shared inputs, become literal value snapshots
+with retained aliases; source parameter names/identities and expressions are omitted. Standard choices keep
+their exact immutable revision, selected row/columns and complete provenance snapshot. The UI states
+this value-snapshot boundary explicitly.
+
+Load Values retains the current feature's ID/name, target Body, support, placement identities/sources,
+Slot profile and explicit Face/Body limit references. A Slot preset requires an existing Slot/profile;
+To Face and Up to Body require their current role and selected limit first. Missing current references
+or conflicting pinned revisions produce an inline diagnostic and preserve the previous draft.
+Each loaded numeric binding receives a fresh owned parameter. Existing step identities are retained
+by index, while added steps get fresh identities. Required missing revisions remain candidate-only
+until Apply; changing to a recipe/profile that no longer needs them prunes their publication.
+
+The preference file is `feature-presets.json` under Qt's application config location; the explicit
+`BLCAD_PRESETS_PATH` override supports isolated automation. QSaveFile publishes the complete library
+atomically. Missing files mean an empty library; malformed, unsupported, duplicate or noncanonical
+entries fail without overwriting the existing file. Each value template uses the canonical Core Part
+codec with fixed placeholder identities. Re-capture validation excludes document-specific bindings;
+no new document intent, geometry interpreter or model persistence schema is introduced.
+
+Proof sources: [typed preset/storage regression](../tests/gui/gui_hole_thread_preset_tests.cpp),
+[shell and native interactions](../tests/gui/gui_shell_hole_thread_edit_tests.cpp), tags
+`[hole-thread-presets]`, `[hole-preset-shell]` and `[native-hole-preset]`. The broader regression passes 122 cases / 10,463 assertions with 22 native skips; the focused native
+preset/canvas/source/repeat selection passes 10 cases / 824 assertions at both scales. This is targeted
+native coverage. Runtime and delivery evidence is indexed in
+the [current implementation plan](mvp-plan.md#current-implementation--157b3). Presets alone do not
+close 157B3; explicit legacy conversion, extended contexts and combined acceptance remain assigned.
 
 ## Why more than a cut
 
