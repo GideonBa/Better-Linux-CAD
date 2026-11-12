@@ -78,15 +78,11 @@ public:
 
   [[nodiscard]] Result<std::size_t> begin_new_hole(const GuiDocumentSession& session,
                                                    FeatureId feature) {
-    const auto* part = session.part_document();
-    if (!part || part->is_reference_part() || active_ || feature.empty() ||
-        part->dependency_graph().has_node(feature.value()))
-      return fail("new Hole requires an editable Part and a fresh feature identity");
-    feature_ = std::move(feature);
-    kind_ = GuiFeatureEditKind::Hole;
-    creating_ = true;
-    active_ = true;
-    return Result<std::size_t>::success(1);
+    return begin_creation(session, std::move(feature), GuiFeatureEditKind::Hole);
+  }
+  [[nodiscard]] Result<std::size_t> begin_new_thread(const GuiDocumentSession& session,
+                                                     FeatureId feature) {
+    return begin_creation(session, std::move(feature), GuiFeatureEditKind::Thread);
   }
 
   [[nodiscard]] bool active() const noexcept { return active_; }
@@ -103,10 +99,14 @@ public:
     if (!active_ || !session.part_document())
       return Result<PartDocument>::failure(
           Error::validation("gui.feature_edit", "no active Part feature edit"));
-    if constexpr (!std::is_same_v<FeatureT, HoleFeature>)
-      if (creating_)
+    if (creating_) {
+      constexpr bool hole = std::is_same_v<FeatureT, HoleFeature>;
+      constexpr bool thread = std::is_same_v<FeatureT, ThreadFeature>;
+      if ((!hole && !thread) || (hole && kind_ != GuiFeatureEditKind::Hole) ||
+          (thread && kind_ != GuiFeatureEditKind::Thread))
         return Result<PartDocument>::failure(
-            Error::validation("gui.feature_edit", "new Hole requires typed Hole intent"));
+            Error::validation("gui.feature_edit", "creation requires the matching typed intent"));
+    }
     const auto id = [&] {
       if constexpr (std::is_same_v<FeatureT, SurfaceFeature>)
         return surface_feature_id(replacement);
@@ -142,7 +142,7 @@ public:
     auto plan = draft.value().create_recompute_plan();
     if (plan.has_error()) return Result<GuiPartFeaturePreview>::failure(plan.error());
     return Result<GuiPartFeaturePreview>::success(
-        {feature_, creating_ ? "create Hole" : "edit feature", plan.value().step_count()});
+        {feature_, creating_ ? creation_label() : "edit feature", plan.value().step_count()});
   }
 
   // Commit the edit as one transaction. The session recompute makes any
@@ -154,7 +154,7 @@ public:
     auto checked = preview(session, replacement, updater, prepare);
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
     auto committed = session.commit_part_transaction(
-        creating_ ? "Create Hole" : "Edit feature",
+        creating_ ? creation_label() : "Edit feature",
         [replacement = std::move(replacement), updater, prepare](PartDocument& part) mutable {
           if (prepare) {
             auto prepared = prepare(part);
@@ -173,6 +173,21 @@ public:
   }
 
 private:
+  [[nodiscard]] const char* creation_label() const noexcept {
+    return kind_ == GuiFeatureEditKind::Thread ? "Create Thread" : "Create Hole";
+  }
+  [[nodiscard]] Result<std::size_t> begin_creation(const GuiDocumentSession& session,
+                                                   FeatureId feature, GuiFeatureEditKind kind) {
+    const auto* part = session.part_document();
+    if (!part || part->is_reference_part() || active_ || feature.empty() ||
+        part->dependency_graph().has_node(feature.value()))
+      return fail("creation requires an editable Part and a fresh feature identity");
+    feature_ = std::move(feature);
+    kind_ = kind;
+    creating_ = true;
+    active_ = true;
+    return Result<std::size_t>::success(1);
+  }
   [[nodiscard]] static Result<std::size_t> fail(std::string message) {
     return Result<std::size_t>::failure(Error::validation("gui.feature_edit", std::move(message)));
   }

@@ -441,6 +441,30 @@ not rerun for this component. A separate PID-matched app startup is viewable (in
 Frozen runtime inputs: 1,053 files, SHA256
 `61137aa67d57872682a95c05ccad144db0fdd9fcba8bb4afc4527392ce1ff01e`.
 
+### 157B2b progress — external creation and modeled templates
+
+Model → Design → Thread now authors a typed external feature with used-only owned custom inputs,
+scoped target/support collection and the shared creation lifecycle. Both new internal/external
+cylindrical templates support an explicit modeled switch. Current imported inspection includes
+the terminal Body placement. [Contract, physical oracles and raw captures](hole-wizard.md#external-creation-and-new-modeled-templates--157b2b)
+link the creation, cancellation, freshness, exact history/reopen and physical STEP proofs.
+
+GUI/app/export/Geometry targets build. Query/import Geometry proof passes **6 cases / 326
+assertions**. The focused selection/cancellation check passes **1 case / 33 assertions**;
+the combined creation/recipe/support/edit/Pattern/prefix/viewport/icon/inventory Qt selection
+passes **76 cases / 10 native skips / 5,882 assertions**. The relevant native group passes **7
+cases / 496 assertions at each of 100% and compact 150%**, without failures/skips; it executes
+seven of the ten cases skipped by that Qt selection. Separate PID-matched startup is viewable
+(intentional timeout 124). Core's binary hash is unchanged; full Core, full Geometry and full Qt
+are not rerun. Frozen inputs: 1,055 files, SHA256
+`47ef78f129d9307b6bdfce4733efa7cd188d9508ac7d5843e9cae78fdfeeca5c`.
+
+This component stays on the existing draft PR #179. Next within 157B2b: explicit standard Thread
+revision/row/typed columns and custom conversion, optional start/taper controls, complete limit
+collection and existing-support editing. Full configuration Create Another, manipulators, Sketch
+return, presets and legacy conversion remain 157B3, then 157C and the full 158–165 sequence.
+No parent block or complete 157B2b acceptance is advanced by this component.
+
 ## Later phases
 
 Interactive Part & Assembly Modeling MVP-9 is complete through Block 131. GUI Shell Reset MVP-9R

@@ -525,12 +525,53 @@ planar faces, another Body's faces and inward-facing bore walls. Reversing direc
 origin to the other end and reverses the taper sign; the query does not create parameters or
 claim that a complete thread profile fits. Execution still checks the authored interval, material,
 breakout, overlap and representation limits. Imported support inspection checks supplier freshness.
+Inspection includes the current terminal Body transform. It has no authored consumer yet; resolving
+only a predecessor placement would lose an otherwise valid moved imported support.
 
 Independent `[thread-support-query]` / `[thread-import]` Geometry tests cover both directions,
 native rigid placement, imported cylinders/cones, radius/span/taper, stale caches, wrong targets,
 bore rejection and changed supplier bytes after initial resolution. Queries preserve exact Part
 intent, current BRep and supplier bytes. The full `[parity-b155]` regression protects execution
-after sharing the resolver. External creation and complete Thread selectors remain assigned here.
+after sharing the resolver. External creation uses this query below; complete Thread selectors
+remain assigned here.
+
+### External creation and new modeled templates — 157B2b
+
+Model → Design → Thread opens the shared property task for a complete editable Part. Choose a
+visible solid and a current exterior cylindrical/conical face. Native, imported and result-origin
+faces are explicitly rebound to `ThreadSupportFace` and filtered through Geometry inspection;
+planar and inward bore faces are excluded. Face/Body preselection is scoped to that catalog.
+Changing target clears the selected support and blocks Apply until a new support is chosen.
+Profile dimensions remain authored inputs; choosing another support never rewrites shared values.
+
+The disposable custom seed derives its major diameter and signed taper from the actual support.
+For radius `r` and axial span `s`, radial profile depth is `min(1 mm, r/5, s/8)`, included angle is
+60°, pitch is 1.5 times that depth and thread length is `min(4 mm, s)`. These are editable custom
+values with authored labels, without an inferred standard/tolerance. The pitch separates ideal-V
+flanks when the existing modeled limits permit execution. Conical defaults remain cosmetic;
+modeled taper and tiny/otherwise unsupported profiles fail with the existing Geometry diagnostic.
+The new internal custom template also uses 1.5 mm pitch for its 1 mm radial depth, so its cylindrical
+modeled switch is valid. Existing definitions and their dimensional bindings are unchanged.
+
+Both creation kinds share the controller/task lifecycle and typed Core add commands. Required
+owned dimensions and the feature publish in one transaction; rebinding to an existing parameter
+prunes its unused draft counterpart. Invalid/corrected previews, supplier changes, Cancel and
+committed Save during preview retain the established contracts. Thread creation has an Apply
+footer and becomes the repeatable command after publication. Full configuration retention for
+Create Another, optional start/taper/source selectors and existing-support edits remain assigned
+to the remaining 157B2b/B3 scope.
+
+Focused proof is `[thread-create-shell]` / `[native-thread-create]`: pending ownership, dimensions,
+invalid correction/cancellation, target/support changes, imported placement/freshness, new internal
+and external modeled cuts, exact Undo/Redo/reopen and physical STEP roundtrip. Actual executed
+counts and delivery status remain in `mvp-plan.md`.
+
+Original native captures show [external creation](images/thread-creation.png) and
+[new modeled internal creation](images/thread-internal-creation.png) at 1280×800, plus
+[placed imported creation at compact 150%](images/thread-imported-creation-compact.png) at
+1536×960 physical pixels. The native tests use real scoped model picks, keyboard length/mode
+input and mouse Apply, assert no horizontal form overflow and replay exact history/reopening.
+Fit includes the current origin planes; these captures are unmodified.
 
 ## Why more than a cut
 

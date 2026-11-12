@@ -207,3 +207,17 @@ controls select compatible pinned cells or convert a resolved source to an owned
 [The Hole contract](hole-wizard.md#recipe-and-dimensional-source-controls--157b2a) owns exact limits;
 the existing recipe/source and native test tags provide focused proof. Full Thread/support selectors,
 manipulators, Sketch return, presets and legacy conversion remain assigned to 157B2b/B3/C.
+
+### External Thread creation — 157B2b
+
+`begin_new_thread` joins `begin_new_hole` in the shared controller's creation lifecycle. A candidate
+must retain the fresh identity and match the creation kind; typed add commands publish one
+`Create Thread` or `Create Hole` transaction, including used pending inputs. The shell shares
+initialization, committed-source freshness, preview, pick scope, context restoration and final
+publication. External support dimensions come from Geometry inspection; the disposable custom
+seed uses `GuiThreadRecipeCommands`. Existing feature updates retain their update commands.
+
+The [Hole/Thread contract](hole-wizard.md#external-creation-and-new-modeled-templates--157b2b) owns
+defaults, supported representations and the remaining selectors/Create Another boundary.
+`[thread-create-shell]` and `[native-thread-create]` exercise new internal/external modeled geometry,
+actual scoped face picks and transactional history; run existing creation/edit regression alongside.

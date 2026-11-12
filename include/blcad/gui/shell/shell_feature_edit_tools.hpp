@@ -15,6 +15,7 @@ public:
   ~ShellFeatureEditTools() override;
   [[nodiscard]] Result<std::size_t> begin(FeatureId);
   [[nodiscard]] Result<std::size_t> begin_new_hole();
+  [[nodiscard]] Result<std::size_t> begin_new_thread();
   [[nodiscard]] Result<std::size_t> apply(bool create_another = false);
   [[nodiscard]] bool accept_selection(const GuiSelection&);
   void cancel();

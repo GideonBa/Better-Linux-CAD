@@ -448,11 +448,13 @@ ThreadAdapter::inspect_support(const PartDocument& part, const BodyId& body,
   if (!definition || definition->kind() != BodyKind::Solid || !target || target->empty())
     return fail("Thread support requires a current solid Body");
   try {
+    // Inspection has no authored consumer. An empty consumer selects the current
+    // terminal Body placement, including a transform that is itself terminal.
     auto resolved =
         external_support(part, cache, target->impl_->shape, reference, target->impl_->face_lineage,
-                         FeatureId(body.value()), direction, imports);
+                         FeatureId(""), direction, imports);
     if (!resolved)
-      return Result<ThreadSupportInspection>::failure(resolved.error());
+      return fail(resolved.error().message());
     const auto& frame = resolved.value().frame;
     if (std::abs(length(frame.axis) - 1) > tol || std::abs(length(frame.x) - 1) > tol ||
         std::abs(dot(frame.axis, frame.x)) > tol)

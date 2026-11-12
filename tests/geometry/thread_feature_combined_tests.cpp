@@ -442,6 +442,42 @@ TEST_CASE("Thread support inspection rejects changed supplier bytes on an alread
                                        ThreadDirection::AlongSupportAxis, &restored));
 }
 
+TEST_CASE("Imported Thread inspection includes the current terminal Body placement",
+          "[geometry][parity-b157][thread-support-query][thread-import]") {
+  imported_body_test::Fixture input;
+  input.write(BRepPrimAPI_MakeCylinder(5, 8).Shape());
+  auto part = input.editable();
+  const auto body = part.bodies().front().id();
+  REQUIRE(part.add_body_transform(checked(BodyTransform::create_translate(
+      BodyTransformId("move"), body, BodyTransformCoordinateSpace::World, {}, {12, -5, 10}, false,
+      false))));
+  StepImportTopologyContext context(input.root);
+  const auto cache = evaluate(part, &context);
+  const auto& catalog = part.imported_topology_catalogs().front();
+  const ImportedTopologyEntry* wall = nullptr;
+  for (const auto& entry : catalog.entries())
+    if (entry.descriptor.kind == ImportedTopologyKind::Face &&
+        entry.descriptor.geometry == ImportedGeometryClass::Cylinder)
+      wall = &entry;
+  REQUIRE(wall);
+  const auto reference = checked(FaceReference::create_imported(
+      PartFeatureInputRole::ThreadSupportFace,
+      checked(ImportedTopologyReference::create(catalog.id(), wall->id,
+                                                ImportedTopologyCapability::Face))));
+  const auto before = checked(serialize_part_document_to_json(part));
+  for (auto direction : {ThreadDirection::AlongSupportAxis, ThreadDirection::OppositeSupportAxis}) {
+    const auto inspected =
+        checked(ThreadAdapter::inspect_support(part, body, reference, cache, direction, &context));
+    CHECK(inspected.origin.x == Catch::Approx(12).margin(1e-6));
+    CHECK(inspected.origin.y == Catch::Approx(-5).margin(1e-6));
+    CHECK(std::abs(inspected.axis.z) == Catch::Approx(1).margin(1e-7));
+    CHECK(inspected.origin.z == Catch::Approx(inspected.axis.z > 0 ? 10 : 18).margin(1e-6));
+    CHECK(inspected.radius_mm == Catch::Approx(5).margin(1e-6));
+    CHECK(inspected.axial_length_mm == Catch::Approx(8).margin(1e-6));
+  }
+  CHECK(checked(serialize_part_document_to_json(part)) == before);
+}
+
 TEST_CASE("Explicit modeled switches return both Thread consumers to identical cosmetic intent",
           "[geometry][parity-b155][thread-combined]") {
   auto p = f::pair_part();
