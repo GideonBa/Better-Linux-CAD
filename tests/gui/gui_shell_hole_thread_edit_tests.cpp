@@ -2621,3 +2621,374 @@ TEST_CASE("Native Up to Body picks exclude the target and bind the actual separa
   CHECK(w.viewport().preview_selection_target_count() == 0);
   replay(w, dir, before);
 }
+
+TEST_CASE(
+    "Create Another retains every Hole recipe with fresh owned inputs and placement identities",
+    "[gui][parity-b157][hole-repeat-shell]") {
+  const int mode = GENERATE(0, 1, 2, 3, 4, 5, 6, 7, 8);
+  CAPTURE(mode);
+  auto part = manufacture::seed();
+  REQUIRE(part.set_parameter_value(ParameterId("width"), checked(Quantity::length_mm(80))));
+  REQUIRE(part.set_parameter_value(ParameterId("height"), checked(Quantity::length_mm(60))));
+  if (mode == 8) {
+    REQUIRE(part.add_construction_plane(checked(ConstructionPlane::create_explicit(
+        ConstructionPlaneId("slot.second.plane"), "Second slot plane", {20, 0, 8}, {1, 0, 0},
+        {0, 1, 0}, {0, 0, 1}))));
+    auto second = checked(
+        Sketch::create(SketchId("slot.second"), "Second slot", DatumPlaneId("slot.second.plane")));
+    const auto original = *part.find_sketch(SketchId("slot"));
+    for (const auto& line : original.line_segments())
+      REQUIRE(second.add_entity(line));
+    for (const auto& arc : original.arc_segments())
+      REQUIRE(second.add_entity(arc));
+    REQUIRE(second.add_profile(original.arc_closed_profiles().front()));
+    REQUIRE(part.add_sketch(std::move(second)));
+  }
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  if (mode != 8)
+    field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(-15);
+  choose_hole_mode(w, "blcad.hole.recipe", mode);
+  REQUIRE(w.feature_edit_tools().apply(true));
+  REQUIRE(w.feature_edit_tools().active());
+  const auto before = snapshot(w);
+  const auto first = w.session().part_document()->hole_features().front();
+  CHECK(control<QComboBox>(w, "blcad.hole.recipe").currentIndex() == mode);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  if (mode == 8) {
+    auto& sketch = field<QComboBox>(w, "/manufacturing/sketch");
+    const int index = sketch.findData("slot.second");
+    REQUIRE(index >= 0);
+    sketch.setCurrentIndex(index);
+  } else
+    field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(15);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  REQUIRE(result.hole_features().size() == 2);
+  const auto& next = result.hole_features().back();
+  CHECK(next.id() != first.id());
+  CHECK(next.placements().front().id != first.placements().front().id);
+  CHECK(next.kind() == first.kind());
+  CHECK(next.manufacturing().index() == first.manufacturing().index());
+  CHECK(next.extent().index() == first.extent().index());
+  const auto previous_inputs = first.parameter_dependencies();
+  const auto next_inputs = next.parameter_dependencies();
+  CHECK(previous_inputs.size() == next_inputs.size());
+  for (const auto& id : next_inputs)
+    CHECK(std::find(previous_inputs.begin(), previous_inputs.end(), id) == previous_inputs.end());
+  CHECK(result.parameters().size() == part.parameters().size() + 2 * previous_inputs.size());
+  if (mode == 4) {
+    const auto& before_steps = std::get<HoleStepped>(first.manufacturing()).steps;
+    const auto& after_steps = std::get<HoleStepped>(next.manufacturing()).steps;
+    REQUIRE(before_steps.size() == after_steps.size());
+    for (std::size_t i = 0; i < before_steps.size(); ++i)
+      CHECK(before_steps[i].id != after_steps[i].id);
+  }
+  const double removed[] = {8, 24, 44. / 3, 16, 31, 8, 8, 12};
+  const double cut = mode == 8 ? (8 + std::numbers::pi) * 8 : removed[mode] * std::numbers::pi;
+  CHECK(volume(w) == Catch::Approx(38400 - 2 * cut).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Create Another retains custom or pinned Thread intent and explicit shared length bindings",
+    "[gui][parity-b157][hole-repeat-shell]") {
+  const bool pinned = GENERATE(false, true);
+  const bool shared = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = threads::pair_part();
+  open(w, dir, part);
+  create_thread(w);
+  if (pinned)
+    thread_mapping(w);
+  if (shared) {
+    auto& binding = control<QComboBox>(w, "blcad.feature_edit.binding/thread/length");
+    binding.setCurrentIndex(binding.findData("thread.length"));
+  }
+  field<QDoubleSpinBox>(w, "/thread/length").setValue(2);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.create_another").isVisible());
+  REQUIRE(w.feature_edit_tools().apply(true));
+  REQUIRE(w.feature_edit_tools().active());
+  const auto before = snapshot(w);
+  const auto first = w.session().part_document()->thread_features().front();
+  CHECK(control<QComboBox>(w, "blcad.thread.source").currentData() ==
+        (pinned ? "standard" : "custom"));
+  CHECK(field<QDoubleSpinBox>(w, "/thread/length").value() == 2);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  control<QCheckBox>(w, "blcad.thread.start.enabled").setChecked(true);
+  settle();
+  field<QDoubleSpinBox>(w, "/thread/start").setValue(4);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  REQUIRE(result.thread_features().size() == 2);
+  const auto& next = result.thread_features().back();
+  CHECK(next.id() != first.id());
+  CHECK(next.direction() == first.direction());
+  CHECK(next.thread().profile().index() == first.thread().profile().index());
+  CHECK((next.thread().length() == first.thread().length()) == shared);
+  CHECK(result.parameters().size() ==
+        part.parameters().size() + (pinned ? 0 : 8) + (shared ? 0 : 2) + 1);
+  CHECK(result.engineering_resources() == part.engineering_resources());
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  REQUIRE(checked(geometry::ThreadAdapter::cosmetic_presentations(
+                      *w.session().part_shape_cache()->find_body_shape(BodyId("body.shaft"))))
+              .size() == 2);
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Repeated internal Threads preserve bore aliases while Cancel discards fresh candidate inputs",
+    "[gui][parity-b157][hole-repeat-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(-15);
+  choose_hole_mode(w, "blcad.hole.internal_thread", 1);
+  const auto minor =
+      control<QComboBox>(w, "blcad.feature_edit.binding/thread/profile/minor_diameter")
+          .currentData();
+  auto& bore = control<QComboBox>(w, "blcad.feature_edit.binding/diameter/parameter");
+  bore.setCurrentIndex(bore.findData(minor));
+  REQUIRE(w.feature_edit_tools().apply(true));
+  const auto before = snapshot(w);
+  const auto first = w.session().part_document()->hole_features().front();
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(15);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply(true));
+  const auto second_state = snapshot(w);
+  REQUIRE(w.feature_edit_tools().active());
+  const auto second = w.session().part_document()->hole_features().back();
+  REQUIRE(second.thread());
+  const auto& profile = std::get<ThreadParameterProfile>(second.thread()->profile());
+  CHECK(std::get<ParameterId>(second.diameter()) == profile.minor_diameter);
+  CHECK(std::get<ParameterId>(second.diameter()) != std::get<ParameterId>(first.diameter()));
+  CHECK(volume(w) == Catch::Approx(38400 - 64 * std::numbers::pi).margin(1e-6));
+  field<QDoubleSpinBox>(w, "/thread/length").setValue(0);
+  w.feature_edit_tools().cancel();
+  CHECK(snapshot(w) == second_state);
+  CHECK_FALSE(w.session().task().active());
+  CHECK(w.viewport().preview_selection_target_count() == 0);
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native Create Another retains a Counterbore recipe and separate transactional ownership",
+          "[gui][parity-b157][hole-repeat-shell][native-hole-repeat]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native repeated Hole authoring");
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(-15);
+  choose_hole_mode(w, "blcad.hole.recipe", 1);
+  click(control<QPushButton>(w, "blcad.feature_edit.create_another"));
+  REQUIRE(w.feature_edit_tools().active());
+  const auto before = snapshot(w);
+  CHECK(control<QComboBox>(w, "blcad.hole.recipe").currentIndex() == 1);
+  activate(w);
+  auto& x = field<QDoubleSpinBox>(w, "/placements/0/position/x");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&x);
+  x.setFocus();
+  REQUIRE(x.hasFocus());
+  x.selectAll();
+  key(x, Qt::Key_1, "15");
+  key(x, Qt::Key_Return);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "hole-repeat-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  CHECK(w.session().part_document()->hole_features().size() == 2);
+  CHECK(volume(w) == Catch::Approx(38400 - 48 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Create Another retains every termination and its external limit inputs",
+          "[gui][parity-b157][hole-repeat-shell]") {
+  const int extent = GENERATE(0, 1, 2, 3, 4, 5);
+  CAPTURE(extent);
+  auto part = plate();
+  REQUIRE(part.add_construction_plane(
+      checked(ConstructionPlane::create_explicit(ConstructionPlaneId("limit.plane"), "Limit plane",
+                                                 {0, 0, -4}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}))));
+  blcad::test::history_fixture::rectangle(part, "limit.profile", "limit.plane");
+  auto feature = checked(Feature::create_additive_extrude(
+      FeatureId("limit"), "Limit", SketchId("limit.profile"), ParameterId("depth")));
+  REQUIRE(part.add_feature(checked(
+      feature.with_body_result_context(blcad::test::history_fixture::new_body(part, "limit")))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(-15);
+  choose_hole_mode(w, "blcad.hole.extent", extent);
+  REQUIRE(w.feature_edit_tools().apply(true));
+  REQUIRE(w.feature_edit_tools().active());
+  const auto before = snapshot(w);
+  CHECK(control<QComboBox>(w, "blcad.hole.extent").currentIndex() == extent);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(15);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  CHECK(result.hole_features().front().extent().index() ==
+        result.hole_features().back().extent().index());
+  const double depths[] = {5, 8, 8, 8, 4, 4};
+  CHECK(volume(w) == Catch::Approx(38400 - 2 * depths[extent] * std::numbers::pi).margin(1e-6));
+  CHECK(volume(w, "body.limit") == Catch::Approx(38400).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Repeated Holes preserve formula and pinned seat bindings while copying only owned depth",
+          "[gui][parity-b157][hole-repeat-shell]") {
+  auto part = plate();
+  REQUIRE(part.add_engineering_resource(manufacture::table()));
+  REQUIRE(part.add_parameter(checked(Parameter::create_expression(
+      ParameterId("shared.diameter"), "shared_diameter", ParameterType::Length, "diameter",
+      checked(Quantity::length_mm(3))))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  create_hole(w);
+  auto& bore = control<QComboBox>(w, "blcad.feature_edit.binding/diameter/parameter");
+  bore.setCurrentIndex(bore.findData("shared.diameter"));
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(-15);
+  choose_hole_mode(w, "blcad.hole.recipe", 1);
+  auto& source = control<QComboBox>(w, "blcad.hole.source/manufacturing/diameter");
+  const int pin = source.findData(QStringList{"synthetic.holes", "r1", "small", "seat.diameter"});
+  REQUIRE(pin >= 0);
+  source.setCurrentIndex(pin);
+  settle();
+  REQUIRE(w.feature_edit_tools().apply(true));
+  REQUIRE(w.feature_edit_tools().active());
+  const auto before = snapshot(w);
+  CHECK_FALSE(field<QDoubleSpinBox>(w, "/diameter/parameter").isEnabled());
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(15);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& first = result.hole_features().front();
+  const auto& second = result.hole_features().back();
+  CHECK(std::get<ParameterId>(first.diameter()) == ParameterId("shared.diameter"));
+  CHECK(std::get<ParameterId>(second.diameter()) == ParameterId("shared.diameter"));
+  const auto& first_seat = std::get<HoleCounterbore>(first.manufacturing());
+  const auto& second_seat = std::get<HoleCounterbore>(second.manufacturing());
+  CHECK(std::get<HoleStandardSelection>(first_seat.diameter) ==
+        std::get<HoleStandardSelection>(second_seat.diameter));
+  CHECK(std::get<ParameterId>(first_seat.depth) != std::get<ParameterId>(second_seat.depth));
+  CHECK(result.parameters().size() == part.parameters().size() + 2);
+  CHECK(result.find_parameter(ParameterId("shared.diameter"))->formula() ==
+        part.find_parameter(ParameterId("shared.diameter"))->formula());
+  CHECK(result.engineering_resources() == part.engineering_resources());
+  CHECK(volume(w) == Catch::Approx(38400 - 43 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Native Thread Create Another retains its profile and commits a separate corrected interval",
+    "[gui][parity-b157][hole-repeat-shell][native-hole-repeat]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native repeated Thread authoring");
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part());
+  create_thread(w);
+  activate(w);
+  auto& length = field<QDoubleSpinBox>(w, "/thread/length");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&length);
+  length.setFocus();
+  REQUIRE(length.hasFocus());
+  length.selectAll();
+  key(length, Qt::Key_2, "2");
+  key(length, Qt::Key_Return);
+  click(control<QPushButton>(w, "blcad.feature_edit.create_another"));
+  REQUIRE(w.feature_edit_tools().active());
+  const auto before = snapshot(w);
+  CHECK(field<QDoubleSpinBox>(w, "/thread/length").value() == 2);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  click(control<QCheckBox>(w, "blcad.thread.start.enabled"));
+  auto& start = field<QDoubleSpinBox>(w, "/thread/start");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&start);
+  start.setFocus();
+  REQUIRE(start.hasFocus());
+  start.selectAll();
+  key(start, Qt::Key_4, "4");
+  key(start, Qt::Key_Return);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "thread-repeat-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  const auto& result = *w.session().part_document();
+  REQUIRE(result.thread_features().size() == 2);
+  CHECK(result.thread_features().front().id() != result.thread_features().back().id());
+  CHECK(result.thread_features().front().thread().length() !=
+        result.thread_features().back().thread().length());
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("A repeated or existing modeled Thread can explicitly move to another shaft",
+          "[gui][parity-b157][hole-repeat-shell]") {
+  const bool repeated = GENERATE(false, true);
+  CAPTURE(repeated);
+  auto part = threads::pair_part();
+  auto other = checked(Feature::create_additive_extrude(
+      FeatureId("other.shaft"), "Other shaft", SketchId("shaft.profile"), ParameterId("depth")));
+  REQUIRE(part.add_feature(checked(other.with_body_result_context(
+      blcad::test::history_fixture::new_body(part, "other.shaft")))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  REQUIRE(w.session().selection().add({GuiSelectionKind::Body, "body/body.shaft"}));
+  create_thread(w);
+  CHECK(field<QComboBox>(w, "/target_body").currentData() == "body.shaft");
+  field<QDoubleSpinBox>(w, "/thread/length").setValue(2);
+  auto& mode = field<QComboBox>(w, "/thread/representation");
+  mode.setCurrentIndex(mode.findData("modeled"));
+  REQUIRE(w.feature_edit_tools().apply(repeated));
+  const auto before = snapshot(w);
+  if (!repeated) {
+    const auto id = w.session().part_document()->thread_features().front().id();
+    begin(w, id.value().c_str());
+  }
+  REQUIRE(w.feature_edit_tools().active());
+  CHECK(field<QComboBox>(w, "/thread/representation").currentData() == "modeled");
+  auto& target = field<QComboBox>(w, "/target_body");
+  const int body = target.findData("body.other.shaft");
+  REQUIRE(body >= 0);
+  target.setCurrentIndex(body);
+  settle();
+  auto& support = field<QComboBox>(w, "/support");
+  REQUIRE(support.count() > 0);
+  support.setCurrentIndex(0);
+  INFO(support.currentData().toString().toStdString());
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  const auto applied = w.feature_edit_tools().apply();
+  INFO((applied ? "Applied" : applied.error().object_id() + ": " + applied.error().message()));
+  REQUIRE(applied);
+  const auto& result = *w.session().part_document();
+  REQUIRE(result.thread_features().size() == (repeated ? 2 : 1));
+  CHECK(result.thread_features().back().target_body() == BodyId("body.other.shaft"));
+  CHECK(result.thread_features().back().thread().representation() == ThreadRepresentation::Modeled);
+  const auto& face =
+      std::get<ResultFaceReference>(result.thread_features().back().support().source());
+  CHECK(face.body() == BodyId("body.other.shaft"));
+  const double removed =
+      4 * std::numbers::pi * std::tan(std::numbers::pi / 6) * 2 / 1.5 * (4. / 2 + 1. / 3);
+  CHECK(volume(w, "body.shaft") ==
+        Catch::Approx(200 * std::numbers::pi - (repeated ? removed : 0)).margin(2e-4));
+  CHECK(volume(w, "body.other.shaft") ==
+        Catch::Approx(200 * std::numbers::pi - removed).margin(2e-4));
+  replay(w, dir, before);
+}

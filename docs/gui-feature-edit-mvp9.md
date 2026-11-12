@@ -251,3 +251,19 @@ Complete rejected profile mappings retry after a used scalar/binding correction;
 Thread numeric focus. Existing definitions retain their explicit bindings/directions. See the
 [conical combinations contract](hole-wizard.md#conical-thread-combinations--157b2b) and
 `[thread-cone-shell]` / `[native-thread-cone]` for combined source, interval and physical proof.
+
+### Complete Create Another — 157B3
+
+Both creation kinds commit once and open a complete typed repeat through
+`GuiHoleThreadRepeatCommands`. The current creation's owned parameters identify which numeric
+bindings need fresh copies; explicit existing/formula/standard references remain bound. New
+feature/placement/step IDs and copied parameter aliases preserve independent future edits. The
+new draft can be invalid at its retained location and stays correctable. Cancel preserves the
+preceding commit; normal preview, freshness and used-input publication apply unchanged. See
+[the repeat contract](hole-wizard.md#complete-create-another--157b3) and `[hole-repeat-shell]` /
+`[native-hole-repeat]`; this component alone does not close 157B3 or parent 157.
+
+An explicit Thread target/support rebind first obtains the pair's canonical encoding through the
+Core factory/update/serializer. The form replaces its support before decoding the changed target,
+so a formerly valid reference on the old Body cannot prevent correcting the pair. Other pending
+numeric/source edits remain intact; complete downstream execution still decides validity.

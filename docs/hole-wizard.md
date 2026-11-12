@@ -411,7 +411,7 @@ Datum support is also available explicitly in the selector.
 
 Preview and Save leave the committed Part unchanged. Apply adds only the required new dimensions
 and Hole in one transaction, with exact Undo/Redo/reopen. Create Another publishes that candidate
-once, then opens a new fresh draft retaining its custom diameter and revalidating its target. Cancel
+once, then opens a fresh draft retaining the complete recipe through the 157B3 lifecycle below. Cancel
 restores consumed preselection and camera. Focused tests cover physical cut volumes, invalid
 corrections, existing-parameter ownership, preselection versus collection, multiple Bodies, nested
 form layout and actual native keyboard/model/mouse workflows at 100%/150%. Creation does not close
@@ -484,8 +484,8 @@ Focused proof is `[hole-recipe-shell]` / `[native-hole-recipe]` in the current s
 independent analytic volumes for all nine recipes and six extent choices, separate limit-Body
 invariance, pin/custom changes, angle units, invalid correction, new dimensions on existing features,
 retired steps, unused Thread inputs and exact history/reopen. Parent 157B2 and 157 remain open.
-Create Another retains the B1 numeric diameter/target behavior and starts a fresh Plain draft;
-retaining the full recipe/thread configuration with fresh owned inputs remains assigned to 157B3.
+Create Another retains the complete recipe/thread configuration with fresh owned inputs through
+the 157B3 lifecycle below.
 
 Original native recipe captures: [ordinary](images/hole-recipe.png), 1280×800, and
 [compact](images/hole-recipe-compact.png), 1536×960 physical pixels at 150%. They follow repeated
@@ -563,9 +563,9 @@ Both creation kinds share the controller/task lifecycle and typed Core add comma
 owned dimensions and the feature publish in one transaction; rebinding to an existing parameter
 prunes its unused draft counterpart. Invalid/corrected previews, supplier changes, Cancel and
 committed Save during preview retain the established contracts. Thread creation has an Apply
-footer and becomes the repeatable command after publication. Full configuration retention for
-Create Another remains assigned to 157B3; optional start/taper/source selectors and existing-support
-editing are described below.
+footer and becomes the repeatable command after publication. Create Another now uses the 157B3
+typed repeat lifecycle below; optional start/taper/source selectors and existing-support editing
+are described below.
 
 Focused proof is `[thread-create-shell]` / `[native-thread-create]`: pending ownership, dimensions,
 invalid correction/cancellation, target/support changes, imported placement/freshness, new internal
@@ -707,6 +707,34 @@ Source proof: [current shell tests](../tests/gui/gui_shell_hole_thread_edit_test
 Original [compact conical preview](images/thread-conical-compact.png), 1536×960 physical pixels,
 shows the signed nine-decimal taper, Cosmetic representation and reachable Apply/Cancel. Fit All
 includes the origin plane; the small conical Body and its illustrative Thread graphics are unedited.
+
+### Complete Create Another — 157B3
+
+Creation tasks for both Hole and Thread expose Create Another. It commits the current candidate
+once, then uses `GuiHoleThreadRepeatCommands` to clone the complete typed intent into a disposable
+new task. The feature, Hole placement and step identities are fresh. Numeric parameters owned by
+the current creation receive fresh identities while repeated bindings within that feature remain
+aliased. Explicit existing parameter/formula bindings and immutable standard pins remain shared;
+the command never converts them to resolved numeric snapshots. Only required new inputs publish.
+The canonical Core factories, serializer and normal preview/transaction authorities remain in use.
+
+Recipe, extent/limits, support/target, positions, tip, internal/external Thread profile, interval,
+direction, handedness and representation are retained. Existing semantic support workplanes and
+Slot profiles remain explicit model references. Repeating the same position, Slot profile or
+Thread interval can be ineffective or overlap the committed feature; the new task remains open
+with Apply disabled until the user chooses another position/profile/interval/target. No new
+location is guessed. Cancel discards only this new draft and its inputs. Save during that draft
+continues to save the previously committed model. Each later Apply is one independent undo step.
+
+`[hole-repeat-shell]` covers all nine recipes and six extents, fresh owned dimensions/placements/
+steps, internal bore aliases, custom/pinned external profiles, shared lengths, formula/pinned seat
+bindings, physical cuts, unchanged limit Bodies and exact history/reopen. `[native-hole-repeat]`
+uses mouse Create Another, numeric keyboard correction and a second mouse Apply. Full remaining
+157B3 interactions, referenced positions, presets, conversion and extended contexts remain assigned.
+
+Native evidence: [second Counterbore position](images/hole-repeat.png) and
+[second Thread interval at compact 150%](images/thread-repeat-compact.png). The captures are
+unmodified outputs of the asserted native workflows.
 
 ## Why more than a cut
 

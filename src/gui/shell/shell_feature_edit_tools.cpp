@@ -7,6 +7,7 @@
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 #include "blcad/gui/gui_hole_recipe.hpp"
+#include "blcad/gui/gui_hole_thread_repeat.hpp"
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/gui_thread_recipe.hpp"
@@ -395,8 +396,6 @@ struct ShellFeatureEditTools::Impl {
   std::string recipe_namespace;
   QComboBox *target_field{}, *support_field{}, *limit_field{};
   ShellPropertySelector *target_selector{}, *support_selector{}, *limit_selector{};
-  std::optional<double> next_diameter;
-  std::optional<BodyId> next_target;
   std::size_t entry_revision{};
   std::optional<GuiViewportCameraBookmark> entry_camera;
   GuiSelectionModel entry_selection;
@@ -588,13 +587,16 @@ struct ShellFeatureEditTools::Impl {
     dock->setWindowTitle(kind == Kind::Thread ? "Create Thread" : "Create Hole");
     dynamic->hide();
     dynamic_label->hide();
-    another->setVisible(kind == Kind::Hole);
+    another->show();
     guidance->setText(
         kind == Kind::Thread
             ? "Choose the target and exterior cylindrical or conical support. Edit the "
-              "profile and interval, then Apply. Modeled taper remains unsupported."
+              "profile and interval, then Apply. Create Another retains the configuration in a "
+              "fresh draft; choose another interval or target as needed. Modeled taper remains "
+              "unsupported."
             : "Choose target and support, then edit local X/Y positions, recipe and dimensions. "
-              "Apply creates one Hole; Create Another opens a fresh draft.");
+              "Apply creates one Hole; Create Another retains the recipe with fresh owned inputs. "
+              "Choose the next positions before Apply.");
     build_form();
     pick_mode();
     dock->show();
@@ -602,6 +604,47 @@ struct ShellFeatureEditTools::Impl {
     (void)preview();
     window.refresh();
     return Result<std::size_t>::success(1);
+  }
+  Result<std::size_t> start_repetition(FeatureId previous, Kind kind, std::string old_namespace,
+                                       const std::vector<ParameterId>& owned) {
+    const auto tag = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+    const bool thread = kind == Kind::Thread;
+    const FeatureId id((thread ? "feature.thread." : "feature.hole.") + tag);
+    const std::string draft = (thread ? "thread.draft." : "hole.draft.") + tag;
+    const auto* part = session.part_document();
+    const auto count = thread ? part->thread_features().size() : part->hole_features().size();
+    auto seed = GuiHoleThreadRepeatCommands::create(
+        *part, previous, id, (thread ? "Thread " : "Hole ") + std::to_string(count + 1),
+        std::move(old_namespace), draft, owned);
+    if (!seed)
+      return Result<std::size_t>::failure(seed.error());
+    if (thread) {
+      const auto& next = *seed.value().find_thread_feature(id);
+      auto collected = collect_thread_supports(next.target_body());
+      if (!collected)
+        return collected;
+      thread_support_override = next.support();
+      thread_support_id.clear();
+      for (const auto& choice : thread_supports)
+        if (face_identity(choice.reference) == face_identity(next.support()))
+          thread_support_id = choice.semantic_id;
+      if (thread_support_id.empty()) {
+        thread_support_id = "repeat/current-thread-support";
+        thread_supports.push_back({thread_support_id, "Previous support", next.support(), {}, {}});
+      }
+    } else {
+      const auto& next = *seed.value().find_hole_feature(id);
+      auto collected = collect_supports(next.target_body());
+      if (!collected)
+        return collected;
+      support_override = next.support();
+      pending_support_plane.reset();
+      if (std::none_of(supports.begin(), supports.end(), [&](const auto& choice) {
+            return plane_identity(choice.reference) == plane_identity(next.support());
+          }))
+        supports.push_back({"repeat/current-hole-support", "Previous support", next.support(), {}});
+    }
+    return start_creation(seed.value(), id, kind, draft);
   }
   Result<std::size_t> collect_thread_supports(const BodyId& body) {
     thread_supports.clear();
@@ -667,12 +710,38 @@ struct ShellFeatureEditTools::Impl {
       for (const auto& support : supports)
         callback(support);
   }
+  Result<Json> encode_thread_support(const FaceReference& support) const {
+    auto canonical = deserialize_part_document_from_json(source.dump());
+    if (!canonical)
+      return Result<Json>::failure(canonical.error());
+    const auto original = *canonical.value().find_thread_feature(edit.feature());
+    auto rebound = ThreadFeature::create(original.id(), original.name(),
+                                         BodyId(record.at("target_body").get<std::string>()),
+                                         support, original.thread(), original.direction());
+    if (!rebound)
+      return Result<Json>::failure(rebound.error());
+    auto updated = canonical.value().update_thread_feature(std::move(rebound.value()));
+    if (!updated)
+      return Result<Json>::failure(updated.error());
+    auto encoded = serialize_part_document_to_json(canonical.value());
+    if (!encoded)
+      return Result<Json>::failure(encoded.error());
+    return Result<Json>::success(
+        Json::parse(encoded.value()).at(collection).at(record_index).at("support"));
+  }
   bool choose_support(int index) {
     if (edit.kind() == Kind::Thread) {
       thread_support_override.reset();
       thread_support_id.clear();
       if (index < 0 || std::size_t(index) >= thread_supports.size())
         return false;
+      auto encoded = encode_thread_support(thread_supports[index].reference);
+      if (!encoded) {
+        support_error = encoded.error();
+        return false;
+      }
+      record["support"] = std::move(encoded.value());
+      support_error.reset();
       thread_support_override = thread_supports[index].reference;
       thread_support_id = thread_supports[index].semantic_id;
     } else {
@@ -2611,8 +2680,6 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
 Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
   auto& p = *impl_;
   if (!p.can_create()) {
-    p.next_diameter.reset();
-    p.next_target.reset();
     return Result<std::size_t>::failure(
         error("Hole creation requires a complete editable Part with a visible solid and no active "
               "command or workflow."));
@@ -2625,12 +2692,6 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
       break;
     }
   bool explicit_body = false;
-  if (p.next_target) {
-    if (const auto* body = part.find_body(*p.next_target); body && p.body_available(*body)) {
-      target = body->id();
-      explicit_body = true;
-    }
-  }
   std::optional<std::string> reference;
   const auto selections = p.session.selection().entries();
   for (const auto& selected : selections) {
@@ -2688,9 +2749,7 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
         break;
       }
   }
-  const auto diameter_value = p.next_diameter.value_or(6.0);
-  p.next_diameter.reset();
-  p.next_target.reset();
+  const auto diameter_value = 6.0;
   const auto tag = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
   const FeatureId id("feature.hole." + tag);
   const ParameterId diameter("parameter.hole." + tag + ".diameter");
@@ -2843,7 +2902,7 @@ bool ShellFeatureEditTools::accept_selection(const GuiSelection& incoming) {
 Result<std::size_t> ShellFeatureEditTools::apply(bool create_another) {
   auto& p = *impl_;
   if (!p.fresh() || !p.layer.active_handle_id().empty() || p.picking != Impl::Pick::None ||
-      (create_another && (!p.creating || p.edit.kind() != Kind::Hole)))
+      (create_another && (!p.creating || !p.hole_thread())))
     return Result<std::size_t>::failure(error("No current applicable feature edit"));
   auto preview = p.preview();
   if (!preview)
@@ -2864,26 +2923,21 @@ Result<std::size_t> ShellFeatureEditTools::apply(bool create_another) {
   if (committed) {
     const bool created_hole = p.creating && p.edit.kind() == Kind::Hole;
     const bool created_thread = p.creating && p.edit.kind() == Kind::Thread;
-    std::optional<double> repeated_diameter;
-    std::optional<BodyId> repeated_target;
-    if (p.creating) {
-      const auto* hole = p.session.part_document()->find_hole_feature(p.edit.feature());
-      if (hole) {
-        auto size = resolve_hole_diameter(*p.session.part_document(), hole->diameter());
-        if (size)
-          repeated_diameter = size.value().diameter.millimeters();
-        repeated_target = hole->target_body();
-      }
-    }
+    const auto previous = p.edit.feature();
+    const auto kind = p.edit.kind();
+    const auto old_namespace = p.recipe_namespace;
+    std::vector<ParameterId> owned;
+    if (create_another)
+      for (const auto& parameter : p.pending_parameters)
+        if (p.session.part_document()->find_parameter(parameter.id()))
+          owned.push_back(parameter.id());
     p.finish(true);
     if (created_hole)
       p.window.remember_repeatable_command(*p.hole_action);
     else if (created_thread)
       p.window.remember_repeatable_command(*p.thread_action);
     if (create_another) {
-      p.next_diameter = repeated_diameter;
-      p.next_target = repeated_target;
-      auto next = begin_new_hole();
+      auto next = p.start_repetition(previous, kind, old_namespace, owned);
       if (!next)
         p.window.report_error(next.error());
     }

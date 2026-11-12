@@ -299,6 +299,10 @@ controls expose nine decimal places; offset/direction changes require explicit m
 values. [Conical combinations](hole-wizard.md#conical-thread-combinations--157b2b) retain correction
 controls for incompatible profiles and unsupported modeled taper. A complete rejected standard
 mapping retries when its used numeric input or binding is corrected.
+Create Another in both Hole and Thread retains the complete recipe and uses fresh owned inputs.
+The [new draft](hole-wizard.md#complete-create-another--157b3) keeps its positions/interval and
+reports overlap or ineffective cuts until corrected. Cancel preserves the preceding committed
+feature. Presets and the remaining advanced workflow remain assigned to 157B3/C.
 
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
 [compact suppression at 150%](images/history-suppression-compact.png) and

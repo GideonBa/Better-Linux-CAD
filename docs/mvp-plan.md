@@ -443,12 +443,29 @@ Block 158 integrated acceptance and the full 159–165 sequence. Preserve all sc
 The branch starts from verified merged `d4bc4c2` after the Main/tree check. Keep one serial branch
 and preserve the full parent acceptance gate. The implementation order below adds no acceptance:
 
+The active delivery is [draft PR #180](https://github.com/GideonBa/Better-Linux-CAD/pull/180).
+The complete typed Create Another component is implemented and verified;
+its [contract](hole-wizard.md#complete-create-another--157b3), current shell tests
+`[hole-repeat-shell]` / `[native-hole-repeat]` and normal transaction authorities own behavior.
+No 157B3 or parent acceptance is claimed while the remaining rows are open.
+
 | Work | Implementation / focused proof |
 | --- | --- |
-| Complete Create Another ownership | Retain the complete Hole recipe or Thread definition, issue fresh feature/placement/owned-input identities, preserve explicit shared/formula/pinned bindings, and publish each action once. Verify unused-input pruning, correction, Cancel and exact history/reopen. |
+| Complete Create Another ownership — implemented | Retain the complete Hole recipe or Thread definition, issue fresh feature/placement/owned-input identities, preserve explicit shared/formula/pinned bindings, and publish each action once. `[hole-repeat-shell]`: 6 passed, 2 native skips, 1,241 assertions. Native repeat/creation/source/support regression: 7 cases / 684 assertions at each of 100% and compact 150%; physical cuts, correction, Cancel and exact history/reopen. |
 | Referenced positions and Sketch return | Use existing typed Sketch-point references and source workflow authority; support multiple positions, coplanarity/current-frame validation and breadcrumb return without publishing disposable edits. |
 | Support-anchored interaction | Reuse the shared manipulator layer for meaningful position/depth/diameter/interval controls, exact release, explicit formula/source override and invalid/corrected/cancelled drags on posed supports. |
 | Presets, legacy conversion and shared contexts | Presets retain properties without captured targets; explicit conversion previews semantic intent and preserves supported downstream mappings or reports a diagnostic. Complete hidden/consumed/prefix and shared-context lifecycle against existing session/history authorities. |
+
+Create Another regression on frozen runtime inputs: the broader Hole/Thread/editor/Pattern/prefix/
+coverage/icons/viewport selection passes **110 cases: 94 passed, 16 native skips; 8,634 assertions**.
+The focused native selection passes **7 cases / 684 assertions** at both scales; it covers the two
+new repeat workflows and five affected creation/source/support workflows, not all sixteen skipped
+cases. The full native combination gate remains 157C. Core/Geometry/support inputs and their
+binaries, plus the exporter binary, match the preceding delivery; no fresh full Core/Geometry or
+full Qt suite is claimed here. Runtime manifest: **1,057 files**, SHA256
+`9d4f6ee372bdb12be47ed2ef0979ca3ca075e43cfaf3c4c9fb46ccced4848dce`.
+The rebuilt app also opens a PID-matched, viewable native window; the bounded startup ends with
+the intentional timeout exit 124. Working/staged whitespace and changed-document links are checked.
 
 For every coherent change, synchronize the existing Hole/Feature-edit/UI/persistence contracts,
 run focused regressions and native 100%/compact 150% as applicable, review, commit and push. Then
