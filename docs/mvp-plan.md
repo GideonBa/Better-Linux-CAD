@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 156
 current_block: 157
-current_boundary: Block 156 accepted; 157A/B verified; 157C combined acceptance next
+current_boundary: Block 156 accepted; 157A/B delivered; 157C combined acceptance in progress
 current_tag: "[parity-b157]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 156
-current block        Block 157 (157C next)
+current block        Block 157 (157C in progress)
 current phase        Semantic holes and threads
-current boundary     Hole/Thread workflow lifecycle verified; combined native acceptance remains open
+current boundary     Hole/Thread workflow lifecycle delivered; combined native acceptance in progress
 ```
 
 The next assigned work is Block 157. [The consolidated sequence](inventor-parity-sequence.md)
@@ -284,7 +284,7 @@ remain assigned. Deliver named slices serially, with the parent block open until
 | 157B2a — verified | Nine recipes, six extent transitions, tip and custom internal Thread controls, typed dimensional table/custom sources, stable owned inputs and existing-feature recipe changes. |
 | 157B2b — delivered | Complete standard Thread profile mappings, optional start/taper authoring, external Thread creation and scoped native/imported/result support and limit collection. |
 | 157B3 — verified | In-canvas position/depth/diameter interaction, referenced Sketch points and breadcrumb return, presets, explicit legacy conversion, full recipe/thread Create Another ownership and extended shared context lifecycle. |
-| 157C — next | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
+| 157C — in progress | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
 
 No new Hole/Thread persistence authority or independent pattern evaluator is planned. Preserve
 legacy cut editing and all subsequent 158–204 requirements. Acceptance of 157A alone does not
@@ -441,6 +441,7 @@ Block 158 integrated acceptance and the full 159–165 sequence. Preserve all sc
 ### Current implementation — 157B3
 
 157B3 is **implemented and verified** in [PR #180](https://github.com/GideonBa/Better-Linux-CAD/pull/180).
+PR #180 merged as `248d7c2`; refreshed Main and its runtime match the verified delivery.
 Its serial branch started from verified merged `d4bc4c2`. This named slice does not accept parent
 157: complete B01–B04/UI01 combinations and capability promotion remain 157C, followed by 158's
 Phase A/B integration and the assigned 159–165 sequence. Preserve all scope after 165.
@@ -476,6 +477,25 @@ links, binary hashes and the frozen runtime are checked before delivery: **1,062
 `4a8bafe1f25b31e2d2b3d2b6732e87700478766726cd07c76ccbc6b3584b26a2`.
 Failed, interrupted and superseded runs contribute no final proof. These are focused component
 results; full Geometry/Qt and whole-parent integration remain assigned to 157C/158.
+
+### Combined acceptance plan — 157C
+
+The serial acceptance branch starts from merged `248d7c2` after verifying PR #180 is merged,
+Main is current and clean, no delivery PR remains open, and the delivered runtime is unchanged.
+This plan records assigned work, not acceptance; `implemented_through` stays 156 until all gates pass.
+
+| Gate | Work / completion boundary |
+| --- | --- |
+| B01/B02 + UI01 | Combine native Hole authoring, ordered selection/picks, custom/pinned sizes, seat/extent edits, canvas/source return, preset/repeat, invalid correction and exact one-step history with the existing Extrude baseline. Cover Enter/Tab/Ctrl+Enter/Escape, command search and reachable fixed actions at both scales. |
+| B03 + UI01 | Combine native internal/external Thread authoring, pinned revisions, hand/interval edits, cosmetic/modeled transitions and correction with physical material/helix oracles and portable reopen. Retain supported/imported capability limits. |
+| B04 combination | Continue newly authored multiple-position Holes through the existing Pattern/skip/count and Assembly per-hole target authorities into physical structured STEP readback. Reuse existing material and old-feature authorities; 158 still owns the complete Phase A/B suppression/reorder/mass/Assembly and incremental-versus-fresh acceptance repeat. |
+| Negative and compatibility coverage | Reconcile the existing legacy-conversion, supplier, stale/forbidden input, source/prefix and Cancel/Save proofs with the new combined cases; every claimed combination needs actual native execution, not only an inventory filter. |
+| Capability inventory and closure | Promote Hole/Thread mappings only after their API/command/proof references resolve and B01–B04/UI01 pass natively at 100%/compact 150%. Keep all later capabilities planned. Then accept only whole 157, deliver its PR serially and begin 158 from refreshed Main. |
+
+Use the existing Hole/Thread, Pattern, Assembly and exchange contracts and test fixtures. Add focused
+combined proof in the current shell rather than a second authoring or persistence authority.
+Record final execution, skips, original captures and material/history/reopen oracles in the linked
+contracts. Full 158–165 implementation and 166–204 planning remain unchanged.
 
 For every coherent change, synchronize the existing Hole/Feature-edit/UI/persistence contracts,
 run focused regressions and native 100%/compact 150% as applicable, review, commit and push. Then
