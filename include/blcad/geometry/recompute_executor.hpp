@@ -59,6 +59,12 @@ public:
   resolve_feature_axis(const PartDocument& document, const AxisReference& reference,
                        const ShapeCache& cache) const;
 
+  // Read-only authoring query over the exact support resolver used by Hole execution.
+  // A prefix cache is accepted only with its explicit matching history scope.
+  [[nodiscard]] Result<ResolvedWorkplane>
+  resolve_hole_support(const PartDocument&, const PlaneReference&, const ShapeCache&, FeatureId,
+                       std::optional<std::size_t> history_prefix = std::nullopt) const;
+
   [[nodiscard]] Result<SurfaceExtensionFrame>
   surface_extension_frame(const PartDocument& document, const SurfaceReference& target,
                           const BoundaryCurveReference& boundary, const ShapeCache& cache) const;

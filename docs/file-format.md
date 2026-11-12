@@ -1432,6 +1432,13 @@ Sketch placement is `{id, kind: sketch_point, sketch, point}` using existing ent
 Placement order and IDs remain authored; nonfinite coordinates, duplicate IDs and unknown sources
 are invalid. JSON booleans cannot be coordinates.
 
+The [157B3 position editor](hole-wizard.md#referenced-position-workflow--157b3) uses these existing
+variants unchanged. Explicit source changes retain the placement ID; choosing an independent
+point writes support-local coordinates only after resolving the current referenced position.
+The source breadcrumb and its pending Part workflow are transient; normal Save during that
+workflow serializes the committed entry document. Final Apply uses the canonical current Hole
+envelope and one ordinary history entry for the source and feature changes together.
+
 Extent is exactly one of `{kind: blind, depth}`, `{kind: through_all}`, `{kind: to_next}`,
 `{kind: to_face, face}`, `{kind: up_to_body, body}` or `{kind: symmetric, total_depth}`. Depths and
 included angle reference existing typed parameters. The shared Face spelling for `to_face` requires

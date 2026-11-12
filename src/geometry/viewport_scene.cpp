@@ -488,6 +488,10 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
       const auto point = [&workplane_resolver, &resolved = workplane.value()](Point2 local) {
         return to_point(workplane_resolver.evaluate_point(resolved, local));
       };
+      for (const auto& explicit_point : sketch.points())
+        items.push_back({ViewportSceneKind::SketchEntity,
+                         sketch_entity_id(sketch, explicit_point.id()),
+                         wrap(BRepBuilderAPI_MakeVertex(point(explicit_point.position())).Shape())});
       for (const LineSegment& line : sketch.line_segments()) {
         items.push_back(
             {ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, line.id()),

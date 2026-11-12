@@ -303,6 +303,11 @@ Create Another in both Hole and Thread retains the complete recipe and uses fres
 The [new draft](hole-wizard.md#complete-create-another--157b3) keeps its positions/interval and
 reports overlap or ineffective cuts until corrected. Cancel preserves the preceding committed
 feature. Presets and the remaining advanced workflow remain assigned to 157B3/C.
+Hole position controls choose independent support-local points or existing scoped Sketch points.
+They retain placement identity across source changes and support actual point picking. Edit Source
+Sketch and the return breadcrumb use the same Sketch workspace as the shared feature workflow;
+source operations remain inside the Hole draft until the combined Apply. See the
+[position workflow](hole-wizard.md#referenced-position-workflow--157b3) for Save/Cancel and scope.
 
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
 [compact suppression at 150%](images/history-suppression-compact.png) and

@@ -807,3 +807,45 @@ TEST_CASE("A captured Hole bottom limits another Body and owns its new planar te
   auto restored = evaluate(reopened);
   REQUIRE(ResultFaceSupportGeometry::resolve_face(reopened, restored, end));
 }
+
+TEST_CASE(
+    "Hole authoring support queries share posed execution frames and require exact cache scope",
+    "[geometry][parity-b157][hole-support-query]") {
+  const auto face = GENERATE(SemanticFace::Top, SemanticFace::Bottom, SemanticFace::Left,
+                             SemanticFace::Right, SemanticFace::Front, SemanticFace::Back);
+  const int mode = GENERATE(0, 1, 2);
+  auto part = history::native_base();
+  const auto reference = checked(SemanticFaceReference::create(FeatureId("base"), face));
+  const auto raw = checked(WorkplaneResolver{}.resolve_generated_face(part, reference));
+  const auto pose = pose_body(part, mode);
+  const auto support = checked(
+      PlaneReference::create_semantic_face(PartFeatureInputRole::HoleSupportPlane, reference));
+  auto current = evaluate(part);
+  const GeometryRecomputeExecutor executor;
+  const auto inspected =
+      checked(executor.resolve_hole_support(part, support, current, FeatureId("")));
+  const auto expected_origin = pose.transform_point(raw.origin);
+  CHECK(distance(inspected.origin, expected_origin) < 1e-7);
+  CHECK(dot(inspected.normal, normalized(pose.transform_vector(raw.normal))) == Catch::Approx(1));
+  CHECK(dot(inspected.x_axis, normalized(pose.transform_vector(raw.x_axis))) == Catch::Approx(1));
+  REQUIRE(part.add_hole_feature(checked(HoleFeature::create(
+      FeatureId("query.hole"), "Query Hole", HoleKind::Plain, BodyId("body.base"), support,
+      {{HolePlacementId("p"), Point2{}}}, ParameterId("radius")))));
+  CHECK_FALSE(executor.resolve_hole_support(part, support, current, FeatureId("query.hole")));
+  const auto history_order = checked(part.executable_history());
+  const auto hole = std::find_if(history_order.begin(), history_order.end(),
+                                 [](const auto& item) { return item.node_id == "query.hole"; });
+  REQUIRE(hole != history_order.end());
+  const auto prefix = std::size_t(hole - history_order.begin());
+  auto inputs = checked(ShapeCache::create(ShapeCacheId("query.inputs")));
+  REQUIRE(executor.execute_history_prefix(part, prefix, inputs));
+  CHECK_FALSE(executor.resolve_hole_support(part, support, inputs, FeatureId("query.hole")));
+  const auto scoped = checked(
+      executor.resolve_hole_support(part, support, inputs, FeatureId("query.hole"), prefix));
+  CHECK(distance(scoped.origin, expected_origin) < 1e-7);
+  CHECK_FALSE(
+      executor.resolve_hole_support(part, support, inputs, FeatureId("query.hole"), prefix + 1));
+  REQUIRE(part.set_parameter_value(ParameterId("depth"), checked(Quantity::length_mm(9))));
+  CHECK_FALSE(
+      executor.resolve_hole_support(part, support, inputs, FeatureId("query.hole"), prefix));
+}

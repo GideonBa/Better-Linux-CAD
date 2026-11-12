@@ -736,6 +736,45 @@ Native evidence: [second Counterbore position](images/hole-repeat.png) and
 [second Thread interval at compact 150%](images/thread-repeat-compact.png). The captures are
 unmodified outputs of the asserted native workflows.
 
+### Referenced position workflow — 157B3
+
+Each placement selects an independent point in the support frame or an existing scoped Sketch
+point. The latter retains `SketchId` and point identity; no resolved coordinate snapshot replaces
+the reference. Multiple placements keep independent stable placement IDs when reordered or
+rebound. Explicit point preselection seeds creation; the selector also offers actual viewport
+point picks. The Geometry executor validates each point in its current Sketch frame against the
+current support plane and rejects incompatible positions before publication.
+
+Selecting Independent point explicitly breaks that placement's reference at its resolved current
+support-local coordinates. It preserves the placement ID and leaves the source Sketch unchanged.
+It resolves the selected typed support independently of unrelated invalid property values. A
+referenced Slot origin can therefore return to its required independent origin without abandoning
+the recipe; the complete candidate still decides whether Apply is valid.
+`GeometryRecomputeExecutor::resolve_hole_support` shares the execution resolver and accepts only
+the exact complete cache or an explicitly matching predecessor scope; stale caches fail closed.
+
+Edit Source Sketch enters the existing Sketch workspace through the shared breadcrumb authority.
+The enclosing Part workflow owns Sketch operations, sidecars and the Hole draft. Finish Sketch
+returns to the retained Hole inputs and recomputes its complete candidate. Local Undo/Redo affects
+the source operations; Save writes the committed entry state. Final Apply publishes the source
+and Hole together as one Undo step. Cancel discards the complete workflow. End of Part source
+navigation remains disabled while its broader lifecycle is being completed.
+
+`[hole-position-shell]` covers multiple scoped explicit/projected points, current-frame rejection,
+explicit independent conversion, retained inputs, source Save/Cancel/local Undo/Redo, actual
+shifted bore axes and one combined publication. The existing `[source-sketch-workflow]` and
+`[block136-feature-edit]` regression passes 15 cases / 1,967 assertions, with three native skips.
+Geometry `[hole-support-query]` plus current support/Thread/scene regression passes 18 cases /
+1,299 assertions. Native position/source/repeat/feature-edit regression passes five cases / 508
+assertions at each of 100% and compact 150%, including real point picking, source point creation,
+breadcrumb return and Apply. Unmodified captures show the [source visit](images/hole-source-sketch.png)
+and [compact return](images/hole-position-return-compact.png). Full 157B3 acceptance still requires
+the remaining interactions, presets, conversion and extended contexts.
+
+The shared Window keeps the idle model selection filter when entering a feature's source Sketch;
+the task's temporary pick mask never becomes the idle filter. Hole Cancel restores the entry
+selection/camera after the enclosing workflow rollback, whose revision deliberately advances.
+
 ## Why more than a cut
 
 ```text

@@ -2992,3 +2992,297 @@ TEST_CASE("A repeated or existing modeled Thread can explicitly move to another 
         Catch::Approx(200 * std::numbers::pi - removed).margin(2e-4));
   replay(w, dir, before);
 }
+
+namespace {
+PartDocument point_plate() {
+  auto part = plate();
+  REQUIRE(part.add_construction_plane(checked(ConstructionPlane::create_explicit(
+      ConstructionPlaneId("positions.plane"), "Rotated position frame", {-15, 0, 8}, {0, 1, 0},
+      {-1, 0, 0}, {0, 0, 1}))));
+  auto sketch = checked(
+      Sketch::create(SketchId("positions"), "Hole positions", DatumPlaneId("positions.plane")));
+  REQUIRE(sketch.add_entity(checked(SketchPoint::create(SketchEntityId("a"), {0, 0}))));
+  REQUIRE(sketch.add_entity(checked(SketchPoint::create(SketchEntityId("b"), {0, -30}))));
+  REQUIRE(part.add_sketch(std::move(sketch)));
+  auto wrong = checked(
+      Sketch::create(SketchId("wrong.positions"), "Wrong support", DatumPlaneId("datum.xy")));
+  REQUIRE(wrong.add_entity(checked(SketchPoint::create(SketchEntityId("a"), {0, 0}))));
+  REQUIRE(part.add_sketch(std::move(wrong)));
+  return part;
+}
+void reference_position(ShellWindow& w, const char* path, const QStringList& key) {
+  const auto kind_path = QString::fromLatin1(path) + "/kind";
+  auto* kind = qobject_cast<QComboBox*>(w.feature_edit_tools().field(kind_path));
+  REQUIRE(kind);
+  kind->setCurrentIndex(1);
+  settle();
+  auto* point =
+      qobject_cast<QComboBox*>(w.feature_edit_tools().field(QString::fromLatin1(path) + "/point"));
+  REQUIRE(point);
+  const int selected = point->findData(key);
+  REQUIRE(selected >= 0);
+  point->setCurrentIndex(selected);
+  settle();
+}
+void move_position_source(ShellWindow& w, double local_x) {
+  REQUIRE(w.session().commit_part_transaction("Move source point", [local_x](PartDocument& part) {
+    auto sketch =
+        Sketch::create(SketchId("positions"), "Hole positions", DatumPlaneId("positions.plane"));
+    if (!sketch)
+      return Result<std::size_t>::failure(sketch.error());
+    auto point = SketchPoint::create(SketchEntityId("a"), {local_x, 0});
+    auto added = sketch.value().add_entity(point.value());
+    if (!added)
+      return added;
+    added = sketch.value().add_entity(SketchPoint::create(SketchEntityId("b"), {0, -30}).value());
+    if (!added)
+      return added;
+    return part.update_sketch(std::move(sketch.value()));
+  }));
+  w.refresh();
+  settle();
+}
+} // namespace
+
+TEST_CASE("Hole point selectors preserve scoped references and reject incompatible frames",
+          "[gui][parity-b157][hole-position-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, point_plate());
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  reference_position(w, "/placements/0", {"positions", "a"});
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  control<QPushButton>(w, "blcad.feature_edit.add/placements").click();
+  settle();
+  reference_position(w, "/placements/1", {"positions", "b"});
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  reference_position(w, "/placements/1", {"wrong.positions", "a"});
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  CHECK(snapshot(w) == before);
+  CHECK(control<QLabel>(w, "blcad.feature_edit.status").text().contains("support plane"));
+  reference_position(w, "/placements/1", {"positions", "b"});
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto hole = w.session().part_document()->hole_features().front();
+  REQUIRE(hole.placements().size() == 2);
+  CHECK(hole.placements()[0].id != hole.placements()[1].id);
+  CHECK(std::get<HoleSketchPointReference>(hole.placements()[1].source).point ==
+        SketchEntityId("b"));
+  CHECK(volume(w) == Catch::Approx(38400 - 16 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+  const auto after = snapshot(w);
+  begin(w, hole.id().value().c_str());
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(0);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  field<QComboBox>(w, "/placements/0/kind").setCurrentIndex(0);
+  settle();
+  CHECK(field<QDoubleSpinBox>(w, "/placements/0/position/x").value() == Catch::Approx(-15));
+  CHECK(field<QDoubleSpinBox>(w, "/placements/0/position/y").value() == Catch::Approx(0));
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& independent = w.session().part_document()->hole_features().front().placements()[0];
+  CHECK(std::get<Point2>(independent.source).x == Catch::Approx(-15));
+  CHECK(independent.id == hole.placements()[0].id);
+  CHECK(volume(w) == Catch::Approx(38400 - 16 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, after);
+}
+
+TEST_CASE("Hole source breadcrumb keeps edits local through Save Cancel and one combined Apply",
+          "[gui][parity-b157][hole-position-shell][source-sketch-workflow]") {
+  const bool existing = GENERATE(false, true);
+  CAPTURE(existing);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, point_plate());
+  REQUIRE(
+      w.session().selection().add({GuiSelectionKind::SketchEntity, "sketch/positions/entity/a"}));
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  REQUIRE(field<QComboBox>(w, "/placements/0/point").currentData() ==
+          QStringList{"positions", "a"});
+  if (existing) {
+    REQUIRE(w.feature_edit_tools().apply());
+    begin(w, w.session().part_document()->hole_features().front().id().value().c_str());
+  }
+  const auto before = snapshot(w);
+  const auto constraints = w.session().sketch_constraint_catalogs();
+  const auto dimensions = w.session().sketch_dimension_catalogs();
+  auto idle_entry = w.session();
+  (void)idle_entry.task().cancel();
+  const auto undo = std::string(idle_entry.undo_label());
+  const auto selection = w.session().selection().entries();
+  const auto selection_mask = w.session().selection().filter_mask();
+  control<QPushButton>(w, "blcad.hole.edit_source/placements/0").click();
+  REQUIRE(w.feature_edit_tools().editing_source_sketch());
+  REQUIRE(w.active_sketch() == SketchId("positions"));
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  move_position_source(w, 10);
+  const auto edited = snapshot(w);
+  REQUIRE(edited != before);
+  REQUIRE(w.undo());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.redo());
+  CHECK(snapshot(w) == edited);
+  const auto saved = dir.filePath("source-draft.blcad.json");
+  REQUIRE(w.save_to(saved));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(saved.toStdString()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == before);
+  control<QPushButton>(w, "blcad.hole.breadcrumb").click();
+  REQUIRE_FALSE(w.active_sketch());
+  REQUIRE_FALSE(w.feature_edit_tools().editing_source_sketch());
+  CHECK(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  w.feature_edit_tools().cancel();
+  CHECK(snapshot(w) == before);
+  CHECK(w.session().sketch_constraint_catalogs() == constraints);
+  CHECK(w.session().sketch_dimension_catalogs() == dimensions);
+  CHECK(w.session().undo_label() == undo);
+  CHECK(w.session().selection().entries() == selection);
+  CHECK(w.session().selection().filter_mask() == selection_mask);
+  CHECK_FALSE(w.session().part_workflow_active());
+  if (existing)
+    begin(w, w.session().part_document()->hole_features().front().id().value().c_str());
+  else {
+    w.session().selection().clear();
+    REQUIRE(
+        w.session().selection().add({GuiSelectionKind::SketchEntity, "sketch/positions/entity/a"}));
+    create_hole(w);
+    field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  }
+  control<QPushButton>(w, "blcad.hole.edit_source/placements/0").click();
+  REQUIRE(w.feature_edit_tools().editing_source_sketch());
+  move_position_source(w, 10);
+  REQUIRE(w.finish_active_sketch());
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK_FALSE(w.session().part_workflow_active());
+  CHECK(w.session()
+            .part_document()
+            ->find_sketch(SketchId("positions"))
+            ->find_point(SketchEntityId("a"))
+            ->position()
+            .x == 10);
+  CHECK(volume(w) == Catch::Approx(38400 - 8 * std::numbers::pi).margin(1e-6));
+  const auto& result = *w.session().part_document();
+  const auto hole = result.hole_features().front();
+  const auto axis = checked(HoleInstanceReference::create(hole.id(), hole.placements().front().id,
+                                                          HoleReferenceRole::Axis));
+  const auto physical = checked(
+      geometry::HoleInstanceGeometry::resolve(result, axis, *w.session().part_shape_cache()));
+  CHECK(physical.frame.origin.x == Catch::Approx(-15));
+  CHECK(physical.frame.origin.y == Catch::Approx(10));
+  CHECK(physical.frame.origin.z == Catch::Approx(8));
+  replay(w, dir, before);
+  const auto accepted_state = snapshot(w);
+  begin(w, hole.id().value().c_str());
+  control<QPushButton>(w, "blcad.hole.edit_source/placements/0").click();
+  REQUIRE(w.feature_edit_tools().editing_source_sketch());
+  move_position_source(w, 5);
+  w.feature_edit_tools().cancel();
+  CHECK_FALSE(w.active_sketch());
+  CHECK_FALSE(w.session().task().active());
+  CHECK_FALSE(w.session().part_workflow_active());
+  CHECK(snapshot(w) == accepted_state);
+}
+
+TEST_CASE("Native Hole point picking and source breadcrumb publish one scoped workflow",
+          "[gui][parity-b157][hole-position-shell][native-hole-position]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native position picking and Sketch return");
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, point_plate());
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  reference_position(w, "/placements/0", {"positions", "a"});
+  click(control<QToolButton>(w, "blcad.hole.position/placements/0.pick"));
+  REQUIRE(w.viewport().preview_selection_target_count() >= 2);
+  const auto screen = checked(w.viewport().model_to_screen({15, 0, 8}));
+  click_at(w.viewport(), {screen.x, screen.y});
+  REQUIRE(field<QComboBox>(w, "/placements/0/point").currentData() ==
+          QStringList{"positions", "b"});
+  click(control<QPushButton>(w, "blcad.hole.edit_source/placements/0"));
+  REQUIRE(w.feature_edit_tools().editing_source_sketch());
+  activate(w);
+  auto& point = control<QAction>(w, "sketch.create.point");
+  REQUIRE(point.isEnabled());
+  point.trigger();
+  settle();
+  const auto source_screen = checked(w.viewport().sketch_plane_to_screen({10, -15}));
+  click_at(w.viewport(), {source_screen.x, source_screen.y});
+  const auto added =
+      w.session().part_document()->find_sketch(SketchId("positions"))->points().size();
+  REQUIRE(added == 3);
+  capture(w, "hole-source-sketch");
+  click(control<QPushButton>(w, "blcad.hole.breadcrumb"));
+  REQUIRE_FALSE(w.active_sketch());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "hole-position-return");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  REQUIRE(w.session().part_document()->hole_features().size() == 1);
+  const auto& ref = std::get<HoleSketchPointReference>(
+      w.session().part_document()->hole_features().front().placements()[0].source);
+  CHECK(ref.sketch == SketchId("positions"));
+  CHECK(ref.point == SketchEntityId("b"));
+  CHECK(volume(w) == Catch::Approx(38400 - 8 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Hole creation preselects multiple explicit and projected points without copying their "
+          "coordinates",
+          "[gui][parity-b157][hole-position-shell]") {
+  auto part = point_plate();
+  REQUIRE(part.add_construction_point(checked(ConstructionPoint::create_explicit(
+      ConstructionPointId("position.projector"), "Projected position", {0, 15, 8}))));
+  auto sketch = *part.find_sketch(SketchId("positions"));
+  REQUIRE(sketch.add_reference(checked(ProjectedSketchPoint::create_from_construction_point(
+      SketchEntityId("projected"), ConstructionPointId("position.projector")))));
+  REQUIRE(part.update_sketch(std::move(sketch)));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  for (const auto* id : {"sketch/positions/entity/a", "sketch/positions/entity/projected"})
+    REQUIRE(w.session().selection().add({GuiSelectionKind::SketchEntity, id}));
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& positions = w.session().part_document()->hole_features().front().placements();
+  REQUIRE(positions.size() == 2);
+  CHECK(std::get<HoleSketchPointReference>(positions[0].source).point == SketchEntityId("a"));
+  CHECK(std::get<HoleSketchPointReference>(positions[1].source).point ==
+        SketchEntityId("projected"));
+  CHECK(volume(w) == Catch::Approx(38400 - 16 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("A Slot placement can recover from a referenced source without abandoning the recipe",
+          "[gui][parity-b157][hole-position-shell]") {
+  auto part = manufacture::seed();
+  auto sketch = *part.find_sketch(SketchId("slot"));
+  REQUIRE(sketch.add_entity(checked(SketchPoint::create(SketchEntityId("anchor"), {0, 0}))));
+  REQUIRE(part.update_sketch(std::move(sketch)));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  const auto original_volume = volume(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.recipe", 8);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  reference_position(w, "/placements/0", {"slot", "anchor"});
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  field<QComboBox>(w, "/placements/0/kind").setCurrentIndex(0);
+  settle();
+  CHECK(control<QComboBox>(w, "blcad.hole.recipe").currentIndex() == 8);
+  CHECK(field<QDoubleSpinBox>(w, "/placements/0/position/x").value() == 0);
+  CHECK(field<QDoubleSpinBox>(w, "/placements/0/position/y").value() == 0);
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(volume(w) == Catch::Approx(original_volume - (8 + std::numbers::pi) * 8).margin(1e-6));
+  replay(w, dir, before);
+}

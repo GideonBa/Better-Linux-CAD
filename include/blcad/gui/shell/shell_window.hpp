@@ -155,6 +155,7 @@ protected:
   void closeEvent(QCloseEvent* event) override;
 
 private:
+  [[nodiscard]] bool editing_feature_source_sketch() const noexcept;
   void build_ribbon();
   void build_docks();
   void wire_viewport();

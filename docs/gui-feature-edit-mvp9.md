@@ -267,3 +267,18 @@ An explicit Thread target/support rebind first obtains the pair's canonical enco
 Core factory/update/serializer. The form replaces its support before decoding the changed target,
 so a formerly valid reference on the old Body cannot prevent correcting the pair. Other pending
 numeric/source edits remain intact; complete downstream execution still decides validity.
+
+### Referenced Hole positions and source return — 157B3
+
+Placement controls use the existing owned-point/Sketch-point variants, preserve placement identity,
+and support multiple scoped explicit/projected point references. Current support-local conversion
+requires an explicit Independent point choice. The exact read-only Geometry support query supplies
+the current frame; it rejects stale or incorrectly scoped caches.
+
+Edit Source Sketch suspends the property task inside the existing Part workflow and Sketch
+workspace. Finish Sketch returns to the retained form and revalidates the candidate. Source edits,
+constraint/dimension sidecars and the final feature publish together through a disposable session;
+Save retains the committed entry, Cancel restores the workflow, and Apply creates one Undo step.
+The Window's shared source navigation dispatches to the owning Extrude or Hole workflow. No second
+Sketch workspace, transaction system or persistence schema is introduced. See the
+[position contract](hole-wizard.md#referenced-position-workflow--157b3) for current bounds and proof.

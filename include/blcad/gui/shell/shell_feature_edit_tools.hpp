@@ -25,6 +25,9 @@ public:
   [[nodiscard]] QWidget* field(const QString& path) const;
   [[nodiscard]] GuiViewportManipulatorLayer& manipulators();
   [[nodiscard]] Result<std::size_t> set_drag_text(const QString&);
+  [[nodiscard]] Result<std::size_t> edit_source_sketch(SketchId);
+  void resume_source_sketch(SketchId);
+  [[nodiscard]] bool editing_source_sketch() const noexcept;
 
 protected:
   bool eventFilter(QObject*, QEvent*) override;
