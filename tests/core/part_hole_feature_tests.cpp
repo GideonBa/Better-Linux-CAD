@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <nlohmann/json.hpp>
 
 using namespace blcad;
@@ -405,4 +406,79 @@ TEST_CASE("Hole result faces share typed input persistence and dependency author
   }
   CHECK_FALSE(p.remove_hole_feature(FeatureId("hole")));
   CHECK(text(p) == encoded);
+}
+
+TEST_CASE(
+    "Atomic Extrude to Hole replacement preserves Body consumers and canonical schema envelopes",
+    "[core][parity-b157][hole-family-replacement]") {
+  const int mode = GENERATE(0, 1, 2);
+  const bool authored = GENERATE(false, true);
+  auto part = history::native_base();
+  auto sketch =
+      checked(Sketch::create(SketchId("legacy.sketch"), "Legacy circle", DatumPlaneId("datum.xy")));
+  REQUIRE(sketch.add_profile(
+      checked(CircleProfile::create(ProfileId("legacy.circle"), ParameterId("radius")))));
+  REQUIRE(part.add_sketch(std::move(sketch)));
+  auto cut = checked(Feature::create_subtractive_extrude(
+      FeatureId("legacy"), "Legacy cut", SketchId("legacy.sketch"), FeatureId("base")));
+  auto context = checked(FeatureBodyResultContext::create(FeatureBodyOperationMode::Cut,
+                                                          BodyId("body.base"), std::nullopt));
+  REQUIRE(part.add_feature(checked(cut.with_body_result_context(context))));
+  const auto copies = history::new_body(part, "copies");
+  REQUIRE(part.add_linear_pattern_feature(checked(
+      LinearPatternFeature::create(FeatureId("copies"), "Body copies",
+                                   {checked(PatternSourceReference::body(BodyId("body.base")))},
+                                   history::axis(PartFeatureInputRole::PatternAxis),
+                                   ParameterId("count"), LinearPatternExtentMode::Spacing,
+                                   ParameterId("width"), PatternDirectionSign::Positive, copies))));
+  if (authored)
+    REQUIRE(part.apply_history_intent({{"base", "legacy", "copies"}, {}}));
+  const auto length = [&](const char* id, double value) {
+    REQUIRE(part.add_parameter(checked(
+        Parameter::create_length(ParameterId(id), id, checked(Quantity::length_mm(value))))));
+  };
+  HoleManufacturing manufacturing;
+  std::optional<ThreadDefinition> thread;
+  if (mode == 1) {
+    length("seat.diameter", 3);
+    length("seat.depth", 1);
+    manufacturing = HoleCounterbore{ParameterId("seat.diameter"), ParameterId("seat.depth")};
+  } else if (mode == 2) {
+    length("thread.major", 2);
+    length("thread.pitch", 1);
+    REQUIRE(part.add_parameter(checked(Parameter::create_angle(
+        ParameterId("thread.angle"), "Thread angle", checked(Quantity::angle_deg(60))))));
+    thread = checked(ThreadDefinition::create(
+        ThreadParameterProfile{"Custom", "2 x 1", "Authored", ParameterId("thread.major"),
+                               ParameterId("radius"), ParameterId("thread.pitch"),
+                               ParameterId("thread.angle"), std::nullopt},
+        ParameterId("depth")));
+  }
+  auto basic = fixture::hole("legacy");
+  auto hole = checked(HoleFeature::create(basic.id(), basic.name(), basic.kind(),
+                                          basic.target_body(), basic.support(), basic.placements(),
+                                          basic.diameter(), basic.extent(), basic.direction(),
+                                          basic.tip(), manufacturing, thread));
+  const auto before = text(part);
+  const auto before_graph = graph(part);
+  auto converted = replace_part_extrude_with_hole(part, hole);
+  INFO((converted ? "ok" : converted.error().message()));
+  REQUIRE(converted);
+  CHECK(text(part) == before);
+  CHECK(graph(part) == before_graph);
+  CHECK_FALSE(converted.value().find_feature(FeatureId("legacy")));
+  REQUIRE(converted.value().find_hole_feature(FeatureId("legacy")));
+  CHECK_FALSE(converted.value().dependency_graph().has_dependency("legacy.sketch", "legacy"));
+  CHECK(converted.value().dependency_graph().has_dependency("legacy", "body:body.base"));
+  CHECK(checked(converted.value().executable_history())[1].node_id == "legacy");
+  CHECK(checked(converted.value().executable_history())[2].node_id == "copies");
+  CHECK(bool(converted.value().authored_history_intent()) == authored);
+  CHECK(json::parse(text(converted.value())).at("version") == (mode == 2 ? 6 : mode == 1 ? 5 : 4));
+  CHECK(text(checked(deserialize_part_document_from_json(text(converted.value())))) ==
+        text(converted.value()));
+  CHECK_FALSE(replace_part_extrude_with_hole(part, fixture::hole("base")));
+  CHECK_FALSE(replace_part_extrude_with_hole(part, fixture::hole("missing")));
+  CHECK_FALSE(
+      replace_part_extrude_with_hole(part, fixture::hole("legacy", ParameterId("missing"))));
+  CHECK(text(part) == before);
 }

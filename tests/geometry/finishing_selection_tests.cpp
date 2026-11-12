@@ -631,3 +631,42 @@ TEST_CASE("Owned face-supported Sketches apply only the Body pose after their ca
   REQUIRE(frame);
   require_near(frame.value().origin, {57, 59, 81});
 }
+
+TEST_CASE(
+    "Hidden input selection is explicit and preserves strict scope and default visibility policy",
+    "[geometry][finishing-selection][hidden-input-selection]") {
+  auto part = drawn_box();
+  auto visible_cache = ShapeCache::create(ShapeCacheId("visible.inputs")).value();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_history_prefix(part, 1, visible_cache));
+  auto visible = FinishingSelectionBuilder::build(
+      part, visible_cache, BodyId("body"), PartFeatureInputRole::ShellRemovalFace, nullptr, 1);
+  REQUIRE(visible);
+  REQUIRE(part.set_body_visibility(BodyId("body"), BodyVisibility::Hidden));
+  auto cache = ShapeCache::create(ShapeCacheId("hidden.inputs")).value();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_history_prefix(part, 1, cache));
+  const auto before = serialize_part_document_to_json(part).value();
+  CHECK_FALSE(FinishingSelectionBuilder::build(part, cache, BodyId("body"),
+                                               PartFeatureInputRole::ShellRemovalFace, nullptr, 1));
+  auto hidden = FinishingSelectionBuilder::build(part, cache, BodyId("body"),
+                                                 PartFeatureInputRole::ShellRemovalFace, nullptr, 1,
+                                                 FinishingSelectionVisibility::IncludeHiddenInputs);
+  REQUIRE(hidden);
+  REQUIRE(hidden.value().size() == visible.value().size());
+  for (std::size_t i = 0; i < hidden.value().size(); ++i) {
+    CHECK(hidden.value()[i].semantic_id == visible.value()[i].semantic_id);
+    CHECK(hidden.value()[i].anchor == visible.value()[i].anchor);
+    CHECK_FALSE(hidden.value()[i].shape.empty());
+  }
+  CHECK(part.find_body(BodyId("body"))->visibility() == BodyVisibility::Hidden);
+  CHECK(serialize_part_document_to_json(part).value() == before);
+  CHECK_FALSE(FinishingSelectionBuilder::build(part, cache, BodyId("missing"),
+                                               PartFeatureInputRole::ShellRemovalFace, nullptr, 1,
+                                               FinishingSelectionVisibility::IncludeHiddenInputs));
+  CHECK_FALSE(FinishingSelectionBuilder::build(part, cache, BodyId("body"),
+                                               PartFeatureInputRole::MirrorPlane, nullptr, 1,
+                                               FinishingSelectionVisibility::IncludeHiddenInputs));
+  REQUIRE(part.set_parameter_value(ParameterId("depth"), Quantity::length_mm(12).value()));
+  CHECK_FALSE(FinishingSelectionBuilder::build(part, cache, BodyId("body"),
+                                               PartFeatureInputRole::ShellRemovalFace, nullptr, 1,
+                                               FinishingSelectionVisibility::IncludeHiddenInputs));
+}

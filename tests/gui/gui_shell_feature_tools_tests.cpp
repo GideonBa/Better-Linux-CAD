@@ -1854,3 +1854,42 @@ TEST_CASE("Nested line polygons expose and extrude the outer face with a polygon
   CHECK(std::abs(summary.volume_mm3 - expected_volume) <=
         std::max(1.0e-6, expected_volume * 1.0e-8));
 }
+
+TEST_CASE(
+    "Authored linear and diameter values map posed distances without scaling numeric overrides",
+    "[gui][viewport-manipulators][hole-canvas-shell]") {
+  auto mapping = GuiViewportManipulatorMapping::create(
+      [](GuiSketchScreenPoint point) {
+        return Result<GuiSketchViewRay>::success({{point.x, point.y, 100}, {0, 0, -1}});
+      },
+      [](Point3 point) { return Result<GuiSketchScreenPoint>::success({point.x, point.y}); });
+  REQUIRE(mapping);
+  GuiViewportManipulatorLayer layer;
+  REQUIRE(layer.set_mapping(mapping.value()));
+  GuiViewportManipulatorHandle handle;
+  handle.id = "posed.length";
+  handle.reference_value = 10;
+  handle.model_units_per_value = 2;
+  REQUIRE(layer.set_handles({handle}));
+  REQUIRE(layer.begin_drag({68, 0}));
+  const auto released = layer.end_drag({78, 0});
+  REQUIRE(released);
+  CHECK(released->scalar_value == Catch::Approx(15));
+  REQUIRE(layer.begin_drag({68, 0}));
+  REQUIRE(layer.set_numeric_input("12 mm"));
+  CHECK(layer.end_drag({100, 0})->scalar_value == Catch::Approx(12));
+  handle.kind = GuiViewportManipulatorKind::Radial;
+  handle.reference_value = 4;
+  handle.model_units_per_value = .5;
+  REQUIRE(layer.set_handles({handle}));
+  REQUIRE(layer.begin_drag({68, 0}));
+  CHECK(layer.end_drag({70, 0})->scalar_value == Catch::Approx(8));
+  REQUIRE(layer.begin_drag({68, 0}));
+  REQUIRE(layer.set_numeric_input("6 mm"));
+  CHECK(layer.end_drag({100, 0})->scalar_value == Catch::Approx(6));
+  handle.model_units_per_value = 0;
+  CHECK_FALSE(layer.set_handles({handle}));
+  handle.model_units_per_value = .5;
+  handle.kind = GuiViewportManipulatorKind::Angular;
+  CHECK_FALSE(layer.set_handles({handle}));
+}

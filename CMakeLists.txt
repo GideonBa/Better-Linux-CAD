@@ -373,6 +373,9 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_assembly_advanced.cpp
     src/gui/shell/shell_feature_edit_tools.cpp
     src/gui/gui_hole_recipe.cpp
+    src/gui/gui_hole_conversion.cpp
+    src/gui/gui_hole_thread_repeat.cpp
+    src/gui/gui_hole_thread_preset.cpp
     src/gui/gui_thread_recipe.cpp
     src/gui/shell/shell_history_tools.cpp
     src/gui/shell/shell_manipulator_overlay.cpp
@@ -769,6 +772,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_assembly_analysis_tests.cpp
       tests/gui/gui_shell_feature_edit_tests.cpp
       tests/gui/gui_shell_hole_thread_edit_tests.cpp
+      tests/gui/gui_hole_thread_preset_tests.cpp
       tests/gui/gui_shell_navigation_tests.cpp
       tests/gui/gui_shell_selection_filter_tests.cpp
       tests/gui/gui_shell_repeat_tests.cpp

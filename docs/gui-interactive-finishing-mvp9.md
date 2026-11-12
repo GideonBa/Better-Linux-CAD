@@ -35,6 +35,12 @@ manipulator layer and folds viewport candidates back into the candidate.
 
 ## Edge and face chain picking
 
+The shared `FinishingSelectionBuilder` defaults to `VisibleOnly`; finishing tasks retain that
+policy. Hole/Thread predecessor editing explicitly requests `IncludeHiddenInputs` for its temporary
+input model. That option changes availability filtering only: exact cache/history scope, imported
+source freshness and stable semantic-reference checks remain required. See the
+[Hole input-history contract](hole-wizard.md#hidden-and-consumed-input-bodies--157b3).
+
 Fillet and Chamfer collect an ordered chain of `EdgeReference`s; Shell and Draft collect
 `FaceReference`s. `add_edge`/`add_face` reject a duplicate using the same stable per-edge / per-face
 identity the Core edge/face-treatment contracts use, so pick-time rejection agrees with feature

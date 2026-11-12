@@ -1,12 +1,17 @@
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/geometry/body_boolean_adapter.hpp"
 #include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/result_face_support.hpp"
+#include "blcad/geometry/sketch_reference_projector.hpp"
 #include "blcad/geometry/thread_adapter.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
+#include "blcad/gui/gui_hole_conversion.hpp"
 #include "blcad/gui/gui_hole_recipe.hpp"
+#include "blcad/gui/gui_hole_thread_preset.hpp"
+#include "blcad/gui/gui_hole_thread_repeat.hpp"
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/gui_thread_recipe.hpp"
@@ -30,6 +35,7 @@
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QStandardPaths>
 #include <QStatusBar>
 #include <QTimer>
 #include <QUuid>
@@ -357,8 +363,9 @@ struct ShellFeatureEditTools::Impl {
   bool support_editing{};
   std::optional<geometry::ShapeCache> feature_input_cache;
   std::optional<std::size_t> feature_input_prefix;
-  enum class Pick { None, Body, Support, LimitFace, LimitBody };
+  enum class Pick { None, Body, Support, LimitFace, LimitBody, Position };
   Pick picking{Pick::None};
+  QString picking_position;
   struct SupportChoice {
     std::string semantic_id, label;
     PlaneReference reference;
@@ -393,10 +400,14 @@ struct ShellFeatureEditTools::Impl {
   std::optional<Error> support_error;
   std::vector<Parameter> pending_parameters;
   std::string recipe_namespace;
+  QComboBox* preset_name{};
+  QPushButton *preset_load{}, *preset_save{}, *preset_remove{};
+  QLabel* preset_status{};
+  bool preset_library_valid{};
+  QString retained_preset_name;
+  std::vector<GuiHoleThreadPreset> presets;
   QComboBox *target_field{}, *support_field{}, *limit_field{};
   ShellPropertySelector *target_selector{}, *support_selector{}, *limit_selector{};
-  std::optional<double> next_diameter;
-  std::optional<BodyId> next_target;
   std::size_t entry_revision{};
   std::optional<GuiViewportCameraBookmark> entry_camera;
   GuiSelectionModel entry_selection;
@@ -411,6 +422,8 @@ struct ShellFeatureEditTools::Impl {
   std::map<QString, QWidget*> fields;
   std::map<QString, QDoubleSpinBox*> numbers;
   std::map<QString, QuantityKind> units;
+  std::map<QString, GuiViewportManipulatorHandle> canvas_handles;
+  std::string retained_canvas_handle;
   std::uint32_t previous_mask{};
   std::optional<std::vector<std::string>> previous_scope;
   bool valid{}, building{};
@@ -418,6 +431,11 @@ struct ShellFeatureEditTools::Impl {
   GuiSketchScreenPoint last_pointer{};
   QString buffer;
   QString pending_focus_id;
+  bool owns_source_workflow{};
+  bool owns_history_command{};
+  bool converting_legacy{};
+  std::optional<SketchId> editing_source;
+  QPushButton* return_to_feature{};
   struct ThreadMappingDraft {
     std::optional<EngineeringResourceKey> table;
     std::string row;
@@ -439,6 +457,12 @@ struct ShellFeatureEditTools::Impl {
     status->setObjectName("blcad.feature_edit.status");
     status->setWordWrap(true);
     column->addWidget(status);
+    return_to_feature = make_gui_button("Finish Sketch and return to Hole", content);
+    return_to_feature->setObjectName("blcad.hole.breadcrumb");
+    return_to_feature->hide();
+    column->addWidget(return_to_feature);
+    QObject::connect(return_to_feature, &QPushButton::clicked, &owner,
+                     [this] { (void)window.finish_active_sketch(); });
     dynamic = new QComboBox(content);
     dynamic->setObjectName("blcad.feature_edit.dynamic");
     dynamic->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
@@ -525,19 +549,46 @@ struct ShellFeatureEditTools::Impl {
     return feature_input_cache ? &*feature_input_cache : session.part_shape_cache();
   }
   bool input_body_available(const Body& body) const {
-    return body_available(body) && input_cache() && input_cache()->find_body_shape(body.id());
+    return body.kind() == BodyKind::Solid && input_cache() &&
+           input_cache()->find_body_shape(body.id()) &&
+           (support_editing || (body.visibility() == BodyVisibility::Visible &&
+                                session.presentation_visible("body/" + body.id().value())));
+  }
+  std::string input_body_label(const Body& body) const {
+    if (!support_editing)
+      return body.name();
+    if (body.visibility() == BodyVisibility::Hidden ||
+        !session.presentation_visible("body/" + body.id().value()))
+      return body.name() + " (hidden input)";
+    if (!session.part_shape_cache()->find_body_shape(body.id()))
+      return body.name() + " (input history)";
+    return body.name();
   }
   std::string body_selection_id(const BodyId& body) const {
     return (feature_input_cache ? "feature-input/body/" : "body/") + body.value();
+  }
+  std::optional<std::size_t> input_prefix() const {
+    return feature_input_prefix ? feature_input_prefix : session.history_prefix_count();
   }
   bool can_create() const {
     const auto* part = session.part_document();
     return part && !part->is_reference_part() && session.workspace() == GuiWorkspace::Part &&
            session.part_modeling_ready() && !session.reference_repair_mode() &&
-           !session.task().active() && !session.part_workflow_active() && !window.active_sketch() &&
-           !edit.active() &&
+           !session.task().active() &&
+           (!session.part_workflow_active() ||
+            (session.history_prefix_ready() && !session.part_history_command_active())) &&
+           !window.active_sketch() && !edit.active() &&
            std::any_of(part->bodies().begin(), part->bodies().end(),
                        [this](const auto& b) { return body_available(b); });
+  }
+  Result<std::size_t> record_position(const Json& root) const {
+    if (root.contains(collection) && root.at(collection).is_array()) {
+      const auto& records = root.at(collection);
+      for (std::size_t index = 0; index < records.size(); ++index)
+        if (records.at(index).at("id") == edit.feature().value())
+          return Result<std::size_t>::success(index);
+    }
+    return Result<std::size_t>::failure(error("The active feature record is unavailable."));
   }
   Result<std::size_t> start_creation(const PartDocument& seed, FeatureId id, Kind kind,
                                      std::string draft_namespace) {
@@ -549,6 +600,14 @@ struct ShellFeatureEditTools::Impl {
                                       : edit.begin_new_hole(session, id);
     if (!begun)
       return begun;
+    if (session.history_prefix_count()) {
+      auto command = session.begin_part_history_command(task_id);
+      if (!command) {
+        edit.cancel();
+        return command;
+      }
+      owns_history_command = true;
+    }
     entry_revision = session.model_revision();
     entry_camera = viewport.camera_bookmark();
     entry_selection = session.selection();
@@ -574,27 +633,44 @@ struct ShellFeatureEditTools::Impl {
     source_text = original.value();
     source = Json::parse(encoded.value());
     collection = kind == Kind::Thread ? "thread_features" : "hole_features";
-    record_index = source.at(collection).size() - 1;
+    const auto position = record_position(source);
+    if (!position) {
+      edit.cancel();
+      if (owns_history_command)
+        session.cancel_part_history_command();
+      owns_history_command = false;
+      creating = false;
+      pending_parameters.clear();
+      return Result<std::size_t>::failure(position.error());
+    }
+    record_index = position.value();
     record = source.at(collection).at(record_index);
     parameter_values.clear();
     array_templates.clear();
     if (!session.task().begin(task_id) || !session.task().begin_parameter_editing() ||
         !session.task().show_preview()) {
       edit.cancel();
+      if (owns_history_command)
+        session.cancel_part_history_command();
+      owns_history_command = false;
       creating = false;
       pending_parameters.clear();
       return Result<std::size_t>::failure(error("Could not start feature creation task."));
     }
     dock->setWindowTitle(kind == Kind::Thread ? "Create Thread" : "Create Hole");
-    dynamic->hide();
-    dynamic_label->hide();
-    another->setVisible(kind == Kind::Hole);
+    dynamic->show();
+    dynamic_label->show();
+    dynamic_label->setText("Canvas Control");
+    another->show();
     guidance->setText(
         kind == Kind::Thread
             ? "Choose the target and exterior cylindrical or conical support. Edit the "
-              "profile and interval, then Apply. Modeled taper remains unsupported."
+              "profile and interval, then Apply. Create Another retains the configuration in a "
+              "fresh draft; choose another interval or target as needed. Modeled taper remains "
+              "unsupported."
             : "Choose target and support, then edit local X/Y positions, recipe and dimensions. "
-              "Apply creates one Hole; Create Another opens a fresh draft.");
+              "Apply creates one Hole; Create Another retains the recipe with fresh owned inputs. "
+              "Choose the next positions before Apply.");
     build_form();
     pick_mode();
     dock->show();
@@ -603,18 +679,63 @@ struct ShellFeatureEditTools::Impl {
     window.refresh();
     return Result<std::size_t>::success(1);
   }
+  Result<std::size_t> start_repetition(FeatureId previous, Kind kind, std::string old_namespace,
+                                       const std::vector<ParameterId>& owned) {
+    const auto tag = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+    const bool thread = kind == Kind::Thread;
+    const FeatureId id((thread ? "feature.thread." : "feature.hole.") + tag);
+    const std::string draft = (thread ? "thread.draft." : "hole.draft.") + tag;
+    const auto* part = session.part_document();
+    const auto count = thread ? part->thread_features().size() : part->hole_features().size();
+    auto seed = GuiHoleThreadRepeatCommands::create(
+        *part, previous, id, (thread ? "Thread " : "Hole ") + std::to_string(count + 1),
+        std::move(old_namespace), draft, owned, session.history_prefix_count());
+    if (!seed)
+      return Result<std::size_t>::failure(seed.error());
+    if (thread) {
+      const auto& next = *seed.value().find_thread_feature(id);
+      auto collected = collect_thread_supports(next.target_body());
+      if (!collected)
+        return collected;
+      thread_support_override = next.support();
+      thread_support_id.clear();
+      for (const auto& choice : thread_supports)
+        if (face_identity(choice.reference) == face_identity(next.support()))
+          thread_support_id = choice.semantic_id;
+      if (thread_support_id.empty()) {
+        thread_support_id = "repeat/current-thread-support";
+        thread_supports.push_back({thread_support_id, "Previous support", next.support(), {}, {}});
+      }
+    } else {
+      const auto& next = *seed.value().find_hole_feature(id);
+      auto collected = collect_supports(next.target_body());
+      if (!collected)
+        return collected;
+      support_override = next.support();
+      pending_support_plane.reset();
+      if (std::none_of(supports.begin(), supports.end(), [&](const auto& choice) {
+            return plane_identity(choice.reference) == plane_identity(next.support());
+          }))
+        supports.push_back({"repeat/current-hole-support", "Previous support", next.support(), {}});
+    }
+    return start_creation(seed.value(), id, kind, draft);
+  }
   Result<std::size_t> collect_thread_supports(const BodyId& body) {
     thread_supports.clear();
     const auto* part = session.part_document();
     const auto* cache = input_cache();
     if (!part || !cache || !part->find_body(body) || !input_body_available(*part->find_body(body)))
-      return Result<std::size_t>::failure(error("Choose a current visible solid target."));
+      return Result<std::size_t>::failure(
+          error(support_editing ? "Choose a Solid available before this feature."
+                                : "Choose a current visible solid target."));
     auto context = make_step_import_context(session);
     if (!context)
       return Result<std::size_t>::failure(context.error());
     auto faces = geometry::FinishingSelectionBuilder::build(
         *part, *cache, body, PartFeatureInputRole::ShellRemovalFace, context.value().get(),
-        feature_input_prefix);
+        input_prefix(),
+        support_editing ? geometry::FinishingSelectionVisibility::IncludeHiddenInputs
+                        : geometry::FinishingSelectionVisibility::VisibleOnly);
     if (!faces)
       return Result<std::size_t>::failure(faces.error());
     for (const auto& face : faces.value()) {
@@ -639,13 +760,13 @@ struct ShellFeatureEditTools::Impl {
         continue;
       auto inspected = geometry::ThreadAdapter::inspect_support(
           *part, body, selected.value(), *cache, ThreadDirection::AlongSupportAxis,
-          context.value().get(), feature_input_prefix);
+          context.value().get(), input_prefix());
       auto direction = ThreadDirection::AlongSupportAxis;
       if (inspected && inspected.value().radius_mm <= 1e-7) {
         direction = ThreadDirection::OppositeSupportAxis;
         inspected = geometry::ThreadAdapter::inspect_support(*part, body, selected.value(), *cache,
                                                              direction, context.value().get(),
-                                                             feature_input_prefix);
+                                                             input_prefix());
       }
       if (inspected && inspected.value().radius_mm > 1e-7)
         thread_supports.push_back({face.semantic_id, face.label, selected.value(), face.shape,
@@ -667,12 +788,41 @@ struct ShellFeatureEditTools::Impl {
       for (const auto& support : supports)
         callback(support);
   }
+  Result<Json> encode_thread_support(const FaceReference& support) const {
+    auto canonical = deserialize_part_document_from_json(source.dump());
+    if (!canonical)
+      return Result<Json>::failure(canonical.error());
+    const auto original = *canonical.value().find_thread_feature(edit.feature());
+    auto rebound = ThreadFeature::create(original.id(), original.name(),
+                                         BodyId(record.at("target_body").get<std::string>()),
+                                         support, original.thread(), original.direction());
+    if (!rebound)
+      return Result<Json>::failure(rebound.error());
+    auto updated = canonical.value().update_thread_feature(std::move(rebound.value()));
+    if (!updated)
+      return Result<Json>::failure(updated.error());
+    auto encoded = serialize_part_document_to_json(canonical.value());
+    if (!encoded)
+      return Result<Json>::failure(encoded.error());
+    const auto root = Json::parse(encoded.value());
+    const auto position = record_position(root);
+    if (!position)
+      return Result<Json>::failure(position.error());
+    return Result<Json>::success(root.at(collection).at(position.value()).at("support"));
+  }
   bool choose_support(int index) {
     if (edit.kind() == Kind::Thread) {
       thread_support_override.reset();
       thread_support_id.clear();
       if (index < 0 || std::size_t(index) >= thread_supports.size())
         return false;
+      auto encoded = encode_thread_support(thread_supports[index].reference);
+      if (!encoded) {
+        support_error = encoded.error();
+        return false;
+      }
+      record["support"] = std::move(encoded.value());
+      support_error.reset();
       thread_support_override = thread_supports[index].reference;
       thread_support_id = thread_supports[index].semantic_id;
     } else {
@@ -690,7 +840,9 @@ struct ShellFeatureEditTools::Impl {
     const auto* part = session.part_document();
     const auto* cache = input_cache();
     if (!part || !cache || !part->find_body(body) || !input_body_available(*part->find_body(body)))
-      return Result<std::size_t>::failure(error("Choose a current visible solid target."));
+      return Result<std::size_t>::failure(
+          error(support_editing ? "Choose a Solid available before this feature."
+                                : "Choose a current visible solid target."));
     const auto add_plane = [&](const auto& plane, bool construction, const char* prefix) {
       if (!geometry::WorkplaneResolver{}.resolve(*part, DatumPlaneId(plane.id().value()), *cache))
         return;
@@ -717,7 +869,9 @@ struct ShellFeatureEditTools::Impl {
       return Result<std::size_t>::failure(context.error());
     auto faces = geometry::FinishingSelectionBuilder::build(
         *part, *cache, body, PartFeatureInputRole::ShellRemovalFace, context.value().get(),
-        feature_input_prefix);
+        input_prefix(),
+        support_editing ? geometry::FinishingSelectionVisibility::IncludeHiddenInputs
+                        : geometry::FinishingSelectionVisibility::VisibleOnly);
     if (!faces)
       return Result<std::size_t>::failure(faces.error());
     for (const auto& face : faces.value())
@@ -760,8 +914,8 @@ struct ShellFeatureEditTools::Impl {
         return fresh;
     }
     if (feature_input_cache) {
-      auto scene = geometry::ViewportSceneBuilder{context.value().get()}.build_part(
-          *part, *cache, feature_input_prefix);
+      auto scene = geometry::ViewportSceneBuilder{context.value().get()}.build_part(*part, *cache,
+                                                                                    input_prefix());
       if (!scene)
         return Result<std::size_t>::failure(scene.error());
       for (auto& choice : supports)
@@ -780,13 +934,12 @@ struct ShellFeatureEditTools::Impl {
   }
   Result<std::size_t> prepare_support_editing() {
     const auto* part = session.part_document();
-    if (!hole_thread() || session.history_prefix_count())
+    if (!hole_thread())
       return Result<std::size_t>::success(0);
     const BodyId body(record.at("target_body").get<std::string>());
     const auto* target = part->find_body(body);
-    if (!target || !body_available(*target))
+    if (!target || target->kind() != BodyKind::Solid)
       return Result<std::size_t>::success(0);
-    support_editing = true;
     auto history = part->executable_history();
     if (!history)
       return Result<std::size_t>::failure(history.error());
@@ -808,6 +961,12 @@ struct ShellFeatureEditTools::Impl {
     if (!evaluated)
       return Result<std::size_t>::failure(evaluated.error());
     feature_input_cache = std::move(cache.value());
+    if (!feature_input_cache->find_body_shape(body)) {
+      feature_input_cache.reset();
+      feature_input_prefix.reset();
+      return Result<std::size_t>::success(0);
+    }
+    support_editing = true;
     auto collected =
         edit.kind() == Kind::Thread ? collect_thread_supports(body) : collect_supports(body);
     support_error = collected ? std::nullopt : std::optional(collected.error());
@@ -822,7 +981,7 @@ struct ShellFeatureEditTools::Impl {
         }
       auto inspected = geometry::ThreadAdapter::inspect_support(
           *part, body, current, *feature_input_cache, ThreadDirection::AlongSupportAxis,
-          context.value().get(), feature_input_prefix);
+          context.value().get(), input_prefix());
       thread_support_id = "feature-input/current-thread-support";
       thread_supports.push_back(
           {thread_support_id,
@@ -855,7 +1014,9 @@ struct ShellFeatureEditTools::Impl {
         continue;
       auto faces = geometry::FinishingSelectionBuilder::build(
           *part, *cache, body.id(), PartFeatureInputRole::ShellRemovalFace, context.value().get(),
-          feature_input_prefix);
+          input_prefix(),
+          support_editing ? geometry::FinishingSelectionVisibility::IncludeHiddenInputs
+                          : geometry::FinishingSelectionVisibility::VisibleOnly);
       if (!faces)
         return Result<std::size_t>::failure(faces.error());
       for (const auto& face : faces.value()) {
@@ -907,10 +1068,13 @@ struct ShellFeatureEditTools::Impl {
         auto encoded = serialize_part_document_to_json(candidate.value());
         if (!encoded)
           return Result<std::size_t>::failure(encoded.error());
+        const auto root = Json::parse(encoded.value());
+        const auto position = record_position(root);
+        if (!position)
+          return Result<std::size_t>::failure(position.error());
         limit_faces.push_back(
             {face.semantic_id, body.name() + " / " + face.label, selected.value(), face.shape,
-             Json::parse(encoded.value()).at(collection).at(record_index).at("extent").at("face"),
-             body.id()});
+             root.at(collection).at(position.value()).at("extent").at("face"), body.id()});
       }
     }
     if (context.value()) {
@@ -929,22 +1093,31 @@ struct ShellFeatureEditTools::Impl {
     const geometry::ViewportSceneBuilder builder{context.value().get()};
     auto scoped =
         builder.build_part(*session.part_document(), *feature_input_cache, feature_input_prefix);
-    auto original = builder.build_part(*session.part_document(), *session.part_shape_cache());
+    auto original = builder.build_part(*session.part_document(), *session.part_shape_cache(),
+                                       session.history_prefix_count());
     if (!scoped || !original)
       return Result<std::size_t>::failure(scoped ? original.error() : scoped.error());
     std::vector<geometry::GeometryShape> shapes;
     std::vector<std::string> replaced;
-    for (const auto& item : scoped.value())
-      if (body_item(item) && session.presentation_visible(item.semantic_id))
-        shapes.push_back(item.shape);
+    // An explicit history edit temporarily exposes its input geometry. Display
+    // filtering belongs to the accepted scene and must not erase hidden or
+    // subsequently consumed predecessors from this disposable picking model.
+    for (const auto& cached : feature_input_cache->body_shapes())
+      if (session.part_document()->find_body(cached.body_id) && !cached.shape.empty())
+        shapes.push_back(cached.shape);
     for (const auto& item : original.value())
       if (body_item(item) || item.kind == geometry::ViewportSceneKind::Datum)
         replaced.push_back(item.semantic_id);
     return viewport.set_feature_previews(std::move(shapes), std::move(replaced));
   }
   void pick_mode() {
+    refresh_preset_actions();
     if (!input_selection() || !edit.active())
       return;
+    if (picking != Pick::None && layer.active_handle_id().empty()) {
+      (void)layer.set_handles({});
+      overlay->hide();
+    }
     if (!support_chosen) {
       valid = false;
       viewport.clear_feature_preview();
@@ -975,6 +1148,26 @@ struct ShellFeatureEditTools::Impl {
             targets.push_back({geometry::ViewportSceneKind::SolidBody, id,
                                *feature_input_cache->find_body_shape(body.id())});
         }
+    } else if (picking == Pick::Position) {
+      auto context = make_step_import_context(session);
+      if (!context) {
+        (void)reject(context.error());
+        return;
+      }
+      auto scene = geometry::ViewportSceneBuilder{context.value().get()}.build_part(
+          *session.part_document(), *input_cache(), input_prefix());
+      if (!scene) {
+        (void)reject(scene.error());
+        return;
+      }
+      const auto choices = point_choices();
+      for (auto& item : scene.value())
+        if (std::any_of(choices.begin(), choices.end(),
+                        [&](const auto& choice) { return choice.semantic == item.semantic_id; })) {
+          item.semantic_id = "hole-input/" + item.semantic_id;
+          scope.push_back(item.semantic_id);
+          targets.push_back(std::move(item));
+        }
     } else if (picking == Pick::Support) {
       each_support([&](const auto& choice) {
         scope.push_back(choice.semantic_id);
@@ -997,6 +1190,7 @@ struct ShellFeatureEditTools::Impl {
         body_pick                  ? selection_kind_bit(GuiSelectionKind::Body)
         : picking == Pick::Support ? selection_kind_bit(GuiSelectionKind::Face) |
                                          selection_kind_bit(GuiSelectionKind::Datum)
+        : picking == Pick::Position  ? selection_kind_bit(GuiSelectionKind::SketchEntity)
         : picking == Pick::LimitFace ? selection_kind_bit(GuiSelectionKind::Face)
                                      : 0);
     if (target_selector)
@@ -1052,7 +1246,7 @@ struct ShellFeatureEditTools::Impl {
     register_field(spin, path);
     numbers[path] = spin;
     units[path] = unit;
-    if (!unitless)
+    if (!unitless && (!hole_thread() || canvas_path(path)))
       dynamic->addItem(path_label(path), path);
     return spin;
   }
@@ -1061,6 +1255,24 @@ struct ShellFeatureEditTools::Impl {
     for (const auto& part : path.split('/', Qt::SkipEmptyParts))
       result.push_back(label(part.toStdString()));
     return result.join(" / ");
+  }
+  bool canvas_path(const QString& path) const {
+    if (path == "/thread/length" || path == "/thread/start")
+      return true;
+    if (edit.kind() != Kind::Hole)
+      return false;
+    if (record.contains("manufacturing") &&
+        record.at("manufacturing").value("kind", "") == "slot" &&
+        (path.startsWith("/placements/") || path.contains("diameter")))
+      return false; // Slot position/width are authored by its source profile.
+    return (path.startsWith("/placements/") &&
+            (path.endsWith("/position/x") || path.endsWith("/position/y"))) ||
+           path == "/diameter/parameter" || path == "/extent/depth" ||
+           path == "/extent/total_depth" ||
+           (path.startsWith("/manufacturing/") &&
+            (path.endsWith("/diameter/parameter") || path.endsWith("/depth/parameter") ||
+             path.endsWith("/minimum_diameter/parameter") ||
+             path.endsWith("/maximum_diameter/parameter")));
   }
   QComboBox* combo(QWidget* parent) {
     auto* box = new QComboBox(parent);
@@ -1110,7 +1322,7 @@ struct ShellFeatureEditTools::Impl {
       if (input_selection() && key == "target_body") {
         for (const auto& body : part.bodies())
           if (input_body_available(body))
-            result.emplace_back(body.id().value(), body.name());
+            result.emplace_back(body.id().value(), input_body_label(body));
       } else
         add(part.bodies());
     } else if (key == "source_feature" || key == "target_feature" || key == "feature") {
@@ -1165,14 +1377,78 @@ struct ShellFeatureEditTools::Impl {
     if (selected.formula())
       scalar->setToolTip("Formula: " + QString::fromStdString(*selected.formula()));
     layout->addWidget(scalar);
+    QPushButton* independent = nullptr;
+    if (hole_thread()) {
+      independent = make_gui_button("Make Independent", row);
+      independent->setVisible(
+          selected.is_expression() ||
+          std::none_of(pending_parameters.begin(), pending_parameters.end(),
+                       [&](const auto& pending) { return pending.id() == selected.id(); }));
+      independent->setObjectName("blcad.feature_edit.independent" + path);
+      independent->setToolTip(
+          "Create an owned value without changing the shared parameter or formula.");
+      layout->addWidget(independent);
+      QObject::connect(independent, &QPushButton::clicked, &owner, [this, path] {
+        auto canonical = deserialize_part_document_from_json(source.dump());
+        const auto* original = parameter(value(path).get<std::string>());
+        if (!canonical || !original) {
+          window.report_error(canonical ? error("The bound parameter is unavailable.")
+                                        : canonical.error());
+          return;
+        }
+        const auto id =
+            ParameterId(recipe_namespace + ".override." +
+                        QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString());
+        std::size_t index = 1;
+        std::string name;
+        do {
+          name = original->name() + "_independent_" + std::to_string(index++);
+        } while (canonical.value().find_parameter(std::string_view(name)));
+        auto quantity = original->type() == ParameterType::Angle
+                            ? Quantity::angle_deg(parameter_value(*original))
+                        : original->type() == ParameterType::Count
+                            ? Quantity::count(parameter_value(*original))
+                            : Quantity::length_mm(parameter_value(*original));
+        if (!quantity) {
+          window.report_error(quantity.error());
+          return;
+        }
+        auto owned = original->type() == ParameterType::Angle
+                         ? Parameter::create_angle(id, name, quantity.value(), original->scope())
+                     : original->type() == ParameterType::Count
+                         ? Parameter::create_count(id, name, quantity.value(), original->scope())
+                         : Parameter::create_length(id, name, quantity.value(), original->scope());
+        if (!owned) {
+          window.report_error(owned.error());
+          return;
+        }
+        auto added = canonical.value().add_parameter(owned.value());
+        auto encoded = added ? serialize_part_document_to_json(canonical.value())
+                             : Result<std::string>::failure(added.error());
+        if (!encoded) {
+          window.report_error(encoded.error());
+          return;
+        }
+        source["parameters"] = Json::parse(encoded.value()).at("parameters");
+        pending_parameters.push_back(std::move(owned.value()));
+        value(path) = id.value();
+        deferred_rebuild();
+      });
+    }
     form->addRow(label(key), row);
     QObject::connect(
-        binding, &QComboBox::currentIndexChanged, &owner, [this, path, binding, scalar] {
+        binding, &QComboBox::currentIndexChanged, &owner,
+        [this, path, binding, scalar, independent] {
           value(path) = binding->currentData().toString().toStdString();
           const auto* p = parameter(value(path).get<std::string>());
           const QSignalBlocker block(scalar);
           scalar->setValue(parameter_value(*p));
           scalar->setEnabled(!p->is_expression());
+          if (independent)
+            independent->setVisible(
+                p->is_expression() ||
+                std::none_of(pending_parameters.begin(), pending_parameters.end(),
+                             [&](const auto& pending) { return pending.id() == p->id(); }));
           scalar->setToolTip(p->formula() ? "Formula: " + QString::fromStdString(*p->formula())
                                           : QString());
           if (thread_mapping_pending && thread_mapping_error)
@@ -1204,6 +1480,10 @@ struct ShellFeatureEditTools::Impl {
     return {};
   }
   void deferred_rebuild() {
+    if (hole_thread() && retained_canvas_handle.empty())
+      if (const auto selected = canvas_handles.find(dynamic->currentData().toString());
+          selected != canvas_handles.end())
+        retained_canvas_handle = selected->second.id;
     if (const auto focus = retained_focus_id(); !focus.isEmpty())
       pending_focus_id = focus;
     scroll->widget()->setEnabled(false);
@@ -1260,6 +1540,12 @@ struct ShellFeatureEditTools::Impl {
       (void)reject(encoded.error());
       return;
     }
+    auto root = Json::parse(encoded.value());
+    const auto position = record_position(root);
+    if (!position) {
+      (void)reject(position.error());
+      return;
+    }
     pending_parameters.clear();
     std::erase_if(parameter_values, [this](const auto& entry) {
       return !session.part_document()->find_parameter(ParameterId(entry.first));
@@ -1267,7 +1553,8 @@ struct ShellFeatureEditTools::Impl {
     for (const auto& parameter : candidate.value().parameters())
       if (!session.part_document()->find_parameter(parameter.id()))
         pending_parameters.push_back(parameter);
-    source = Json::parse(encoded.value());
+    source = std::move(root);
+    record_index = position.value();
     record = source.at(collection).at(record_index);
     deferred_rebuild();
   }
@@ -1337,7 +1624,9 @@ struct ShellFeatureEditTools::Impl {
   }
   void build_thread_mapping(QFormLayout* form) {
     auto& draft = *thread_mapping;
-    const auto& resources = session.part_document()->engineering_resources();
+    auto pending = deserialize_part_document_from_json(source.dump());
+    const auto& resources = pending ? pending.value().engineering_resources()
+                                    : session.part_document()->engineering_resources();
     const auto add = [&](const char* field, const QString& title) {
       auto* input = combo(form->parentWidget());
       input->setObjectName("blcad.thread.standard." + QString::fromLatin1(field));
@@ -1777,7 +2066,7 @@ struct ShellFeatureEditTools::Impl {
       for (const auto& body : session.part_document()->bodies())
         if (input_body_available(body) &&
             body.id().value() != record.at("target_body").get<std::string>()) {
-          add_choice(input, body.id().value(), body.name());
+          add_choice(input, body.id().value(), input_body_label(body));
           if (limit_chosen &&
               body.id().value() == record.at("extent").at("body").get<std::string>())
             selected = input->count() - 1;
@@ -1813,7 +2102,173 @@ struct ShellFeatureEditTools::Impl {
                        (void)preview();
                      });
   }
+  struct PointChoice {
+    QStringList key;
+    std::string label, semantic;
+  };
+  std::vector<PointChoice> point_choices() const {
+    std::vector<PointChoice> choices;
+    for (const auto& sketch : session.part_document()->sketches()) {
+      const auto add = [&](const auto& points) {
+        for (const auto& point : points)
+          choices.push_back({{QString::fromStdString(sketch.id().value()),
+                              QString::fromStdString(point.id().value())},
+                             sketch.name() + " / " + point.id().value(),
+                             "sketch/" + sketch.id().value() + "/entity/" + point.id().value()});
+      };
+      add(sketch.points());
+      add(sketch.projected_points());
+    }
+    return choices;
+  }
+  Result<Point2> independent_position(const Json& placement) const {
+    const auto& part = *session.part_document();
+    const auto* cache = input_cache();
+    const auto* sketch = part.find_sketch(SketchId(placement.at("sketch").get<std::string>()));
+    if (!sketch || !cache)
+      return Result<Point2>::failure(error("The referenced position is unavailable."));
+    auto context = make_step_import_context(session);
+    if (!context)
+      return Result<Point2>::failure(context.error());
+    const geometry::WorkplaneResolver resolver;
+    auto frame = resolver.resolve_for_sketch(part, *sketch, *cache);
+    if (!frame)
+      return Result<Point2>::failure(frame.error());
+    Point2 local;
+    const SketchEntityId id(placement.at("point").get<std::string>());
+    if (const auto* point = sketch->find_point(id))
+      local = point->position();
+    else if (const auto* projected = sketch->find_projected_point(id)) {
+      auto resolved =
+          geometry::SketchReferenceProjector{}.resolve_point(part, *sketch, *projected, *cache);
+      if (!resolved)
+        return Result<Point2>::failure(resolved.error());
+      local = resolved.value().position;
+    } else
+      return Result<Point2>::failure(error("The referenced point is unavailable."));
+    // Correcting a placement must remain possible while another form value
+    // (or Slot's owned-origin requirement) is invalid. Resolve the already
+    // selected typed support without decoding those unrelated pending fields.
+    const auto* current = part.find_hole_feature(edit.feature());
+    const auto* selected_support = input_selection() && support_override ? &*support_override
+                                   : current                             ? &current->support()
+                                                                         : nullptr;
+    if (!selected_support || (input_selection() && !support_chosen))
+      return Result<Point2>::failure(
+          error("Choose a current support before converting the position."));
+    auto support = geometry::GeometryRecomputeExecutor{context.value().get()}.resolve_hole_support(
+        part, *selected_support, *cache, FeatureId(""), input_prefix());
+    if (pending_support_plane)
+      if (const auto* plane = std::get_if<DatumPlaneId>(&selected_support->source());
+          plane && *plane == pending_support_plane->id()) {
+        auto resolved = geometry::ResultFaceSupportGeometry::resolve(part, *pending_support_plane,
+                                                                     *cache, context.value().get());
+        if (!resolved)
+          return Result<Point2>::failure(resolved.error());
+        support = std::move(resolved);
+      }
+    if (!support)
+      return Result<Point2>::failure(support.error());
+    const auto world = resolver.evaluate_point(frame.value(), local);
+    const Vector3 delta{world.x - support.value().origin.x, world.y - support.value().origin.y,
+                        world.z - support.value().origin.z};
+    if (std::abs(dot(delta, support.value().normal)) > 1e-7)
+      return Result<Point2>::failure(error("The referenced point must lie on the support plane."));
+    return Result<Point2>::success(
+        {dot(delta, support.value().x_axis), dot(delta, support.value().y_axis)});
+  }
+  void bind_point(const QString& path, const QStringList& key) {
+    const auto id = value(path).at("id");
+    value(path) = Json{{"id", id},
+                       {"kind", "sketch_point"},
+                       {"sketch", key.at(0).toStdString()},
+                       {"point", key.at(1).toStdString()}};
+    picking = Pick::None;
+    deferred_rebuild();
+  }
+  void build_position(QFormLayout* form, const QString& path, const Json& placement) {
+    const bool referenced = placement.at("kind") == "sketch_point";
+    const auto choices = point_choices();
+    auto* source_kind = combo(form->parentWidget());
+    source_kind->addItem("Independent point", "owned_point");
+    source_kind->addItem("Referenced Sketch point", "sketch_point");
+    source_kind->setCurrentIndex(referenced ? 1 : 0);
+    register_field(source_kind, path + "/kind");
+    form->addRow("Position Source", source_kind);
+    QObject::connect(
+        source_kind, &QComboBox::currentIndexChanged, &owner,
+        [this, path, choices, source_kind](int index) {
+          if (index == 1) {
+            if (!choices.empty())
+              bind_point(path, choices.front().key);
+            else {
+              const QSignalBlocker blocked(source_kind);
+              source_kind->setCurrentIndex(0);
+              status->setText("Create a Sketch point before selecting a referenced position.");
+            }
+          } else {
+            auto local = independent_position(value(path));
+            if (!local) {
+              const QSignalBlocker blocked(source_kind);
+              source_kind->setCurrentIndex(1);
+              window.report_error(local.error());
+              return;
+            }
+            const auto id = value(path).at("id");
+            value(path) = Json{{"id", id},
+                               {"kind", "owned_point"},
+                               {"position", {{"x", local.value().x}, {"y", local.value().y}}}};
+            deferred_rebuild();
+          }
+        });
+    if (!referenced) {
+      build_fields(form, Json{{"position", placement.at("position")}}, path);
+      return;
+    }
+    auto* point = combo(form->parentWidget());
+    const QStringList selected{QString::fromStdString(placement.at("sketch").get<std::string>()),
+                               QString::fromStdString(placement.at("point").get<std::string>())};
+    for (const auto& choice : choices)
+      point->addItem(QString::fromStdString(choice.label), choice.key);
+    point->setCurrentIndex(point->findData(selected));
+    register_field(point, path + "/point");
+    auto* selector = new ShellPropertySelector(
+        "blcad.hole.position" + path, "Sketch Point", *point, owner,
+        [this, path](bool active) {
+          picking = active ? Pick::Position : Pick::None;
+          picking_position = active ? path : QString{};
+          pick_mode();
+          if (!active)
+            (void)preview();
+        },
+        form->parentWidget());
+    form->addRow(selector);
+    QObject::connect(point, &QComboBox::currentIndexChanged, &owner,
+                     [this, path, point](int index) {
+                       if (index >= 0)
+                         bind_point(path, point->currentData().toStringList());
+                       else {
+                         picking = Pick::Position;
+                         picking_position = path;
+                         pick_mode();
+                       }
+                     });
+    auto* edit_source = make_gui_button("Edit Source Sketch", form->parentWidget());
+    edit_source->setObjectName("blcad.hole.edit_source" + path);
+    edit_source->setEnabled(!session.history_prefix_count() || owns_history_command);
+    form->addRow(edit_source);
+    QObject::connect(edit_source, &QPushButton::clicked, &owner, [this, selected] {
+      auto entered = owner.edit_source_sketch(SketchId(selected.at(0).toStdString()));
+      if (!entered)
+        window.report_error(entered.error());
+    });
+  }
   void build_fields(QFormLayout* form, const Json& object, const QString& prefix) {
+    if (edit.kind() == Kind::Hole && prefix.startsWith("/placements/") && prefix.count('/') == 2 &&
+        object.is_object() && object.contains("kind")) {
+      build_position(form, prefix, object);
+      return;
+    }
     for (auto it = object.begin(); it != object.end(); ++it) {
       const auto key = it.key();
       if ((key == "id" && !prefix.endsWith("/table")) || key == "type")
@@ -2106,11 +2561,128 @@ struct ShellFeatureEditTools::Impl {
       });
     }
   }
+  QString preset_path() const {
+    const auto override = qEnvironmentVariable("BLCAD_PRESETS_PATH");
+    return override.isEmpty()
+               ? QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) +
+                     "/feature-presets.json"
+               : override;
+  }
+  const GuiHoleThreadPreset* selected_preset() const {
+    const auto name = retained_preset_name.trimmed().toStdString();
+    const auto found = std::find_if(presets.begin(), presets.end(), [&](const auto& preset) {
+      return preset.name == name && preset.hole() == (edit.kind() == Kind::Hole);
+    });
+    return found == presets.end() ? nullptr : &*found;
+  }
+  void refresh_preset_actions() {
+    if (!preset_name)
+      return;
+    const bool idle = edit.active() && !building && !editing_source && picking == Pick::None &&
+                      layer.active_handle_id().empty();
+    preset_name->setEnabled(idle);
+    preset_load->setEnabled(idle && preset_library_valid && selected_preset());
+    preset_remove->setEnabled(idle && preset_library_valid && selected_preset());
+    preset_save->setEnabled(idle && preset_library_valid && valid &&
+                            !retained_preset_name.trimmed().isEmpty());
+  }
+  void build_presets(QVBoxLayout* column) {
+    auto* group = new QGroupBox("Property Presets");
+    auto* form = make_form(group);
+    preset_name = combo(group);
+    preset_name->setEditable(true);
+    preset_name->setObjectName("blcad.feature_preset.name");
+    auto loaded = GuiHoleThreadPresetCommands::load(preset_path());
+    preset_library_valid = bool(loaded);
+    presets = loaded ? std::move(loaded.value()) : std::vector<GuiHoleThreadPreset>{};
+    for (const auto& preset : presets)
+      if (preset.hole() == (edit.kind() == Kind::Hole))
+        preset_name->addItem(QString::fromStdString(preset.name));
+    preset_name->setCurrentText(retained_preset_name);
+    form->addRow("Name", preset_name);
+    auto* buttons = new QWidget(group);
+    auto* row = new QHBoxLayout(buttons);
+    row->setContentsMargins(0, 0, 0, 0);
+    const auto button = [&](const char* text, const char* id) {
+      auto* result = new QPushButton(QString::fromLatin1(text), buttons);
+      result->setObjectName(QString::fromLatin1(id));
+      row->addWidget(result);
+      return result;
+    };
+    preset_load = button("Load Values", "blcad.feature_preset.load");
+    preset_save = button("Save Values", "blcad.feature_preset.save");
+    preset_remove = button("Remove", "blcad.feature_preset.remove");
+    form->addRow(buttons);
+    auto* hint = new QLabel("Save Values snapshots dimensions and pinned revisions. Load Values "
+                            "keeps this feature's targets, positions and limit/profile references.",
+                            group);
+    hint->setWordWrap(true);
+    form->addRow(hint);
+    preset_status = new QLabel(group);
+    preset_status->setObjectName("blcad.feature_preset.status");
+    preset_status->setWordWrap(true);
+    if (!loaded)
+      preset_status->setText(QString::fromStdString(loaded.error().message()));
+    form->addRow(preset_status);
+    column->addWidget(group);
+    QObject::connect(preset_name, &QComboBox::currentTextChanged, &owner,
+                     [this](const QString& text) {
+                       retained_preset_name = text;
+                       refresh_preset_actions();
+                     });
+    QObject::connect(preset_load, &QPushButton::clicked, &owner, [this] {
+      const auto* selected = selected_preset();
+      if (!selected)
+        return;
+      auto destination = recipe_document(false, true);
+      auto candidate =
+          destination ? GuiHoleThreadPresetCommands::apply(
+                            *selected, std::move(destination.value()), edit.feature(),
+                            "preset.draft." +
+                                QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString())
+                      : Result<PartDocument>::failure(destination.error());
+      if (!candidate) {
+        preset_status->setText("Preset not loaded: " +
+                               QString::fromStdString(candidate.error().message()));
+        return;
+      }
+      thread_mapping.reset();
+      thread_mapping_pending = false;
+      thread_mapping_error.reset();
+      adopt_recipe(std::move(candidate));
+    });
+    QObject::connect(preset_save, &QPushButton::clicked, &owner, [this] {
+      auto candidate = recipe_document();
+      auto captured = candidate
+                          ? GuiHoleThreadPresetCommands::capture(candidate.value(), edit.feature(),
+                                                                 retained_preset_name.toStdString())
+                          : Result<GuiHoleThreadPreset>::failure(candidate.error());
+      auto saved =
+          captured ? GuiHoleThreadPresetCommands::save(preset_path(), std::move(captured.value()))
+                   : Result<std::size_t>::failure(captured.error());
+      if (!saved) {
+        preset_status->setText(QString::fromStdString(saved.error().message()));
+        return;
+      }
+      deferred_rebuild();
+    });
+    QObject::connect(preset_remove, &QPushButton::clicked, &owner, [this] {
+      auto removed = GuiHoleThreadPresetCommands::remove(
+          preset_path(), retained_preset_name.trimmed().toStdString(), edit.kind() == Kind::Hole);
+      if (!removed) {
+        preset_status->setText(QString::fromStdString(removed.error().message()));
+        return;
+      }
+      retained_preset_name.clear();
+      deferred_rebuild();
+    });
+  }
   void build_form() {
     auto focus_id = std::exchange(pending_focus_id, QString{});
     if (focus_id.isEmpty())
       focus_id = retained_focus_id();
     building = true;
+    preset_name = nullptr;
     target_field = support_field = limit_field = nullptr;
     target_selector = support_selector = limit_selector = nullptr;
     const auto selected = dynamic->currentData();
@@ -2123,7 +2695,6 @@ struct ShellFeatureEditTools::Impl {
     auto* column = new QVBoxLayout(panel);
     auto* form = make_form();
     column->addLayout(form);
-    column->addStretch();
     if (hole_thread()) {
       for (const auto* key : {"name", "placements", "target_body", "support", "direction", "kind",
                               "diameter", "manufacturing", "extent", "tip", "thread"}) {
@@ -2135,6 +2706,9 @@ struct ShellFeatureEditTools::Impl {
       }
     } else
       build_fields(form, record, {});
+    if (hole_thread())
+      build_presets(column);
+    column->addStretch();
     auto* old = scroll->takeWidget();
     scroll->setWidget(panel);
     if (old) {
@@ -2159,6 +2733,16 @@ struct ShellFeatureEditTools::Impl {
   }
   GuiPartMutation input_updates(const PartDocument& decoded) const {
     std::vector<Parameter> changes, added;
+    std::vector<EngineeringResource> resources;
+    std::vector<EngineeringResourceKey> required;
+    if (const auto* hole = decoded.find_hole_feature(edit.feature()))
+      required = hole->standard_dependencies();
+    else if (const auto* thread = decoded.find_thread_feature(edit.feature()))
+      required = thread->thread().standard_dependencies();
+    for (const auto& key : required)
+      if (!session.part_document()->engineering_resources().find(key))
+        if (const auto* resource = decoded.engineering_resources().find(key))
+          resources.push_back(*resource);
     const auto used = bound_parameters(record);
     for (const auto& p : decoded.parameters())
       if (used.contains(p.id().value()) && !session.part_document()->find_parameter(p.id()))
@@ -2173,7 +2757,14 @@ struct ShellFeatureEditTools::Impl {
       if (const auto* selected = std::get_if<DatumPlaneId>(&support_override->source());
           selected && *selected == pending_support_plane->id())
         plane = pending_support_plane;
-    return [changes, added, plane](PartDocument& part) -> Result<std::size_t> {
+    return [changes, added, plane, resources](PartDocument& part) -> Result<std::size_t> {
+      std::size_t resource_count = 0;
+      for (const auto& resource : resources) {
+        auto inserted = part.add_engineering_resource(resource);
+        if (!inserted)
+          return inserted;
+        resource_count += inserted.value();
+      }
       std::size_t plane_count = 0;
       if (plane && !part.find_result_face_workplane(plane->id())) {
         auto inserted = part.add_result_face_workplane(*plane);
@@ -2191,7 +2782,8 @@ struct ShellFeatureEditTools::Impl {
         if (!set)
           return Result<std::size_t>::failure(set.error());
       }
-      return Result<std::size_t>::success(changes.size() + added.size() + plane_count);
+      return Result<std::size_t>::success(changes.size() + added.size() + plane_count +
+                                          resource_count);
     };
   }
   Result<PartDocument> decode(bool parameter_edits = true,
@@ -2214,6 +2806,12 @@ struct ShellFeatureEditTools::Impl {
     if (!edit.active() || !session.part_document() || !session.part_modeling_ready() ||
         session.task().command_id() != task_id || session.task().stage() != GuiTaskStage::Preview)
       return false;
+    if (hole_thread() &&
+        (session.workspace() != GuiWorkspace::Part ||
+         session.part_document()->is_reference_part() || session.reference_repair_mode() ||
+         (owns_history_command && !session.part_history_command_active()) ||
+         (owns_source_workflow && !session.part_workflow_active())))
+      return false;
     auto current = serialize_part_document_to_json(*session.part_document());
     return current && current.value() == source_text;
   }
@@ -2221,10 +2819,160 @@ struct ShellFeatureEditTools::Impl {
     valid = false;
     apply->setEnabled(false);
     another->setEnabled(false);
+    refresh_preset_actions();
     viewport.clear_feature_preview();
     status->setText(QString::fromStdString(failure.message()));
     overlay->hide();
+    if (hole_thread()) {
+      canvas_handles.clear();
+      if (layer.active_handle_id().empty())
+        (void)layer.set_handles({});
+    }
     return Result<std::size_t>::failure(std::move(failure));
+  }
+  Result<std::size_t> prepare_canvas_handles(const PartDocument& candidate,
+                                             const geometry::ShapeCache& result,
+                                             geometry::StepImportTopologyContext* context) {
+    canvas_handles.clear();
+    const auto* hole = candidate.find_hole_feature(edit.feature());
+    const auto* thread = candidate.find_thread_feature(edit.feature());
+    if (!hole && !thread)
+      return Result<std::size_t>::success(0);
+    auto history = candidate.executable_history();
+    if (!history)
+      return Result<std::size_t>::failure(history.error());
+    const auto position =
+        std::find_if(history.value().begin(), history.value().end(),
+                     [this](const auto& entry) { return entry.node_id == edit.feature().value(); });
+    if (position == history.value().end())
+      return Result<std::size_t>::failure(error("Canvas support history is unavailable."));
+    const auto prefix = std::size_t(position - history.value().begin());
+    auto inputs = geometry::ShapeCache::create(ShapeCacheId("feature.edit.canvas.inputs"));
+    if (!inputs)
+      return Result<std::size_t>::failure(inputs.error());
+    auto evaluated = geometry::GeometryRecomputeExecutor{context}.execute_history_prefix(
+        candidate, prefix, inputs.value());
+    if (!evaluated)
+      return Result<std::size_t>::failure(evaluated.error());
+    const auto body = hole ? hole->target_body() : thread->target_body();
+    const auto* before = inputs.value().find_latest_body_transform_state(body);
+    const auto* after = result.find_latest_body_transform_state(body);
+    auto inverse =
+        (before ? before->cumulative_transform : geometry::GeometryAffineTransform::identity())
+            .inverse_similarity();
+    if (!inverse)
+      return Result<std::size_t>::failure(inverse.error());
+    const auto pose = inverse.value().followed_by(
+        after ? after->cumulative_transform : geometry::GeometryAffineTransform::identity());
+    const auto shifted = [](Point3 origin, Vector3 axis, double distance) {
+      return Point3{origin.x + axis.x * distance, origin.y + axis.y * distance,
+                    origin.z + axis.z * distance};
+    };
+    Vector3 axis{}, x_axis{}, y_axis{}, normal{};
+    std::vector<Point3> centers;
+    if (hole) {
+      auto support = geometry::GeometryRecomputeExecutor{context}.resolve_hole_support(
+          candidate, hole->support(), inputs.value(), FeatureId(""), prefix);
+      if (!support)
+        return Result<std::size_t>::failure(support.error());
+      x_axis = support.value().x_axis;
+      y_axis = support.value().y_axis;
+      normal = support.value().normal;
+      const double sign = hole->direction() == HoleDirection::SupportNormal ? 1 : -1;
+      axis = {normal.x * sign, normal.y * sign, normal.z * sign};
+      const geometry::WorkplaneResolver resolver;
+      for (const auto& placement : hole->placements()) {
+        if (const auto* point = std::get_if<Point2>(&placement.source)) {
+          centers.push_back(resolver.evaluate_point(support.value(), *point));
+          continue;
+        }
+        const auto& reference = std::get<HoleSketchPointReference>(placement.source);
+        const auto& sketch = *candidate.find_sketch(reference.sketch);
+        auto frame = resolver.resolve_for_sketch(candidate, sketch, inputs.value());
+        if (!frame)
+          return Result<std::size_t>::failure(frame.error());
+        Point2 local;
+        if (const auto* point = sketch.find_point(reference.point))
+          local = point->position();
+        else {
+          const auto* projected = sketch.find_projected_point(reference.point);
+          if (!projected)
+            return Result<std::size_t>::failure(error("The position source is unavailable."));
+          auto resolved_point = geometry::SketchReferenceProjector{}.resolve_point(
+              candidate, sketch, *projected, inputs.value());
+          if (!resolved_point)
+            return Result<std::size_t>::failure(resolved_point.error());
+          local = resolved_point.value().position;
+        }
+        centers.push_back(resolver.evaluate_point(frame.value(), local));
+      }
+    } else {
+      auto support = geometry::ThreadAdapter::inspect_support(
+          candidate, body, thread->support(), inputs.value(), thread->direction(), context, prefix);
+      if (!support)
+        return Result<std::size_t>::failure(support.error());
+      centers.push_back(support.value().origin);
+      axis = support.value().axis;
+      x_axis = support.value().x_axis;
+      normal = axis;
+      y_axis = cross(normal, x_axis);
+    }
+    if (centers.empty())
+      return Result<std::size_t>::failure(error("Choose a position before using canvas controls."));
+    for (const auto& [path, input] : numbers) {
+      if (!canvas_path(path) || !input->isEnabled())
+        continue;
+      GuiViewportManipulatorHandle handle;
+      const auto identity = "feature.edit.canvas/" + edit.feature().value();
+      handle.id = identity + path.toStdString();
+      handle.reference_value = input->value();
+      auto origin = centers.front();
+      auto direction = axis;
+      const bool placement = path.startsWith("/placements/");
+      const bool diameter = path.contains("diameter");
+      if (placement) {
+        bool ok = false;
+        const auto index = path.split('/', Qt::SkipEmptyParts).at(1).toULongLong(&ok);
+        if (!ok || index >= centers.size())
+          continue;
+        origin = centers[index];
+        direction = path.endsWith("/x") ? x_axis : y_axis;
+        handle.id = identity + "/placement/" + hole->placements()[index].id.value() +
+                    (path.endsWith("/x") ? ".x" : ".y");
+      } else if (diameter) {
+        handle.kind = GuiViewportManipulatorKind::Radial;
+        direction = x_axis;
+        handle.minimum_value = 0;
+      } else {
+        handle.minimum_value = 0;
+        if (path == "/thread/length") {
+          const auto& definition = hole ? *hole->thread() : thread->thread();
+          if (definition.start())
+            origin = shifted(origin, axis,
+                             candidate.find_parameter(*definition.start())->value().millimeters());
+        }
+      }
+      if (hole && path.startsWith("/manufacturing/steps/"))
+        if (const auto* steps = std::get_if<HoleStepped>(&hole->manufacturing())) {
+          const auto fields = path.split('/', Qt::SkipEmptyParts);
+          bool ok = false;
+          const auto index = fields.at(2).toULongLong(&ok);
+          if (ok && index < steps->steps.size())
+            handle.id = identity + "/step/" + steps->steps[index].id + "/" +
+                        fields.mid(3).join('/').toStdString();
+        }
+      const auto posed_axis = pose.transform_vector(direction);
+      const double scale = length(posed_axis);
+      if (!std::isfinite(scale) || scale <= 0)
+        continue;
+      handle.origin = pose.transform_point(origin);
+      handle.axis = normalized(posed_axis);
+      handle.plane_normal = normalized(pose.transform_vector(normal));
+      handle.reference_direction = normalized(pose.transform_vector(x_axis));
+      handle.model_units_per_value = diameter ? scale / 2 : scale;
+      canvas_handles.emplace(path, std::move(handle));
+    }
+    return Result<std::size_t>::success(canvas_handles.size());
   }
   Result<std::size_t> preview() {
     if (building)
@@ -2292,8 +3040,9 @@ struct ShellFeatureEditTools::Impl {
         return reject(executed.error());
     }
     const geometry::ViewportSceneBuilder builder{context};
-    auto scene =
-        builder.build_part(candidate.value(), cache.value(), session.history_prefix_count());
+    const auto* plan = cache.value().history_plan();
+    auto scene = builder.build_part(candidate.value(), cache.value(),
+                                    plan ? plan->prefix_count : std::nullopt);
     if (!scene)
       return reject(scene.error());
     auto original = builder.build_part(*session.part_document(), *session.part_shape_cache(),
@@ -2319,6 +3068,16 @@ struct ShellFeatureEditTools::Impl {
         return reject(published.error());
     } else
       viewport.clear_feature_preview();
+    if (hole_thread()) {
+      auto handles = prepare_canvas_handles(candidate.value(), cache.value(), context);
+      dynamic->setToolTip(handles ? QStringLiteral("Choose the authored dimension to manipulate.")
+                                  : QString::fromStdString(handles.error().message()));
+    }
+    if (context) {
+      auto fresh = context->validate_sources();
+      if (!fresh)
+        return reject(fresh.error());
+    }
     valid = true;
     apply->setEnabled(layer.active_handle_id().empty());
     another->setEnabled(creating && layer.active_handle_id().empty());
@@ -2337,9 +3096,23 @@ struct ShellFeatureEditTools::Impl {
     if (!edit.active() || building)
       return;
     std::vector<GuiViewportManipulatorHandle> handles;
-    // Hole/Thread need support-anchored grips in 157B. Keep this slice numeric.
     if (hole_thread()) {
-      (void)layer.set_handles({});
+      if (!retained_canvas_handle.empty()) {
+        const QSignalBlocker blocked(dynamic);
+        int selected = 0;
+        for (const auto& [path, handle] : canvas_handles)
+          if (handle.id == retained_canvas_handle) {
+            selected = dynamic->findData(path);
+            break;
+          }
+        dynamic->setCurrentIndex(std::max(0, selected));
+        retained_canvas_handle.clear();
+      }
+      const auto path = dynamic->currentData().toString();
+      if (valid && picking == Pick::None)
+        if (auto found = canvas_handles.find(path); found != canvas_handles.end())
+          handles.push_back(found->second);
+      (void)layer.set_handles(std::move(handles));
       owner.refresh_presentation();
       return;
     }
@@ -2381,11 +3154,28 @@ struct ShellFeatureEditTools::Impl {
                  : Result<std::size_t>::failure(error("Invalid Preview"));
   }
   void finish(bool applied) {
+    canvas_handles.clear();
+    retained_canvas_handle.clear();
+    dynamic->setEnabled(true);
+    const bool rolled_back_source = (owns_source_workflow || owns_history_command) && !applied;
+    if (editing_source)
+      window.abort_feature_source_sketch_view();
+    editing_source.reset();
+    return_to_feature->hide();
+    scroll->setEnabled(true);
+    if (owns_source_workflow && !applied)
+      session.cancel_part_workflow();
+    if (owns_history_command && !applied)
+      session.cancel_part_history_command();
+    owns_source_workflow = false;
+    owns_history_command = false;
+    converting_legacy = false;
     thread_mapping.reset();
     thread_mapping_pending = false;
     thread_mapping_error.reset();
-    const bool restore_creation = input_selection() && !applied && session.part_document() &&
-                                  session.model_revision() == entry_revision;
+    const bool restore_creation =
+        input_selection() && !applied && session.part_document() &&
+        (rolled_back_source || session.model_revision() == entry_revision);
     const auto camera = entry_camera;
     const auto selection = entry_selection;
     const auto viewed = entry_viewport_selection;
@@ -2419,6 +3209,9 @@ struct ShellFeatureEditTools::Impl {
     numbers.clear();
     pending_parameters.clear();
     pending_focus_id.clear();
+    preset_name = nullptr;
+    retained_preset_name.clear();
+    presets.clear();
     supports.clear();
     limit_faces.clear();
     limit_chosen = true;
@@ -2446,6 +3239,7 @@ struct ShellFeatureEditTools::Impl {
   }
   void restore_drag() {
     layer.cancel();
+    dynamic->setEnabled(true);
     if (viewport.mouseGrabber() == &viewport)
       viewport.release_interaction_mouse();
     if (drag_start) {
@@ -2495,6 +3289,106 @@ QWidget* ShellFeatureEditTools::field(const QString& path) const {
 GuiViewportManipulatorLayer& ShellFeatureEditTools::manipulators() {
   return impl_->layer;
 }
+Result<std::size_t> ShellFeatureEditTools::begin_legacy_hole_conversion(FeatureId id) {
+  auto& p = *impl_;
+  if (active() || p.window.active_sketch() || p.session.task().active() ||
+      !p.session.part_modeling_ready() || p.session.part_workflow_active() ||
+      p.session.history_prefix_count())
+    return Result<std::size_t>::failure(error(
+        "Convert to Hole requires an idle, complete editable Part without another workflow."));
+  auto converted = GuiHoleConversionCommands::candidate(*p.session.part_document(), id);
+  if (!converted)
+    return Result<std::size_t>::failure(converted.error());
+  const auto original = p.session;
+  const auto entry_camera = p.viewport.camera_bookmark();
+  const auto entry_viewport_selection = p.viewport.selected_semantic();
+  const auto entry_mask = p.viewport.selection_filter_mask();
+  const auto entry_scope = p.viewport.selection_semantic_scope();
+  auto staged = original;
+  auto begun = staged.begin_part_workflow();
+  if (!begun)
+    return begun;
+  auto prepared =
+      staged.commit_part_transaction("Preview Hole conversion", [&](PartDocument& part) {
+        part = converted.value();
+        return Result<std::size_t>::success(1);
+      });
+  if (!prepared)
+    return Result<std::size_t>::failure(error(
+        "Conversion cannot preserve the current downstream geometry: " +
+        prepared.error().message() +
+        ". The legacy cut is unchanged; keep editing it or repair its consumers explicitly."));
+  // Compare actual common material, not just equal volume: a displaced bore
+  // must never pass a conversion-equivalence check by removing the same amount.
+  const geometry::RectangleExtrusionAdapter summary;
+  std::size_t checked = 0;
+  for (const auto& body : original.part_document()->bodies()) {
+    if (body.kind() != BodyKind::Solid)
+      continue;
+    const auto* before = original.part_shape_cache()->find_body_shape(body.id());
+    const auto* after = staged.part_shape_cache()->find_body_shape(body.id());
+    if (bool(before) != bool(after))
+      return Result<std::size_t>::failure(
+          error("Conversion changes the available Body results. The legacy cut is unchanged."));
+    if (!before)
+      continue;
+    auto common = geometry::BodyBooleanAdapter{}.combine(id, BodyBooleanOperation::Intersect,
+                                                         *before, {*after});
+    if (!common)
+      return Result<std::size_t>::failure(
+          error("Conversion cannot certify unchanged material: " + common.error().message()));
+    const double old_volume = summary.summarize(*before).volume_mm3;
+    const double new_volume = summary.summarize(*after).volume_mm3;
+    const double shared_volume = summary.summarize(common.value()).volume_mm3;
+    const double tolerance = std::max(1.0, old_volume) * 1e-8;
+    if (!std::isfinite(old_volume) || !std::isfinite(new_volume) || !std::isfinite(shared_volume) ||
+        std::abs(old_volume - shared_volume) > tolerance ||
+        std::abs(new_volume - shared_volume) > tolerance)
+      return Result<std::size_t>::failure(
+          error("Conversion changes the current material or its placement. The legacy cut is "
+                "unchanged; retain it or repair its support explicitly."));
+    ++checked;
+  }
+  if (!checked)
+    return Result<std::size_t>::failure(
+        error("Conversion requires an available Solid result to certify its material."));
+  p.session = std::move(staged);
+  p.window.refresh();
+  p.converting_legacy = true;
+  auto editing = begin(id);
+  if (!editing || !p.valid) {
+    const auto failure =
+        editing ? error("The converted Hole preview is unavailable.") : editing.error();
+    if (active())
+      cancel();
+    p.converting_legacy = false;
+    p.session.restore_creation_checkpoint(original);
+    p.window.refresh();
+    p.viewport.set_selection_filter_mask(entry_mask);
+    p.viewport.set_selection_semantic_scope(entry_scope);
+    if (!entry_viewport_selection ||
+        !p.viewport.select_semantic(entry_viewport_selection->semantic_id))
+      p.viewport.clear_selection();
+    p.session.selection() = original.selection();
+    (void)p.viewport.restore_camera_bookmark(entry_camera);
+    p.window.refresh_context_toolbar();
+    return Result<std::size_t>::failure(failure);
+  }
+  p.entry_revision = original.model_revision();
+  p.entry_camera = entry_camera;
+  p.entry_selection = original.selection();
+  p.entry_viewport_selection = entry_viewport_selection;
+  p.previous_mask = entry_mask;
+  p.previous_scope = entry_scope;
+  p.owns_source_workflow = true;
+  p.converting_legacy = true;
+  p.dock->setWindowTitle("Convert Legacy Cut to Hole");
+  p.guidance->setText(
+      "Convert to Plain Through All. Diameter/support stay bound; the circle center/origin "
+      "becomes independent. Source Sketch stays available. Apply converts once; Cancel restores "
+      "the cut.");
+  return Result<std::size_t>::success(1);
+}
 Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   auto& p = *impl_;
   if (active() || p.window.active_sketch() || p.session.task().active() ||
@@ -2514,6 +3408,15 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   auto begun = p.edit.begin(p.session, id);
   if (!begun)
     return begun;
+  if (p.hole_thread() &&
+      (p.session.workspace() != GuiWorkspace::Part ||
+       p.session.part_document()->is_reference_part() || p.session.reference_repair_mode() ||
+       (p.session.part_workflow_active() && !p.session.history_prefix_count() &&
+        !p.converting_legacy))) {
+    p.edit.cancel();
+    return Result<std::size_t>::failure(error("Hole/Thread editing requires the idle editable Part "
+                                              "workspace or its End of Part context."));
+  }
   p.creating = false;
   p.limit_chosen = true;
   p.support_editing = false;
@@ -2559,9 +3462,20 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
     p.edit.cancel();
     return Result<std::size_t>::failure(error("Feature type cannot be edited"));
   }
+  if (p.hole_thread() && p.session.history_prefix_count()) {
+    auto command = p.session.begin_part_history_command(task_id);
+    if (!command) {
+      p.edit.cancel();
+      return command;
+    }
+    p.owns_history_command = true;
+  }
   if (!p.session.task().begin(task_id) || !p.session.task().begin_parameter_editing() ||
       !p.session.task().show_preview()) {
     p.edit.cancel();
+    if (p.owns_history_command)
+      p.session.cancel_part_history_command();
+    p.owns_history_command = false;
     return Result<std::size_t>::failure(error("Could not start editing task"));
   }
   p.previous_mask = p.viewport.selection_filter_mask();
@@ -2582,11 +3496,13 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   p.parameter_values.clear();
   p.array_templates.clear();
   p.dock->setWindowTitle(family(p.edit.kind()) + " Edit");
-  p.dynamic->setVisible(!p.hole_thread());
-  p.dynamic_label->setVisible(!p.hole_thread());
+  p.dynamic->show();
+  p.dynamic_label->show();
+  p.dynamic_label->setText(p.hole_thread() ? "Canvas Control" : "Dynamic Value");
   p.guidance->setText(
       p.support_editing
-          ? "Picks use the model before this feature. Apply validates the complete downstream "
+          ? "Picks show the model before this feature, including hidden inputs. Apply validates "
+            "the complete downstream "
             "model. "
             "Shared parameters affect every use; formula values require an explicit rebind."
       : p.hole_thread()
@@ -2611,8 +3527,6 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
 Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
   auto& p = *impl_;
   if (!p.can_create()) {
-    p.next_diameter.reset();
-    p.next_target.reset();
     return Result<std::size_t>::failure(
         error("Hole creation requires a complete editable Part with a visible solid and no active "
               "command or workflow."));
@@ -2625,12 +3539,6 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
       break;
     }
   bool explicit_body = false;
-  if (p.next_target) {
-    if (const auto* body = part.find_body(*p.next_target); body && p.body_available(*body)) {
-      target = body->id();
-      explicit_body = true;
-    }
-  }
   std::optional<std::string> reference;
   const auto selections = p.session.selection().entries();
   for (const auto& selected : selections) {
@@ -2688,9 +3596,7 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
         break;
       }
   }
-  const auto diameter_value = p.next_diameter.value_or(6.0);
-  p.next_diameter.reset();
-  p.next_target.reset();
+  const auto diameter_value = 6.0;
   const auto tag = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
   const FeatureId id("feature.hole." + tag);
   const ParameterId diameter("parameter.hole." + tag + ".diameter");
@@ -2704,9 +3610,19 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
                                             quantity.value());
   if (!parameter)
     return Result<std::size_t>::failure(parameter.error());
-  auto definition =
-      HoleFeature::create(id, "Hole " + std::to_string(index), HoleKind::Plain, target, *support,
-                          {{HolePlacementId("placement." + tag), Point2{}}}, diameter);
+  std::vector<HolePlacement> placements;
+  for (const auto& selected : selections)
+    if (selected.kind == GuiSelectionKind::SketchEntity)
+      for (const auto& choice : p.point_choices())
+        if (choice.semantic == selected.semantic_id)
+          placements.push_back(
+              {HolePlacementId("placement." + tag + "." + std::to_string(placements.size())),
+               HoleSketchPointReference{SketchId(choice.key[0].toStdString()),
+                                        SketchEntityId(choice.key[1].toStdString())}});
+  if (placements.empty())
+    placements.push_back({HolePlacementId("placement." + tag), Point2{}});
+  auto definition = HoleFeature::create(id, "Hole " + std::to_string(index), HoleKind::Plain,
+                                        target, *support, std::move(placements), diameter);
   if (!definition)
     return Result<std::size_t>::failure(definition.error());
   auto seed = part;
@@ -2714,8 +3630,15 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
                              : Result<std::size_t>::success(0);
   if (added)
     added = seed.add_parameter(parameter.value());
-  if (added)
-    added = seed.add_hole_feature(definition.value());
+  if (added) {
+    if (const auto prefix = p.session.history_prefix_count()) {
+      auto inserted = insert_part_hole_feature(seed, definition.value(), *prefix);
+      if (!inserted)
+        return Result<std::size_t>::failure(inserted.error());
+      seed = std::move(inserted.value());
+    } else
+      added = seed.add_hole_feature(definition.value());
+  }
   if (!added)
     return added;
   p.thread_supports.clear();
@@ -2778,7 +3701,7 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_thread() {
   auto seed = GuiThreadRecipeCommands::create_external(
       part, id, "Thread " + std::to_string(part.thread_features().size() + 1), *target,
       selected->reference, draft, support.radius_mm, support.axial_length_mm,
-      support.taper_angle_deg, selected->direction);
+      support.taper_angle_deg, selected->direction, p.session.history_prefix_count());
   if (!seed)
     return Result<std::size_t>::failure(seed.error());
   p.supports.clear();
@@ -2794,6 +3717,14 @@ bool ShellFeatureEditTools::accept_selection(const GuiSelection& incoming) {
   if (!p.input_selection() || !active() || p.picking == Impl::Pick::None)
     return false;
   const auto selected = incoming;
+  if (p.picking == Impl::Pick::Position && !p.picking_position.isEmpty() &&
+      selected.kind == GuiSelectionKind::SketchEntity) {
+    for (const auto& choice : p.point_choices())
+      if (selected.semantic_id == "hole-input/" + choice.semantic) {
+        p.bind_point(p.picking_position, choice.key);
+        return true;
+      }
+  }
   if ((p.picking == Impl::Pick::LimitFace || p.picking == Impl::Pick::LimitBody) && p.limit_field) {
     const bool face = p.picking == Impl::Pick::LimitFace;
     for (int i = 0; i < p.limit_field->count(); ++i) {
@@ -2840,10 +3771,159 @@ bool ShellFeatureEditTools::accept_selection(const GuiSelection& incoming) {
   return false;
 }
 
+bool ShellFeatureEditTools::editing_source_sketch() const noexcept {
+  return impl_->editing_source.has_value();
+}
+
+Result<std::size_t> ShellFeatureEditTools::edit_source_sketch(SketchId sketch) {
+  auto& p = *impl_;
+  if (!p.fresh() || p.edit.kind() != Kind::Hole || p.editing_source ||
+      (p.session.history_prefix_count() && !p.owns_history_command) ||
+      !p.layer.active_handle_id().empty() || !p.session.part_document()->find_sketch(sketch))
+    return Result<std::size_t>::failure(
+        error("Finish the current input before editing the source Sketch."));
+  const bool bound = std::any_of(p.record.at("placements").begin(), p.record.at("placements").end(),
+                                 [&](const auto& placement) {
+                                   return placement.at("kind") == "sketch_point" &&
+                                          placement.at("sketch") == sketch.value();
+                                 });
+  if (!bound)
+    return Result<std::size_t>::failure(
+        error("Choose a referenced position before entering its Sketch."));
+  (void)p.session.task().cancel();
+  if (!p.owns_source_workflow && !p.owns_history_command) {
+    auto workflow = p.session.begin_part_workflow();
+    if (!workflow) {
+      (void)p.session.task().begin(task_id);
+      (void)p.session.task().begin_parameter_editing();
+      (void)p.session.task().show_preview();
+      return workflow;
+    }
+    p.owns_source_workflow = true;
+  }
+  p.editing_source = sketch;
+  p.valid = false;
+  p.apply->setEnabled(false);
+  p.another->setEnabled(false);
+  p.scroll->setEnabled(false);
+  p.return_to_feature->show();
+  p.status->setText("Editing position Sketch. Finish Sketch to return to the Hole draft.");
+  p.viewport.clear_feature_preview();
+  p.viewport.clear_preview_selection_targets();
+  (void)p.layer.set_handles({});
+  p.picking = Impl::Pick::None;
+  if (!p.window.enter_feature_source_sketch(sketch)) {
+    p.editing_source.reset();
+    p.return_to_feature->hide();
+    p.scroll->setEnabled(true);
+    (void)p.session.task().begin(task_id);
+    (void)p.session.task().begin_parameter_editing();
+    (void)p.session.task().show_preview();
+    (void)p.preview();
+    return Result<std::size_t>::failure(error("The position Sketch cannot be entered."));
+  }
+  return Result<std::size_t>::success(1);
+}
+
+void ShellFeatureEditTools::resume_source_sketch(SketchId sketch) {
+  auto& p = *impl_;
+  if (!p.editing_source || *p.editing_source != sketch)
+    return;
+  p.editing_source.reset();
+  p.return_to_feature->hide();
+  p.scroll->setEnabled(true);
+  (void)p.session.task().begin(task_id);
+  (void)p.session.task().begin_parameter_editing();
+  (void)p.session.task().show_preview();
+  auto current = serialize_part_document_to_json(*p.session.part_document());
+  if (!current) {
+    (void)p.reject(current.error());
+    return;
+  }
+  auto root = Json::parse(current.value());
+  // A newly created Hole can require a newer canonical envelope than its
+  // committed entry document. Keep that envelope while rebasing Sketch intent.
+  root["version"] = std::max(root.at("version").get<int>(), p.source.at("version").get<int>());
+  if (!root.contains("history_version") && p.source.contains("history_version")) {
+    root["history_version"] = p.source.at("history_version");
+    if (!root.contains("suppressed_features") && p.source.contains("suppressed_features"))
+      root["suppressed_features"] = p.source.at("suppressed_features");
+  }
+  for (const auto* key : {"engineering_resources", "material_assignments"})
+    if (!root.contains(key) && p.source.contains(key))
+      root[key] = p.source.at(key);
+  const auto original_record = p.source.at(p.collection).at(p.record_index);
+  for (const auto& parameter : p.pending_parameters)
+    if (!p.session.part_document()->find_parameter(parameter.id()))
+      for (const auto& encoded : p.source.at("parameters"))
+        if (encoded.at("id") == parameter.id().value())
+          root.at("parameters").push_back(encoded);
+  for (const auto& plane : p.source.value("result_face_workplanes", Json::array()))
+    if (!p.session.part_document()->has_workplane_id(
+            DatumPlaneId(plane.at("id").get<std::string>()))) {
+      if (!root.contains("result_face_workplanes"))
+        root["result_face_workplanes"] = Json::array();
+      root["result_face_workplanes"].push_back(plane);
+    }
+  if (p.creating) {
+    if (!root.contains(p.collection))
+      root[p.collection] = Json::array();
+    p.record_index = root.at(p.collection).size();
+    root[p.collection].push_back(original_record);
+    if (!root.contains("feature_order")) {
+      root["feature_order"] = Json::array();
+      auto history = p.session.part_document()->executable_history();
+      if (!history) {
+        (void)p.reject(history.error());
+        return;
+      }
+      for (const auto& entry : history.value())
+        root["feature_order"].push_back(entry.node_id);
+    }
+    if (const auto prefix = p.session.history_prefix_count())
+      root["feature_order"].insert(root["feature_order"].begin() +
+                                       static_cast<std::ptrdiff_t>(*prefix),
+                                   p.edit.feature().value());
+    else
+      root["feature_order"].push_back(p.edit.feature().value());
+  } else {
+    for (std::size_t index = 0; index < root.at(p.collection).size(); ++index)
+      if (root.at(p.collection).at(index).at("id") == p.edit.feature().value())
+        p.record_index = index;
+  }
+  p.source = std::move(root);
+  p.source_text = current.value();
+  if (p.feature_input_prefix) {
+    auto cache = geometry::ShapeCache::create(ShapeCacheId("feature.edit.inputs"));
+    auto context = make_step_import_context(p.session);
+    if (!cache || !context) {
+      (void)p.reject(cache ? context.error() : cache.error());
+      return;
+    }
+    auto evaluated =
+        geometry::GeometryRecomputeExecutor{context.value().get()}.execute_history_prefix(
+            *p.session.part_document(), *p.feature_input_prefix, cache.value());
+    if (!evaluated) {
+      (void)p.reject(evaluated.error());
+      return;
+    }
+    p.feature_input_cache = std::move(cache.value());
+    auto collected = p.collect_supports(BodyId(p.record.at("target_body").get<std::string>()));
+    if (!collected) {
+      (void)p.reject(collected.error());
+      return;
+    }
+  }
+  p.build_form();
+  (void)p.preview();
+  p.window.refresh();
+  p.window.statusBar()->showMessage("Returned to Hole.");
+}
+
 Result<std::size_t> ShellFeatureEditTools::apply(bool create_another) {
   auto& p = *impl_;
-  if (!p.fresh() || !p.layer.active_handle_id().empty() || p.picking != Impl::Pick::None ||
-      (create_another && (!p.creating || p.edit.kind() != Kind::Hole)))
+  if (p.editing_source || !p.fresh() || !p.layer.active_handle_id().empty() ||
+      p.picking != Impl::Pick::None || (create_another && (!p.creating || !p.hole_thread())))
     return Result<std::size_t>::failure(error("No current applicable feature edit"));
   auto preview = p.preview();
   if (!preview)
@@ -2851,39 +3931,47 @@ Result<std::size_t> ShellFeatureEditTools::apply(bool create_another) {
   auto decoded = p.decode();
   if (!decoded)
     return Result<std::size_t>::failure(decoded.error());
+  // Source Sketch operations are local to the enclosing Part workflow. Publish
+  // the checked feature and that workflow together on a disposable session.
+  auto accepted = p.session;
+  auto controller = p.edit;
   auto committed = with_record(
       decoded.value(), p.edit.feature(), p.edit.kind(),
       [&](auto replacement, auto updater) {
         auto selected = p.selected_record(std::move(replacement));
         if (!selected)
           return Result<std::size_t>::failure(selected.error());
-        return p.edit.commit(p.session, std::move(selected.value()), updater,
-                             p.input_updates(decoded.value()));
+        return controller.commit(accepted, std::move(selected.value()), updater,
+                                 p.input_updates(decoded.value()));
       },
       p.creating);
+  if (committed && p.owns_source_workflow)
+    committed = accepted.publish_part_workflow(p.converting_legacy ? "Convert Legacy Cut to Hole"
+                                               : p.creating        ? "Create Hole"
+                                                                   : "Edit Hole");
+  if (committed && p.owns_history_command)
+    committed = accepted.publish_part_history_command(
+        p.creating ? (p.edit.kind() == Kind::Thread ? "Create Thread" : "Create Hole")
+                   : (p.edit.kind() == Kind::Thread ? "Edit Thread" : "Edit Hole"));
   if (committed) {
+    p.session = std::move(accepted);
     const bool created_hole = p.creating && p.edit.kind() == Kind::Hole;
     const bool created_thread = p.creating && p.edit.kind() == Kind::Thread;
-    std::optional<double> repeated_diameter;
-    std::optional<BodyId> repeated_target;
-    if (p.creating) {
-      const auto* hole = p.session.part_document()->find_hole_feature(p.edit.feature());
-      if (hole) {
-        auto size = resolve_hole_diameter(*p.session.part_document(), hole->diameter());
-        if (size)
-          repeated_diameter = size.value().diameter.millimeters();
-        repeated_target = hole->target_body();
-      }
-    }
+    const auto previous = p.edit.feature();
+    const auto kind = p.edit.kind();
+    const auto old_namespace = p.recipe_namespace;
+    std::vector<ParameterId> owned;
+    if (create_another)
+      for (const auto& parameter : p.pending_parameters)
+        if (p.session.part_document()->find_parameter(parameter.id()))
+          owned.push_back(parameter.id());
     p.finish(true);
     if (created_hole)
       p.window.remember_repeatable_command(*p.hole_action);
     else if (created_thread)
       p.window.remember_repeatable_command(*p.thread_action);
     if (create_another) {
-      p.next_diameter = repeated_diameter;
-      p.next_target = repeated_target;
-      auto next = begin_new_hole();
+      auto next = p.start_repetition(previous, kind, old_namespace, owned);
       if (!next)
         p.window.report_error(next.error());
     }
@@ -2902,6 +3990,10 @@ void ShellFeatureEditTools::refresh() {
     p.thread_action->setEnabled(p.can_create());
   if (!active())
     return;
+  if (p.editing_source) {
+    refresh_presentation();
+    return;
+  }
   if (!p.fresh()) {
     cancel();
     p.window.statusBar()->showMessage("Feature changed. Restart editing.");
@@ -2911,6 +4003,7 @@ void ShellFeatureEditTools::refresh() {
 }
 void ShellFeatureEditTools::refresh_presentation() {
   auto& p = *impl_;
+  p.refresh_preset_actions();
   auto mapping = GuiViewportManipulatorMapping::create(
       [&p](GuiSketchScreenPoint point) { return p.viewport.screen_to_view_ray(point); },
       [&p](Point3 point) { return p.viewport.model_to_screen(point); });
@@ -2936,7 +4029,7 @@ Result<std::size_t> ShellFeatureEditTools::set_drag_text(const QString& text) {
   return p.accept_candidate(*p.layer.candidate());
 }
 bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
-  if (!active())
+  if (!active() || impl_->editing_source)
     return QObject::eventFilter(watched, event);
   auto& p = *impl_;
   if (event->type() == QEvent::KeyPress) {
@@ -2955,8 +4048,10 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
         if (candidate)
           (void)p.accept_candidate(*candidate);
         p.drag_start.reset();
+        p.dynamic->setEnabled(true);
         p.publish_handle();
         p.apply->setEnabled(p.valid);
+        p.another->setEnabled(p.creating && p.valid);
         return true;
       }
       if (key->key() == Qt::Key_Backspace)
@@ -2980,10 +4075,13 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
         p.last_pointer = {mouse->position().x(), mouse->position().y()};
         if (p.layer.begin_drag(p.last_pointer)) {
           p.drag_start = p.numbers.at(p.dynamic->currentData().toString())->value();
+          p.dynamic->setEnabled(false);
           p.buffer.clear();
           p.viewport.setFocus();
           p.viewport.grab_interaction_mouse();
           p.apply->setEnabled(false);
+          p.another->setEnabled(false);
+          p.refresh_preset_actions();
           return true;
         }
       }
@@ -2999,6 +4097,7 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
       auto* mouse = static_cast<QMouseEvent*>(event);
       auto candidate = p.layer.end_drag({mouse->position().x(), mouse->position().y()});
       p.viewport.release_interaction_mouse();
+      p.dynamic->setEnabled(true);
       if (candidate) {
         (void)p.accept_candidate(*candidate);
         p.drag_start.reset();
@@ -3006,6 +4105,7 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
       } else
         p.restore_drag();
       p.apply->setEnabled(p.valid);
+      p.another->setEnabled(p.creating && p.valid);
       return true;
     }
   }

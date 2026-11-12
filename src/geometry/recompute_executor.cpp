@@ -2600,6 +2600,30 @@ Result<std::vector<ClosedProfileCurveSegment>> detail::resolve_loft_alignment_se
   return resolve_loft_closed_section(document, section, cache, WorkplaneResolver{});
 }
 
+Result<ResolvedWorkplane> GeometryRecomputeExecutor::resolve_hole_support(
+    const PartDocument& document, const PlaneReference& reference, const ShapeCache& cache,
+    FeatureId consumer, std::optional<std::size_t> history_prefix) const {
+  if (document.is_reference_part() || reference.role() != PartFeatureInputRole::HoleSupportPlane)
+    return Result<ResolvedWorkplane>::failure(
+        geometry_error("hole.support", "Hole authoring requires an editable Part and typed support"));
+  auto valid = validate_part_feature_input_reference(document, reference);
+  if (!valid)
+    return Result<ResolvedWorkplane>::failure(valid.error());
+  auto scope = history_prefix
+                   ? detail::validate_history_modeling_scope(document, cache, history_prefix)
+                   : cache.validate_complete_geometry_result(document);
+  if (!scope)
+    return Result<ResolvedWorkplane>::failure(scope.error());
+  auto support = resolve_hole_plane(document, reference.source(), cache, workplane_resolver_,
+                                     import_context_, consumer);
+  if (!support)
+    return Result<ResolvedWorkplane>::failure(support.error());
+  auto fresh = validate_import_sources();
+  if (!fresh)
+    return Result<ResolvedWorkplane>::failure(fresh.error());
+  return Result<ResolvedWorkplane>::success(support.value().plane);
+}
+
 Result<std::pair<Point3, Vector3>> GeometryRecomputeExecutor::resolve_feature_axis(
     const PartDocument& document, const AxisReference& reference, const ShapeCache& cache) const {
   const auto history = detail::validate_history_input(document, cache);

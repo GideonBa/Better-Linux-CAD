@@ -14,6 +14,7 @@ public:
   ShellFeatureEditTools(ShellWindow&, ShellRibbon&, int model_tab);
   ~ShellFeatureEditTools() override;
   [[nodiscard]] Result<std::size_t> begin(FeatureId);
+  [[nodiscard]] Result<std::size_t> begin_legacy_hole_conversion(FeatureId);
   [[nodiscard]] Result<std::size_t> begin_new_hole();
   [[nodiscard]] Result<std::size_t> begin_new_thread();
   [[nodiscard]] Result<std::size_t> apply(bool create_another = false);
@@ -25,6 +26,9 @@ public:
   [[nodiscard]] QWidget* field(const QString& path) const;
   [[nodiscard]] GuiViewportManipulatorLayer& manipulators();
   [[nodiscard]] Result<std::size_t> set_drag_text(const QString&);
+  [[nodiscard]] Result<std::size_t> edit_source_sketch(SketchId);
+  void resume_source_sketch(SketchId);
+  [[nodiscard]] bool editing_source_sketch() const noexcept;
 
 protected:
   bool eventFilter(QObject*, QEvent*) override;

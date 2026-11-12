@@ -292,13 +292,52 @@ block Apply and remain correctable. [Existing support picks](hole-wizard.md#exis
 show the model before the edited feature; numeric preview and Apply validate the whole downstream
 model. Cancel restores the entry selection/camera. [Hole limits](hole-wizard.md#explicit-hole-limits--157b2b)
 have their own required Face/Body selectors and model picks; clearing or choosing an invalid limit
-blocks Apply while preserving correction controls. Extended contexts,
-support-anchored grips and the full workflow remain 157B2b/B3/C.
+blocks Apply while preserving correction controls. Support-anchored controls and extended contexts
+are described below; combined workflow acceptance remains 157C.
 Conical Thread seeds retain a positive interval and inspected entry direction. Thread numeric
 controls expose nine decimal places; offset/direction changes require explicit matching profile
 values. [Conical combinations](hole-wizard.md#conical-thread-combinations--157b2b) retain correction
 controls for incompatible profiles and unsupported modeled taper. A complete rejected standard
 mapping retries when its used numeric input or binding is corrected.
+Create Another in both Hole and Thread retains the complete recipe and uses fresh owned inputs.
+The [new draft](hole-wizard.md#complete-create-another--157b3) keeps its positions/interval and
+reports overlap or ineffective cuts until corrected. Cancel preserves the preceding committed
+feature. The scrolling Property Presets group now manages named Hole/Thread value snapshots through
+Save Values, Load Values and Remove. Its hint explains that dimensions and pinned revisions are
+snapshots and current targets/positions/limits/profiles remain selected. A failed load reports inline
+and retains the draft; active picking, source visits and dragging suspend these controls. See the
+[preset contract](hole-wizard.md#property-presets--157b3). Combined acceptance remains assigned to 157C.
+
+In End of Part, Hole/Thread Apply stages one local change and Create Another opens the next child.
+The outer context row keeps Save/Cancel/final Apply ownership; final Apply remains disabled during
+feature input or a Source Sketch visit. Referenced Hole positions can enter their Sketch and return
+to the same draft. Cancel abandons the current child while retaining previously staged changes.
+New features enter at the marker and the complete suffix is validated only on final publication.
+See the [prefix contract and verification status](hole-wizard.md#end-of-part-and-shared-contexts--157b3).
+
+History → Convert to Hole explicitly previews a selected compatible legacy circle cut in the same
+property editor. The browser menu offers the same command. The task discloses retained diameter/
+support bindings and the independent center/origin snapshot; Apply converts once and Cancel restores
+the legacy cut. Unsupported profiles/consumers give a diagnostic while ordinary Edit Feature remains
+available. The [conversion contract](hole-wizard.md#explicit-legacy-conversion--157b3) owns the complete
+Part prerequisite and supported mapping boundary.
+
+An existing Hole/Thread can select supports on hidden or subsequently consumed Bodies from its
+pre-feature input model. Labels identify these inputs; picking temporarily shows them without
+changing model visibility. Normal preview/Apply checks the complete result, and Cancel restores
+the entry view. The [input-history contract](hole-wizard.md#hidden-and-consumed-input-bodies--157b3)
+owns this scope; prefix/enclosing-workflow extensions remain assigned.
+Hole position controls choose independent support-local points or existing scoped Sketch points.
+They retain placement identity across source changes and support actual point picking. Edit Source
+Sketch and the return breadcrumb use the same Sketch workspace as the shared feature workflow;
+source operations remain inside the Hole draft until the combined Apply. See the
+[position workflow](hole-wizard.md#referenced-position-workflow--157b3) for Save/Cancel and scope.
+Canvas Control selects a support-anchored position, diameter, depth or Thread interval grip.
+Dragging previews the selected authored value; numeric input uses the same units. Escape resets
+the drag, and Apply commits the feature. Shared/formula inputs require the explicit Make
+Independent action before their bindings are replaced. Pinned values keep their explicit Custom
+source transition. The [canvas contract](hole-wizard.md#support-anchored-canvas-controls--157b3)
+owns posed frames, value scaling and candidate validation.
 
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
 [compact suppression at 150%](images/history-suppression-compact.png) and

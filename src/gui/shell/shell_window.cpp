@@ -621,6 +621,8 @@ void ShellWindow::build_docks() {
             if (source && source->kind == GuiBrowserNodeKind::Feature && history_tools_) {
               history_tools_->refresh();
               menu.addAction(&history_tools_->edit_action());
+              if (history_tools_->convert_hole_action().isEnabled())
+                menu.addAction(&history_tools_->convert_hole_action());
               menu.addAction(&history_tools_->suppress_action());
               menu.addAction(&history_tools_->restore_action());
               menu.addAction(&history_tools_->reorder_action());
@@ -1068,8 +1070,11 @@ std::optional<ResultFaceReference> ShellWindow::selected_result_face() const {
 }
 
 bool ShellWindow::cancel_face_supported_sketch() {
-  if (feature_tools_ && feature_tools_->editing_source_sketch()) {
-    feature_tools_->cancel();
+  if (editing_feature_source_sketch()) {
+    if (feature_edit_tools_ && feature_edit_tools_->editing_source_sketch())
+      feature_edit_tools_->cancel();
+    else
+      feature_tools_->cancel();
     return true;
   }
   if (!face_sketch_checkpoint_ || !active_sketch_)
@@ -1145,7 +1150,10 @@ bool ShellWindow::enter_sketch(SketchId sketch) {
   if (session_.reference_repair_mode())
     return false;
   sketch_camera_bookmark_ = viewport_->camera_bookmark();
-  model_selection_filter_mask_ = viewport_->selection_filter_mask();
+  // Feature tasks temporarily own viewport pick masks. Keep the idle model
+  // filter when visiting their source Sketch; it must survive return/Cancel.
+  if (!editing_feature_source_sketch())
+    model_selection_filter_mask_ = viewport_->selection_filter_mask();
   const auto plane = sketch_workspace_.enter(session_, sketch_workbench_, sketch);
   if (plane.has_error()) {
     show_error(plane.error());
@@ -1175,13 +1183,17 @@ bool ShellWindow::enter_sketch(SketchId sketch) {
   return true;
 }
 
+bool ShellWindow::editing_feature_source_sketch() const noexcept {
+  return (feature_tools_ && feature_tools_->editing_source_sketch()) ||
+         (feature_edit_tools_ && feature_edit_tools_->editing_source_sketch());
+}
+
 bool ShellWindow::enter_feature_source_sketch(SketchId sketch) {
-  return feature_tools_ && feature_tools_->editing_source_sketch() &&
-         enter_sketch(std::move(sketch));
+  return editing_feature_source_sketch() && enter_sketch(std::move(sketch));
 }
 
 void ShellWindow::abort_feature_source_sketch_view() {
-  if (!active_sketch_ || !feature_tools_ || !feature_tools_->editing_source_sketch())
+  if (!active_sketch_ || !editing_feature_source_sketch())
     return;
   sketch_tools_->deactivate();
   while (session_.task().active() && sketch_workspace_.escape(session_)) {
@@ -1307,8 +1319,11 @@ bool ShellWindow::finish_active_sketch() {
     return reject_finish(finished.error());
   face_sketch_checkpoint_.reset();
   leave_sketch_view();
-  if (feature_tools_ && feature_tools_->editing_source_sketch()) {
-    feature_tools_->resume_extrude_source_sketch(finished_sketch);
+  if (editing_feature_source_sketch()) {
+    if (feature_edit_tools_ && feature_edit_tools_->editing_source_sketch())
+      feature_edit_tools_->resume_source_sketch(finished_sketch);
+    else
+      feature_tools_->resume_extrude_source_sketch(finished_sketch);
     return true;
   }
   std::optional<ProfileId> finished_profile;
@@ -1338,7 +1353,7 @@ bool ShellWindow::finish_active_sketch() {
 bool ShellWindow::undo() {
   if (history_tools_ && !history_tools_->prefix_active())
     history_tools_->cancel();
-  if (feature_tools_ && feature_tools_->editing_source_sketch()) {
+  if (editing_feature_source_sketch()) {
     sketch_tools_->cancel_tool();
     while (session_.task().active() && sketch_workspace_.escape(session_)) {
     }
@@ -1398,7 +1413,7 @@ bool ShellWindow::undo() {
 bool ShellWindow::redo() {
   if (history_tools_ && !history_tools_->prefix_active())
     history_tools_->cancel();
-  if (feature_tools_ && feature_tools_->editing_source_sketch()) {
+  if (editing_feature_source_sketch()) {
     sketch_tools_->cancel_tool();
     while (session_.task().active() && sketch_workspace_.escape(session_)) {
     }
@@ -1720,7 +1735,7 @@ void ShellWindow::refresh() {
   action_finish_sketch_->setEnabled(sketch_active);
   action_cancel_face_sketch_->setEnabled(
       sketch_active && (face_sketch_checkpoint_.has_value() ||
-                        (feature_tools_ && feature_tools_->editing_source_sketch())));
+                        editing_feature_source_sketch()));
   action_perspective_->setEnabled(!sketch_active);
 
   const QString name =

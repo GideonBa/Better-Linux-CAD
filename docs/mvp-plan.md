@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 156
 current_block: 157
-current_boundary: Block 156 accepted; 157A/B1/B2a delivered; 157B2b verified, PR delivery pending
+current_boundary: Block 156 accepted; 157A/B verified; 157C combined acceptance next
 current_tag: "[parity-b157]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 156
-current block        Block 157 (157B2b verified; delivery pending)
+current block        Block 157 (157C next)
 current phase        Semantic holes and threads
-current boundary     Support, limit and Thread authoring verified; 157B3/C and combined acceptance remain open
+current boundary     Hole/Thread workflow lifecycle verified; combined native acceptance remains open
 ```
 
 The next assigned work is Block 157. [The consolidated sequence](inventor-parity-sequence.md)
@@ -280,11 +280,11 @@ remain assigned. Deliver named slices serially, with the parent block open until
 | --- | --- |
 | 157A — verified | Typed Hole/Thread property editing over existing Core update commands, stable IDs/history, formula and pinned-resource ownership, whole downstream preview and rollback. |
 | 157B1 — verified | Semantic Plain/ThroughAll Hole creation in the existing panel, target/support selection, pending dimensional ownership, Create Another and one final publication. Normal complete Part context first; no new Hole schema or cut interpreter. |
-| 157B2 — verified; delivery pending | Complete recipe/custom-standard/internal-external Thread selectors and native/imported/result supports and limits; keep 157A editing compatible. |
+| 157B2 — delivered | Complete recipe/custom-standard/internal-external Thread selectors and native/imported/result supports and limits; keep 157A editing compatible. |
 | 157B2a — verified | Nine recipes, six extent transitions, tip and custom internal Thread controls, typed dimensional table/custom sources, stable owned inputs and existing-feature recipe changes. |
-| 157B2b — verified; delivery pending | Complete standard Thread profile mappings, optional start/taper authoring, external Thread creation and scoped native/imported/result support and limit collection. |
-| 157B3 | In-canvas position/depth/diameter interaction, referenced Sketch points and breadcrumb return, presets, explicit legacy conversion, full recipe/thread Create Another ownership and extended shared context lifecycle. |
-| 157C | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
+| 157B2b — delivered | Complete standard Thread profile mappings, optional start/taper authoring, external Thread creation and scoped native/imported/result support and limit collection. |
+| 157B3 — verified | In-canvas position/depth/diameter interaction, referenced Sketch points and breadcrumb return, presets, explicit legacy conversion, full recipe/thread Create Another ownership and extended shared context lifecycle. |
+| 157C — next | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
 
 No new Hole/Thread persistence authority or independent pattern evaluator is planned. Preserve
 legacy cut editing and all subsequent 158–204 requirements. Acceptance of 157A alone does not
@@ -398,11 +398,12 @@ Main was refreshed before starting `feat/hole-thread-support-authoring`.
 The following 157B2b verification closes the named selector/authoring slice. 157B3/C and the full
 158–165 sequence remain assigned; neither 157B2a nor 157B2b closes Block 157.
 
-### 157B2b implementation and verification — verified; delivery pending
+### 157B2b implementation and verification — delivered
 
-The serial delivery remains on `feat/hole-thread-support-authoring`, based on merged `1348d19`,
-in [PR #179](https://github.com/GideonBa/Better-Linux-CAD/pull/179). The complete named slice is
-verified and awaits normal PR delivery. Parent 157 and the assigned continuation through 165 remain open.
+The serial delivery is [PR #179](https://github.com/GideonBa/Better-Linux-CAD/pull/179), based on
+merged `1348d19`. Reviewed final implementation `f4e0d87` is merged normally as `d4bc4c2`; the
+merged tree matches the verified delivery. Main was refreshed before starting
+`feat/hole-thread-workflow-lifecycle`. Parent 157 and the assigned continuation through 165 remain open.
 
 | Component | Contract / focused proof | Delivery |
 | --- | --- | --- |
@@ -432,22 +433,49 @@ from the 25-case proof. Frozen runtime inputs: 1,055 files, SHA256
 `0446ae69aa332d6de03e43eb201495052eded6bda9270195bb64b34852ff74bd`.
 Detailed earlier component runs remain in Git/PR history.
 
-157B3 retains full recipe/thread Create Another ownership, support-anchored manipulators, referenced
+157B3 implements full recipe/thread Create Another ownership, support-anchored manipulators, referenced
 Sketch points and breadcrumb return, presets without captured targets, explicit legacy conversion
 with mapping or diagnostic, and extended shared contexts. Then complete 157C's B01–B04/UI01 gates,
 Block 158 integrated acceptance and the full 159–165 sequence. Preserve all scope after 165.
 
-### Next implementation — 157B3
+### Current implementation — 157B3
 
-Begin only after the complete 157B2b PR is merged and main is refreshed. Keep one serial branch
-and preserve the full parent acceptance gate. The implementation order below adds no acceptance:
+157B3 is **implemented and verified** in [PR #180](https://github.com/GideonBa/Better-Linux-CAD/pull/180).
+Its serial branch started from verified merged `d4bc4c2`. This named slice does not accept parent
+157: complete B01–B04/UI01 combinations and capability promotion remain 157C, followed by 158's
+Phase A/B integration and the assigned 159–165 sequence. Preserve all scope after 165.
 
-| Work | Implementation / focused proof |
+| Completed component | Contract / proof source |
 | --- | --- |
-| Complete Create Another ownership | Retain the complete Hole recipe or Thread definition, issue fresh feature/placement/owned-input identities, preserve explicit shared/formula/pinned bindings, and publish each action once. Verify unused-input pruning, correction, Cancel and exact history/reopen. |
-| Referenced positions and Sketch return | Use existing typed Sketch-point references and source workflow authority; support multiple positions, coplanarity/current-frame validation and breadcrumb return without publishing disposable edits. |
-| Support-anchored interaction | Reuse the shared manipulator layer for meaningful position/depth/diameter/interval controls, exact release, explicit formula/source override and invalid/corrected/cancelled drags on posed supports. |
-| Presets, legacy conversion and shared contexts | Presets retain properties without captured targets; explicit conversion previews semantic intent and preserves supported downstream mappings or reports a diagnostic. Complete hidden/consumed/prefix and shared-context lifecycle against existing session/history authorities. |
+| Complete Create Another ownership | [Repeat contract](hole-wizard.md#complete-create-another--157b3); `[hole-repeat-shell]`, `[native-hole-repeat]` |
+| Referenced positions and Source Sketch return | [Position/source contract](hole-wizard.md#referenced-position-workflow--157b3); `[hole-position-shell]`, `[source-sketch-workflow]`, `[native-hole-position]` |
+| Support-anchored position/diameter/depth/Thread controls | [Canvas contract](gui-feature-edit-mvp9.md#holethread-canvas-controls--157b3); `[hole-canvas-shell]`, native canvas cases |
+| Property value presets without captured targets | [Preset contract](hole-wizard.md#property-presets--157b3); typed/storage, `[hole-preset-shell]`, `[native-hole-preset]` |
+| Explicit legacy conversion with mapping/material certification | [Conversion contract](hole-wizard.md#explicit-legacy-conversion--157b3); Core replacement, `[hole-conversion-shell]`, native conversion/context cases |
+| Hidden/consumed predecessor input selection | [Input-history contract](hole-wizard.md#hidden-and-consumed-input-bodies--157b3); Geometry visibility/scope, `[hole-input-history-shell]`, native input cases |
+| Prefix child commands, source return and enclosing workflow guards | [Prefix contract](hole-wizard.md#end-of-part-and-shared-contexts--157b3); `[hole-thread-insertion]`, `[hole-prefix-shell]`, `[hole-context-shell]`, `[native-hole-prefix]` |
+| Stable-ID recipe/support/limit rebasing before a same-family suffix | Same prefix contract; `[hole-canonical-rebase-shell]` covers Source return, Through All/To Face, Counterbore, exact unchanged suffix, independent volume, history/reopen and native source/keyboard input |
+
+Final rebasing/component verification on frozen runtime inputs:
+
+| Check | Final result |
+| --- | --- |
+| Full Core, unchanged Core closure from prefix delivery | 708 cases / 27,016 assertions |
+| Focused Geometry, unchanged Body/Pattern/support closure | 37 cases / 2,987 assertions |
+| Focused canonical-rebasing Qt | 1 case / 169 assertions, both Through All and To Face |
+| Affected recipe/position/support/limit/Thread/preset/source/editor/history Qt selection | 79 cases: 69 passed, 10 native skips / 5,996 assertions |
+| Native rebasing/prefix/support/limit/Thread/preset, 100% and compact 150% | 7 cases / 1,026 assertions at each scale, all with exit 0 |
+| Native app startup | PID-matched viewable window; intentional timeout 124 |
+
+The preceding prefix transaction/context component passed its 161-case strict shared Qt selection
+and ten-case native selection at both scales; detailed counts and earlier component runs remain in
+Git/PR history and the linked contracts. Core/Geometry/export inputs and binaries are unchanged
+after GUI-only rebasing. Original native captures are linked from the prefix contract. All 155
+current GUI/app dependency records are valid and nonempty. Working/staged diffs, documentation
+links, binary hashes and the frozen runtime are checked before delivery: **1,062 files**, SHA256
+`4a8bafe1f25b31e2d2b3d2b6732e87700478766726cd07c76ccbc6b3584b26a2`.
+Failed, interrupted and superseded runs contribute no final proof. These are focused component
+results; full Geometry/Qt and whole-parent integration remain assigned to 157C/158.
 
 For every coherent change, synchronize the existing Hole/Feature-edit/UI/persistence contracts,
 run focused regressions and native 100%/compact 150% as applicable, review, commit and push. Then

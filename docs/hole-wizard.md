@@ -411,7 +411,7 @@ Datum support is also available explicitly in the selector.
 
 Preview and Save leave the committed Part unchanged. Apply adds only the required new dimensions
 and Hole in one transaction, with exact Undo/Redo/reopen. Create Another publishes that candidate
-once, then opens a new fresh draft retaining its custom diameter and revalidating its target. Cancel
+once, then opens a fresh draft retaining the complete recipe through the 157B3 lifecycle below. Cancel
 restores consumed preselection and camera. Focused tests cover physical cut volumes, invalid
 corrections, existing-parameter ownership, preselection versus collection, multiple Bodies, nested
 form layout and actual native keyboard/model/mouse workflows at 100%/150%. Creation does not close
@@ -484,8 +484,8 @@ Focused proof is `[hole-recipe-shell]` / `[native-hole-recipe]` in the current s
 independent analytic volumes for all nine recipes and six extent choices, separate limit-Body
 invariance, pin/custom changes, angle units, invalid correction, new dimensions on existing features,
 retired steps, unused Thread inputs and exact history/reopen. Parent 157B2 and 157 remain open.
-Create Another retains the B1 numeric diameter/target behavior and starts a fresh Plain draft;
-retaining the full recipe/thread configuration with fresh owned inputs remains assigned to 157B3.
+Create Another retains the complete recipe/thread configuration with fresh owned inputs through
+the 157B3 lifecycle below.
 
 Original native recipe captures: [ordinary](images/hole-recipe.png), 1280×800, and
 [compact](images/hole-recipe-compact.png), 1536×960 physical pixels at 150%. They follow repeated
@@ -563,9 +563,9 @@ Both creation kinds share the controller/task lifecycle and typed Core add comma
 owned dimensions and the feature publish in one transaction; rebinding to an existing parameter
 prunes its unused draft counterpart. Invalid/corrected previews, supplier changes, Cancel and
 committed Save during preview retain the established contracts. Thread creation has an Apply
-footer and becomes the repeatable command after publication. Full configuration retention for
-Create Another remains assigned to 157B3; optional start/taper/source selectors and existing-support
-editing are described below.
+footer and becomes the repeatable command after publication. Create Another now uses the 157B3
+typed repeat lifecycle below; optional start/taper/source selectors and existing-support editing
+are described below.
 
 Focused proof is `[thread-create-shell]` / `[native-thread-create]`: pending ownership, dimensions,
 invalid correction/cancellation, target/support changes, imported placement/freshness, new internal
@@ -640,8 +640,9 @@ the entry camera, selection and pick scope while the entry revision remains curr
 Focused proof is `[hole-support-edit-shell]`, `[native-hole-support-edit]` and Geometry
 `[thread-support-prefix]`: reference preservation, explicit rebinding, downstream exclusion,
 used-only workplanes, independent physical frames/volumes, exact history/reopen and actual native
-predecessor picking. Hidden/consumed targets and active user history prefixes retain their existing
-numeric edit path; their extended support-selection lifecycle remains 157B3.
+predecessor picking. The [157B3 input-history workflow](#hidden-and-consumed-input-bodies--157b3)
+extends these selectors to hidden/consumed targets. The
+[prefix lifecycle](#end-of-part-and-shared-contexts--157b3) also uses exact predecessor selectors.
 
 Original native previews: [100%](images/hole-support-edit.png), 1280×800, and
 [compact 150%](images/hole-support-edit-compact.png), 1536×960 physical pixels. Both show the
@@ -707,6 +708,284 @@ Source proof: [current shell tests](../tests/gui/gui_shell_hole_thread_edit_test
 Original [compact conical preview](images/thread-conical-compact.png), 1536×960 physical pixels,
 shows the signed nine-decimal taper, Cosmetic representation and reachable Apply/Cancel. Fit All
 includes the origin plane; the small conical Body and its illustrative Thread graphics are unedited.
+
+### Complete Create Another — 157B3
+
+Creation tasks for both Hole and Thread expose Create Another. It commits the current candidate
+once, then uses `GuiHoleThreadRepeatCommands` to clone the complete typed intent into a disposable
+new task. The feature, Hole placement and step identities are fresh. Numeric parameters owned by
+the current creation receive fresh identities while repeated bindings within that feature remain
+aliased. Explicit existing parameter/formula bindings and immutable standard pins remain shared;
+the command never converts them to resolved numeric snapshots. Only required new inputs publish.
+The canonical Core factories, serializer and normal preview/transaction authorities remain in use.
+
+Recipe, extent/limits, support/target, positions, tip, internal/external Thread profile, interval,
+direction, handedness and representation are retained. Existing semantic support workplanes and
+Slot profiles remain explicit model references. Repeating the same position, Slot profile or
+Thread interval can be ineffective or overlap the committed feature; the new task remains open
+with Apply disabled until the user chooses another position/profile/interval/target. No new
+location is guessed. Cancel discards only this new draft and its inputs. Save during that draft
+continues to save the previously committed model. Each later Apply is one independent undo step.
+
+`[hole-repeat-shell]` covers all nine recipes and six extents, fresh owned dimensions/placements/
+steps, internal bore aliases, custom/pinned external profiles, shared lengths, formula/pinned seat
+bindings, physical cuts, unchanged limit Bodies and exact history/reopen. `[native-hole-repeat]`
+uses mouse Create Another, numeric keyboard correction and a second mouse Apply. Full remaining
+The remaining 157B3 conversion and extended contexts, plus 157C combinations, remain assigned.
+
+Native evidence: [second Counterbore position](images/hole-repeat.png) and
+[second Thread interval at compact 150%](images/thread-repeat-compact.png). The captures are
+unmodified outputs of the asserted native workflows.
+
+### Referenced position workflow — 157B3
+
+Each placement selects an independent point in the support frame or an existing scoped Sketch
+point. The latter retains `SketchId` and point identity; no resolved coordinate snapshot replaces
+the reference. Multiple placements keep independent stable placement IDs when reordered or
+rebound. Explicit point preselection seeds creation; the selector also offers actual viewport
+point picks. The Geometry executor validates each point in its current Sketch frame against the
+current support plane and rejects incompatible positions before publication.
+
+Selecting Independent point explicitly breaks that placement's reference at its resolved current
+support-local coordinates. It preserves the placement ID and leaves the source Sketch unchanged.
+It resolves the selected typed support independently of unrelated invalid property values. A
+referenced Slot origin can therefore return to its required independent origin without abandoning
+the recipe; the complete candidate still decides whether Apply is valid.
+`GeometryRecomputeExecutor::resolve_hole_support` shares the execution resolver and accepts only
+the exact complete cache or an explicitly matching predecessor scope; stale caches fail closed.
+
+Edit Source Sketch enters the existing Sketch workspace through the shared breadcrumb authority.
+The enclosing Part workflow owns Sketch operations, sidecars and the Hole draft. Finish Sketch
+returns to the retained Hole inputs and recomputes its complete candidate. Local Undo/Redo affects
+the source operations; Save writes the committed entry state. Final Apply publishes the source
+and Hole together as one Undo step. Cancel discards the complete workflow. End of Part source
+navigation remains disabled while its broader lifecycle is being completed.
+
+`[hole-position-shell]` covers multiple scoped explicit/projected points, current-frame rejection,
+explicit independent conversion, retained inputs, source Save/Cancel/local Undo/Redo, actual
+shifted bore axes and one combined publication. The existing `[source-sketch-workflow]` and
+`[block136-feature-edit]` regression passes 15 cases / 1,967 assertions, with three native skips.
+Geometry `[hole-support-query]` plus current support/Thread/scene regression passes 18 cases /
+1,299 assertions. Native position/source/repeat/feature-edit regression passes five cases / 508
+assertions at each of 100% and compact 150%, including real point picking, source point creation,
+breadcrumb return and Apply. Unmodified captures show the [source visit](images/hole-source-sketch.png)
+and [compact return](images/hole-position-return-compact.png). Full 157B3 acceptance still requires
+legacy conversion, extended contexts and the complete native combination gate.
+
+The shared Window keeps the idle model selection filter when entering a feature's source Sketch;
+the task's temporary pick mask never becomes the idle filter. Hole Cancel restores the entry
+selection/camera after the enclosing workflow rollback, whose revision deliberately advances.
+
+### Support-anchored canvas controls — 157B3
+
+The shared property editor's Canvas Control selects an authored position X/Y, bore/seat/step
+dimension, depth or Thread start/length. The existing Linear/Radial manipulator layer owns pointer
+mapping, frozen starts, numeric override and exact release. A valid candidate supplies its exact
+predecessor cache for support resolution; the result cache supplies subsequent Body placement.
+Grips follow rotation/translation/uniform scale while entered values retain their authored units.
+Radial diameter grips explicitly map half the posed diameter to world radius.
+Slot position/width remain driven by the selected source profile; those ineffective placement/
+diameter grips are omitted. Its authored depth remains available as a canvas control.
+
+Dragging changes only the disposable form/candidate. Invalid geometry disables Apply and remains
+correctable during the same drag. Escape restores the preceding scalar, release uses the final
+sample, and Apply publishes once. Canvas Control is locked during the drag. Selection pick modes
+clear grips so model/point picks cannot be intercepted by a manipulation handle.
+Placement and step grips use their semantic IDs. Reordering retains the selected logical grip;
+removing it clears the selection instead of redirecting manipulation to another row.
+
+Formula/shared values retain their bindings until Make Independent is explicitly chosen. It
+creates an owned typed parameter from the displayed value without changing the original source;
+unused pending inputs remain pruned. Pinned properties retain the explicit Custom source action.
+Referenced placements likewise require the explicit Independent point transition before position
+dragging. Thread length starts at the authored interval offset on its inspected cylinder/cone.
+
+Geometry `[hole-canvas-frame]` plus Body-transform/result-face/support regression passes 21 cases /
+1,195 assertions. Qt canvas/manipulator/position/source/editor regression passes 28 cases / 2,428
+assertions, with five native skips. Native canvas/source/repeat/editor/body/face/limit regression
+passes twelve cases / 1,111 assertions at 100%. The same binary at 150% passes disjoint eleven-case /
+1,030-assertion and one-case / 81-assertion runs. The broader canvas/position/source/Hole/Thread/
+editor/prefix/coverage/viewport regression passes 115 cases / 9,804 assertions, with 20 native
+skips. The focused native selection covers eleven of those skips plus the all-platform post-Body-
+scale case; complete native combination acceptance remains 157C. This component does not close 157B3.
+Unmodified captures show [posed Hole depth](images/hole-canvas.png),
+[diameter after Body scale/rotation](images/hole-canvas-scaled.png) and
+[compact modeled Thread interval](images/thread-canvas-compact.png).
+Proof sources: [shell/native interactions](../tests/gui/gui_shell_hole_thread_edit_tests.cpp),
+[value mapping](../tests/gui/gui_shell_feature_tools_tests.cpp) and
+[pose inversion](../tests/geometry/body_transform_pipeline_tests.cpp).
+
+### Property presets — 157B3
+
+Hole and Thread share the Property Presets group after the ordinary inputs in the scrolling form.
+An editable name, Save Values, Load Values and Remove manage application preferences independently of model history.
+Names are scoped by Hole/Thread kind; Save Values explicitly replaces the same kind/name. Cancel
+discards the model draft while retaining an explicitly saved preset. Active canvas input, model
+picking and source-Sketch visits suspend preset actions. Invalid model preview disables Save Values;
+loading can correct scalar input without publishing a feature.
+
+Save Values captures all recipe/extent/tip or Thread profile/interval/hand/direction/representation
+properties. Numeric parameters, including formulas and shared inputs, become literal value snapshots
+with retained aliases; source parameter names/identities and expressions are omitted. Standard choices
+keep their exact immutable revision, selected row/columns and complete provenance snapshot. The UI states
+this value-snapshot boundary explicitly.
+
+Load Values retains the current feature's ID/name, target Body, support, placement identities/sources,
+Slot profile and explicit Face/Body limit references. A Slot preset requires an existing Slot/profile;
+To Face and Up to Body require their current role and selected limit first. Missing current references
+or conflicting pinned revisions produce an inline diagnostic and preserve the previous draft.
+Each loaded numeric binding receives a fresh owned parameter. Existing step identities are retained
+by index, while added steps get fresh identities. Required missing revisions remain candidate-only
+until Apply; changing to a recipe/profile that no longer needs them prunes their publication.
+
+The preference file is `feature-presets.json` under Qt's application config location; the explicit
+`BLCAD_PRESETS_PATH` override supports isolated automation. QSaveFile publishes the complete library
+atomically. Missing files mean an empty library; malformed, unsupported, duplicate or noncanonical
+entries fail without overwriting the existing file. Each value template uses the canonical Core Part
+codec with fixed placeholder identities. Re-capture validation excludes document-specific bindings;
+no new document intent, geometry interpreter or model persistence schema is introduced.
+
+Proof sources: [typed preset/storage regression](../tests/gui/gui_hole_thread_preset_tests.cpp),
+[shell and native interactions](../tests/gui/gui_shell_hole_thread_edit_tests.cpp), tags
+`[hole-thread-presets]`, `[hole-preset-shell]` and `[native-hole-preset]`. The broader regression passes
+122 cases / 10,463 assertions with 22 native skips; the focused native preset/canvas/source/repeat selection passes 10 cases / 824 assertions at both scales. This is targeted
+native coverage. Runtime and delivery evidence is indexed in
+the [current implementation plan](mvp-plan.md#current-implementation--157b3). Presets alone do not
+accept parent 157; explicit conversion and extended contexts are described below, while combined
+acceptance remains 157C.
+
+### Explicit legacy conversion — 157B3
+
+History → Convert to Hole and the selected feature's browser menu explicitly preview a legacy
+subtractive Extrude as a semantic Plain ThroughAll Hole. Ordinary Edit Feature remains available;
+opening old documents does not migrate their cuts. The conversion currently requires a straight,
+flat ThroughAll cut, one selected materialized Circle profile (or the only profile), and an explicit
+Cut target preserving its Body identity. Suppressed cuts must be unsuppressed first. Circular Hole
+Pattern radius/count bindings, other profiles, taper/thin/path/other extents and Body aliases report
+an actionable diagnostic; their legacy intent remains intact.
+
+The Hole retains the feature ID/name, executable history position, target Body, diameter binding
+(including formulas) and source workplane binding. Its circle center plus any Sketch-origin offset
+becomes an explicitly disclosed independent position. The source Sketch and its inputs remain in
+the Part; later source-center edits do not move this independent Hole. The canonical Core factory
+and `replace_part_extrude_with_hole` codec operation own the replacement and complete dependency/
+reference validation. The latter replaces the family atomically at its existing history position,
+without appending an intermediate modifier behind downstream Body readers. Supported
+consumers such as whole-Body Patterns and subsequent Body placement retain their mappings.
+An old full-result feature Pattern can have a different material meaning from a semantic Hole
+Pattern; unchanged feature IDs alone do not certify it. Such material changes, unsupported legacy
+target-feature or semantic mappings fail before publication and identify the conversion boundary
+instead of dropping or reinterpreting consumers.
+
+Conversion begins in an idle complete editable Part without an enclosing workflow/End of Part.
+The existing disposable Part workflow stages and recomputes the complete candidate before opening
+the ordinary Hole editor. Every available Solid Body must retain its result availability and common
+material: the existing Boolean intersection compares both original and candidate volume to their
+shared volume within `1e-8 * max(1 mm³, original volume)`. Equal volume with a displaced bore therefore
+fails certification. This derived check adds no geometry intent or topology identifiers.
+
+The task identifies the conversion and its value/reference boundary. Subsequent edits use normal
+Hole preview, support selection, canvas and presets. Save writes the committed legacy entry until
+Apply; Cancel restores it. Final Apply publishes conversion and the accepted Hole properties as one
+ordinary workflow transaction and one Undo step. Existing imported-source freshness and downstream
+geometry validation still apply. The shared context lifecycle is described below; full native
+combinations remain assigned to 157C. This bounded command alone does not accept parent 157.
+The task captures the original camera, model/viewport selection and pick scope before internal
+staging clears the selection. Cancel restores that entry context after rebuilding the legacy model;
+a rejected task startup also restores it through the existing monotonic checkpoint authority.
+
+Proof sources: [atomic Core family/schema regression](../tests/core/part_hole_feature_tests.cpp),
+[conversion, shell and native regression](../tests/gui/gui_shell_hole_thread_edit_tests.cpp),
+tags `[hole-conversion]`, `[hole-conversion-shell]`, `[native-hole-conversion]` and
+`[native-hole-conversion-context]`. Full Core passes 707 cases / 26,935 assertions; focused Geometry
+passes 26 / 2,186; final focused Qt passes seven / 670 with one native skip. The broader Qt selection
+passes 150 / 12,297 with 25 native skips. Targeted native conversion/context/editor/preset/source/
+History regression passes 14 / 920 at 100% and 14 / 926 at compact 150%. The
+[implementation plan](mvp-plan.md#current-implementation--157b3) owns delivery/runtime evidence;
+these focused results retain their component boundary; combined acceptance remains 157C.
+
+### Hidden and consumed input Bodies — 157B3
+
+Existing Hole/Thread support editing resolves the exact predecessor cache before deciding which
+targets are available. A Body hidden by persistent intent or transient presentation, or consumed
+by a later Boolean, remains selectable when it existed before the edited feature. Later Bodies,
+the feature's own results and unavailable predecessors remain excluded. Creation still chooses
+currently visible available Solids; this edit extension changes no creation eligibility.
+
+Target/limit labels identify hidden inputs and Bodies available only in the input history. During
+an explicit pick, the task temporarily displays the predecessor cache's available Body shapes,
+including hidden inputs, through the existing candidate overlay. Canonical scope validation and
+typed face/Body references still own picking; no visibility flag or persistent display override is
+written. Closing the pick returns to normal complete candidate preview. Apply validates the full
+downstream model, including consumption, and publishes one ordinary edit. Cancel clears the input
+overlay and restores the entry camera, selection and scope under the existing revision policy.
+The shared Geometry selector requires an explicit `IncludeHiddenInputs` policy for these queries;
+its normal finishing default remains `VisibleOnly`. Scope/cache/source validation is unchanged.
+
+If the target is unavailable even before the feature (for example an unavailable creator), the
+existing numeric edit/failure policy remains; the task does not invent support geometry. Active
+user-prefix edits use the same predecessor query within the enclosing prefix boundary below.
+
+Proof sources: [input-history shell/native regression](../tests/gui/gui_shell_hole_thread_edit_tests.cpp)
+and [explicit Geometry visibility/scope regression](../tests/geometry/finishing_selection_tests.cpp),
+tags `[hole-input-history-shell]`, `[native-hole-input-history]` and `[hidden-input-selection]`. The
+[implementation plan](mvp-plan.md#current-implementation--157b3) records verification and delivery.
+Focused Geometry passes 11 cases / 801 assertions; focused Qt passes two / 246 with two native skips.
+The broader relevant Qt selection passes 82 / 6,200 with 15 native skips. Targeted native input/
+support/source/limit/context regression passes seven / 763 at each scale. These are bounded proofs;
+complete native combination acceptance remains assigned separately.
+
+### End of Part and shared contexts — 157B3
+
+Hole/Thread creation, existing edits and Create Another use the existing session-owned prefix child
+checkpoint. A child Apply compacts its source and feature edits into one local Undo operation;
+Cancel restores only the child entry. Create Another starts a fresh child after the accepted row.
+The outer End of Part context retains its marker, complete suffix, committed Save snapshot and
+final Apply/Cancel authority. Its Apply stays disabled throughout a child or Source Sketch visit.
+Final publication validates the complete suffix and produces one global Undo operation.
+
+Creation inserts typed Hole/Thread intent atomically at the marker through the canonical Core
+reader. Adding a modifier at the end and subsequently moving it can create a forbidden intermediate
+Body-consumer order; the insertion operation validates the complete order and lineage together.
+It retains existing suppression and all suffix records, rejects invalid positions/identities and
+leaves the source unchanged on failure. The session still owns marker advancement and local history.
+The candidate scene uses its evaluated prefix count, including newly inserted rows. Support and
+position queries explicitly use either the edited feature's predecessor scope or the current marker.
+
+Referenced Hole positions can enter Source Sketch under the same prefix child. Returning rebases
+the pending Hole against current Sketch intent and refreshes its predecessor inputs; no nested
+Part workflow is opened. Save, child Cancel and outer Cancel retain their existing boundaries.
+Historical documents without explicit history retain a complete canonical history envelope when
+the pending Hole requires a newer one; the source-return regression covers both history modes.
+Ordinary complete-document source visits and explicit conversion keep their existing Part workflow.
+Hole/Thread entry requires an editable current Part workspace; unrelated workflows and active
+commands are rejected without taking ownership. A changed source or lost task/context ownership
+rejects stale Apply and preserves independently committed document changes.
+
+Proof sources: [canonical insertion](../tests/core/thread_feature_tests.cpp),
+[shell/native lifecycle](../tests/gui/gui_shell_hole_thread_edit_tests.cpp), tags
+`[hole-thread-insertion]`, `[hole-prefix-shell]`, `[hole-context-shell]` and `[native-hole-prefix]`.
+Focused Qt passes five cases / 582 assertions with one native skip. Native prefix/context and
+source/input/conversion-context selections pass ten cases / 1,134 assertions at each of 100% and
+compact 150%, in disjoint six-plus-four runs with clean exits. Full Core passes 708 cases / 27,016
+assertions; focused Geometry passes 37 / 2,987. These are targeted lifecycle proofs; the
+[implementation plan](mvp-plan.md#current-implementation--157b3) records the broader regression and
+delivery boundary separately from the remaining 157C combined gates.
+
+Recipe/support/limit handoffs reselect the active feature by stable ID whenever Core returns
+canonical JSON. A record index belongs only to its current template; it is never carried across
+re-serialization. Source Sketch return can append a pending record to a template while executable
+order places it before another Hole. The next recipe or reference change retains the pending
+feature's name, bindings and positions and leaves the suffix intent unchanged.
+
+`[hole-canonical-rebase-shell]` in the same shell test source covers Through All and To Face,
+Source return followed by a Counterbore recipe, exact suffix records, independent combined cut
+volume and complete Undo/Redo/reopen. The focused case passes 169 assertions. Native Source input
+and keyboard recipe changes join the existing support/limit/Thread/preset selection: seven cases /
+1,026 assertions at both scales, all with exit 0. Original captures show the retained
+[100% prefix/recipe context](images/hole-prefix-rebased-100.png) and
+[compact 150% context](images/hole-prefix-rebased-150.png); scrolled fields remain reachable and
+outer/local Apply/Cancel remain visible. Combined B01–B04/UI01 acceptance stays assigned to 157C.
 
 ## Why more than a cut
 

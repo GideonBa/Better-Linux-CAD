@@ -171,12 +171,13 @@ Whole-block replacement-shell acceptance remains separate work.
 
 The existing editor now identifies typed Hole/Thread records and calls `update_hole_feature` /
 `update_thread_feature`; browser double-click and History Edit share this boundary. Existing
-thirteen-family behavior and legacy cuts retain their own editing path. Current 157A scope and
-fixed support/resource fields are owned by [Hole/Thread](hole-wizard.md#property-editing--157a-design-and-boundary).
-The full Wizard remains 157B/C. Numerical controls follow parameter units/formulas, and complete
-Geometry preview/Apply preserves downstream validation and one transaction. Existing viewport
+thirteen-family behavior and legacy cuts retain their own editing path. The original 157A bridge
+boundary before later selectors is owned by [Hole/Thread](hole-wizard.md#property-editing--157a-design-and-boundary).
+The later 157B sections own the complete authoring workflow; combined acceptance remains 157C.
+Numerical controls follow parameter units/formulas, and complete Geometry preview/Apply preserves
+downstream validation and one transaction. Existing viewport
 preview authority regenerates cosmetic graphics from the candidate Bodies and hides replaced
-annotations. Support-anchored grips remain assigned to 157B.
+annotations. The support-anchored grips and extended lifecycle are described below.
 
 Focused proof: `[hole-thread-edit-shell]` in
 [the current shell tests](../tests/gui/gui_shell_hole_thread_edit_tests.cpp), including actual
@@ -205,8 +206,9 @@ freshness remains unchanged. Required pending dimensions are added for creation 
 editing, while explicit changes to shared parameters remain part of that same transaction. Source
 controls select compatible pinned cells or convert a resolved source to an owned custom dimension.
 [The Hole contract](hole-wizard.md#recipe-and-dimensional-source-controls--157b2a) owns exact limits;
-the existing recipe/source and native test tags provide focused proof. Full Thread/support selectors,
-manipulators, Sketch return, presets and legacy conversion remain assigned to 157B2b/B3/C.
+the existing recipe/source and native test tags provide focused proof. The following sections own
+Thread/support selectors, manipulators, Sketch return, presets and legacy conversion; combined
+acceptance remains 157C.
 
 ### External Thread creation — 157B2b
 
@@ -227,8 +229,8 @@ records. Mapping drafts live only in the form; complete choices become a `Thread
 Commands filter scalar edits against the resulting record's dependencies before its Core update,
 so an explicitly removed optional input cannot leak an invalid unused value. Existing shared and
 formula bindings retain their established ownership. See [source and interval controls](hole-wizard.md#thread-sources-and-optional-intervals--157b2b)
-and `[thread-source-shell]` / `[native-thread-source]`; remaining limit/context scope and combined
-acceptance stay assigned.
+and `[thread-source-shell]` / `[native-thread-source]`. Limit/context workflows are described below;
+combined acceptance stays assigned to 157C.
 
 Existing Hole/Thread support selectors evaluate the feature's exact predecessor history in a
 separate checked input cache. Scoped preview targets show that geometry during picks; they retain
@@ -251,3 +253,98 @@ Complete rejected profile mappings retry after a used scalar/binding correction;
 Thread numeric focus. Existing definitions retain their explicit bindings/directions. See the
 [conical combinations contract](hole-wizard.md#conical-thread-combinations--157b2b) and
 `[thread-cone-shell]` / `[native-thread-cone]` for combined source, interval and physical proof.
+
+### Complete Create Another — 157B3
+
+Both creation kinds commit once and open a complete typed repeat through
+`GuiHoleThreadRepeatCommands`. The current creation's owned parameters identify which numeric
+bindings need fresh copies; explicit existing/formula/standard references remain bound. New
+feature/placement/step IDs and copied parameter aliases preserve independent future edits. The
+new draft can be invalid at its retained location and stays correctable. Cancel preserves the
+preceding commit; normal preview, freshness and used-input publication apply unchanged. See
+[the repeat contract](hole-wizard.md#complete-create-another--157b3) and `[hole-repeat-shell]` /
+`[native-hole-repeat]`; this component alone does not close 157B3 or parent 157.
+
+An explicit Thread target/support rebind first obtains the pair's canonical encoding through the
+Core factory/update/serializer. The form replaces its support before decoding the changed target,
+so a formerly valid reference on the old Body cannot prevent correcting the pair. Other pending
+numeric/source edits remain intact; complete downstream execution still decides validity.
+
+### Referenced Hole positions and source return — 157B3
+
+Placement controls use the existing owned-point/Sketch-point variants, preserve placement identity,
+and support multiple scoped explicit/projected point references. Current support-local conversion
+requires an explicit Independent point choice. The exact read-only Geometry support query supplies
+the current frame; it rejects stale or incorrectly scoped caches.
+
+Edit Source Sketch suspends the property task inside the existing Part workflow and Sketch
+workspace. Finish Sketch returns to the retained form and revalidates the candidate. Source edits,
+constraint/dimension sidecars and the final feature publish together through a disposable session;
+Save retains the committed entry, Cancel restores the workflow, and Apply creates one Undo step.
+The Window's shared source navigation dispatches to the owning Extrude or Hole workflow. No second
+Sketch workspace, transaction system or persistence schema is introduced. See the
+[position contract](hole-wizard.md#referenced-position-workflow--157b3) for current bounds and proof.
+
+### Hole/Thread canvas controls — 157B3
+
+Canvas Control publishes one selected support-anchored Linear/Radial handle through the shared
+manipulator layer. Frames resolve from the valid candidate's exact predecessor geometry, including
+pending parameter/source edits; the result's Body placement maps them to the visible posed model.
+Positive world-distance/value scale keeps diameter and uniformly scaled dimensions in authored
+units. Active drags lock the control chooser and publication actions; exact release, invalid
+correction and Escape remain candidate-only operations. Pick modes remove the handles.
+
+Make Independent is an explicit typed parameter copy/rebind for shared/formula fields; it preserves
+the source and publishes only when the owning feature requires the new input. Pinned dimensions
+and profiles keep their existing explicit Custom transitions. The support query, canonical
+factories, full preview and existing transaction/workflow authority still decide validity. See the
+[canvas contract](hole-wizard.md#support-anchored-canvas-controls--157b3) for scope and proof.
+
+### Hole/Thread property presets — 157B3
+
+The scrolling form shares Save Values/Load Values/Remove through `GuiHoleThreadPresetCommands`.
+Canonical Core templates capture literal values and exact pinned snapshots while loading retains
+the destination's live references. Failed loads preserve the existing draft and report inline;
+successful loads use the ordinary full preview and one Apply. Preset preference writes do not add
+model history. Newly imported required resources join the disposable candidate's input mutation;
+unused revisions are pruned before publication. Thread source selectors read this candidate catalog.
+The [preset contract](hole-wizard.md#property-presets--157b3) owns reference prerequisites, explicit
+snapshot semantics, storage validation and proof tags.
+
+### Explicit legacy Hole conversion — 157B3
+
+Convert to Hole stages a canonical replacement in the existing Part workflow, checks full downstream
+execution and common Solid material, then opens this ordinary editor over the staged Hole. Save
+continues to serialize the committed legacy entry. Apply publishes the conversion and accepted
+properties once; Cancel restores the original. Diameter/support bindings and feature/history identity
+are retained; center/origin values explicitly become an independent placement. Unsupported mappings
+leave ordinary legacy editing available. The
+[conversion contract](hole-wizard.md#explicit-legacy-conversion--157b3) owns prerequisites, diagnostics,
+material tolerance and proof tags. No second edit controller or transaction system is introduced.
+
+### Hidden/consumed predecessor inputs — 157B3
+
+An existing Hole/Thread determines input availability from its exact predecessor cache, independently
+of end-state visibility or later consumption. Target/limit labels disclose hidden/input-history
+Bodies. Explicit picking displays available cached inputs through the temporary overlay without
+changing visibility intent; full downstream preview/Apply and entry-context Cancel remain authoritative.
+See the [input-history contract](hole-wizard.md#hidden-and-consumed-input-bodies--157b3) for bounds and
+focused proof. User history prefixes retain the same predecessor authority as described below.
+
+### Hole/Thread prefix child lifecycle — 157B3
+
+Hole/Thread creation, editing, Source Sketch return and Create Another use the existing
+`begin/publish/cancel_part_history_command` checkpoint within End of Part. Child Apply compacts one
+local change; child Cancel retains prior staged work and the outer workflow. New modifiers enter
+through canonical atomic insertion before session-owned candidate preparation, so later Body
+consumers never observe an invalid append/reorder intermediate state. Predecessor selectors and
+candidate scenes use their exact evaluated scope. Outer Save/Cancel/Apply and full suffix validation
+remain unchanged. Workspace, unrelated workflow and stale ownership guards reject entry or Apply
+without adopting another command. The [Hole contract](hole-wizard.md#end-of-part-and-shared-contexts--157b3)
+owns exact behavior and focused proof sources; complete native combinations remain 157C.
+
+Recipe, support and limit handoffs find the active feature by stable ID in each canonical result.
+The source template's array index is retained only inside that template. This preserves a pending
+Hole's recipe/name/bindings after Source Sketch return when executable order places it before an
+existing Hole suffix. `[hole-canonical-rebase-shell]` checks both Through All and To Face with
+unchanged suffix intent, independent material, exact history and native source/keyboard input.
