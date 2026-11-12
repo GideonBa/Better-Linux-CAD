@@ -987,6 +987,35 @@ and keyboard recipe changes join the existing support/limit/Thread/preset select
 [compact 150% context](images/hole-prefix-rebased-150.png); scrolled fields remain reachable and
 outer/local Apply/Cancel remain visible. Combined B01–B04/UI01 acceptance stays assigned to 157C.
 
+### Keyboard input and correction — 157C
+
+Enter and Tab finish local field editing without publishing a feature. Ctrl+Enter first checks the
+focused spin-box or text input, interprets acceptable numeric text or finishes the text edit, then
+uses ordinary typed preview/Apply. An incomplete number is retained for correction; a geometric
+failure also leaves the draft and committed document intact. Feedback stays in the current task,
+preserving compact input space and the wrapped guidance and fixed Apply/Cancel actions. Finishing
+the preceding accepted number still refreshes a preview after an incomplete edit.
+
+Escape from an owned input cancels the task, or resets an active canvas drag under the existing
+gesture contract. Source Sketch editing keeps its own key handling. These handlers are attached to
+the current Hole/Thread inputs; they introduce no new document transaction or persistence rule.
+
+Proof: `[hole-thread-keyboard-shell]` in
+[combined shell acceptance](../tests/gui/gui_shell_hole_thread_acceptance_tests.cpp), run with the
+existing `[property-controls-widget]` Extrude baseline. The case checks incomplete and oversized
+values, focus/correction, Enter/Tab, pending names on Ctrl+Enter, committed Save, Repeat/Escape,
+one Undo/Redo and exact reopen, with native OCCT availability and compact guidance/action bounds.
+Verification: focused offscreen keyboard/Extrude **4 cases / 308 assertions**; affected shared Qt
+selection **66 cases: 58 passed, 8 native-only skips / 5,403 assertions**; native keyboard/Extrude
+**4 cases / 325 assertions** at each of 100% and compact 150%, all completed with exit 0. The
+PID-matched native startup reached `IsViewable` before its intentional timeout (124). Original
+[incomplete Hole input](images/hole-keyboard-invalid.png) and
+[compact Thread preview](images/thread-keyboard-preview-compact.png) show the retained task controls.
+All 156 GUI/app dependency records are valid. Frozen runtime: **1,063 files**, SHA256
+`3867fa78784cbbce25642e22e2f17e40672c46cf4b717e3868c49d49760dc3eb`.
+Failed and superseded runs contribute no proof. This component alone does not accept parent 157;
+the combined authoring, Pattern/Assembly/STEP and inventory gates remain assigned below the plan.
+
 ## Why more than a cut
 
 ```text

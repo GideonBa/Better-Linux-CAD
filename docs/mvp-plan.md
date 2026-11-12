@@ -483,6 +483,15 @@ results; full Geometry/Qt and whole-parent integration remain assigned to 157C/1
 The serial acceptance branch starts from merged `248d7c2` after verifying PR #180 is merged,
 Main is current and clean, no delivery PR remains open, and the delivered runtime is unchanged.
 This plan records assigned work, not acceptance; `implemented_through` stays 156 until all gates pass.
+The active delivery is [draft PR #181](https://github.com/GideonBa/Better-Linux-CAD/pull/181).
+
+The first focused correction implements Hole/Thread field-owned Ctrl+Enter validation and
+Escape handling, with local Enter/Tab and inline compact feedback. The keyboard/geometry/history
+case and existing Extrude property-control baseline pass offscreen and natively at both scales;
+the affected Qt selection passes with its eight native-only skips. The
+[keyboard contract and proof](hole-wizard.md#keyboard-input-and-correction--157c) record counts,
+original captures and the frozen runtime. The remaining combined authoring, Pattern/Assembly/STEP
+and inventory gates below stay open.
 
 | Gate | Work / completion boundary |
 | --- | --- |

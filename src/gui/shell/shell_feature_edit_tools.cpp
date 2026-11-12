@@ -19,6 +19,7 @@
 #include "blcad/gui/shell/shell_property_controls.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
+#include <QAbstractSpinBox>
 #include <QAction>
 #include <QApplication>
 #include <QCheckBox>
@@ -476,6 +477,7 @@ struct ShellFeatureEditTools::Impl {
     scroll->setFrameShape(QFrame::NoFrame);
     column->addWidget(scroll, 1);
     guidance = new QLabel(content);
+    guidance->setObjectName("blcad.feature_edit.guidance");
     guidance->setWordWrap(true);
     column->addWidget(guidance);
     auto* footer = new QHBoxLayout;
@@ -513,6 +515,7 @@ struct ShellFeatureEditTools::Impl {
     });
     viewport.installEventFilter(&owner);
     window.installEventFilter(&owner);
+    dynamic->installEventFilter(&owner);
   }
   ~Impl() {
     delete overlay;
@@ -2708,6 +2711,17 @@ struct ShellFeatureEditTools::Impl {
       build_fields(form, record, {});
     if (hole_thread())
       build_presets(column);
+    if (hole_thread())
+      for (auto* input : panel->findChildren<QWidget*>()) {
+        if (qobject_cast<QLineEdit*>(input) || qobject_cast<QComboBox*>(input) ||
+            qobject_cast<QAbstractSpinBox*>(input))
+          input->installEventFilter(&owner);
+        if (auto* number = qobject_cast<QAbstractSpinBox*>(input))
+          QObject::connect(number, &QAbstractSpinBox::editingFinished, &owner, [this] {
+            if (!building && edit.active() && !editing_source && layer.active_handle_id().empty())
+              (void)preview();
+          });
+      }
     column->addStretch();
     auto* old = scroll->takeWidget();
     scroll->setWidget(panel);
@@ -2973,6 +2987,24 @@ struct ShellFeatureEditTools::Impl {
       canvas_handles.emplace(path, std::move(handle));
     }
     return Result<std::size_t>::success(canvas_handles.size());
+  }
+  Result<std::size_t> finish_focused_input() {
+    auto* focused = QApplication::focusWidget();
+    if (!focused || !dock->isAncestorOf(focused))
+      return Result<std::size_t>::success(0);
+    auto* number = qobject_cast<QAbstractSpinBox*>(focused);
+    if (!number)
+      number = qobject_cast<QAbstractSpinBox*>(focused->parentWidget());
+    if (number) {
+      if (!number->hasAcceptableInput())
+        return reject(error("Complete the focused numeric input before applying."));
+      number->interpretText();
+    } else if (auto* text = qobject_cast<QLineEdit*>(focused)) {
+      if (!text->hasAcceptableInput())
+        return reject(error("Complete the focused input before applying."));
+      (void)QMetaObject::invokeMethod(text, "editingFinished", Qt::DirectConnection);
+    }
+    return Result<std::size_t>::success(1);
   }
   Result<std::size_t> preview() {
     if (building)
@@ -4063,6 +4095,16 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
           (void)p.accept_candidate(*p.layer.candidate());
       } else
         (void)set_drag_text(p.buffer);
+      return true;
+    }
+    if (p.hole_thread() && (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) &&
+        key->modifiers() == Qt::ControlModifier) {
+      auto finished = p.finish_focused_input();
+      if (finished) {
+        auto applied = apply();
+        if (!applied)
+          (void)p.reject(applied.error());
+      }
       return true;
     }
   }
