@@ -1139,6 +1139,13 @@ Bodies retain their physical result but need not retain a BRep owner across that
 fallback. Record executed-feature counts and this baseline in timing comparisons. Density-only
 reuse remains a separate existing metadata/cache contract.
 
+Assembly shape consumers retain their documented single-available-Solid compatibility boundary;
+hiding a second Body does not select a historical final shape. The native integration checks that
+ambiguity without changing intent, then explicitly suppresses the hidden Body's creator through
+History before assembling/exporting. Its record and Undo/Redo remain intact. Earlier physical-mass
+checks include the hidden **48 mm³**; subsequent Assembly mass excludes the explicitly suppressed
+Body. No implicit Body selection or new multi-body Assembly export policy is introduced.
+
 Run recompute measurements only after correctness and in isolation from builds or other tests.
 Record first-call and repeated raw samples, source/runtime/binary/build/OCCT/CPU identity and exact
 measurement boundaries. Compare the same changed document through the existing plan/cache path
@@ -1146,6 +1153,13 @@ and an empty cache. Label Geometry-only measurements explicitly, excluding setup
 history; make no portable timing-budget or pointer-latency claim. Full Core/Geometry/Qt and native
 fresh/migrated 100%/compact 150%, reviewed captures and startup are required before whole-158
 acceptance. The numbered plan owns progress and serial delivery.
+
+Current integrated verification is in progress on **1,065 frozen runtime files**, SHA256
+`0235ddc89e4f5e01cdb091cf85f6cdabb0f770f6d74b8dfd509be255a01ef4c4`. All affected targets and
+the standalone profiler build successfully. Full Core passes **708 cases / 27,016 assertions** and
+full Geometry **682 cases / 58,224 assertions**, both exit 0. Corrected native 100% passes the
+complete fresh/migrated case with **1,260 assertions**, exit 0. Full Qt is running; compact native 150%, final
+capture review/startup and isolated raw measurements remain open. No whole-158 acceptance is claimed.
 
 ## Why more than a cut
 

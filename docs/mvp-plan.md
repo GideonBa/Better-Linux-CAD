@@ -532,8 +532,8 @@ planned; discovered behavior fixes require focused proof and synchronized existi
 | Step | Completion boundary |
 | --- | --- |
 | 158A — in progress | Fresh and pre-Hole V3 migrated inputs through current Hole/Thread, Pattern, outer-edge Fillet/Chamfer, suppression/restore/reorder, material mass, bound Assembly targets and physical structured STEP/reimport; exact failure/history/reopen oracles. Shared Geometry fixture and affected regression verified in the linked contract; native chain remains open. |
-| 158B — planned | Complete current Core/Geometry/Qt suites, native fresh/migrated 100% and compact 150%, reviewed original captures and app startup; reconcile every required skip and preserve existing imported/capability limits. |
-| 158C — planned | Isolated incremental-versus-empty-cache recompute samples with correctness equivalence, raw measurements and environment/source/binary identity; review, commit/push and normal protected delivery. |
+| 158B — in progress | Full Core/Geometry and corrected fresh/migrated native 100% verified; full Qt running. Complete compact 150%, final original-capture review and startup; reconcile required skips and preserve existing imported/capability limits. |
+| 158C — in progress | Standalone opt-in profiler built; isolated incremental-versus-empty-cache samples, physical equivalence and raw environment/source/binary records remain unmeasured. Review, commit/push and normal protected delivery remain open. |
 
 Record concise proof links/results here and in the existing contracts. After whole-158 acceptance
 and merged delivery, refresh Main before starting 159; the complete 159–165 assignment and all
