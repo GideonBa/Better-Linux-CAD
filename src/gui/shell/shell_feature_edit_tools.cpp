@@ -2,6 +2,7 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 #include "blcad/gui/gui_hole_recipe.hpp"
@@ -337,9 +338,11 @@ struct ShellFeatureEditTools::Impl {
     std::string semantic_id, label;
     PlaneReference reference;
     geometry::GeometryShape shape;
+    std::optional<ResultFaceWorkplane> workplane{};
   };
   std::vector<SupportChoice> supports;
   std::optional<PlaneReference> support_override;
+  std::optional<ResultFaceWorkplane> pending_support_plane;
   bool support_chosen{};
   std::optional<Error> support_error;
   std::vector<Parameter> pending_parameters;
@@ -504,13 +507,39 @@ struct ShellFeatureEditTools::Impl {
     if (!faces)
       return Result<std::size_t>::failure(faces.error());
     for (const auto& face : faces.value())
-      if (const auto* ref = std::get_if<FaceReference>(&face.reference))
+      if (const auto* ref = std::get_if<FaceReference>(&face.reference)) {
         if (const auto* native = std::get_if<SemanticFaceReference>(&ref->source())) {
           auto plane =
               PlaneReference::create_semantic_face(PartFeatureInputRole::HoleSupportPlane, *native);
           if (plane)
             supports.push_back({face.semantic_id, face.label, plane.value(), face.shape});
+        } else if (const auto* imported = std::get_if<ImportedTopologyReference>(&ref->source())) {
+          auto identity = ImportedTopologyReference::create(imported->catalog(), imported->entry(),
+                                                            ImportedTopologyCapability::Plane);
+          if (!identity)
+            continue;
+          auto plane = PlaneReference::create_imported(PartFeatureInputRole::HoleSupportPlane,
+                                                       identity.value());
+          if (plane && validate_part_feature_input_reference(*part, plane.value()))
+            supports.push_back({face.semantic_id,
+                                face.label + " / (" + QString::number(face.anchor.x).toStdString() +
+                                    ", " + QString::number(face.anchor.y).toStdString() + ", " +
+                                    QString::number(face.anchor.z).toStdString() + ") mm",
+                                plane.value(), face.shape});
+        } else if (const auto* result = std::get_if<ResultFaceReference>(&ref->source())) {
+          const auto tag = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+          auto workplane = ResultFaceWorkplane::create(DatumPlaneId("plane.hole." + tag),
+                                                       face.label + " / Hole support", *result);
+          if (!workplane || !geometry::ResultFaceSupportGeometry::resolve(
+                                *part, workplane.value(), *cache, context.value().get()))
+            continue;
+          auto plane = PlaneReference::create_datum_plane(PartFeatureInputRole::HoleSupportPlane,
+                                                          workplane.value().id());
+          if (plane)
+            supports.push_back(
+                {face.semantic_id, face.label, plane.value(), face.shape, workplane.value()});
         }
+      }
     if (context.value()) {
       auto fresh = context.value()->validate_sources();
       if (!fresh)
@@ -760,6 +789,12 @@ struct ShellFeatureEditTools::Impl {
     auto part = decode();
     if (!part || edit.kind() != Kind::Hole)
       return part;
+    if (pending_support_plane &&
+        !part.value().find_result_face_workplane(pending_support_plane->id())) {
+      auto added = part.value().add_result_face_workplane(*pending_support_plane);
+      if (!added)
+        return Result<PartDocument>::failure(added.error());
+    }
     auto hole = selected_record(*part.value().find_hole_feature(edit.feature()));
     if (!hole)
       return Result<PartDocument>::failure(hole.error());
@@ -1020,10 +1055,13 @@ struct ShellFeatureEditTools::Impl {
         return;
       picking = Pick::None;
       support_chosen = index >= 0 && std::size_t(index) < supports.size();
-      if (support_chosen)
+      if (support_chosen) {
         support_override = supports[index].reference;
-      else
+        pending_support_plane = supports[index].workplane;
+      } else {
         support_override.reset();
+        pending_support_plane.reset();
+      }
       pick_mode();
       (void)preview();
     });
@@ -1248,6 +1286,7 @@ struct ShellFeatureEditTools::Impl {
             picking = Pick::None;
             support_chosen = false;
             support_override.reset();
+            pending_support_plane.reset();
             auto catalog = collect_supports(BodyId(value(path).get<std::string>()));
             support_error = catalog ? std::nullopt : std::optional(catalog.error());
             pick_mode();
@@ -1358,7 +1397,7 @@ struct ShellFeatureEditTools::Impl {
         }
       });
   }
-  GuiPartMutation parameter_updates(const PartDocument& decoded) const {
+  GuiPartMutation input_updates(const PartDocument& decoded) const {
     std::vector<Parameter> changes, added;
     const auto used = bound_parameters(record);
     for (const auto& p : decoded.parameters())
@@ -1369,7 +1408,19 @@ struct ShellFeatureEditTools::Impl {
       if (used.contains(id) && session.part_document()->find_parameter(ParameterId(id)))
         changes.push_back(*decoded.find_parameter(ParameterId(id)));
     }
-    return [changes, added](PartDocument& part) -> Result<std::size_t> {
+    std::optional<ResultFaceWorkplane> plane;
+    if (pending_support_plane && support_override)
+      if (const auto* selected = std::get_if<DatumPlaneId>(&support_override->source());
+          selected && *selected == pending_support_plane->id())
+        plane = pending_support_plane;
+    return [changes, added, plane](PartDocument& part) -> Result<std::size_t> {
+      std::size_t plane_count = 0;
+      if (plane && !part.find_result_face_workplane(plane->id())) {
+        auto inserted = part.add_result_face_workplane(*plane);
+        if (!inserted)
+          return inserted;
+        plane_count = inserted.value();
+      }
       for (const auto& p : added) {
         auto result = part.add_parameter(p);
         if (!result)
@@ -1380,7 +1431,7 @@ struct ShellFeatureEditTools::Impl {
         if (!set)
           return Result<std::size_t>::failure(set.error());
       }
-      return Result<std::size_t>::success(changes.size() + added.size());
+      return Result<std::size_t>::success(changes.size() + added.size() + plane_count);
     };
   }
   Result<PartDocument> decode() const {
@@ -1442,7 +1493,7 @@ struct ShellFeatureEditTools::Impl {
           if (!selected)
             return Result<PartDocument>::failure(selected.error());
           return edit.candidate(session, std::move(selected.value()), updater,
-                                parameter_updates(decoded.value()));
+                                input_updates(decoded.value()));
         },
         creating);
     if (!candidate)
@@ -1585,6 +1636,7 @@ struct ShellFeatureEditTools::Impl {
     pending_focus_id.clear();
     supports.clear();
     support_override.reset();
+    pending_support_plane.reset();
     support_error.reset();
     another->hide();
     window.refresh();
@@ -1667,6 +1719,7 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   p.pending_parameters.clear();
   p.supports.clear();
   p.support_override.reset();
+  p.pending_support_plane.reset();
   p.support_error.reset();
   p.picking = Impl::Pick::None;
   p.another->hide();
@@ -1772,6 +1825,7 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
       reference = selected.semantic_id;
   }
   std::optional<PlaneReference> support;
+  std::optional<ResultFaceWorkplane> pending_plane;
   if (reference) {
     for (const auto& body : part.bodies()) {
       if (!p.body_available(body) || (explicit_body && body.id() != target))
@@ -1783,6 +1837,7 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
         if (choice.semantic_id == *reference) {
           target = body.id();
           support = choice.reference;
+          pending_plane = choice.workplane;
           break;
         }
       if (support)
@@ -1790,7 +1845,7 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
     }
     if (!support)
       return Result<std::size_t>::failure(
-          error("Choose a supported native planar face or existing workplane."));
+          error("Choose a current planar face or resolvable workplane."));
   } else {
     auto catalog = p.collect_supports(target);
     if (!catalog)
@@ -1800,10 +1855,12 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
     return Result<std::size_t>::failure(error("No resolvable Hole support is available."));
   if (!support) {
     support = p.supports.front().reference;
+    pending_plane = p.supports.front().workplane;
     for (const auto& choice : p.supports)
       if (const auto* face = std::get_if<SemanticFaceReference>(&choice.reference.source());
           face && face->face() == SemanticFace::Top) {
         support = choice.reference;
+        pending_plane = choice.workplane;
         break;
       }
   }
@@ -1829,7 +1886,10 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
   if (!definition)
     return Result<std::size_t>::failure(definition.error());
   auto seed = part;
-  auto added = seed.add_parameter(parameter.value());
+  auto added = pending_plane ? seed.add_result_face_workplane(*pending_plane)
+                             : Result<std::size_t>::success(0);
+  if (added)
+    added = seed.add_parameter(parameter.value());
   if (added)
     added = seed.add_hole_feature(definition.value());
   if (!added)
@@ -1851,6 +1911,7 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
       "hole.draft." + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
   p.picking = Impl::Pick::None;
   p.support_override = support;
+  p.pending_support_plane = pending_plane;
   p.support_chosen = true;
   p.support_error.reset();
   p.pending_parameters = {parameter.value()};
@@ -1909,6 +1970,7 @@ bool ShellFeatureEditTools::accept_selection(const GuiSelection& incoming) {
         const QSignalBlocker block(p.support_field);
         p.support_field->setCurrentIndex(int(i));
         p.support_override = p.supports[i].reference;
+        p.pending_support_plane = p.supports[i].workplane;
         p.support_chosen = true;
         p.picking = Impl::Pick::None;
         p.pick_mode();
@@ -1937,7 +1999,7 @@ Result<std::size_t> ShellFeatureEditTools::apply(bool create_another) {
         if (!selected)
           return Result<std::size_t>::failure(selected.error());
         return p.edit.commit(p.session, std::move(selected.value()), updater,
-                             p.parameter_updates(decoded.value()));
+                             p.input_updates(decoded.value()));
       },
       p.creating);
   if (committed) {

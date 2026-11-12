@@ -2,8 +2,13 @@
 #include "../support/hole_pattern_fixture.hpp"
 #include "../support/thread_feature_fixture.hpp"
 #include "blcad/core/hole_instance_reference.hpp"
+#include "blcad/core/step_import_freshness.hpp"
 #include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/hole_instance_geometry.hpp"
+#include "blcad/geometry/step_editable_commands.hpp"
+#include "blcad/geometry/step_exporter.hpp"
+#include "blcad/geometry/step_import_reader.hpp"
+#include "blcad/geometry/step_import_topology.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_history_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -12,6 +17,7 @@
 #include <QComboBox>
 #include <QDir>
 #include <QDoubleSpinBox>
+#include <QFile>
 #include <QGroupBox>
 #include <QKeyEvent>
 #include <QLabel>
@@ -130,6 +136,8 @@ void rename(ShellWindow& w) {
 void click_at(QWidget& widget, QPointF point) {
   REQUIRE(widget.isVisible());
   REQUIRE(widget.isEnabled());
+  REQUIRE(widget.rect().contains(point.toPoint()));
+  REQUIRE(widget.screen()->availableGeometry().contains(widget.mapToGlobal(point.toPoint())));
   for (auto type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
     QMouseEvent event(type, point, widget.mapToGlobal(point.toPoint()), Qt::LeftButton,
                       type == QEvent::MouseButtonPress ? Qt::LeftButton : Qt::NoButton,
@@ -139,6 +147,17 @@ void click_at(QWidget& widget, QPointF point) {
   }
 }
 void click(QWidget& widget) {
+  for (auto* parent = widget.parentWidget(); parent; parent = parent->parentWidget())
+    if (auto* scroll = qobject_cast<QScrollArea*>(parent))
+      scroll->ensureWidgetVisible(&widget);
+  settle();
+  const auto point = widget.rect().center();
+  auto* window = widget.window();
+  const auto local = widget.mapTo(window, point);
+  REQUIRE(window->rect().contains(local));
+  auto* hit = window->childAt(local);
+  INFO(widget.objectName().toStdString());
+  REQUIRE((hit == &widget || (hit && widget.isAncestorOf(hit))));
   click_at(widget, widget.rect().center());
 }
 void key(QWidget& widget, int code, const QString& text = {}) {
@@ -159,6 +178,62 @@ PartDocument plate() {
   auto p = holes::part(false, false);
   REQUIRE(p.remove_hole_feature(FeatureId("holes")));
   return p;
+}
+PartDocument imported_plate(QTemporaryDir& dir, bool posed = false) {
+  REQUIRE(dir.isValid());
+  const auto root = std::filesystem::path(dir.path().toStdString());
+  const auto shape = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(
+      checked(Quantity::length_mm(80)), checked(Quantity::length_mm(60)),
+      checked(Quantity::length_mm(8))));
+  REQUIRE(geometry::StepExporter{}.write_step(shape, (root / "supplier.step").string()));
+  const auto asset = checked(inspect_step_import_asset(root, "supplier.step"));
+  REQUIRE(asset.observed_sha256_digest());
+  const auto source = checked(
+      StepImportSource::create(StepImportSourceId("supplier"), "Supplier", "supplier.step",
+                               *asset.observed_sha256_digest(), StepImportMode::EditableBody));
+  const auto imported = checked(geometry::StepImportReader{}.read(source, root));
+  const auto catalog = checked(geometry::StepImportTopology{}.create_catalog(
+      ImportedTopologyCatalogId("catalog"), imported, 0));
+  auto part = checked(geometry::StepEditableCommands{}.create_definition(
+      source, catalog, DocumentId("import.hole"), "Imported plate", FeatureId("import.base"),
+      root));
+  if (posed)
+    REQUIRE(part.add_body_transform(checked(BodyTransform::create_translate(
+        BodyTransformId("pose"), part.bodies().front().id(), BodyTransformCoordinateSpace::World,
+        {}, {12, -5, 10}, false, false))));
+  return part;
+}
+std::string imported_top(const PartDocument& part) {
+  const auto& catalog = part.imported_topology_catalogs().front();
+  for (const auto& entry : catalog.entries())
+    if (entry.descriptor.kind == ImportedTopologyKind::Face &&
+        std::abs(entry.descriptor.bounds_mm[2] - 8) < 1e-5 &&
+        std::abs(entry.descriptor.bounds_mm[5] - 8) < 1e-5) {
+      const auto ref = checked(ImportedTopologyReference::create(catalog.id(), entry.id,
+                                                                 ImportedTopologyCapability::Face));
+      return "finishing/" + checked(make_imported_topology_target_spelling(ref));
+    }
+  FAIL("No imported top face");
+  return {};
+}
+void choose_support(ShellWindow& w, const std::string& semantic) {
+  auto& support = field<QComboBox>(w, "/support");
+  const int index = support.findData(QString::fromStdString(semantic));
+  REQUIRE(index >= 0);
+  support.setCurrentIndex(index);
+  settle();
+}
+std::string hole_bottom(ShellWindow& w) {
+  const auto faces = checked(geometry::FinishingSelectionBuilder::build(
+      *w.session().part_document(), *w.session().part_shape_cache(), BodyId("body.base"),
+      PartFeatureInputRole::ShellRemovalFace));
+  for (const auto& face : faces)
+    if (const auto* ref = std::get_if<FaceReference>(&face.reference))
+      if (const auto* result = std::get_if<ResultFaceReference>(&ref->source());
+          result && result->origins().front().role.ends_with("/bottom"))
+        return face.semantic_id;
+  FAIL("No Hole bottom");
+  return {};
 }
 void create_hole(ShellWindow& w) {
   auto& action = control<QAction>(w, "blcad.action.semantic_hole");
@@ -986,5 +1061,185 @@ TEST_CASE("Returning to a custom seat preserves a dimension deliberately shared 
   REQUIRE(w.feature_edit_tools().apply());
   CHECK(w.session().part_document()->parameters().size() == p.parameters().size() + 3);
   CHECK(volume(w) == Catch::Approx(38400 - 23 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Hole creation binds a current imported plane through authored Body placement",
+          "[gui][parity-b157][hole-support-shell]") {
+  const bool posed = GENERATE(false, true);
+  QTemporaryDir dir;
+  auto p = imported_plate(dir, posed);
+  const auto top = imported_top(p);
+  const auto body = p.bodies().front().id().value();
+  ShellWindow w;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  REQUIRE(w.feature_edit_tools().begin_new_hole());
+  choose_support(w, top);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& part = *w.session().part_document();
+  const auto& hole = part.hole_features().front();
+  REQUIRE(std::holds_alternative<ImportedTopologyReference>(hole.support().source()));
+  CHECK(std::get<ImportedTopologyReference>(hole.support().source()).capability() ==
+        ImportedTopologyCapability::Plane);
+  CHECK(hole.support().role() == PartFeatureInputRole::HoleSupportPlane);
+  CHECK(part.result_face_workplane_count() == 0);
+  CHECK(volume(w, body.c_str()) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  auto axis = checked(HoleInstanceReference::create(hole.id(), hole.placements().front().id,
+                                                    HoleReferenceRole::Axis));
+  auto frame =
+      checked(geometry::HoleInstanceGeometry::resolve(part, axis, *w.session().part_shape_cache()));
+  CHECK(frame.frame.origin.x == Catch::Approx(posed ? 12 : 0).margin(1e-6));
+  CHECK(frame.frame.origin.y == Catch::Approx(posed ? -5 : 0).margin(1e-6));
+  CHECK(frame.frame.origin.z == Catch::Approx(posed ? 18 : 8).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("A changed supplier asset cannot publish a pending Hole or its dimensions",
+          "[gui][parity-b157][hole-support-shell]") {
+  QTemporaryDir dir;
+  auto p = imported_plate(dir);
+  ShellWindow w;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  const auto undo = std::string(w.session().undo_label());
+  REQUIRE(w.feature_edit_tools().begin_new_hole());
+  choose_support(w, imported_top(p));
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  QFile asset(dir.filePath("supplier.step"));
+  REQUIRE(asset.open(QIODevice::ReadOnly));
+  const auto bytes = asset.readAll();
+  asset.close();
+  REQUIRE(asset.open(QIODevice::WriteOnly | QIODevice::Truncate));
+  REQUIRE(asset.write("changed supplier bytes") > 0);
+  asset.close();
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  CHECK(snapshot(w) == before);
+  CHECK(w.session().undo_label() == undo);
+  CHECK_FALSE(w.session().dirty());
+  CHECK_FALSE(w.viewport().feature_preview_active());
+  w.feature_edit_tools().cancel();
+  REQUIRE(asset.open(QIODevice::WriteOnly | QIODevice::Truncate));
+  REQUIRE(asset.write(bytes) == bytes.size());
+  asset.close();
+}
+
+TEST_CASE("A derived Hole support workplane is pending until its single atomic publication",
+          "[gui][parity-b157][hole-support-shell]") {
+  const bool commit = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, holes::part(false, false));
+  const auto before = snapshot(w);
+  const auto bottom = hole_bottom(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(1);
+  choose_support(w, bottom);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(w.session().part_document()->result_face_workplane_count() == 0);
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.save_to(dir.filePath("support-preview.blcad.json")));
+  GuiDocumentSession saved;
+  REQUIRE(saved.open_file(w.session().file_path()));
+  CHECK(checked(serialize_part_document_to_json(*saved.part_document())) == before);
+  if (!commit) {
+    w.feature_edit_tools().cancel();
+    CHECK(snapshot(w) == before);
+    CHECK_FALSE(w.session().can_undo());
+    return;
+  }
+  REQUIRE(w.feature_edit_tools().apply());
+  REQUIRE(w.session().part_document()->result_face_workplane_count() == 1);
+  const auto& plane = w.session().part_document()->result_face_workplanes().front();
+  const auto& hole = w.session().part_document()->hole_features().back();
+  CHECK(std::get<DatumPlaneId>(hole.support().source()) == plane.id());
+  CHECK(plane.reference().origins().front().role.ends_with("/bottom"));
+  CHECK(volume(w) == Catch::Approx(38400 - 14 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Changing a pending result support prunes its workplane even after a recipe transition",
+          "[gui][parity-b157][hole-support-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, holes::part(false, false));
+  const auto before = snapshot(w);
+  const auto bottom = hole_bottom(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(1);
+  choose_support(w, bottom);
+  choose_hole_mode(w, "blcad.hole.recipe", 1);
+  choose_support(w, "finishing/face/4:base/top");
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(w.session().part_document()->result_face_workplane_count() == 0);
+  CHECK(volume(w) == Catch::Approx(38400 - 27.5 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Native Hole creation picks a bounded derived bottom and publishes only its used workplane",
+    "[gui][parity-b157][hole-support-shell][native-hole-support]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires actual derived support picking");
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, holes::part(false, false));
+  const auto before = snapshot(w);
+  const auto bottom = hole_bottom(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(1);
+  w.viewport().set_standard_view(GuiStandardView::Top);
+  settle();
+  click(control<QToolButton>(w, "blcad.hole.support.pick"));
+  const auto point = checked(w.viewport().model_to_screen({-20, -15, 2}));
+  click_at(w.viewport(), {point.x, point.y});
+  CHECK(field<QComboBox>(w, "/support").currentData().toString().toStdString() == bottom);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll")
+            .horizontalScrollBar()
+            ->maximum() == 0);
+  capture(w, "hole-derived-support-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  CHECK(w.session().part_document()->result_face_workplane_count() == 1);
+  CHECK(volume(w) == Catch::Approx(38400 - 14 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native Hole creation picks the actual placed imported face with a typed plane binding",
+          "[gui][parity-b157][hole-support-shell][native-hole-support]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires actual imported support picking");
+  QTemporaryDir dir;
+  auto p = imported_plate(dir, true);
+  const auto body = p.bodies().front().id().value();
+  const auto top = imported_top(p);
+  ShellWindow w;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  REQUIRE(w.feature_edit_tools().begin_new_hole());
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  w.viewport().set_standard_view(GuiStandardView::Top);
+  settle();
+  click(control<QToolButton>(w, "blcad.hole.support.pick"));
+  const auto point = checked(w.viewport().model_to_screen({20, 1, 18}));
+  click_at(w.viewport(), {point.x, point.y});
+  CHECK(field<QComboBox>(w, "/support").currentData().toString().toStdString() == top);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "hole-imported-support-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  REQUIRE(w.session().part_document()->hole_features().size() == 1);
+  const auto& reference = std::get<ImportedTopologyReference>(
+      w.session().part_document()->hole_features().front().support().source());
+  CHECK(reference.capability() == ImportedTopologyCapability::Plane);
+  CHECK(w.session().part_document()->result_face_workplane_count() == 0);
+  CHECK(volume(w, body.c_str()) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
   replay(w, dir, before);
 }

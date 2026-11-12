@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 156
 current_block: 157
-current_boundary: Block 156 accepted; 157A/B1 delivered; 157B2a verified; 157B2b next
+current_boundary: Block 156 accepted; 157A/B1/B2a delivered; 157B2b support and Thread authoring in progress
 current_tag: "[parity-b157]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -35,7 +35,7 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 156
-current block        Block 157 (157B2a verified; 157B2b next)
+current block        Block 157 (157B2b in progress)
 current phase        Semantic holes and threads
 current boundary     Editing, recipes and dimensional sources verified; full Wizard and combined acceptance remain open
 ```
@@ -282,7 +282,7 @@ remain assigned. Deliver named slices serially, with the parent block open until
 | 157B1 — verified | Semantic Plain/ThroughAll Hole creation in the existing panel, target/support selection, pending dimensional ownership, Create Another and one final publication. Normal complete Part context first; no new Hole schema or cut interpreter. |
 | 157B2 — in progress | Complete recipe/custom-standard/internal-external Thread selectors and native/imported support collection; keep 157A editing compatible. |
 | 157B2a — verified | Nine recipes, six extent transitions, tip and custom internal Thread controls, typed dimensional table/custom sources, stable owned inputs and existing-feature recipe changes. |
-| 157B2b | Complete standard Thread profile mappings, optional start/taper authoring, external Thread creation and scoped native/imported/result support and limit collection. |
+| 157B2b — in progress | Complete standard Thread profile mappings, optional start/taper authoring, external Thread creation and scoped native/imported/result support and limit collection. |
 | 157B3 | In-canvas position/depth/diameter interaction, referenced Sketch points and breadcrumb return, presets, explicit legacy conversion, full recipe/thread Create Another ownership and extended shared context lifecycle. |
 | 157C | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
 
@@ -392,11 +392,33 @@ fences, raw captures and working/staged content are reviewed. The branch starts 
 
 Delivery: [PR #178](https://github.com/GideonBa/Better-Linux-CAD/pull/178), reviewed implementation
 `7e107b7`. This final delivery record changes documentation only; verified runtime inputs/binaries
-remain unchanged. Verify the merged tree and refresh main before starting the next branch.
+remain unchanged. PR #178 is verified merged as `1348d19`; its tree matches the reviewed delivery.
+Main was refreshed before starting `feat/hole-thread-support-authoring`.
 
 Next: 157B2b completes Thread profiles/start/taper, external Thread creation and native/imported/result
 support/limit collection. Then 157B3/C and full 158–165 remain assigned. Acceptance of 157B2a does
 not close its parent 157B2 or Block 157.
+
+### 157B2b progress — planar creation supports
+
+Creation now collects typed native/imported/result planar supports. Imported references retain
+catalog/capability and actual Body placement. Result supports add a required workplane only in the
+same final transaction; Cancel, committed Save during preview and support/recipe changes do not
+publish unused metadata. [Contract and raw captures](hole-wizard.md#planar-support-collection--157b2b)
+link to `[hole-support-shell]` / `[native-hole-support]` proof.
+
+Current proof: GUI/app/export targets built; shared Qt regression **67 passed / 8 native skips /
+4,983 assertions**. The focused native support/create/recipe/Thread-edit group passes **5 cases /
+296 assertions at both 100% and compact 150%**, with no failures/skips; controls and model targets
+are checked on screen. This group executes five of the eight native-only cases in the Qt filter,
+not every historical native case. A separate PID-matched startup is viewable (intentional timeout
+124). All five binary hashes match; backend code/tests are unchanged from the retained 156 evidence.
+Full backend/full Qt are not rerun. Frozen inputs: 1,053 files, SHA256
+`73697c1b689d6ba5e755ad40ae8969ee4df4d3928bffb76a8905b34314f1ae9b`.
+
+This is a verified intermediate change on `feat/hole-thread-support-authoring`, based on merged
+`1348d19`. Keep the branch open for Thread profiles/start/taper, external creation, complete limit
+collection and existing-support editing. 157B2b, parent 157 and the sequence through 165 stay open.
 
 ## Later phases
 

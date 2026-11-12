@@ -493,6 +493,28 @@ keyboard recipe changes, numeric seat input and mouse Apply. Tests assert focus 
 reachability and absence of horizontal form overflow. Numbered status and executed counts remain
 in `mvp-plan.md`.
 
+### Planar support collection — 157B2b
+
+Hole creation now collects current native, imported and result-origin planar faces on its visible
+solid target. Imported face selections are rebound explicitly as Plane-capable Hole support
+references to their captured catalog/entry. The same supplier-byte checks and authored Body
+placements apply to collection, preview and commit; labels disclose the current face center in mm.
+
+Result-origin faces must resolve as planar on the current cache. Their support workplane is a
+pending typed ResultFaceWorkplane, since the canonical Hole plane reference uses a DatumPlane ID.
+The candidate adds that record before the Hole. Only a workplane used by the final support is
+published, together with required dimensions and the Hole in one transaction. Recipe reseeding may
+carry pending records; changing support, Cancel and Save during preview never leak them into the
+committed Part. No sampled surface, topology index or viewer identity becomes persistent input.
+
+Focused proof is `[hole-support-shell]` / `[native-hole-support]`: imported translation and axis
+frames, supplier changes, pending/unused workplanes, exact history/reopen, and actual native model
+picks on a derived Hole bottom and placed imported top. Existing-support editing, complete limit
+collection, Thread profiles and external Thread creation remain open within 157B2b.
+Original captures: [derived bottom](images/hole-derived-support.png), 1280×800, and
+[placed imported plane at compact 150%](images/hole-imported-support-compact.png), 1536×960.
+Native helpers reveal the scrolled controls and verify hit ownership and on-screen coordinates.
+
 ## Why more than a cut
 
 ```text
