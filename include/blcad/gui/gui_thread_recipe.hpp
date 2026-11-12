@@ -13,7 +13,8 @@ public:
   [[nodiscard]] static Result<PartDocument>
   create_external(PartDocument part, FeatureId id, std::string name, BodyId target,
                   FaceReference support, std::string draft_namespace, double radius_mm,
-                  double axial_length_mm, double taper_angle_deg);
+                  double axial_length_mm, double taper_angle_deg,
+                  ThreadDirection direction = ThreadDirection::AlongSupportAxis);
   [[nodiscard]] static Result<PartDocument> profile(PartDocument part, FeatureId feature,
                                                     ThreadProfile profile,
                                                     const GuiThreadParameterValues& values = {});

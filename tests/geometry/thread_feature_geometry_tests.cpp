@@ -21,6 +21,7 @@
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 using namespace blcad;
 using namespace blcad::geometry;
@@ -326,4 +327,99 @@ TEST_CASE("Thread support inspection requires an explicit matching pre-feature h
   REQUIRE(part.set_parameter_value(ParameterId("depth"), checked(Quantity::length_mm(9))));
   CHECK_FALSE(ThreadAdapter::inspect_support(part, BodyId("body.shaft"), support, cache,
                                              ThreadDirection::AlongSupportAxis, nullptr, prefix));
+}
+
+TEST_CASE("Revolved source edges supply stable conical Thread roots through placement and replay",
+          "[geometry][parity-b157][thread-support-query][revolve-lineage]") {
+  const bool apex_first = GENERATE(false, true);
+  auto part = checked(PartDocument::create(DocumentId("cone"), "Conical shaft"));
+  REQUIRE(part.add_datum_plane(checked(DatumPlane::xy())));
+  REQUIRE(part.add_datum_axis(
+      checked(DatumAxis::create_explicit(DatumAxisId("cone.axis"), "Axis", {}, {0, 1, 0}))));
+  auto sketch =
+      checked(Sketch::create(SketchId("cone.profile"), "Profile", DatumPlaneId("datum.xy")));
+  const std::vector<Point2> points = apex_first ? std::vector<Point2>{{0, 0}, {5, 2}, {0, 2}}
+                                                : std::vector<Point2>{{0, 0}, {5, 0}, {0, 2}};
+  std::vector<SketchEntityId> edges;
+  for (std::size_t i = 0; i < points.size(); ++i) {
+    edges.emplace_back("edge." + std::to_string(i));
+    REQUIRE(sketch.add_entity(
+        checked(LineSegment::create(edges.back(), points[i], points[(i + 1) % points.size()]))));
+  }
+  REQUIRE(sketch.add_profile(checked(ClosedProfile::create(ProfileId("cone.region"), edges))));
+  REQUIRE(part.add_sketch(std::move(sketch)));
+  const auto context = blcad::test::history_fixture::new_body(part, "cone");
+  REQUIRE(part.add_revolve_feature(checked(RevolveFeature::create_revolve(
+      FeatureId("cone"), "Cone",
+      checked(ProfileRegionReference::create(SketchId("cone.profile"), ProfileId("cone.region"),
+                                             PartFeatureInputRole::RevolveProfile)),
+      checked(AxisReference::create_datum_axis(PartFeatureInputRole::RevolveAxis,
+                                               DatumAxisId("cone.axis"))),
+      RevolveAngleExtent::full(), context))));
+  auto cache = evaluate(part);
+  const auto expected_role =
+      std::string("revolve/sketch/12:cone.profile/profile/11:cone.region/line/6:edge.") +
+      (apex_first ? "0" : "1") + "/wall";
+  const auto captured = checked(ResultFaceReference::create(FeatureId("cone"), BodyId("body.cone"),
+                                                            {{FeatureId("cone"), expected_role}}));
+  const auto reference =
+      checked(FaceReference::create_result(PartFeatureInputRole::ThreadSupportFace, captured));
+  const auto faces = checked(FinishingSelectionBuilder::build(
+      part, cache, BodyId("body.cone"), PartFeatureInputRole::ShellRemovalFace));
+  CHECK(std::count_if(faces.begin(), faces.end(), [&](const auto& face) {
+          return face.semantic_id == "finishing/" + captured.identity();
+        }) == 1);
+  const auto along =
+      checked(ThreadAdapter::inspect_support(part, BodyId("body.cone"), reference, cache));
+  CHECK(along.origin.y == Catch::Approx(0).margin(1e-7));
+  CHECK(along.axis.y == Catch::Approx(1).margin(1e-7));
+  CHECK(along.radius_mm == Catch::Approx(apex_first ? 0 : 5).margin(1e-7));
+  CHECK(along.axial_length_mm == Catch::Approx(2).margin(1e-7));
+  CHECK(
+      along.taper_angle_deg ==
+      Catch::Approx((apex_first ? 1 : -1) * std::atan(2.5) * 180 / std::numbers::pi).margin(1e-7));
+  for (const auto& [id, value] :
+       {std::pair{"major", 10.}, {"minor", 9.5}, {"pitch", .375}, {"length", .95}})
+    REQUIRE(part.add_parameter(checked(
+        Parameter::create_length(ParameterId(id), id, checked(Quantity::length_mm(value))))));
+  REQUIRE(part.add_parameter(checked(
+      Parameter::create_angle(ParameterId("angle"), "Angle", checked(Quantity::angle_deg(60))))));
+  REQUIRE(part.add_parameter(checked(Parameter::create_angle(
+      ParameterId("taper"), "Taper",
+      checked(Quantity::angle_deg(-std::atan(2.5) * 180 / std::numbers::pi))))));
+  const ThreadParameterProfile profile{"Custom",
+                                       "Cone",
+                                       "Authored",
+                                       ParameterId("major"),
+                                       ParameterId("minor"),
+                                       ParameterId("pitch"),
+                                       ParameterId("angle"),
+                                       ParameterId("taper")};
+  const auto direction =
+      apex_first ? ThreadDirection::OppositeSupportAxis : ThreadDirection::AlongSupportAxis;
+  REQUIRE(part.add_thread_feature(checked(ThreadFeature::create(
+      FeatureId("thread"), "Thread", BodyId("body.cone"), reference,
+      checked(ThreadDefinition::create(profile, ParameterId("length"))), direction))));
+  REQUIRE(part.add_body_transform(checked(BodyTransform::create_translate(
+      BodyTransformId("pose"), BodyId("body.cone"), BodyTransformCoordinateSpace::World, {},
+      {12, -5, 10}, false, false))));
+  cache = evaluate(part);
+  const auto placed = checked(
+      ThreadAdapter::inspect_support(part, BodyId("body.cone"), reference, cache, direction));
+  CHECK(placed.origin.x == Catch::Approx(12).margin(1e-7));
+  CHECK(placed.origin.y == Catch::Approx(apex_first ? -3 : -5).margin(1e-7));
+  CHECK(placed.origin.z == Catch::Approx(10).margin(1e-7));
+  CHECK(placed.radius_mm == Catch::Approx(5).margin(1e-7));
+  CHECK(placed.axis.y == Catch::Approx(apex_first ? -1 : 1).margin(1e-7));
+  const auto expected_volume = 50 * std::numbers::pi / 3;
+  CHECK(volume(*cache.find_body_shape(BodyId("body.cone"))) ==
+        Catch::Approx(expected_volume).margin(1e-6));
+  const auto reopened =
+      checked(deserialize_part_document_from_json(checked(serialize_part_document_to_json(part))));
+  const auto replayed = evaluate(reopened);
+  CHECK(volume(*replayed.find_body_shape(BodyId("body.cone"))) ==
+        Catch::Approx(expected_volume).margin(1e-6));
+  REQUIRE(
+      checked(ThreadAdapter::cosmetic_presentations(*replayed.find_body_shape(BodyId("body.cone"))))
+          .size() == 1);
 }

@@ -294,6 +294,11 @@ model. Cancel restores the entry selection/camera. [Hole limits](hole-wizard.md#
 have their own required Face/Body selectors and model picks; clearing or choosing an invalid limit
 blocks Apply while preserving correction controls. Extended contexts,
 support-anchored grips and the full workflow remain 157B2b/B3/C.
+Conical Thread seeds retain a positive interval and inspected entry direction. Thread numeric
+controls expose nine decimal places; offset/direction changes require explicit matching profile
+values. [Conical combinations](hole-wizard.md#conical-thread-combinations--157b2b) retain correction
+controls for incompatible profiles and unsupported modeled taper. A complete rejected standard
+mapping retries when its used numeric input or binding is corrected.
 
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
 [compact suppression at 150%](images/history-suppression-compact.png) and

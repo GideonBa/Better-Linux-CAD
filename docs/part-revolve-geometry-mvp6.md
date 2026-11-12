@@ -28,6 +28,22 @@ reference axes remain associative. No OCCT topology ID becomes persistent input 
 `GeometryRecomputeExecutor::resolve_feature_axis` exposes this same resolved/transformed frame to
 interactive clients. The replacement-shell axis catalog and wheel do not approximate a second frame.
 
+### Selectable polygon-profile face origins
+
+Rectangle and line-based closed profiles attach source-edge roles through OCCT's revolution
+generator history. A role scopes the authored Sketch/profile, then a fixed rectangle side or stable
+line entity ID. It follows the generated face through the shared Boolean/placement lineage; no
+topology traversal position or geometric-nearest match becomes a persistent reference. Start-face
+rotation transforms both the input edges and their frames before querying generated descendants.
+Frame origins lie on their source edges, while the authored unit axis and radial seam support
+cylindrical/conical Thread inspection. Axis-only edges generate no selectable surface.
+
+These roots use the existing ResultFaceReference schema. Curved/composite-profile Revolve keeps its
+existing geometry boundary; this extension does not invent source roles for untracked input edges.
+Focused `[revolve-lineage]` / `[thread-support-query]` proof covers analytic cone frames/radii/spans,
+both apex orientations, authored source-edge identity, placement, cosmetic Thread execution and
+fresh JSON replay. Retain `[revolve-feature]` for partial/symmetric and modifying operations.
+
 ## Angle execution
 
 The Block-61 modes map to deterministic OCCT sweeps:

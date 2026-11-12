@@ -2953,10 +2953,13 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
   if (axis.has_error())
     return Result<std::size_t>::failure(axis.error());
   const ResolvedRevolveAngles angles = resolve_revolve_angles(feature->extent());
+  const ProfileId& profile_id = feature->profile().profile();
+  const auto profile_role = "revolve/sketch/" + std::to_string(sketch->id().value().size()) + ":" +
+                            sketch->id().value() + "/profile/" +
+                            std::to_string(profile_id.value().size()) + ":" + profile_id.value();
 
   Result<GeometryShape> tool = Result<GeometryShape>::failure(
       geometry_error(feature->id().value(), "unsupported revolve profile region"));
-  const ProfileId& profile_id = feature->profile().profile();
   auto profile_valid = validate_part_feature_input_reference(document, feature->profile());
   if (!profile_valid)
     return Result<std::size_t>::failure(profile_valid.error());
@@ -2971,17 +2974,23 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
         rectangle_local_vertices(*rectangle, width->value(), height->value()));
     if (vertices.has_error())
       return Result<std::size_t>::failure(vertices.error());
-    tool =
-        revolve_adapter_.revolve_profile(feature->id(), vertices.value(), axis.value().first,
-                                         axis.value().second, angles.start_deg, angles.sweep_deg);
+    tool = revolve_adapter_.revolve_profile(
+        feature->id(), vertices.value(), axis.value().first, axis.value().second, angles.start_deg,
+        angles.sweep_deg,
+        {profile_role + "/side/bottom", profile_role + "/side/right", profile_role + "/side/top",
+         profile_role + "/side/left"});
   } else if (const ClosedProfile* closed = sketch->find_closed_profile(profile_id)) {
     auto vertices = evaluate_bounded_closed_profile_vertices(document, workplane_resolver_,
                                                              workplane.value(), *sketch, *closed);
     if (vertices.has_error())
       return Result<std::size_t>::failure(vertices.error());
-    tool =
-        revolve_adapter_.revolve_profile(feature->id(), vertices.value(), axis.value().first,
-                                         axis.value().second, angles.start_deg, angles.sweep_deg);
+    std::vector<std::string> roles;
+    for (const auto& edge : closed->line_segments())
+      roles.push_back(profile_role + "/line/" + std::to_string(edge.value().size()) + ":" +
+                      edge.value() + "/wall");
+    tool = revolve_adapter_.revolve_profile(feature->id(), vertices.value(), axis.value().first,
+                                            axis.value().second, angles.start_deg, angles.sweep_deg,
+                                            roles);
   } else if (const ArcClosedProfile* arc = sketch->find_arc_closed_profile(profile_id)) {
     auto curves =
         evaluate_bounded_arc_profile_curves(workplane_resolver_, workplane.value(), *sketch, *arc);

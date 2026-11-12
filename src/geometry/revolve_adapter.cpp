@@ -10,14 +10,17 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
+#include <BRep_Tool.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GProp_GProps.hxx>
 #include <Geom_BezierCurve.hxx>
 #include <Standard_Failure.hxx>
-#include <TColgp_Array1OfPnt.hxx>
 #include <TColStd_Array1OfReal.hxx>
+#include <TColgp_Array1OfPnt.hxx>
 #include <TopAbs_ShapeEnum.hxx>
+#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopTools_ListIteratorOfListOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
@@ -41,6 +44,10 @@ namespace {
 
 constexpr double kTolerance = 1.0e-8;
 constexpr double kPi = 3.14159265358979323846;
+struct ProfileEdge {
+  TopoDS_Edge edge;
+  std::string role;
+};
 
 [[nodiscard]] Error revolve_error(const FeatureId& id, std::string message) {
   return Error::geometry(id.value(), std::move(message));
@@ -80,8 +87,31 @@ polygon_wire(const FeatureId& id, const std::vector<Point3>& vertices, std::stri
 
 [[nodiscard]] Result<TopoDS_Face> polygon_face(const FeatureId& id,
                                                const std::vector<Point3>& outer,
-                                               const std::vector<std::vector<Point3>>& inner) {
+                                               const std::vector<std::vector<Point3>>& inner,
+                                               const std::vector<std::string>& roles = {},
+                                               std::vector<ProfileEdge>* roots = nullptr) {
   auto outer_wire = polygon_wire(id, outer, "outer");
+  if (!roles.empty()) {
+    if (!roots || roles.size() != outer.size())
+      return Result<TopoDS_Face>::failure(
+          revolve_error(id, "Revolve edge roles must match the profile"));
+    BRepBuilderAPI_MakeWire wire;
+    for (std::size_t i = 0; i < outer.size(); ++i) {
+      if (roles[i].empty() || std::count(roles.begin(), roles.end(), roles[i]) != 1)
+        return Result<TopoDS_Face>::failure(
+            revolve_error(id, "Revolve edge roles must be nonempty and unique"));
+      BRepBuilderAPI_MakeEdge edge(point(outer[i]), point(outer[(i + 1) % outer.size()]));
+      if (!edge.IsDone())
+        return Result<TopoDS_Face>::failure(
+            revolve_error(id, "Could not build a tagged profile edge"));
+      wire.Add(edge.Edge());
+      if (!wire.IsDone())
+        return Result<TopoDS_Face>::failure(
+            revolve_error(id, "Could not connect tagged profile edges"));
+      roots->push_back({wire.Edge(), roles[i]});
+    }
+    outer_wire = Result<TopoDS_Wire>::success(wire.Wire());
+  }
   if (outer_wire.has_error())
     return Result<TopoDS_Face>::failure(outer_wire.error());
   BRepBuilderAPI_MakeFace builder(outer_wire.value());
@@ -116,7 +146,8 @@ polygon_wire(const FeatureId& id, const std::vector<Point3>& vertices, std::stri
     poles.SetValue(3, point(curve.control2));
     poles.SetValue(4, point(curve.end));
     TColStd_Array1OfReal weights(1, 4);
-    for (int i = 1; i <= 4; ++i) weights.SetValue(i, curve.weights[i-1]);
+    for (int i = 1; i <= 4; ++i)
+      weights.SetValue(i, curve.weights[i - 1]);
     Handle(Geom_BezierCurve) bezier = new Geom_BezierCurve(poles, weights);
     BRepBuilderAPI_MakeEdge builder(bezier);
     if (!builder.IsDone())
@@ -203,9 +234,10 @@ polygon_wire(const FeatureId& id, const std::vector<Point3>& vertices, std::stri
   return Result<std::size_t>::success(samples.size());
 }
 
-[[nodiscard]] Result<TopoDS_Shape> revolve_face(const FeatureId& id, TopoDS_Face face,
-                                                Point3 axis_origin, Vector3 axis_direction,
-                                                double start_angle_deg, double sweep_angle_deg) {
+[[nodiscard]] Result<TopoDS_Shape>
+revolve_face(const FeatureId& id, TopoDS_Face face, Point3 axis_origin, Vector3 axis_direction,
+             double start_angle_deg, double sweep_angle_deg, std::vector<ProfileEdge> roots = {},
+             std::vector<detail::FaceLineage>* lineage = nullptr) {
   if (!std::isfinite(start_angle_deg) || !std::isfinite(sweep_angle_deg) ||
       std::abs(sweep_angle_deg) <= kTolerance || std::abs(sweep_angle_deg) > 360.0 + kTolerance)
     return Result<TopoDS_Shape>::failure(revolve_error(id, "revolve sweep angle is invalid"));
@@ -220,6 +252,8 @@ polygon_wire(const FeatureId& id, const std::vector<Point3>& vertices, std::stri
       return Result<TopoDS_Shape>::failure(
           revolve_error(id, "could not place symmetric revolve start profile"));
     start_face = rotated.Shape();
+    for (auto& root : roots)
+      root.edge = TopoDS::Edge(rotated.ModifiedShape(root.edge));
   }
   BRepPrimAPI_MakeRevol builder(start_face, rotation_axis, sweep_angle_deg * kPi / 180.0, true);
   builder.Build();
@@ -236,6 +270,32 @@ polygon_wire(const FeatureId& id, const std::vector<Point3>& vertices, std::stri
   if (!std::isfinite(properties.Mass()) || properties.Mass() <= kTolerance)
     return Result<TopoDS_Shape>::failure(
         revolve_error(id, "revolve result has no positive volume"));
+  if (lineage)
+    for (const auto& root : roots) {
+      const auto radial = [&](const gp_Pnt& p) {
+        const Vector3 delta{p.X() - axis_origin.x, p.Y() - axis_origin.y, p.Z() - axis_origin.z};
+        const double z = dot(delta, axis);
+        return Vector3{delta.x - z * axis.x, delta.y - z * axis.y, delta.z - z * axis.z};
+      };
+      const auto first = BRep_Tool::Pnt(TopExp::FirstVertex(root.edge));
+      auto x = radial(first);
+      if (length(x) <= kTolerance)
+        x = radial(BRep_Tool::Pnt(TopExp::LastVertex(root.edge)));
+      if (length(x) <= kTolerance)
+        continue;
+      x = normalized(x);
+      for (TopTools_ListIteratorOfListOfShape it(builder.Generated(root.edge)); it.More();
+           it.Next())
+        if (it.Value().ShapeType() == TopAbs_FACE)
+          detail::append_lineage(*lineage,
+                                 {{id, root.role},
+                                  TopoDS::Face(it.Value()),
+                                  {first.X(), first.Y(), first.Z()},
+                                  x,
+                                  true,
+                                  axis},
+                                 result);
+    }
   return Result<TopoDS_Shape>::success(std::move(result));
 }
 
@@ -243,7 +303,8 @@ template <typename FaceFactory>
 [[nodiscard]] Result<TopoDS_Shape>
 execute_revolve(const FeatureId& id, const std::vector<Point3>& samples, Point3 axis_origin,
                 Vector3 axis_direction, double start_angle_deg, double sweep_angle_deg,
-                FaceFactory&& face_factory) {
+                FaceFactory&& face_factory, std::vector<ProfileEdge>* roots = nullptr,
+                std::vector<detail::FaceLineage>* lineage = nullptr) {
   if (id.empty())
     return Result<TopoDS_Shape>::failure(
         Error::validation("revolve", "feature id must not be empty"));
@@ -255,7 +316,7 @@ execute_revolve(const FeatureId& id, const std::vector<Point3>& samples, Point3 
     if (face.has_error())
       return Result<TopoDS_Shape>::failure(face.error());
     return revolve_face(id, face.value(), axis_origin, axis_direction, start_angle_deg,
-                        sweep_angle_deg);
+                        sweep_angle_deg, roots ? *roots : std::vector<ProfileEdge>{}, lineage);
   } catch (const Standard_Failure& failure) {
     return Result<TopoDS_Shape>::failure(revolve_error(id, failure_message(failure)));
   } catch (const std::exception& exception) {
@@ -267,18 +328,21 @@ execute_revolve(const FeatureId& id, const std::vector<Point3>& samples, Point3 
 
 } // namespace
 
-Result<GeometryShape> RevolveAdapter::revolve_profile(FeatureId feature_id,
-                                                      const std::vector<Point3>& vertices,
-                                                      Point3 axis_origin, Vector3 axis_direction,
-                                                      double start_angle_deg,
-                                                      double sweep_angle_deg) const {
-  auto shape =
-      execute_revolve(feature_id, vertices, axis_origin, axis_direction, start_angle_deg,
-                      sweep_angle_deg, [&] { return polygon_face(feature_id, vertices, {}); });
+Result<GeometryShape>
+RevolveAdapter::revolve_profile(FeatureId feature_id, const std::vector<Point3>& vertices,
+                                Point3 axis_origin, Vector3 axis_direction, double start_angle_deg,
+                                double sweep_angle_deg,
+                                const std::vector<std::string>& edge_roles) const {
+  std::vector<ProfileEdge> roots;
+  std::vector<detail::FaceLineage> lineage;
+  auto shape = execute_revolve(
+      feature_id, vertices, axis_origin, axis_direction, start_angle_deg, sweep_angle_deg,
+      [&] { return polygon_face(feature_id, vertices, {}, edge_roles, &roots); }, &roots, &lineage);
   if (shape.has_error())
     return Result<GeometryShape>::failure(shape.error());
-  return Result<GeometryShape>::success(
-      GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(shape.value()))));
+  auto backing = std::make_shared<GeometryShape::Impl>(std::move(shape.value()));
+  backing->face_lineage = std::move(lineage);
+  return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
 }
 
 Result<GeometryShape> RevolveAdapter::revolve_profile_with_holes(

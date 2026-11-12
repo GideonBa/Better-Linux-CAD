@@ -373,6 +373,7 @@ struct ShellFeatureEditTools::Impl {
     geometry::GeometryShape shape;
     geometry::ThreadSupportInspection geometry;
     geometry::ViewportSceneKind kind{geometry::ViewportSceneKind::Face};
+    ThreadDirection direction{ThreadDirection::AlongSupportAxis};
   };
   std::vector<ThreadSupportChoice> thread_supports;
   struct LimitFaceChoice {
@@ -639,9 +640,17 @@ struct ShellFeatureEditTools::Impl {
       auto inspected = geometry::ThreadAdapter::inspect_support(
           *part, body, selected.value(), *cache, ThreadDirection::AlongSupportAxis,
           context.value().get(), feature_input_prefix);
-      if (inspected)
-        thread_supports.push_back(
-            {face.semantic_id, face.label, selected.value(), face.shape, inspected.value()});
+      auto direction = ThreadDirection::AlongSupportAxis;
+      if (inspected && inspected.value().radius_mm <= 1e-7) {
+        direction = ThreadDirection::OppositeSupportAxis;
+        inspected = geometry::ThreadAdapter::inspect_support(*part, body, selected.value(), *cache,
+                                                             direction, context.value().get(),
+                                                             feature_input_prefix);
+      }
+      if (inspected && inspected.value().radius_mm > 1e-7)
+        thread_supports.push_back({face.semantic_id, face.label, selected.value(), face.shape,
+                                   inspected.value(), geometry::ViewportSceneKind::Face,
+                                   direction});
     }
     if (context.value()) {
       auto fresh = context.value()->validate_sources();
@@ -1032,7 +1041,7 @@ struct ShellFeatureEditTools::Impl {
   QDoubleSpinBox* number(QWidget* parent, const QString& path, double scalar, QuantityKind unit,
                          bool unitless = false) {
     auto* spin = new QDoubleSpinBox(parent);
-    spin->setDecimals(unit == QuantityKind::Count ? 0 : 6);
+    spin->setDecimals(unit == QuantityKind::Count ? 0 : path.startsWith("/thread/") ? 9 : 6);
     spin->setRange(-1e9, 1e9);
     spin->setKeyboardTracking(false);
     spin->setValue(scalar);
@@ -1141,6 +1150,7 @@ struct ShellFeatureEditTools::Impl {
     layout->setContentsMargins(0, 0, 0, 0);
     auto* binding = combo(row);
     binding->setObjectName("blcad.feature_edit.binding" + path);
+    binding->setProperty("blcad.restoreFocusAfterRebuild", path.startsWith("/thread/"));
     for (const auto& p : session.part_document()->parameters())
       if (p.type() == selected.type())
         add_choice(binding, p.id().value(), p.name());
@@ -1150,6 +1160,7 @@ struct ShellFeatureEditTools::Impl {
     binding->setCurrentIndex(binding->findData(QString::fromStdString(selected.id().value())));
     layout->addWidget(binding);
     auto* scalar = number(row, path, parameter_value(selected), selected.value().kind());
+    scalar->setProperty("blcad.restoreFocusAfterRebuild", path.startsWith("/thread/"));
     scalar->setEnabled(!selected.is_expression());
     if (selected.formula())
       scalar->setToolTip("Formula: " + QString::fromStdString(*selected.formula()));
@@ -1164,7 +1175,10 @@ struct ShellFeatureEditTools::Impl {
           scalar->setEnabled(!p->is_expression());
           scalar->setToolTip(p->formula() ? "Formula: " + QString::fromStdString(*p->formula())
                                           : QString());
-          (void)preview();
+          if (thread_mapping_pending && thread_mapping_error)
+            materialize_thread_mapping();
+          else
+            (void)preview();
         });
     QObject::connect(scalar, &QDoubleSpinBox::valueChanged, &owner,
                      [this, path](double scalar_value) {
@@ -1176,7 +1190,10 @@ struct ShellFeatureEditTools::Impl {
                            other->setValue(scalar_value);
                          }
                        }
-                       (void)preview();
+                       if (thread_mapping_pending && thread_mapping_error)
+                         materialize_thread_mapping();
+                       else
+                         (void)preview();
                      });
   }
   QString retained_focus_id() const {
@@ -2761,7 +2778,7 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_thread() {
   auto seed = GuiThreadRecipeCommands::create_external(
       part, id, "Thread " + std::to_string(part.thread_features().size() + 1), *target,
       selected->reference, draft, support.radius_mm, support.axial_length_mm,
-      support.taper_angle_deg);
+      support.taper_angle_deg, selected->direction);
   if (!seed)
     return Result<std::size_t>::failure(seed.error());
   p.supports.clear();

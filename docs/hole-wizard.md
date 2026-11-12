@@ -550,7 +550,11 @@ The disposable custom seed derives its major diameter and signed taper from the 
 For radius `r` and axial span `s`, radial profile depth is `min(1 mm, r/5, s/8)`, included angle is
 60°, pitch is 1.5 times that depth and thread length is `min(4 mm, s)`. These are editable custom
 values with authored labels, without an inferred standard/tolerance. The pitch separates ideal-V
-flanks when the existing modeled limits permit execution. Conical defaults remain cosmetic;
+flanks when the existing modeled limits permit execution. For a narrowing cone with signed radius
+slope `m < 0`, the initial length is also bounded by `(r - depth) / (-2*m)`, retaining a positive
+minor radius over the interval. An apical initial entry selects the inspected opposite direction
+with a positive entry radius. This seeds only new intent; support changes never rewrite an
+existing feature's authored direction or profile. Conical defaults remain cosmetic;
 modeled taper and tiny/otherwise unsupported profiles fail with the existing Geometry diagnostic.
 The new internal custom template also uses 1.5 mm pitch for its 1 mm radial depth, so its cylindrical
 modeled switch is valid. Existing definitions and their dimensional bindings are unchanged.
@@ -605,6 +609,9 @@ draft without publishing it. Other explicitly shared bindings and expression own
 intact. Source controls remain available when current custom input is invalid; an explicit profile
 replacement discards superseded profile edits while retaining the remaining intent and used values.
 Required new inputs publish in the same final transaction, with unused draft roles pruned.
+When a complete mapping was rejected by Core because of another used numeric value or binding,
+correcting that input retries the same explicit mapping. It does not require changing an already
+selected column. Incomplete mappings still wait for their missing explicit choices.
 Focused `[thread-source-shell]` / `[native-thread-source]` proof covers typed mappings, invalid
 correction, revision changes, custom ownership, optional removal, history/reopen and a native
 mapped modeled cut. Whole-block status and executed counts remain in `mvp-plan.md`.
@@ -665,9 +672,41 @@ switching the limit face. No limit picker introduces a new cut or persistence im
 Focused proof: `[hole-limit-shell]` and `[native-hole-limit]` cover invalid/cleared correction,
 native/imported/result identity, placement and supplier changes, distinct limit Bodies, target
 changes, physical volumes, exact Undo/Redo/reopen and actual native planar model picks.
+`[native-hole-body-limit]` additionally picks the actual separate Solid with the target excluded,
+then checks its unchanged volume and the target's independently known termination depth.
+The original [separate Body-limit preview at 100%](images/hole-body-limit.png), 1280×800,
+shows the actual picked Solid, target cut and reachable footer.
 Original captures show [a native bottom limit at 100%](images/hole-native-limit.png), 1280×800,
 and [a placed imported limit at compact 150%](images/hole-imported-limit-compact.png), 1536×960
 physical pixels, with scrolled limit selectors and pinned Apply/Create Another/Cancel.
+
+### Conical Thread combinations — 157B2b
+
+Thread dimensions use nine decimal places in the numeric editor, sufficient for the existing
+`1e-7` support/profile checks when a conical start requires a nonintegral diameter or taper angle.
+Native rectangle/line-profile Revolve supplies [authored source-edge roots](part-revolve-geometry-mvp6.md#selectable-polygon-profile-face-origins)
+through the existing result-face lineage, so its analytic cone can be selected without importing
+it or capturing a topology index.
+Profile diameters describe the actual thread start, not the support's end. A start offset or
+direction change therefore requires explicitly authored matching major/minor diameters and signed
+taper; the panel reports incompatibility and keeps correction controls available. A reverse
+direction reverses taper sign and moves the support entry to the opposite end. Modeled conical
+intent remains rejected; returning to Cosmetic restores a valid unchanged solid when the profile
+and interval fit.
+
+`[thread-cone-shell]` checks both apex orientations, native and placed imported supports, bounded
+positive seeds, pinned taper/custom conversion, corrected start/direction and a complete rejected
+mapping retried after length correction. Native `[native-thread-cone]` uses actual keyboard/mouse
+controls, asserts focus after bounded window activation, corrects an invalid interval/profile and
+unsupported modeled choice, then verifies exact history/reopen and physical STEP volume. Existing
+placed imported Hole/Thread support edits additionally exercise the qualified predecessor context.
+The native mapped-profile fixture also corrects a rejected length through keyboard input and
+asserts focus on the rebuilt numeric field before continuing to modeled Apply.
+Source proof: [current shell tests](../tests/gui/gui_shell_hole_thread_edit_tests.cpp) and
+[independent Geometry roots/frames](../tests/geometry/thread_feature_geometry_tests.cpp).
+Original [compact conical preview](images/thread-conical-compact.png), 1536×960 physical pixels,
+shows the signed nine-decimal taper, Cosmetic representation and reachable Apply/Cancel. Fit All
+includes the origin plane; the small conical Body and its illustrative Thread graphics are unedited.
 
 ## Why more than a cut
 

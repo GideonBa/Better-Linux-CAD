@@ -244,3 +244,10 @@ Body choices exclude the target. Cleared or invalid candidates preserve the comm
 remain correctable, including a target change that invalidates the old limit. See
 [the limit contract](hole-wizard.md#explicit-hole-limits--157b2b) and `[hole-limit-shell]` /
 `[native-hole-limit]` for geometry, source freshness, transactional and native proof.
+
+New external conical seeds choose a positive inspected entry and bound a narrowing interval before
+an apex. Thread scalar controls retain nine decimal places for exact support/profile compatibility.
+Complete rejected profile mappings retry after a used scalar/binding correction; rebuilding retains
+Thread numeric focus. Existing definitions retain their explicit bindings/directions. See the
+[conical combinations contract](hole-wizard.md#conical-thread-combinations--157b2b) and
+`[thread-cone-shell]` / `[native-thread-cone]` for combined source, interval and physical proof.

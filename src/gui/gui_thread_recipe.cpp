@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 
 namespace blcad::gui {
 namespace {
@@ -98,11 +99,9 @@ Result<PartDocument> replace(PartDocument part, const FeatureId& id, ThreadDefin
 }
 } // namespace
 
-Result<PartDocument> GuiThreadRecipeCommands::create_external(PartDocument part, FeatureId id,
-                                                              std::string name, BodyId target,
-                                                              FaceReference support,
-                                                              std::string prefix, double radius,
-                                                              double span, double taper) {
+Result<PartDocument> GuiThreadRecipeCommands::create_external(
+    PartDocument part, FeatureId id, std::string name, BodyId target, FaceReference support,
+    std::string prefix, double radius, double span, double taper, ThreadDirection direction) {
   const auto fail = [](std::string message) {
     return Result<PartDocument>::failure(
         Error::validation("gui.thread.recipe", std::move(message)));
@@ -124,14 +123,20 @@ Result<PartDocument> GuiThreadRecipeCommands::create_external(PartDocument part,
                                  {}};
   if (std::abs(taper) > 1e-9)
     profile.taper_angle = inputs.add("taper", taper, true);
-  const auto length = inputs.add("length", std::min(4., span));
+  double interval = std::min(4., span);
+  const double slope = std::tan(taper * std::numbers::pi / 180);
+  // A narrowing cone can reach its apex inside the full axial span. Keep the
+  // seeded minor radius positive throughout the authored interval.
+  if (slope < 0)
+    interval = std::min(interval, (radius - depth) / (-2 * slope));
+  const auto length = inputs.add("length", interval);
   if (inputs.failure)
     return Result<PartDocument>::failure(*inputs.failure);
   auto thread = ThreadDefinition::create(std::move(profile), length);
   if (!thread)
     return Result<PartDocument>::failure(thread.error());
   auto feature = ThreadFeature::create(std::move(id), std::move(name), std::move(target),
-                                       std::move(support), std::move(thread.value()));
+                                       std::move(support), std::move(thread.value()), direction);
   if (!feature)
     return Result<PartDocument>::failure(feature.error());
   auto added = part.add_thread_feature(std::move(feature.value()));
