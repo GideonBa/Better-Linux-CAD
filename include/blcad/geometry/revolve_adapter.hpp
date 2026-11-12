@@ -6,6 +6,7 @@
 #include "blcad/geometry/closed_profile_adapter.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 
+#include <string>
 #include <vector>
 
 namespace blcad::geometry {
@@ -14,7 +15,8 @@ class RevolveAdapter {
 public:
   [[nodiscard]] Result<GeometryShape>
   revolve_profile(FeatureId feature_id, const std::vector<Point3>& vertices, Point3 axis_origin,
-                  Vector3 axis_direction, double start_angle_deg, double sweep_angle_deg) const;
+                  Vector3 axis_direction, double start_angle_deg, double sweep_angle_deg,
+                  const std::vector<std::string>& edge_roles = {}) const;
 
   [[nodiscard]] Result<GeometryShape>
   revolve_profile_with_holes(FeatureId feature_id, const std::vector<Point3>& outer_vertices,

@@ -2,11 +2,14 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/result_face_support.hpp"
+#include "blcad/geometry/thread_adapter.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 #include "blcad/gui/gui_hole_recipe.hpp"
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
+#include "blcad/gui/gui_thread_recipe.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_property_controls.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
@@ -258,7 +261,9 @@ auto with_record(const PartDocument& part, FeatureId id, Kind kind, Callback cal
   case Kind::Hole:
     return callback(*part.find_hole_feature(id), creating ? &PartDocument::add_hole_feature
                                                           : &PartDocument::update_hole_feature);
-    BLCAD_EDIT_RECORD(Thread, find_thread_feature, update_thread_feature)
+  case Kind::Thread:
+    return callback(*part.find_thread_feature(id), creating ? &PartDocument::add_thread_feature
+                                                            : &PartDocument::update_thread_feature);
 #undef BLCAD_EDIT_RECORD
   }
   return callback(*part.find_feature(id), &PartDocument::update_feature);
@@ -281,6 +286,23 @@ std::string plane_identity(const PlaneReference& plane) {
           return "datum/" + source.value();
       },
       plane.source());
+}
+std::string face_identity(const FaceReference& face) {
+  return std::visit(
+      [](const auto& source) -> std::string {
+        using T = std::decay_t<decltype(source)>;
+        if constexpr (std::is_same_v<T, SemanticFaceReference>)
+          return "face/" + std::to_string(source.source_feature().value().size()) + ":" +
+                 source.source_feature().value() + "/" + std::string(to_string(source.face()));
+        else if constexpr (std::is_same_v<T, SemanticCylindricalFaceReference>)
+          return make_generated_topology_target_spelling(GeneratedTopologyReferenceIdentity{source})
+              .value();
+        else if constexpr (std::is_same_v<T, ImportedTopologyReference>)
+          return make_imported_topology_target_spelling(source).value();
+        else
+          return source.identity();
+      },
+      face.source());
 }
 bool body_item(const geometry::ViewportSceneItem& item) {
   return item.kind == geometry::ViewportSceneKind::SolidBody ||
@@ -329,23 +351,50 @@ struct ShellFeatureEditTools::Impl {
   QLabel* dynamic_label{};
   QLabel* guidance{};
   QAction* hole_action{};
+  QAction* thread_action{};
   QPushButton* another{};
   bool creating{};
-  enum class Pick { None, Body, Support };
+  bool support_editing{};
+  std::optional<geometry::ShapeCache> feature_input_cache;
+  std::optional<std::size_t> feature_input_prefix;
+  enum class Pick { None, Body, Support, LimitFace, LimitBody };
   Pick picking{Pick::None};
   struct SupportChoice {
     std::string semantic_id, label;
     PlaneReference reference;
     geometry::GeometryShape shape;
+    std::optional<ResultFaceWorkplane> workplane{};
+    geometry::ViewportSceneKind kind{geometry::ViewportSceneKind::Face};
   };
   std::vector<SupportChoice> supports;
+  struct ThreadSupportChoice {
+    std::string semantic_id, label;
+    FaceReference reference;
+    geometry::GeometryShape shape;
+    geometry::ThreadSupportInspection geometry;
+    geometry::ViewportSceneKind kind{geometry::ViewportSceneKind::Face};
+    ThreadDirection direction{ThreadDirection::AlongSupportAxis};
+  };
+  std::vector<ThreadSupportChoice> thread_supports;
+  struct LimitFaceChoice {
+    std::string semantic_id, label;
+    FaceReference reference;
+    geometry::GeometryShape shape;
+    Json encoded;
+    BodyId body;
+  };
+  std::vector<LimitFaceChoice> limit_faces;
+  bool limit_chosen{true};
+  std::optional<FaceReference> thread_support_override;
+  std::string thread_support_id;
   std::optional<PlaneReference> support_override;
+  std::optional<ResultFaceWorkplane> pending_support_plane;
   bool support_chosen{};
   std::optional<Error> support_error;
   std::vector<Parameter> pending_parameters;
   std::string recipe_namespace;
-  QComboBox *target_field{}, *support_field{};
-  ShellPropertySelector *target_selector{}, *support_selector{};
+  QComboBox *target_field{}, *support_field{}, *limit_field{};
+  ShellPropertySelector *target_selector{}, *support_selector{}, *limit_selector{};
   std::optional<double> next_diameter;
   std::optional<BodyId> next_target;
   std::size_t entry_revision{};
@@ -369,6 +418,15 @@ struct ShellFeatureEditTools::Impl {
   GuiSketchScreenPoint last_pointer{};
   QString buffer;
   QString pending_focus_id;
+  struct ThreadMappingDraft {
+    std::optional<EngineeringResourceKey> table;
+    std::string row;
+    std::map<std::string, std::string> columns;
+    bool taper{};
+  };
+  std::optional<ThreadMappingDraft> thread_mapping;
+  bool thread_mapping_pending{};
+  std::optional<Error> thread_mapping_error;
 
   Impl(ShellFeatureEditTools& owner_, ShellWindow& window_)
       : owner(owner_), window(window_), session(window.session()), viewport(window.viewport()) {
@@ -451,14 +509,26 @@ struct ShellFeatureEditTools::Impl {
     return form;
   }
   bool immutable_field(const QString& path) const {
-    return hole_thread() && (path.startsWith("/support/") || path.contains("/table/") ||
-                             path.contains("/columns/") || path.endsWith("/row") ||
-                             path.endsWith("/diameter_column"));
+    return hole_thread() && (path == "/thread/profile/kind" || path.startsWith("/support/") ||
+                             path.contains("/table/") || path.contains("/columns/") ||
+                             path.endsWith("/row") || path.endsWith("/diameter_column"));
   }
   bool body_available(const Body& body) const {
     return body.kind() == BodyKind::Solid && body.visibility() == BodyVisibility::Visible &&
            session.presentation_visible("body/" + body.id().value()) &&
            session.part_shape_cache() && session.part_shape_cache()->find_body_shape(body.id());
+  }
+  bool input_selection() const noexcept {
+    return creating || support_editing;
+  }
+  const geometry::ShapeCache* input_cache() const {
+    return feature_input_cache ? &*feature_input_cache : session.part_shape_cache();
+  }
+  bool input_body_available(const Body& body) const {
+    return body_available(body) && input_cache() && input_cache()->find_body_shape(body.id());
+  }
+  std::string body_selection_id(const BodyId& body) const {
+    return (feature_input_cache ? "feature-input/body/" : "body/") + body.value();
   }
   bool can_create() const {
     const auto* part = session.part_document();
@@ -469,11 +539,157 @@ struct ShellFeatureEditTools::Impl {
            std::any_of(part->bodies().begin(), part->bodies().end(),
                        [this](const auto& b) { return body_available(b); });
   }
+  Result<std::size_t> start_creation(const PartDocument& seed, FeatureId id, Kind kind,
+                                     std::string draft_namespace) {
+    auto encoded = serialize_part_document_to_json(seed);
+    auto original = serialize_part_document_to_json(*session.part_document());
+    if (!encoded || !original)
+      return Result<std::size_t>::failure(encoded ? original.error() : encoded.error());
+    auto begun = kind == Kind::Thread ? edit.begin_new_thread(session, id)
+                                      : edit.begin_new_hole(session, id);
+    if (!begun)
+      return begun;
+    entry_revision = session.model_revision();
+    entry_camera = viewport.camera_bookmark();
+    entry_selection = session.selection();
+    entry_viewport_selection = viewport.selected_semantic();
+    previous_mask = viewport.selection_filter_mask();
+    previous_scope = viewport.selection_semantic_scope();
+    creating = true;
+    limit_chosen = true;
+    support_editing = false;
+    feature_input_cache.reset();
+    feature_input_prefix.reset();
+    thread_mapping.reset();
+    thread_mapping_pending = false;
+    thread_mapping_error.reset();
+    recipe_namespace = std::move(draft_namespace);
+    picking = Pick::None;
+    support_chosen = true;
+    support_error.reset();
+    pending_parameters.clear();
+    for (const auto& parameter : seed.parameters())
+      if (!session.part_document()->find_parameter(parameter.id()))
+        pending_parameters.push_back(parameter);
+    source_text = original.value();
+    source = Json::parse(encoded.value());
+    collection = kind == Kind::Thread ? "thread_features" : "hole_features";
+    record_index = source.at(collection).size() - 1;
+    record = source.at(collection).at(record_index);
+    parameter_values.clear();
+    array_templates.clear();
+    if (!session.task().begin(task_id) || !session.task().begin_parameter_editing() ||
+        !session.task().show_preview()) {
+      edit.cancel();
+      creating = false;
+      pending_parameters.clear();
+      return Result<std::size_t>::failure(error("Could not start feature creation task."));
+    }
+    dock->setWindowTitle(kind == Kind::Thread ? "Create Thread" : "Create Hole");
+    dynamic->hide();
+    dynamic_label->hide();
+    another->setVisible(kind == Kind::Hole);
+    guidance->setText(
+        kind == Kind::Thread
+            ? "Choose the target and exterior cylindrical or conical support. Edit the "
+              "profile and interval, then Apply. Modeled taper remains unsupported."
+            : "Choose target and support, then edit local X/Y positions, recipe and dimensions. "
+              "Apply creates one Hole; Create Another opens a fresh draft.");
+    build_form();
+    pick_mode();
+    dock->show();
+    dock->raise();
+    (void)preview();
+    window.refresh();
+    return Result<std::size_t>::success(1);
+  }
+  Result<std::size_t> collect_thread_supports(const BodyId& body) {
+    thread_supports.clear();
+    const auto* part = session.part_document();
+    const auto* cache = input_cache();
+    if (!part || !cache || !part->find_body(body) || !input_body_available(*part->find_body(body)))
+      return Result<std::size_t>::failure(error("Choose a current visible solid target."));
+    auto context = make_step_import_context(session);
+    if (!context)
+      return Result<std::size_t>::failure(context.error());
+    auto faces = geometry::FinishingSelectionBuilder::build(
+        *part, *cache, body, PartFeatureInputRole::ShellRemovalFace, context.value().get(),
+        feature_input_prefix);
+    if (!faces)
+      return Result<std::size_t>::failure(faces.error());
+    for (const auto& face : faces.value()) {
+      const auto* ref = std::get_if<FaceReference>(&face.reference);
+      if (!ref)
+        continue;
+      auto selected = std::visit(
+          [](const auto& source) -> Result<FaceReference> {
+            using T = std::decay_t<decltype(source)>;
+            constexpr auto role = PartFeatureInputRole::ThreadSupportFace;
+            if constexpr (std::is_same_v<T, SemanticFaceReference>)
+              return FaceReference::create_planar(role, source);
+            else if constexpr (std::is_same_v<T, SemanticCylindricalFaceReference>)
+              return FaceReference::create_cylindrical(role, source);
+            else if constexpr (std::is_same_v<T, ImportedTopologyReference>)
+              return FaceReference::create_imported(role, source);
+            else
+              return FaceReference::create_result(role, source);
+          },
+          ref->source());
+      if (!selected)
+        continue;
+      auto inspected = geometry::ThreadAdapter::inspect_support(
+          *part, body, selected.value(), *cache, ThreadDirection::AlongSupportAxis,
+          context.value().get(), feature_input_prefix);
+      auto direction = ThreadDirection::AlongSupportAxis;
+      if (inspected && inspected.value().radius_mm <= 1e-7) {
+        direction = ThreadDirection::OppositeSupportAxis;
+        inspected = geometry::ThreadAdapter::inspect_support(*part, body, selected.value(), *cache,
+                                                             direction, context.value().get(),
+                                                             feature_input_prefix);
+      }
+      if (inspected && inspected.value().radius_mm > 1e-7)
+        thread_supports.push_back({face.semantic_id, face.label, selected.value(), face.shape,
+                                   inspected.value(), geometry::ViewportSceneKind::Face,
+                                   direction});
+    }
+    if (context.value()) {
+      auto fresh = context.value()->validate_sources();
+      if (!fresh)
+        return fresh;
+    }
+    return Result<std::size_t>::success(thread_supports.size());
+  }
+  template <class Callback> void each_support(Callback callback) const {
+    if (edit.kind() == Kind::Thread)
+      for (const auto& support : thread_supports)
+        callback(support);
+    else
+      for (const auto& support : supports)
+        callback(support);
+  }
+  bool choose_support(int index) {
+    if (edit.kind() == Kind::Thread) {
+      thread_support_override.reset();
+      thread_support_id.clear();
+      if (index < 0 || std::size_t(index) >= thread_supports.size())
+        return false;
+      thread_support_override = thread_supports[index].reference;
+      thread_support_id = thread_supports[index].semantic_id;
+    } else {
+      support_override.reset();
+      pending_support_plane.reset();
+      if (index < 0 || std::size_t(index) >= supports.size())
+        return false;
+      support_override = supports[index].reference;
+      pending_support_plane = supports[index].workplane;
+    }
+    return true;
+  }
   Result<std::size_t> collect_supports(const BodyId& body) {
     supports.clear();
     const auto* part = session.part_document();
-    const auto* cache = session.part_shape_cache();
-    if (!part || !cache || !part->find_body(body) || !body_available(*part->find_body(body)))
+    const auto* cache = input_cache();
+    if (!part || !cache || !part->find_body(body) || !input_body_available(*part->find_body(body)))
       return Result<std::size_t>::failure(error("Choose a current visible solid target."));
     const auto add_plane = [&](const auto& plane, bool construction, const char* prefix) {
       if (!geometry::WorkplaneResolver{}.resolve(*part, DatumPlaneId(plane.id().value()), *cache))
@@ -500,26 +716,234 @@ struct ShellFeatureEditTools::Impl {
     if (!context)
       return Result<std::size_t>::failure(context.error());
     auto faces = geometry::FinishingSelectionBuilder::build(
-        *part, *cache, body, PartFeatureInputRole::ShellRemovalFace, context.value().get());
+        *part, *cache, body, PartFeatureInputRole::ShellRemovalFace, context.value().get(),
+        feature_input_prefix);
     if (!faces)
       return Result<std::size_t>::failure(faces.error());
     for (const auto& face : faces.value())
-      if (const auto* ref = std::get_if<FaceReference>(&face.reference))
+      if (const auto* ref = std::get_if<FaceReference>(&face.reference)) {
         if (const auto* native = std::get_if<SemanticFaceReference>(&ref->source())) {
           auto plane =
               PlaneReference::create_semantic_face(PartFeatureInputRole::HoleSupportPlane, *native);
           if (plane)
             supports.push_back({face.semantic_id, face.label, plane.value(), face.shape});
+        } else if (const auto* imported = std::get_if<ImportedTopologyReference>(&ref->source())) {
+          auto identity = ImportedTopologyReference::create(imported->catalog(), imported->entry(),
+                                                            ImportedTopologyCapability::Plane);
+          if (!identity)
+            continue;
+          auto plane = PlaneReference::create_imported(PartFeatureInputRole::HoleSupportPlane,
+                                                       identity.value());
+          if (plane && validate_part_feature_input_reference(*part, plane.value()))
+            supports.push_back({face.semantic_id,
+                                face.label + " / (" + QString::number(face.anchor.x).toStdString() +
+                                    ", " + QString::number(face.anchor.y).toStdString() + ", " +
+                                    QString::number(face.anchor.z).toStdString() + ") mm",
+                                plane.value(), face.shape});
+        } else if (const auto* result = std::get_if<ResultFaceReference>(&ref->source())) {
+          const auto tag = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+          auto workplane = ResultFaceWorkplane::create(DatumPlaneId("plane.hole." + tag),
+                                                       face.label + " / Hole support", *result);
+          if (!workplane || !geometry::ResultFaceSupportGeometry::resolve(
+                                *part, workplane.value(), *cache, context.value().get()))
+            continue;
+          auto plane = PlaneReference::create_datum_plane(PartFeatureInputRole::HoleSupportPlane,
+                                                          workplane.value().id());
+          if (plane)
+            supports.push_back(
+                {face.semantic_id, face.label, plane.value(), face.shape, workplane.value()});
         }
+      }
     if (context.value()) {
       auto fresh = context.value()->validate_sources();
       if (!fresh)
         return fresh;
     }
+    if (feature_input_cache) {
+      auto scene = geometry::ViewportSceneBuilder{context.value().get()}.build_part(
+          *part, *cache, feature_input_prefix);
+      if (!scene)
+        return Result<std::size_t>::failure(scene.error());
+      for (auto& choice : supports)
+        if (choice.shape.empty()) {
+          for (const auto& item : scene.value())
+            if (item.kind == geometry::ViewportSceneKind::Datum &&
+                item.semantic_id == choice.semantic_id) {
+              choice.shape = item.shape;
+              break;
+            }
+          choice.semantic_id = "feature-input/" + choice.semantic_id;
+          choice.kind = geometry::ViewportSceneKind::Datum;
+        }
+    }
     return Result<std::size_t>::success(supports.size());
   }
+  Result<std::size_t> prepare_support_editing() {
+    const auto* part = session.part_document();
+    if (!hole_thread() || session.history_prefix_count())
+      return Result<std::size_t>::success(0);
+    const BodyId body(record.at("target_body").get<std::string>());
+    const auto* target = part->find_body(body);
+    if (!target || !body_available(*target))
+      return Result<std::size_t>::success(0);
+    support_editing = true;
+    auto history = part->executable_history();
+    if (!history)
+      return Result<std::size_t>::failure(history.error());
+    const auto feature =
+        std::find_if(history.value().begin(), history.value().end(),
+                     [this](const auto& item) { return item.node_id == edit.feature().value(); });
+    if (feature == history.value().end())
+      return Result<std::size_t>::failure(error("Feature input history is unavailable."));
+    feature_input_prefix = std::size_t(feature - history.value().begin());
+    auto cache = geometry::ShapeCache::create(ShapeCacheId("feature.edit.inputs"));
+    if (!cache)
+      return Result<std::size_t>::failure(cache.error());
+    auto context = make_step_import_context(session);
+    if (!context)
+      return Result<std::size_t>::failure(context.error());
+    auto evaluated =
+        geometry::GeometryRecomputeExecutor{context.value().get()}.execute_history_prefix(
+            *part, *feature_input_prefix, cache.value());
+    if (!evaluated)
+      return Result<std::size_t>::failure(evaluated.error());
+    feature_input_cache = std::move(cache.value());
+    auto collected =
+        edit.kind() == Kind::Thread ? collect_thread_supports(body) : collect_supports(body);
+    support_error = collected ? std::nullopt : std::optional(collected.error());
+    support_chosen = true;
+    if (edit.kind() == Kind::Thread) {
+      const auto& current = part->find_thread_feature(edit.feature())->support();
+      thread_support_override = current;
+      for (const auto& choice : thread_supports)
+        if (face_identity(choice.reference) == face_identity(current)) {
+          thread_support_id = choice.semantic_id;
+          return Result<std::size_t>::success(1);
+        }
+      auto inspected = geometry::ThreadAdapter::inspect_support(
+          *part, body, current, *feature_input_cache, ThreadDirection::AlongSupportAxis,
+          context.value().get(), feature_input_prefix);
+      thread_support_id = "feature-input/current-thread-support";
+      thread_supports.push_back(
+          {thread_support_id,
+           "Current support",
+           current,
+           {},
+           inspected ? inspected.value() : geometry::ThreadSupportInspection{}});
+    } else {
+      const auto& current = part->find_hole_feature(edit.feature())->support();
+      support_override = current;
+      if (std::none_of(supports.begin(), supports.end(), [&](const auto& choice) {
+            return plane_identity(choice.reference) == plane_identity(current);
+          }))
+        supports.push_back({"feature-input/current-hole-support", "Current support", current, {}});
+    }
+    return Result<std::size_t>::success(1);
+  }
+  Result<std::size_t> collect_limit_faces() {
+    limit_faces.clear();
+    const auto* part = session.part_document();
+    const auto* cache = input_cache();
+    auto canonical = deserialize_part_document_from_json(source.dump());
+    if (!part || !cache || !canonical)
+      return Result<std::size_t>::failure(error("Hole limit inputs are unavailable."));
+    auto context = make_step_import_context(session);
+    if (!context)
+      return Result<std::size_t>::failure(context.error());
+    for (const auto& body : part->bodies()) {
+      if (!input_body_available(body))
+        continue;
+      auto faces = geometry::FinishingSelectionBuilder::build(
+          *part, *cache, body.id(), PartFeatureInputRole::ShellRemovalFace, context.value().get(),
+          feature_input_prefix);
+      if (!faces)
+        return Result<std::size_t>::failure(faces.error());
+      for (const auto& face : faces.value()) {
+        const auto* reference = std::get_if<FaceReference>(&face.reference);
+        if (!reference)
+          continue;
+        auto selected = std::visit(
+            [&](const auto& ref) -> Result<FaceReference> {
+              using T = std::decay_t<decltype(ref)>;
+              constexpr auto role = PartFeatureInputRole::HoleLimitFace;
+              if constexpr (std::is_same_v<T, SemanticFaceReference>)
+                return FaceReference::create_planar(role, ref);
+              else if constexpr (std::is_same_v<T, ImportedTopologyReference>) {
+                auto plane = ImportedTopologyReference::create(ref.catalog(), ref.entry(),
+                                                               ImportedTopologyCapability::Plane);
+                if (!plane)
+                  return Result<FaceReference>::failure(plane.error());
+                auto support = PlaneReference::create_imported(
+                    PartFeatureInputRole::HoleSupportPlane, plane.value());
+                if (!support)
+                  return Result<FaceReference>::failure(support.error());
+                auto valid = validate_part_feature_input_reference(*part, support.value());
+                if (!valid)
+                  return Result<FaceReference>::failure(valid.error());
+                return FaceReference::create_imported(role, ref);
+              } else if constexpr (std::is_same_v<T, ResultFaceReference>) {
+                auto plane = ResultFaceWorkplane::create(DatumPlaneId("plane.hole.limit.inspect"),
+                                                         "Limit inspection", ref);
+                if (!plane)
+                  return Result<FaceReference>::failure(plane.error());
+                auto resolved = geometry::ResultFaceSupportGeometry::resolve(
+                    *part, plane.value(), *cache, context.value().get());
+                if (!resolved)
+                  return Result<FaceReference>::failure(resolved.error());
+                return FaceReference::create_result(role, ref);
+              } else
+                return Result<FaceReference>::failure(error("Choose a planar Hole limit face."));
+            },
+            reference->source());
+        if (!selected)
+          continue;
+        // Keep serialization in Core. This disposable transition supplies only
+        // the encoded typed face; it does not replace current numeric edits.
+        auto candidate =
+            GuiHoleRecipeCommands::extent(canonical.value(), edit.feature(), recipe_namespace,
+                                          GuiHoleExtentChoice::ToFace, selected.value());
+        if (!candidate)
+          continue;
+        auto encoded = serialize_part_document_to_json(candidate.value());
+        if (!encoded)
+          return Result<std::size_t>::failure(encoded.error());
+        limit_faces.push_back(
+            {face.semantic_id, body.name() + " / " + face.label, selected.value(), face.shape,
+             Json::parse(encoded.value()).at(collection).at(record_index).at("extent").at("face"),
+             body.id()});
+      }
+    }
+    if (context.value()) {
+      auto fresh = context.value()->validate_sources();
+      if (!fresh)
+        return fresh;
+    }
+    return Result<std::size_t>::success(limit_faces.size());
+  }
+  Result<std::size_t> publish_input_scene() {
+    if (!feature_input_cache)
+      return Result<std::size_t>::success(0);
+    auto context = make_step_import_context(session);
+    if (!context)
+      return Result<std::size_t>::failure(context.error());
+    const geometry::ViewportSceneBuilder builder{context.value().get()};
+    auto scoped =
+        builder.build_part(*session.part_document(), *feature_input_cache, feature_input_prefix);
+    auto original = builder.build_part(*session.part_document(), *session.part_shape_cache());
+    if (!scoped || !original)
+      return Result<std::size_t>::failure(scoped ? original.error() : scoped.error());
+    std::vector<geometry::GeometryShape> shapes;
+    std::vector<std::string> replaced;
+    for (const auto& item : scoped.value())
+      if (body_item(item) && session.presentation_visible(item.semantic_id))
+        shapes.push_back(item.shape);
+    for (const auto& item : original.value())
+      if (body_item(item) || item.kind == geometry::ViewportSceneKind::Datum)
+        replaced.push_back(item.semantic_id);
+    return viewport.set_feature_previews(std::move(shapes), std::move(replaced));
+  }
   void pick_mode() {
-    if (!creating || !edit.active())
+    if (!input_selection() || !edit.active())
       return;
     if (!support_chosen) {
       valid = false;
@@ -527,44 +951,74 @@ struct ShellFeatureEditTools::Impl {
     }
     viewport.clear_preview_selection_targets();
     std::vector<std::string> scope;
-    if (picking == Pick::Body) {
+    std::vector<geometry::ViewportSceneItem> targets;
+    if (picking != Pick::None && feature_input_cache) {
+      auto shown = publish_input_scene();
+      if (!shown) {
+        (void)reject(shown.error());
+        return;
+      }
+    }
+    const bool body_pick = picking == Pick::Body || picking == Pick::LimitBody;
+    if ((picking == Pick::LimitFace || picking == Pick::LimitBody) && !feature_input_cache)
       viewport.clear_feature_preview();
+    if (body_pick) {
+      if (!feature_input_cache)
+        viewport.clear_feature_preview();
       for (const auto& body : session.part_document()->bodies())
-        if (body_available(body))
-          scope.push_back("body/" + body.id().value());
+        if (input_body_available(body) &&
+            (picking != Pick::LimitBody ||
+             body.id().value() != record.at("target_body").get<std::string>())) {
+          const auto id = body_selection_id(body.id());
+          scope.push_back(id);
+          if (feature_input_cache)
+            targets.push_back({geometry::ViewportSceneKind::SolidBody, id,
+                               *feature_input_cache->find_body_shape(body.id())});
+        }
     } else if (picking == Pick::Support) {
-      std::vector<geometry::ViewportSceneItem> targets;
-      for (const auto& choice : supports) {
+      each_support([&](const auto& choice) {
         scope.push_back(choice.semantic_id);
         if (!choice.shape.empty())
-          targets.push_back({geometry::ViewportSceneKind::Face, choice.semantic_id, choice.shape});
+          targets.push_back({choice.kind, choice.semantic_id, choice.shape});
+      });
+    } else if (picking == Pick::LimitFace) {
+      for (const auto& face : limit_faces) {
+        scope.push_back(face.semantic_id);
+        targets.push_back({geometry::ViewportSceneKind::Face, face.semantic_id, face.shape});
       }
-      if (!targets.empty()) {
-        auto result = viewport.set_preview_selection_targets(std::move(targets));
-        if (!result)
-          window.report_error(result.error());
-      }
+    }
+    if (!targets.empty()) {
+      auto result = viewport.set_preview_selection_targets(std::move(targets));
+      if (!result)
+        window.report_error(result.error());
     }
     viewport.set_selection_semantic_scope(std::move(scope));
     viewport.set_selection_filter_mask(
-        picking == Pick::Body      ? selection_kind_bit(GuiSelectionKind::Body)
+        body_pick                  ? selection_kind_bit(GuiSelectionKind::Body)
         : picking == Pick::Support ? selection_kind_bit(GuiSelectionKind::Face) |
                                          selection_kind_bit(GuiSelectionKind::Datum)
-                                   : 0);
+        : picking == Pick::LimitFace ? selection_kind_bit(GuiSelectionKind::Face)
+                                     : 0);
     if (target_selector)
       target_selector->set_active(picking == Pick::Body);
     if (support_selector)
       support_selector->set_active(picking == Pick::Support);
+    if (limit_selector)
+      limit_selector->set_active(picking == Pick::LimitFace || picking == Pick::LimitBody);
     apply->setEnabled(valid && support_chosen && picking == Pick::None);
-    another->setEnabled(valid && support_chosen && picking == Pick::None);
+    another->setEnabled(creating && valid && support_chosen && picking == Pick::None);
   }
   template <class Record> Result<Record> selected_record(Record record) const {
     if constexpr (std::is_same_v<Record, HoleFeature>) {
-      if (creating && support_override)
+      if (input_selection() && support_override)
         return HoleFeature::create(record.id(), record.name(), record.kind(), record.target_body(),
                                    *support_override, record.placements(), record.diameter(),
                                    record.extent(), record.direction(), record.tip(),
                                    record.manufacturing(), record.thread());
+    } else if constexpr (std::is_same_v<Record, ThreadFeature>) {
+      if (input_selection() && thread_support_override)
+        return ThreadFeature::create(record.id(), record.name(), record.target_body(),
+                                     *thread_support_override, record.thread(), record.direction());
     }
     return Result<Record>::success(std::move(record));
   }
@@ -587,7 +1041,7 @@ struct ShellFeatureEditTools::Impl {
   QDoubleSpinBox* number(QWidget* parent, const QString& path, double scalar, QuantityKind unit,
                          bool unitless = false) {
     auto* spin = new QDoubleSpinBox(parent);
-    spin->setDecimals(unit == QuantityKind::Count ? 0 : 6);
+    spin->setDecimals(unit == QuantityKind::Count ? 0 : path.startsWith("/thread/") ? 9 : 6);
     spin->setRange(-1e9, 1e9);
     spin->setKeyboardTracking(false);
     spin->setValue(scalar);
@@ -653,9 +1107,9 @@ struct ShellFeatureEditTools::Impl {
     else if (key == "construction_plane")
       add(part.construction_planes());
     else if (key == "body" || key == "target_body" || key == "tools" || key == "tool_bodies") {
-      if (creating && key == "target_body") {
+      if (input_selection() && key == "target_body") {
         for (const auto& body : part.bodies())
-          if (body_available(body))
+          if (input_body_available(body))
             result.emplace_back(body.id().value(), body.name());
       } else
         add(part.bodies());
@@ -696,6 +1150,7 @@ struct ShellFeatureEditTools::Impl {
     layout->setContentsMargins(0, 0, 0, 0);
     auto* binding = combo(row);
     binding->setObjectName("blcad.feature_edit.binding" + path);
+    binding->setProperty("blcad.restoreFocusAfterRebuild", path.startsWith("/thread/"));
     for (const auto& p : session.part_document()->parameters())
       if (p.type() == selected.type())
         add_choice(binding, p.id().value(), p.name());
@@ -705,6 +1160,7 @@ struct ShellFeatureEditTools::Impl {
     binding->setCurrentIndex(binding->findData(QString::fromStdString(selected.id().value())));
     layout->addWidget(binding);
     auto* scalar = number(row, path, parameter_value(selected), selected.value().kind());
+    scalar->setProperty("blcad.restoreFocusAfterRebuild", path.startsWith("/thread/"));
     scalar->setEnabled(!selected.is_expression());
     if (selected.formula())
       scalar->setToolTip("Formula: " + QString::fromStdString(*selected.formula()));
@@ -719,7 +1175,10 @@ struct ShellFeatureEditTools::Impl {
           scalar->setEnabled(!p->is_expression());
           scalar->setToolTip(p->formula() ? "Formula: " + QString::fromStdString(*p->formula())
                                           : QString());
-          (void)preview();
+          if (thread_mapping_pending && thread_mapping_error)
+            materialize_thread_mapping();
+          else
+            (void)preview();
         });
     QObject::connect(scalar, &QDoubleSpinBox::valueChanged, &owner,
                      [this, path](double scalar_value) {
@@ -731,7 +1190,10 @@ struct ShellFeatureEditTools::Impl {
                            other->setValue(scalar_value);
                          }
                        }
-                       (void)preview();
+                       if (thread_mapping_pending && thread_mapping_error)
+                         materialize_thread_mapping();
+                       else
+                         (void)preview();
                      });
   }
   QString retained_focus_id() const {
@@ -756,10 +1218,28 @@ struct ShellFeatureEditTools::Impl {
       }
     });
   }
-  Result<PartDocument> recipe_document() const {
-    auto part = decode();
-    if (!part || edit.kind() != Kind::Hole)
+  Result<PartDocument> recipe_document(bool parameter_edits = true,
+                                       bool canonical_thread_profile = false) const {
+    auto part = decode(parameter_edits, canonical_thread_profile);
+    if (!part)
       return part;
+    if (edit.kind() == Kind::Thread) {
+      auto thread = selected_record(*part.value().find_thread_feature(edit.feature()));
+      if (!thread)
+        return Result<PartDocument>::failure(thread.error());
+      auto updated = part.value().update_thread_feature(std::move(thread.value()));
+      if (!updated)
+        return Result<PartDocument>::failure(updated.error());
+      return part;
+    }
+    if (edit.kind() != Kind::Hole)
+      return part;
+    if (pending_support_plane &&
+        !part.value().find_result_face_workplane(pending_support_plane->id())) {
+      auto added = part.value().add_result_face_workplane(*pending_support_plane);
+      if (!added)
+        return Result<PartDocument>::failure(added.error());
+    }
     auto hole = selected_record(*part.value().find_hole_feature(edit.feature()));
     if (!hole)
       return Result<PartDocument>::failure(hole.error());
@@ -798,6 +1278,254 @@ struct ShellFeatureEditTools::Impl {
       return;
     }
     adopt_recipe(command(std::move(part.value())));
+  }
+  template <class Command>
+  bool thread_command(Command command, std::optional<Error>* failure = nullptr,
+                      bool replace_profile = false) {
+    auto part = recipe_document(false, replace_profile);
+    if (!part) {
+      if (failure)
+        *failure = part.error();
+      (void)reject(part.error());
+      return false;
+    }
+    auto result = command(std::move(part.value()));
+    const bool accepted = bool(result);
+    if (!result && failure)
+      *failure = result.error();
+    adopt_recipe(std::move(result));
+    return accepted;
+  }
+  std::string fresh_thread_namespace() const {
+    return "thread.draft." + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+  }
+  void materialize_thread_mapping() {
+    thread_mapping_pending = true;
+    thread_mapping_error.reset();
+    if (!thread_mapping || !thread_mapping->table || thread_mapping->row.empty()) {
+      deferred_rebuild();
+      return;
+    }
+    auto& draft = *thread_mapping;
+    for (const auto* field : {"system", "designation", "tolerance", "major_diameter",
+                              "minor_diameter", "pitch", "included_angle"})
+      if (draft.columns[field].empty()) {
+        deferred_rebuild();
+        return;
+      }
+    if (draft.taper && draft.columns["taper_angle"].empty()) {
+      deferred_rebuild();
+      return;
+    }
+    ThreadStandardColumns columns{draft.columns["system"],
+                                  draft.columns["designation"],
+                                  draft.columns["tolerance"],
+                                  draft.columns["major_diameter"],
+                                  draft.columns["minor_diameter"],
+                                  draft.columns["pitch"],
+                                  draft.columns["included_angle"],
+                                  draft.taper ? std::optional(draft.columns["taper_angle"])
+                                              : std::nullopt};
+    const ThreadStandardProfile profile{*draft.table, draft.row, std::move(columns)};
+    if (thread_command(
+            [&](PartDocument part) {
+              return GuiThreadRecipeCommands::profile(std::move(part), edit.feature(), profile,
+                                                      parameter_values);
+            },
+            &thread_mapping_error, true))
+      thread_mapping_pending = false;
+  }
+  void build_thread_mapping(QFormLayout* form) {
+    auto& draft = *thread_mapping;
+    const auto& resources = session.part_document()->engineering_resources();
+    const auto add = [&](const char* field, const QString& title) {
+      auto* input = combo(form->parentWidget());
+      input->setObjectName("blcad.thread.standard." + QString::fromLatin1(field));
+      input->setProperty("blcad.restoreFocusAfterRebuild", true);
+      form->addRow(title, input);
+      return input;
+    };
+    auto* table = add("table", "Table / Revision");
+    table->addItem("Choose a pinned revision", QStringList{});
+    std::vector<EngineeringResourceKey> keys;
+    for (const auto& entry : resources.entries())
+      if (const auto* resource = std::get_if<EngineeringStandardTable>(&entry)) {
+        keys.push_back(resource->key());
+        table->addItem(QString::fromStdString(resource->name() + " / " +
+                                              resource->key().id().value() + " / " +
+                                              resource->key().revision()),
+                       QStringList{QString::fromStdString(resource->key().id().value()),
+                                   QString::fromStdString(resource->key().revision())});
+        table->setItemData(table->count() - 1,
+                           QString::fromStdString(resource->key().id().value() + " / " +
+                                                  resource->key().revision() + "\n" +
+                                                  resource->provenance().source()),
+                           Qt::ToolTipRole);
+        if (draft.table && *draft.table == resource->key())
+          table->setCurrentIndex(table->count() - 1);
+      }
+    if (table->currentIndex() > 0)
+      table->setToolTip(table->currentData(Qt::ToolTipRole).toString());
+    QObject::connect(table, &QComboBox::currentIndexChanged, &owner, [this, keys](int index) {
+      thread_mapping = ThreadMappingDraft{};
+      if (index > 0)
+        thread_mapping->table = keys.at(std::size_t(index - 1));
+      thread_mapping_pending = true;
+      thread_mapping_error.reset();
+      deferred_rebuild();
+    });
+    const auto* selected = draft.table ? resources.find_table(*draft.table) : nullptr;
+    auto* row = add("row", "Row");
+    row->addItem("Choose a row", "");
+    if (selected)
+      for (const auto& choice : selected->rows())
+        row->addItem(QString::fromStdString(choice.name + " / " + choice.key),
+                     QString::fromStdString(choice.key));
+    row->setCurrentIndex(std::max(0, row->findData(QString::fromStdString(draft.row))));
+    QObject::connect(row, &QComboBox::currentIndexChanged, &owner, [this, row] {
+      thread_mapping->row = row->currentData().toString().toStdString();
+      thread_mapping->columns.clear();
+      thread_mapping_pending = true;
+      thread_mapping_error.reset();
+      deferred_rebuild();
+    });
+    const auto* selected_row = selected ? selected->find_row(draft.row) : nullptr;
+    auto* tapered = new QCheckBox("Map a taper Angle column", form->parentWidget());
+    tapered->setObjectName("blcad.thread.standard.taper.enabled");
+    tapered->setProperty("blcad.restoreFocusAfterRebuild", true);
+    tapered->setChecked(draft.taper);
+    form->addRow(tapered);
+    QObject::connect(tapered, &QCheckBox::toggled, &owner, [this](bool enabled) {
+      thread_mapping->taper = enabled;
+      materialize_thread_mapping();
+    });
+    for (const auto* field : {"system", "designation", "tolerance", "major_diameter",
+                              "minor_diameter", "pitch", "included_angle", "taper_angle"}) {
+      const std::string name(field);
+      if (name == "taper_angle" && !draft.taper)
+        continue;
+      const bool text = name == "system" || name == "designation" || name == "tolerance";
+      const bool angle = name == "included_angle" || name == "taper_angle";
+      auto* column = add(field, label(name));
+      column->addItem("Choose a typed column", "");
+      if (selected_row)
+        for (const auto& cell : selected_row->cells) {
+          QString value;
+          if (text) {
+            const auto* string = std::get_if<std::string>(&cell.value);
+            if (!string || QString::fromStdString(*string).trimmed().isEmpty())
+              continue;
+            value = QString::fromStdString(*string);
+          } else {
+            const auto* quantity = std::get_if<Quantity>(&cell.value);
+            if (!quantity ||
+                quantity->kind() != (angle ? QuantityKind::AngleDeg : QuantityKind::LengthMm))
+              continue;
+            value = QString::number(angle ? quantity->degrees() : quantity->millimeters()) +
+                    (angle ? " deg" : " mm");
+          }
+          column->addItem(QString::fromStdString(cell.column) + " / " + value,
+                          QString::fromStdString(cell.column));
+          column->setItemData(column->count() - 1, QString::fromStdString(cell.provenance.source()),
+                              Qt::ToolTipRole);
+        }
+      column->setCurrentIndex(
+          std::max(0, column->findData(QString::fromStdString(draft.columns[name]))));
+      if (column->currentIndex() > 0)
+        column->setToolTip(column->currentData(Qt::ToolTipRole).toString());
+      QObject::connect(column, &QComboBox::currentIndexChanged, &owner, [this, name, column] {
+        thread_mapping->columns[name] = column->currentData().toString().toStdString();
+        materialize_thread_mapping();
+      });
+    }
+  }
+  void build_thread_controls(QFormLayout* form) {
+    auto part = deserialize_part_document_from_json(source.dump());
+    if (!part)
+      return;
+    const ThreadDefinition* definition = nullptr;
+    if (edit.kind() == Kind::Thread)
+      definition = &part.value().find_thread_feature(edit.feature())->thread();
+    else if (const auto* hole = part.value().find_hole_feature(edit.feature());
+             hole && hole->thread())
+      definition = &*hole->thread();
+    if (!definition)
+      return;
+    const auto* standard = std::get_if<ThreadStandardProfile>(&definition->profile());
+    if (standard && !thread_mapping) {
+      thread_mapping = ThreadMappingDraft{standard->table,
+                                          standard->row,
+                                          {{"system", standard->columns.system},
+                                           {"designation", standard->columns.designation},
+                                           {"tolerance", standard->columns.tolerance},
+                                           {"major_diameter", standard->columns.major_diameter},
+                                           {"minor_diameter", standard->columns.minor_diameter},
+                                           {"pitch", standard->columns.pitch},
+                                           {"included_angle", standard->columns.included_angle}},
+                                          bool(standard->columns.taper_angle)};
+      if (standard->columns.taper_angle)
+        thread_mapping->columns["taper_angle"] = *standard->columns.taper_angle;
+    }
+    auto* source = combo(form->parentWidget());
+    source->setObjectName("blcad.thread.source");
+    source->setProperty("blcad.restoreFocusAfterRebuild", true);
+    source->addItem("Custom parameters", "custom");
+    source->addItem("Pinned standard profile", "standard");
+    source->setCurrentIndex(thread_mapping ? 1 : 0);
+    form->addRow("Thread Profile Source", source);
+    QObject::connect(source, &QComboBox::currentIndexChanged, &owner,
+                     [this, was_standard = bool(standard)](int index) {
+                       if (index == 1) {
+                         thread_mapping = ThreadMappingDraft{};
+                         thread_mapping_pending = true;
+                         thread_mapping_error.reset();
+                         deferred_rebuild();
+                       } else if (!was_standard) {
+                         thread_mapping.reset();
+                         thread_mapping_pending = false;
+                         thread_mapping_error.reset();
+                         deferred_rebuild();
+                       } else if (thread_command(
+                                      [&](PartDocument part) {
+                                        return GuiThreadRecipeCommands::custom_profile(
+                                            std::move(part), edit.feature(),
+                                            fresh_thread_namespace(), parameter_values);
+                                      },
+                                      nullptr, true)) {
+                         thread_mapping.reset();
+                         thread_mapping_pending = false;
+                         thread_mapping_error.reset();
+                       }
+                     });
+    if (thread_mapping)
+      build_thread_mapping(form);
+    const auto optional = [&](const char* name, const QString& title, bool checked, auto changed) {
+      auto* input = new QCheckBox(title, form->parentWidget());
+      input->setObjectName(QString::fromLatin1(name));
+      input->setProperty("blcad.restoreFocusAfterRebuild", true);
+      input->setChecked(checked);
+      form->addRow(input);
+      QObject::connect(input, &QCheckBox::toggled, &owner, changed);
+    };
+    optional("blcad.thread.start.enabled", "Start offset (omitted = 0 mm)",
+             bool(definition->start()), [this](bool enabled) {
+               thread_command([&](PartDocument part) {
+                 return GuiThreadRecipeCommands::start_offset(std::move(part), edit.feature(),
+                                                              fresh_thread_namespace(), enabled,
+                                                              parameter_values);
+               });
+             });
+    if (!thread_mapping) {
+      const auto& profile = std::get<ThreadParameterProfile>(definition->profile());
+      optional("blcad.thread.taper.enabled", "Custom taper angle", bool(profile.taper_angle),
+               [this](bool enabled) {
+                 thread_command([&](PartDocument part) {
+                   return GuiThreadRecipeCommands::taper(std::move(part), edit.feature(),
+                                                         fresh_thread_namespace(), enabled,
+                                                         parameter_values);
+                 });
+               });
+    }
   }
   static std::optional<GuiHoleDimensionSlot> dimension_slot(const QString& path) {
     using R = GuiHoleDimensionRole;
@@ -942,35 +1670,36 @@ struct ShellFeatureEditTools::Impl {
               std::optional<BodyId> body;
               const auto* hole = part.find_hole_feature(edit.feature());
               if (index == int(GuiHoleExtentChoice::ToFace)) {
-                auto context = make_step_import_context(session);
-                if (!context)
-                  return Result<PartDocument>::failure(context.error());
-                auto targets = geometry::FinishingSelectionBuilder::build(
-                    *session.part_document(), *session.part_shape_cache(), hole->target_body(),
-                    PartFeatureInputRole::ShellRemovalFace, context.value().get());
-                if (!targets)
-                  return Result<PartDocument>::failure(targets.error());
-                for (const auto& target : targets.value())
-                  if (const auto* ref = std::get_if<FaceReference>(&target.reference))
-                    if (const auto* native = std::get_if<SemanticFaceReference>(&ref->source());
-                        native && native->face() == SemanticFace::Bottom) {
-                      auto limit = FaceReference::create_planar(PartFeatureInputRole::HoleLimitFace,
-                                                                *native);
-                      if (!limit)
-                        return Result<PartDocument>::failure(limit.error());
-                      face = std::move(limit.value());
-                      break;
-                    }
+                auto collected = collect_limit_faces();
+                if (!collected)
+                  return Result<PartDocument>::failure(collected.error());
+                const LimitFaceChoice* preferred = nullptr;
+                for (const auto& target : limit_faces) {
+                  if (!preferred)
+                    preferred = &target;
+                  if (const auto* native =
+                          std::get_if<SemanticFaceReference>(&target.reference.source());
+                      native && native->face() == SemanticFace::Bottom &&
+                      target.body == hole->target_body()) {
+                    preferred = &target;
+                    break;
+                  }
+                }
+                if (preferred)
+                  face = preferred->reference;
               }
               if (index == int(GuiHoleExtentChoice::UpToBody))
                 for (const auto& candidate : part.bodies())
-                  if (candidate.id() != hole->target_body() && body_available(candidate)) {
+                  if (candidate.id() != hole->target_body() && input_body_available(candidate)) {
                     body = candidate.id();
                     break;
                   }
-              return GuiHoleRecipeCommands::extent(std::move(part), edit.feature(),
-                                                   recipe_namespace, GuiHoleExtentChoice(index),
-                                                   face, body);
+              auto result =
+                  GuiHoleRecipeCommands::extent(std::move(part), edit.feature(), recipe_namespace,
+                                                GuiHoleExtentChoice(index), face, body);
+              if (result)
+                limit_chosen = true;
+              return result;
             });
           });
     } else if (key == "tip") {
@@ -984,6 +1713,9 @@ struct ShellFeatureEditTools::Impl {
     } else if (key == "thread") {
       add("blcad.hole.internal_thread", "Internal Thread", {"None", "Enabled"},
           record.contains("thread") ? 1 : 0, [this](int index) {
+            thread_mapping.reset();
+            thread_mapping_pending = false;
+            thread_mapping_error.reset();
             recipe_command([&](PartDocument part) {
               return GuiHoleRecipeCommands::internal_thread(std::move(part), edit.feature(),
                                                             recipe_namespace, index == 1);
@@ -993,20 +1725,24 @@ struct ShellFeatureEditTools::Impl {
   }
   void build_support_selector(QFormLayout* form) {
     auto* input = combo(form->parentWidget());
-    input->setObjectName("blcad.hole.support.choices");
+    const bool thread = edit.kind() == Kind::Thread;
+    input->setObjectName(thread ? "blcad.thread.support.choices" : "blcad.hole.support.choices");
     int selected = -1;
-    for (std::size_t i = 0; i < supports.size(); ++i) {
-      input->addItem(QString::fromStdString(supports[i].label),
-                     QString::fromStdString(supports[i].semantic_id));
-      if (support_chosen && support_override &&
-          plane_identity(*support_override) == plane_identity(supports[i].reference))
-        selected = int(i);
-    }
+    each_support([&](const auto& support) {
+      input->addItem(QString::fromStdString(support.label),
+                     QString::fromStdString(support.semantic_id));
+      if constexpr (std::is_same_v<std::decay_t<decltype(support)>, ThreadSupportChoice>) {
+        if (support_chosen && thread_support_id == support.semantic_id)
+          selected = input->count() - 1;
+      } else if (support_chosen && support_override &&
+                 plane_identity(*support_override) == plane_identity(support.reference))
+        selected = input->count() - 1;
+    });
     input->setCurrentIndex(selected);
     support_field = input;
     register_field(input, "/support");
     support_selector = new ShellPropertySelector(
-        "blcad.hole.support", "Support", *input, owner,
+        thread ? "blcad.thread.support" : "blcad.hole.support", "Support", *input, owner,
         [this](bool picked) {
           picking = picked ? Pick::Support : Pick::None;
           pick_mode();
@@ -1019,14 +1755,63 @@ struct ShellFeatureEditTools::Impl {
       if (building)
         return;
       picking = Pick::None;
-      support_chosen = index >= 0 && std::size_t(index) < supports.size();
-      if (support_chosen)
-        support_override = supports[index].reference;
-      else
-        support_override.reset();
+      support_chosen = choose_support(index);
       pick_mode();
       (void)preview();
     });
+  }
+  void build_limit_selector(QFormLayout* form, bool face) {
+    auto* input = combo(form->parentWidget());
+    input->setObjectName(face ? "blcad.hole.limit_face.choices" : "blcad.hole.limit_body.choices");
+    int selected = -1;
+    if (face) {
+      auto collected = collect_limit_faces();
+      if (!collected)
+        status->setText(QString::fromStdString(collected.error().message()));
+      for (const auto& choice : limit_faces) {
+        add_choice(input, choice.semantic_id, choice.label);
+        if (limit_chosen && choice.encoded == record.at("extent").at("face"))
+          selected = input->count() - 1;
+      }
+    } else
+      for (const auto& body : session.part_document()->bodies())
+        if (input_body_available(body) &&
+            body.id().value() != record.at("target_body").get<std::string>()) {
+          add_choice(input, body.id().value(), body.name());
+          if (limit_chosen &&
+              body.id().value() == record.at("extent").at("body").get<std::string>())
+            selected = input->count() - 1;
+        }
+    input->setCurrentIndex(selected);
+    limit_chosen = selected >= 0;
+    limit_field = input;
+    register_field(input, face ? "/extent/face" : "/extent/body");
+    limit_selector = new ShellPropertySelector(
+        face ? "blcad.hole.limit_face" : "blcad.hole.limit_body",
+        face ? "Limit Face" : "Limit Body", *input, owner,
+        [this, face](bool picked) {
+          picking = picked ? (face ? Pick::LimitFace : Pick::LimitBody) : Pick::None;
+          pick_mode();
+          if (!picked)
+            (void)preview();
+        },
+        form->parentWidget());
+    form->addRow(limit_selector);
+    QObject::connect(input, &QComboBox::currentIndexChanged, &owner,
+                     [this, face, input](int index) {
+                       if (building)
+                         return;
+                       picking = Pick::None;
+                       limit_chosen = index >= 0;
+                       if (limit_chosen) {
+                         if (face)
+                           record["extent"]["face"] = limit_faces.at(std::size_t(index)).encoded;
+                         else
+                           record["extent"]["body"] = input->currentData().toString().toStdString();
+                       }
+                       pick_mode();
+                       (void)preview();
+                     });
   }
   void build_fields(QFormLayout* form, const Json& object, const QString& prefix) {
     for (auto it = object.begin(); it != object.end(); ++it) {
@@ -1039,8 +1824,13 @@ struct ShellFeatureEditTools::Impl {
           (dimension_slot(prefix) || prefix == "/manufacturing" || prefix == "/extent" ||
            prefix == "/tip"))
         continue;
-      if (creating && prefix.isEmpty() && key == "support") {
+      if (input_selection() && prefix.isEmpty() && key == "support") {
         build_support_selector(form);
+        continue;
+      }
+      if (input_selection() && edit.kind() == Kind::Hole && prefix == "/extent" &&
+          (key == "face" || key == "body")) {
+        build_limit_selector(form, key == "face");
         continue;
       }
       std::optional<Json> optional_default;
@@ -1226,10 +2016,11 @@ struct ShellFeatureEditTools::Impl {
         }
         input->setCurrentIndex(selected);
         register_field(input, path);
-        if (creating && path == "/target_body") {
+        if (input_selection() && path == "/target_body") {
           target_field = input;
           target_selector = new ShellPropertySelector(
-              "blcad.hole.target", "Target Body", *input, owner,
+              edit.kind() == Kind::Thread ? "blcad.thread.target" : "blcad.hole.target",
+              "Target Body", *input, owner,
               [this](bool picked) {
                 picking = picked ? Pick::Body : Pick::None;
                 pick_mode();
@@ -1244,11 +2035,16 @@ struct ShellFeatureEditTools::Impl {
                        input);
         QObject::connect(input, &QComboBox::currentIndexChanged, &owner, [this, path, input] {
           value(path) = input->currentData().toString().toStdString();
-          if (creating && path == "/target_body") {
+          if (input_selection() && path == "/target_body") {
             picking = Pick::None;
             support_chosen = false;
             support_override.reset();
-            auto catalog = collect_supports(BodyId(value(path).get<std::string>()));
+            pending_support_plane.reset();
+            thread_support_override.reset();
+            thread_support_id.clear();
+            const BodyId body(value(path).get<std::string>());
+            auto catalog = edit.kind() == Kind::Thread ? collect_thread_supports(body)
+                                                       : collect_supports(body);
             support_error = catalog ? std::nullopt : std::optional(catalog.error());
             pick_mode();
             deferred_rebuild();
@@ -1315,8 +2111,8 @@ struct ShellFeatureEditTools::Impl {
     if (focus_id.isEmpty())
       focus_id = retained_focus_id();
     building = true;
-    target_field = support_field = nullptr;
-    target_selector = support_selector = nullptr;
+    target_field = support_field = limit_field = nullptr;
+    target_selector = support_selector = limit_selector = nullptr;
     const auto selected = dynamic->currentData();
     fields.clear();
     numbers.clear();
@@ -1332,6 +2128,8 @@ struct ShellFeatureEditTools::Impl {
       for (const auto* key : {"name", "placements", "target_body", "support", "direction", "kind",
                               "diameter", "manufacturing", "extent", "tip", "thread"}) {
         build_hole_modes(form, key);
+        if (std::string_view(key) == "thread" && record.contains(key))
+          build_thread_controls(form);
         if (record.contains(key))
           build_fields(form, Json{{key, record.at(key)}}, {});
       }
@@ -1347,6 +2145,7 @@ struct ShellFeatureEditTools::Impl {
     const int retained = dynamic->findData(selected);
     dynamic->setCurrentIndex(retained > 0 ? retained : dynamic->count() > 1 ? 1 : 0);
     building = false;
+    pick_mode();
     if (!focus_id.isEmpty())
       QTimer::singleShot(0, &owner, [this, focus_id, draft = recipe_namespace] {
         if (!edit.active() || recipe_namespace != draft || !scroll->widget())
@@ -1358,7 +2157,7 @@ struct ShellFeatureEditTools::Impl {
         }
       });
   }
-  GuiPartMutation parameter_updates(const PartDocument& decoded) const {
+  GuiPartMutation input_updates(const PartDocument& decoded) const {
     std::vector<Parameter> changes, added;
     const auto used = bound_parameters(record);
     for (const auto& p : decoded.parameters())
@@ -1369,7 +2168,19 @@ struct ShellFeatureEditTools::Impl {
       if (used.contains(id) && session.part_document()->find_parameter(ParameterId(id)))
         changes.push_back(*decoded.find_parameter(ParameterId(id)));
     }
-    return [changes, added](PartDocument& part) -> Result<std::size_t> {
+    std::optional<ResultFaceWorkplane> plane;
+    if (pending_support_plane && support_override)
+      if (const auto* selected = std::get_if<DatumPlaneId>(&support_override->source());
+          selected && *selected == pending_support_plane->id())
+        plane = pending_support_plane;
+    return [changes, added, plane](PartDocument& part) -> Result<std::size_t> {
+      std::size_t plane_count = 0;
+      if (plane && !part.find_result_face_workplane(plane->id())) {
+        auto inserted = part.add_result_face_workplane(*plane);
+        if (!inserted)
+          return inserted;
+        plane_count = inserted.value();
+      }
       for (const auto& p : added) {
         auto result = part.add_parameter(p);
         if (!result)
@@ -1380,17 +2191,21 @@ struct ShellFeatureEditTools::Impl {
         if (!set)
           return Result<std::size_t>::failure(set.error());
       }
-      return Result<std::size_t>::success(changes.size() + added.size());
+      return Result<std::size_t>::success(changes.size() + added.size() + plane_count);
     };
   }
-  Result<PartDocument> decode() const {
+  Result<PartDocument> decode(bool parameter_edits = true,
+                              bool canonical_thread_profile = false) const {
     Json root = source;
     root.at(collection).at(record_index) = record;
+    if (canonical_thread_profile && record.contains("thread"))
+      root.at(collection).at(record_index).at("thread").at("profile") =
+          source.at(collection).at(record_index).at("thread").at("profile");
     const auto used = bound_parameters(record);
     for (auto& p : root.at("parameters")) {
       const auto id = p.at("id").get<std::string>();
       if (auto found = parameter_values.find(id);
-          found != parameter_values.end() && used.contains(id))
+          parameter_edits && found != parameter_values.end() && used.contains(id))
         p["value"] = found->second;
     }
     return deserialize_part_document_from_json(root.dump());
@@ -1416,15 +2231,30 @@ struct ShellFeatureEditTools::Impl {
       return Result<std::size_t>::success(0);
     if (!fresh())
       return reject(error("Feature or document changed. Restart editing."));
-    if (creating) {
+    if (input_selection() && picking != Pick::None) {
+      apply->setEnabled(false);
+      another->setEnabled(false);
+      return Result<std::size_t>::success(0);
+    }
+    if (thread_mapping_pending)
+      return reject(thread_mapping_error.value_or(
+          error("Complete the pinned Thread revision, row and typed column mappings.")));
+    if (input_selection()) {
       const auto* body =
           session.part_document()->find_body(BodyId(record.at("target_body").get<std::string>()));
-      if (!body || !body_available(*body))
+      if (!body || !input_body_available(*body))
         return reject(error("Choose a current visible solid target."));
       if (support_error)
         return reject(*support_error);
       if (!support_chosen)
-        return reject(error("Choose a support plane or planar face."));
+        return reject(error(edit.kind() == Kind::Thread
+                                ? "Choose an exterior cylindrical or conical face."
+                                : "Choose a support plane or planar face."));
+      if (edit.kind() == Kind::Hole &&
+          (record.at("extent").at("kind") == "to_face" ||
+           record.at("extent").at("kind") == "up_to_body") &&
+          !limit_chosen)
+        return reject(error("Choose a current planar limit face or a distinct solid limit Body."));
       if (picking != Pick::None)
         return Result<std::size_t>::success(0);
     }
@@ -1442,7 +2272,7 @@ struct ShellFeatureEditTools::Impl {
           if (!selected)
             return Result<PartDocument>::failure(selected.error());
           return edit.candidate(session, std::move(selected.value()), updater,
-                                parameter_updates(decoded.value()));
+                                input_updates(decoded.value()));
         },
         creating);
     if (!candidate)
@@ -1496,7 +2326,7 @@ struct ShellFeatureEditTools::Impl {
         session.history_prefix_count()
             ? "Prefix preview valid. Apply stages this edit; finish End of Part to validate the "
               "complete model."
-        : creating ? "Hole preview valid. Apply creates the Hole and its required inputs."
+        : creating ? "Preview valid. Apply creates the feature and its required inputs."
                    : "Preview valid, including downstream features. Commit changes with Apply.");
     if (layer.active_handle_id().empty())
       publish_handle();
@@ -1551,13 +2381,19 @@ struct ShellFeatureEditTools::Impl {
                  : Result<std::size_t>::failure(error("Invalid Preview"));
   }
   void finish(bool applied) {
-    const bool restore_creation = creating && !applied && session.part_document() &&
+    thread_mapping.reset();
+    thread_mapping_pending = false;
+    thread_mapping_error.reset();
+    const bool restore_creation = input_selection() && !applied && session.part_document() &&
                                   session.model_revision() == entry_revision;
     const auto camera = entry_camera;
     const auto selection = entry_selection;
     const auto viewed = entry_viewport_selection;
-    const bool was_creating = creating;
+    const bool was_creating = input_selection();
     creating = false;
+    support_editing = false;
+    feature_input_cache.reset();
+    feature_input_prefix.reset();
     picking = Pick::None;
     edit.cancel();
     layer.cancel();
@@ -1584,7 +2420,13 @@ struct ShellFeatureEditTools::Impl {
     pending_parameters.clear();
     pending_focus_id.clear();
     supports.clear();
+    limit_faces.clear();
+    limit_chosen = true;
+    thread_supports.clear();
+    thread_support_override.reset();
+    thread_support_id.clear();
     support_override.reset();
+    pending_support_plane.reset();
     support_error.reset();
     another->hide();
     window.refresh();
@@ -1624,9 +2466,20 @@ ShellFeatureEditTools::ShellFeatureEditTools(ShellWindow& window, ShellRibbon& r
   impl_->hole_action->setToolTip(
       "Create a semantic Hole with stable positions, seats and optional internal threads.");
   apply_gui_action_icon(*impl_->hole_action);
-  ribbon.add_button(ribbon.add_group(model_tab, "Design"), impl_->hole_action);
+  auto* design = ribbon.add_group(model_tab, "Design");
+  ribbon.add_button(design, impl_->hole_action);
   connect(impl_->hole_action, &QAction::triggered, this, [this] {
     auto result = begin_new_hole();
+    if (!result)
+      impl_->window.report_error(result.error());
+  });
+  impl_->thread_action = new QAction("Thread", this);
+  impl_->thread_action->setObjectName("blcad.action.semantic_thread");
+  impl_->thread_action->setToolTip("Create a Thread on an exterior cylindrical or conical face.");
+  apply_gui_action_icon(*impl_->thread_action);
+  ribbon.add_button(design, impl_->thread_action);
+  connect(impl_->thread_action, &QAction::triggered, this, [this] {
+    auto result = begin_new_thread();
     if (!result)
       impl_->window.report_error(result.error());
   });
@@ -1662,11 +2515,22 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   if (!begun)
     return begun;
   p.creating = false;
+  p.limit_chosen = true;
+  p.support_editing = false;
+  p.feature_input_cache.reset();
+  p.feature_input_prefix.reset();
+  p.thread_mapping.reset();
+  p.thread_mapping_pending = false;
+  p.thread_mapping_error.reset();
   p.recipe_namespace =
       "hole.draft." + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
   p.pending_parameters.clear();
   p.supports.clear();
+  p.thread_supports.clear();
+  p.thread_support_override.reset();
+  p.thread_support_id.clear();
   p.support_override.reset();
+  p.pending_support_plane.reset();
   p.support_error.reset();
   p.picking = Impl::Pick::None;
   p.another->hide();
@@ -1702,14 +2566,30 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   }
   p.previous_mask = p.viewport.selection_filter_mask();
   p.previous_scope = p.viewport.selection_semantic_scope();
+  if (p.hole_thread()) {
+    p.entry_revision = p.session.model_revision();
+    p.entry_camera = p.viewport.camera_bookmark();
+    p.entry_selection = p.session.selection();
+    p.entry_viewport_selection = p.viewport.selected_semantic();
+  }
   p.viewport.set_selection_filter_mask(0);
+  auto scoped = p.prepare_support_editing();
+  if (!scoped) {
+    const auto failure = scoped.error();
+    p.finish(false);
+    return Result<std::size_t>::failure(failure);
+  }
   p.parameter_values.clear();
   p.array_templates.clear();
   p.dock->setWindowTitle(family(p.edit.kind()) + " Edit");
   p.dynamic->setVisible(!p.hole_thread());
   p.dynamic_label->setVisible(!p.hole_thread());
   p.guidance->setText(
-      p.hole_thread()
+      p.support_editing
+          ? "Picks use the model before this feature. Apply validates the complete downstream "
+            "model. "
+            "Shared parameters affect every use; formula values require an explicit rebind."
+      : p.hole_thread()
           ? "The preview checks downstream features. Shared parameters affect every use. "
             "Formula values follow their expressions; select another binding to rebind. "
             "Escape cancels editing."
@@ -1720,7 +2600,7 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   p.dock->show();
   p.dock->raise();
   auto preview = p.preview();
-  if (!preview) {
+  if (!preview && !p.support_editing) {
     const auto failure = preview.error();
     p.finish(false);
     return Result<std::size_t>::failure(failure);
@@ -1738,9 +2618,6 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
               "command or workflow."));
   }
   const auto& part = *p.session.part_document();
-  const auto source_text = serialize_part_document_to_json(part);
-  if (!source_text)
-    return Result<std::size_t>::failure(source_text.error());
   BodyId target("");
   for (const auto& body : part.bodies())
     if (p.body_available(body)) {
@@ -1772,6 +2649,7 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
       reference = selected.semantic_id;
   }
   std::optional<PlaneReference> support;
+  std::optional<ResultFaceWorkplane> pending_plane;
   if (reference) {
     for (const auto& body : part.bodies()) {
       if (!p.body_available(body) || (explicit_body && body.id() != target))
@@ -1783,6 +2661,7 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
         if (choice.semantic_id == *reference) {
           target = body.id();
           support = choice.reference;
+          pending_plane = choice.workplane;
           break;
         }
       if (support)
@@ -1790,7 +2669,7 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
     }
     if (!support)
       return Result<std::size_t>::failure(
-          error("Choose a supported native planar face or existing workplane."));
+          error("Choose a current planar face or resolvable workplane."));
   } else {
     auto catalog = p.collect_supports(target);
     if (!catalog)
@@ -1800,10 +2679,12 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
     return Result<std::size_t>::failure(error("No resolvable Hole support is available."));
   if (!support) {
     support = p.supports.front().reference;
+    pending_plane = p.supports.front().workplane;
     for (const auto& choice : p.supports)
       if (const auto* face = std::get_if<SemanticFaceReference>(&choice.reference.source());
           face && face->face() == SemanticFace::Top) {
         support = choice.reference;
+        pending_plane = choice.workplane;
         break;
       }
   }
@@ -1829,69 +2710,110 @@ Result<std::size_t> ShellFeatureEditTools::begin_new_hole() {
   if (!definition)
     return Result<std::size_t>::failure(definition.error());
   auto seed = part;
-  auto added = seed.add_parameter(parameter.value());
+  auto added = pending_plane ? seed.add_result_face_workplane(*pending_plane)
+                             : Result<std::size_t>::success(0);
+  if (added)
+    added = seed.add_parameter(parameter.value());
   if (added)
     added = seed.add_hole_feature(definition.value());
   if (!added)
     return added;
-  auto encoded = serialize_part_document_to_json(seed);
-  if (!encoded)
-    return Result<std::size_t>::failure(encoded.error());
-  auto begun = p.edit.begin_new_hole(p.session, id);
-  if (!begun)
-    return begun;
-  p.entry_revision = p.session.model_revision();
-  p.entry_camera = p.viewport.camera_bookmark();
-  p.entry_selection = p.session.selection();
-  p.entry_viewport_selection = p.viewport.selected_semantic();
-  p.previous_mask = p.viewport.selection_filter_mask();
-  p.previous_scope = p.viewport.selection_semantic_scope();
-  p.creating = true;
-  p.recipe_namespace =
-      "hole.draft." + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
-  p.picking = Impl::Pick::None;
+  p.thread_supports.clear();
+  p.thread_support_override.reset();
+  p.thread_support_id.clear();
   p.support_override = support;
-  p.support_chosen = true;
-  p.support_error.reset();
-  p.pending_parameters = {parameter.value()};
-  p.source_text = source_text.value();
-  p.source = Json::parse(encoded.value());
-  p.collection = "hole_features";
-  p.record_index = p.source.at(p.collection).size() - 1;
-  p.record = p.source.at(p.collection).at(p.record_index);
-  p.parameter_values.clear();
-  p.array_templates.clear();
-  if (!p.session.task().begin(task_id) || !p.session.task().begin_parameter_editing() ||
-      !p.session.task().show_preview()) {
-    p.edit.cancel();
-    p.creating = false;
-    p.pending_parameters.clear();
-    return Result<std::size_t>::failure(error("Could not start Hole task."));
+  p.pending_support_plane = pending_plane;
+  return p.start_creation(seed, id, Kind::Hole,
+                          "hole.draft." +
+                              QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString());
+}
+
+Result<std::size_t> ShellFeatureEditTools::begin_new_thread() {
+  auto& p = *impl_;
+  if (!p.can_create())
+    return Result<std::size_t>::failure(
+        error("Thread creation requires a complete editable Part with a visible solid and no "
+              "active command or workflow."));
+  const auto& part = *p.session.part_document();
+  std::optional<BodyId> requested_body;
+  std::optional<std::string> requested_face;
+  for (const auto& selected : p.session.selection().entries()) {
+    if (selected.kind == GuiSelectionKind::Body) {
+      bool found = false;
+      for (const auto& body : part.bodies())
+        if (selected.semantic_id == "body/" + body.id().value() && p.body_available(body)) {
+          requested_body = body.id();
+          found = true;
+          break;
+        }
+      if (!found)
+        return Result<std::size_t>::failure(error("Select a current visible solid target."));
+    } else if (selected.kind == GuiSelectionKind::Face || selected.kind == GuiSelectionKind::Datum)
+      requested_face = selected.semantic_id;
   }
-  p.dock->setWindowTitle("Create Hole");
-  p.dynamic->hide();
-  p.dynamic_label->hide();
-  p.another->show();
-  p.guidance->setText(
-      "Choose target and support, then edit local X/Y positions, recipe and dimensions. "
-      "Apply creates one Hole; Create Another opens a fresh draft.");
-  p.build_form();
-  p.pick_mode();
-  p.dock->show();
-  p.dock->raise();
-  (void)p.preview();
-  p.window.refresh();
-  return Result<std::size_t>::success(1);
+  std::optional<BodyId> target;
+  std::optional<Impl::ThreadSupportChoice> selected;
+  for (const auto& body : part.bodies()) {
+    if (!p.body_available(body) || (requested_body && *requested_body != body.id()))
+      continue;
+    auto catalog = p.collect_thread_supports(body.id());
+    if (!catalog)
+      return catalog;
+    for (const auto& choice : p.thread_supports)
+      if (!requested_face || choice.semantic_id == *requested_face) {
+        target = body.id();
+        selected = choice;
+        break;
+      }
+    if (selected)
+      break;
+  }
+  if (!selected)
+    return Result<std::size_t>::failure(
+        error("Choose a current exterior cylindrical or conical face on the target solid."));
+  const auto tag = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+  const FeatureId id("feature.thread." + tag);
+  const std::string draft = "thread.draft." + tag;
+  const auto& support = selected->geometry;
+  auto seed = GuiThreadRecipeCommands::create_external(
+      part, id, "Thread " + std::to_string(part.thread_features().size() + 1), *target,
+      selected->reference, draft, support.radius_mm, support.axial_length_mm,
+      support.taper_angle_deg, selected->direction);
+  if (!seed)
+    return Result<std::size_t>::failure(seed.error());
+  p.supports.clear();
+  p.support_override.reset();
+  p.pending_support_plane.reset();
+  p.thread_support_override = selected->reference;
+  p.thread_support_id = selected->semantic_id;
+  return p.start_creation(seed.value(), id, Kind::Thread, draft);
 }
 
 bool ShellFeatureEditTools::accept_selection(const GuiSelection& incoming) {
   auto& p = *impl_;
-  if (!p.creating || !active() || p.picking == Impl::Pick::None)
+  if (!p.input_selection() || !active() || p.picking == Impl::Pick::None)
     return false;
   const auto selected = incoming;
+  if ((p.picking == Impl::Pick::LimitFace || p.picking == Impl::Pick::LimitBody) && p.limit_field) {
+    const bool face = p.picking == Impl::Pick::LimitFace;
+    for (int i = 0; i < p.limit_field->count(); ++i) {
+      const auto value = p.limit_field->itemData(i).toString().toStdString();
+      const auto id = face ? value : p.body_selection_id(BodyId(value));
+      if (selected.semantic_id == id &&
+          selected.kind == (face ? GuiSelectionKind::Face : GuiSelectionKind::Body)) {
+        p.limit_field->setCurrentIndex(i);
+        p.limit_chosen = true;
+        p.picking = Impl::Pick::None;
+        p.pick_mode();
+        (void)p.preview();
+        return true;
+      }
+    }
+  }
   if (p.picking == Impl::Pick::Body && selected.kind == GuiSelectionKind::Body && p.target_field) {
     for (int i = 0; i < p.target_field->count(); ++i)
-      if (selected.semantic_id == "body/" + p.target_field->itemData(i).toString().toStdString()) {
+      if (selected.semantic_id ==
+          p.body_selection_id(BodyId(p.target_field->itemData(i).toString().toStdString()))) {
         const bool changed = i != p.target_field->currentIndex();
         p.target_field->setCurrentIndex(i);
         if (!changed) {
@@ -1903,13 +2825,12 @@ bool ShellFeatureEditTools::accept_selection(const GuiSelection& incoming) {
       }
   }
   if (p.picking == Impl::Pick::Support && p.support_field) {
-    for (std::size_t i = 0; i < p.supports.size(); ++i)
-      if (selected.semantic_id == p.supports[i].semantic_id &&
+    for (int i = 0; i < p.support_field->count(); ++i)
+      if (selected.semantic_id == p.support_field->itemData(i).toString().toStdString() &&
           (selected.kind == GuiSelectionKind::Face || selected.kind == GuiSelectionKind::Datum)) {
         const QSignalBlocker block(p.support_field);
-        p.support_field->setCurrentIndex(int(i));
-        p.support_override = p.supports[i].reference;
-        p.support_chosen = true;
+        p.support_field->setCurrentIndex(i);
+        p.support_chosen = p.choose_support(i);
         p.picking = Impl::Pick::None;
         p.pick_mode();
         (void)p.preview();
@@ -1922,7 +2843,7 @@ bool ShellFeatureEditTools::accept_selection(const GuiSelection& incoming) {
 Result<std::size_t> ShellFeatureEditTools::apply(bool create_another) {
   auto& p = *impl_;
   if (!p.fresh() || !p.layer.active_handle_id().empty() || p.picking != Impl::Pick::None ||
-      (create_another && !p.creating))
+      (create_another && (!p.creating || p.edit.kind() != Kind::Hole)))
     return Result<std::size_t>::failure(error("No current applicable feature edit"));
   auto preview = p.preview();
   if (!preview)
@@ -1937,11 +2858,12 @@ Result<std::size_t> ShellFeatureEditTools::apply(bool create_another) {
         if (!selected)
           return Result<std::size_t>::failure(selected.error());
         return p.edit.commit(p.session, std::move(selected.value()), updater,
-                             p.parameter_updates(decoded.value()));
+                             p.input_updates(decoded.value()));
       },
       p.creating);
   if (committed) {
-    const bool created_hole = p.creating;
+    const bool created_hole = p.creating && p.edit.kind() == Kind::Hole;
+    const bool created_thread = p.creating && p.edit.kind() == Kind::Thread;
     std::optional<double> repeated_diameter;
     std::optional<BodyId> repeated_target;
     if (p.creating) {
@@ -1956,6 +2878,8 @@ Result<std::size_t> ShellFeatureEditTools::apply(bool create_another) {
     p.finish(true);
     if (created_hole)
       p.window.remember_repeatable_command(*p.hole_action);
+    else if (created_thread)
+      p.window.remember_repeatable_command(*p.thread_action);
     if (create_another) {
       p.next_diameter = repeated_diameter;
       p.next_target = repeated_target;
@@ -1974,6 +2898,8 @@ void ShellFeatureEditTools::refresh() {
   auto& p = *impl_;
   if (p.hole_action)
     p.hole_action->setEnabled(p.can_create());
+  if (p.thread_action)
+    p.thread_action->setEnabled(p.can_create());
   if (!active())
     return;
   if (!p.fresh()) {

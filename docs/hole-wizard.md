@@ -458,9 +458,9 @@ The shared Hole panel adds Plain/Clearance intent and explicit Simple, Counterbo
 Spotface, Stepped, Fitted, Reamed, Center and Slot choices. The Slot transition starts from an existing
 arc-closed profile and keeps its typed profile selector; an unavailable profile is diagnosed. Blind,
 Through All, To Next, To Face, Up to Body and Symmetric choices use the existing extent definitions.
-The initial To Face limit is a current native bottom face; its existing typed reference fields remain
-editable. Up to Body begins with another visible solid. Scoped imported/result limit collection is
-still 157B2b. Flat/Conical tip transitions enforce the existing Blind-only cone contract.
+The initial To Face limit prefers a current native bottom face. Up to Body begins with another
+visible solid. Explicit scoped native/imported/result selectors are described below under 157B2b.
+Flat/Conical tip transitions enforce the existing Blind-only cone contract.
 
 `GuiHoleRecipeCommands` operates only on disposable Part clones through Core factories and update
 commands. The shell reseeds its form through the canonical serializer while retaining committed
@@ -492,6 +492,221 @@ Original native recipe captures: [ordinary](images/hole-recipe.png), 1280×800, 
 keyboard recipe changes, numeric seat input and mouse Apply. Tests assert focus retention, footer
 reachability and absence of horizontal form overflow. Numbered status and executed counts remain
 in `mvp-plan.md`.
+
+### Planar support collection — 157B2b
+
+Hole creation now collects current native, imported and result-origin planar faces on its visible
+solid target. Imported face selections are rebound explicitly as Plane-capable Hole support
+references to their captured catalog/entry. The same supplier-byte checks and authored Body
+placements apply to collection, preview and commit; labels disclose the current face center in mm.
+
+Result-origin faces must resolve as planar on the current cache. Their support workplane is a
+pending typed ResultFaceWorkplane, since the canonical Hole plane reference uses a DatumPlane ID.
+The candidate adds that record before the Hole. Only a workplane used by the final support is
+published, together with required dimensions and the Hole in one transaction. Recipe reseeding may
+carry pending records; changing support, Cancel and Save during preview never leak them into the
+committed Part. No sampled surface, topology index or viewer identity becomes persistent input.
+
+Focused proof is `[hole-support-shell]` / `[native-hole-support]`: imported translation and axis
+frames, supplier changes, pending/unused workplanes, exact history/reopen, and actual native model
+picks on a derived Hole bottom and placed imported top. Existing-support editing and explicit
+limit selection use the scoped input model described below.
+Original captures: [derived bottom](images/hole-derived-support.png), 1280×800, and
+[placed imported plane at compact 150%](images/hole-imported-support-compact.png), 1536×960.
+Native helpers reveal the scrolled controls and verify hit ownership and on-screen coordinates.
+
+### Exterior Thread support inspection — 157B2b
+
+The Geometry authoring query `ThreadAdapter::inspect_support` is read-only and requires an editable
+Part, a typed `ThreadSupportFace`, a solid target and a complete cache for the exact document.
+Existing-feature authoring can instead supply an explicitly matching history-prefix cache and
+count. An unqualified partial cache, mismatched prefix or downstream reference is rejected.
+It shares the execution resolver and producer-axis/seam rules, returning the entry origin, unit
+axis/seam, entry radius, finite axial span and signed taper in the selected direction. It rejects
+planar faces, another Body's faces and inward-facing bore walls. Reversing direction moves the
+origin to the other end and reverses the taper sign; the query does not create parameters or
+claim that a complete thread profile fits. Execution still checks the authored interval, material,
+breakout, overlap and representation limits. Imported support inspection checks supplier freshness.
+Inspection includes the current terminal Body transform. It has no authored consumer yet; resolving
+only a predecessor placement would lose an otherwise valid moved imported support.
+
+Independent `[thread-support-query]` / `[thread-import]` Geometry tests cover both directions,
+native rigid placement, imported cylinders/cones, radius/span/taper, stale caches, wrong targets,
+bore rejection and changed supplier bytes after initial resolution. Queries preserve exact Part
+intent, current BRep and supplier bytes. The full `[parity-b155]` regression protects execution
+after sharing the resolver. External creation uses this query below; complete Thread selectors
+remain assigned here.
+
+### External creation and new modeled templates — 157B2b
+
+Model → Design → Thread opens the shared property task for a complete editable Part. Choose a
+visible solid and a current exterior cylindrical/conical face. Native, imported and result-origin
+faces are explicitly rebound to `ThreadSupportFace` and filtered through Geometry inspection;
+planar and inward bore faces are excluded. Face/Body preselection is scoped to that catalog.
+Changing target clears the selected support and blocks Apply until a new support is chosen.
+Profile dimensions remain authored inputs; choosing another support never rewrites shared values.
+
+The disposable custom seed derives its major diameter and signed taper from the actual support.
+For radius `r` and axial span `s`, radial profile depth is `min(1 mm, r/5, s/8)`, included angle is
+60°, pitch is 1.5 times that depth and thread length is `min(4 mm, s)`. These are editable custom
+values with authored labels, without an inferred standard/tolerance. The pitch separates ideal-V
+flanks when the existing modeled limits permit execution. For a narrowing cone with signed radius
+slope `m < 0`, the initial length is also bounded by `(r - depth) / (-2*m)`, retaining a positive
+minor radius over the interval. An apical initial entry selects the inspected opposite direction
+with a positive entry radius. This seeds only new intent; support changes never rewrite an
+existing feature's authored direction or profile. Conical defaults remain cosmetic;
+modeled taper and tiny/otherwise unsupported profiles fail with the existing Geometry diagnostic.
+The new internal custom template also uses 1.5 mm pitch for its 1 mm radial depth, so its cylindrical
+modeled switch is valid. Existing definitions and their dimensional bindings are unchanged.
+
+Both creation kinds share the controller/task lifecycle and typed Core add commands. Required
+owned dimensions and the feature publish in one transaction; rebinding to an existing parameter
+prunes its unused draft counterpart. Invalid/corrected previews, supplier changes, Cancel and
+committed Save during preview retain the established contracts. Thread creation has an Apply
+footer and becomes the repeatable command after publication. Full configuration retention for
+Create Another remains assigned to 157B3; optional start/taper/source selectors and existing-support
+editing are described below.
+
+Focused proof is `[thread-create-shell]` / `[native-thread-create]`: pending ownership, dimensions,
+invalid correction/cancellation, target/support changes, imported placement/freshness, new internal
+and external modeled cuts, exact Undo/Redo/reopen and physical STEP roundtrip. Actual executed
+counts and delivery status remain in `mvp-plan.md`.
+
+Original native captures show [external creation](images/thread-creation.png) and
+[new modeled internal creation](images/thread-internal-creation.png) at 1280×800, plus
+[placed imported creation at compact 150%](images/thread-imported-creation-compact.png) at
+1536×960 physical pixels. The native tests use real scoped model picks, keyboard length/mode
+input and mouse Apply, assert no horizontal form overflow and replay exact history/reopening.
+Fit includes the current origin planes; these captures are unmodified.
+
+### Thread sources and optional intervals — 157B2b
+
+Internal and external Thread definitions share a Profile Source selector. A standard profile
+requires an explicit immutable table ID/revision, row and typed column for each system,
+designation, tolerance, major/minor diameter, pitch and included angle. A tapered profile adds an
+explicit Angle-column mapping. No column is guessed from its name or selected automatically.
+Changing the table clears row/columns; changing the row clears columns. Existing pins preload
+their persisted choices. Controls disclose keys, resolved values/units and cell provenance.
+
+Incomplete mappings are transient form state: they block preview/Apply while preserving the
+committed document and last canonical definition. A complete but invalid mapping retains its
+specific Core diagnostic and remains editable. Selecting Custom abandons an unfinished mapping:
+it retains the preceding custom definition or converts the preceding complete pin. Converting a
+complete pinned profile creates fresh owned
+dimensional parameters with the resolved values and authored labels; it retains length/start
+bindings, handedness and representation. It never overwrites another field's intentional binding
+to a formerly used profile parameter or changes a resource revision.
+
+Start offset is optional: omission means exactly zero, enabling it creates a positive 1 mm Length
+input. A custom taper toggle creates a signed Angle input initialized to 1°; straight/tapered
+compatibility still comes from the actual support and complete execution. Explicit zero taper is
+invalid; omission represents a cylinder. Unsupported modeled taper remains a diagnostic. Standard
+taper uses the mapped Angle column instead of a custom parameter.
+
+Typed commands apply numeric changes only to parameters used by the resulting Hole/Thread intent
+before the Core family update. Removing a start/taper also discards an invalid unused numeric
+draft without publishing it. Other explicitly shared bindings and expression ownership remain
+intact. Source controls remain available when current custom input is invalid; an explicit profile
+replacement discards superseded profile edits while retaining the remaining intent and used values.
+Required new inputs publish in the same final transaction, with unused draft roles pruned.
+When a complete mapping was rejected by Core because of another used numeric value or binding,
+correcting that input retries the same explicit mapping. It does not require changing an already
+selected column. Incomplete mappings still wait for their missing explicit choices.
+Focused `[thread-source-shell]` / `[native-thread-source]` proof covers typed mappings, invalid
+correction, revision changes, custom ownership, optional removal, history/reopen and a native
+mapped modeled cut. Whole-block status and executed counts remain in `mvp-plan.md`.
+
+Original mapped-profile previews: [100%](images/thread-standard-creation.png), 1280×800, and
+[compact 150%](images/thread-standard-creation-compact.png), 1536×960 physical pixels. The native
+fixture activates its window before keyboard input and asserts focus before/after selector rebuilds.
+The field values, units and current origin planes are unmodified captures.
+
+### Existing support editing — 157B2b
+
+Editing a Hole or Thread on a currently visible solid collects target and support choices from
+the exact executable history before that feature. The existing Geometry prefix evaluator and
+typed reference resolvers own this input model; no second feature interpreter is introduced.
+Later Bodies and the edited feature's own faces are excluded. Existing references remain unchanged
+until an explicit rebind, including native cylindrical Thread references whose selectable result
+counterpart has a different identity.
+
+During a model pick, the viewport shows that predecessor geometry with transient scoped Body,
+face and datum targets. Unique preview aliases avoid collisions with current presentation IDs;
+only typed Core references enter the candidate. A result-face Hole support owns a pending
+workplane in the same final transaction. Numeric preview and Apply still recompute the complete
+downstream model. Invalid inputs block Apply and remain available for correction. Cancel restores
+the entry camera, selection and pick scope while the entry revision remains current.
+
+Focused proof is `[hole-support-edit-shell]`, `[native-hole-support-edit]` and Geometry
+`[thread-support-prefix]`: reference preservation, explicit rebinding, downstream exclusion,
+used-only workplanes, independent physical frames/volumes, exact history/reopen and actual native
+predecessor picking. Hidden/consumed targets and active user history prefixes retain their existing
+numeric edit path; their extended support-selection lifecycle remains 157B3.
+
+Original native previews: [100%](images/hole-support-edit.png), 1280×800, and
+[compact 150%](images/hole-support-edit-compact.png), 1536×960 physical pixels. Both show the
+selected predecessor bottom, complete candidate, scrolled selectors and reachable Apply/Cancel.
+
+### Explicit Hole limits — 157B2b
+
+To Face exposes a required Limit Face selector and scoped model pick. It collects native planar,
+Plane-capable imported and planar result-origin faces from available visible solids in the input
+model. The persisted input is a `HoleLimitFace` with its native/imported/result identity. Imported
+limits retain Face capability; Plane capability is checked separately during collection. Result
+limits use a temporary checked plane only for inspection and create no persistent workplane.
+Core's existing typed extent command and serializer supply each face's canonical form.
+
+Up to Body exposes a required Limit Body selector and Body pick. It excludes the target and Bodies
+unavailable at the feature's input history. Changing target cannot silently keep it as its own
+limit; the remaining selector allows an explicit correction. Clearing either limit blocks Apply
+without publishing incomplete Core intent. Invalid parallel/behind/finite-footprint choices remain
+selectable and report the existing Geometry diagnostic, so another limit can correct the draft.
+Only the target is cut; the selected limit Body remains unchanged.
+
+The native target's bottom remains the initial To Face choice when available; otherwise the first
+collected plane seeds the editable choice. This seed does not promise a valid cut. Existing-feature
+limits use the same predecessor cache and picking lifecycle as support edits. Imported source
+freshness is checked during collection, preview and final Apply. Numeric edits are retained when
+switching the limit face. No limit picker introduces a new cut or persistence implementation.
+
+Focused proof: `[hole-limit-shell]` and `[native-hole-limit]` cover invalid/cleared correction,
+native/imported/result identity, placement and supplier changes, distinct limit Bodies, target
+changes, physical volumes, exact Undo/Redo/reopen and actual native planar model picks.
+`[native-hole-body-limit]` additionally picks the actual separate Solid with the target excluded,
+then checks its unchanged volume and the target's independently known termination depth.
+The original [separate Body-limit preview at 100%](images/hole-body-limit.png), 1280×800,
+shows the actual picked Solid, target cut and reachable footer.
+Original captures show [a native bottom limit at 100%](images/hole-native-limit.png), 1280×800,
+and [a placed imported limit at compact 150%](images/hole-imported-limit-compact.png), 1536×960
+physical pixels, with scrolled limit selectors and pinned Apply/Create Another/Cancel.
+
+### Conical Thread combinations — 157B2b
+
+Thread dimensions use nine decimal places in the numeric editor, sufficient for the existing
+`1e-7` support/profile checks when a conical start requires a nonintegral diameter or taper angle.
+Native rectangle/line-profile Revolve supplies [authored source-edge roots](part-revolve-geometry-mvp6.md#selectable-polygon-profile-face-origins)
+through the existing result-face lineage, so its analytic cone can be selected without importing
+it or capturing a topology index.
+Profile diameters describe the actual thread start, not the support's end. A start offset or
+direction change therefore requires explicitly authored matching major/minor diameters and signed
+taper; the panel reports incompatibility and keeps correction controls available. A reverse
+direction reverses taper sign and moves the support entry to the opposite end. Modeled conical
+intent remains rejected; returning to Cosmetic restores a valid unchanged solid when the profile
+and interval fit.
+
+`[thread-cone-shell]` checks both apex orientations, native and placed imported supports, bounded
+positive seeds, pinned taper/custom conversion, corrected start/direction and a complete rejected
+mapping retried after length correction. Native `[native-thread-cone]` uses actual keyboard/mouse
+controls, asserts focus after bounded window activation, corrects an invalid interval/profile and
+unsupported modeled choice, then verifies exact history/reopen and physical STEP volume. Existing
+placed imported Hole/Thread support edits additionally exercise the qualified predecessor context.
+The native mapped-profile fixture also corrects a rejected length through keyboard input and
+asserts focus on the rebuilt numeric field before continuing to modeled Apply.
+Source proof: [current shell tests](../tests/gui/gui_shell_hole_thread_edit_tests.cpp) and
+[independent Geometry roots/frames](../tests/geometry/thread_feature_geometry_tests.cpp).
+Original [compact conical preview](images/thread-conical-compact.png), 1536×960 physical pixels,
+shows the signed nine-decimal taper, Cosmetic representation and reachable Apply/Cancel. Fit All
+includes the origin plane; the small conical Body and its illustrative Thread graphics are unedited.
 
 ## Why more than a cut
 

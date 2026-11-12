@@ -258,7 +258,7 @@ Result<PartDocument> GuiHoleRecipeCommands::internal_thread(PartDocument part, F
                                                         "Authored",
                                                         dims.add("thread.major", minor + 2),
                                                         dims.add("thread.minor", minor),
-                                                        dims.add("thread.pitch", 1),
+                                                        dims.add("thread.pitch", 1.5),
                                                         dims.add("thread.angle", 60, true),
                                                         {}},
                                  dims.add("thread.length", 4));

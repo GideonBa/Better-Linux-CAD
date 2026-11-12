@@ -102,6 +102,7 @@
     "blcad.action.save": "save",
     "blcad.action.save_as": "save",
     "blcad.action.semantic_hole": "circle",
+    "blcad.action.semantic_thread": "circle",
     "blcad.action.undo": "undo",
     "blcad.action.view_home": "home"
   },

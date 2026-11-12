@@ -2,16 +2,26 @@
 #include "../support/hole_pattern_fixture.hpp"
 #include "../support/thread_feature_fixture.hpp"
 #include "blcad/core/hole_instance_reference.hpp"
+#include "blcad/core/step_import_freshness.hpp"
 #include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/hole_instance_geometry.hpp"
+#include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/step_editable_commands.hpp"
+#include "blcad/geometry/step_exporter.hpp"
+#include "blcad/geometry/step_import_reader.hpp"
+#include "blcad/geometry/step_import_topology.hpp"
+#include "blcad/geometry/thread_adapter.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_history_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDir>
 #include <QDoubleSpinBox>
+#include <QEventLoop>
+#include <QFile>
 #include <QGroupBox>
 #include <QKeyEvent>
 #include <QLabel>
@@ -21,7 +31,9 @@
 #include <QScreen>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QStatusBar>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <catch2/catch_approx.hpp>
@@ -43,6 +55,26 @@ template <class T> T checked(Result<T> result) {
 void settle() {
   for (int i = 0; i < 5; ++i)
     qApp->processEvents();
+}
+void activate(ShellWindow& w) {
+  w.raise();
+  w.activateWindow();
+  QGuiApplication::sync();
+  settle();
+  if (!w.isActiveWindow()) {
+    QEventLoop activation;
+    QTimer poll, deadline;
+    deadline.setSingleShot(true);
+    QObject::connect(&poll, &QTimer::timeout, &activation, [&] {
+      if (w.isActiveWindow())
+        activation.quit();
+    });
+    QObject::connect(&deadline, &QTimer::timeout, &activation, &QEventLoop::quit);
+    poll.start(5);
+    deadline.start(2000);
+    activation.exec();
+  }
+  REQUIRE(w.isActiveWindow());
 }
 template <class T> T& control(ShellWindow& w, const char* name) {
   auto* found = w.findChild<T*>(QString::fromLatin1(name));
@@ -130,6 +162,8 @@ void rename(ShellWindow& w) {
 void click_at(QWidget& widget, QPointF point) {
   REQUIRE(widget.isVisible());
   REQUIRE(widget.isEnabled());
+  REQUIRE(widget.rect().contains(point.toPoint()));
+  REQUIRE(widget.screen()->availableGeometry().contains(widget.mapToGlobal(point.toPoint())));
   for (auto type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
     QMouseEvent event(type, point, widget.mapToGlobal(point.toPoint()), Qt::LeftButton,
                       type == QEvent::MouseButtonPress ? Qt::LeftButton : Qt::NoButton,
@@ -139,6 +173,17 @@ void click_at(QWidget& widget, QPointF point) {
   }
 }
 void click(QWidget& widget) {
+  for (auto* parent = widget.parentWidget(); parent; parent = parent->parentWidget())
+    if (auto* scroll = qobject_cast<QScrollArea*>(parent))
+      scroll->ensureWidgetVisible(&widget);
+  settle();
+  const auto point = widget.rect().center();
+  auto* window = widget.window();
+  const auto local = widget.mapTo(window, point);
+  REQUIRE(window->rect().contains(local));
+  auto* hit = window->childAt(local);
+  INFO(widget.objectName().toStdString());
+  REQUIRE((hit == &widget || (hit && widget.isAncestorOf(hit))));
   click_at(widget, widget.rect().center());
 }
 void key(QWidget& widget, int code, const QString& text = {}) {
@@ -160,6 +205,117 @@ PartDocument plate() {
   REQUIRE(p.remove_hole_feature(FeatureId("holes")));
   return p;
 }
+PartDocument imported_shape(QTemporaryDir& dir, const geometry::GeometryShape& shape, bool posed) {
+  REQUIRE(dir.isValid());
+  const auto root = std::filesystem::path(dir.path().toStdString());
+  REQUIRE(geometry::StepExporter{}.write_step(shape, (root / "supplier.step").string()));
+  const auto asset = checked(inspect_step_import_asset(root, "supplier.step"));
+  REQUIRE(asset.observed_sha256_digest());
+  const auto source = checked(
+      StepImportSource::create(StepImportSourceId("supplier"), "Supplier", "supplier.step",
+                               *asset.observed_sha256_digest(), StepImportMode::EditableBody));
+  const auto imported = checked(geometry::StepImportReader{}.read(source, root));
+  const auto catalog = checked(geometry::StepImportTopology{}.create_catalog(
+      ImportedTopologyCatalogId("catalog"), imported, 0));
+  auto part = checked(geometry::StepEditableCommands{}.create_definition(
+      source, catalog, DocumentId("import.hole"), "Imported plate", FeatureId("import.base"),
+      root));
+  if (posed)
+    REQUIRE(part.add_body_transform(checked(BodyTransform::create_translate(
+        BodyTransformId("pose"), part.bodies().front().id(), BodyTransformCoordinateSpace::World,
+        {}, {12, -5, 10}, false, false))));
+  return part;
+}
+PartDocument imported_plate(QTemporaryDir& dir, bool posed = false) {
+  const auto shape = checked(geometry::RectangleExtrusionAdapter{}.make_extruded_rectangle(
+      checked(Quantity::length_mm(80)), checked(Quantity::length_mm(60)),
+      checked(Quantity::length_mm(8))));
+  return imported_shape(dir, shape, posed);
+}
+PartDocument imported_shaft(QTemporaryDir& dir, bool posed = false) {
+  const auto part = threads::pair_part();
+  auto cache = checked(geometry::ShapeCache::create(ShapeCacheId("shaft.supplier")));
+  REQUIRE(geometry::GeometryRecomputeExecutor{}.execute_document(part, cache));
+  const auto* shape = cache.find_body_shape(BodyId("body.shaft"));
+  REQUIRE(shape);
+  return imported_shape(dir, *shape, posed);
+}
+PartDocument conical_part(double first_radius, double last_radius, double height = 2) {
+  auto part = checked(PartDocument::create(DocumentId("cone"), "Conical shaft"));
+  REQUIRE(part.add_datum_plane(checked(DatumPlane::xy())));
+  REQUIRE(part.add_datum_axis(
+      checked(DatumAxis::create_explicit(DatumAxisId("cone.axis"), "Cone axis", {}, {0, 1, 0}))));
+  auto sketch =
+      checked(Sketch::create(SketchId("cone.profile"), "Cone profile", DatumPlaneId("datum.xy")));
+  std::vector<Point2> points{{0, 0}};
+  if (first_radius > 0)
+    points.push_back({first_radius, 0});
+  points.push_back({last_radius, height});
+  if (last_radius > 0)
+    points.push_back({0, height});
+  std::vector<SketchEntityId> edges;
+  for (std::size_t i = 0; i < points.size(); ++i) {
+    edges.emplace_back("edge." + std::to_string(i));
+    REQUIRE(sketch.add_entity(
+        checked(LineSegment::create(edges.back(), points[i], points[(i + 1) % points.size()]))));
+  }
+  REQUIRE(sketch.add_profile(checked(ClosedProfile::create(ProfileId("cone.region"), edges))));
+  REQUIRE(part.add_sketch(std::move(sketch)));
+  const auto body = blcad::test::history_fixture::new_body(part, "cone");
+  REQUIRE(part.add_revolve_feature(checked(RevolveFeature::create_revolve(
+      FeatureId("cone"), "Conical shaft",
+      checked(ProfileRegionReference::create(SketchId("cone.profile"), ProfileId("cone.region"),
+                                             PartFeatureInputRole::RevolveProfile)),
+      checked(AxisReference::create_datum_axis(PartFeatureInputRole::RevolveAxis,
+                                               DatumAxisId("cone.axis"))),
+      RevolveAngleExtent::full(), body))));
+  return part;
+}
+std::string imported_top(const PartDocument& part) {
+  const auto& catalog = part.imported_topology_catalogs().front();
+  for (const auto& entry : catalog.entries())
+    if (entry.descriptor.kind == ImportedTopologyKind::Face &&
+        std::abs(entry.descriptor.bounds_mm[2] - 8) < 1e-5 &&
+        std::abs(entry.descriptor.bounds_mm[5] - 8) < 1e-5) {
+      const auto ref = checked(ImportedTopologyReference::create(catalog.id(), entry.id,
+                                                                 ImportedTopologyCapability::Face));
+      return "finishing/" + checked(make_imported_topology_target_spelling(ref));
+    }
+  FAIL("No imported top face");
+  return {};
+}
+std::string imported_bottom(const PartDocument& part) {
+  const auto& catalog = part.imported_topology_catalogs().front();
+  for (const auto& entry : catalog.entries())
+    if (entry.descriptor.kind == ImportedTopologyKind::Face &&
+        std::abs(entry.descriptor.bounds_mm[2]) < 1e-5 &&
+        std::abs(entry.descriptor.bounds_mm[5]) < 1e-5) {
+      const auto ref = checked(ImportedTopologyReference::create(catalog.id(), entry.id,
+                                                                 ImportedTopologyCapability::Face));
+      return "finishing/" + checked(make_imported_topology_target_spelling(ref));
+    }
+  FAIL("No imported bottom face");
+  return {};
+}
+void choose_support(ShellWindow& w, const std::string& semantic) {
+  auto& support = field<QComboBox>(w, "/support");
+  const int index = support.findData(QString::fromStdString(semantic));
+  REQUIRE(index >= 0);
+  support.setCurrentIndex(index);
+  settle();
+}
+std::string hole_bottom(ShellWindow& w) {
+  const auto faces = checked(geometry::FinishingSelectionBuilder::build(
+      *w.session().part_document(), *w.session().part_shape_cache(), BodyId("body.base"),
+      PartFeatureInputRole::ShellRemovalFace));
+  for (const auto& face : faces)
+    if (const auto* ref = std::get_if<FaceReference>(&face.reference))
+      if (const auto* result = std::get_if<ResultFaceReference>(&ref->source());
+          result && result->origins().front().role.ends_with("/bottom"))
+        return face.semantic_id;
+  FAIL("No Hole bottom");
+  return {};
+}
 void create_hole(ShellWindow& w) {
   auto& action = control<QAction>(w, "blcad.action.semantic_hole");
   REQUIRE(action.isEnabled());
@@ -169,9 +325,65 @@ void create_hole(ShellWindow& w) {
   REQUIRE(w.feature_edit_tools().active());
   REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
 }
+void create_thread(ShellWindow& w) {
+  auto& action = control<QAction>(w, "blcad.action.semantic_thread");
+  REQUIRE(action.isEnabled());
+  CHECK_FALSE(action.icon().isNull());
+  action.trigger();
+  settle();
+  INFO(w.statusBar()->currentMessage().toStdString());
+  REQUIRE(w.feature_edit_tools().active());
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+}
 void choose_hole_mode(ShellWindow& w, const char* name, int index) {
   control<QComboBox>(w, name).setCurrentIndex(index);
   settle();
+}
+void thread_choice(ShellWindow& w, const char* name, const QVariant& value, bool native = false) {
+  INFO(name);
+  auto& initial = control<QComboBox>(w, name);
+  const int target = initial.findData(value);
+  REQUIRE(target >= 0);
+  if (!native) {
+    initial.setCurrentIndex(target);
+    settle();
+    return;
+  }
+  const int attempts_limit = initial.count() + 1;
+  for (int attempts = 0; attempts < attempts_limit; ++attempts) {
+    auto& current = control<QComboBox>(w, name);
+    if (current.currentIndex() == target)
+      return;
+    control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&current);
+    current.setFocus();
+    REQUIRE(current.hasFocus());
+    key(current, current.currentIndex() < target ? Qt::Key_Down : Qt::Key_Up);
+    REQUIRE(control<QComboBox>(w, name).hasFocus());
+  }
+  FAIL("Thread selector did not reach its explicit choice");
+}
+void thread_mapping(ShellWindow& w, const char* revision = "r1", bool native = false,
+                    bool invalid_major = false) {
+  thread_choice(w, "blcad.thread.source", "standard", native);
+  REQUIRE_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  thread_choice(w, "blcad.thread.standard.table",
+                QStringList{"synthetic.threads", QString::fromLatin1(revision)}, native);
+  thread_choice(w, "blcad.thread.standard.row", "synthetic.row", native);
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.major_diameter").findData("angle") == -1);
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.included_angle").findData("major") == -1);
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.system").findData("pitch") == -1);
+  for (const auto& [field, column] : {std::pair{"system", "system"},
+                                      {"designation", "designation"},
+                                      {"tolerance", "tolerance"},
+                                      {"major_diameter", invalid_major ? "minor" : "major"},
+                                      {"minor_diameter", "minor"},
+                                      {"pitch", "pitch"},
+                                      {"included_angle", "angle"}}) {
+    const auto name = "blcad.thread.standard." + std::string(field);
+    REQUIRE(control<QComboBox>(w, name.c_str()).currentIndex() == 0);
+    thread_choice(w, name.c_str(), QString::fromLatin1(column), native);
+  }
 }
 } // namespace
 
@@ -986,5 +1198,1426 @@ TEST_CASE("Returning to a custom seat preserves a dimension deliberately shared 
   REQUIRE(w.feature_edit_tools().apply());
   CHECK(w.session().part_document()->parameters().size() == p.parameters().size() + 3);
   CHECK(volume(w) == Catch::Approx(38400 - 23 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Hole creation binds a current imported plane through authored Body placement",
+          "[gui][parity-b157][hole-support-shell]") {
+  const bool posed = GENERATE(false, true);
+  QTemporaryDir dir;
+  auto p = imported_plate(dir, posed);
+  const auto top = imported_top(p);
+  const auto body = p.bodies().front().id().value();
+  ShellWindow w;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  REQUIRE(w.feature_edit_tools().begin_new_hole());
+  choose_support(w, top);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& part = *w.session().part_document();
+  const auto& hole = part.hole_features().front();
+  REQUIRE(std::holds_alternative<ImportedTopologyReference>(hole.support().source()));
+  CHECK(std::get<ImportedTopologyReference>(hole.support().source()).capability() ==
+        ImportedTopologyCapability::Plane);
+  CHECK(hole.support().role() == PartFeatureInputRole::HoleSupportPlane);
+  CHECK(part.result_face_workplane_count() == 0);
+  CHECK(volume(w, body.c_str()) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  auto axis = checked(HoleInstanceReference::create(hole.id(), hole.placements().front().id,
+                                                    HoleReferenceRole::Axis));
+  auto frame =
+      checked(geometry::HoleInstanceGeometry::resolve(part, axis, *w.session().part_shape_cache()));
+  CHECK(frame.frame.origin.x == Catch::Approx(posed ? 12 : 0).margin(1e-6));
+  CHECK(frame.frame.origin.y == Catch::Approx(posed ? -5 : 0).margin(1e-6));
+  CHECK(frame.frame.origin.z == Catch::Approx(posed ? 18 : 8).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("A changed supplier asset cannot publish a pending Hole or its dimensions",
+          "[gui][parity-b157][hole-support-shell]") {
+  QTemporaryDir dir;
+  auto p = imported_plate(dir);
+  ShellWindow w;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  const auto undo = std::string(w.session().undo_label());
+  REQUIRE(w.feature_edit_tools().begin_new_hole());
+  choose_support(w, imported_top(p));
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  QFile asset(dir.filePath("supplier.step"));
+  REQUIRE(asset.open(QIODevice::ReadOnly));
+  const auto bytes = asset.readAll();
+  asset.close();
+  REQUIRE(asset.open(QIODevice::WriteOnly | QIODevice::Truncate));
+  REQUIRE(asset.write("changed supplier bytes") > 0);
+  asset.close();
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  CHECK(snapshot(w) == before);
+  CHECK(w.session().undo_label() == undo);
+  CHECK_FALSE(w.session().dirty());
+  CHECK_FALSE(w.viewport().feature_preview_active());
+  w.feature_edit_tools().cancel();
+  REQUIRE(asset.open(QIODevice::WriteOnly | QIODevice::Truncate));
+  REQUIRE(asset.write(bytes) == bytes.size());
+  asset.close();
+}
+
+TEST_CASE("A derived Hole support workplane is pending until its single atomic publication",
+          "[gui][parity-b157][hole-support-shell]") {
+  const bool commit = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, holes::part(false, false));
+  const auto before = snapshot(w);
+  const auto bottom = hole_bottom(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(1);
+  choose_support(w, bottom);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(w.session().part_document()->result_face_workplane_count() == 0);
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.save_to(dir.filePath("support-preview.blcad.json")));
+  GuiDocumentSession saved;
+  REQUIRE(saved.open_file(w.session().file_path()));
+  CHECK(checked(serialize_part_document_to_json(*saved.part_document())) == before);
+  if (!commit) {
+    w.feature_edit_tools().cancel();
+    CHECK(snapshot(w) == before);
+    CHECK_FALSE(w.session().can_undo());
+    return;
+  }
+  REQUIRE(w.feature_edit_tools().apply());
+  REQUIRE(w.session().part_document()->result_face_workplane_count() == 1);
+  const auto& plane = w.session().part_document()->result_face_workplanes().front();
+  const auto& hole = w.session().part_document()->hole_features().back();
+  CHECK(std::get<DatumPlaneId>(hole.support().source()) == plane.id());
+  CHECK(plane.reference().origins().front().role.ends_with("/bottom"));
+  CHECK(volume(w) == Catch::Approx(38400 - 14 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Changing a pending result support prunes its workplane even after a recipe transition",
+          "[gui][parity-b157][hole-support-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, holes::part(false, false));
+  const auto before = snapshot(w);
+  const auto bottom = hole_bottom(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(1);
+  choose_support(w, bottom);
+  choose_hole_mode(w, "blcad.hole.recipe", 1);
+  choose_support(w, "finishing/face/4:base/top");
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(w.session().part_document()->result_face_workplane_count() == 0);
+  CHECK(volume(w) == Catch::Approx(38400 - 27.5 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Native Hole creation picks a bounded derived bottom and publishes only its used workplane",
+    "[gui][parity-b157][hole-support-shell][native-hole-support]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires actual derived support picking");
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, holes::part(false, false));
+  const auto before = snapshot(w);
+  const auto bottom = hole_bottom(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(1);
+  w.viewport().set_standard_view(GuiStandardView::Top);
+  settle();
+  click(control<QToolButton>(w, "blcad.hole.support.pick"));
+  const auto point = checked(w.viewport().model_to_screen({-20, -15, 2}));
+  click_at(w.viewport(), {point.x, point.y});
+  CHECK(field<QComboBox>(w, "/support").currentData().toString().toStdString() == bottom);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll")
+            .horizontalScrollBar()
+            ->maximum() == 0);
+  capture(w, "hole-derived-support-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  CHECK(w.session().part_document()->result_face_workplane_count() == 1);
+  CHECK(volume(w) == Catch::Approx(38400 - 14 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native Hole creation picks the actual placed imported face with a typed plane binding",
+          "[gui][parity-b157][hole-support-shell][native-hole-support]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires actual imported support picking");
+  QTemporaryDir dir;
+  auto p = imported_plate(dir, true);
+  const auto body = p.bodies().front().id().value();
+  const auto top = imported_top(p);
+  ShellWindow w;
+  open(w, dir, p);
+  const auto before = snapshot(w);
+  REQUIRE(w.feature_edit_tools().begin_new_hole());
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  w.viewport().set_standard_view(GuiStandardView::Top);
+  settle();
+  click(control<QToolButton>(w, "blcad.hole.support.pick"));
+  const auto point = checked(w.viewport().model_to_screen({20, 1, 18}));
+  click_at(w.viewport(), {point.x, point.y});
+  CHECK(field<QComboBox>(w, "/support").currentData().toString().toStdString() == top);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "hole-imported-support-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  REQUIRE(w.session().part_document()->hole_features().size() == 1);
+  const auto& reference = std::get<ImportedTopologyReference>(
+      w.session().part_document()->hole_features().front().support().source());
+  CHECK(reference.capability() == ImportedTopologyCapability::Plane);
+  CHECK(w.session().part_document()->result_face_workplane_count() == 0);
+  CHECK(volume(w, body.c_str()) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("External Thread creation publishes only its used custom inputs in one transaction",
+          "[gui][parity-b157][thread-create-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = threads::pair_part();
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_thread(w);
+  CHECK(field<QComboBox>(w, "/target_body").currentData() == "body.shaft");
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/major_diameter").value() == 10);
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/minor_diameter").value() == 8);
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/pitch").value() == 1.5);
+  CHECK(snapshot(w) == before);
+  const auto during = dir.filePath("thread-preview.blcad.json");
+  REQUIRE(w.save_to(during));
+  GuiDocumentSession saved;
+  REQUIRE(saved.open_file(during.toStdString()));
+  CHECK(checked(serialize_part_document_to_json(*saved.part_document())) == before);
+  // Rebinding to an existing parameter must prune the unused owned length.
+  auto& binding = control<QComboBox>(w, "blcad.feature_edit.binding/thread/length");
+  binding.setCurrentIndex(binding.findData("thread.length"));
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  REQUIRE(result.thread_features().size() == 1);
+  const auto& thread = result.thread_features().front();
+  CHECK(thread.target_body() == BodyId("body.shaft"));
+  CHECK(thread.support().role() == PartFeatureInputRole::ThreadSupportFace);
+  CHECK(thread.thread().length() == ParameterId("thread.length"));
+  CHECK_FALSE(thread.thread().start());
+  CHECK(result.parameters().size() == part.parameters().size() + 4);
+  CHECK(result.sketches().size() == part.sketches().size());
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  CHECK(volume(w) == Catch::Approx(2560).margin(1e-6));
+  REQUIRE(checked(geometry::ThreadAdapter::cosmetic_presentations(
+                      *w.session().part_shape_cache()->find_body_shape(BodyId("body.shaft"))))
+              .size() == 1);
+  CHECK(w.session().undo_label() == "Create Thread");
+  replay(w, dir, before);
+}
+
+TEST_CASE("A new external Thread switches to modeled geometry and exports its physical cut",
+          "[gui][parity-b157][thread-create-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part());
+  const auto before = snapshot(w);
+  create_thread(w);
+  auto& mode = field<QComboBox>(w, "/thread/representation");
+  mode.setCurrentIndex(mode.findData("modeled"));
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const double removed =
+      4 * std::numbers::pi * std::tan(std::numbers::pi / 6) * 4 / 1.5 * (4. / 2 + 1. / 3);
+  const double expected = 200 * std::numbers::pi - removed;
+  CHECK(volume(w, "body.shaft") == Catch::Approx(expected).margin(2e-4));
+  const auto root = std::filesystem::path(dir.path().toStdString());
+  REQUIRE(geometry::StepExporter{}.write_part_step(
+      *w.session().part_document(), *w.session().part_shape_cache(), root / "modeled.step"));
+  const auto asset = checked(inspect_step_import_asset(root, "modeled.step"));
+  const auto source = checked(
+      StepImportSource::create(StepImportSourceId("roundtrip"), "Thread roundtrip", "modeled.step",
+                               *asset.observed_sha256_digest(), StepImportMode::EditableBody));
+  const auto imported = checked(geometry::StepImportReader{}.read(source, root));
+  REQUIRE(imported.body_count() == 2);
+  double total = 0;
+  for (const auto& product : imported.products)
+    for (const auto& body : product.bodies)
+      total += body.volume_mm3;
+  CHECK(total == Catch::Approx(2560 + expected).margin(2e-4));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Invalid external Thread creation restores the consumed context without leaking inputs",
+          "[gui][parity-b157][thread-create-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part());
+  REQUIRE(w.session().selection().add({GuiSelectionKind::Body, "body/body.shaft"}));
+  REQUIRE(w.viewport().select_semantic("body/body.shaft"));
+  const auto before = snapshot(w);
+  const auto mask = w.viewport().selection_filter_mask();
+  const auto scope = w.viewport().selection_semantic_scope();
+  create_thread(w);
+  field<QDoubleSpinBox>(w, "/thread/profile/major_diameter").setValue(20);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  CHECK(w.viewport().feature_preview_count() == 0);
+  field<QDoubleSpinBox>(w, "/thread/profile/major_diameter").setValue(10);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  w.feature_edit_tools().cancel();
+  CHECK(snapshot(w) == before);
+  CHECK_FALSE(w.session().dirty());
+  CHECK(w.viewport().selection_filter_mask() == mask);
+  CHECK(w.viewport().selection_semantic_scope() == scope);
+  REQUIRE(w.session().selection().entries().size() == 1);
+  CHECK(w.session().selection().entries().front().semantic_id == "body/body.shaft");
+  REQUIRE(w.session().selection().add({GuiSelectionKind::Body, "body/missing"}));
+  CHECK_FALSE(w.feature_edit_tools().begin_new_thread());
+  CHECK_FALSE(w.feature_edit_tools().active());
+  CHECK(snapshot(w) == before);
+}
+
+TEST_CASE("External Thread target changes require a current exterior support before Apply",
+          "[gui][parity-b157][thread-create-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part());
+  create_thread(w);
+  auto& target = field<QComboBox>(w, "/target_body");
+  target.setCurrentIndex(target.findData("body.base"));
+  settle();
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(field<QComboBox>(w, "/support").count() == 0);
+  auto& restored = field<QComboBox>(w, "/target_body");
+  restored.setCurrentIndex(restored.findData("body.shaft"));
+  settle();
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  auto& support = field<QComboBox>(w, "/support");
+  REQUIRE(support.count() > 0);
+  for (int i = 0; i < support.count(); ++i) {
+    support.setCurrentIndex(i);
+    REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  }
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+}
+
+TEST_CASE("External Thread creation retains imported capability placement and source freshness",
+          "[gui][parity-b157][thread-create-shell]") {
+  const bool changed = GENERATE(false, true);
+  QTemporaryDir dir;
+  const auto part = imported_shaft(dir, true);
+  const auto body = part.bodies().front().id();
+  ShellWindow w;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_thread(w);
+  if (changed) {
+    QFile supplier(dir.filePath("supplier.step"));
+    REQUIRE(supplier.open(QIODevice::Append));
+    REQUIRE(supplier.write("\n") == 1);
+    supplier.close();
+    CHECK_FALSE(w.feature_edit_tools().apply());
+    CHECK(snapshot(w) == before);
+    CHECK(w.viewport().feature_preview_count() == 0);
+    return;
+  }
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& thread = w.session().part_document()->thread_features().front();
+  const auto& ref = std::get<ImportedTopologyReference>(thread.support().source());
+  CHECK(ref.capability() == ImportedTopologyCapability::Face);
+  CHECK(volume(w, body.value().c_str()) == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  const auto& profile = std::get<ThreadParameterProfile>(thread.thread().profile());
+  CHECK(
+      w.session().part_document()->find_parameter(profile.major_diameter)->value().millimeters() ==
+      Catch::Approx(10));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native external Thread creation picks its support and creates a modeled cut",
+          "[gui][parity-b157][thread-create-shell][native-thread-create]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native external Thread creation and OCCT rendering");
+  const bool imported = GENERATE(false, true);
+  QTemporaryDir dir;
+  const auto part = imported ? imported_shaft(dir, true) : threads::pair_part();
+  const auto body = imported ? part.bodies().front().id().value() : "body.shaft";
+  ShellWindow w;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_thread(w);
+  w.viewport().set_standard_view(GuiStandardView::Front);
+  settle();
+  const Point3 surface = imported ? Point3{42, -10, 14} : Point3{30, -5, 4};
+  click(control<QToolButton>(w, "blcad.thread.target.pick"));
+  auto projected = checked(w.viewport().model_to_screen(surface));
+  click_at(w.viewport(), {projected.x, projected.y});
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  click(control<QToolButton>(w, "blcad.thread.support.pick"));
+  projected = checked(w.viewport().model_to_screen(surface));
+  click_at(w.viewport(), {projected.x, projected.y});
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  auto& length = field<QDoubleSpinBox>(w, "/thread/length");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&length);
+  length.setFocus();
+  length.selectAll();
+  key(length, Qt::Key_3, "3");
+  key(length, Qt::Key_Return);
+  auto& mode = field<QComboBox>(w, "/thread/representation");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&mode);
+  mode.setFocus();
+  key(mode, Qt::Key_Down);
+  REQUIRE(mode.currentData() == "modeled");
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll")
+            .horizontalScrollBar()
+            ->maximum() == 0);
+  CHECK(snapshot(w) == before);
+  capture(w, imported ? "thread-imported-creation-preview" : "thread-creation-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  const double removed =
+      4 * std::numbers::pi * std::tan(std::numbers::pi / 6) * 3 / 1.5 * (4. / 2 + 1. / 3);
+  CHECK(volume(w, body.c_str()) == Catch::Approx(200 * std::numbers::pi - removed).margin(2e-4));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native new internal Thread template switches to valid modeled geometry",
+          "[gui][parity-b157][thread-create-shell][native-thread-create]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native internal Thread creation and OCCT rendering");
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  choose_hole_mode(w, "blcad.hole.internal_thread", 1);
+  auto& mode = field<QComboBox>(w, "/thread/representation");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&mode);
+  mode.setFocus();
+  key(mode, Qt::Key_Down);
+  REQUIRE(mode.currentData() == "modeled");
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "thread-internal-creation-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  const double removed =
+      4 * std::numbers::pi * std::tan(std::numbers::pi / 6) * 4 / 1.5 * (3. / 2 - 1. / 3);
+  CHECK(volume(w) == Catch::Approx(38400 - 32 * std::numbers::pi - removed).margin(2e-4));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "A new external Thread pins an explicitly mapped revision without publishing unused inputs",
+    "[gui][parity-b157][thread-source-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = threads::pair_part();
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_thread(w);
+  field<QDoubleSpinBox>(w, "/thread/profile/major_diameter").setValue(0);
+  auto& system = field<QLineEdit>(w, "/thread/profile/system");
+  system.setText("");
+  REQUIRE(QMetaObject::invokeMethod(&system, "editingFinished"));
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  thread_mapping(w, "r2");
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.major_diameter")
+            .toolTip()
+            .contains("Synthetic r2/major"));
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& definition = result.thread_features().front().thread();
+  const auto& pin = std::get<ThreadStandardProfile>(definition.profile());
+  CHECK(pin.table == threads::selected("r2").table);
+  CHECK(pin.row == "synthetic.row");
+  CHECK(pin.columns.major_diameter == "major");
+  const auto value = checked(resolve_thread_definition(result, definition));
+  CHECK(value.pitch_mm == 2.2);
+  CHECK(value.system == "Synthetic table system");
+  CHECK(value.provenance.size() == 7);
+  CHECK(result.engineering_resources() == part.engineering_resources());
+  CHECK(result.parameters().size() == part.parameters().size() + 1);
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Incomplete and invalid Thread mappings retain committed intent and remain correctable",
+          "[gui][parity-b157][thread-source-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part());
+  const auto before = snapshot(w);
+  create_thread(w);
+  field<QDoubleSpinBox>(w, "/thread/profile/pitch").setValue(1.9);
+  thread_choice(w, "blcad.thread.source", "standard");
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  const auto saved = dir.filePath("incomplete-thread.blcad.json");
+  REQUIRE(w.save_to(saved));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(saved.toStdString()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == before);
+  thread_choice(w, "blcad.thread.source", "custom");
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/pitch").value() == 1.9);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  thread_mapping(w, "r1", false, true);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  CHECK(snapshot(w) == before);
+  thread_choice(w, "blcad.thread.standard.major_diameter", "major");
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  thread_choice(w, "blcad.thread.standard.table", QStringList{"synthetic.threads", "r2"});
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.row").currentIndex() == 0);
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.major_diameter").currentIndex() == 0);
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  w.feature_edit_tools().cancel();
+  CHECK(snapshot(w) == before);
+}
+
+TEST_CASE(
+    "Converting a pinned Thread owns fresh profile dimensions and retains shared interval bindings",
+    "[gui][parity-b157][thread-source-shell]") {
+  auto part = threads::pair_part();
+  const auto definition =
+      checked(ThreadDefinition::create(threads::selected(), ParameterId("thread.minor")));
+  REQUIRE(part.add_thread_feature(threads::external(definition)));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  begin(w, "external");
+  thread_choice(w, "blcad.thread.source", "custom");
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/minor_diameter").value() == 8);
+  CHECK(field<QDoubleSpinBox>(w, "/thread/length").value() == 8);
+  field<QDoubleSpinBox>(w, "/thread/profile/minor_diameter").setValue(7);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& thread = result.thread_features().front();
+  const auto& profile = std::get<ThreadParameterProfile>(thread.thread().profile());
+  CHECK(thread.id() == FeatureId("external"));
+  CHECK(thread.thread().length() == ParameterId("thread.minor"));
+  CHECK(profile.minor_diameter != ParameterId("thread.minor"));
+  CHECK(profile.major_diameter != ParameterId("thread.major"));
+  CHECK(result.find_parameter(ParameterId("thread.minor"))->value().millimeters() == 8);
+  CHECK(result.find_parameter(profile.minor_diameter)->value().millimeters() == 7);
+  CHECK(result.parameters().size() == part.parameters().size() + 4);
+  CHECK(result.engineering_resources() == part.engineering_resources());
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Internal Thread standard mapping retains its pilot and publishes only used dimensional inputs",
+    "[gui][parity-b157][thread-source-shell]") {
+  auto part = plate();
+  REQUIRE(part.add_engineering_resource(threads::table()));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(8);
+  choose_hole_mode(w, "blcad.hole.internal_thread", 1);
+  thread_mapping(w);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& hole = result.hole_features().front();
+  REQUIRE(hole.thread());
+  CHECK(std::holds_alternative<ThreadStandardProfile>(hole.thread()->profile()));
+  CHECK(result.parameters().size() == part.parameters().size() + 2);
+  CHECK(volume(w) == Catch::Approx(38400 - 128 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Optional Thread offset and taper can discard invalid unused values without publishing inputs",
+    "[gui][parity-b157][thread-source-shell]") {
+  const bool internal = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = internal ? plate() : threads::pair_part();
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  if (internal) {
+    create_hole(w);
+    choose_hole_mode(w, "blcad.hole.internal_thread", 1);
+  } else
+    create_thread(w);
+  control<QCheckBox>(w, "blcad.thread.start.enabled").setChecked(true);
+  settle();
+  CHECK(field<QDoubleSpinBox>(w, "/thread/start").value() == 1);
+  field<QDoubleSpinBox>(w, "/thread/start").setValue(0);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  control<QCheckBox>(w, "blcad.thread.start.enabled").setChecked(false);
+  settle();
+  CHECK(w.feature_edit_tools().field("/thread/start") == nullptr);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  control<QCheckBox>(w, "blcad.thread.taper.enabled").setChecked(true);
+  settle();
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/taper_angle").value() == 1);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  field<QDoubleSpinBox>(w, "/thread/profile/taper_angle").setValue(0);
+  control<QCheckBox>(w, "blcad.thread.taper.enabled").setChecked(false);
+  settle();
+  CHECK(w.feature_edit_tools().field("/thread/profile/taper_angle") == nullptr);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(w.session().part_document()->parameters().size() ==
+        part.parameters().size() + (internal ? 6 : 5));
+  CHECK(snapshot(w) != before);
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native standard Thread mapping retains focus through explicit typed selections and "
+          "modeled Apply",
+          "[gui][parity-b157][thread-source-shell][native-thread-source]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native standard Thread authoring");
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part());
+  const auto before = snapshot(w);
+  create_thread(w);
+  activate(w);
+  auto& invalid_length = field<QDoubleSpinBox>(w, "/thread/length");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&invalid_length);
+  invalid_length.setFocus();
+  REQUIRE(invalid_length.hasFocus());
+  invalid_length.selectAll();
+  key(invalid_length, Qt::Key_0, "0");
+  key(invalid_length, Qt::Key_Return);
+  thread_mapping(w, "r1", true);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  auto& corrected_length = field<QDoubleSpinBox>(w, "/thread/length");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll")
+      .ensureWidgetVisible(&corrected_length);
+  corrected_length.setFocus();
+  REQUIRE(corrected_length.hasFocus());
+  corrected_length.selectAll();
+  key(corrected_length, Qt::Key_4, "4");
+  key(corrected_length, Qt::Key_Return);
+  REQUIRE(field<QDoubleSpinBox>(w, "/thread/length").hasFocus());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  click(control<QCheckBox>(w, "blcad.thread.start.enabled"));
+  auto& length = field<QDoubleSpinBox>(w, "/thread/length");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&length);
+  length.setFocus();
+  length.selectAll();
+  key(length, Qt::Key_3, "3");
+  key(length, Qt::Key_Return);
+  auto& mode = field<QComboBox>(w, "/thread/representation");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&mode);
+  mode.setFocus();
+  key(mode, Qt::Key_Down);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll")
+            .horizontalScrollBar()
+            ->maximum() == 0);
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll")
+      .ensureWidgetVisible(&control<QComboBox>(w, "blcad.thread.standard.table"));
+  settle();
+  capture(w, "thread-standard-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  const double removed =
+      4 * std::numbers::pi * std::tan(55 * std::numbers::pi / 360) * 3 / 1.7 * (4. / 2 + 1. / 3);
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi - removed).margin(2e-4));
+  const auto& thread = w.session().part_document()->thread_features().front();
+  REQUIRE(thread.thread().start());
+  CHECK(w.session()
+            .part_document()
+            ->find_parameter(*thread.thread().start())
+            ->value()
+            .millimeters() == 1);
+  replay(w, dir, before);
+}
+
+TEST_CASE("A mapped taper retains its signed Angle and explicit custom removal restores a "
+          "cylindrical Thread",
+          "[gui][parity-b157][thread-source-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = threads::pair_part();
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_thread(w);
+  thread_mapping(w);
+  control<QCheckBox>(w, "blcad.thread.standard.taper.enabled").setChecked(true);
+  settle();
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  auto& columns = control<QComboBox>(w, "blcad.thread.standard.taper_angle");
+  CHECK(columns.findData("major") == -1);
+  thread_choice(w, "blcad.thread.standard.taper_angle", "taper");
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  thread_choice(w, "blcad.thread.source", "custom");
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/taper_angle").value() == -2);
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/taper_angle").suffix().contains("deg"));
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  control<QCheckBox>(w, "blcad.thread.taper.enabled").setChecked(false);
+  settle();
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& profile =
+      std::get<ThreadParameterProfile>(result.thread_features().front().thread().profile());
+  CHECK_FALSE(profile.taper_angle);
+  CHECK(result.parameters().size() == part.parameters().size() + 5);
+  CHECK(result.engineering_resources() == part.engineering_resources());
+  replay(w, dir, before);
+}
+
+TEST_CASE("Thread source rebuilds preserve an active support selector and its scoped targets",
+          "[gui][parity-b157][thread-source-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part());
+  const auto before = snapshot(w);
+  const auto entry_scope = w.viewport().selection_semantic_scope();
+  create_thread(w);
+  control<QToolButton>(w, "blcad.thread.support.pick").click();
+  const auto scoped = w.viewport().selection_semantic_scope();
+  REQUIRE(scoped);
+  REQUIRE_FALSE(scoped->empty());
+  thread_choice(w, "blcad.thread.source", "standard");
+  CHECK(control<QToolButton>(w, "blcad.thread.support.pick").isChecked());
+  CHECK(w.viewport().selection_semantic_scope() == scoped);
+  REQUIRE(w.feature_edit_tools().accept_selection({GuiSelectionKind::Face, scoped->front()}));
+  CHECK_FALSE(control<QToolButton>(w, "blcad.thread.support.pick").isChecked());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  thread_choice(w, "blcad.thread.source", "custom");
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  w.feature_edit_tools().cancel();
+  CHECK(w.viewport().selection_semantic_scope() == entry_scope);
+  CHECK(snapshot(w) == before);
+}
+
+TEST_CASE("Editing a Hole support uses its predecessor and preserves its owned placement identity",
+          "[gui][parity-b157][hole-support-edit-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = holes::part(false, false);
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  begin(w, "holes");
+  auto& supports = field<QComboBox>(w, "/support");
+  for (int i = 0; i < supports.count(); ++i)
+    CHECK_FALSE(supports.itemData(i).toString().contains("hole/5:first/bottom"));
+  const auto bottom = supports.findData("finishing/face/4:base/bottom");
+  REQUIRE(bottom >= 0);
+  supports.setCurrentIndex(bottom);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& hole = result.hole_features().front();
+  CHECK(hole.id() == FeatureId("holes"));
+  CHECK(hole.placements().front().id == HolePlacementId("first"));
+  CHECK(std::get<SemanticFaceReference>(hole.support().source()).face() == SemanticFace::Bottom);
+  CHECK(result.parameters().size() == part.parameters().size());
+  CHECK(result.result_face_workplane_count() == 0);
+  CHECK(volume(w) == Catch::Approx(38400 - 13.5 * std::numbers::pi).margin(1e-6));
+  const auto axis = checked(
+      HoleInstanceReference::create(hole.id(), HolePlacementId("first"), HoleReferenceRole::Axis));
+  const auto frame = checked(
+      geometry::HoleInstanceGeometry::resolve(result, axis, *w.session().part_shape_cache()));
+  CHECK(frame.frame.origin.x == Catch::Approx(-20).margin(1e-7));
+  CHECK(frame.frame.origin.y == Catch::Approx(-15).margin(1e-7));
+  CHECK(frame.frame.origin.z == Catch::Approx(0).margin(1e-7));
+  CHECK(frame.frame.normal.z == Catch::Approx(1).margin(1e-7));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Existing Thread support editing retains its original reference until an explicit rebind",
+          "[gui][parity-b157][hole-support-edit-shell]") {
+  const bool rebind = GENERATE(false, true);
+  auto part = threads::pair_part();
+  REQUIRE(part.add_thread_feature(threads::external()));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  begin(w, "external");
+  if (rebind) {
+    auto& supports = field<QComboBox>(w, "/support");
+    int choice = -1;
+    for (int i = 0; i < supports.count(); ++i)
+      if (supports.itemData(i).toString() != "feature-input/current-thread-support") {
+        choice = i;
+        break;
+      }
+    REQUIRE(choice >= 0);
+    supports.setCurrentIndex(choice);
+  } else
+    rename(w);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& thread = result.thread_features().front();
+  CHECK(thread.id() == FeatureId("external"));
+  if (rebind) {
+    REQUIRE(std::holds_alternative<ResultFaceReference>(thread.support().source()));
+    CHECK(std::get<ResultFaceReference>(thread.support().source()).producer() ==
+          FeatureId("shaft"));
+  } else
+    CHECK(nlohmann::json::parse(snapshot(w))["thread_features"][0]["support"] ==
+          nlohmann::json::parse(before)["thread_features"][0]["support"]);
+  CHECK(result.parameters().size() == part.parameters().size());
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Existing support selectors exclude Bodies introduced after the edited feature",
+          "[gui][parity-b157][hole-support-edit-shell]") {
+  auto part = holes::part(false, false);
+  const auto sketch = part.features().front().input_sketch();
+  const auto context = blcad::test::history_fixture::new_body(part, "later");
+  auto feature = checked(Feature::create_additive_extrude(FeatureId("later"), "Later Body", sketch,
+                                                          ParameterId("depth")));
+  REQUIRE(part.add_feature(checked(feature.with_body_result_context(context))));
+  REQUIRE(part.apply_history_intent({{"base", "holes", "later"}, {}}));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  begin(w, "holes");
+  const auto& targets = field<QComboBox>(w, "/target_body");
+  CHECK(targets.findData("body.base") >= 0);
+  CHECK(targets.findData("body.later") == -1);
+  w.feature_edit_tools().cancel();
+}
+
+TEST_CASE("Editing a Hole onto an earlier result support owns only its used pending workplane",
+          "[gui][parity-b157][hole-support-edit-shell]") {
+  auto part = holes::part(false, false);
+  REQUIRE(part.add_parameter(checked(Parameter::create_length(
+      ParameterId("second.diameter"), "Second diameter", checked(Quantity::length_mm(1))))));
+  const auto& original = part.hole_features().front();
+  REQUIRE(part.add_hole_feature(checked(HoleFeature::create(
+      FeatureId("second"), "Second Hole", HoleKind::Plain, original.target_body(),
+      original.support(), {{HolePlacementId("second.point"), Point2{20, 15}}},
+      ParameterId("second.diameter")))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  begin(w, "second");
+  const auto placement = checked(HoleInstanceReference::create(
+      FeatureId("holes"), HolePlacementId("first"), HoleReferenceRole::Axis));
+  const auto reference = checked(ResultFaceReference::create(
+      FeatureId("holes"), BodyId("body.base"), {placement.origin("bottom")}));
+  auto& supports = field<QComboBox>(w, "/support");
+  const auto choice =
+      supports.findData(QString::fromStdString("finishing/" + reference.identity()));
+  REQUIRE(choice >= 0);
+  supports.setCurrentIndex(choice);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(0);
+  field<QDoubleSpinBox>(w, "/placements/0/position/y").setValue(0);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  CHECK(w.session().part_document()->result_face_workplane_count() == 0);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  CHECK(result.result_face_workplane_count() == 1);
+  const auto* second = result.find_hole_feature(FeatureId("second"));
+  REQUIRE(second);
+  CHECK(second->placements().front().id == HolePlacementId("second.point"));
+  const auto& plane = std::get<DatumPlaneId>(second->support().source());
+  REQUIRE(result.find_result_face_workplane(plane));
+  CHECK(result.find_result_face_workplane(plane)->reference().producer() == FeatureId("holes"));
+  CHECK(volume(w) == Catch::Approx(38400 - 14 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Native existing Hole support picks use predecessor geometry and restore context on Cancel",
+    "[gui][parity-b157][hole-support-edit-shell][native-hole-support-edit]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native pre-feature input picking");
+  const bool apply = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, holes::part(false, false));
+  REQUIRE(w.session().selection().add({GuiSelectionKind::Body, "body/body.base"}));
+  REQUIRE(w.viewport().select_semantic("body/body.base"));
+  const auto before = snapshot(w);
+  const auto camera = w.viewport().camera_bookmark();
+  const auto scope = w.viewport().selection_semantic_scope();
+  begin(w, "holes");
+  w.viewport().set_standard_view(GuiStandardView::Bottom);
+  settle();
+  click(control<QToolButton>(w, "blcad.hole.support.pick"));
+  const auto point = checked(w.viewport().model_to_screen({-20, -15, 0}));
+  click_at(w.viewport(), {point.x, point.y});
+  CHECK(field<QComboBox>(w, "/support").currentData() == "finishing/face/4:base/bottom");
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "hole-support-edit-preview");
+  if (apply) {
+    click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+    CHECK(std::get<SemanticFaceReference>(
+              w.session().part_document()->hole_features().front().support().source())
+              .face() == SemanticFace::Bottom);
+    replay(w, dir, before);
+  } else {
+    click(control<QPushButton>(w, "blcad.feature_edit.cancel"));
+    CHECK(snapshot(w) == before);
+    CHECK(w.viewport().selection_semantic_scope() == scope);
+    REQUIRE(w.session().selection().entries().size() == 1);
+    CHECK(w.session().selection().entries().front().semantic_id == "body/body.base");
+    const auto restored = w.viewport().camera_bookmark();
+    CHECK(restored.eye.x == Catch::Approx(camera.eye.x).margin(1e-7));
+    CHECK(restored.eye.y == Catch::Approx(camera.eye.y).margin(1e-7));
+    CHECK(restored.eye.z == Catch::Approx(camera.eye.z).margin(1e-7));
+  }
+  CHECK(w.viewport().preview_selection_target_count() == 0);
+}
+
+TEST_CASE("Hole limit faces remain explicitly selectable through invalid and cleared candidates",
+          "[gui][parity-b157][hole-limit-shell]") {
+  const bool editing = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, editing ? holes::part(false, false) : plate());
+  const auto before = snapshot(w);
+  if (editing)
+    begin(w, "holes");
+  else
+    create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.extent", 3);
+  auto& limits = field<QComboBox>(w, "/extent/face");
+  const int top = limits.findData("finishing/face/4:base/top");
+  const int bottom = limits.findData("finishing/face/4:base/bottom");
+  REQUIRE(top >= 0);
+  REQUIRE(bottom >= 0);
+  limits.setCurrentIndex(top);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  limits.setCurrentIndex(-1);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QLabel>(w, "blcad.feature_edit.status").text().contains("Choose a current"));
+  limits.setCurrentIndex(bottom);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& part = *w.session().part_document();
+  const auto& hole = part.hole_features().front();
+  const auto& face = std::get<HoleToFaceExtent>(hole.extent()).face;
+  CHECK(face.role() == PartFeatureInputRole::HoleLimitFace);
+  CHECK(std::get<SemanticFaceReference>(face.source()).face() == SemanticFace::Bottom);
+  CHECK(part.result_face_workplane_count() == 0);
+  CHECK(volume(w) == Catch::Approx(38400 - 8 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Imported Hole limits retain typed face identity placement and supplier guards",
+          "[gui][parity-b157][hole-limit-shell]") {
+  const bool posed = GENERATE(false, true);
+  const bool stale = GENERATE(false, true);
+  QTemporaryDir dir;
+  auto part = imported_plate(dir, posed);
+  const auto body = part.bodies().front().id().value();
+  const auto bottom = imported_bottom(part);
+  ShellWindow w;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  REQUIRE(w.feature_edit_tools().begin_new_hole());
+  choose_support(w, imported_top(part));
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  choose_hole_mode(w, "blcad.hole.extent", 3);
+  auto& limits = field<QComboBox>(w, "/extent/face");
+  const int index = limits.findData(QString::fromStdString(bottom));
+  REQUIRE(index >= 0);
+  limits.setCurrentIndex(index);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  if (stale) {
+    QFile file(dir.filePath("supplier.step"));
+    REQUIRE(file.open(QIODevice::Append));
+    REQUIRE(file.write("\n") == 1);
+    file.close();
+    CHECK_FALSE(w.feature_edit_tools().apply());
+    CHECK(snapshot(w) == before);
+    w.feature_edit_tools().cancel();
+    return;
+  }
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& face = std::get<HoleToFaceExtent>(result.hole_features().front().extent()).face;
+  CHECK(face.role() == PartFeatureInputRole::HoleLimitFace);
+  CHECK(std::get<ImportedTopologyReference>(face.source()).capability() ==
+        ImportedTopologyCapability::Face);
+  CHECK(result.result_face_workplane_count() == 0);
+  CHECK(volume(w, body.c_str()) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("A Hole can terminate at an earlier result face without creating a support workplane",
+          "[gui][parity-b157][hole-limit-shell]") {
+  auto part = holes::part(false, false);
+  const auto context = blcad::test::history_fixture::new_body(part, "cover");
+  auto cover = checked(Feature::create_additive_extrude(
+      FeatureId("cover"), "Cover", part.features().front().input_sketch(), ParameterId("depth")));
+  REQUIRE(part.add_feature(checked(cover.with_body_result_context(context))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_hole(w);
+  auto& targets = field<QComboBox>(w, "/target_body");
+  targets.setCurrentIndex(targets.findData("body.cover"));
+  settle();
+  choose_support(w, "finishing/face/5:cover/top");
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(1);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(-20);
+  field<QDoubleSpinBox>(w, "/placements/0/position/y").setValue(-15);
+  choose_hole_mode(w, "blcad.hole.extent", 3);
+  const auto placement = checked(HoleInstanceReference::create(
+      FeatureId("holes"), HolePlacementId("first"), HoleReferenceRole::Axis));
+  const auto reference = checked(ResultFaceReference::create(
+      FeatureId("holes"), BodyId("body.base"), {placement.origin("bottom")}));
+  auto& limits = field<QComboBox>(w, "/extent/face");
+  const int index = limits.findData(QString::fromStdString("finishing/" + reference.identity()));
+  REQUIRE(index >= 0);
+  limits.setCurrentIndex(index);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& face = std::get<HoleToFaceExtent>(result.hole_features().back().extent()).face;
+  CHECK(std::get<ResultFaceReference>(face.source()).identity() == reference.identity());
+  CHECK(result.result_face_workplane_count() == 0);
+  CHECK(volume(w, "body.cover") == Catch::Approx(38400 - 1.5 * std::numbers::pi).margin(1e-6));
+  CHECK(volume(w) == Catch::Approx(38400 - 13.5 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Up to Body selectors exclude the target and replace an invalid same-body limit",
+          "[gui][parity-b157][hole-limit-shell]") {
+  const bool retarget = GENERATE(false, true);
+  auto part = plate();
+  for (const auto& [id, z] : {std::pair{"limit1", -4.0}, std::pair{"limit2", -2.0}}) {
+    const std::string name(id);
+    REQUIRE(part.add_construction_plane(checked(ConstructionPlane::create_explicit(
+        ConstructionPlaneId(name + ".plane"), name, {0, 0, z}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}))));
+    blcad::test::history_fixture::rectangle(part, (name + ".profile").c_str(),
+                                            (name + ".plane").c_str());
+    auto feature = checked(Feature::create_additive_extrude(
+        FeatureId(name), name, SketchId(name + ".profile"), ParameterId("depth")));
+    REQUIRE(part.add_feature(checked(
+        feature.with_body_result_context(blcad::test::history_fixture::new_body(part, id)))));
+  }
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.extent", 4);
+  auto& limits = field<QComboBox>(w, "/extent/body");
+  CHECK(limits.findData("body.base") == -1);
+  REQUIRE(limits.findData("body.limit1") >= 0);
+  REQUIRE(limits.findData("body.limit2") >= 0);
+  limits.setCurrentIndex(-1);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  control<QToolButton>(w, "blcad.hole.limit_body.pick").click();
+  CHECK_FALSE(
+      w.feature_edit_tools().accept_selection({GuiSelectionKind::Face, "body/body.limit2"}));
+  REQUIRE(w.feature_edit_tools().accept_selection({GuiSelectionKind::Body, "body/body.limit2"}));
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  if (retarget) {
+    auto& target = field<QComboBox>(w, "/target_body");
+    target.setCurrentIndex(target.findData("body.limit2"));
+    settle();
+    choose_support(w, "finishing/face/6:limit2/top");
+    CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+    auto& replacement = field<QComboBox>(w, "/extent/body");
+    CHECK(replacement.findData("body.limit2") == -1);
+    replacement.setCurrentIndex(replacement.findData("body.limit1"));
+    INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+    REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  }
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(std::get<HoleUpToBodyExtent>(w.session().part_document()->hole_features().front().extent())
+            .body == BodyId(retarget ? "body.limit1" : "body.limit2"));
+  CHECK(volume(w) == Catch::Approx(38400 - (retarget ? 0 : 2 * std::numbers::pi)).margin(1e-6));
+  CHECK(volume(w, "body.limit1") == Catch::Approx(38400).margin(1e-6));
+  CHECK(volume(w, "body.limit2") ==
+        Catch::Approx(38400 - (retarget ? 2 * std::numbers::pi : 0)).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native Hole limit picks bind the selected planar face and recover invalid geometry",
+          "[gui][parity-b157][hole-limit-shell][native-hole-limit]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native limit-face picks");
+  const bool imported = GENERATE(false, true);
+  QTemporaryDir dir;
+  auto part = imported ? imported_plate(dir, true) : plate();
+  const auto body = part.bodies().front().id().value();
+  ShellWindow w;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  if (imported) {
+    REQUIRE(w.feature_edit_tools().begin_new_hole());
+    choose_support(w, imported_top(part));
+  } else
+    create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  choose_hole_mode(w, "blcad.hole.extent", 3);
+  w.viewport().set_standard_view(GuiStandardView::Top);
+  settle();
+  click(control<QToolButton>(w, "blcad.hole.limit_face.pick"));
+  auto top =
+      checked(w.viewport().model_to_screen(imported ? Point3{20, 1, 18} : Point3{10, 10, 8}));
+  click_at(w.viewport(), {top.x, top.y});
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  w.viewport().set_standard_view(GuiStandardView::Bottom);
+  settle();
+  click(control<QToolButton>(w, "blcad.hole.limit_face.pick"));
+  auto bottom =
+      checked(w.viewport().model_to_screen(imported ? Point3{20, 1, 10} : Point3{10, 10, 0}));
+  click_at(w.viewport(), {bottom.x, bottom.y});
+  CHECK(field<QComboBox>(w, "/extent/face").currentData() ==
+        QString::fromStdString(imported ? imported_bottom(part) : "finishing/face/4:base/bottom"));
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, imported ? "hole-imported-limit-preview" : "hole-native-limit-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  CHECK(volume(w, body.c_str()) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  CHECK(w.viewport().preview_selection_target_count() == 0);
+  replay(w, dir, before);
+}
+
+TEST_CASE("Conical Thread creation seeds a finite positive interval from either apex orientation",
+          "[gui][parity-b157][thread-cone-shell]") {
+  const bool apex_first = GENERATE(false, true);
+  const bool imported = GENERATE(false, true);
+  auto part = conical_part(apex_first ? 0 : 5, apex_first ? 5 : 0);
+  QTemporaryDir dir;
+  if (imported) {
+    auto cache = checked(geometry::ShapeCache::create(ShapeCacheId("cone.supplier")));
+    REQUIRE(geometry::GeometryRecomputeExecutor{}.execute_document(part, cache));
+    part = imported_shape(dir, *cache.find_body_shape(BodyId("body.cone")), true);
+  }
+  const auto body = part.bodies().front().id().value();
+  ShellWindow w;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_thread(w);
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/major_diameter").value() == Catch::Approx(10));
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/minor_diameter").value() == Catch::Approx(9.5));
+  CHECK(field<QDoubleSpinBox>(w, "/thread/length").value() == Catch::Approx(.95).margin(1e-8));
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& definition = result.thread_features().front().thread();
+  const auto value = checked(resolve_thread_definition(result, definition));
+  CHECK(value.minor_diameter_mm +
+            2 * std::tan(value.taper_angle_deg * std::numbers::pi / 180) * value.length_mm >
+        0);
+  CHECK(value.major_diameter_mm == Catch::Approx(10).margin(1e-7));
+  CHECK(result.parameters().size() == part.parameters().size() + 6);
+  CHECK(volume(w, body.c_str()) == Catch::Approx(50 * std::numbers::pi / 3).margin(1e-6));
+  REQUIRE(checked(geometry::ThreadAdapter::cosmetic_presentations(
+                      *w.session().part_shape_cache()->find_body_shape(BodyId(body))))
+              .size() == 1);
+  replay(w, dir, before);
+}
+
+TEST_CASE("A conical standard profile converts to owned start and opposite-direction inputs",
+          "[gui][parity-b157][thread-cone-shell]") {
+  const double slope = std::tan(-2 * std::numbers::pi / 180);
+  auto part = conical_part(5, 5 + 8 * slope, 8);
+  auto cache = checked(geometry::ShapeCache::create(ShapeCacheId("cone.profile.source")));
+  REQUIRE(geometry::GeometryRecomputeExecutor{}.execute_document(part, cache));
+  const auto faces = checked(geometry::FinishingSelectionBuilder::build(
+      part, cache, BodyId("body.cone"), PartFeatureInputRole::ShellRemovalFace));
+  std::optional<geometry::ThreadSupportInspection> support;
+  for (const auto& face : faces)
+    if (const auto* ref = std::get_if<FaceReference>(&face.reference))
+      if (const auto* result = std::get_if<ResultFaceReference>(&ref->source())) {
+        auto selected =
+            checked(FaceReference::create_result(PartFeatureInputRole::ThreadSupportFace, *result));
+        auto inspected =
+            geometry::ThreadAdapter::inspect_support(part, BodyId("body.cone"), selected, cache);
+        if (inspected) {
+          support = inspected.value();
+          break;
+        }
+      }
+  REQUIRE(support);
+  const auto original = threads::table();
+  auto rows = original.rows();
+  const double signed_slope = std::tan(support->taper_angle_deg * std::numbers::pi / 180);
+  for (auto& cell : rows.front().cells) {
+    if (cell.column == "major")
+      cell.value = checked(Quantity::length_mm(2 * support->radius_mm));
+    if (cell.column == "minor")
+      cell.value = checked(Quantity::length_mm(2 * support->radius_mm - 1));
+    if (cell.column == "taper")
+      cell.value = checked(Quantity::angle_deg(support->taper_angle_deg));
+  }
+  REQUIRE(part.add_engineering_resource(checked(EngineeringStandardTable::create(
+      original.key(), original.name(), original.provenance(), original.columns(), rows))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_thread(w);
+  thread_mapping(w);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  control<QCheckBox>(w, "blcad.thread.standard.taper.enabled").setChecked(true);
+  settle();
+  thread_choice(w, "blcad.thread.standard.taper_angle", "taper");
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  thread_choice(w, "blcad.thread.source", "custom");
+  control<QCheckBox>(w, "blcad.thread.start.enabled").setChecked(true);
+  settle();
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  field<QDoubleSpinBox>(w, "/thread/profile/major_diameter")
+      .setValue(2 * (support->radius_mm + signed_slope));
+  field<QDoubleSpinBox>(w, "/thread/profile/minor_diameter")
+      .setValue(2 * (support->radius_mm + signed_slope) - 1);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  auto& direction = field<QComboBox>(w, "/direction");
+  direction.setCurrentIndex(1 - direction.currentIndex());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  field<QDoubleSpinBox>(w, "/thread/profile/taper_angle").setValue(-support->taper_angle_deg);
+  field<QDoubleSpinBox>(w, "/thread/profile/major_diameter")
+      .setValue(2 * (support->radius_mm + 7 * signed_slope));
+  field<QDoubleSpinBox>(w, "/thread/profile/minor_diameter")
+      .setValue(2 * (support->radius_mm + 7 * signed_slope) - 1);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& definition = result.thread_features().front().thread();
+  REQUIRE(std::holds_alternative<ThreadParameterProfile>(definition.profile()));
+  const auto value = checked(resolve_thread_definition(result, definition));
+  CHECK(value.start_mm == 1);
+  CHECK(value.taper_angle_deg == Catch::Approx(-support->taper_angle_deg).margin(1e-8));
+  CHECK(result.engineering_resources() == part.engineering_resources());
+  CHECK(result.parameters().size() == 7);
+  const double end_radius = 5 + 8 * slope;
+  CHECK(volume(w, "body.cone") ==
+        Catch::Approx(std::numbers::pi * 8 / 3 * (25 + 5 * end_radius + end_radius * end_radius))
+            .margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native conical Thread controls correct offset direction and unsupported modeled intent",
+          "[gui][parity-b157][thread-cone-shell][native-thread-cone]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native conical Thread authoring");
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, conical_part(2, 5));
+  const auto before = snapshot(w);
+  create_thread(w);
+  activate(w);
+  const auto type_number = [&](const char* path, const QString& text) {
+    auto& input = field<QDoubleSpinBox>(w, path);
+    control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&input);
+    input.setFocus();
+    settle();
+    REQUIRE(input.hasFocus());
+    CHECK(input.decimals() == 9);
+    input.selectAll();
+    key(input, Qt::Key_0, text);
+    key(input, Qt::Key_Return);
+  };
+  type_number("/thread/length", "0.5");
+  click(control<QCheckBox>(w, "blcad.thread.start.enabled"));
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  type_number("/thread/profile/major_diameter", "7");
+  type_number("/thread/profile/minor_diameter", "6.5");
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  const double angle = field<QDoubleSpinBox>(w, "/thread/profile/taper_angle").value();
+  auto& direction = field<QComboBox>(w, "/direction");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&direction);
+  direction.setFocus();
+  REQUIRE(direction.hasFocus());
+  key(direction, direction.currentIndex() ? Qt::Key_Up : Qt::Key_Down);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  type_number("/thread/profile/taper_angle", QString::number(-angle, 'f', 9));
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  auto& mode = field<QComboBox>(w, "/thread/representation");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&mode);
+  mode.setFocus();
+  REQUIRE(mode.hasFocus());
+  key(mode, Qt::Key_Down);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QLabel>(w, "blcad.feature_edit.status").text().contains("modeled tapered"));
+  key(mode, Qt::Key_Up);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "thread-conical-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  const auto& part = *w.session().part_document();
+  const auto value =
+      checked(resolve_thread_definition(part, part.thread_features().front().thread()));
+  CHECK(value.start_mm == 1);
+  CHECK(value.length_mm == .5);
+  CHECK(value.major_diameter_mm == 7);
+  CHECK(value.minor_diameter_mm == 6.5);
+  CHECK(volume(w, "body.cone") == Catch::Approx(26 * std::numbers::pi).margin(1e-6));
+  const auto root = std::filesystem::path(dir.path().toStdString());
+  REQUIRE(geometry::StepExporter{}.write_part_step(part, *w.session().part_shape_cache(),
+                                                   root / "cone.step"));
+  const auto asset = checked(inspect_step_import_asset(root, "cone.step"));
+  const auto source = checked(
+      StepImportSource::create(StepImportSourceId("cone.roundtrip"), "Cone roundtrip", "cone.step",
+                               *asset.observed_sha256_digest(), StepImportMode::EditableBody));
+  const auto imported = checked(geometry::StepImportReader{}.read(source, root));
+  REQUIRE(imported.body_count() == 1);
+  double total = 0;
+  for (const auto& product : imported.products)
+    for (const auto& body : product.bodies)
+      total += body.volume_mm3;
+  CHECK(total == Catch::Approx(26 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Existing imported Hole and Thread inputs retain their placed predecessor scope",
+          "[gui][parity-b157][hole-support-edit-shell][thread-cone-shell]") {
+  const bool thread = GENERATE(false, true);
+  QTemporaryDir dir;
+  const auto part = thread ? imported_shaft(dir, true) : imported_plate(dir, true);
+  const auto body = part.bodies().front().id().value();
+  ShellWindow w;
+  open(w, dir, part);
+  if (thread)
+    create_thread(w);
+  else {
+    REQUIRE(w.feature_edit_tools().begin_new_hole());
+    choose_support(w, imported_top(part));
+    field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  }
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto before = snapshot(w);
+  const auto& current = *w.session().part_document();
+  const auto parameter_count = current.parameters().size();
+  const auto id =
+      thread ? current.thread_features().front().id() : current.hole_features().front().id();
+  begin(w, id.value().c_str());
+  auto& supports = field<QComboBox>(w, "/support");
+  if (thread) {
+    REQUIRE(supports.count() >= 2);
+    supports.setCurrentIndex((supports.currentIndex() + 1) % supports.count());
+  } else {
+    const auto bottom = supports.findData(QString::fromStdString(imported_bottom(part)));
+    REQUIRE(bottom >= 0);
+    supports.setCurrentIndex(bottom);
+  }
+  rename(w);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  CHECK(result.parameters().size() == parameter_count);
+  if (thread) {
+    CHECK(result.thread_features().front().id() == id);
+    CHECK(std::holds_alternative<ImportedTopologyReference>(
+        result.thread_features().front().support().source()));
+    CHECK(volume(w, body.c_str()) == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  } else {
+    CHECK(result.hole_features().front().id() == id);
+    CHECK(std::holds_alternative<ImportedTopologyReference>(
+        result.hole_features().front().support().source()));
+    CHECK(volume(w, body.c_str()) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  }
+  CHECK(result.result_face_workplane_count() == 0);
+  replay(w, dir, before);
+}
+
+TEST_CASE("Correcting a used Thread length retries a complete rejected profile mapping",
+          "[gui][parity-b157][thread-source-shell][thread-cone-shell]") {
+  const bool shared = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = threads::pair_part();
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_thread(w);
+  if (shared) {
+    auto& binding = control<QComboBox>(w, "blcad.feature_edit.binding/thread/length");
+    binding.setCurrentIndex(binding.findData("thread.length"));
+  }
+  field<QDoubleSpinBox>(w, "/thread/length").setValue(0);
+  thread_mapping(w);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.pitch").currentData() == "pitch");
+  CHECK(snapshot(w) == before);
+  field<QDoubleSpinBox>(w, "/thread/length").setValue(3);
+  settle();
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.pitch").currentData() == "pitch");
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& definition = result.thread_features().front().thread();
+  CHECK(std::holds_alternative<ThreadStandardProfile>(definition.profile()));
+  CHECK(checked(resolve_thread_definition(result, definition)).length_mm == 3);
+  if (shared)
+    CHECK(definition.length() == ParameterId("thread.length"));
+  CHECK(result.parameters().size() == part.parameters().size() + (shared ? 0 : 1));
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native Up to Body picks exclude the target and bind the actual separate limit solid",
+          "[gui][parity-b157][hole-limit-shell][native-hole-body-limit]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native limit-Body picking");
+  auto part = plate();
+  REQUIRE(part.add_construction_plane(
+      checked(ConstructionPlane::create_explicit(ConstructionPlaneId("limit.plane"), "Limit plane",
+                                                 {20, 0, -4}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}))));
+  blcad::test::history_fixture::rectangle(part, "limit.profile", "limit.plane");
+  auto feature = checked(Feature::create_additive_extrude(
+      FeatureId("limit"), "Limit", SketchId("limit.profile"), ParameterId("depth")));
+  REQUIRE(part.add_feature(checked(
+      feature.with_body_result_context(blcad::test::history_fixture::new_body(part, "limit")))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.extent", 4);
+  field<QComboBox>(w, "/extent/body").setCurrentIndex(-1);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  w.viewport().set_standard_view(GuiStandardView::Top);
+  settle();
+  click(control<QToolButton>(w, "blcad.hole.limit_body.pick"));
+  const auto scope = w.viewport().selection_semantic_scope();
+  REQUIRE(scope);
+  CHECK(std::find(scope->begin(), scope->end(), "body/body.base") == scope->end());
+  CHECK(std::find(scope->begin(), scope->end(), "body/body.limit") != scope->end());
+  const auto point = checked(w.viewport().model_to_screen({50, 0, 4}));
+  click_at(w.viewport(), {point.x, point.y});
+  CHECK(field<QComboBox>(w, "/extent/body").currentData() == "body.limit");
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "hole-body-limit-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  CHECK(volume(w) == Catch::Approx(38400 - 4 * std::numbers::pi).margin(1e-6));
+  CHECK(volume(w, "body.limit") == Catch::Approx(38400).margin(1e-6));
+  CHECK(std::get<HoleUpToBodyExtent>(w.session().part_document()->hole_features().front().extent())
+            .body == BodyId("body.limit"));
+  CHECK(w.viewport().preview_selection_target_count() == 0);
   replay(w, dir, before);
 }

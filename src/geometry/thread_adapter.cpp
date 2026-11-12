@@ -1,9 +1,11 @@
 #include "blcad/geometry/thread_adapter.hpp"
 #include "blcad/core/hole_feature.hpp"
 #include "blcad/core/part_document.hpp"
+#include "blcad/geometry/step_import_topology_context.hpp"
 #include "geometry_shape_internal.hpp"
 #include "helical_curve.hpp"
 #include "occt_failure_message.hpp"
+#include "part_history_evaluation.hpp"
 #include "semantic_face_resolution.hpp"
 
 #include <BRepAdaptor_Surface.hxx>
@@ -17,6 +19,7 @@
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
+#include <BRepLProp_SLProps.hxx>
 #include <BRepOffsetAPI_MakePipeShell.hxx>
 #include <BRepPrimAPI_MakeCone.hxx>
 #include <BRepPrimAPI_MakeCylinder.hxx>
@@ -62,6 +65,44 @@ Point3 along(const Frame& f, double z, double r = 0) {
 }
 double axial(const Frame& f, gp_Pnt p) {
   return dot({p.X() - f.origin.x, p.Y() - f.origin.y, p.Z() - f.origin.z}, f.axis);
+}
+struct ExternalSupport {
+  TopoDS_Face face;
+  Frame frame;
+};
+Result<ExternalSupport> external_support(const PartDocument& part, const ShapeCache& cache,
+                                         const TopoDS_Shape& target, const FaceReference& reference,
+                                         const std::vector<detail::FaceLineage>& lineage,
+                                         const FeatureId& id, ThreadDirection direction,
+                                         StepImportTopologyContext* imports) {
+  auto face = resolve_semantic_face(part, cache, target, reference, id, "Thread", imports);
+  if (!face)
+    return Result<ExternalSupport>::failure(face.error());
+  BRepAdaptor_Surface surface(face.value());
+  if (surface.GetType() != GeomAbs_Cylinder && surface.GetType() != GeomAbs_Cone)
+    return Result<ExternalSupport>::failure(
+        Error::geometry(id.value(), "Thread support must be cylindrical or conical"));
+  const gp_Ax3 axis = surface.GetType() == GeomAbs_Cylinder ? surface.Cylinder().Position()
+                                                            : surface.Cone().Position();
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(face.value(), u0, u1, v0, v1);
+  Frame frame{{axis.Location().X(), axis.Location().Y(), axis.Location().Z()},
+              {axis.Direction().X(), axis.Direction().Y(), axis.Direction().Z()},
+              {axis.XDirection().X(), axis.XDirection().Y(), axis.XDirection().Z()}};
+  // Preserve the same producer axis/seam rules for inspection and execution.
+  for (const auto& entry : lineage)
+    if (entry.face.IsSame(face.value()) && entry.support_axis) {
+      frame.axis = *entry.support_axis;
+      frame.x = normalized(entry.x_axis);
+      break;
+    }
+  const double first = axial(frame, surface.Value(u0, v0)),
+               last = axial(frame, surface.Value(u0, v1));
+  const bool reverse = direction == ThreadDirection::OppositeSupportAxis;
+  frame.origin = along(frame, reverse ? std::max(first, last) : std::min(first, last));
+  if (reverse)
+    frame.axis = {-frame.axis.x, -frame.axis.y, -frame.axis.z};
+  return Result<ExternalSupport>::success({face.value(), frame});
 }
 double volume(const TopoDS_Shape& s) {
   GProp_GProps g;
@@ -385,6 +426,84 @@ Result<Applied> apply_checked(const FeatureId& id, const TopoDS_Shape& target,
 }
 } // namespace
 
+Result<ThreadSupportInspection>
+ThreadAdapter::inspect_support(const PartDocument& part, const BodyId& body,
+                               const FaceReference& reference, const ShapeCache& cache,
+                               ThreadDirection direction, StepImportTopologyContext* imports,
+                               std::optional<std::size_t> history_prefix) {
+  const auto fail = [&](std::string message) {
+    return Result<ThreadSupportInspection>::failure(
+        Error::geometry(body.value(), std::move(message)));
+  };
+  if (part.is_reference_part() || reference.role() != PartFeatureInputRole::ThreadSupportFace ||
+      (direction != ThreadDirection::AlongSupportAxis &&
+       direction != ThreadDirection::OppositeSupportAxis))
+    return fail("Thread authoring requires an editable Part and a typed support/direction");
+  const auto valid = validate_part_feature_input_reference(part, reference);
+  if (!valid)
+    return Result<ThreadSupportInspection>::failure(valid.error());
+  const auto complete = history_prefix
+                            ? detail::validate_history_modeling_scope(part, cache, history_prefix)
+                            : cache.validate_complete_geometry_result(part);
+  if (!complete)
+    return Result<ThreadSupportInspection>::failure(complete.error());
+  const auto* definition = part.find_body(body);
+  const auto* target = cache.find_body_shape(body);
+  if (!definition || definition->kind() != BodyKind::Solid || !target || target->empty())
+    return fail("Thread support requires a current solid Body");
+  try {
+    // Inspection has no authored consumer. An empty consumer selects the current
+    // terminal Body placement, including a transform that is itself terminal.
+    auto resolved =
+        external_support(part, cache, target->impl_->shape, reference, target->impl_->face_lineage,
+                         FeatureId(""), direction, imports);
+    if (!resolved)
+      return fail(resolved.error().message());
+    const auto& frame = resolved.value().frame;
+    if (std::abs(length(frame.axis) - 1) > tol || std::abs(length(frame.x) - 1) > tol ||
+        std::abs(dot(frame.axis, frame.x)) > tol)
+      return fail("Thread support frame must be orthonormal");
+    BRepAdaptor_Surface surface(resolved.value().face);
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(resolved.value().face, u0, u1, v0, v1);
+    if (!std::isfinite(u0) || !std::isfinite(u1) || !std::isfinite(v0) || !std::isfinite(v1))
+      return fail("Thread support must have finite bounds");
+    const auto first = surface.Value(u0, v0), last = surface.Value(u0, v1);
+    const double z0 = axial(frame, first), z1 = axial(frame, last), span = std::abs(z1 - z0);
+    if (!(span > tol) || !std::isfinite(span))
+      return fail("Thread support has no finite axial interval");
+    const double r0 = point(along(frame, z0)).Distance(first),
+                 r1 = point(along(frame, z1)).Distance(last);
+    const double slope = (r1 - r0) / (z1 - z0), radius = r0 - slope * z0;
+    if (!std::isfinite(slope) || !std::isfinite(radius) || radius < -tol ||
+        radius + slope * span < -tol)
+      return fail("Thread support radius or taper is invalid");
+    const double u = (u0 + u1) / 2, v = (v0 + v1) / 2;
+    BRepLProp_SLProps properties(surface, u, v, 1, tol);
+    if (!properties.IsNormalDefined())
+      return fail("Thread support normal is undefined");
+    auto normal = properties.Normal();
+    if (resolved.value().face.Orientation() == TopAbs_REVERSED)
+      normal.Reverse();
+    const auto sample = surface.Value(u, v);
+    const auto center = along(frame, axial(frame, sample));
+    Vector3 radial{sample.X() - center.x, sample.Y() - center.y, sample.Z() - center.z};
+    if (!(length(radial) > tol) ||
+        dot(normalized(radial), {normal.X(), normal.Y(), normal.Z()}) <= tol)
+      return fail("Choose an exterior cylinder or cone for an external Thread");
+    if (imports) {
+      auto fresh = imports->validate_sources();
+      if (!fresh)
+        return Result<ThreadSupportInspection>::failure(fresh.error());
+    }
+    return Result<ThreadSupportInspection>::success({frame.origin, frame.axis, frame.x,
+                                                     std::max(0., radius), span,
+                                                     std::atan(slope) * 180 / std::numbers::pi});
+  } catch (const Standard_Failure& e) {
+    return fail(standard_failure_message(e, "Thread support inspection failed"));
+  }
+}
+
 Result<GeometryShape> ThreadAdapter::apply(const PartDocument& part, const ThreadFeature& feature,
                                            const GeometryShape& target, const ShapeCache& cache,
                                            StepImportTopologyContext* imports) const {
@@ -395,40 +514,17 @@ Result<GeometryShape> ThreadAdapter::apply(const PartDocument& part, const Threa
     return Result<GeometryShape>::failure(
         Error::geometry(feature.id().value(), "Thread target is unavailable"));
   try {
-    auto face = resolve_semantic_face(part, cache, target.impl_->shape, feature.support(),
-                                      feature.id(), "Thread", imports);
-    if (!face)
-      return Result<GeometryShape>::failure(face.error());
-    BRepAdaptor_Surface s(face.value());
-    if (s.GetType() != GeomAbs_Cylinder && s.GetType() != GeomAbs_Cone)
-      return Result<GeometryShape>::failure(
-          Error::geometry(feature.id().value(), "Thread support must be cylindrical or conical"));
-    const gp_Ax3 axis =
-        s.GetType() == GeomAbs_Cylinder ? s.Cylinder().Position() : s.Cone().Position();
-    double u0, u1, v0, v1;
-    BRepTools::UVBounds(face.value(), u0, u1, v0, v1);
-    Frame f{{axis.Location().X(), axis.Location().Y(), axis.Location().Z()},
-            {axis.Direction().X(), axis.Direction().Y(), axis.Direction().Z()},
-            {axis.XDirection().X(), axis.XDirection().Y(), axis.XDirection().Z()}};
-    // Native producer roots retain their authored axis and seam frame. Kernel
-    // cylinder parameterization may run opposite to the extrusion direction.
-    for (const auto& entry : target.impl_->face_lineage) {
-      if (entry.face.IsSame(face.value()) && entry.support_axis) {
-        f.axis = *entry.support_axis;
-        f.x = normalized(entry.x_axis);
-        break;
-      }
-    }
-    const double z0 = axial(f, s.Value(u0, v0)), z1 = axial(f, s.Value(u0, v1));
-    const bool reverse = feature.direction() == ThreadDirection::OppositeSupportAxis;
-    f.origin = along(f, reverse ? std::max(z0, z1) : std::min(z0, z1));
-    if (reverse)
-      f.axis = {-f.axis.x, -f.axis.y, -f.axis.z};
+    auto support =
+        external_support(part, cache, target.impl_->shape, feature.support(),
+                         target.impl_->face_lineage, feature.id(), feature.direction(), imports);
+    if (!support)
+      return Result<GeometryShape>::failure(support.error());
     auto t = resolve_thread_definition(part, feature.thread());
     if (!t)
       return Result<GeometryShape>::failure(t.error());
-    auto result = apply_checked(feature.id(), target.impl_->shape, face.value(), t.value(), f,
-                                false, target.impl_->face_lineage, "thread/display");
+    auto result =
+        apply_checked(feature.id(), target.impl_->shape, support.value().face, t.value(),
+                      support.value().frame, false, target.impl_->face_lineage, "thread/display");
     if (!result)
       return Result<GeometryShape>::failure(result.error());
     auto backing = std::make_shared<GeometryShape::Impl>(result.value().shape);

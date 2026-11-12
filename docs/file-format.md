@@ -1391,6 +1391,11 @@ referenced solid Body and each extant origin must precede it. Roles describe aut
 generation rather than OCCT face positions. The transient Geometry lineage is rebuilt
 on recompute; BRep handles, raw face indices and world-space face snapshots are absent.
 
+Polygon-profile Revolve roots scope the Sketch/profile with length-prefixed IDs, followed by
+`side/bottom|right|top|left` for a rectangle or `line/<length>:<entity-id>/wall` for an authored
+line. They reuse this origin structure and OCCT generator lineage, without a new schema marker.
+See [Revolve source-edge origins](part-revolve-geometry-mvp6.md#selectable-polygon-profile-face-origins).
+
 Nonempty result-face supports require explicit `feature_order`. The reader validates
 that order against every executable exactly once and interleaves dependent Sketches,
 workplanes, ownership and construction records with the authored executable order.

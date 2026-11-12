@@ -207,3 +207,47 @@ controls select compatible pinned cells or convert a resolved source to an owned
 [The Hole contract](hole-wizard.md#recipe-and-dimensional-source-controls--157b2a) owns exact limits;
 the existing recipe/source and native test tags provide focused proof. Full Thread/support selectors,
 manipulators, Sketch return, presets and legacy conversion remain assigned to 157B2b/B3/C.
+
+### External Thread creation — 157B2b
+
+`begin_new_thread` joins `begin_new_hole` in the shared controller's creation lifecycle. A candidate
+must retain the fresh identity and match the creation kind; typed add commands publish one
+`Create Thread` or `Create Hole` transaction, including used pending inputs. The shell shares
+initialization, committed-source freshness, preview, pick scope, context restoration and final
+publication. External support dimensions come from Geometry inspection; the disposable custom
+seed uses `GuiThreadRecipeCommands`. Existing feature updates retain their update commands.
+
+The [Hole/Thread contract](hole-wizard.md#external-creation-and-new-modeled-templates--157b2b) owns
+defaults, supported representations and the remaining selectors/Create Another boundary.
+`[thread-create-shell]` and `[native-thread-create]` exercise new internal/external modeled geometry,
+actual scoped face picks and transactional history; run existing creation/edit regression alongside.
+
+Thread source/start/taper controls use `GuiThreadRecipeCommands` over the same typed Hole/Thread
+records. Mapping drafts live only in the form; complete choices become a `ThreadStandardProfile`.
+Commands filter scalar edits against the resulting record's dependencies before its Core update,
+so an explicitly removed optional input cannot leak an invalid unused value. Existing shared and
+formula bindings retain their established ownership. See [source and interval controls](hole-wizard.md#thread-sources-and-optional-intervals--157b2b)
+and `[thread-source-shell]` / `[native-thread-source]`; remaining limit/context scope and combined
+acceptance stay assigned.
+
+Existing Hole/Thread support selectors evaluate the feature's exact predecessor history in a
+separate checked input cache. Scoped preview targets show that geometry during picks; they retain
+typed references and never publish preview IDs. Existing references are preserved until explicitly
+rebound, and the full downstream candidate remains the preview/Apply authority. Cancel restores
+the entry context. See [the support-edit contract](hole-wizard.md#existing-support-editing--157b2b)
+and `[hole-support-edit-shell]` / `[native-hole-support-edit]` for the visible-solid boundary and
+retained extended-context scope.
+
+Hole To Face and Up to Body add required typed limit selectors and scoped model picks to that same
+lifecycle. Native/imported/result face choices use the existing Core extent/serialization authority;
+Body choices exclude the target. Cleared or invalid candidates preserve the committed model and
+remain correctable, including a target change that invalidates the old limit. See
+[the limit contract](hole-wizard.md#explicit-hole-limits--157b2b) and `[hole-limit-shell]` /
+`[native-hole-limit]` for geometry, source freshness, transactional and native proof.
+
+New external conical seeds choose a positive inspected entry and bound a narrowing interval before
+an apex. Thread scalar controls retain nine decimal places for exact support/profile compatibility.
+Complete rejected profile mappings retry after a used scalar/binding correction; rebuilding retains
+Thread numeric focus. Existing definitions retain their explicit bindings/directions. See the
+[conical combinations contract](hole-wizard.md#conical-thread-combinations--157b2b) and
+`[thread-cone-shell]` / `[native-thread-cone]` for combined source, interval and physical proof.

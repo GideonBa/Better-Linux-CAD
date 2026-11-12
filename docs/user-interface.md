@@ -27,7 +27,7 @@ file-format fields or undo records.
 | --- | --- |
 | File | New Part, New Assembly, Open, Open for Repair, Save, Save As |
 | Quick Access | New, Open, Save, Undo, Redo and Repeat, accessible from every ribbon context |
-| 3D Model | Plane/face → Create 2D Sketch; profile → Extrude/Revolve; finishing, patterns, Body operations, Sweep/Loft, construction, Sketch3D and Hole |
+| 3D Model | Plane/face → Create 2D Sketch; profile → Extrude/Revolve; finishing, patterns, Body operations, Sweep/Loft, construction, Sketch3D, Hole and Thread |
 | Sketch | Finish/Cancel where supported; draw, constrain, dimension, modify, transform, project, grid and diagnostics; enabled only during Sketch editing |
 | Surface | Boundary, Fill, Trim, Extend, Stitch and Shell to Solid |
 | Assembly | Assembly creation, placement, relationships, joints/motion and STEP sources |
@@ -281,8 +281,24 @@ millimeters. Recipe, termination, tip, dimensional source and custom internal Th
 [the 157B2a contract](hole-wizard.md#recipe-and-dimensional-source-controls--157b2a). Pinned dimensions
 show their resolved value/units and source; returning to Custom is explicit. Apply commits once;
 Create Another opens a fresh draft. The current entry context is a
-complete editable Part with a visible solid and no other active task/workflow. Complete Thread and
-imported/result support selectors, support-anchored grips and the full workflow remain 157B2b/B3/C.
+complete editable Part with a visible solid and no other active task/workflow. Model → Design →
+Thread now creates a custom external Thread in that same task, with scoped exterior support picks
+and an explicit cosmetic/modeled choice. New cylindrical internal/external templates support the
+modeled switch; unsupported tapered modeling still blocks Apply. See [creation and support
+contracts](hole-wizard.md#external-creation-and-new-modeled-templates--157b2b). Thread profiles expose
+explicit revision/row/typed-column mapping or custom parameters, optional start and taper controls,
+resolved units and provenance. [Incomplete/invalid mappings](hole-wizard.md#thread-sources-and-optional-intervals--157b2b)
+block Apply and remain correctable. [Existing support picks](hole-wizard.md#existing-support-editing--157b2b)
+show the model before the edited feature; numeric preview and Apply validate the whole downstream
+model. Cancel restores the entry selection/camera. [Hole limits](hole-wizard.md#explicit-hole-limits--157b2b)
+have their own required Face/Body selectors and model picks; clearing or choosing an invalid limit
+blocks Apply while preserving correction controls. Extended contexts,
+support-anchored grips and the full workflow remain 157B2b/B3/C.
+Conical Thread seeds retain a positive interval and inspected entry direction. Thread numeric
+controls expose nine decimal places; offset/direction changes require explicit matching profile
+values. [Conical combinations](hole-wizard.md#conical-thread-combinations--157b2b) retain correction
+controls for incompatible profiles and unsupported modeled taper. A complete rejected standard
+mapping retries when its used numeric input or binding is corrected.
 
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
 [compact suppression at 150%](images/history-suppression-compact.png) and

@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 156
 current_block: 157
-current_boundary: Block 156 accepted; 157A/B1 delivered; 157B2a verified; 157B2b next
+current_boundary: Block 156 accepted; 157A/B1/B2a delivered; 157B2b verified, PR delivery pending
 current_tag: "[parity-b157]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 156
-current block        Block 157 (157B2a verified; 157B2b next)
+current block        Block 157 (157B2b verified; delivery pending)
 current phase        Semantic holes and threads
-current boundary     Editing, recipes and dimensional sources verified; full Wizard and combined acceptance remain open
+current boundary     Support, limit and Thread authoring verified; 157B3/C and combined acceptance remain open
 ```
 
 The next assigned work is Block 157. [The consolidated sequence](inventor-parity-sequence.md)
@@ -280,9 +280,9 @@ remain assigned. Deliver named slices serially, with the parent block open until
 | --- | --- |
 | 157A — verified | Typed Hole/Thread property editing over existing Core update commands, stable IDs/history, formula and pinned-resource ownership, whole downstream preview and rollback. |
 | 157B1 — verified | Semantic Plain/ThroughAll Hole creation in the existing panel, target/support selection, pending dimensional ownership, Create Another and one final publication. Normal complete Part context first; no new Hole schema or cut interpreter. |
-| 157B2 — in progress | Complete recipe/custom-standard/internal-external Thread selectors and native/imported support collection; keep 157A editing compatible. |
+| 157B2 — verified; delivery pending | Complete recipe/custom-standard/internal-external Thread selectors and native/imported/result supports and limits; keep 157A editing compatible. |
 | 157B2a — verified | Nine recipes, six extent transitions, tip and custom internal Thread controls, typed dimensional table/custom sources, stable owned inputs and existing-feature recipe changes. |
-| 157B2b | Complete standard Thread profile mappings, optional start/taper authoring, external Thread creation and scoped native/imported/result support and limit collection. |
+| 157B2b — verified; delivery pending | Complete standard Thread profile mappings, optional start/taper authoring, external Thread creation and scoped native/imported/result support and limit collection. |
 | 157B3 | In-canvas position/depth/diameter interaction, referenced Sketch points and breadcrumb return, presets, explicit legacy conversion, full recipe/thread Create Another ownership and extended shared context lifecycle. |
 | 157C | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
 
@@ -392,11 +392,67 @@ fences, raw captures and working/staged content are reviewed. The branch starts 
 
 Delivery: [PR #178](https://github.com/GideonBa/Better-Linux-CAD/pull/178), reviewed implementation
 `7e107b7`. This final delivery record changes documentation only; verified runtime inputs/binaries
-remain unchanged. Verify the merged tree and refresh main before starting the next branch.
+remain unchanged. PR #178 is verified merged as `1348d19`; its tree matches the reviewed delivery.
+Main was refreshed before starting `feat/hole-thread-support-authoring`.
 
-Next: 157B2b completes Thread profiles/start/taper, external Thread creation and native/imported/result
-support/limit collection. Then 157B3/C and full 158–165 remain assigned. Acceptance of 157B2a does
-not close its parent 157B2 or Block 157.
+The following 157B2b verification closes the named selector/authoring slice. 157B3/C and the full
+158–165 sequence remain assigned; neither 157B2a nor 157B2b closes Block 157.
+
+### 157B2b implementation and verification — verified; delivery pending
+
+The serial delivery remains on `feat/hole-thread-support-authoring`, based on merged `1348d19`,
+in [PR #179](https://github.com/GideonBa/Better-Linux-CAD/pull/179). The complete named slice is
+verified and awaits normal PR delivery. Parent 157 and the assigned continuation through 165 remain open.
+
+| Component | Contract / focused proof | Delivery |
+| --- | --- | --- |
+| Native/imported/result planar creation supports; current placement, source guards and used-only pending workplanes | [Support contract and captures](hole-wizard.md#planar-support-collection--157b2b); `[hole-support-shell]`, `[native-hole-support]` | `3c0b01c` |
+| Read-only exterior Thread frame/radius/span/signed taper; shared execution resolver, placed imports and stale/wrong/inner/source rejection | [Geometry contract](hole-wizard.md#exterior-thread-support-inspection--157b2b); `[thread-support-query]`, `[thread-import]` | `58b0ca7`, terminal placement correction in `8973417` |
+| External creation and new modeled cylindrical templates; transactional used inputs, scoped picks, invalid correction, exact history/reopen and physical STEP | [Creation contract and captures](hole-wizard.md#external-creation-and-new-modeled-templates--157b2b); `[thread-create-shell]`, `[native-thread-create]` | `8973417` |
+| Explicit Thread revision/row/typed columns, custom conversion, optional start/taper and live scoped selectors | [Source/interval contract](hole-wizard.md#thread-sources-and-optional-intervals--157b2b); `[thread-source-shell]`, `[native-thread-source]` | Verified in PR #179 |
+| Existing Hole/Thread support editing against exact predecessor history; preserved references, later-Body exclusion and used-only pending workplanes | [Support-edit contract and captures](hole-wizard.md#existing-support-editing--157b2b); `[hole-support-edit-shell]`, `[native-hole-support-edit]`, Geometry `[thread-support-prefix]` | Verified in PR #179 |
+| Explicit native/imported/result To Face and distinct Up to Body limits; invalid/cleared/retarget correction and unchanged limit Bodies | [Limit contract and captures](hole-wizard.md#explicit-hole-limits--157b2b); `[hole-limit-shell]`, `[native-hole-limit]` | Verified in PR #179 |
+| Native polygon-Revolve source-edge roots; positive conical seeds, offset/opposite-direction/source correction, numeric precision and complete mapping retry | [Conical contract](hole-wizard.md#conical-thread-combinations--157b2b), [Revolve origins](part-revolve-geometry-mvp6.md#selectable-polygon-profile-face-origins); `[thread-cone-shell]`, `[native-thread-cone]`, `[revolve-lineage]` | Verified in PR #179 |
+
+Geometry/GUI/app/export targets build. Final Revolve/Thread support, query, import and execution
+regression passes **25 cases / 1,744 assertions**. The combined creation/recipe/support/limit/edit/
+source/Pattern/prefix/inventory/icon/viewport/lifecycle Qt selection passes **88 cases / 14 native
+skips / 7,393 assertions**. All fourteen skipped cases execute natively at **100% and compact
+150%: 14 cases / 1,179 assertions at each scale**, without failures/skips. The 100% proof comprises
+two disjoint runs (2 / 265 and 12 / 914) on the same final test binary. This is complete coverage of
+the selected regression's skips, not the full native suite. Native proof includes real face/Body
+picks, corrected complete mappings and retained numeric focus, modeled/cosmetic geometry, exact
+history/reopen, physical STEP and viewer teardown. Original captures are inspected without edits.
+Separate PID-matched startup is viewable (intentional timeout 124).
+
+Core inputs and binary remain unchanged from the accepted backend evidence. Full Core, full
+Geometry and full Qt are not rerun for this named slice; complete integration remains 157C/158.
+The final GUI-test-only additions leave Geometry/app/export input closures and binaries unchanged
+from the 25-case proof. Frozen runtime inputs: 1,055 files, SHA256
+`0446ae69aa332d6de03e43eb201495052eded6bda9270195bb64b34852ff74bd`.
+Detailed earlier component runs remain in Git/PR history.
+
+157B3 retains full recipe/thread Create Another ownership, support-anchored manipulators, referenced
+Sketch points and breadcrumb return, presets without captured targets, explicit legacy conversion
+with mapping or diagnostic, and extended shared contexts. Then complete 157C's B01–B04/UI01 gates,
+Block 158 integrated acceptance and the full 159–165 sequence. Preserve all scope after 165.
+
+### Next implementation — 157B3
+
+Begin only after the complete 157B2b PR is merged and main is refreshed. Keep one serial branch
+and preserve the full parent acceptance gate. The implementation order below adds no acceptance:
+
+| Work | Implementation / focused proof |
+| --- | --- |
+| Complete Create Another ownership | Retain the complete Hole recipe or Thread definition, issue fresh feature/placement/owned-input identities, preserve explicit shared/formula/pinned bindings, and publish each action once. Verify unused-input pruning, correction, Cancel and exact history/reopen. |
+| Referenced positions and Sketch return | Use existing typed Sketch-point references and source workflow authority; support multiple positions, coplanarity/current-frame validation and breadcrumb return without publishing disposable edits. |
+| Support-anchored interaction | Reuse the shared manipulator layer for meaningful position/depth/diameter/interval controls, exact release, explicit formula/source override and invalid/corrected/cancelled drags on posed supports. |
+| Presets, legacy conversion and shared contexts | Presets retain properties without captured targets; explicit conversion previews semantic intent and preserves supported downstream mappings or reports a diagnostic. Complete hidden/consumed/prefix and shared-context lifecycle against existing session/history authorities. |
+
+For every coherent change, synchronize the existing Hole/Feature-edit/UI/persistence contracts,
+run focused regressions and native 100%/compact 150% as applicable, review, commit and push. Then
+157C proves the complete B01–B04/UI01 combinations and updates capability inventory; 158 proves
+Phase A/B integration before the assigned 159–165 implementation. No later scope is removed.
 
 ## Later phases
 
