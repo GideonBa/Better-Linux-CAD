@@ -1014,7 +1014,48 @@ PID-matched native startup reached `IsViewable` before its intentional timeout (
 All 156 GUI/app dependency records are valid. Frozen runtime: **1,063 files**, SHA256
 `3867fa78784cbbce25642e22e2f17e40672c46cf4b717e3868c49d49760dc3eb`.
 Failed and superseded runs contribute no proof. This component alone does not accept parent 157;
-the combined authoring, Pattern/Assembly/STEP and inventory gates remain assigned below the plan.
+the combined authoring, Pattern/Assembly/STEP and inventory gates remain assigned in the plan.
+
+### Combined authored Hole and Thread workflows — 157C
+
+`[hole-combined-b04]` in the existing combined shell acceptance file continues two newly authored
+owned Counterbore placements into the native two-direction Pattern task, physical bore picking and
+a checked exclusion. The resulting base has ten bores: `38,400 − 10 × 22π mm³`. The cover reuses
+the accepted typed intent through the existing Core commands, with a 4 mm thickness, underside
+support and 0.5 mm seats.
+
+The existing Assembly task authors two Insert relationships against distinct Pattern occurrences.
+A shared Assembly count binding reduces each Part from ten to eight bores; the retained target
+must resolve, the removed target must diagnose while retaining both relationships. Independent
+alignment, density/volume mass, exact per-operation history and native JSON reopen are checked.
+Structured STEP is exported through the public shell export command and read as physical solids
+and occurrence transforms. The existing native structured-import copy workflow then registers
+that exact asset, previews both occurrences, saves a separate Project while preserving the current
+document/history, explicitly opens the copy and checks both local volumes, poses and portable reopen.
+
+`[thread-combined-b03]` pairs a new internal blind Thread and exterior cylinder in one Part. Each
+authors an explicit revision, offset, length and hand, corrects invalid length, publishes cosmetic
+intent, switches through modeled left/right hands and distinct pinned pitches, then returns to
+cosmetic. Independent analytic removed volumes and radial/axial point classification check pitch,
+hand, profile and partial interval in the actual accepted BRep. Each Apply has exact Undo/Redo;
+the final native JSON retains both definitions and pinned resources through reopen. The test-only
+Geometry oracle keeps OCCT headers outside the GUI test target.
+
+Native 100% passes the two combined cases in separate completed runs: **645 Thread assertions**
+and **309 B04 assertions**. Compact 150% runs both together with the Hole/Thread keyboard and
+existing Extrude baseline: **6 cases / 1,279 assertions**, no skips, exit 0. Original captures show
+the [reopened STEP Project](images/hole-thread-combined-step-100.png),
+[compact Assembly task](images/hole-thread-combined-assembly-compact.png),
+[compact Thread task](images/hole-thread-combined-thread-compact.png) and
+[compact structured-import preview](images/hole-thread-combined-import-compact.png).
+
+Frozen runtime: **1,063 files**, SHA256
+`d4efa49f338b0b86b262de0ad31063631dadee6b1367b9e6a8aa24840e205fa9`; all 156 current GUI/app
+dependency records are valid and nonempty. Failed/interrupted and superseded runs contribute no
+proof. Shared keyboard/Extrude/Source Sketch offscreen regression passes **5 cases / 488 assertions**
+with no skips and exit 0. Whole 157 still requires the
+remaining native workflow reconciliation and capability-inventory checks; 158 retains full Phase
+A/B integration, migrated/fresh documents, suppression/reorder and recompute measurements.
 
 ## Why more than a cut
 

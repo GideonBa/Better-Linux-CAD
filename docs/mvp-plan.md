@@ -490,8 +490,14 @@ Escape handling, with local Enter/Tab and inline compact feedback. The keyboard/
 case and existing Extrude property-control baseline pass offscreen and natively at both scales;
 the affected Qt selection passes with its eight native-only skips. The
 [keyboard contract and proof](hole-wizard.md#keyboard-input-and-correction--157c) record counts,
-original captures and the frozen runtime. The remaining combined authoring, Pattern/Assembly/STEP
-and inventory gates below stay open.
+original captures and the frozen runtime. The remaining native reconciliation and inventory gates
+below stay open.
+
+The combined proofs pass natively at 100% and compact 150%: newly authored two-position
+Counterbores continue through Pattern exclusions, bound Assembly targets/mass and structured STEP
+reimport; paired internal/external Threads exercise pins, hands, partial intervals and representation
+changes. The [combined workflow contract](hole-wizard.md#combined-authored-hole-and-thread-workflows--157c)
+records explicit oracles, execution counts, original captures and the remaining acceptance boundary.
 
 | Gate | Work / completion boundary |
 | --- | --- |
