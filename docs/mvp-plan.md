@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 156
 current_block: 157
-current_boundary: Block 156 accepted; 157A/B1/B2a delivered; 157B2b verified, PR delivery pending
+current_boundary: Block 156 accepted; 157A/B1/B2 delivered; 157B3 workflow lifecycle in progress
 current_tag: "[parity-b157]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 156
-current block        Block 157 (157B2b verified; delivery pending)
+current block        Block 157 (157B3 in progress)
 current phase        Semantic holes and threads
-current boundary     Support, limit and Thread authoring verified; 157B3/C and combined acceptance remain open
+current boundary     Support, limit and Thread authoring delivered; workflow lifecycle and combined acceptance remain open
 ```
 
 The next assigned work is Block 157. [The consolidated sequence](inventor-parity-sequence.md)
@@ -280,10 +280,10 @@ remain assigned. Deliver named slices serially, with the parent block open until
 | --- | --- |
 | 157A — verified | Typed Hole/Thread property editing over existing Core update commands, stable IDs/history, formula and pinned-resource ownership, whole downstream preview and rollback. |
 | 157B1 — verified | Semantic Plain/ThroughAll Hole creation in the existing panel, target/support selection, pending dimensional ownership, Create Another and one final publication. Normal complete Part context first; no new Hole schema or cut interpreter. |
-| 157B2 — verified; delivery pending | Complete recipe/custom-standard/internal-external Thread selectors and native/imported/result supports and limits; keep 157A editing compatible. |
+| 157B2 — delivered | Complete recipe/custom-standard/internal-external Thread selectors and native/imported/result supports and limits; keep 157A editing compatible. |
 | 157B2a — verified | Nine recipes, six extent transitions, tip and custom internal Thread controls, typed dimensional table/custom sources, stable owned inputs and existing-feature recipe changes. |
-| 157B2b — verified; delivery pending | Complete standard Thread profile mappings, optional start/taper authoring, external Thread creation and scoped native/imported/result support and limit collection. |
-| 157B3 | In-canvas position/depth/diameter interaction, referenced Sketch points and breadcrumb return, presets, explicit legacy conversion, full recipe/thread Create Another ownership and extended shared context lifecycle. |
+| 157B2b — delivered | Complete standard Thread profile mappings, optional start/taper authoring, external Thread creation and scoped native/imported/result support and limit collection. |
+| 157B3 — in progress | In-canvas position/depth/diameter interaction, referenced Sketch points and breadcrumb return, presets, explicit legacy conversion, full recipe/thread Create Another ownership and extended shared context lifecycle. |
 | 157C | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
 
 No new Hole/Thread persistence authority or independent pattern evaluator is planned. Preserve
@@ -398,11 +398,12 @@ Main was refreshed before starting `feat/hole-thread-support-authoring`.
 The following 157B2b verification closes the named selector/authoring slice. 157B3/C and the full
 158–165 sequence remain assigned; neither 157B2a nor 157B2b closes Block 157.
 
-### 157B2b implementation and verification — verified; delivery pending
+### 157B2b implementation and verification — delivered
 
-The serial delivery remains on `feat/hole-thread-support-authoring`, based on merged `1348d19`,
-in [PR #179](https://github.com/GideonBa/Better-Linux-CAD/pull/179). The complete named slice is
-verified and awaits normal PR delivery. Parent 157 and the assigned continuation through 165 remain open.
+The serial delivery is [PR #179](https://github.com/GideonBa/Better-Linux-CAD/pull/179), based on
+merged `1348d19`. Reviewed final implementation `f4e0d87` is merged normally as `d4bc4c2`; the
+merged tree matches the verified delivery. Main was refreshed before starting
+`feat/hole-thread-workflow-lifecycle`. Parent 157 and the assigned continuation through 165 remain open.
 
 | Component | Contract / focused proof | Delivery |
 | --- | --- | --- |
@@ -437,9 +438,9 @@ Sketch points and breadcrumb return, presets without captured targets, explicit 
 with mapping or diagnostic, and extended shared contexts. Then complete 157C's B01–B04/UI01 gates,
 Block 158 integrated acceptance and the full 159–165 sequence. Preserve all scope after 165.
 
-### Next implementation — 157B3
+### Current implementation — 157B3
 
-Begin only after the complete 157B2b PR is merged and main is refreshed. Keep one serial branch
+The branch starts from verified merged `d4bc4c2` after the Main/tree check. Keep one serial branch
 and preserve the full parent acceptance gate. The implementation order below adds no acceptance:
 
 | Work | Implementation / focused proof |
