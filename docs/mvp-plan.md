@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 156
 current_block: 157
-current_boundary: Block 156 accepted; 157A/B1/B2 delivered; 157B3 workflow lifecycle in progress
+current_boundary: Block 156 accepted; 157A/B verified; 157C combined acceptance next
 current_tag: "[parity-b157]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 156
-current block        Block 157 (157B3 in progress)
+current block        Block 157 (157C next)
 current phase        Semantic holes and threads
-current boundary     Support, limit and Thread authoring delivered; workflow lifecycle and combined acceptance remain open
+current boundary     Hole/Thread workflow lifecycle verified; combined native acceptance remains open
 ```
 
 The next assigned work is Block 157. [The consolidated sequence](inventor-parity-sequence.md)
@@ -283,8 +283,8 @@ remain assigned. Deliver named slices serially, with the parent block open until
 | 157B2 — delivered | Complete recipe/custom-standard/internal-external Thread selectors and native/imported/result supports and limits; keep 157A editing compatible. |
 | 157B2a — verified | Nine recipes, six extent transitions, tip and custom internal Thread controls, typed dimensional table/custom sources, stable owned inputs and existing-feature recipe changes. |
 | 157B2b — delivered | Complete standard Thread profile mappings, optional start/taper authoring, external Thread creation and scoped native/imported/result support and limit collection. |
-| 157B3 — in progress | In-canvas position/depth/diameter interaction, referenced Sketch points and breadcrumb return, presets, explicit legacy conversion, full recipe/thread Create Another ownership and extended shared context lifecycle. |
-| 157C | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
+| 157B3 — verified | In-canvas position/depth/diameter interaction, referenced Sketch points and breadcrumb return, presets, explicit legacy conversion, full recipe/thread Create Another ownership and extended shared context lifecycle. |
+| 157C — next | Native B01–B04/UI01 combinations at 100%/150%, invalid/corrected candidates, exact history/reopen and physical STEP; synchronize capability inventory. |
 
 No new Hole/Thread persistence authority or independent pattern evaluator is planned. Preserve
 legacy cut editing and all subsequent 158–204 requirements. Acceptance of 157A alone does not
@@ -433,64 +433,49 @@ from the 25-case proof. Frozen runtime inputs: 1,055 files, SHA256
 `0446ae69aa332d6de03e43eb201495052eded6bda9270195bb64b34852ff74bd`.
 Detailed earlier component runs remain in Git/PR history.
 
-157B3 retains full recipe/thread Create Another ownership, support-anchored manipulators, referenced
+157B3 implements full recipe/thread Create Another ownership, support-anchored manipulators, referenced
 Sketch points and breadcrumb return, presets without captured targets, explicit legacy conversion
 with mapping or diagnostic, and extended shared contexts. Then complete 157C's B01–B04/UI01 gates,
 Block 158 integrated acceptance and the full 159–165 sequence. Preserve all scope after 165.
 
 ### Current implementation — 157B3
 
-The branch starts from verified merged `d4bc4c2` after the Main/tree check. Keep one serial branch
-and preserve the full parent acceptance gate. The implementation order below adds no acceptance:
+157B3 is **implemented and verified** in [PR #180](https://github.com/GideonBa/Better-Linux-CAD/pull/180).
+Its serial branch started from verified merged `d4bc4c2`. This named slice does not accept parent
+157: complete B01–B04/UI01 combinations and capability promotion remain 157C, followed by 158's
+Phase A/B integration and the assigned 159–165 sequence. Preserve all scope after 165.
 
-The active delivery is [draft PR #180](https://github.com/GideonBa/Better-Linux-CAD/pull/180).
-The complete typed Create Another component is implemented and verified;
-its [contract](hole-wizard.md#complete-create-another--157b3), current shell tests
-`[hole-repeat-shell]` / `[native-hole-repeat]` and normal transaction authorities own behavior.
-No 157B3 or parent acceptance is claimed while the remaining rows are open.
-
-| Work | Implementation / focused proof |
+| Completed component | Contract / proof source |
 | --- | --- |
-| Complete Create Another ownership — implemented | Retain the complete Hole recipe or Thread definition, issue fresh feature/placement/owned-input identities, preserve explicit shared/formula/pinned bindings, and publish each action once. `[hole-repeat-shell]`: 6 passed, 2 native skips, 1,241 assertions. Native repeat/creation/source/support regression: 7 cases / 684 assertions at each of 100% and compact 150%; physical cuts, correction, Cancel and exact history/reopen. |
-| Referenced positions and Sketch return — implemented and verified | Existing typed Sketch-point references, independent/referenced selection, multiple positions, preselection/native picks, exact support-frame query and shared source breadcrumb/Part workflow. Qt position/source/editor regression: 15 passed, 3 native skips / 1,967 assertions, including invalid-diameter and Slot-origin correction. Geometry support/Thread/scene regression: 18 cases / 1,299 assertions. Native position/source/repeat/feature-edit regression: 5 cases / 508 assertions at both scales. |
-| Support-anchored interaction — implemented and verified | Shared Linear/Radial controls for owned positions, bore/seat/step dimensions, depth and Thread intervals. Candidate predecessor geometry supplies the support, and current Body placements supply the posed frame/value scale. Explicit Make Independent retains shared/formula sources. Focused Qt/manipulator/source/editor regression: 28 passed, 5 native skips / 2,428 assertions. Geometry inverse/Body-transform/result-face/support regression: 21 cases / 1,195 assertions. Native: 12 cases / 1,111 assertions at each scale (150% disjoint 11+1 runs). |
-| Property presets — implemented and verified | Canonical Core value templates, literal dimensional snapshots/aliases and immutable pinned revisions; retain current targets/support/positions/limits/profile, publish only required new inputs and report conflicts without replacing a valid draft. Typed/storage and shell regression passes the recorded 144-case selection; native preset/canvas/source/repeat regression passes 10 cases / 824 assertions at both scales. [Contract](hole-wizard.md#property-presets--157b3). |
-| Explicit legacy conversion — implemented and verified | Compatible circle cuts stage a canonical Hole in the existing Part workflow; retain feature/history identity and diameter/support bindings, disclose independent center/origin values, validate downstream execution/common material, preserve supported Pattern/pose mappings or report a diagnostic. Full Core, focused Geometry, 175-case Qt regression and 14-case native regression at both scales verify the replacement, diagnostics, context restoration and exact history. [Contract](hole-wizard.md#explicit-legacy-conversion--157b3). |
-| Hidden/consumed predecessor inputs — implemented and verified | Determine edit availability from the exact predecessor cache, disclose hidden/input-history Bodies, temporarily expose their pick geometry without changing visibility and validate complete downstream edits. Focused Geometry: 11 cases / 801 assertions; Qt input history: 2 passed, 2 native skips / 246 assertions. Relevant Qt regression: 82 passed, 15 skips / 6,200 assertions. Native picks/support/limit/context: 7 cases / 763 assertions at both scales. [Contract](hole-wizard.md#hidden-and-consumed-input-bodies--157b3). |
-| Prefix and shared contexts — lifecycle implemented; combined rebasing follow-up open | Existing session child checkpoints own Hole/Thread creation/editing, Source Sketch return and Create Another. Canonical atomic insertion preserves Body-consumer suffixes; exact prefix scenes and predecessor selectors retain context. Workspace, unrelated-workflow and stale-command guards preserve enclosing workflows. Focused Qt: 5 passed, 1 native skip / 582 assertions. Native: 10 cases / 1,134 assertions at each scale in disjoint 6+4 clean-exit runs. Complete stable-ID recipe/support/limit handoffs after source return with a same-family suffix before closing 157B3. [Contract](hole-wizard.md#end-of-part-and-shared-contexts--157b3). |
+| Complete Create Another ownership | [Repeat contract](hole-wizard.md#complete-create-another--157b3); `[hole-repeat-shell]`, `[native-hole-repeat]` |
+| Referenced positions and Source Sketch return | [Position/source contract](hole-wizard.md#referenced-position-workflow--157b3); `[hole-position-shell]`, `[source-sketch-workflow]`, `[native-hole-position]` |
+| Support-anchored position/diameter/depth/Thread controls | [Canvas contract](gui-feature-edit-mvp9.md#holethread-canvas-controls--157b3); `[hole-canvas-shell]`, native canvas cases |
+| Property value presets without captured targets | [Preset contract](hole-wizard.md#property-presets--157b3); typed/storage, `[hole-preset-shell]`, `[native-hole-preset]` |
+| Explicit legacy conversion with mapping/material certification | [Conversion contract](hole-wizard.md#explicit-legacy-conversion--157b3); Core replacement, `[hole-conversion-shell]`, native conversion/context cases |
+| Hidden/consumed predecessor input selection | [Input-history contract](hole-wizard.md#hidden-and-consumed-input-bodies--157b3); Geometry visibility/scope, `[hole-input-history-shell]`, native input cases |
+| Prefix child commands, source return and enclosing workflow guards | [Prefix contract](hole-wizard.md#end-of-part-and-shared-contexts--157b3); `[hole-thread-insertion]`, `[hole-prefix-shell]`, `[hole-context-shell]`, `[native-hole-prefix]` |
+| Stable-ID recipe/support/limit rebasing before a same-family suffix | Same prefix contract; `[hole-canonical-rebase-shell]` covers Source return, Through All/To Face, Counterbore, exact unchanged suffix, independent volume, history/reopen and native source/keyboard input |
 
-The conversion component uses the existing disposable Part workflow and canonical Core codec.
-The linked conversion contract retains its focused proof; complete the combined rebasing follow-up next.
-Do not infer parent acceptance from these components; 157C and all 158–165 work remain assigned.
-
-Current verification covers prefix child-command/source-return lifecycle through the existing
-session authority and workspace/read-only/stale-command guards. The next focused follow-up must
-reselect recipe/support/limit records by stable feature ID after canonical reordering, including
-Source Sketch return before an existing Hole/Thread suffix. Preserve the outer End of Part
-Save/Cancel/publication boundary and complete this combination before closing 157B3.
-
-Earlier components retain their linked contract/test proofs above. Detailed intermediate runs,
-commit chronology and superseded manifests remain in Git/PR history.
-
-Current prefix/context verification on frozen runtime inputs:
+Final rebasing/component verification on frozen runtime inputs:
 
 | Check | Final result |
 | --- | --- |
-| Full Core | 708 cases / 27,016 assertions |
-| Focused Geometry: Body consumers/poses/Patterns and exact support scopes | 37 cases / 2,987 assertions |
-| Focused Qt prefix/context | 6 cases: 5 passed, 1 native skip / 582 assertions |
-| Broader Hole/Thread, source/editor/prefix/viewport and strict capability Qt selection | 161 cases: 135 passed, 26 native skips / 11,769 assertions |
-| Native prefix/context/source/input/conversion-context, 100% and compact 150% | 10 cases / 1,134 assertions at each scale, disjoint 6+4 runs with clean exits |
+| Full Core, unchanged Core closure from prefix delivery | 708 cases / 27,016 assertions |
+| Focused Geometry, unchanged Body/Pattern/support closure | 37 cases / 2,987 assertions |
+| Focused canonical-rebasing Qt | 1 case / 169 assertions, both Through All and To Face |
+| Affected recipe/position/support/limit/Thread/preset/source/editor/history Qt selection | 79 cases: 69 passed, 10 native skips / 5,996 assertions |
+| Native rebasing/prefix/support/limit/Thread/preset, 100% and compact 150% | 7 cases / 1,026 assertions at each scale, all with exit 0 |
 | Native app startup | PID-matched viewable window; intentional timeout 124 |
 
-Core/Geometry/export inputs and binaries remain unchanged after the final GUI-only legacy-envelope
-and source-return corrections, so their proofs remain current. All 155 current GUI/app dependency
-records are valid and nonempty. Working/staged diffs, changed-document links, binary hashes and the
-frozen runtime are checked before delivery: **1,062 files**, SHA256
-`d153b3a81561cf0cc55952b2fdb292aba2bf1da742eaac209192d4d01cc0d07b`.
-Failed, interrupted and superseded runs contribute no final proof. This is focused lifecycle
-verification, not full Geometry/Qt or parent acceptance. The same-family canonical-rebasing
-follow-up remains open before 157B3 closure.
+The preceding prefix transaction/context component passed its 161-case strict shared Qt selection
+and ten-case native selection at both scales; detailed counts and earlier component runs remain in
+Git/PR history and the linked contracts. Core/Geometry/export inputs and binaries are unchanged
+after GUI-only rebasing. Original native captures are linked from the prefix contract. All 155
+current GUI/app dependency records are valid and nonempty. Working/staged diffs, documentation
+links, binary hashes and the frozen runtime are checked before delivery: **1,062 files**, SHA256
+`4a8bafe1f25b31e2d2b3d2b6732e87700478766726cd07c76ccbc6b3584b26a2`.
+Failed, interrupted and superseded runs contribute no final proof. These are focused component
+results; full Geometry/Qt and whole-parent integration remain assigned to 157C/158.
 
 For every coherent change, synchronize the existing Hole/Feature-edit/UI/persistence contracts,
 run focused regressions and native 100%/compact 150% as applicable, review, commit and push. Then

@@ -581,6 +581,15 @@ struct ShellFeatureEditTools::Impl {
            std::any_of(part->bodies().begin(), part->bodies().end(),
                        [this](const auto& b) { return body_available(b); });
   }
+  Result<std::size_t> record_position(const Json& root) const {
+    if (root.contains(collection) && root.at(collection).is_array()) {
+      const auto& records = root.at(collection);
+      for (std::size_t index = 0; index < records.size(); ++index)
+        if (records.at(index).at("id") == edit.feature().value())
+          return Result<std::size_t>::success(index);
+    }
+    return Result<std::size_t>::failure(error("The active feature record is unavailable."));
+  }
   Result<std::size_t> start_creation(const PartDocument& seed, FeatureId id, Kind kind,
                                      std::string draft_namespace) {
     auto encoded = serialize_part_document_to_json(seed);
@@ -624,19 +633,17 @@ struct ShellFeatureEditTools::Impl {
     source_text = original.value();
     source = Json::parse(encoded.value());
     collection = kind == Kind::Thread ? "thread_features" : "hole_features";
-    const auto& records = source.at(collection);
-    const auto found = std::find_if(records.begin(), records.end(),
-                                    [&](const auto& row) { return row.at("id") == id.value(); });
-    if (found == records.end()) {
+    const auto position = record_position(source);
+    if (!position) {
       edit.cancel();
       if (owns_history_command)
         session.cancel_part_history_command();
       owns_history_command = false;
       creating = false;
       pending_parameters.clear();
-      return Result<std::size_t>::failure(error("The pending feature record is unavailable."));
+      return Result<std::size_t>::failure(position.error());
     }
-    record_index = std::size_t(found - records.begin());
+    record_index = position.value();
     record = source.at(collection).at(record_index);
     parameter_values.clear();
     array_templates.clear();
@@ -797,8 +804,11 @@ struct ShellFeatureEditTools::Impl {
     auto encoded = serialize_part_document_to_json(canonical.value());
     if (!encoded)
       return Result<Json>::failure(encoded.error());
-    return Result<Json>::success(
-        Json::parse(encoded.value()).at(collection).at(record_index).at("support"));
+    const auto root = Json::parse(encoded.value());
+    const auto position = record_position(root);
+    if (!position)
+      return Result<Json>::failure(position.error());
+    return Result<Json>::success(root.at(collection).at(position.value()).at("support"));
   }
   bool choose_support(int index) {
     if (edit.kind() == Kind::Thread) {
@@ -1058,10 +1068,13 @@ struct ShellFeatureEditTools::Impl {
         auto encoded = serialize_part_document_to_json(candidate.value());
         if (!encoded)
           return Result<std::size_t>::failure(encoded.error());
+        const auto root = Json::parse(encoded.value());
+        const auto position = record_position(root);
+        if (!position)
+          return Result<std::size_t>::failure(position.error());
         limit_faces.push_back(
             {face.semantic_id, body.name() + " / " + face.label, selected.value(), face.shape,
-             Json::parse(encoded.value()).at(collection).at(record_index).at("extent").at("face"),
-             body.id()});
+             root.at(collection).at(position.value()).at("extent").at("face"), body.id()});
       }
     }
     if (context.value()) {
@@ -1527,6 +1540,12 @@ struct ShellFeatureEditTools::Impl {
       (void)reject(encoded.error());
       return;
     }
+    auto root = Json::parse(encoded.value());
+    const auto position = record_position(root);
+    if (!position) {
+      (void)reject(position.error());
+      return;
+    }
     pending_parameters.clear();
     std::erase_if(parameter_values, [this](const auto& entry) {
       return !session.part_document()->find_parameter(ParameterId(entry.first));
@@ -1534,7 +1553,8 @@ struct ShellFeatureEditTools::Impl {
     for (const auto& parameter : candidate.value().parameters())
       if (!session.part_document()->find_parameter(parameter.id()))
         pending_parameters.push_back(parameter);
-    source = Json::parse(encoded.value());
+    source = std::move(root);
+    record_index = position.value();
     record = source.at(collection).at(record_index);
     deferred_rebuild();
   }

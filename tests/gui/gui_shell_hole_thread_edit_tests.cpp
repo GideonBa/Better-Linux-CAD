@@ -4652,3 +4652,110 @@ TEST_CASE("Immutable STEP Reference Parts reject Hole and Thread authoring witho
   CHECK_FALSE(w.session().part_workflow_active());
   CHECK(snapshot(w) == before);
 }
+
+TEST_CASE("Source return rebases the pending Hole recipe and limit by identity before another Hole",
+          "[gui][parity-b157][hole-canonical-rebase-shell]") {
+  const bool to_face = GENERATE(false, true);
+  CAPTURE(to_face);
+  auto part = point_plate();
+  REQUIRE(part.add_parameter(checked(Parameter::create_length(
+      ParameterId("suffix.diameter"), "Suffix diameter", checked(Quantity::length_mm(2))))));
+  const auto support = checked(PlaneReference::create_semantic_face(
+      PartFeatureInputRole::HoleSupportPlane,
+      checked(SemanticFaceReference::create(FeatureId("base"), SemanticFace::Top))));
+  REQUIRE(part.add_hole_feature(checked(HoleFeature::create(
+      FeatureId("suffix.hole"), "Existing suffix Hole", HoleKind::Plain, BodyId("body.base"),
+      support, {{HolePlacementId("suffix.position"), Point2{15, 0}}},
+      ParameterId("suffix.diameter")))));
+  REQUIRE(part.apply_history_intent({{"base", "suffix.hole"}, {}}));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  const auto suffix_record = [&](const std::string& text) {
+    const auto root = nlohmann::json::parse(text);
+    for (const auto& row : root.at("hole_features"))
+      if (row.at("id") == "suffix.hole")
+        return row;
+    FAIL("Missing suffix Hole");
+    return nlohmann::json{};
+  };
+  const auto original_suffix = suffix_record(before);
+  prefix_after(w, "base");
+  REQUIRE(
+      w.session().selection().add({GuiSelectionKind::SketchEntity, "sketch/positions/entity/a"}));
+  create_hole(w);
+  auto& name = field<QLineEdit>(w, "/name");
+  name.setText("Pending prefix seat");
+  REQUIRE(QMetaObject::invokeMethod(&name, "editingFinished"));
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  if (to_face) {
+    choose_hole_mode(w, "blcad.hole.extent", 3);
+    auto& limits = field<QComboBox>(w, "/extent/face");
+    const int bottom = limits.findData("finishing/face/4:base/bottom");
+    REQUIRE(bottom >= 0);
+    limits.setCurrentIndex(bottom);
+    settle();
+  }
+  if (QApplication::platformName() == "xcb")
+    click(control<QPushButton>(w, "blcad.hole.edit_source/placements/0"));
+  else
+    control<QPushButton>(w, "blcad.hole.edit_source/placements/0").click();
+  REQUIRE(w.feature_edit_tools().editing_source_sketch());
+  if (QApplication::platformName() == "xcb") {
+    activate(w);
+    auto& point = control<QAction>(w, "sketch.create.point");
+    REQUIRE(point.isEnabled());
+    point.trigger();
+    settle();
+    const auto screen = checked(w.viewport().sketch_plane_to_screen({10, -15}));
+    click_at(w.viewport(), {screen.x, screen.y});
+    REQUIRE(w.session().part_document()->find_sketch(SketchId("positions"))->points().size() == 3);
+    click(control<QPushButton>(w, "blcad.hole.breadcrumb"));
+  } else {
+    move_position_source(w, 10);
+    control<QPushButton>(w, "blcad.hole.breadcrumb").click();
+  }
+  REQUIRE_FALSE(w.active_sketch());
+  const auto source_state = snapshot(w);
+  CHECK(suffix_record(source_state) == original_suffix);
+  if (QApplication::platformName() == "xcb") {
+    auto& recipe = control<QComboBox>(w, "blcad.hole.recipe");
+    recipe.setFocus();
+    key(recipe, Qt::Key_Home);
+    key(recipe, Qt::Key_Down);
+    REQUIRE(control<QComboBox>(w, "blcad.hole.recipe").currentIndex() == 1);
+  } else
+    choose_hole_mode(w, "blcad.hole.recipe", 1);
+  REQUIRE(field<QLineEdit>(w, "/name").text() == "Pending prefix seat");
+  field<QDoubleSpinBox>(w, "/manufacturing/diameter/parameter").setValue(4);
+  field<QDoubleSpinBox>(w, "/manufacturing/depth/parameter").setValue(2);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == source_state);
+  if (QApplication::platformName() == "xcb") {
+    capture(w, to_face ? "hole-prefix-rebased-face-limit" : "hole-prefix-rebased-recipe");
+    click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  } else
+    REQUIRE(w.feature_edit_tools().apply());
+  REQUIRE_FALSE(w.feature_edit_tools().active());
+  CHECK(w.session().history_prefix_count() == 2);
+  CHECK(suffix_record(snapshot(w)) == original_suffix);
+  if (QApplication::platformName() == "xcb")
+    click(control<QPushButton>(w, "blcad.history.prefix_apply"));
+  else
+    control<QPushButton>(w, "blcad.history.prefix_apply").click();
+  REQUIRE(w.session().derived_results_fresh());
+  CHECK(suffix_record(snapshot(w)) == original_suffix);
+  const auto& accepted = *w.session().part_document();
+  REQUIRE(accepted.hole_features().size() == 2);
+  const auto found =
+      std::find_if(accepted.hole_features().begin(), accepted.hole_features().end(),
+                   [](const auto& hole) { return hole.id() != FeatureId("suffix.hole"); });
+  REQUIRE(found != accepted.hole_features().end());
+  CHECK(found->name() == "Pending prefix seat");
+  CHECK(std::holds_alternative<HoleCounterbore>(found->manufacturing()));
+  CHECK(std::holds_alternative<HoleToFaceExtent>(found->extent()) == to_face);
+  CHECK(volume(w) == Catch::Approx(38400 - 22 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}

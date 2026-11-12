@@ -292,8 +292,8 @@ block Apply and remain correctable. [Existing support picks](hole-wizard.md#exis
 show the model before the edited feature; numeric preview and Apply validate the whole downstream
 model. Cancel restores the entry selection/camera. [Hole limits](hole-wizard.md#explicit-hole-limits--157b2b)
 have their own required Face/Body selectors and model picks; clearing or choosing an invalid limit
-blocks Apply while preserving correction controls. Extended contexts,
-support-anchored grips and the full workflow remain 157B2b/B3/C.
+blocks Apply while preserving correction controls. Support-anchored controls and extended contexts
+are described below; combined workflow acceptance remains 157C.
 Conical Thread seeds retain a positive interval and inspected entry direction. Thread numeric
 controls expose nine decimal places; offset/direction changes require explicit matching profile
 values. [Conical combinations](hole-wizard.md#conical-thread-combinations--157b2b) retain correction

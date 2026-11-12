@@ -851,7 +851,8 @@ Proof sources: [typed preset/storage regression](../tests/gui/gui_hole_thread_pr
 122 cases / 10,463 assertions with 22 native skips; the focused native preset/canvas/source/repeat selection passes 10 cases / 824 assertions at both scales. This is targeted
 native coverage. Runtime and delivery evidence is indexed in
 the [current implementation plan](mvp-plan.md#current-implementation--157b3). Presets alone do not
-close 157B3; explicit legacy conversion, extended contexts and combined acceptance remain assigned.
+accept parent 157; explicit conversion and extended contexts are described below, while combined
+acceptance remains 157C.
 
 ### Explicit legacy conversion — 157B3
 
@@ -887,8 +888,8 @@ The task identifies the conversion and its value/reference boundary. Subsequent 
 Hole preview, support selection, canvas and presets. Save writes the committed legacy entry until
 Apply; Cancel restores it. Final Apply publishes conversion and the accepted Hole properties as one
 ordinary workflow transaction and one Undo step. Existing imported-source freshness and downstream
-geometry validation still apply. Extended shared contexts and full native combinations remain
-assigned; this bounded command does not close 157B3 or parent 157.
+geometry validation still apply. The shared context lifecycle is described below; full native
+combinations remain assigned to 157C. This bounded command alone does not accept parent 157.
 The task captures the original camera, model/viewport selection and pick scope before internal
 staging clears the selection. Cancel restores that entry context after rebuilding the legacy model;
 a rejected task startup also restores it through the existing monotonic checkpoint authority.
@@ -901,7 +902,7 @@ passes 26 / 2,186; final focused Qt passes seven / 670 with one native skip. The
 passes 150 / 12,297 with 25 native skips. Targeted native conversion/context/editor/preset/source/
 History regression passes 14 / 920 at 100% and 14 / 926 at compact 150%. The
 [implementation plan](mvp-plan.md#current-implementation--157b3) owns delivery/runtime evidence;
-these focused results do not close the remaining shared contexts or combined acceptance.
+these focused results retain their component boundary; combined acceptance remains 157C.
 
 ### Hidden and consumed input Bodies — 157B3
 
@@ -971,10 +972,20 @@ assertions; focused Geometry passes 37 / 2,987. These are targeted lifecycle pro
 [implementation plan](mvp-plan.md#current-implementation--157b3) records the broader regression and
 delivery boundary separately from the remaining 157C combined gates.
 
-The remaining 157B3 follow-up covers Source Sketch return followed by a recipe or reference change
-when another Hole/Thread remains in the suffix. Re-serialized collections can change record order;
-every recipe/support/limit handoff must reselect the active feature by identity. This combined
-rebasing case is not yet part of the verified lifecycle boundary above.
+Recipe/support/limit handoffs reselect the active feature by stable ID whenever Core returns
+canonical JSON. A record index belongs only to its current template; it is never carried across
+re-serialization. Source Sketch return can append a pending record to a template while executable
+order places it before another Hole. The next recipe or reference change retains the pending
+feature's name, bindings and positions and leaves the suffix intent unchanged.
+
+`[hole-canonical-rebase-shell]` in the same shell test source covers Through All and To Face,
+Source return followed by a Counterbore recipe, exact suffix records, independent combined cut
+volume and complete Undo/Redo/reopen. The focused case passes 169 assertions. Native Source input
+and keyboard recipe changes join the existing support/limit/Thread/preset selection: seven cases /
+1,026 assertions at both scales, all with exit 0. Original captures show the retained
+[100% prefix/recipe context](images/hole-prefix-rebased-100.png) and
+[compact 150% context](images/hole-prefix-rebased-150.png); scrolled fields remain reachable and
+outer/local Apply/Cancel remain visible. Combined B01–B04/UI01 acceptance stays assigned to 157C.
 
 ## Why more than a cut
 

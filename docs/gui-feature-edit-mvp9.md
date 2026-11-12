@@ -171,12 +171,13 @@ Whole-block replacement-shell acceptance remains separate work.
 
 The existing editor now identifies typed Hole/Thread records and calls `update_hole_feature` /
 `update_thread_feature`; browser double-click and History Edit share this boundary. Existing
-thirteen-family behavior and legacy cuts retain their own editing path. Current 157A scope and
-fixed support/resource fields are owned by [Hole/Thread](hole-wizard.md#property-editing--157a-design-and-boundary).
-The full Wizard remains 157B/C. Numerical controls follow parameter units/formulas, and complete
-Geometry preview/Apply preserves downstream validation and one transaction. Existing viewport
+thirteen-family behavior and legacy cuts retain their own editing path. The original 157A bridge
+boundary before later selectors is owned by [Hole/Thread](hole-wizard.md#property-editing--157a-design-and-boundary).
+The later 157B sections own the complete authoring workflow; combined acceptance remains 157C.
+Numerical controls follow parameter units/formulas, and complete Geometry preview/Apply preserves
+downstream validation and one transaction. Existing viewport
 preview authority regenerates cosmetic graphics from the candidate Bodies and hides replaced
-annotations. Support-anchored grips remain assigned to 157B.
+annotations. The support-anchored grips and extended lifecycle are described below.
 
 Focused proof: `[hole-thread-edit-shell]` in
 [the current shell tests](../tests/gui/gui_shell_hole_thread_edit_tests.cpp), including actual
@@ -205,8 +206,9 @@ freshness remains unchanged. Required pending dimensions are added for creation 
 editing, while explicit changes to shared parameters remain part of that same transaction. Source
 controls select compatible pinned cells or convert a resolved source to an owned custom dimension.
 [The Hole contract](hole-wizard.md#recipe-and-dimensional-source-controls--157b2a) owns exact limits;
-the existing recipe/source and native test tags provide focused proof. Full Thread/support selectors,
-manipulators, Sketch return, presets and legacy conversion remain assigned to 157B2b/B3/C.
+the existing recipe/source and native test tags provide focused proof. The following sections own
+Thread/support selectors, manipulators, Sketch return, presets and legacy conversion; combined
+acceptance remains 157C.
 
 ### External Thread creation — 157B2b
 
@@ -227,8 +229,8 @@ records. Mapping drafts live only in the form; complete choices become a `Thread
 Commands filter scalar edits against the resulting record's dependencies before its Core update,
 so an explicitly removed optional input cannot leak an invalid unused value. Existing shared and
 formula bindings retain their established ownership. See [source and interval controls](hole-wizard.md#thread-sources-and-optional-intervals--157b2b)
-and `[thread-source-shell]` / `[native-thread-source]`; remaining limit/context scope and combined
-acceptance stay assigned.
+and `[thread-source-shell]` / `[native-thread-source]`. Limit/context workflows are described below;
+combined acceptance stays assigned to 157C.
 
 Existing Hole/Thread support selectors evaluate the feature's exact predecessor history in a
 separate checked input cache. Scoped preview targets show that geometry during picks; they retain
@@ -340,3 +342,9 @@ candidate scenes use their exact evaluated scope. Outer Save/Cancel/Apply and fu
 remain unchanged. Workspace, unrelated workflow and stale ownership guards reject entry or Apply
 without adopting another command. The [Hole contract](hole-wizard.md#end-of-part-and-shared-contexts--157b3)
 owns exact behavior and focused proof sources; complete native combinations remain 157C.
+
+Recipe, support and limit handoffs find the active feature by stable ID in each canonical result.
+The source template's array index is retained only inside that template. This preserves a pending
+Hole's recipe/name/bindings after Source Sketch return when executable order places it before an
+existing Hole suffix. `[hole-canonical-rebase-shell]` checks both Through All and To Face with
+unchanged suffix intent, independent material, exact history and native source/keyboard input.
