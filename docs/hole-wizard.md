@@ -458,9 +458,9 @@ The shared Hole panel adds Plain/Clearance intent and explicit Simple, Counterbo
 Spotface, Stepped, Fitted, Reamed, Center and Slot choices. The Slot transition starts from an existing
 arc-closed profile and keeps its typed profile selector; an unavailable profile is diagnosed. Blind,
 Through All, To Next, To Face, Up to Body and Symmetric choices use the existing extent definitions.
-The initial To Face limit is a current native bottom face; its existing typed reference fields remain
-editable. Up to Body begins with another visible solid. Scoped imported/result limit collection is
-still 157B2b. Flat/Conical tip transitions enforce the existing Blind-only cone contract.
+The initial To Face limit prefers a current native bottom face. Up to Body begins with another
+visible solid. Explicit scoped native/imported/result selectors are described below under 157B2b.
+Flat/Conical tip transitions enforce the existing Blind-only cone contract.
 
 `GuiHoleRecipeCommands` operates only on disposable Part clones through Core factories and update
 commands. The shell reseeds its form through the canonical serializer while retaining committed
@@ -509,8 +509,8 @@ committed Part. No sampled surface, topology index or viewer identity becomes pe
 
 Focused proof is `[hole-support-shell]` / `[native-hole-support]`: imported translation and axis
 frames, supplier changes, pending/unused workplanes, exact history/reopen, and actual native model
-picks on a derived Hole bottom and placed imported top. Existing-support editing uses the scoped
-input model described below; complete limit collection remains assigned within 157B2b.
+picks on a derived Hole bottom and placed imported top. Existing-support editing and explicit
+limit selection use the scoped input model described below.
 Original captures: [derived bottom](images/hole-derived-support.png), 1280×800, and
 [placed imported plane at compact 150%](images/hole-imported-support-compact.png), 1536×960.
 Native helpers reveal the scrolled controls and verify hit ownership and on-screen coordinates.
@@ -639,6 +639,35 @@ numeric edit path; their extended support-selection lifecycle remains 157B3.
 Original native previews: [100%](images/hole-support-edit.png), 1280×800, and
 [compact 150%](images/hole-support-edit-compact.png), 1536×960 physical pixels. Both show the
 selected predecessor bottom, complete candidate, scrolled selectors and reachable Apply/Cancel.
+
+### Explicit Hole limits — 157B2b
+
+To Face exposes a required Limit Face selector and scoped model pick. It collects native planar,
+Plane-capable imported and planar result-origin faces from available visible solids in the input
+model. The persisted input is a `HoleLimitFace` with its native/imported/result identity. Imported
+limits retain Face capability; Plane capability is checked separately during collection. Result
+limits use a temporary checked plane only for inspection and create no persistent workplane.
+Core's existing typed extent command and serializer supply each face's canonical form.
+
+Up to Body exposes a required Limit Body selector and Body pick. It excludes the target and Bodies
+unavailable at the feature's input history. Changing target cannot silently keep it as its own
+limit; the remaining selector allows an explicit correction. Clearing either limit blocks Apply
+without publishing incomplete Core intent. Invalid parallel/behind/finite-footprint choices remain
+selectable and report the existing Geometry diagnostic, so another limit can correct the draft.
+Only the target is cut; the selected limit Body remains unchanged.
+
+The native target's bottom remains the initial To Face choice when available; otherwise the first
+collected plane seeds the editable choice. This seed does not promise a valid cut. Existing-feature
+limits use the same predecessor cache and picking lifecycle as support edits. Imported source
+freshness is checked during collection, preview and final Apply. Numeric edits are retained when
+switching the limit face. No limit picker introduces a new cut or persistence implementation.
+
+Focused proof: `[hole-limit-shell]` and `[native-hole-limit]` cover invalid/cleared correction,
+native/imported/result identity, placement and supplier changes, distinct limit Bodies, target
+changes, physical volumes, exact Undo/Redo/reopen and actual native planar model picks.
+Original captures show [a native bottom limit at 100%](images/hole-native-limit.png), 1280×800,
+and [a placed imported limit at compact 150%](images/hole-imported-limit-compact.png), 1536×960
+physical pixels, with scrolled limit selectors and pinned Apply/Create Another/Cancel.
 
 ## Why more than a cut
 

@@ -357,7 +357,7 @@ struct ShellFeatureEditTools::Impl {
   bool support_editing{};
   std::optional<geometry::ShapeCache> feature_input_cache;
   std::optional<std::size_t> feature_input_prefix;
-  enum class Pick { None, Body, Support };
+  enum class Pick { None, Body, Support, LimitFace, LimitBody };
   Pick picking{Pick::None};
   struct SupportChoice {
     std::string semantic_id, label;
@@ -375,6 +375,15 @@ struct ShellFeatureEditTools::Impl {
     geometry::ViewportSceneKind kind{geometry::ViewportSceneKind::Face};
   };
   std::vector<ThreadSupportChoice> thread_supports;
+  struct LimitFaceChoice {
+    std::string semantic_id, label;
+    FaceReference reference;
+    geometry::GeometryShape shape;
+    Json encoded;
+    BodyId body;
+  };
+  std::vector<LimitFaceChoice> limit_faces;
+  bool limit_chosen{true};
   std::optional<FaceReference> thread_support_override;
   std::string thread_support_id;
   std::optional<PlaneReference> support_override;
@@ -383,8 +392,8 @@ struct ShellFeatureEditTools::Impl {
   std::optional<Error> support_error;
   std::vector<Parameter> pending_parameters;
   std::string recipe_namespace;
-  QComboBox *target_field{}, *support_field{};
-  ShellPropertySelector *target_selector{}, *support_selector{};
+  QComboBox *target_field{}, *support_field{}, *limit_field{};
+  ShellPropertySelector *target_selector{}, *support_selector{}, *limit_selector{};
   std::optional<double> next_diameter;
   std::optional<BodyId> next_target;
   std::size_t entry_revision{};
@@ -546,6 +555,7 @@ struct ShellFeatureEditTools::Impl {
     previous_mask = viewport.selection_filter_mask();
     previous_scope = viewport.selection_semantic_scope();
     creating = true;
+    limit_chosen = true;
     support_editing = false;
     feature_input_cache.reset();
     feature_input_prefix.reset();
@@ -821,6 +831,86 @@ struct ShellFeatureEditTools::Impl {
     }
     return Result<std::size_t>::success(1);
   }
+  Result<std::size_t> collect_limit_faces() {
+    limit_faces.clear();
+    const auto* part = session.part_document();
+    const auto* cache = input_cache();
+    auto canonical = deserialize_part_document_from_json(source.dump());
+    if (!part || !cache || !canonical)
+      return Result<std::size_t>::failure(error("Hole limit inputs are unavailable."));
+    auto context = make_step_import_context(session);
+    if (!context)
+      return Result<std::size_t>::failure(context.error());
+    for (const auto& body : part->bodies()) {
+      if (!input_body_available(body))
+        continue;
+      auto faces = geometry::FinishingSelectionBuilder::build(
+          *part, *cache, body.id(), PartFeatureInputRole::ShellRemovalFace, context.value().get(),
+          feature_input_prefix);
+      if (!faces)
+        return Result<std::size_t>::failure(faces.error());
+      for (const auto& face : faces.value()) {
+        const auto* reference = std::get_if<FaceReference>(&face.reference);
+        if (!reference)
+          continue;
+        auto selected = std::visit(
+            [&](const auto& ref) -> Result<FaceReference> {
+              using T = std::decay_t<decltype(ref)>;
+              constexpr auto role = PartFeatureInputRole::HoleLimitFace;
+              if constexpr (std::is_same_v<T, SemanticFaceReference>)
+                return FaceReference::create_planar(role, ref);
+              else if constexpr (std::is_same_v<T, ImportedTopologyReference>) {
+                auto plane = ImportedTopologyReference::create(ref.catalog(), ref.entry(),
+                                                               ImportedTopologyCapability::Plane);
+                if (!plane)
+                  return Result<FaceReference>::failure(plane.error());
+                auto support = PlaneReference::create_imported(
+                    PartFeatureInputRole::HoleSupportPlane, plane.value());
+                if (!support)
+                  return Result<FaceReference>::failure(support.error());
+                auto valid = validate_part_feature_input_reference(*part, support.value());
+                if (!valid)
+                  return Result<FaceReference>::failure(valid.error());
+                return FaceReference::create_imported(role, ref);
+              } else if constexpr (std::is_same_v<T, ResultFaceReference>) {
+                auto plane = ResultFaceWorkplane::create(DatumPlaneId("plane.hole.limit.inspect"),
+                                                         "Limit inspection", ref);
+                if (!plane)
+                  return Result<FaceReference>::failure(plane.error());
+                auto resolved = geometry::ResultFaceSupportGeometry::resolve(
+                    *part, plane.value(), *cache, context.value().get());
+                if (!resolved)
+                  return Result<FaceReference>::failure(resolved.error());
+                return FaceReference::create_result(role, ref);
+              } else
+                return Result<FaceReference>::failure(error("Choose a planar Hole limit face."));
+            },
+            reference->source());
+        if (!selected)
+          continue;
+        // Keep serialization in Core. This disposable transition supplies only
+        // the encoded typed face; it does not replace current numeric edits.
+        auto candidate =
+            GuiHoleRecipeCommands::extent(canonical.value(), edit.feature(), recipe_namespace,
+                                          GuiHoleExtentChoice::ToFace, selected.value());
+        if (!candidate)
+          continue;
+        auto encoded = serialize_part_document_to_json(candidate.value());
+        if (!encoded)
+          return Result<std::size_t>::failure(encoded.error());
+        limit_faces.push_back(
+            {face.semantic_id, body.name() + " / " + face.label, selected.value(), face.shape,
+             Json::parse(encoded.value()).at(collection).at(record_index).at("extent").at("face"),
+             body.id()});
+      }
+    }
+    if (context.value()) {
+      auto fresh = context.value()->validate_sources();
+      if (!fresh)
+        return fresh;
+    }
+    return Result<std::size_t>::success(limit_faces.size());
+  }
   Result<std::size_t> publish_input_scene() {
     if (!feature_input_cache)
       return Result<std::size_t>::success(0);
@@ -860,11 +950,16 @@ struct ShellFeatureEditTools::Impl {
         return;
       }
     }
-    if (picking == Pick::Body) {
+    const bool body_pick = picking == Pick::Body || picking == Pick::LimitBody;
+    if ((picking == Pick::LimitFace || picking == Pick::LimitBody) && !feature_input_cache)
+      viewport.clear_feature_preview();
+    if (body_pick) {
       if (!feature_input_cache)
         viewport.clear_feature_preview();
       for (const auto& body : session.part_document()->bodies())
-        if (input_body_available(body)) {
+        if (input_body_available(body) &&
+            (picking != Pick::LimitBody ||
+             body.id().value() != record.at("target_body").get<std::string>())) {
           const auto id = body_selection_id(body.id());
           scope.push_back(id);
           if (feature_input_cache)
@@ -877,6 +972,11 @@ struct ShellFeatureEditTools::Impl {
         if (!choice.shape.empty())
           targets.push_back({choice.kind, choice.semantic_id, choice.shape});
       });
+    } else if (picking == Pick::LimitFace) {
+      for (const auto& face : limit_faces) {
+        scope.push_back(face.semantic_id);
+        targets.push_back({geometry::ViewportSceneKind::Face, face.semantic_id, face.shape});
+      }
     }
     if (!targets.empty()) {
       auto result = viewport.set_preview_selection_targets(std::move(targets));
@@ -885,14 +985,17 @@ struct ShellFeatureEditTools::Impl {
     }
     viewport.set_selection_semantic_scope(std::move(scope));
     viewport.set_selection_filter_mask(
-        picking == Pick::Body      ? selection_kind_bit(GuiSelectionKind::Body)
+        body_pick                  ? selection_kind_bit(GuiSelectionKind::Body)
         : picking == Pick::Support ? selection_kind_bit(GuiSelectionKind::Face) |
                                          selection_kind_bit(GuiSelectionKind::Datum)
-                                   : 0);
+        : picking == Pick::LimitFace ? selection_kind_bit(GuiSelectionKind::Face)
+                                     : 0);
     if (target_selector)
       target_selector->set_active(picking == Pick::Body);
     if (support_selector)
       support_selector->set_active(picking == Pick::Support);
+    if (limit_selector)
+      limit_selector->set_active(picking == Pick::LimitFace || picking == Pick::LimitBody);
     apply->setEnabled(valid && support_chosen && picking == Pick::None);
     another->setEnabled(creating && valid && support_chosen && picking == Pick::None);
   }
@@ -1550,35 +1653,36 @@ struct ShellFeatureEditTools::Impl {
               std::optional<BodyId> body;
               const auto* hole = part.find_hole_feature(edit.feature());
               if (index == int(GuiHoleExtentChoice::ToFace)) {
-                auto context = make_step_import_context(session);
-                if (!context)
-                  return Result<PartDocument>::failure(context.error());
-                auto targets = geometry::FinishingSelectionBuilder::build(
-                    *session.part_document(), *session.part_shape_cache(), hole->target_body(),
-                    PartFeatureInputRole::ShellRemovalFace, context.value().get());
-                if (!targets)
-                  return Result<PartDocument>::failure(targets.error());
-                for (const auto& target : targets.value())
-                  if (const auto* ref = std::get_if<FaceReference>(&target.reference))
-                    if (const auto* native = std::get_if<SemanticFaceReference>(&ref->source());
-                        native && native->face() == SemanticFace::Bottom) {
-                      auto limit = FaceReference::create_planar(PartFeatureInputRole::HoleLimitFace,
-                                                                *native);
-                      if (!limit)
-                        return Result<PartDocument>::failure(limit.error());
-                      face = std::move(limit.value());
-                      break;
-                    }
+                auto collected = collect_limit_faces();
+                if (!collected)
+                  return Result<PartDocument>::failure(collected.error());
+                const LimitFaceChoice* preferred = nullptr;
+                for (const auto& target : limit_faces) {
+                  if (!preferred)
+                    preferred = &target;
+                  if (const auto* native =
+                          std::get_if<SemanticFaceReference>(&target.reference.source());
+                      native && native->face() == SemanticFace::Bottom &&
+                      target.body == hole->target_body()) {
+                    preferred = &target;
+                    break;
+                  }
+                }
+                if (preferred)
+                  face = preferred->reference;
               }
               if (index == int(GuiHoleExtentChoice::UpToBody))
                 for (const auto& candidate : part.bodies())
-                  if (candidate.id() != hole->target_body() && body_available(candidate)) {
+                  if (candidate.id() != hole->target_body() && input_body_available(candidate)) {
                     body = candidate.id();
                     break;
                   }
-              return GuiHoleRecipeCommands::extent(std::move(part), edit.feature(),
-                                                   recipe_namespace, GuiHoleExtentChoice(index),
-                                                   face, body);
+              auto result =
+                  GuiHoleRecipeCommands::extent(std::move(part), edit.feature(), recipe_namespace,
+                                                GuiHoleExtentChoice(index), face, body);
+              if (result)
+                limit_chosen = true;
+              return result;
             });
           });
     } else if (key == "tip") {
@@ -1639,6 +1743,59 @@ struct ShellFeatureEditTools::Impl {
       (void)preview();
     });
   }
+  void build_limit_selector(QFormLayout* form, bool face) {
+    auto* input = combo(form->parentWidget());
+    input->setObjectName(face ? "blcad.hole.limit_face.choices" : "blcad.hole.limit_body.choices");
+    int selected = -1;
+    if (face) {
+      auto collected = collect_limit_faces();
+      if (!collected)
+        status->setText(QString::fromStdString(collected.error().message()));
+      for (const auto& choice : limit_faces) {
+        add_choice(input, choice.semantic_id, choice.label);
+        if (limit_chosen && choice.encoded == record.at("extent").at("face"))
+          selected = input->count() - 1;
+      }
+    } else
+      for (const auto& body : session.part_document()->bodies())
+        if (input_body_available(body) &&
+            body.id().value() != record.at("target_body").get<std::string>()) {
+          add_choice(input, body.id().value(), body.name());
+          if (limit_chosen &&
+              body.id().value() == record.at("extent").at("body").get<std::string>())
+            selected = input->count() - 1;
+        }
+    input->setCurrentIndex(selected);
+    limit_chosen = selected >= 0;
+    limit_field = input;
+    register_field(input, face ? "/extent/face" : "/extent/body");
+    limit_selector = new ShellPropertySelector(
+        face ? "blcad.hole.limit_face" : "blcad.hole.limit_body",
+        face ? "Limit Face" : "Limit Body", *input, owner,
+        [this, face](bool picked) {
+          picking = picked ? (face ? Pick::LimitFace : Pick::LimitBody) : Pick::None;
+          pick_mode();
+          if (!picked)
+            (void)preview();
+        },
+        form->parentWidget());
+    form->addRow(limit_selector);
+    QObject::connect(input, &QComboBox::currentIndexChanged, &owner,
+                     [this, face, input](int index) {
+                       if (building)
+                         return;
+                       picking = Pick::None;
+                       limit_chosen = index >= 0;
+                       if (limit_chosen) {
+                         if (face)
+                           record["extent"]["face"] = limit_faces.at(std::size_t(index)).encoded;
+                         else
+                           record["extent"]["body"] = input->currentData().toString().toStdString();
+                       }
+                       pick_mode();
+                       (void)preview();
+                     });
+  }
   void build_fields(QFormLayout* form, const Json& object, const QString& prefix) {
     for (auto it = object.begin(); it != object.end(); ++it) {
       const auto key = it.key();
@@ -1652,6 +1809,11 @@ struct ShellFeatureEditTools::Impl {
         continue;
       if (input_selection() && prefix.isEmpty() && key == "support") {
         build_support_selector(form);
+        continue;
+      }
+      if (input_selection() && edit.kind() == Kind::Hole && prefix == "/extent" &&
+          (key == "face" || key == "body")) {
+        build_limit_selector(form, key == "face");
         continue;
       }
       std::optional<Json> optional_default;
@@ -1932,8 +2094,8 @@ struct ShellFeatureEditTools::Impl {
     if (focus_id.isEmpty())
       focus_id = retained_focus_id();
     building = true;
-    target_field = support_field = nullptr;
-    target_selector = support_selector = nullptr;
+    target_field = support_field = limit_field = nullptr;
+    target_selector = support_selector = limit_selector = nullptr;
     const auto selected = dynamic->currentData();
     fields.clear();
     numbers.clear();
@@ -2071,6 +2233,11 @@ struct ShellFeatureEditTools::Impl {
         return reject(error(edit.kind() == Kind::Thread
                                 ? "Choose an exterior cylindrical or conical face."
                                 : "Choose a support plane or planar face."));
+      if (edit.kind() == Kind::Hole &&
+          (record.at("extent").at("kind") == "to_face" ||
+           record.at("extent").at("kind") == "up_to_body") &&
+          !limit_chosen)
+        return reject(error("Choose a current planar limit face or a distinct solid limit Body."));
       if (picking != Pick::None)
         return Result<std::size_t>::success(0);
     }
@@ -2236,6 +2403,8 @@ struct ShellFeatureEditTools::Impl {
     pending_parameters.clear();
     pending_focus_id.clear();
     supports.clear();
+    limit_faces.clear();
+    limit_chosen = true;
     thread_supports.clear();
     thread_support_override.reset();
     thread_support_id.clear();
@@ -2329,6 +2498,7 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   if (!begun)
     return begun;
   p.creating = false;
+  p.limit_chosen = true;
   p.support_editing = false;
   p.feature_input_cache.reset();
   p.feature_input_prefix.reset();
@@ -2607,6 +2777,22 @@ bool ShellFeatureEditTools::accept_selection(const GuiSelection& incoming) {
   if (!p.input_selection() || !active() || p.picking == Impl::Pick::None)
     return false;
   const auto selected = incoming;
+  if ((p.picking == Impl::Pick::LimitFace || p.picking == Impl::Pick::LimitBody) && p.limit_field) {
+    const bool face = p.picking == Impl::Pick::LimitFace;
+    for (int i = 0; i < p.limit_field->count(); ++i) {
+      const auto value = p.limit_field->itemData(i).toString().toStdString();
+      const auto id = face ? value : p.body_selection_id(BodyId(value));
+      if (selected.semantic_id == id &&
+          selected.kind == (face ? GuiSelectionKind::Face : GuiSelectionKind::Body)) {
+        p.limit_field->setCurrentIndex(i);
+        p.limit_chosen = true;
+        p.picking = Impl::Pick::None;
+        p.pick_mode();
+        (void)p.preview();
+        return true;
+      }
+    }
+  }
   if (p.picking == Impl::Pick::Body && selected.kind == GuiSelectionKind::Body && p.target_field) {
     for (int i = 0; i < p.target_field->count(); ++i)
       if (selected.semantic_id ==

@@ -233,6 +233,19 @@ std::string imported_top(const PartDocument& part) {
   FAIL("No imported top face");
   return {};
 }
+std::string imported_bottom(const PartDocument& part) {
+  const auto& catalog = part.imported_topology_catalogs().front();
+  for (const auto& entry : catalog.entries())
+    if (entry.descriptor.kind == ImportedTopologyKind::Face &&
+        std::abs(entry.descriptor.bounds_mm[2]) < 1e-5 &&
+        std::abs(entry.descriptor.bounds_mm[5]) < 1e-5) {
+      const auto ref = checked(ImportedTopologyReference::create(catalog.id(), entry.id,
+                                                                 ImportedTopologyCapability::Face));
+      return "finishing/" + checked(make_imported_topology_target_spelling(ref));
+    }
+  FAIL("No imported bottom face");
+  return {};
+}
 void choose_support(ShellWindow& w, const std::string& semantic) {
   auto& support = field<QComboBox>(w, "/support");
   const int index = support.findData(QString::fromStdString(semantic));
@@ -2015,4 +2028,221 @@ TEST_CASE(
     CHECK(restored.eye.z == Catch::Approx(camera.eye.z).margin(1e-7));
   }
   CHECK(w.viewport().preview_selection_target_count() == 0);
+}
+
+TEST_CASE("Hole limit faces remain explicitly selectable through invalid and cleared candidates",
+          "[gui][parity-b157][hole-limit-shell]") {
+  const bool editing = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, editing ? holes::part(false, false) : plate());
+  const auto before = snapshot(w);
+  if (editing)
+    begin(w, "holes");
+  else
+    create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.extent", 3);
+  auto& limits = field<QComboBox>(w, "/extent/face");
+  const int top = limits.findData("finishing/face/4:base/top");
+  const int bottom = limits.findData("finishing/face/4:base/bottom");
+  REQUIRE(top >= 0);
+  REQUIRE(bottom >= 0);
+  limits.setCurrentIndex(top);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  limits.setCurrentIndex(-1);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QLabel>(w, "blcad.feature_edit.status").text().contains("Choose a current"));
+  limits.setCurrentIndex(bottom);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& part = *w.session().part_document();
+  const auto& hole = part.hole_features().front();
+  const auto& face = std::get<HoleToFaceExtent>(hole.extent()).face;
+  CHECK(face.role() == PartFeatureInputRole::HoleLimitFace);
+  CHECK(std::get<SemanticFaceReference>(face.source()).face() == SemanticFace::Bottom);
+  CHECK(part.result_face_workplane_count() == 0);
+  CHECK(volume(w) == Catch::Approx(38400 - 8 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Imported Hole limits retain typed face identity placement and supplier guards",
+          "[gui][parity-b157][hole-limit-shell]") {
+  const bool posed = GENERATE(false, true);
+  const bool stale = GENERATE(false, true);
+  QTemporaryDir dir;
+  auto part = imported_plate(dir, posed);
+  const auto body = part.bodies().front().id().value();
+  const auto bottom = imported_bottom(part);
+  ShellWindow w;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  REQUIRE(w.feature_edit_tools().begin_new_hole());
+  choose_support(w, imported_top(part));
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  choose_hole_mode(w, "blcad.hole.extent", 3);
+  auto& limits = field<QComboBox>(w, "/extent/face");
+  const int index = limits.findData(QString::fromStdString(bottom));
+  REQUIRE(index >= 0);
+  limits.setCurrentIndex(index);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  if (stale) {
+    QFile file(dir.filePath("supplier.step"));
+    REQUIRE(file.open(QIODevice::Append));
+    REQUIRE(file.write("\n") == 1);
+    file.close();
+    CHECK_FALSE(w.feature_edit_tools().apply());
+    CHECK(snapshot(w) == before);
+    w.feature_edit_tools().cancel();
+    return;
+  }
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& face = std::get<HoleToFaceExtent>(result.hole_features().front().extent()).face;
+  CHECK(face.role() == PartFeatureInputRole::HoleLimitFace);
+  CHECK(std::get<ImportedTopologyReference>(face.source()).capability() ==
+        ImportedTopologyCapability::Face);
+  CHECK(result.result_face_workplane_count() == 0);
+  CHECK(volume(w, body.c_str()) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("A Hole can terminate at an earlier result face without creating a support workplane",
+          "[gui][parity-b157][hole-limit-shell]") {
+  auto part = holes::part(false, false);
+  const auto context = blcad::test::history_fixture::new_body(part, "cover");
+  auto cover = checked(Feature::create_additive_extrude(
+      FeatureId("cover"), "Cover", part.features().front().input_sketch(), ParameterId("depth")));
+  REQUIRE(part.add_feature(checked(cover.with_body_result_context(context))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_hole(w);
+  auto& targets = field<QComboBox>(w, "/target_body");
+  targets.setCurrentIndex(targets.findData("body.cover"));
+  settle();
+  choose_support(w, "finishing/face/5:cover/top");
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(1);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(-20);
+  field<QDoubleSpinBox>(w, "/placements/0/position/y").setValue(-15);
+  choose_hole_mode(w, "blcad.hole.extent", 3);
+  const auto placement = checked(HoleInstanceReference::create(
+      FeatureId("holes"), HolePlacementId("first"), HoleReferenceRole::Axis));
+  const auto reference = checked(ResultFaceReference::create(
+      FeatureId("holes"), BodyId("body.base"), {placement.origin("bottom")}));
+  auto& limits = field<QComboBox>(w, "/extent/face");
+  const int index = limits.findData(QString::fromStdString("finishing/" + reference.identity()));
+  REQUIRE(index >= 0);
+  limits.setCurrentIndex(index);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& face = std::get<HoleToFaceExtent>(result.hole_features().back().extent()).face;
+  CHECK(std::get<ResultFaceReference>(face.source()).identity() == reference.identity());
+  CHECK(result.result_face_workplane_count() == 0);
+  CHECK(volume(w, "body.cover") == Catch::Approx(38400 - 1.5 * std::numbers::pi).margin(1e-6));
+  CHECK(volume(w) == Catch::Approx(38400 - 13.5 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Up to Body selectors exclude the target and replace an invalid same-body limit",
+          "[gui][parity-b157][hole-limit-shell]") {
+  const bool retarget = GENERATE(false, true);
+  auto part = plate();
+  for (const auto& [id, z] : {std::pair{"limit1", -4.0}, std::pair{"limit2", -2.0}}) {
+    const std::string name(id);
+    REQUIRE(part.add_construction_plane(checked(ConstructionPlane::create_explicit(
+        ConstructionPlaneId(name + ".plane"), name, {0, 0, z}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}))));
+    blcad::test::history_fixture::rectangle(part, (name + ".profile").c_str(),
+                                            (name + ".plane").c_str());
+    auto feature = checked(Feature::create_additive_extrude(
+        FeatureId(name), name, SketchId(name + ".profile"), ParameterId("depth")));
+    REQUIRE(part.add_feature(checked(
+        feature.with_body_result_context(blcad::test::history_fixture::new_body(part, id)))));
+  }
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.extent", 4);
+  auto& limits = field<QComboBox>(w, "/extent/body");
+  CHECK(limits.findData("body.base") == -1);
+  REQUIRE(limits.findData("body.limit1") >= 0);
+  REQUIRE(limits.findData("body.limit2") >= 0);
+  limits.setCurrentIndex(-1);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  control<QToolButton>(w, "blcad.hole.limit_body.pick").click();
+  CHECK_FALSE(
+      w.feature_edit_tools().accept_selection({GuiSelectionKind::Face, "body/body.limit2"}));
+  REQUIRE(w.feature_edit_tools().accept_selection({GuiSelectionKind::Body, "body/body.limit2"}));
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  if (retarget) {
+    auto& target = field<QComboBox>(w, "/target_body");
+    target.setCurrentIndex(target.findData("body.limit2"));
+    settle();
+    choose_support(w, "finishing/face/6:limit2/top");
+    CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+    auto& replacement = field<QComboBox>(w, "/extent/body");
+    CHECK(replacement.findData("body.limit2") == -1);
+    replacement.setCurrentIndex(replacement.findData("body.limit1"));
+    INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+    REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  }
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(std::get<HoleUpToBodyExtent>(w.session().part_document()->hole_features().front().extent())
+            .body == BodyId(retarget ? "body.limit1" : "body.limit2"));
+  CHECK(volume(w) == Catch::Approx(38400 - (retarget ? 0 : 2 * std::numbers::pi)).margin(1e-6));
+  CHECK(volume(w, "body.limit1") == Catch::Approx(38400).margin(1e-6));
+  CHECK(volume(w, "body.limit2") ==
+        Catch::Approx(38400 - (retarget ? 2 * std::numbers::pi : 0)).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native Hole limit picks bind the selected planar face and recover invalid geometry",
+          "[gui][parity-b157][hole-limit-shell][native-hole-limit]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native limit-face picks");
+  const bool imported = GENERATE(false, true);
+  QTemporaryDir dir;
+  auto part = imported ? imported_plate(dir, true) : plate();
+  const auto body = part.bodies().front().id().value();
+  ShellWindow w;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  if (imported) {
+    REQUIRE(w.feature_edit_tools().begin_new_hole());
+    choose_support(w, imported_top(part));
+  } else
+    create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  choose_hole_mode(w, "blcad.hole.extent", 3);
+  w.viewport().set_standard_view(GuiStandardView::Top);
+  settle();
+  click(control<QToolButton>(w, "blcad.hole.limit_face.pick"));
+  auto top =
+      checked(w.viewport().model_to_screen(imported ? Point3{20, 1, 18} : Point3{10, 10, 8}));
+  click_at(w.viewport(), {top.x, top.y});
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  w.viewport().set_standard_view(GuiStandardView::Bottom);
+  settle();
+  click(control<QToolButton>(w, "blcad.hole.limit_face.pick"));
+  auto bottom =
+      checked(w.viewport().model_to_screen(imported ? Point3{20, 1, 10} : Point3{10, 10, 0}));
+  click_at(w.viewport(), {bottom.x, bottom.y});
+  CHECK(field<QComboBox>(w, "/extent/face").currentData() ==
+        QString::fromStdString(imported ? imported_bottom(part) : "finishing/face/4:base/bottom"));
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, imported ? "hole-imported-limit-preview" : "hole-native-limit-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  CHECK(volume(w, body.c_str()) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  CHECK(w.viewport().preview_selection_target_count() == 0);
+  replay(w, dir, before);
 }

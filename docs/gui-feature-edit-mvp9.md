@@ -237,3 +237,10 @@ rebound, and the full downstream candidate remains the preview/Apply authority. 
 the entry context. See [the support-edit contract](hole-wizard.md#existing-support-editing--157b2b)
 and `[hole-support-edit-shell]` / `[native-hole-support-edit]` for the visible-solid boundary and
 retained extended-context scope.
+
+Hole To Face and Up to Body add required typed limit selectors and scoped model picks to that same
+lifecycle. Native/imported/result face choices use the existing Core extent/serialization authority;
+Body choices exclude the target. Cleared or invalid candidates preserve the committed model and
+remain correctable, including a target change that invalidates the old limit. See
+[the limit contract](hole-wizard.md#explicit-hole-limits--157b2b) and `[hole-limit-shell]` /
+`[native-hole-limit]` for geometry, source freshness, transactional and native proof.
