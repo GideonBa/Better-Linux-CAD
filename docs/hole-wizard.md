@@ -641,8 +641,8 @@ Focused proof is `[hole-support-edit-shell]`, `[native-hole-support-edit]` and G
 `[thread-support-prefix]`: reference preservation, explicit rebinding, downstream exclusion,
 used-only workplanes, independent physical frames/volumes, exact history/reopen and actual native
 predecessor picking. The [157B3 input-history workflow](#hidden-and-consumed-input-bodies--157b3)
-extends these selectors to hidden/consumed targets. Active user history prefixes retain their
-numeric edit path until the remaining 157B3 prefix lifecycle is verified.
+extends these selectors to hidden/consumed targets. The
+[prefix lifecycle](#end-of-part-and-shared-contexts--157b3) also uses exact predecessor selectors.
 
 Original native previews: [100%](images/hole-support-edit.png), 1280×800, and
 [compact 150%](images/hole-support-edit-compact.png), 1536×960 physical pixels. Both show the
@@ -923,7 +923,7 @@ its normal finishing default remains `VisibleOnly`. Scope/cache/source validatio
 
 If the target is unavailable even before the feature (for example an unavailable creator), the
 existing numeric edit/failure policy remains; the task does not invent support geometry. Active
-user-prefix and enclosing source-workflow extensions remain assigned separately.
+user-prefix edits use the same predecessor query within the enclosing prefix boundary below.
 
 Proof sources: [input-history shell/native regression](../tests/gui/gui_shell_hole_thread_edit_tests.cpp)
 and [explicit Geometry visibility/scope regression](../tests/geometry/finishing_selection_tests.cpp),
@@ -932,7 +932,49 @@ tags `[hole-input-history-shell]`, `[native-hole-input-history]` and `[hidden-in
 Focused Geometry passes 11 cases / 801 assertions; focused Qt passes two / 246 with two native skips.
 The broader relevant Qt selection passes 82 / 6,200 with 15 native skips. Targeted native input/
 support/source/limit/context regression passes seven / 763 at each scale. These are bounded proofs;
-remaining prefix/shared contexts and complete native combination acceptance stay assigned.
+complete native combination acceptance remains assigned separately.
+
+### End of Part and shared contexts — 157B3
+
+Hole/Thread creation, existing edits and Create Another use the existing session-owned prefix child
+checkpoint. A child Apply compacts its source and feature edits into one local Undo operation;
+Cancel restores only the child entry. Create Another starts a fresh child after the accepted row.
+The outer End of Part context retains its marker, complete suffix, committed Save snapshot and
+final Apply/Cancel authority. Its Apply stays disabled throughout a child or Source Sketch visit.
+Final publication validates the complete suffix and produces one global Undo operation.
+
+Creation inserts typed Hole/Thread intent atomically at the marker through the canonical Core
+reader. Adding a modifier at the end and subsequently moving it can create a forbidden intermediate
+Body-consumer order; the insertion operation validates the complete order and lineage together.
+It retains existing suppression and all suffix records, rejects invalid positions/identities and
+leaves the source unchanged on failure. The session still owns marker advancement and local history.
+The candidate scene uses its evaluated prefix count, including newly inserted rows. Support and
+position queries explicitly use either the edited feature's predecessor scope or the current marker.
+
+Referenced Hole positions can enter Source Sketch under the same prefix child. Returning rebases
+the pending Hole against current Sketch intent and refreshes its predecessor inputs; no nested
+Part workflow is opened. Save, child Cancel and outer Cancel retain their existing boundaries.
+Historical documents without explicit history retain a complete canonical history envelope when
+the pending Hole requires a newer one; the source-return regression covers both history modes.
+Ordinary complete-document source visits and explicit conversion keep their existing Part workflow.
+Hole/Thread entry requires an editable current Part workspace; unrelated workflows and active
+commands are rejected without taking ownership. A changed source or lost task/context ownership
+rejects stale Apply and preserves independently committed document changes.
+
+Proof sources: [canonical insertion](../tests/core/thread_feature_tests.cpp),
+[shell/native lifecycle](../tests/gui/gui_shell_hole_thread_edit_tests.cpp), tags
+`[hole-thread-insertion]`, `[hole-prefix-shell]`, `[hole-context-shell]` and `[native-hole-prefix]`.
+Focused Qt passes five cases / 582 assertions with one native skip. Native prefix/context and
+source/input/conversion-context selections pass ten cases / 1,134 assertions at each of 100% and
+compact 150%, in disjoint six-plus-four runs with clean exits. Full Core passes 708 cases / 27,016
+assertions; focused Geometry passes 37 / 2,987. These are targeted lifecycle proofs; the
+[implementation plan](mvp-plan.md#current-implementation--157b3) records the broader regression and
+delivery boundary separately from the remaining 157C combined gates.
+
+The remaining 157B3 follow-up covers Source Sketch return followed by a recipe or reference change
+when another Hole/Thread remains in the suffix. Re-serialized collections can change record order;
+every recipe/support/limit handoff must reselect the active feature by identity. This combined
+rebasing case is not yet part of the verified lifecycle boundary above.
 
 ## Why more than a cut
 

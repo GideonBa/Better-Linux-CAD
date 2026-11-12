@@ -306,7 +306,14 @@ feature. The scrolling Property Presets group now manages named Hole/Thread valu
 Save Values, Load Values and Remove. Its hint explains that dimensions and pinned revisions are
 snapshots and current targets/positions/limits/profiles remain selected. A failed load reports inline
 and retains the draft; active picking, source visits and dragging suspend these controls. See the
-[preset contract](hole-wizard.md#property-presets--157b3). Extended contexts and combined acceptance remain assigned to 157B3/C.
+[preset contract](hole-wizard.md#property-presets--157b3). Combined acceptance remains assigned to 157C.
+
+In End of Part, Hole/Thread Apply stages one local change and Create Another opens the next child.
+The outer context row keeps Save/Cancel/final Apply ownership; final Apply remains disabled during
+feature input or a Source Sketch visit. Referenced Hole positions can enter their Sketch and return
+to the same draft. Cancel abandons the current child while retaining previously staged changes.
+New features enter at the marker and the complete suffix is validated only on final publication.
+See the [prefix contract and verification status](hole-wizard.md#end-of-part-and-shared-contexts--157b3).
 
 History → Convert to Hole explicitly previews a selected compatible legacy circle cut in the same
 property editor. The browser menu offers the same command. The task discloses retained diameter/

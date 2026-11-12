@@ -454,59 +454,43 @@ No 157B3 or parent acceptance is claimed while the remaining rows are open.
 | Complete Create Another ownership — implemented | Retain the complete Hole recipe or Thread definition, issue fresh feature/placement/owned-input identities, preserve explicit shared/formula/pinned bindings, and publish each action once. `[hole-repeat-shell]`: 6 passed, 2 native skips, 1,241 assertions. Native repeat/creation/source/support regression: 7 cases / 684 assertions at each of 100% and compact 150%; physical cuts, correction, Cancel and exact history/reopen. |
 | Referenced positions and Sketch return — implemented and verified | Existing typed Sketch-point references, independent/referenced selection, multiple positions, preselection/native picks, exact support-frame query and shared source breadcrumb/Part workflow. Qt position/source/editor regression: 15 passed, 3 native skips / 1,967 assertions, including invalid-diameter and Slot-origin correction. Geometry support/Thread/scene regression: 18 cases / 1,299 assertions. Native position/source/repeat/feature-edit regression: 5 cases / 508 assertions at both scales. |
 | Support-anchored interaction — implemented and verified | Shared Linear/Radial controls for owned positions, bore/seat/step dimensions, depth and Thread intervals. Candidate predecessor geometry supplies the support, and current Body placements supply the posed frame/value scale. Explicit Make Independent retains shared/formula sources. Focused Qt/manipulator/source/editor regression: 28 passed, 5 native skips / 2,428 assertions. Geometry inverse/Body-transform/result-face/support regression: 21 cases / 1,195 assertions. Native: 12 cases / 1,111 assertions at each scale (150% disjoint 11+1 runs). |
-| Property presets — implemented and verified | Canonical Core value templates, literal dimensional snapshots/aliases and immutable pinned revisions; retain current targets/support/positions/limits/profile, publish only required new inputs and report conflicts without replacing a valid draft. Typed/storage and shell regression is included in the 144-case selection below; native preset/canvas/source/repeat regression passes 10 cases / 824 assertions at both scales. [Contract](hole-wizard.md#property-presets--157b3). |
+| Property presets — implemented and verified | Canonical Core value templates, literal dimensional snapshots/aliases and immutable pinned revisions; retain current targets/support/positions/limits/profile, publish only required new inputs and report conflicts without replacing a valid draft. Typed/storage and shell regression passes the recorded 144-case selection; native preset/canvas/source/repeat regression passes 10 cases / 824 assertions at both scales. [Contract](hole-wizard.md#property-presets--157b3). |
 | Explicit legacy conversion — implemented and verified | Compatible circle cuts stage a canonical Hole in the existing Part workflow; retain feature/history identity and diameter/support bindings, disclose independent center/origin values, validate downstream execution/common material, preserve supported Pattern/pose mappings or report a diagnostic. Full Core, focused Geometry, 175-case Qt regression and 14-case native regression at both scales verify the replacement, diagnostics, context restoration and exact history. [Contract](hole-wizard.md#explicit-legacy-conversion--157b3). |
 | Hidden/consumed predecessor inputs — implemented and verified | Determine edit availability from the exact predecessor cache, disclose hidden/input-history Bodies, temporarily expose their pick geometry without changing visibility and validate complete downstream edits. Focused Geometry: 11 cases / 801 assertions; Qt input history: 2 passed, 2 native skips / 246 assertions. Relevant Qt regression: 82 passed, 15 skips / 6,200 assertions. Native picks/support/limit/context: 7 cases / 763 assertions at both scales. [Contract](hole-wizard.md#hidden-and-consumed-input-bodies--157b3). |
-| Prefix and shared contexts — open | Complete prefix child-command/source-return lifecycle and workspace/read-only/stale-command guards against existing session/history authorities, preserving enclosing workflows. |
+| Prefix and shared contexts — lifecycle implemented; combined rebasing follow-up open | Existing session child checkpoints own Hole/Thread creation/editing, Source Sketch return and Create Another. Canonical atomic insertion preserves Body-consumer suffixes; exact prefix scenes and predecessor selectors retain context. Workspace, unrelated-workflow and stale-command guards preserve enclosing workflows. Focused Qt: 5 passed, 1 native skip / 582 assertions. Native: 10 cases / 1,134 assertions at each scale in disjoint 6+4 clean-exit runs. Complete stable-ID recipe/support/limit handoffs after source return with a same-family suffix before closing 157B3. [Contract](hole-wizard.md#end-of-part-and-shared-contexts--157b3). |
 
 The conversion component uses the existing disposable Part workflow and canonical Core codec.
-The conversion proof below closes this named component; complete extended shared-context lifecycle next.
+The linked conversion contract retains its focused proof; complete the combined rebasing follow-up next.
 Do not infer parent acceptance from these components; 157C and all 158–165 work remain assigned.
 
-Next context work must collect existing-feature supports from their predecessor results even when
-the final target is hidden or consumed; complete prefix child-command/source-return lifecycle through
-the existing session authority; and verify workspace/read-only/stale-command guards without leaking
-tasks, inputs or enclosing workflows. Preserve the outer End of Part Save/Cancel/publication boundary.
+Current verification covers prefix child-command/source-return lifecycle through the existing
+session authority and workspace/read-only/stale-command guards. The next focused follow-up must
+reselect recipe/support/limit records by stable feature ID after canonical reordering, including
+Source Sketch return before an existing Hole/Thread suffix. Preserve the outer End of Part
+Save/Cancel/publication boundary and complete this combination before closing 157B3.
 
-Delivered components on this PR are `f415ddf` (complete repeat), `211366a` (referenced
-positions/source return), `ab9adbc` (posed canvas controls) and `548524e` (property presets).
-Their exact ownership, geometric oracles, native bounds and captures are indexed in the linked contracts above. Detailed intermediate
-runs and runtime manifests remain in Git/PR history instead of being repeated here.
+Earlier components retain their linked contract/test proofs above. Detailed intermediate runs,
+commit chronology and superseded manifests remain in Git/PR history.
 
-Preset delivery `548524e` passes the 144-case Qt selection (122 passed, 22 native skips;
-10,463 assertions) and the ten-case native preset/canvas/source/repeat selection (824 assertions
-at both scales). Its [contract and proof sources](hole-wizard.md#property-presets--157b3) retain the
-ownership and storage boundaries; detailed manifests and superseded runs remain in Git/PR history.
+Current prefix/context verification on frozen runtime inputs:
 
-Current conversion verification on frozen runtime inputs: **full Core 707 cases / 26,935 assertions**,
-**focused Geometry 26 cases / 2,186 assertions**, and **focused Qt 8 cases: 7 passed, 1 native skip /
-670 assertions**. The Core cases include atomic Body-consumer replacement and existing Plain,
-manufacturing and internal-Thread schema envelopes. Qt distinguishes unsupported old Pattern shape
-semantics from transferable whole-Body Pattern/pose consumers, checks independent volumes and exact
-workflow Save/Cancel/Undo/Redo/reopen. The final broader Qt selection passes **175 cases: 150 passed,
-25 native skips / 12,297 assertions**.
-Native conversion/context/editor/preset/source/History regression passes **14 cases / 920 assertions
-at 100%** and **14 cases / 926 assertions at compact 150%**. The different assertion counts come
-from layout-dependent native interaction checks. This is targeted native coverage; no full
-Geometry/Qt or parent acceptance is claimed. The final app opens a PID-matched, viewable native
-window; bounded startup intentionally exits 124.
-Working/staged diffs, binary hashes and changed-document links are checked before delivery.
-All 155 current GUI/app dependency records are valid and nonempty. Runtime manifest: **1,062 files**,
-SHA256 `6a3d8ec92ad74bb6e21982ff74443f328f60de56017b2b3a2623b9127e58eeb6`.
-The final GUI-only Cancel-context correction retains identical Core/Geometry/support inputs and
-Core/Geometry/export binaries, so the Core/Geometry proofs above remain current.
+| Check | Final result |
+| --- | --- |
+| Full Core | 708 cases / 27,016 assertions |
+| Focused Geometry: Body consumers/poses/Patterns and exact support scopes | 37 cases / 2,987 assertions |
+| Focused Qt prefix/context | 6 cases: 5 passed, 1 native skip / 582 assertions |
+| Broader Hole/Thread, source/editor/prefix/viewport and strict capability Qt selection | 161 cases: 135 passed, 26 native skips / 11,769 assertions |
+| Native prefix/context/source/input/conversion-context, 100% and compact 150% | 10 cases / 1,134 assertions at each scale, disjoint 6+4 runs with clean exits |
+| Native app startup | PID-matched viewable window; intentional timeout 124 |
 
-Final hidden/consumed-input proof uses frozen runtime inputs. Focused Geometry
-visibility/finishing/support regression passes **11 cases / 801 assertions**; its inputs/binary remain
-unchanged after the GUI-only fixture history correction. Focused Qt passes **4 cases: 2 passed,
-2 native skips / 246 assertions**. Native input/support/source/limit/conversion-context regression
-passes **7 cases / 763 assertions at each of 100% and compact 150%**. The broader relevant Qt
-regression passes **97 cases: 82 passed, 15 native skips / 6,200 assertions**. The final app opens a PID-matched, viewable native window; bounded startup intentionally exits 124.
-Working/staged diffs, documentation links, manifest and binary hashes are checked before delivery. These are focused results,
-not full Geometry/Qt or parent acceptance. Core inputs (303 paths) and its full-suite binary remain
-unchanged from the preceding delivery; no new full Core run is claimed. All 155 current GUI/app
-dependency records are valid and nonempty. Manifest: **1,062 files**, SHA256
-`220e113b4acdcb2a4501e73db4cf4fc3a30a3862cb58a7fc95511e4659d68b94`.
+Core/Geometry/export inputs and binaries remain unchanged after the final GUI-only legacy-envelope
+and source-return corrections, so their proofs remain current. All 155 current GUI/app dependency
+records are valid and nonempty. Working/staged diffs, changed-document links, binary hashes and the
+frozen runtime are checked before delivery: **1,062 files**, SHA256
+`d153b3a81561cf0cc55952b2fdb292aba2bf1da742eaac209192d4d01cc0d07b`.
+Failed, interrupted and superseded runs contribute no final proof. This is focused lifecycle
+verification, not full Geometry/Qt or parent acceptance. The same-family canonical-rebasing
+follow-up remains open before 157B3 closure.
 
 For every coherent change, synchronize the existing Hole/Feature-edit/UI/persistence contracts,
 run focused regressions and native 100%/compact 150% as applicable, review, commit and push. Then

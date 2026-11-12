@@ -196,6 +196,13 @@ imported suppliers on a copy before replacing the session. Failed suffixes leave
 correctable. Exact native evidence lives in `development-setup.md`; whole-block combined acceptance
 and capability promotion remain separately owned by 148C in `mvp-plan.md`.
 
+Hole/Thread use this same child checkpoint for creation, existing edits, referenced Source Sketch
+return and Create Another. Canonical `insert_part_hole_feature` / `insert_part_thread_feature`
+validate new typed intent at an explicit history position atomically with complete Body lineage,
+preserving suppression and suffix records. The session owns the marker and publication boundaries;
+the Core helper adds no independent history authority. See the
+[workflow contract](hole-wizard.md#end-of-part-and-shared-contexts--157b3) for verification status.
+
 
 ### Combined browser acceptance — Block 148C verified
 

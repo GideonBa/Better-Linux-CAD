@@ -4,6 +4,7 @@
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
 
 #include "blcad/core/part_document.hpp"
+#include "blcad/core/part_document_json.hpp"
 
 #include <string>
 #include <string_view>
@@ -122,7 +123,8 @@ public:
       if (!prepared)
         return Result<PartDocument>::failure(prepared.error());
     }
-    auto updated = (draft.*updater)(std::move(replacement));
+    auto updated = apply_replacement(draft, std::move(replacement), updater,
+                                     creating_ ? session.history_prefix_count() : std::nullopt);
     if (!updated)
       return Result<PartDocument>::failure(updated.error());
     auto plan = draft.create_recompute_plan();
@@ -155,13 +157,15 @@ public:
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
     auto committed = session.commit_part_transaction(
         creating_ ? creation_label() : "Edit feature",
-        [replacement = std::move(replacement), updater, prepare](PartDocument& part) mutable {
+        [replacement = std::move(replacement), updater, prepare,
+         prefix = creating_ ? session.history_prefix_count()
+                            : std::nullopt](PartDocument& part) mutable {
           if (prepare) {
             auto prepared = prepare(part);
             if (!prepared)
               return prepared;
           }
-          return (part.*updater)(std::move(replacement));
+          return apply_replacement(part, std::move(replacement), updater, prefix);
         });
     if (!committed.has_error()) active_ = false;
     return committed;
@@ -173,6 +177,28 @@ public:
   }
 
 private:
+  template <typename FeatureT>
+  static Result<std::size_t>
+  apply_replacement(PartDocument& part, FeatureT replacement,
+                    Result<std::size_t> (PartDocument::*updater)(FeatureT),
+                    std::optional<std::size_t> prefix) {
+    if constexpr (std::is_same_v<FeatureT, HoleFeature> ||
+                  std::is_same_v<FeatureT, ThreadFeature>) {
+      if (prefix) {
+        auto inserted = [&] {
+          if constexpr (std::is_same_v<FeatureT, HoleFeature>)
+            return insert_part_hole_feature(part, replacement, *prefix);
+          else
+            return insert_part_thread_feature(part, replacement, *prefix);
+        }();
+        if (!inserted)
+          return Result<std::size_t>::failure(inserted.error());
+        part = std::move(inserted.value());
+        return Result<std::size_t>::success(1);
+      }
+    }
+    return (part.*updater)(std::move(replacement));
+  }
   [[nodiscard]] const char* creation_label() const noexcept {
     return kind_ == GuiFeatureEditKind::Thread ? "Create Thread" : "Create Hole";
   }

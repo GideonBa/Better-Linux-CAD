@@ -22,6 +22,16 @@ enum class PartDocumentReadMode { Strict, ReferenceRepair };
 [[nodiscard]] Result<PartDocument> replace_part_extrude_with_hole(const PartDocument& document,
                                                                   const HoleFeature& replacement);
 
+// Insert a modifier before a history row atomically, retaining the complete
+// suffix. The canonical reader validates ordering, inputs and Body lineage
+// together, avoiding an invalid append-then-reorder intermediate document.
+[[nodiscard]] Result<PartDocument> insert_part_hole_feature(const PartDocument& document,
+                                                            const HoleFeature& feature,
+                                                            std::size_t before_index);
+[[nodiscard]] Result<PartDocument> insert_part_thread_feature(const PartDocument& document,
+                                                              const ThreadFeature& feature,
+                                                              std::size_t before_index);
+
 [[nodiscard]] Result<PartDocument> deserialize_part_document_from_json(std::string_view content);
 [[nodiscard]] Result<PartDocument> deserialize_part_document_from_json(std::string_view content,
                                                                        PartDocumentReadMode mode);

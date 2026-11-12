@@ -1465,6 +1465,15 @@ retains executable order and required resource/material envelopes, and chooses t
 Hole/manufacturing/Thread versions 4/5/6 while preserving higher source versions. It returns a
 disposable complete candidate; a source with unsupported consumers remains unchanged.
 
+Atomic `insert_part_hole_feature` / `insert_part_thread_feature` reuse the same canonical encoders
+and complete reader to insert a new modifier before an existing executable index. They retain all
+suffix records, existing suppression and higher envelope versions, promote legacy order to explicit
+history intent, and validate Body lineage with the final order. Invalid positions, duplicate IDs,
+unavailable inputs or invalid ordering reject the complete candidate without mutating the source.
+No new persistent field/version or transient End of Part marker is written; the
+[session workflow](hole-wizard.md#end-of-part-and-shared-contexts--157b3) owns marker advancement,
+committed Save and publication.
+
 Extent is exactly one of `{kind: blind, depth}`, `{kind: through_all}`, `{kind: to_next}`,
 `{kind: to_face, face}`, `{kind: up_to_body, body}` or `{kind: symmetric, total_depth}`. Depths and
 included angle reference existing typed parameters. The shared Face spelling for `to_face` requires

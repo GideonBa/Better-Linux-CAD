@@ -4343,6 +4343,60 @@ Result<PartDocument> replace_part_extrude_with_hole(const PartDocument& document
   return deserialize_part_document_from_json(root.dump());
 }
 
+namespace {
+Result<PartDocument> insert_modifier(const PartDocument& document, const json& feature,
+                                     const char* collection, int required,
+                                     std::size_t before_index) {
+  auto history = document.executable_history();
+  if (!history)
+    return Result<PartDocument>::failure(history.error());
+  if (document.is_reference_part() || before_index > history.value().size() ||
+      document.dependency_graph().has_node(feature.at("id").get<std::string>()))
+    return Result<PartDocument>::failure(json_error(
+        "Insertion requires an editable Part, fresh identity and valid history position"));
+  auto encoded = serialize_part_document_to_json(document);
+  if (!encoded)
+    return Result<PartDocument>::failure(encoded.error());
+  auto root = json::parse(encoded.value());
+  if (!root.contains(collection))
+    root[collection] = json::array();
+  root[collection].push_back(feature);
+  root["version"] = std::max(root.at("version").get<int>(), required);
+  root["history_version"] = k_history_version;
+  if (!root.contains("suppressed_features"))
+    root["suppressed_features"] = json::array();
+  root["engineering_resources"] =
+      detail::engineering_resources_to_json(document.engineering_resources());
+  root["material_assignments"] = detail::part_material_assignments_to_json(document);
+  root["feature_order"] = json::array();
+  for (std::size_t index = 0; index <= history.value().size(); ++index) {
+    if (index == before_index)
+      root["feature_order"].push_back(feature.at("id"));
+    if (index < history.value().size())
+      root["feature_order"].push_back(history.value()[index].node_id);
+  }
+  return deserialize_part_document_from_json(root.dump());
+}
+} // namespace
+
+Result<PartDocument> insert_part_hole_feature(const PartDocument& document,
+                                              const HoleFeature& feature,
+                                              std::size_t before_index) {
+  const int required = feature.thread() ? k_thread_version
+                       : !std::holds_alternative<std::monostate>(feature.manufacturing())
+                           ? k_manufacturing_hole_version
+                           : k_hole_version;
+  return insert_modifier(document, hole_feature_to_json(feature), "hole_features", required,
+                         before_index);
+}
+
+Result<PartDocument> insert_part_thread_feature(const PartDocument& document,
+                                                const ThreadFeature& feature,
+                                                std::size_t before_index) {
+  return insert_modifier(document, thread_feature_to_json(feature), "thread_features",
+                         k_thread_version, before_index);
+}
+
 Result<std::string> serialize_part_document_to_json(const PartDocument& document) {
   json root;
   root["schema"] = k_schema;

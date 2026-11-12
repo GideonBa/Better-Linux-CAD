@@ -10,6 +10,7 @@
 #include "blcad/geometry/step_exporter.hpp"
 #include "blcad/geometry/step_import_reader.hpp"
 #include "blcad/geometry/step_import_topology.hpp"
+#include "blcad/geometry/step_reference_commands.hpp"
 #include "blcad/geometry/thread_adapter.hpp"
 #include "blcad/gui/gui_hole_conversion.hpp"
 #include "blcad/gui/gui_hole_thread_preset.hpp"
@@ -80,11 +81,13 @@ void activate(ShellWindow& w) {
 }
 template <class T> T& control(ShellWindow& w, const char* name) {
   auto* found = w.findChild<T*>(QString::fromUtf8(name));
+  INFO(name);
   REQUIRE(found);
   return *found;
 }
 template <class T> T& field(ShellWindow& w, const char* path) {
   auto* found = qobject_cast<T*>(w.feature_edit_tools().field(QString::fromLatin1(path)));
+  INFO(path);
   REQUIRE(found);
   return *found;
 }
@@ -4195,6 +4198,25 @@ double modeled_external_removal() {
   return 4 * std::numbers::pi * depth * depth * std::tan(55 * std::numbers::pi / 360) * 4 / 1.7 *
          (8. / 4 + depth / 3);
 }
+PartDocument prefix_position_plate(bool authored = true) {
+  auto part = point_plate();
+  auto feature = checked(Feature::create_additive_extrude(
+      FeatureId("later"), "Later body", SketchId("profile"), ParameterId("depth")));
+  REQUIRE(part.add_feature(checked(
+      feature.with_body_result_context(blcad::test::history_fixture::new_body(part, "later")))));
+  if (authored)
+    REQUIRE(part.apply_history_intent({{"base", "later"}, {}}));
+  return part;
+}
+void prefix_after(ShellWindow& w, const char* id) {
+  const auto history = checked(w.session().part_document()->executable_history());
+  const auto found = std::find_if(history.begin(), history.end(),
+                                  [&](const auto& row) { return row.node_id == id; });
+  REQUIRE(found != history.end());
+  REQUIRE(w.history_tools().begin_prefix(std::size_t(found - history.begin()) + 1));
+  settle();
+  REQUIRE(w.session().history_prefix_ready());
+}
 } // namespace
 
 TEST_CASE("Hole history selectors retain hidden and consumed predecessor targets without changing "
@@ -4335,4 +4357,298 @@ TEST_CASE("Native Thread input picks use the cylinder before later consumption a
         Catch::Approx((mode == 2 ? 2560 : 0) + 200 * std::numbers::pi - modeled_external_removal())
             .margin(2e-4));
   replay(w, dir, before);
+}
+
+TEST_CASE("Prefix Hole source edits and Create Another remain local until the outer Apply",
+          "[gui][parity-b157][hole-prefix-shell]") {
+  const bool authored = GENERATE(false, true);
+  CAPTURE(authored);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, prefix_position_plate(authored));
+  const auto before = snapshot(w);
+  prefix_after(w, "base");
+  REQUIRE(
+      w.session().selection().add({GuiSelectionKind::SketchEntity, "sketch/positions/entity/a"}));
+  create_hole(w);
+  REQUIRE(w.session().part_history_command_active());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.history.prefix_apply").isEnabled());
+  CHECK_FALSE(w.feature_edit_tools().begin(FeatureId("later")));
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  control<QPushButton>(w, "blcad.hole.edit_source/placements/0").click();
+  REQUIRE(w.feature_edit_tools().editing_source_sketch());
+  move_position_source(w, 10);
+  const auto edited = snapshot(w);
+  REQUIRE(w.undo());
+  CHECK(snapshot(w) == before);
+  CHECK_FALSE(w.session().can_undo());
+  REQUIRE(w.redo());
+  CHECK(snapshot(w) == edited);
+  const auto saved = dir.filePath("prefix-source.blcad.json");
+  REQUIRE(w.save_to(saved));
+  GuiDocumentSession saved_session;
+  REQUIRE(saved_session.open_file(saved.toStdString()));
+  CHECK(checked(serialize_part_document_to_json(*saved_session.part_document())) == before);
+  control<QPushButton>(w, "blcad.hole.breadcrumb").click();
+  REQUIRE_FALSE(w.active_sketch());
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(w.feature_edit_tools().apply(true));
+  REQUIRE(w.feature_edit_tools().active());
+  CHECK(w.session().history_prefix_count() == 2);
+  REQUIRE(w.session().part_document()->hole_features().size() == 1);
+  const auto created = w.session().part_document()->hole_features().front().id();
+  const auto staged = snapshot(w);
+  CHECK_FALSE(w.session().part_shape_cache()->find_body_shape(BodyId("body.later")));
+  w.feature_edit_tools().cancel();
+  CHECK(snapshot(w) == staged);
+  CHECK_FALSE(w.session().part_history_command_active());
+  CHECK(w.session().part_workflow_active());
+  REQUIRE(w.undo());
+  CHECK(snapshot(w) == before);
+  CHECK(w.session().history_prefix_count() == 1);
+  REQUIRE(w.redo());
+  CHECK(snapshot(w) == staged);
+  const auto history = checked(w.session().part_document()->executable_history());
+  REQUIRE(history.size() == 3);
+  CHECK(history[1].node_id == created.value());
+  CHECK(history[2].node_id == "later");
+  control<QPushButton>(w, "blcad.history.prefix_apply").click();
+  REQUIRE_FALSE(w.session().part_workflow_active());
+  REQUIRE(w.session().derived_results_fresh());
+  CHECK(volume(w) == Catch::Approx(38400 - 8 * std::numbers::pi).margin(1e-6));
+  CHECK(volume(w, "body.later") == Catch::Approx(38400).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Prefix Hole and Thread edits cancel their child and retain the consumed-body suffix",
+          "[gui][parity-b157][hole-prefix-shell]") {
+  const bool thread = GENERATE(false, true);
+  CAPTURE(thread);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, thread ? hidden_thread_input(2) : hidden_hole_input(2));
+  const auto before = snapshot(w);
+  prefix_after(w, thread ? "external" : "holes");
+  const auto prefix = w.session().history_prefix_count();
+  const auto constraints = w.session().sketch_constraint_catalogs();
+  const auto dimensions = w.session().sketch_dimension_catalogs();
+  for (const bool cancel : {true, false}) {
+    begin(w, thread ? "external" : "holes");
+    REQUIRE(w.session().part_history_command_active());
+    CHECK_FALSE(control<QPushButton>(w, "blcad.history.prefix_apply").isEnabled());
+    if (thread) {
+      auto& representation = field<QComboBox>(w, "/thread/representation");
+      representation.setCurrentIndex(representation.findData("modeled"));
+    } else {
+      auto& support = field<QComboBox>(w, "/support");
+      const int bottom = support.findData("finishing/face/4:base/bottom");
+      REQUIRE(bottom >= 0);
+      support.setCurrentIndex(bottom);
+      field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+    }
+    if (cancel) {
+      w.feature_edit_tools().cancel();
+      CHECK(snapshot(w) == before);
+      CHECK(w.session().history_prefix_count() == prefix);
+      CHECK_FALSE(w.session().part_history_command_active());
+      CHECK(w.session().part_workflow_active());
+      CHECK(w.session().sketch_constraint_catalogs() == constraints);
+      CHECK(w.session().sketch_dimension_catalogs() == dimensions);
+    } else
+      REQUIRE(w.feature_edit_tools().apply());
+  }
+  REQUIRE_FALSE(w.session().part_history_command_active());
+  CHECK(w.session().history_prefix_count() == prefix);
+  const auto staged = snapshot(w);
+  REQUIRE(w.undo());
+  CHECK(snapshot(w) == before);
+  CHECK_FALSE(w.session().can_undo());
+  REQUIRE(w.redo());
+  CHECK(snapshot(w) == staged);
+  control<QPushButton>(w, "blcad.history.prefix_apply").click();
+  REQUIRE(w.session().derived_results_fresh());
+  CHECK_FALSE(w.session().part_workflow_active());
+  CHECK(volume(w, thread ? "body.base" : "body.other") ==
+        Catch::Approx(thread ? 2560 + 200 * std::numbers::pi - modeled_external_removal()
+                             : 67200 - 24 * std::numbers::pi)
+            .margin(2e-4));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Prefix Thread Create Another inserts before the existing suffix and cancels only its draft",
+    "[gui][parity-b157][hole-prefix-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  auto part = hidden_thread_input(2);
+  REQUIRE(part.apply_history_intent({{"base", "shaft", "external", "consume"}, {}}));
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  prefix_after(w, "shaft");
+  REQUIRE(w.session().selection().add({GuiSelectionKind::Body, "body/body.shaft"}));
+  create_thread(w);
+  CHECK(w.session().part_history_command_active());
+  REQUIRE(w.feature_edit_tools().apply(true));
+  CHECK(w.session().history_prefix_count() == 3);
+  REQUIRE(w.feature_edit_tools().active());
+  REQUIRE(w.session().part_document()->thread_features().size() == 2);
+  const auto staged = snapshot(w);
+  w.feature_edit_tools().cancel();
+  CHECK_FALSE(w.session().part_history_command_active());
+  CHECK(snapshot(w) == staged);
+  const auto history = checked(w.session().part_document()->executable_history());
+  CHECK(history[3].node_id == "external");
+  CHECK(history[4].node_id == "consume");
+  REQUIRE(w.undo());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.redo());
+  CHECK(snapshot(w) == staged);
+  // Prefix publication deliberately defers the later Thread's physical
+  // overlap check. A failed root Apply must retain the entire correctable draft.
+  control<QPushButton>(w, "blcad.history.prefix_apply").click();
+  CHECK_FALSE(w.session().derived_results_fresh());
+  CHECK(w.session().history_prefix_ready());
+  CHECK(snapshot(w) == staged);
+  CHECK(control<QLabel>(w, "blcad.history.prefix_status").text().contains("overlapping thread"));
+  begin(w, history[2].node_id.c_str());
+  control<QCheckBox>(w, "blcad.thread.start.enabled").setChecked(true);
+  settle();
+  field<QDoubleSpinBox>(w, "/thread/start").setValue(4);
+  field<QDoubleSpinBox>(w, "/thread/length").setValue(2);
+  REQUIRE(w.feature_edit_tools().apply());
+  control<QPushButton>(w, "blcad.history.prefix_apply").click();
+  REQUIRE(w.session().derived_results_fresh());
+  CHECK(volume(w) == Catch::Approx(2560 + 200 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native prefix Hole source return and cancellation preserve the parent command boundary",
+          "[gui][parity-b157][native-hole-prefix]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native prefix picking and Source Sketch return");
+  const bool cancel = GENERATE(true, false);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, prefix_position_plate());
+  const auto before = snapshot(w);
+  const auto constraints = w.session().sketch_constraint_catalogs();
+  const auto dimensions = w.session().sketch_dimension_catalogs();
+  prefix_after(w, "base");
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  reference_position(w, "/placements/0", {"positions", "a"});
+  click(control<QToolButton>(w, "blcad.hole.position/placements/0.pick"));
+  const auto screen = checked(w.viewport().model_to_screen({15, 0, 8}));
+  click_at(w.viewport(), {screen.x, screen.y});
+  REQUIRE(field<QComboBox>(w, "/placements/0/point").currentData() ==
+          QStringList{"positions", "b"});
+  click(control<QPushButton>(w, "blcad.hole.edit_source/placements/0"));
+  REQUIRE(w.feature_edit_tools().editing_source_sketch());
+  activate(w);
+  auto& point = control<QAction>(w, "sketch.create.point");
+  REQUIRE(point.isEnabled());
+  point.trigger();
+  settle();
+  const auto source_screen = checked(w.viewport().sketch_plane_to_screen({10, -15}));
+  click_at(w.viewport(), {source_screen.x, source_screen.y});
+  REQUIRE(w.session().part_document()->find_sketch(SketchId("positions"))->points().size() == 3);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.history.prefix_apply").isEnabled());
+  if (cancel) {
+    w.feature_edit_tools().cancel();
+    CHECK_FALSE(w.active_sketch());
+    CHECK_FALSE(w.session().task().active());
+    CHECK_FALSE(w.session().part_history_command_active());
+    CHECK(w.session().history_prefix_count() == 1);
+    CHECK(snapshot(w) == before);
+    CHECK(w.session().sketch_constraint_catalogs() == constraints);
+    CHECK(w.session().sketch_dimension_catalogs() == dimensions);
+    CHECK_FALSE(w.session().can_undo());
+    w.history_tools().cancel();
+    CHECK_FALSE(w.session().part_workflow_active());
+  } else {
+    click(control<QPushButton>(w, "blcad.hole.breadcrumb"));
+    REQUIRE_FALSE(w.active_sketch());
+    capture(w, "hole-prefix-source-return");
+    click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+    REQUIRE_FALSE(w.feature_edit_tools().active());
+    CHECK(w.session().history_prefix_count() == 2);
+    CHECK(w.session().part_workflow_active());
+    click(control<QPushButton>(w, "blcad.history.prefix_apply"));
+    REQUIRE(w.session().derived_results_fresh());
+    CHECK(w.session().part_document()->find_sketch(SketchId("positions"))->points().size() == 3);
+    CHECK(volume(w) == Catch::Approx(38400 - 8 * std::numbers::pi).margin(1e-6));
+    replay(w, dir, before);
+  }
+}
+
+TEST_CASE("Hole and Thread guards preserve unrelated workspace workflow and stale document edits",
+          "[gui][parity-b157][hole-context-shell]") {
+  const bool thread = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, thread ? hidden_thread_input(2) : hidden_hole_input(2));
+  const auto before = snapshot(w);
+  for (const auto workspace : {GuiWorkspace::Assembly, GuiWorkspace::Inspect,
+                               GuiWorkspace::Exchange, GuiWorkspace::Sketch}) {
+    REQUIRE(w.session().set_workspace(workspace));
+    w.refresh();
+    CHECK_FALSE(control<QAction>(w, "blcad.action.semantic_hole").isEnabled());
+    CHECK_FALSE(control<QAction>(w, "blcad.action.semantic_thread").isEnabled());
+    CHECK_FALSE(w.feature_edit_tools().begin_new_hole());
+    CHECK_FALSE(w.feature_edit_tools().begin_new_thread());
+    CHECK_FALSE(w.feature_edit_tools().begin(FeatureId(thread ? "external" : "holes")));
+    CHECK_FALSE(w.feature_edit_tools().active());
+    CHECK_FALSE(w.session().task().active());
+    CHECK(snapshot(w) == before);
+  }
+  REQUIRE(w.session().set_workspace(GuiWorkspace::Part));
+  REQUIRE(w.session().begin_part_workflow());
+  CHECK_FALSE(w.feature_edit_tools().begin(FeatureId(thread ? "external" : "holes")));
+  CHECK_FALSE(w.feature_edit_tools().begin_new_hole());
+  CHECK_FALSE(w.feature_edit_tools().begin_new_thread());
+  CHECK(w.session().part_workflow_active());
+  CHECK_FALSE(w.session().task().active());
+  w.session().cancel_part_workflow();
+  w.refresh();
+  begin(w, thread ? "external" : "holes");
+  REQUIRE(w.session().commit_part_transaction("Independent source change", [](PartDocument& part) {
+    auto changed = part.set_parameter_value(ParameterId("width"), checked(Quantity::length_mm(81)));
+    return changed ? Result<std::size_t>::success(1)
+                   : Result<std::size_t>::failure(changed.error());
+  }));
+  const auto changed = snapshot(w);
+  REQUIRE(changed != before);
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  w.feature_edit_tools().cancel();
+  CHECK(snapshot(w) == changed);
+  CHECK_FALSE(w.session().task().active());
+  CHECK_FALSE(w.session().part_workflow_active());
+  REQUIRE(w.undo());
+  CHECK(snapshot(w) == before);
+}
+
+TEST_CASE("Immutable STEP Reference Parts reject Hole and Thread authoring without taking a task",
+          "[gui][parity-b157][hole-context-shell]") {
+  QTemporaryDir dir;
+  const auto editable = imported_plate(dir);
+  const auto& old = editable.step_import_sources().front();
+  auto source =
+      checked(StepImportSource::create(old.id(), old.name(), old.project_relative_asset_path(),
+                                       old.sha256_digest(), StepImportMode::Reference));
+  const auto reference = checked(geometry::StepReferenceCommands{}.create_definition(
+      source, editable.imported_topology_catalogs().front(), DocumentId("reference.hole"),
+      "Immutable plate", std::filesystem::path(dir.path().toStdString())));
+  ShellWindow w;
+  open(w, dir, reference);
+  REQUIRE(w.session().part_document()->is_reference_part());
+  const auto before = snapshot(w);
+  CHECK_FALSE(control<QAction>(w, "blcad.action.semantic_hole").isEnabled());
+  CHECK_FALSE(control<QAction>(w, "blcad.action.semantic_thread").isEnabled());
+  CHECK_FALSE(w.feature_edit_tools().begin_new_hole());
+  CHECK_FALSE(w.feature_edit_tools().begin_new_thread());
+  CHECK_FALSE(w.feature_edit_tools().begin(FeatureId("import.base")));
+  CHECK_FALSE(w.feature_edit_tools().active());
+  CHECK_FALSE(w.session().task().active());
+  CHECK_FALSE(w.session().part_workflow_active());
+  CHECK(snapshot(w) == before);
 }

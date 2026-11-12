@@ -327,4 +327,16 @@ of end-state visibility or later consumption. Target/limit labels disclose hidde
 Bodies. Explicit picking displays available cached inputs through the temporary overlay without
 changing visibility intent; full downstream preview/Apply and entry-context Cancel remain authoritative.
 See the [input-history contract](hole-wizard.md#hidden-and-consumed-input-bodies--157b3) for bounds and
-focused proof. User history prefixes and enclosing workflows remain the next lifecycle component.
+focused proof. User history prefixes retain the same predecessor authority as described below.
+
+### Hole/Thread prefix child lifecycle — 157B3
+
+Hole/Thread creation, editing, Source Sketch return and Create Another use the existing
+`begin/publish/cancel_part_history_command` checkpoint within End of Part. Child Apply compacts one
+local change; child Cancel retains prior staged work and the outer workflow. New modifiers enter
+through canonical atomic insertion before session-owned candidate preparation, so later Body
+consumers never observe an invalid append/reorder intermediate state. Predecessor selectors and
+candidate scenes use their exact evaluated scope. Outer Save/Cancel/Apply and full suffix validation
+remain unchanged. Workspace, unrelated workflow and stale ownership guards reject entry or Apply
+without adopting another command. The [Hole contract](hole-wizard.md#end-of-part-and-shared-contexts--157b3)
+owns exact behavior and focused proof sources; complete native combinations remain 157C.

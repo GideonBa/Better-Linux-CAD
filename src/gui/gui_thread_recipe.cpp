@@ -1,4 +1,5 @@
 #include "blcad/gui/gui_thread_recipe.hpp"
+#include "blcad/core/part_document_json.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -101,7 +102,8 @@ Result<PartDocument> replace(PartDocument part, const FeatureId& id, ThreadDefin
 
 Result<PartDocument> GuiThreadRecipeCommands::create_external(
     PartDocument part, FeatureId id, std::string name, BodyId target, FaceReference support,
-    std::string prefix, double radius, double span, double taper, ThreadDirection direction) {
+    std::string prefix, double radius, double span, double taper, ThreadDirection direction,
+    std::optional<std::size_t> history_position) {
   const auto fail = [](std::string message) {
     return Result<PartDocument>::failure(
         Error::validation("gui.thread.recipe", std::move(message)));
@@ -139,6 +141,8 @@ Result<PartDocument> GuiThreadRecipeCommands::create_external(
                                        std::move(support), std::move(thread.value()), direction);
   if (!feature)
     return Result<PartDocument>::failure(feature.error());
+  if (history_position)
+    return insert_part_thread_feature(part, feature.value(), *history_position);
   auto added = part.add_thread_feature(std::move(feature.value()));
   if (!added)
     return Result<PartDocument>::failure(added.error());

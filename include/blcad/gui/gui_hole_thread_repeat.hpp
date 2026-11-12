@@ -10,6 +10,7 @@ public:
   [[nodiscard]] static Result<PartDocument>
   create(PartDocument part, FeatureId source, FeatureId next, std::string name,
          std::string old_namespace, std::string next_namespace,
-         const std::vector<ParameterId>& owned_parameters);
+         const std::vector<ParameterId>& owned_parameters,
+         std::optional<std::size_t> history_position = {});
 };
 } // namespace blcad::gui

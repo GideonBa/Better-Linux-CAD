@@ -1,6 +1,7 @@
 #include "../support/thread_feature_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 
+#include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <limits>
@@ -334,4 +335,49 @@ TEST_CASE("External Thread input records share typed Body support and read-only 
       part, checked(make(FeatureId("thread"), "Thread", BodyId("surface"), support))));
   const auto reference = blcad::test::history_fixture::imported(true);
   CHECK_FALSE(validate_thread_feature_inputs(reference, feature));
+}
+
+TEST_CASE("Atomic Hole and Thread insertion retains a later Body consumer and complete history",
+          "[core][parity-b157][hole-thread-insertion]") {
+  for (const bool thread : {false, true})
+    for (const int intent : {0, 1, 2}) {
+      CAPTURE(thread, intent);
+      auto part = f::pair_part();
+      accept(part.add_body_boolean_feature(checked(BodyBooleanFeature::create(
+          FeatureId("consume"), BodyBooleanOperation::Add, BodyId("body.base"),
+          {BodyId("body.shaft")}, BodyBooleanResultMode::ModifyTarget, std::nullopt, false))));
+      if (intent)
+        accept(part.apply_history_intent(
+            {{"base", "shaft", "consume"},
+             intent == 2 ? std::vector<std::string>{"consume"} : std::vector<std::string>{}}));
+      const auto before = checked(serialize_part_document_to_json(part));
+      const auto position = thread ? 2U : 1U;
+      const auto insert = [&](std::size_t index, const std::string& id) {
+        return thread ? insert_part_thread_feature(part, f::external(f::definition(), id), index)
+                      : insert_part_hole_feature(part, f::internal(f::definition(), id), index);
+      };
+      auto candidate = insert(position, "inserted");
+      INFO((candidate ? "ok" : candidate.error().message()));
+      REQUIRE(candidate);
+      CHECK(checked(serialize_part_document_to_json(part)) == before);
+      const auto history = checked(candidate.value().executable_history());
+      REQUIRE(history.size() == 4);
+      CHECK(history[position].node_id == "inserted");
+      CHECK(history.back().node_id == "consume");
+      REQUIRE(candidate.value().authored_history_intent());
+      CHECK(candidate.value().authored_history_intent()->suppressed ==
+            (intent == 2 ? std::vector<std::string>{"consume"} : std::vector<std::string>{}));
+      const auto dependents =
+          candidate.value().dependency_graph().transitive_dependents("inserted");
+      CHECK(std::find(dependents.begin(), dependents.end(), "consume") != dependents.end());
+      const auto saved = checked(serialize_part_document_to_json(candidate.value()));
+      CHECK(checked(serialize_part_document_to_json(
+                checked(deserialize_part_document_from_json(saved)))) == saved);
+      CHECK_FALSE(insert(0, "invalid.order"));
+      CHECK_FALSE(insert(4, "invalid.position"));
+      CHECK_FALSE(insert(position, "base"));
+      if (thread)
+        CHECK_FALSE(insert(3, "consumed.target"));
+      CHECK(checked(serialize_part_document_to_json(part)) == before);
+    }
 }

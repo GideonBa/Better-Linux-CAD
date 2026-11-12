@@ -1,4 +1,5 @@
 #include "blcad/gui/gui_hole_thread_repeat.hpp"
+#include "blcad/core/part_document_json.hpp"
 
 #include <algorithm>
 #include <map>
@@ -76,11 +77,10 @@ struct Inputs {
 };
 } // namespace
 
-Result<PartDocument>
-GuiHoleThreadRepeatCommands::create(PartDocument part, FeatureId source, FeatureId next,
-                                    std::string name, std::string old_namespace,
-                                    std::string next_namespace,
-                                    const std::vector<ParameterId>& owned_parameters) {
+Result<PartDocument> GuiHoleThreadRepeatCommands::create(
+    PartDocument part, FeatureId source, FeatureId next, std::string name,
+    std::string old_namespace, std::string next_namespace,
+    const std::vector<ParameterId>& owned_parameters, std::optional<std::size_t> history_position) {
   if (next_namespace.empty() || next == source || next_namespace == old_namespace)
     return Result<PartDocument>::failure(error("A repeated feature requires fresh identities."));
   Inputs inputs{part, owned_parameters, std::move(old_namespace), std::move(next_namespace), {},
@@ -138,6 +138,8 @@ GuiHoleThreadRepeatCommands::create(PartDocument part, FeatureId source, Feature
         original.direction(), std::move(tip), std::move(manufacturing), std::move(thread));
     if (!repeated)
       return Result<PartDocument>::failure(repeated.error());
+    if (history_position)
+      return insert_part_hole_feature(part, repeated.value(), *history_position);
     auto added = part.add_hole_feature(std::move(repeated.value()));
     if (!added)
       return Result<PartDocument>::failure(added.error());
@@ -151,6 +153,8 @@ GuiHoleThreadRepeatCommands::create(PartDocument part, FeatureId source, Feature
                               original.support(), std::move(thread.value()), original.direction());
     if (!repeated)
       return Result<PartDocument>::failure(repeated.error());
+    if (history_position)
+      return insert_part_thread_feature(part, repeated.value(), *history_position);
     auto added = part.add_thread_feature(std::move(repeated.value()));
     if (!added)
       return Result<PartDocument>::failure(added.error());
