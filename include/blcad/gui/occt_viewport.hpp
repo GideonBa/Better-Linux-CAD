@@ -209,7 +209,7 @@ private:
   // Schedules the single OCCT repaint (render surface update). Every state
   // change that needs a redraw funnels through here; nothing redraws directly.
   void render_update();
-  [[nodiscard]] QPoint to_render_point(QPoint point) const;
+  [[nodiscard]] QPoint to_render_point(QPointF point) const;
   void apply_display_mode();
   void apply_selection_filters();
   [[nodiscard]] bool selection_allowed(const GuiSelection& selection) const noexcept;

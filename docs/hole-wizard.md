@@ -1154,12 +1154,15 @@ history; make no portable timing-budget or pointer-latency claim. Full Core/Geom
 fresh/migrated 100%/compact 150%, reviewed captures and startup are required before whole-158
 acceptance. The numbered plan owns progress and serial delivery.
 
-Current integrated verification is in progress on **1,065 frozen runtime files**, SHA256
-`0235ddc89e4f5e01cdb091cf85f6cdabb0f770f6d74b8dfd509be255a01ef4c4`. All affected targets and
-the standalone profiler build successfully. Full Core passes **708 cases / 27,016 assertions** and
-full Geometry **682 cases / 58,224 assertions**, both exit 0. Corrected native 100% passes the
-complete fresh/migrated case with **1,260 assertions**, exit 0. Full Qt is running; compact native 150%, final
-capture review/startup and isolated raw measurements remain open. No whole-158 acceptance is claimed.
+Full Core passes **708 cases / 27,016 assertions** and full Geometry **682 cases / 58,224
+assertions**, exit 0; their inputs remain unchanged. Compact native integration exposed a missed
+thin edge caused by rounding DIP before DPR scaling. The
+[viewport correction](gui-viewport-manipulators-mvp9.md#native-projection-precision--2026-10-24)
+passes its focused fresh/migrated **1-case / 138-assertion** regression and the relevant
+**14-case / 2,514-assertion** native picking regression at both **100% and 150%**, without skips.
+Original compact captures are reviewed. Full Qt is running on the corrected binary; the complete
+native integration at both scales, final captures/startup and isolated raw measurements remain
+open. No whole-158 acceptance or full native-suite coverage is claimed.
 
 ## Why more than a cut
 

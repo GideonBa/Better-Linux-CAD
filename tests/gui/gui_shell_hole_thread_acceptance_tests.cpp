@@ -149,7 +149,7 @@ void task_layout(ShellWindow& window) {
   CHECK(guidance.height() >= required);
   CHECK_FALSE(control<QDockWidget>(window, "blcad.shell.diagnostics_dock").isVisible());
 }
-void click(QWidget& widget, QPoint point) {
+void click_at(QWidget& widget, QPointF point) {
   visible(widget);
   REQUIRE(widget.isEnabled());
   for (const auto type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
@@ -159,6 +159,9 @@ void click(QWidget& widget, QPoint point) {
     QApplication::sendEvent(&widget, &event);
     settle();
   }
+}
+void click(QWidget& widget, QPoint point) {
+  click_at(widget, QPointF(point));
 }
 void number(ShellWindow& window, const char* path, const QString& value) {
   auto& spin = field<QDoubleSpinBox>(window, path);
@@ -325,33 +328,45 @@ void thread_samples(ShellWindow& window, bool internal, double pitch, ThreadHand
   CHECK(cut > 5);
   CHECK(solid > 5);
 }
-void phase_b_part_history(ShellWindow& window, QTemporaryDir& directory, bool migrated,
-                          std::vector<std::string> stages) {
-  const auto hole = window.session().part_document()->hole_features().front().id();
-  const auto pattern = window.session().part_document()->linear_pattern_features().front().id();
-  const auto record = [&] {
-    const auto after = snapshot(window);
-    REQUIRE(after != stages.back());
-    stages.push_back(after);
-  };
-  for (const auto& [command, role, view, amount] :
-       {std::tuple{ShellFeatureTools::Command::Fillet, "top_front", GuiStandardView::Top, "0.5 mm"},
-        {ShellFeatureTools::Command::Chamfer, "bottom_back", GuiStandardView::Bottom, "0.25 mm"}}) {
+template <class Record> void phase_b_finishing(ShellWindow& window, bool migrated, Record record) {
+  for (const auto& [command, role, direction, amount] :
+       {std::tuple{ShellFeatureTools::Command::Fillet, "top_front", Vector3{0, 1, 1}, "0.5 mm"},
+        {ShellFeatureTools::Command::Chamfer, "bottom_back", Vector3{0, -1, -1}, "0.25 mm"}}) {
+    CAPTURE(role);
     auto& tools = window.feature_tools();
+    window.viewport().clear_selection();
     REQUIRE(tools.begin_finishing(command));
     auto& bodies = tools.finishing_body_editor();
     choose(bodies, bodies.findData("body.base"));
-    window.viewport().set_standard_view(view);
+    visible(window.viewport());
+    // Top/Bottom views superimpose opposite edges. An oblique camera makes
+    // the authored edge physically distinct at both desktop pixel scales.
+    REQUIRE(window.viewport().set_plane_camera({0, 0, 4}, direction, {0, -1, 1}));
     window.viewport().fit_all();
     settle();
     const Point3 anchor =
-        command == ShellFeatureTools::Command::Fillet ? Point3{0, 30, 8} : Point3{0, -30, 0};
+        command == ShellFeatureTools::Command::Fillet ? Point3{10, 30, 8} : Point3{10, -30, 0};
+    capture(window, (std::string("integrated-before-pick-") + role).c_str());
     const auto screen = checked(window.viewport().model_to_screen(anchor));
-    click(window.viewport(), {qRound(screen.x), qRound(screen.y)});
+    INFO("screen=" << screen.x << "," << screen.y << " viewport=" << window.viewport().width()
+                   << "x" << window.viewport().height());
+    const auto& scope = window.viewport().selection_semantic_scope();
+    INFO("filter=" << window.viewport().selection_filter_mask()
+                   << " scoped targets=" << (scope ? scope->size() : 0));
+    REQUIRE(window.viewport().rect().contains(QPoint(qRound(screen.x), qRound(screen.y))));
+    click_at(window.viewport(), {screen.x, screen.y});
+    INFO("selected=" << (window.viewport().selected_semantic()
+                             ? window.viewport().selected_semantic()->semantic_id
+                             : "none"));
+    if (tools.finishing_target_editor().selectedItems().size() != 1)
+      capture(window, (std::string("integrated-failed-pick-") + role).c_str());
     REQUIRE(tools.finishing_target_editor().selectedItems().size() == 1);
     const auto targets = tools.finishing_selection_items();
-    CHECK(std::any_of(targets.begin(), targets.end(),
-                      [&](const auto& item) { return item.semantic_id.ends_with(role); }));
+    const int row = tools.finishing_target_editor().row(
+        tools.finishing_target_editor().selectedItems().front());
+    REQUIRE(row >= 0);
+    REQUIRE(static_cast<std::size_t>(row) < targets.size());
+    CHECK(targets[static_cast<std::size_t>(row)].semantic_id.ends_with(role));
     text(tools.numeric_editor(), amount);
     key(tools.numeric_editor(), Qt::Key_Return);
     REQUIRE(window.viewport().feature_preview_active());
@@ -368,6 +383,17 @@ void phase_b_part_history(ShellWindow& window, QTemporaryDir& directory, bool mi
   for (Point3 point : {Point3{0, 29.99, 7.99}, Point3{0, -29.99, .01}})
     CHECK(blcad::test::classify_solid_point(*finished, point) ==
           blcad::test::SolidPointLocation::Outside);
+}
+void phase_b_part_history(ShellWindow& window, QTemporaryDir& directory, bool migrated,
+                          std::vector<std::string> stages) {
+  const auto hole = window.session().part_document()->hole_features().front().id();
+  const auto pattern = window.session().part_document()->linear_pattern_features().front().id();
+  const auto record = [&] {
+    const auto after = snapshot(window);
+    REQUIRE(after != stages.back());
+    stages.push_back(after);
+  };
+  phase_b_finishing(window, migrated, record);
   const auto suppression = [&](const std::string& id, bool suppressed) {
     REQUIRE(window.history_tools().begin_suppression(id, suppressed));
     button(window, "blcad.history.apply");
@@ -492,6 +518,9 @@ void phase_b_part_history(ShellWindow& window, QTemporaryDir& directory, bool mi
     REQUIRE(window.session().derived_results_fresh());
   }
   CHECK_FALSE(window.session().can_redo());
+  window.viewport().set_standard_view(GuiStandardView::Isometric);
+  window.viewport().fit_all();
+  settle();
 }
 } // namespace
 
@@ -927,6 +956,32 @@ TEST_CASE(
   const bool migrated = GENERATE(false, true);
   CAPTURE(migrated);
   run_b04(true, migrated);
+}
+
+TEST_CASE("Native finishing preserves fractional pixel picks on separate physical outer edges",
+          "[gui][parity-b158][native-finishing-precision]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native OCCT edge detection at desktop pixel scale");
+  const bool migrated = GENERATE(false, true);
+  CAPTURE(migrated);
+  auto part = blcad::test::phase_b_fixture::complete(migrated);
+  REQUIRE(part.remove_chamfer_feature(FeatureId("chamfer")));
+  REQUIRE(part.remove_fillet_feature(FeatureId("fillet")));
+  ShellWindow window;
+  window.setProperty("acceptancePrefix", migrated ? "precision-migrated-" : "precision-fresh-");
+  QTemporaryDir directory;
+  open(window, directory, part);
+  const auto before = snapshot(window);
+  phase_b_finishing(window, migrated, [] {});
+  const auto accepted = snapshot(window);
+  REQUIRE(window.undo());
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  CHECK_FALSE(window.session().can_undo());
+  REQUIRE(window.redo());
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == accepted);
+  CHECK_FALSE(window.session().can_redo());
 }
 
 TEST_CASE("Native internal and external Threads combine pins hands interval correction and "
