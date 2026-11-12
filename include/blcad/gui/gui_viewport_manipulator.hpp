@@ -77,6 +77,9 @@ struct GuiViewportManipulatorHandle {
   double hit_tolerance_dip{9.0};
   double count_model_step{12.0};
   double scale_model_step{25.0};
+  // Linear/radial world distance represented by one authored value unit.
+  // Numeric overrides remain in authored units (e.g. diameter on a posed Body).
+  double model_units_per_value{1.0};
 };
 
 struct GuiViewportManipulatorCandidate {
@@ -497,6 +500,9 @@ private:
     if (!finite(h.origin) || !finite(h.axis) || !finite(h.plane_normal) ||
         !finite(h.reference_direction) || !std::isfinite(h.reference_value) ||
         !std::isfinite(h.scale_model_step) || h.scale_model_step <= 0.0 ||
+        !std::isfinite(h.model_units_per_value) || h.model_units_per_value <= 0.0 ||
+        (h.model_units_per_value != 1.0 && h.kind != GuiViewportManipulatorKind::Linear &&
+         h.kind != GuiViewportManipulatorKind::Radial) ||
         !std::isfinite(h.display_size_dip) || h.display_size_dip <= 0.0 ||
         !std::isfinite(h.hit_tolerance_dip) || h.hit_tolerance_dip <= 0.0 ||
         !std::isfinite(h.count_model_step) || h.count_model_step <= 0.0 ||
@@ -663,6 +669,8 @@ private:
       delta /= h.count_model_step;
     if (h.kind == GuiViewportManipulatorKind::UniformScale)
       delta /= h.scale_model_step;
+    if (h.kind == GuiViewportManipulatorKind::Linear || h.kind == GuiViewportManipulatorKind::Radial)
+      delta /= h.model_units_per_value;
     return clamp_value(h, h.reference_value + delta);
   }
 

@@ -282,3 +282,18 @@ Save retains the committed entry, Cancel restores the workflow, and Apply create
 The Window's shared source navigation dispatches to the owning Extrude or Hole workflow. No second
 Sketch workspace, transaction system or persistence schema is introduced. See the
 [position contract](hole-wizard.md#referenced-position-workflow--157b3) for current bounds and proof.
+
+### Hole/Thread canvas controls — 157B3
+
+Canvas Control publishes one selected support-anchored Linear/Radial handle through the shared
+manipulator layer. Frames resolve from the valid candidate's exact predecessor geometry, including
+pending parameter/source edits; the result's Body placement maps them to the visible posed model.
+Positive world-distance/value scale keeps diameter and uniformly scaled dimensions in authored
+units. Active drags lock the control chooser and publication actions; exact release, invalid
+correction and Escape remain candidate-only operations. Pick modes remove the handles.
+
+Make Independent is an explicit typed parameter copy/rebind for shared/formula fields; it preserves
+the source and publishes only when the owning feature requires the new input. Pinned dimensions
+and profiles keep their existing explicit Custom transitions. The support query, canonical
+factories, full preview and existing transaction/workflow authority still decide validity. See the
+[canvas contract](hole-wizard.md#support-anchored-canvas-controls--157b3) for scope and proof.

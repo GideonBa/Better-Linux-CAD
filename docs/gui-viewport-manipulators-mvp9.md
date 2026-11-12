@@ -55,6 +55,14 @@ independent positive `scale_model_step` (25 model millimeters per factor unit by
 Handle descriptors and candidates are transient GUI/application data. They are not feature intent and
 are never serialized.
 
+Linear and Radial handles also accept a positive finite `model_units_per_value` (default 1).
+Pointer displacement is divided by this scale before becoming an authored scalar delta; numeric
+input remains in authored value units. This supports dimensions displayed after uniform Body scale
+and a diameter represented by a radial grip (half the posed scale). Other handle kinds retain scale
+1. Invalid scales reject the descriptor. Fixed-DIP presentation, frozen drag starts, exact release,
+numeric override and cancellation keep their existing contracts. The owning feature command
+supplies the current Geometry frame and scale; the layer still knows no document or reference.
+
 ## Camera and model-space mapping
 
 `GuiViewportManipulatorMapping` accepts explicit screen-to-view-ray and model-to-screen providers. The

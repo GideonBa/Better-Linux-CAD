@@ -77,7 +77,7 @@ void activate(ShellWindow& w) {
   REQUIRE(w.isActiveWindow());
 }
 template <class T> T& control(ShellWindow& w, const char* name) {
-  auto* found = w.findChild<T*>(QString::fromLatin1(name));
+  auto* found = w.findChild<T*>(QString::fromUtf8(name));
   REQUIRE(found);
   return *found;
 }
@@ -3285,4 +3285,371 @@ TEST_CASE("A Slot placement can recover from a referenced source without abandon
   REQUIRE(w.feature_edit_tools().apply());
   CHECK(volume(w) == Catch::Approx(original_volume - (8 + std::numbers::pi) * 8).margin(1e-6));
   replay(w, dir, before);
+}
+
+namespace {
+GuiViewportManipulatorHandle canvas(ShellWindow& w, const char* path) {
+  if (QApplication::platformName() != "xcb") {
+    GuiViewportCameraBookmark camera;
+    camera.eye = {200, 200, 200};
+    camera.scale = 200;
+    camera.projection = GuiViewportProjection::Orthographic;
+    REQUIRE(w.viewport().restore_camera_bookmark(camera));
+    w.feature_edit_tools().refresh_presentation();
+  }
+  auto& controls = control<QComboBox>(w, "blcad.feature_edit.dynamic");
+  const int index = controls.findData(QString::fromLatin1(path));
+  REQUIRE(index >= 0);
+  controls.setCurrentIndex(index);
+  settle();
+  REQUIRE(w.feature_edit_tools().manipulators().handles().size() == 1);
+  return w.feature_edit_tools().manipulators().handles().front();
+}
+void canvas_mouse(ShellWindow& w, QEvent::Type type, GuiSketchScreenPoint point) {
+  const QPointF local(point.x, point.y);
+  QMouseEvent event(type, local, w.viewport().mapToGlobal(local.toPoint()),
+                    type == QEvent::MouseMove ? Qt::NoButton : Qt::LeftButton,
+                    type == QEvent::MouseButtonRelease ? Qt::NoButton : Qt::LeftButton,
+                    Qt::NoModifier);
+  QApplication::sendEvent(&w.viewport(), &event);
+  settle();
+}
+GuiSketchScreenPoint start_canvas(ShellWindow& w) {
+  const auto drawings = w.feature_edit_tools().manipulators().presentations();
+  REQUIRE(drawings.size() == 1);
+  const auto pointer = drawings.front().endpoint;
+  REQUIRE(w.viewport().rect().contains(QPointF(pointer.x, pointer.y).toPoint()));
+  canvas_mouse(w, QEvent::MouseButtonPress, pointer);
+  REQUIRE_FALSE(w.feature_edit_tools().manipulators().active_handle_id().empty());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.create_another").isEnabled());
+  return pointer;
+}
+} // namespace
+
+TEST_CASE("Hole canvas diameter candidates correct invalid input cancel exactly and publish once",
+          "[gui][parity-b157][hole-canvas-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  const auto descriptor = canvas(w, "/diameter/parameter");
+  CHECK(descriptor.kind == GuiViewportManipulatorKind::Radial);
+  CHECK(descriptor.model_units_per_value == Catch::Approx(.5));
+  CHECK(descriptor.origin.z == Catch::Approx(8));
+  auto pointer = start_canvas(w);
+  CHECK_FALSE(w.feature_edit_tools().set_drag_text("0 mm"));
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().set_drag_text("4 mm"));
+  CHECK(field<QDoubleSpinBox>(w, "/diameter/parameter").value() == 4);
+  key(w.viewport(), Qt::Key_Escape);
+  CHECK(field<QDoubleSpinBox>(w, "/diameter/parameter").value() == 2);
+  CHECK(snapshot(w) == before);
+  CHECK(control<QPushButton>(w, "blcad.feature_edit.create_another").isEnabled());
+  pointer = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("4 mm"));
+  canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QPushButton>(w, "blcad.feature_edit.create_another").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(volume(w) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("A selected Hole placement owns its canvas frame while shared depth remains explicit",
+          "[gui][parity-b157][hole-canvas-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(-15);
+  control<QPushButton>(w, "blcad.feature_edit.add/placements").click();
+  settle();
+  field<QDoubleSpinBox>(w, "/placements/1/position/x").setValue(15);
+  const auto selected = canvas(w, "/placements/1/position/y");
+  const auto placement_id = control<QGroupBox>(w, "blcad.feature_edit.entry/placements/1")
+                                .property("semanticId")
+                                .toString()
+                                .toStdString();
+  CHECK(selected.origin.x == Catch::Approx(15));
+  CHECK(selected.origin.y == Catch::Approx(0));
+  auto pointer = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("5 mm"));
+  canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
+  CHECK(field<QDoubleSpinBox>(w, "/placements/0/position/y").value() == 0);
+  CHECK(field<QDoubleSpinBox>(w, "/placements/1/position/y").value() == 5);
+  control<QPushButton>(w, "blcad.feature_edit.↑/placements/1").click();
+  settle();
+  CHECK(control<QComboBox>(w, "blcad.feature_edit.dynamic").currentData() ==
+        "/placements/0/position/y");
+  REQUIRE(w.feature_edit_tools().manipulators().handles().size() == 1);
+  CHECK(w.feature_edit_tools().manipulators().handles().front().id == selected.id);
+  choose_hole_mode(w, "blcad.hole.extent", 0);
+  (void)canvas(w, "/extent/depth");
+  pointer = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("3 mm"));
+  canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& part = *w.session().part_document();
+  const auto& hole = part.hole_features().front();
+  const auto ref = checked(HoleInstanceReference::create(hole.id(), HolePlacementId(placement_id),
+                                                         HoleReferenceRole::Axis));
+  const auto frame =
+      checked(geometry::HoleInstanceGeometry::resolve(part, ref, *w.session().part_shape_cache()));
+  CHECK(frame.frame.origin.x == Catch::Approx(15));
+  CHECK(frame.frame.origin.y == Catch::Approx(5));
+  CHECK(volume(w) == Catch::Approx(38400 - 6 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Hole canvas formula override creates an owned dimension without changing its source",
+          "[gui][parity-b157][hole-canvas-shell]") {
+  auto part = plate();
+  REQUIRE(part.add_parameter(checked(
+      Parameter::create_expression(ParameterId("shared.bore"), "shared_bore", ParameterType::Length,
+                                   "diameter", checked(Quantity::length_mm(3))))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_hole(w);
+  auto& binding = control<QComboBox>(w, "blcad.feature_edit.binding/diameter/parameter");
+  binding.setCurrentIndex(binding.findData("shared.bore"));
+  CHECK_FALSE(field<QDoubleSpinBox>(w, "/diameter/parameter").isEnabled());
+  auto& controls = control<QComboBox>(w, "blcad.feature_edit.dynamic");
+  controls.setCurrentIndex(controls.findData("/diameter/parameter"));
+  CHECK(w.feature_edit_tools().manipulators().handles().empty());
+  control<QPushButton>(w, "blcad.feature_edit.independent/diameter/parameter").click();
+  settle();
+  REQUIRE(field<QDoubleSpinBox>(w, "/diameter/parameter").isEnabled());
+  (void)canvas(w, "/diameter/parameter");
+  const auto pointer = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("4 mm"));
+  canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  CHECK(result.find_parameter(ParameterId("shared.bore"))->formula() == "diameter");
+  CHECK(result.find_parameter(ParameterId("shared.bore"))->value().millimeters() == 3);
+  CHECK(result.parameters().size() == part.parameters().size() + 1);
+  CHECK(volume(w) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Hole canvas frames follow rotations and uniform scale after the edited feature",
+          "[gui][parity-b157][hole-canvas-shell][native-hole-canvas]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, plate());
+  if (QApplication::platformName() == "xcb")
+    activate(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto id = w.session().part_document()->hole_features().front().id();
+  REQUIRE(w.session().commit_part_transaction("Pose the drilled plate", [](PartDocument& part) {
+    auto added = part.add_body_transform(
+        BodyTransform::create_uniform_scale(BodyTransformId("after.scale"), BodyId("body.base"),
+                                            BodyTransformCoordinateSpace::World, std::nullopt, 2,
+                                            {}, false, false)
+            .value());
+    if (!added)
+      return added;
+    added = part.add_body_transform(
+        BodyTransform::create_rotate(
+            BodyTransformId("after.rotate"), BodyId("body.base"),
+            BodyTransformCoordinateSpace::World, std::nullopt,
+            BodyTransformRotationAxis::create_explicit({}, {0, 1, 0}).value(), 90, false, false)
+            .value());
+    if (!added)
+      return added;
+    return part.add_body_transform(
+        BodyTransform::create_translate(BodyTransformId("after.translate"), BodyId("body.base"),
+                                        BodyTransformCoordinateSpace::World, std::nullopt,
+                                        {40, 10, 0}, false, false)
+            .value());
+  }));
+  w.refresh();
+  w.viewport().fit_all();
+  settle();
+  const auto before = snapshot(w);
+  begin(w, id.value().c_str());
+  const auto posed = canvas(w, "/diameter/parameter");
+  CHECK(posed.origin.x == Catch::Approx(56));
+  CHECK(posed.origin.y == Catch::Approx(10));
+  CHECK(posed.origin.z == Catch::Approx(0).margin(1e-9));
+  CHECK(posed.model_units_per_value == Catch::Approx(1));
+  const auto pointer = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("4 mm"));
+  canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
+  capture(w, "hole-canvas-scaled-preview");
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(volume(w) == Catch::Approx((38400 - 32 * std::numbers::pi) * 8).margin(1e-5));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Thread interval canvas anchors the length after the explicit start offset",
+          "[gui][parity-b157][hole-canvas-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part());
+  const auto before = snapshot(w);
+  create_thread(w);
+  auto descriptor = canvas(w, "/thread/length");
+  CHECK(std::abs(descriptor.axis.z) == Catch::Approx(1));
+  auto pointer = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("2 mm"));
+  canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
+  control<QCheckBox>(w, "blcad.thread.start.enabled").setChecked(true);
+  settle();
+  (void)canvas(w, "/thread/start");
+  pointer = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("4 mm"));
+  canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
+  const auto length_frame = canvas(w, "/thread/length");
+  CHECK(length_frame.origin.z == Catch::Approx(descriptor.origin.z + 4 * descriptor.axis.z));
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  REQUIRE(checked(geometry::ThreadAdapter::cosmetic_presentations(
+                      *w.session().part_shape_cache()->find_body_shape(BodyId("body.shaft"))))
+              .size() == 1);
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native Hole canvas release samples the final pointer on a posed support and cancels "
+          "numeric drag",
+          "[gui][parity-b157][hole-canvas-shell][native-hole-canvas]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native support-anchored Hole interaction");
+  auto part = plate();
+  REQUIRE(part.add_body_transform(checked(BodyTransform::create_rotate(
+      BodyTransformId("before.rotate"), BodyId("body.base"), BodyTransformCoordinateSpace::World,
+      std::nullopt, checked(BodyTransformRotationAxis::create_explicit({}, {0, 0, 1})), 37, false,
+      false))));
+  REQUIRE(part.add_body_transform(checked(BodyTransform::create_translate(
+      BodyTransformId("before.translate"), BodyId("body.base"), BodyTransformCoordinateSpace::World,
+      std::nullopt, {50, 20, 10}, false, false))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  activate(w);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  const auto descriptor = canvas(w, "/placements/0/position/x");
+  CHECK(descriptor.origin.z == Catch::Approx(18));
+  const auto drawings = w.feature_edit_tools().manipulators().presentations();
+  REQUIRE(drawings.size() == 1);
+  const auto pointer = start_canvas(w);
+  const GuiSketchScreenPoint final{pointer.x + .2 * (pointer.x - drawings.front().anchor.x),
+                                   pointer.y + .2 * (pointer.y - drawings.front().anchor.y)};
+  const auto measure = [&](GuiSketchScreenPoint pixel) {
+    const auto ray = checked(w.viewport().screen_to_view_ray(pixel));
+    const auto d = normalized(ray.direction);
+    const auto axis = normalized(descriptor.axis);
+    const Vector3 delta{ray.origin.x - descriptor.origin.x, ray.origin.y - descriptor.origin.y,
+                        ray.origin.z - descriptor.origin.z};
+    const double projection = dot(axis, d);
+    return (dot(delta, axis) - projection * dot(delta, d)) / (1 - projection * projection);
+  };
+  const double expected = descriptor.reference_value +
+                          (measure(final) - measure(pointer)) / descriptor.model_units_per_value;
+  // No intermediate move: the actual mouse release must be authoritative.
+  canvas_mouse(w, QEvent::MouseButtonRelease, final);
+  CHECK(field<QDoubleSpinBox>(w, "/placements/0/position/x").value() ==
+        Catch::Approx(expected).margin(1e-5));
+  CHECK(snapshot(w) == before);
+  (void)canvas(w, "/diameter/parameter");
+  auto grip = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("4 mm"));
+  key(w.viewport(), Qt::Key_Escape);
+  CHECK(field<QDoubleSpinBox>(w, "/diameter/parameter").value() == 2);
+  choose_hole_mode(w, "blcad.hole.extent", 0);
+  (void)canvas(w, "/extent/depth");
+  grip = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("3 mm"));
+  canvas_mouse(w, QEvent::MouseButtonRelease, grip);
+  capture(w, "hole-canvas-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  CHECK(volume(w) == Catch::Approx(38400 - 3 * std::numbers::pi).margin(1e-6));
+  const auto& result = *w.session().part_document();
+  const auto& hole = result.hole_features().front();
+  const auto reference = checked(
+      HoleInstanceReference::create(hole.id(), hole.placements()[0].id, HoleReferenceRole::Axis));
+  const auto actual = checked(
+      geometry::HoleInstanceGeometry::resolve(result, reference, *w.session().part_shape_cache()));
+  const double angle = 37 * std::numbers::pi / 180;
+  CHECK(actual.frame.origin.x == Catch::Approx(50 + expected * std::cos(angle)).margin(1e-5));
+  CHECK(actual.frame.origin.y == Catch::Approx(20 + expected * std::sin(angle)).margin(1e-5));
+  CHECK(actual.frame.origin.z == Catch::Approx(18));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native Thread interval grips drive a modeled cut with one Apply and exact history",
+          "[gui][parity-b157][hole-canvas-shell][native-hole-canvas]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native support-anchored Thread interaction");
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part());
+  activate(w);
+  const auto before = snapshot(w);
+  const auto original_volume = volume(w, "body.shaft");
+  create_thread(w);
+  (void)canvas(w, "/thread/length");
+  auto pointer = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("2 mm"));
+  canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
+  click(control<QCheckBox>(w, "blcad.thread.start.enabled"));
+  (void)canvas(w, "/thread/start");
+  pointer = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("4 mm"));
+  canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
+  auto& representation = field<QComboBox>(w, "/thread/representation");
+  representation.setCurrentIndex(representation.findData("modeled"));
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  (void)canvas(w, "/thread/length");
+  pointer = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("3 mm"));
+  canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
+  capture(w, "thread-canvas-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  const auto& result = *w.session().part_document();
+  const auto definition =
+      checked(resolve_thread_definition(result, result.thread_features().front().thread()));
+  CHECK(definition.start_mm == 4);
+  CHECK(definition.length_mm == 3);
+  const double depth = (definition.major_diameter_mm - definition.minor_diameter_mm) / 2;
+  // Integrate 2*pi*r times the V-groove's axial fraction: the radial
+  // integral is a*depth^2/2 + depth^3/3, with a = minor diameter / 2.
+  const double removed = 4 * std::numbers::pi * depth * depth *
+                         std::tan(definition.included_angle_deg * std::numbers::pi / 360) *
+                         definition.length_mm / definition.pitch_mm *
+                         (definition.minor_diameter_mm / 4 + depth / 3);
+  CHECK(volume(w, "body.shaft") == Catch::Approx(original_volume - removed).margin(2e-4));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Profile-driven Slot placement and width do not expose ineffective canvas controls",
+          "[gui][parity-b157][hole-canvas-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, manufacture::seed());
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(2);
+  choose_hole_mode(w, "blcad.hole.recipe", 8);
+  choose_hole_mode(w, "blcad.hole.extent", 0);
+  const auto& controls = control<QComboBox>(w, "blcad.feature_edit.dynamic");
+  CHECK(controls.findData("/placements/0/position/x") == -1);
+  CHECK(controls.findData("/placements/0/position/y") == -1);
+  CHECK(controls.findData("/diameter/parameter") == -1);
+  (void)canvas(w, "/extent/depth");
+  const auto pointer = start_canvas(w);
+  REQUIRE(w.feature_edit_tools().set_drag_text("3 mm"));
+  canvas_mouse(w, QEvent::MouseButtonRelease, pointer);
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(volume(w) == Catch::Approx(1600 - (8 + std::numbers::pi) * 3).margin(1e-6));
 }

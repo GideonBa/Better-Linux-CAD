@@ -308,6 +308,12 @@ They retain placement identity across source changes and support actual point pi
 Sketch and the return breadcrumb use the same Sketch workspace as the shared feature workflow;
 source operations remain inside the Hole draft until the combined Apply. See the
 [position workflow](hole-wizard.md#referenced-position-workflow--157b3) for Save/Cancel and scope.
+Canvas Control selects a support-anchored position, diameter, depth or Thread interval grip.
+Dragging previews the selected authored value; numeric input uses the same units. Escape resets
+the drag, and Apply commits the feature. Shared/formula inputs require the explicit Make
+Independent action before their bindings are replaced. Pinned values keep their explicit Custom
+source transition. The [canvas contract](hole-wizard.md#support-anchored-canvas-controls--157b3)
+owns posed frames, value scaling and candidate validation.
 
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
 [compact suppression at 150%](images/history-suppression-compact.png) and

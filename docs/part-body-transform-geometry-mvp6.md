@@ -35,6 +35,12 @@ construction-source builder's historical feature-coordinate contract.
 Stack order is the persistent insertion/graph order and is intentionally non-commutative. Focused
 proof compares translate-then-rotate with rotate-then-translate.
 
+`GeometryAffineTransform::inverse_similarity()` provides a checked inverse for derived rigid,
+uniform-scale and reflected frames. It rejects nonfinite, singular, sheared, nonuniform or
+projective matrices. Result-face Sketch ownership and support-anchored feature interaction reuse
+this Geometry operation to remove the already-applied prefix before applying the current pose.
+This derived operation introduces no authored matrix or new BodyTransform kind.
+
 ## Associative ownership
 
 When `apply_to_owned_sketches` is set, every matching `SketchOwnership` derives a transformed
@@ -60,7 +66,7 @@ the original resolver overloads retain their previous behavior.
 Focused proof:
 
 ```bash
-./build/blcad_geometry_tests "[geometry][body-transform]"
+./build/dev-gui/blcad_geometry_tests '[body-transform],[hole-canvas-frame],[result-face-owned-pose]'
 ```
 
 The proof covers translation, rotation through ordered stacks, uniform-scale volume, incremental

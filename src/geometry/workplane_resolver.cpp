@@ -360,20 +360,11 @@ WorkplaneResolver::resolve_for_sketch(const PartDocument& document, const Sketch
       if (const auto* prior = shape_cache.find_reference_transform(sketch.id().value(), pose.id()))
         prefix = prior->cumulative_transform;
     }
-    GeometryAffineTransform inverse;
-    const auto& m = prefix.matrix;
-    const double squared = m[0] * m[0] + m[4] * m[4] + m[8] * m[8];
-    if (!std::isfinite(squared) || squared <= 0)
+    auto inverse = prefix.inverse_similarity();
+    if (!inverse)
       return Result<ResolvedWorkplane>::failure(
           validation_error(sketch.id().value(), "result-face ownership pose must be invertible"));
-    for (int row = 0; row < 3; ++row)
-      for (int column = 0; column < 3; ++column)
-        inverse.matrix[row * 4 + column] = m[column * 4 + row] / squared;
-    const auto offset = inverse.transform_vector({m[3], m[7], m[11]});
-    inverse.matrix[3] = -offset.x;
-    inverse.matrix[7] = -offset.y;
-    inverse.matrix[11] = -offset.z;
-    const auto delta = inverse.followed_by(transform->cumulative_transform);
+    const auto delta = inverse.value().followed_by(transform->cumulative_transform);
     workplane.value().origin = delta.transform_point(workplane.value().origin);
     workplane.value().x_axis = delta.transform_vector(workplane.value().x_axis);
     workplane.value().y_axis = delta.transform_vector(workplane.value().y_axis);

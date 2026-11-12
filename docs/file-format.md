@@ -1438,6 +1438,9 @@ point writes support-local coordinates only after resolving the current referenc
 The source breadcrumb and its pending Part workflow are transient; normal Save during that
 workflow serializes the committed entry document. Final Apply uses the canonical current Hole
 envelope and one ordinary history entry for the source and feature changes together.
+Canvas frames and world/value scale are transient. Make Independent writes only an ordinary
+owned typed parameter and explicit binding when required by the accepted Hole/Thread; the original
+shared/formula/resource source remains unchanged.
 
 Extent is exactly one of `{kind: blind, depth}`, `{kind: through_all}`, `{kind: to_next}`,
 `{kind: to_face, face}`, `{kind: up_to_body, body}` or `{kind: symmetric, total_depth}`. Depths and

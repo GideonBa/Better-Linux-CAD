@@ -21,6 +21,8 @@ struct GeometryAffineTransform {
   [[nodiscard]] Vector3 transform_vector(Vector3 vector) const noexcept;
   [[nodiscard]] GeometryAffineTransform
   followed_by(const GeometryAffineTransform& operation) const noexcept;
+  // Checked inverse of a rigid/uniform-scale/reflection Body placement.
+  [[nodiscard]] Result<GeometryAffineTransform> inverse_similarity() const;
 };
 
 struct GeometryShapeBounds {

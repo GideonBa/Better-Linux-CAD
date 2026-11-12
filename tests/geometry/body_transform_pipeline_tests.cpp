@@ -431,3 +431,37 @@ TEST_CASE(
   REQUIRE_FALSE(missing);
   CHECK(missing.error().message().find("repair") != std::string::npos);
 }
+
+TEST_CASE("Body similarity inverses preserve points vectors composition and reject nonplacements",
+          "[geometry][body-transform][hole-canvas-frame]") {
+  auto pose = GeometryAffineTransform::uniform_scale({3, 4, 5}, 2)
+                  .followed_by(GeometryAffineTransform::rotation({1, 2, 3}, {1, 2, 3}, 37))
+                  .followed_by(GeometryAffineTransform::translation({20, -7, 9}));
+  for (const bool mirrored : {false, true}) {
+    auto current = pose;
+    if (mirrored)
+      for (int row = 0; row < 3; ++row)
+        current.matrix[row * 4] *= -1;
+    auto inverse = current.inverse_similarity();
+    REQUIRE(inverse);
+    const Point3 point{2, -3, 7};
+    const Vector3 vector{1, 4, -2};
+    CHECK(distance(inverse.value().transform_point(current.transform_point(point)), point) < 1e-10);
+    const auto restored = inverse.value().transform_vector(current.transform_vector(vector));
+    CHECK(length(Vector3{restored.x - vector.x, restored.y - vector.y, restored.z - vector.z}) <
+          1e-10);
+    const auto identity = current.followed_by(inverse.value());
+    CHECK(distance(identity.transform_point(point), point) < 1e-10);
+  }
+  auto invalid = GeometryAffineTransform::uniform_scale({}, 0);
+  CHECK_FALSE(invalid.inverse_similarity());
+  invalid = GeometryAffineTransform::identity();
+  invalid.matrix[1] = .5;
+  CHECK_FALSE(invalid.inverse_similarity());
+  invalid = GeometryAffineTransform::identity();
+  invalid.matrix[5] = 2;
+  CHECK_FALSE(invalid.inverse_similarity());
+  invalid = GeometryAffineTransform::identity();
+  invalid.matrix[12] = 1;
+  CHECK_FALSE(invalid.inverse_similarity());
+}

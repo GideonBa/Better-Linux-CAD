@@ -775,6 +775,45 @@ The shared Window keeps the idle model selection filter when entering a feature'
 the task's temporary pick mask never becomes the idle filter. Hole Cancel restores the entry
 selection/camera after the enclosing workflow rollback, whose revision deliberately advances.
 
+### Support-anchored canvas controls — 157B3
+
+The shared property editor's Canvas Control selects an authored position X/Y, bore/seat/step
+dimension, depth or Thread start/length. The existing Linear/Radial manipulator layer owns pointer
+mapping, frozen starts, numeric override and exact release. A valid candidate supplies its exact
+predecessor cache for support resolution; the result cache supplies subsequent Body placement.
+Grips follow rotation/translation/uniform scale while entered values retain their authored units.
+Radial diameter grips explicitly map half the posed diameter to world radius.
+Slot position/width remain driven by the selected source profile; those ineffective placement/
+diameter grips are omitted. Its authored depth remains available as a canvas control.
+
+Dragging changes only the disposable form/candidate. Invalid geometry disables Apply and remains
+correctable during the same drag. Escape restores the preceding scalar, release uses the final
+sample, and Apply publishes once. Canvas Control is locked during the drag. Selection pick modes
+clear grips so model/point picks cannot be intercepted by a manipulation handle.
+Placement and step grips use their semantic IDs. Reordering retains the selected logical grip;
+removing it clears the selection instead of redirecting manipulation to another row.
+
+Formula/shared values retain their bindings until Make Independent is explicitly chosen. It
+creates an owned typed parameter from the displayed value without changing the original source;
+unused pending inputs remain pruned. Pinned properties retain the explicit Custom source action.
+Referenced placements likewise require the explicit Independent point transition before position
+dragging. Thread length starts at the authored interval offset on its inspected cylinder/cone.
+
+Geometry `[hole-canvas-frame]` plus Body-transform/result-face/support regression passes 21 cases /
+1,195 assertions. Qt canvas/manipulator/position/source/editor regression passes 28 cases / 2,428
+assertions, with five native skips. Native canvas/source/repeat/editor/body/face/limit regression
+passes twelve cases / 1,111 assertions at 100%. The same binary at 150% passes disjoint eleven-case /
+1,030-assertion and one-case / 81-assertion runs. The broader canvas/position/source/Hole/Thread/
+editor/prefix/coverage/viewport regression passes 115 cases / 9,804 assertions, with 20 native
+skips. The focused native selection covers eleven of those skips plus the all-platform post-Body-
+scale case; complete native combination acceptance remains 157C. This component does not close 157B3.
+Unmodified captures show [posed Hole depth](images/hole-canvas.png),
+[diameter after Body scale/rotation](images/hole-canvas-scaled.png) and
+[compact modeled Thread interval](images/thread-canvas-compact.png).
+Proof sources: [shell/native interactions](../tests/gui/gui_shell_hole_thread_edit_tests.cpp),
+[value mapping](../tests/gui/gui_shell_feature_tools_tests.cpp) and
+[pose inversion](../tests/geometry/body_transform_pipeline_tests.cpp).
+
 ## Why more than a cut
 
 ```text

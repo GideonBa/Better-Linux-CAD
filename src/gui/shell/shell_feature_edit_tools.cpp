@@ -412,6 +412,8 @@ struct ShellFeatureEditTools::Impl {
   std::map<QString, QWidget*> fields;
   std::map<QString, QDoubleSpinBox*> numbers;
   std::map<QString, QuantityKind> units;
+  std::map<QString, GuiViewportManipulatorHandle> canvas_handles;
+  std::string retained_canvas_handle;
   std::uint32_t previous_mask{};
   std::optional<std::vector<std::string>> previous_scope;
   bool valid{}, building{};
@@ -596,8 +598,9 @@ struct ShellFeatureEditTools::Impl {
       return Result<std::size_t>::failure(error("Could not start feature creation task."));
     }
     dock->setWindowTitle(kind == Kind::Thread ? "Create Thread" : "Create Hole");
-    dynamic->hide();
-    dynamic_label->hide();
+    dynamic->show();
+    dynamic_label->show();
+    dynamic_label->setText("Canvas Control");
     another->show();
     guidance->setText(
         kind == Kind::Thread
@@ -1025,6 +1028,10 @@ struct ShellFeatureEditTools::Impl {
   void pick_mode() {
     if (!input_selection() || !edit.active())
       return;
+    if (picking != Pick::None && layer.active_handle_id().empty()) {
+      (void)layer.set_handles({});
+      overlay->hide();
+    }
     if (!support_chosen) {
       valid = false;
       viewport.clear_feature_preview();
@@ -1153,7 +1160,7 @@ struct ShellFeatureEditTools::Impl {
     register_field(spin, path);
     numbers[path] = spin;
     units[path] = unit;
-    if (!unitless)
+    if (!unitless && (!hole_thread() || canvas_path(path)))
       dynamic->addItem(path_label(path), path);
     return spin;
   }
@@ -1162,6 +1169,24 @@ struct ShellFeatureEditTools::Impl {
     for (const auto& part : path.split('/', Qt::SkipEmptyParts))
       result.push_back(label(part.toStdString()));
     return result.join(" / ");
+  }
+  bool canvas_path(const QString& path) const {
+    if (path == "/thread/length" || path == "/thread/start")
+      return true;
+    if (edit.kind() != Kind::Hole)
+      return false;
+    if (record.contains("manufacturing") &&
+        record.at("manufacturing").value("kind", "") == "slot" &&
+        (path.startsWith("/placements/") || path.contains("diameter")))
+      return false; // Slot position/width are authored by its source profile.
+    return (path.startsWith("/placements/") &&
+            (path.endsWith("/position/x") || path.endsWith("/position/y"))) ||
+           path == "/diameter/parameter" || path == "/extent/depth" ||
+           path == "/extent/total_depth" ||
+           (path.startsWith("/manufacturing/") &&
+            (path.endsWith("/diameter/parameter") || path.endsWith("/depth/parameter") ||
+             path.endsWith("/minimum_diameter/parameter") ||
+             path.endsWith("/maximum_diameter/parameter")));
   }
   QComboBox* combo(QWidget* parent) {
     auto* box = new QComboBox(parent);
@@ -1266,14 +1291,78 @@ struct ShellFeatureEditTools::Impl {
     if (selected.formula())
       scalar->setToolTip("Formula: " + QString::fromStdString(*selected.formula()));
     layout->addWidget(scalar);
+    QPushButton* independent = nullptr;
+    if (hole_thread()) {
+      independent = make_gui_button("Make Independent", row);
+      independent->setVisible(
+          selected.is_expression() ||
+          std::none_of(pending_parameters.begin(), pending_parameters.end(),
+                       [&](const auto& pending) { return pending.id() == selected.id(); }));
+      independent->setObjectName("blcad.feature_edit.independent" + path);
+      independent->setToolTip(
+          "Create an owned value without changing the shared parameter or formula.");
+      layout->addWidget(independent);
+      QObject::connect(independent, &QPushButton::clicked, &owner, [this, path] {
+        auto canonical = deserialize_part_document_from_json(source.dump());
+        const auto* original = parameter(value(path).get<std::string>());
+        if (!canonical || !original) {
+          window.report_error(canonical ? error("The bound parameter is unavailable.")
+                                        : canonical.error());
+          return;
+        }
+        const auto id =
+            ParameterId(recipe_namespace + ".override." +
+                        QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString());
+        std::size_t index = 1;
+        std::string name;
+        do {
+          name = original->name() + "_independent_" + std::to_string(index++);
+        } while (canonical.value().find_parameter(std::string_view(name)));
+        auto quantity = original->type() == ParameterType::Angle
+                            ? Quantity::angle_deg(parameter_value(*original))
+                        : original->type() == ParameterType::Count
+                            ? Quantity::count(parameter_value(*original))
+                            : Quantity::length_mm(parameter_value(*original));
+        if (!quantity) {
+          window.report_error(quantity.error());
+          return;
+        }
+        auto owned = original->type() == ParameterType::Angle
+                         ? Parameter::create_angle(id, name, quantity.value(), original->scope())
+                     : original->type() == ParameterType::Count
+                         ? Parameter::create_count(id, name, quantity.value(), original->scope())
+                         : Parameter::create_length(id, name, quantity.value(), original->scope());
+        if (!owned) {
+          window.report_error(owned.error());
+          return;
+        }
+        auto added = canonical.value().add_parameter(owned.value());
+        auto encoded = added ? serialize_part_document_to_json(canonical.value())
+                             : Result<std::string>::failure(added.error());
+        if (!encoded) {
+          window.report_error(encoded.error());
+          return;
+        }
+        source["parameters"] = Json::parse(encoded.value()).at("parameters");
+        pending_parameters.push_back(std::move(owned.value()));
+        value(path) = id.value();
+        deferred_rebuild();
+      });
+    }
     form->addRow(label(key), row);
     QObject::connect(
-        binding, &QComboBox::currentIndexChanged, &owner, [this, path, binding, scalar] {
+        binding, &QComboBox::currentIndexChanged, &owner,
+        [this, path, binding, scalar, independent] {
           value(path) = binding->currentData().toString().toStdString();
           const auto* p = parameter(value(path).get<std::string>());
           const QSignalBlocker block(scalar);
           scalar->setValue(parameter_value(*p));
           scalar->setEnabled(!p->is_expression());
+          if (independent)
+            independent->setVisible(
+                p->is_expression() ||
+                std::none_of(pending_parameters.begin(), pending_parameters.end(),
+                             [&](const auto& pending) { return pending.id() == p->id(); }));
           scalar->setToolTip(p->formula() ? "Formula: " + QString::fromStdString(*p->formula())
                                           : QString());
           if (thread_mapping_pending && thread_mapping_error)
@@ -1305,6 +1394,10 @@ struct ShellFeatureEditTools::Impl {
     return {};
   }
   void deferred_rebuild() {
+    if (hole_thread() && retained_canvas_handle.empty())
+      if (const auto selected = canvas_handles.find(dynamic->currentData().toString());
+          selected != canvas_handles.end())
+        retained_canvas_handle = selected->second.id;
     if (const auto focus = retained_focus_id(); !focus.isEmpty())
       pending_focus_id = focus;
     scroll->widget()->setEnabled(false);
@@ -2491,7 +2584,156 @@ struct ShellFeatureEditTools::Impl {
     viewport.clear_feature_preview();
     status->setText(QString::fromStdString(failure.message()));
     overlay->hide();
+    if (hole_thread()) {
+      canvas_handles.clear();
+      if (layer.active_handle_id().empty())
+        (void)layer.set_handles({});
+    }
     return Result<std::size_t>::failure(std::move(failure));
+  }
+  Result<std::size_t> prepare_canvas_handles(const PartDocument& candidate,
+                                             const geometry::ShapeCache& result,
+                                             geometry::StepImportTopologyContext* context) {
+    canvas_handles.clear();
+    const auto* hole = candidate.find_hole_feature(edit.feature());
+    const auto* thread = candidate.find_thread_feature(edit.feature());
+    if (!hole && !thread)
+      return Result<std::size_t>::success(0);
+    auto history = candidate.executable_history();
+    if (!history)
+      return Result<std::size_t>::failure(history.error());
+    const auto position =
+        std::find_if(history.value().begin(), history.value().end(),
+                     [this](const auto& entry) { return entry.node_id == edit.feature().value(); });
+    if (position == history.value().end())
+      return Result<std::size_t>::failure(error("Canvas support history is unavailable."));
+    const auto prefix = std::size_t(position - history.value().begin());
+    auto inputs = geometry::ShapeCache::create(ShapeCacheId("feature.edit.canvas.inputs"));
+    if (!inputs)
+      return Result<std::size_t>::failure(inputs.error());
+    auto evaluated = geometry::GeometryRecomputeExecutor{context}.execute_history_prefix(
+        candidate, prefix, inputs.value());
+    if (!evaluated)
+      return Result<std::size_t>::failure(evaluated.error());
+    const auto body = hole ? hole->target_body() : thread->target_body();
+    const auto* before = inputs.value().find_latest_body_transform_state(body);
+    const auto* after = result.find_latest_body_transform_state(body);
+    auto inverse =
+        (before ? before->cumulative_transform : geometry::GeometryAffineTransform::identity())
+            .inverse_similarity();
+    if (!inverse)
+      return Result<std::size_t>::failure(inverse.error());
+    const auto pose = inverse.value().followed_by(
+        after ? after->cumulative_transform : geometry::GeometryAffineTransform::identity());
+    const auto shifted = [](Point3 origin, Vector3 axis, double distance) {
+      return Point3{origin.x + axis.x * distance, origin.y + axis.y * distance,
+                    origin.z + axis.z * distance};
+    };
+    Vector3 axis{}, x_axis{}, y_axis{}, normal{};
+    std::vector<Point3> centers;
+    if (hole) {
+      auto support = geometry::GeometryRecomputeExecutor{context}.resolve_hole_support(
+          candidate, hole->support(), inputs.value(), FeatureId(""), prefix);
+      if (!support)
+        return Result<std::size_t>::failure(support.error());
+      x_axis = support.value().x_axis;
+      y_axis = support.value().y_axis;
+      normal = support.value().normal;
+      const double sign = hole->direction() == HoleDirection::SupportNormal ? 1 : -1;
+      axis = {normal.x * sign, normal.y * sign, normal.z * sign};
+      const geometry::WorkplaneResolver resolver;
+      for (const auto& placement : hole->placements()) {
+        if (const auto* point = std::get_if<Point2>(&placement.source)) {
+          centers.push_back(resolver.evaluate_point(support.value(), *point));
+          continue;
+        }
+        const auto& reference = std::get<HoleSketchPointReference>(placement.source);
+        const auto& sketch = *candidate.find_sketch(reference.sketch);
+        auto frame = resolver.resolve_for_sketch(candidate, sketch, inputs.value());
+        if (!frame)
+          return Result<std::size_t>::failure(frame.error());
+        Point2 local;
+        if (const auto* point = sketch.find_point(reference.point))
+          local = point->position();
+        else {
+          const auto* projected = sketch.find_projected_point(reference.point);
+          if (!projected)
+            return Result<std::size_t>::failure(error("The position source is unavailable."));
+          auto resolved_point = geometry::SketchReferenceProjector{}.resolve_point(
+              candidate, sketch, *projected, inputs.value());
+          if (!resolved_point)
+            return Result<std::size_t>::failure(resolved_point.error());
+          local = resolved_point.value().position;
+        }
+        centers.push_back(resolver.evaluate_point(frame.value(), local));
+      }
+    } else {
+      auto support = geometry::ThreadAdapter::inspect_support(
+          candidate, body, thread->support(), inputs.value(), thread->direction(), context, prefix);
+      if (!support)
+        return Result<std::size_t>::failure(support.error());
+      centers.push_back(support.value().origin);
+      axis = support.value().axis;
+      x_axis = support.value().x_axis;
+      normal = axis;
+      y_axis = cross(normal, x_axis);
+    }
+    if (centers.empty())
+      return Result<std::size_t>::failure(error("Choose a position before using canvas controls."));
+    for (const auto& [path, input] : numbers) {
+      if (!canvas_path(path) || !input->isEnabled())
+        continue;
+      GuiViewportManipulatorHandle handle;
+      const auto identity = "feature.edit.canvas/" + edit.feature().value();
+      handle.id = identity + path.toStdString();
+      handle.reference_value = input->value();
+      auto origin = centers.front();
+      auto direction = axis;
+      const bool placement = path.startsWith("/placements/");
+      const bool diameter = path.contains("diameter");
+      if (placement) {
+        bool ok = false;
+        const auto index = path.split('/', Qt::SkipEmptyParts).at(1).toULongLong(&ok);
+        if (!ok || index >= centers.size())
+          continue;
+        origin = centers[index];
+        direction = path.endsWith("/x") ? x_axis : y_axis;
+        handle.id = identity + "/placement/" + hole->placements()[index].id.value() +
+                    (path.endsWith("/x") ? ".x" : ".y");
+      } else if (diameter) {
+        handle.kind = GuiViewportManipulatorKind::Radial;
+        direction = x_axis;
+        handle.minimum_value = 0;
+      } else {
+        handle.minimum_value = 0;
+        if (path == "/thread/length") {
+          const auto& definition = hole ? *hole->thread() : thread->thread();
+          if (definition.start())
+            origin = shifted(origin, axis,
+                             candidate.find_parameter(*definition.start())->value().millimeters());
+        }
+      }
+      if (hole && path.startsWith("/manufacturing/steps/"))
+        if (const auto* steps = std::get_if<HoleStepped>(&hole->manufacturing())) {
+          const auto fields = path.split('/', Qt::SkipEmptyParts);
+          bool ok = false;
+          const auto index = fields.at(2).toULongLong(&ok);
+          if (ok && index < steps->steps.size())
+            handle.id = identity + "/step/" + steps->steps[index].id + "/" +
+                        fields.mid(3).join('/').toStdString();
+        }
+      const auto posed_axis = pose.transform_vector(direction);
+      const double scale = length(posed_axis);
+      if (!std::isfinite(scale) || scale <= 0)
+        continue;
+      handle.origin = pose.transform_point(origin);
+      handle.axis = normalized(posed_axis);
+      handle.plane_normal = normalized(pose.transform_vector(normal));
+      handle.reference_direction = normalized(pose.transform_vector(x_axis));
+      handle.model_units_per_value = diameter ? scale / 2 : scale;
+      canvas_handles.emplace(path, std::move(handle));
+    }
+    return Result<std::size_t>::success(canvas_handles.size());
   }
   Result<std::size_t> preview() {
     if (building)
@@ -2586,6 +2828,16 @@ struct ShellFeatureEditTools::Impl {
         return reject(published.error());
     } else
       viewport.clear_feature_preview();
+    if (hole_thread()) {
+      auto handles = prepare_canvas_handles(candidate.value(), cache.value(), context);
+      dynamic->setToolTip(handles ? QStringLiteral("Choose the authored dimension to manipulate.")
+                                  : QString::fromStdString(handles.error().message()));
+    }
+    if (context) {
+      auto fresh = context->validate_sources();
+      if (!fresh)
+        return reject(fresh.error());
+    }
     valid = true;
     apply->setEnabled(layer.active_handle_id().empty());
     another->setEnabled(creating && layer.active_handle_id().empty());
@@ -2604,9 +2856,23 @@ struct ShellFeatureEditTools::Impl {
     if (!edit.active() || building)
       return;
     std::vector<GuiViewportManipulatorHandle> handles;
-    // Hole/Thread need support-anchored grips in 157B. Keep this slice numeric.
     if (hole_thread()) {
-      (void)layer.set_handles({});
+      if (!retained_canvas_handle.empty()) {
+        const QSignalBlocker blocked(dynamic);
+        int selected = 0;
+        for (const auto& [path, handle] : canvas_handles)
+          if (handle.id == retained_canvas_handle) {
+            selected = dynamic->findData(path);
+            break;
+          }
+        dynamic->setCurrentIndex(std::max(0, selected));
+        retained_canvas_handle.clear();
+      }
+      const auto path = dynamic->currentData().toString();
+      if (valid && picking == Pick::None)
+        if (auto found = canvas_handles.find(path); found != canvas_handles.end())
+          handles.push_back(found->second);
+      (void)layer.set_handles(std::move(handles));
       owner.refresh_presentation();
       return;
     }
@@ -2648,6 +2914,9 @@ struct ShellFeatureEditTools::Impl {
                  : Result<std::size_t>::failure(error("Invalid Preview"));
   }
   void finish(bool applied) {
+    canvas_handles.clear();
+    retained_canvas_handle.clear();
+    dynamic->setEnabled(true);
     const bool rolled_back_source = owns_source_workflow && !applied;
     if (editing_source)
       window.abort_feature_source_sketch_view();
@@ -2723,6 +2992,7 @@ struct ShellFeatureEditTools::Impl {
   }
   void restore_drag() {
     layer.cancel();
+    dynamic->setEnabled(true);
     if (viewport.mouseGrabber() == &viewport)
       viewport.release_interaction_mouse();
     if (drag_start) {
@@ -2859,8 +3129,9 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   p.parameter_values.clear();
   p.array_templates.clear();
   p.dock->setWindowTitle(family(p.edit.kind()) + " Edit");
-  p.dynamic->setVisible(!p.hole_thread());
-  p.dynamic_label->setVisible(!p.hole_thread());
+  p.dynamic->show();
+  p.dynamic_label->show();
+  p.dynamic_label->setText(p.hole_thread() ? "Canvas Control" : "Dynamic Value");
   p.guidance->setText(
       p.support_editing
           ? "Picks use the model before this feature. Apply validates the complete downstream "
@@ -3261,6 +3532,7 @@ void ShellFeatureEditTools::resume_source_sketch(SketchId sketch) {
   p.build_form();
   (void)p.preview();
   p.window.refresh();
+  p.window.statusBar()->showMessage("Returned to Hole.");
 }
 
 Result<std::size_t> ShellFeatureEditTools::apply(bool create_another) {
@@ -3384,8 +3656,10 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
         if (candidate)
           (void)p.accept_candidate(*candidate);
         p.drag_start.reset();
+        p.dynamic->setEnabled(true);
         p.publish_handle();
         p.apply->setEnabled(p.valid);
+        p.another->setEnabled(p.creating && p.valid);
         return true;
       }
       if (key->key() == Qt::Key_Backspace)
@@ -3409,10 +3683,12 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
         p.last_pointer = {mouse->position().x(), mouse->position().y()};
         if (p.layer.begin_drag(p.last_pointer)) {
           p.drag_start = p.numbers.at(p.dynamic->currentData().toString())->value();
+          p.dynamic->setEnabled(false);
           p.buffer.clear();
           p.viewport.setFocus();
           p.viewport.grab_interaction_mouse();
           p.apply->setEnabled(false);
+          p.another->setEnabled(false);
           return true;
         }
       }
@@ -3428,6 +3704,7 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
       auto* mouse = static_cast<QMouseEvent*>(event);
       auto candidate = p.layer.end_drag({mouse->position().x(), mouse->position().y()});
       p.viewport.release_interaction_mouse();
+      p.dynamic->setEnabled(true);
       if (candidate) {
         (void)p.accept_candidate(*candidate);
         p.drag_start.reset();
@@ -3435,6 +3712,7 @@ bool ShellFeatureEditTools::eventFilter(QObject* watched, QEvent* event) {
       } else
         p.restore_drag();
       p.apply->setEnabled(p.valid);
+      p.another->setEnabled(p.creating && p.valid);
       return true;
     }
   }

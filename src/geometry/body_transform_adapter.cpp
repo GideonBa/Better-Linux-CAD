@@ -118,6 +118,37 @@ GeometryAffineTransform::followed_by(const GeometryAffineTransform& operation) c
   return result;
 }
 
+Result<GeometryAffineTransform> GeometryAffineTransform::inverse_similarity() const {
+  const auto fail = [] {
+    return Result<GeometryAffineTransform>::failure(
+        transform_error("Body placement must be a finite invertible similarity transform"));
+  };
+  for (const double value : matrix)
+    if (!std::isfinite(value))
+      return fail();
+  const Vector3 x{matrix[0], matrix[4], matrix[8]}, y{matrix[1], matrix[5], matrix[9]},
+      z{matrix[2], matrix[6], matrix[10]};
+  const double squared = dot(x, x);
+  if (!(squared > 0) || !std::isfinite(squared) || std::abs(dot(y, y) - squared) > 1e-9 * squared ||
+      std::abs(dot(z, z) - squared) > 1e-9 * squared || std::abs(dot(x, y)) > 1e-9 * squared ||
+      std::abs(dot(x, z)) > 1e-9 * squared || std::abs(dot(y, z)) > 1e-9 * squared ||
+      std::abs(matrix[12]) > 1e-12 || std::abs(matrix[13]) > 1e-12 ||
+      std::abs(matrix[14]) > 1e-12 || std::abs(matrix[15] - 1) > 1e-12)
+    return fail();
+  GeometryAffineTransform inverse;
+  for (int row = 0; row < 3; ++row)
+    for (int column = 0; column < 3; ++column)
+      inverse.matrix[row * 4 + column] = matrix[column * 4 + row] / squared;
+  const auto offset = inverse.transform_vector({matrix[3], matrix[7], matrix[11]});
+  inverse.matrix[3] = -offset.x;
+  inverse.matrix[7] = -offset.y;
+  inverse.matrix[11] = -offset.z;
+  for (const double value : inverse.matrix)
+    if (!std::isfinite(value))
+      return fail();
+  return Result<GeometryAffineTransform>::success(inverse);
+}
+
 Result<GeometryShape> BodyTransformAdapter::translate(const GeometryShape& shape,
                                                       Vector3 offset) const {
   if (shape.empty())
