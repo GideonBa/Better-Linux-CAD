@@ -308,3 +308,14 @@ model history. Newly imported required resources join the disposable candidate's
 unused revisions are pruned before publication. Thread source selectors read this candidate catalog.
 The [preset contract](hole-wizard.md#property-presets--157b3) owns reference prerequisites, explicit
 snapshot semantics, storage validation and proof tags.
+
+### Explicit legacy Hole conversion — 157B3
+
+Convert to Hole stages a canonical replacement in the existing Part workflow, checks full downstream
+execution and common Solid material, then opens this ordinary editor over the staged Hole. Save
+continues to serialize the committed legacy entry. Apply publishes the conversion and accepted
+properties once; Cancel restores the original. Diameter/support bindings and feature/history identity
+are retained; center/origin values explicitly become an independent placement. Unsupported mappings
+leave ordinary legacy editing available. The
+[conversion contract](hole-wizard.md#explicit-legacy-conversion--157b3) owns prerequisites, diagnostics,
+material tolerance and proof tags. No second edit controller or transaction system is introduced.

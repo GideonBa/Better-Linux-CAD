@@ -16,6 +16,12 @@ enum class PartDocumentReadMode { Strict, ReferenceRepair };
 
 [[nodiscard]] Result<std::string> serialize_part_document_to_json(const PartDocument& document);
 
+// Explicit atomic family replacement through the canonical codec. Retains the
+// existing subtractive feature's identity, Body result and executable position;
+// incompatible downstream references reject the complete candidate.
+[[nodiscard]] Result<PartDocument> replace_part_extrude_with_hole(const PartDocument& document,
+                                                                  const HoleFeature& replacement);
+
 [[nodiscard]] Result<PartDocument> deserialize_part_document_from_json(std::string_view content);
 [[nodiscard]] Result<PartDocument> deserialize_part_document_from_json(std::string_view content,
                                                                        PartDocumentReadMode mode);

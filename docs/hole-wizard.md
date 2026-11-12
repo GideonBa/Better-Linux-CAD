@@ -816,8 +816,8 @@ Proof sources: [shell/native interactions](../tests/gui/gui_shell_hole_thread_ed
 
 ### Property presets — 157B3
 
-Hole and Thread share the Property Presets group after the ordinary inputs in the scrolling form. An editable name,
-Save Values, Load Values and Remove manage application preferences independently of model history.
+Hole and Thread share the Property Presets group after the ordinary inputs in the scrolling form.
+An editable name, Save Values, Load Values and Remove manage application preferences independently of model history.
 Names are scoped by Hole/Thread kind; Save Values explicitly replaces the same kind/name. Cancel
 discards the model draft while retaining an explicitly saved preset. Active canvas input, model
 picking and source-Sketch visits suspend preset actions. Invalid model preview disables Save Values;
@@ -825,8 +825,8 @@ loading can correct scalar input without publishing a feature.
 
 Save Values captures all recipe/extent/tip or Thread profile/interval/hand/direction/representation
 properties. Numeric parameters, including formulas and shared inputs, become literal value snapshots
-with retained aliases; source parameter names/identities and expressions are omitted. Standard choices keep
-their exact immutable revision, selected row/columns and complete provenance snapshot. The UI states
+with retained aliases; source parameter names/identities and expressions are omitted. Standard choices
+keep their exact immutable revision, selected row/columns and complete provenance snapshot. The UI states
 this value-snapshot boundary explicitly.
 
 Load Values retains the current feature's ID/name, target Body, support, placement identities/sources,
@@ -846,11 +846,61 @@ no new document intent, geometry interpreter or model persistence schema is intr
 
 Proof sources: [typed preset/storage regression](../tests/gui/gui_hole_thread_preset_tests.cpp),
 [shell and native interactions](../tests/gui/gui_shell_hole_thread_edit_tests.cpp), tags
-`[hole-thread-presets]`, `[hole-preset-shell]` and `[native-hole-preset]`. The broader regression passes 122 cases / 10,463 assertions with 22 native skips; the focused native
-preset/canvas/source/repeat selection passes 10 cases / 824 assertions at both scales. This is targeted
+`[hole-thread-presets]`, `[hole-preset-shell]` and `[native-hole-preset]`. The broader regression passes
+122 cases / 10,463 assertions with 22 native skips; the focused native preset/canvas/source/repeat selection passes 10 cases / 824 assertions at both scales. This is targeted
 native coverage. Runtime and delivery evidence is indexed in
 the [current implementation plan](mvp-plan.md#current-implementation--157b3). Presets alone do not
 close 157B3; explicit legacy conversion, extended contexts and combined acceptance remain assigned.
+
+### Explicit legacy conversion — 157B3
+
+History → Convert to Hole and the selected feature's browser menu explicitly preview a legacy
+subtractive Extrude as a semantic Plain ThroughAll Hole. Ordinary Edit Feature remains available;
+opening old documents does not migrate their cuts. The conversion currently requires a straight,
+flat ThroughAll cut, one selected materialized Circle profile (or the only profile), and an explicit
+Cut target preserving its Body identity. Suppressed cuts must be unsuppressed first. Circular Hole
+Pattern radius/count bindings, other profiles, taper/thin/path/other extents and Body aliases report
+an actionable diagnostic; their legacy intent remains intact.
+
+The Hole retains the feature ID/name, executable history position, target Body, diameter binding
+(including formulas) and source workplane binding. Its circle center plus any Sketch-origin offset
+becomes an explicitly disclosed independent position. The source Sketch and its inputs remain in
+the Part; later source-center edits do not move this independent Hole. The canonical Core factory
+and `replace_part_extrude_with_hole` codec operation own the replacement and complete dependency/
+reference validation. The latter replaces the family atomically at its existing history position,
+without appending an intermediate modifier behind downstream Body readers. Supported
+consumers such as whole-Body Patterns and subsequent Body placement retain their mappings.
+An old full-result feature Pattern can have a different material meaning from a semantic Hole
+Pattern; unchanged feature IDs alone do not certify it. Such material changes, unsupported legacy
+target-feature or semantic mappings fail before publication and identify the conversion boundary
+instead of dropping or reinterpreting consumers.
+
+Conversion begins in an idle complete editable Part without an enclosing workflow/End of Part.
+The existing disposable Part workflow stages and recomputes the complete candidate before opening
+the ordinary Hole editor. Every available Solid Body must retain its result availability and common
+material: the existing Boolean intersection compares both original and candidate volume to their
+shared volume within `1e-8 * max(1 mm³, original volume)`. Equal volume with a displaced bore therefore
+fails certification. This derived check adds no geometry intent or topology identifiers.
+
+The task identifies the conversion and its value/reference boundary. Subsequent edits use normal
+Hole preview, support selection, canvas and presets. Save writes the committed legacy entry until
+Apply; Cancel restores it. Final Apply publishes conversion and the accepted Hole properties as one
+ordinary workflow transaction and one Undo step. Existing imported-source freshness and downstream
+geometry validation still apply. Extended shared contexts and full native combinations remain
+assigned; this bounded command does not close 157B3 or parent 157.
+The task captures the original camera, model/viewport selection and pick scope before internal
+staging clears the selection. Cancel restores that entry context after rebuilding the legacy model;
+a rejected task startup also restores it through the existing monotonic checkpoint authority.
+
+Proof sources: [atomic Core family/schema regression](../tests/core/part_hole_feature_tests.cpp),
+[conversion, shell and native regression](../tests/gui/gui_shell_hole_thread_edit_tests.cpp),
+tags `[hole-conversion]`, `[hole-conversion-shell]`, `[native-hole-conversion]` and
+`[native-hole-conversion-context]`. Full Core passes 707 cases / 26,935 assertions; focused Geometry
+passes 26 / 2,186; final focused Qt passes seven / 670 with one native skip. The broader Qt selection
+passes 150 / 12,297 with 25 native skips. Targeted native conversion/context/editor/preset/source/
+History regression passes 14 / 920 at 100% and 14 / 926 at compact 150%. The
+[implementation plan](mvp-plan.md#current-implementation--157b3) owns delivery/runtime evidence;
+these focused results do not close the remaining shared contexts or combined acceptance.
 
 ## Why more than a cut
 

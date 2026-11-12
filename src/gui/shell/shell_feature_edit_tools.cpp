@@ -1,5 +1,6 @@
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/geometry/body_boolean_adapter.hpp"
 #include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/result_face_support.hpp"
@@ -7,6 +8,7 @@
 #include "blcad/geometry/thread_adapter.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
+#include "blcad/gui/gui_hole_conversion.hpp"
 #include "blcad/gui/gui_hole_recipe.hpp"
 #include "blcad/gui/gui_hole_thread_preset.hpp"
 #include "blcad/gui/gui_hole_thread_repeat.hpp"
@@ -430,6 +432,7 @@ struct ShellFeatureEditTools::Impl {
   QString buffer;
   QString pending_focus_id;
   bool owns_source_workflow{};
+  bool converting_legacy{};
   std::optional<SketchId> editing_source;
   QPushButton* return_to_feature{};
   struct ThreadMappingDraft {
@@ -3075,6 +3078,7 @@ struct ShellFeatureEditTools::Impl {
     if (owns_source_workflow && !applied)
       session.cancel_part_workflow();
     owns_source_workflow = false;
+    converting_legacy = false;
     thread_mapping.reset();
     thread_mapping_pending = false;
     thread_mapping_error.reset();
@@ -3193,6 +3197,104 @@ QWidget* ShellFeatureEditTools::field(const QString& path) const {
 }
 GuiViewportManipulatorLayer& ShellFeatureEditTools::manipulators() {
   return impl_->layer;
+}
+Result<std::size_t> ShellFeatureEditTools::begin_legacy_hole_conversion(FeatureId id) {
+  auto& p = *impl_;
+  if (active() || p.window.active_sketch() || p.session.task().active() ||
+      !p.session.part_modeling_ready() || p.session.part_workflow_active() ||
+      p.session.history_prefix_count())
+    return Result<std::size_t>::failure(error(
+        "Convert to Hole requires an idle, complete editable Part without another workflow."));
+  auto converted = GuiHoleConversionCommands::candidate(*p.session.part_document(), id);
+  if (!converted)
+    return Result<std::size_t>::failure(converted.error());
+  const auto original = p.session;
+  const auto entry_camera = p.viewport.camera_bookmark();
+  const auto entry_viewport_selection = p.viewport.selected_semantic();
+  const auto entry_mask = p.viewport.selection_filter_mask();
+  const auto entry_scope = p.viewport.selection_semantic_scope();
+  auto staged = original;
+  auto begun = staged.begin_part_workflow();
+  if (!begun)
+    return begun;
+  auto prepared =
+      staged.commit_part_transaction("Preview Hole conversion", [&](PartDocument& part) {
+        part = converted.value();
+        return Result<std::size_t>::success(1);
+      });
+  if (!prepared)
+    return Result<std::size_t>::failure(error(
+        "Conversion cannot preserve the current downstream geometry: " +
+        prepared.error().message() +
+        ". The legacy cut is unchanged; keep editing it or repair its consumers explicitly."));
+  // Compare actual common material, not just equal volume: a displaced bore
+  // must never pass a conversion-equivalence check by removing the same amount.
+  const geometry::RectangleExtrusionAdapter summary;
+  std::size_t checked = 0;
+  for (const auto& body : original.part_document()->bodies()) {
+    if (body.kind() != BodyKind::Solid)
+      continue;
+    const auto* before = original.part_shape_cache()->find_body_shape(body.id());
+    const auto* after = staged.part_shape_cache()->find_body_shape(body.id());
+    if (bool(before) != bool(after))
+      return Result<std::size_t>::failure(
+          error("Conversion changes the available Body results. The legacy cut is unchanged."));
+    if (!before)
+      continue;
+    auto common = geometry::BodyBooleanAdapter{}.combine(id, BodyBooleanOperation::Intersect,
+                                                         *before, {*after});
+    if (!common)
+      return Result<std::size_t>::failure(
+          error("Conversion cannot certify unchanged material: " + common.error().message()));
+    const double old_volume = summary.summarize(*before).volume_mm3;
+    const double new_volume = summary.summarize(*after).volume_mm3;
+    const double shared_volume = summary.summarize(common.value()).volume_mm3;
+    const double tolerance = std::max(1.0, old_volume) * 1e-8;
+    if (!std::isfinite(old_volume) || !std::isfinite(new_volume) || !std::isfinite(shared_volume) ||
+        std::abs(old_volume - shared_volume) > tolerance ||
+        std::abs(new_volume - shared_volume) > tolerance)
+      return Result<std::size_t>::failure(
+          error("Conversion changes the current material or its placement. The legacy cut is "
+                "unchanged; retain it or repair its support explicitly."));
+    ++checked;
+  }
+  if (!checked)
+    return Result<std::size_t>::failure(
+        error("Conversion requires an available Solid result to certify its material."));
+  p.session = std::move(staged);
+  p.window.refresh();
+  auto editing = begin(id);
+  if (!editing || !p.valid) {
+    const auto failure =
+        editing ? error("The converted Hole preview is unavailable.") : editing.error();
+    if (active())
+      cancel();
+    p.session.restore_creation_checkpoint(original);
+    p.window.refresh();
+    p.viewport.set_selection_filter_mask(entry_mask);
+    p.viewport.set_selection_semantic_scope(entry_scope);
+    if (!entry_viewport_selection ||
+        !p.viewport.select_semantic(entry_viewport_selection->semantic_id))
+      p.viewport.clear_selection();
+    p.session.selection() = original.selection();
+    (void)p.viewport.restore_camera_bookmark(entry_camera);
+    p.window.refresh_context_toolbar();
+    return Result<std::size_t>::failure(failure);
+  }
+  p.entry_revision = original.model_revision();
+  p.entry_camera = entry_camera;
+  p.entry_selection = original.selection();
+  p.entry_viewport_selection = entry_viewport_selection;
+  p.previous_mask = entry_mask;
+  p.previous_scope = entry_scope;
+  p.owns_source_workflow = true;
+  p.converting_legacy = true;
+  p.dock->setWindowTitle("Convert Legacy Cut to Hole");
+  p.guidance->setText(
+      "Convert to Plain Through All. Diameter/support stay bound; the circle center/origin "
+      "becomes independent. Source Sketch stays available. Apply converts once; Cancel restores "
+      "the cut.");
+  return Result<std::size_t>::success(1);
 }
 Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   auto& p = *impl_;
@@ -3713,7 +3815,9 @@ Result<std::size_t> ShellFeatureEditTools::apply(bool create_another) {
       },
       p.creating);
   if (committed && p.owns_source_workflow)
-    committed = accepted.publish_part_workflow(p.creating ? "Create Hole" : "Edit Hole");
+    committed = accepted.publish_part_workflow(p.converting_legacy ? "Convert Legacy Cut to Hole"
+                                               : p.creating        ? "Create Hole"
+                                                                   : "Edit Hole");
   if (committed) {
     p.session = std::move(accepted);
     const bool created_hole = p.creating && p.edit.kind() == Kind::Hole;

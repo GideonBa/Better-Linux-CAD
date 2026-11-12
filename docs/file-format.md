@@ -1453,6 +1453,18 @@ Loading creates ordinary fresh owned dimensions and required catalog entries onl
 model Apply accepts them. Current live references are retained under the
 [preset contract](hole-wizard.md#property-presets--157b3); the Part schema remains unchanged.
 
+Explicit legacy conversion replaces a compatible subtractive `features` entry with a canonical
+`hole_features` entry under the same feature ID and executable order. The source Sketch remains;
+diameter/support references stay bound while the center/origin is an explicitly disclosed owned
+placement. The existing Part workflow keeps Save on the committed legacy entry until Apply.
+Unsupported downstream mappings reject the complete candidate. There is no automatic migration,
+conversion sidecar or additional persistence version; see the
+[conversion contract](hole-wizard.md#explicit-legacy-conversion--157b3).
+Core's `replace_part_extrude_with_hole` reuses the canonical Hole encoder and complete reader,
+retains executable order and required resource/material envelopes, and chooses the existing
+Hole/manufacturing/Thread versions 4/5/6 while preserving higher source versions. It returns a
+disposable complete candidate; a source with unsupported consumers remains unchanged.
+
 Extent is exactly one of `{kind: blind, depth}`, `{kind: through_all}`, `{kind: to_next}`,
 `{kind: to_face, face}`, `{kind: up_to_body, body}` or `{kind: symmetric, total_depth}`. Depths and
 included angle reference existing typed parameters. The shared Face spelling for `to_face` requires

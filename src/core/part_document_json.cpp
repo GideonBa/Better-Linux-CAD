@@ -4303,6 +4303,46 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
 
 } // namespace
 
+Result<PartDocument> replace_part_extrude_with_hole(const PartDocument& document,
+                                                    const HoleFeature& replacement) {
+  const auto* original = document.find_feature(replacement.id());
+  if (document.is_reference_part() || !original ||
+      original->type() != FeatureType::SubtractiveExtrude)
+    return Result<PartDocument>::failure(
+        json_error("Hole replacement requires an existing editable subtractive Extrude"));
+  const auto& context = original->body_result_context();
+  if (!context || context->operation_mode() != FeatureBodyOperationMode::Cut ||
+      !context->target_body() || context->effective_produced_body() != *context->target_body() ||
+      replacement.target_body() != *context->target_body())
+    return Result<PartDocument>::failure(
+        json_error("Hole replacement must preserve the explicit Cut Body result"));
+  auto encoded = serialize_part_document_to_json(document);
+  if (!encoded)
+    return Result<PartDocument>::failure(encoded.error());
+  auto root = json::parse(encoded.value());
+  std::erase_if(root.at("features").get_ref<json::array_t&>(),
+                [&](const auto& feature) { return feature.at("id") == replacement.id().value(); });
+  if (!root.contains("hole_features"))
+    root["hole_features"] = json::array();
+  root["hole_features"].push_back(hole_feature_to_json(replacement));
+  const int required = replacement.thread() ? k_thread_version
+                       : !std::holds_alternative<std::monostate>(replacement.manufacturing())
+                           ? k_manufacturing_hole_version
+                           : k_hole_version;
+  root["version"] = std::max(root.at("version").get<int>(), required);
+  root["history_version"] = document.authored_history_intent() ? k_history_version : k_version;
+  root["engineering_resources"] =
+      detail::engineering_resources_to_json(document.engineering_resources());
+  root["material_assignments"] = detail::part_material_assignments_to_json(document);
+  auto history = document.executable_history();
+  if (!history)
+    return Result<PartDocument>::failure(history.error());
+  root["feature_order"] = json::array();
+  for (const auto& row : history.value())
+    root["feature_order"].push_back(row.node_id);
+  return deserialize_part_document_from_json(root.dump());
+}
+
 Result<std::string> serialize_part_document_to_json(const PartDocument& document) {
   json root;
   root["schema"] = k_schema;

@@ -373,6 +373,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_assembly_advanced.cpp
     src/gui/shell/shell_feature_edit_tools.cpp
     src/gui/gui_hole_recipe.cpp
+    src/gui/gui_hole_conversion.cpp
     src/gui/gui_hole_thread_repeat.cpp
     src/gui/gui_hole_thread_preset.cpp
     src/gui/gui_thread_recipe.cpp

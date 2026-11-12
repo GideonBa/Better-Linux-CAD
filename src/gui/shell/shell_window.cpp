@@ -621,6 +621,8 @@ void ShellWindow::build_docks() {
             if (source && source->kind == GuiBrowserNodeKind::Feature && history_tools_) {
               history_tools_->refresh();
               menu.addAction(&history_tools_->edit_action());
+              if (history_tools_->convert_hole_action().isEnabled())
+                menu.addAction(&history_tools_->convert_hole_action());
               menu.addAction(&history_tools_->suppress_action());
               menu.addAction(&history_tools_->restore_action());
               menu.addAction(&history_tools_->reorder_action());

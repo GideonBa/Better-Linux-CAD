@@ -11,6 +11,7 @@
 #include "blcad/geometry/step_import_reader.hpp"
 #include "blcad/geometry/step_import_topology.hpp"
 #include "blcad/geometry/thread_adapter.hpp"
+#include "blcad/gui/gui_hole_conversion.hpp"
 #include "blcad/gui/gui_hole_thread_preset.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_history_tools.hpp"
@@ -132,7 +133,7 @@ void begin(ShellWindow& w, const char* id) {
               .horizontalScrollBar()
               ->maximum() == 0);
 }
-void history_edit(ShellWindow& w, const char* id) {
+void history_edit(ShellWindow& w, const char* id, bool convert = false) {
   QTreeWidgetItem* selected = nullptr;
   const auto find = [&](auto&& self, QTreeWidgetItem* item) -> void {
     const auto* node = w.browser_model().find(item->data(0, Qt::UserRole).toString().toStdString());
@@ -146,8 +147,10 @@ void history_edit(ShellWindow& w, const char* id) {
   REQUIRE(selected);
   w.model_browser().setCurrentItem(selected);
   settle();
-  REQUIRE(w.history_tools().edit_action().isEnabled());
-  w.history_tools().edit_action().trigger();
+  auto& action =
+      convert ? w.history_tools().convert_hole_action() : w.history_tools().edit_action();
+  REQUIRE(action.isEnabled());
+  action.trigger();
   REQUIRE(w.feature_edit_tools().active());
   settle();
   if (QApplication::platformName() == "xcb")
@@ -1683,6 +1686,306 @@ TEST_CASE("Incomplete and invalid Thread mappings retain committed intent and re
   CHECK_FALSE(w.feature_edit_tools().apply());
   w.feature_edit_tools().cancel();
   CHECK(snapshot(w) == before);
+}
+
+namespace {
+PartDocument legacy_cut(bool circular = false, bool authored = false, bool shifted_origin = false,
+                        bool formula = false) {
+  auto part = plate();
+  if (formula)
+    REQUIRE(part.add_expression_parameter(ParameterId("legacy.diameter"), "legacy_diameter",
+                                          ParameterType::Length, "diameter"));
+  const ParameterId diameter(formula ? "legacy.diameter" : "diameter");
+  auto sketch =
+      checked(Sketch::create(SketchId("legacy.sketch"), "Legacy source", DatumPlaneId("datum.xy")));
+  if (circular) {
+    REQUIRE(part.set_parameter_value(ParameterId("radius"), checked(Quantity::length_mm(10))));
+    REQUIRE(sketch.add_profile(checked(CircularHolePattern::create(
+        ProfileId("legacy.circle"), ParameterId("radius"), ParameterId("count"), diameter))));
+  } else
+    REQUIRE(sketch.add_profile(checked(CircleProfile::create(
+        ProfileId("legacy.circle"), diameter, shifted_origin ? Point2{-17, 3} : Point2{-15, 0}))));
+  REQUIRE(part.add_sketch(std::move(sketch)));
+  if (shifted_origin)
+    REQUIRE(part.add_sketch_origin_override(
+        checked(SketchOriginOverrideRecord::create(SketchId("legacy.sketch"), {2, -3}))));
+  auto cut = checked(Feature::create_subtractive_extrude(
+      FeatureId("legacy"), "Legacy circle cut", SketchId("legacy.sketch"), FeatureId("base")));
+  REQUIRE(part.add_feature(checked(cut.with_body_result_context(holes::context()))));
+  if (authored)
+    REQUIRE(part.apply_history_intent({{"base", "legacy"}, {}}));
+  return part;
+}
+void legacy_pattern(PartDocument& part, bool posed, bool feature_source = false,
+                    bool explicit_placements = false) {
+  auto source = holes::source("legacy");
+  auto context = holes::context();
+  if (!feature_source) {
+    source = checked(PatternSourceReference::body(BodyId("body.base")));
+    context = blcad::test::history_fixture::new_body(part, "pattern");
+    REQUIRE(part.set_parameter_value(ParameterId("spacing.x"), checked(Quantity::length_mm(100))));
+  }
+  REQUIRE(part.add_linear_pattern_feature(checked(LinearPatternFeature::create(
+      FeatureId("pattern"), "Legacy cut pattern", {source}, holes::axis("axis.x"),
+      ParameterId("count"), LinearPatternExtentMode::Spacing, ParameterId("spacing.x"),
+      PatternDirectionSign::Positive, context,
+      explicit_placements ? std::optional(PatternPlacementOptions{}) : std::nullopt))));
+  if (posed)
+    REQUIRE(part.add_body_transform(checked(BodyTransform::create_rotate(
+        BodyTransformId("pose"), BodyId(feature_source ? "body.base" : "body.pattern"),
+        BodyTransformCoordinateSpace::World, std::nullopt,
+        checked(BodyTransformRotationAxis::create_explicit({0, 0, 0}, {0, 0, 1})), 35, false,
+        false))));
+}
+std::vector<std::string> order(const PartDocument& part) {
+  std::vector<std::string> ids;
+  for (const auto& row : checked(part.executable_history()))
+    ids.push_back(row.node_id);
+  return ids;
+}
+} // namespace
+
+TEST_CASE(
+    "Explicit legacy conversion preserves canonical order bindings and a retained source Sketch",
+    "[gui][parity-b157][hole-conversion]") {
+  const bool authored = GENERATE(false, true);
+  const bool origin = GENERATE(false, true);
+  const bool formula = GENERATE(false, true);
+  const auto part = legacy_cut(false, authored, origin, formula);
+  const auto before = checked(serialize_part_document_to_json(part));
+  const auto converted = checked(GuiHoleConversionCommands::candidate(part, FeatureId("legacy")));
+  CHECK(checked(serialize_part_document_to_json(part)) == before);
+  CHECK_FALSE(converted.find_feature(FeatureId("legacy")));
+  const auto* hole = converted.find_hole_feature(FeatureId("legacy"));
+  REQUIRE(hole);
+  CHECK(hole->name() == "Legacy circle cut");
+  const auto diameter = std::get<ParameterId>(hole->diameter());
+  CHECK(diameter == ParameterId(formula ? "legacy.diameter" : "diameter"));
+  CHECK(converted.find_parameter(diameter)->formula() == part.find_parameter(diameter)->formula());
+  REQUIRE(hole->placements().size() == 1);
+  const auto position = std::get<Point2>(hole->placements().front().source);
+  CHECK(position.x == -15);
+  CHECK(position.y == 0);
+  CHECK(std::holds_alternative<HoleThroughAllExtent>(hole->extent()));
+  CHECK(converted.find_sketch(SketchId("legacy.sketch")));
+  CHECK(converted.parameters().size() == part.parameters().size());
+  CHECK(order(converted) == order(part));
+  CHECK(bool(converted.authored_history_intent()) == authored);
+  CHECK(checked(serialize_part_document_to_json(checked(deserialize_part_document_from_json(
+            checked(serialize_part_document_to_json(converted)))))) ==
+        checked(serialize_part_document_to_json(converted)));
+}
+
+TEST_CASE(
+    "Legacy conversion Save and Cancel retain committed intent and Apply publishes one exact step",
+    "[gui][parity-b157][hole-conversion-shell]") {
+  const bool origin = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, legacy_cut(false, true, origin));
+  const auto before = snapshot(w);
+  const double material = 38400 - 18 * std::numbers::pi;
+  CHECK(volume(w) == Catch::Approx(material).margin(1e-6));
+  (void)checked(w.feature_edit_tools().begin_legacy_hole_conversion(FeatureId("legacy")));
+  REQUIRE(w.session().part_workflow_active());
+  CHECK(w.session().part_document()->find_hole_feature(FeatureId("legacy")));
+  CHECK(volume(w) == Catch::Approx(material).margin(1e-6));
+  const auto path = dir.filePath("conversion-save.blcad.json");
+  REQUIRE(w.save_to(path));
+  GuiDocumentSession committed;
+  REQUIRE(committed.open_file(path.toStdString()));
+  CHECK(checked(serialize_part_document_to_json(*committed.part_document())) == before);
+  w.feature_edit_tools().cancel();
+  CHECK_FALSE(w.session().part_workflow_active());
+  CHECK(snapshot(w) == before);
+  CHECK_FALSE(w.session().dirty());
+  (void)checked(w.feature_edit_tools().begin_legacy_hole_conversion(FeatureId("legacy")));
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK_FALSE(w.session().part_workflow_active());
+  CHECK_FALSE(w.session().part_document()->find_feature(FeatureId("legacy")));
+  CHECK(volume(w) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  CHECK(w.session().part_document()->find_sketch(SketchId("legacy.sketch")));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Converted legacy sources retain downstream Body Pattern mapping and subsequent placement",
+    "[gui][parity-b157][hole-conversion-shell]") {
+  const bool posed = GENERATE(false, true);
+  auto part = legacy_cut(false, true, true);
+  legacy_pattern(part, posed);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  CHECK(volume(w) == Catch::Approx(38400 - 18 * std::numbers::pi).margin(1e-6));
+  CHECK(volume(w, "body.pattern") ==
+        Catch::Approx(3 * (38400 - 18 * std::numbers::pi)).margin(1e-6));
+  (void)checked(w.feature_edit_tools().begin_legacy_hole_conversion(FeatureId("legacy")));
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(order(*w.session().part_document()) == order(part));
+  CHECK(volume(w) == Catch::Approx(38400 - 18 * std::numbers::pi).margin(1e-6));
+  CHECK(volume(w, "body.pattern") ==
+        Catch::Approx(3 * (38400 - 18 * std::numbers::pi)).margin(1e-6));
+  const auto root = nlohmann::json::parse(snapshot(w));
+  CHECK(root.at("part_patterns") == nlohmann::json::parse(before).at("part_patterns"));
+  replay(w, dir, before);
+  const auto converted = snapshot(w);
+  begin(w, "legacy");
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(4);
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(volume(w) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  CHECK(volume(w, "body.pattern") ==
+        Catch::Approx(3 * (38400 - 32 * std::numbers::pi)).margin(1e-6));
+  replay(w, dir, converted);
+}
+
+TEST_CASE(
+    "Unsupported associative legacy profiles report a diagnostic and remain ordinarily editable",
+    "[gui][parity-b157][hole-conversion-shell]") {
+  auto part = legacy_cut(true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  const auto revision = w.session().model_revision();
+  const auto result = w.feature_edit_tools().begin_legacy_hole_conversion(FeatureId("legacy"));
+  REQUIRE_FALSE(result);
+  CHECK(result.error().message().find("radius/count") != std::string::npos);
+  CHECK(snapshot(w) == before);
+  CHECK(w.session().model_revision() == revision);
+  CHECK_FALSE(w.session().part_workflow_active());
+  CHECK_FALSE(w.feature_edit_tools().active());
+  history_edit(w, "legacy");
+  rename(w);
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(w.session().part_document()->find_feature(FeatureId("legacy")));
+  CHECK(w.session().part_document()->hole_features().empty());
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Unsupported legacy target-feature consumers reject conversion without losing their edit path",
+    "[gui][parity-b157][hole-conversion-shell]") {
+  auto part = legacy_cut();
+  auto sketch =
+      checked(Sketch::create(SketchId("later.circle"), "Later cut", DatumPlaneId("datum.xy")));
+  REQUIRE(sketch.add_profile(
+      checked(CircleProfile::create(ProfileId("later.circle"), ParameterId("diameter"), {15, 0}))));
+  REQUIRE(part.add_sketch(std::move(sketch)));
+  auto later = checked(Feature::create_subtractive_extrude(
+      FeatureId("later.cut"), "Later cut", SketchId("later.circle"), FeatureId("legacy")));
+  REQUIRE(part.add_feature(checked(later.with_body_result_context(holes::context()))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  const auto revision = w.session().model_revision();
+  const auto result = w.feature_edit_tools().begin_legacy_hole_conversion(FeatureId("legacy"));
+  REQUIRE_FALSE(result);
+  CHECK(result.error().message().find("downstream mapping") != std::string::npos);
+  CHECK(snapshot(w) == before);
+  CHECK(w.session().model_revision() == revision);
+  CHECK_FALSE(w.session().part_workflow_active());
+  CHECK(volume(w) == Catch::Approx(38400 - 36 * std::numbers::pi).margin(1e-6));
+  history_edit(w, "legacy");
+  rename(w);
+  REQUIRE(w.feature_edit_tools().apply());
+  replay(w, dir, before);
+}
+
+TEST_CASE("Legacy full-result feature Patterns reject a conversion that changes material semantics",
+          "[gui][parity-b157][hole-conversion-shell]") {
+  const bool explicit_placements = GENERATE(false, true);
+  auto part = legacy_cut(false, true, true);
+  legacy_pattern(part, false, true, explicit_placements);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  const auto revision = w.session().model_revision();
+  CHECK(volume(w) == Catch::Approx(12 * 60 * 8).margin(1e-6));
+  const auto result = w.feature_edit_tools().begin_legacy_hole_conversion(FeatureId("legacy"));
+  REQUIRE_FALSE(result);
+  INFO(result.error().message());
+  CHECK(result.error().message().find(explicit_placements
+                                          ? "changes the current material"
+                                          : "downstream mapping") != std::string::npos);
+  CHECK(snapshot(w) == before);
+  CHECK(w.session().model_revision() == revision);
+  CHECK_FALSE(w.session().part_workflow_active());
+  CHECK_FALSE(w.feature_edit_tools().active());
+}
+
+TEST_CASE("Cancelling a conversion restores its original selection and scoped viewport context",
+          "[gui][parity-b157][hole-conversion-shell][native-hole-conversion-context]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, legacy_cut());
+  REQUIRE(w.session().selection().add({GuiSelectionKind::Body, "body/body.base"}));
+  REQUIRE(w.viewport().select_semantic("body/body.base"));
+  w.viewport().set_selection_semantic_scope(std::vector<std::string>{"body/body.base"});
+  const auto mask = w.viewport().selection_filter_mask();
+  const auto scope = w.viewport().selection_semantic_scope();
+  const auto before = snapshot(w);
+  const auto undo = std::string(w.session().undo_label());
+  (void)checked(w.feature_edit_tools().begin_legacy_hole_conversion(FeatureId("legacy")));
+  if (QApplication::platformName() == "xcb") {
+    activate(w);
+    click(control<QToolButton>(w, "blcad.hole.support.pick"));
+  } else {
+    control<QToolButton>(w, "blcad.hole.support.pick").click();
+    settle();
+  }
+  CHECK(w.viewport().selection_semantic_scope() != scope);
+  w.feature_edit_tools().cancel();
+  CHECK(snapshot(w) == before);
+  CHECK(w.session().undo_label() == undo);
+  CHECK(w.viewport().selection_filter_mask() == mask);
+  CHECK(w.viewport().selection_semantic_scope() == scope);
+  REQUIRE(w.session().selection().entries().size() == 1);
+  CHECK(w.session().selection().entries().front().semantic_id == "body/body.base");
+  REQUIRE(w.viewport().selected_semantic());
+  CHECK(w.viewport().selected_semantic()->semantic_id == "body/body.base");
+  CHECK_FALSE(w.viewport().feature_preview_active());
+  CHECK_FALSE(w.session().task().active());
+  CHECK_FALSE(w.session().part_workflow_active());
+}
+
+TEST_CASE("Native Convert to Hole exposes explicit semantic preview and one corrected publication",
+          "[gui][parity-b157][hole-conversion-shell][native-hole-conversion]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native conversion action and keyboard input");
+  auto part = legacy_cut(false, true, true);
+  legacy_pattern(part, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  activate(w);
+  history_edit(w, "legacy", true);
+  REQUIRE(w.session().part_workflow_active());
+  auto& diameter = field<QDoubleSpinBox>(w, "/diameter/parameter");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&diameter);
+  diameter.setFocus();
+  diameter.selectAll();
+  REQUIRE(diameter.hasFocus());
+  key(diameter, Qt::Key_4, "4");
+  key(diameter, Qt::Key_Return);
+  CHECK(diameter.value() == 4);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "hole-conversion-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  CHECK_FALSE(w.session().part_workflow_active());
+  CHECK(volume(w) == Catch::Approx(38400 - 32 * std::numbers::pi).margin(1e-6));
+  CHECK(volume(w, "body.pattern") ==
+        Catch::Approx(3 * (38400 - 32 * std::numbers::pi)).margin(1e-6));
+  const auto* hole = w.session().part_document()->find_hole_feature(FeatureId("legacy"));
+  REQUIRE(hole);
+  CHECK(hole->placements().front().id == HolePlacementId("legacy.position"));
+  CHECK(w.session().part_document()->find_sketch(SketchId("legacy.sketch")));
+  replay(w, dir, before);
 }
 
 TEST_CASE(

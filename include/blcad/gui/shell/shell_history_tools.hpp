@@ -85,6 +85,7 @@ public:
   [[nodiscard]] QAction& restore_action() noexcept;
   [[nodiscard]] QAction& reorder_action() noexcept;
   [[nodiscard]] QAction& edit_action() noexcept;
+  [[nodiscard]] QAction& convert_hole_action() noexcept;
   [[nodiscard]] QAction& marker_action() noexcept;
   [[nodiscard]] QAction& marker_before_action() noexcept;
   [[nodiscard]] QAction& marker_after_action() noexcept;

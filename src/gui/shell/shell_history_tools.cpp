@@ -239,7 +239,7 @@ struct ShellHistoryTools::Impl {
   ShellWindow& window;
   GuiPartHistoryController edit;
   PartFeatureHistoryIntent initial;
-  QAction *suppress{}, *restore{}, *reorder{}, *edit_feature{};
+  QAction *suppress{}, *restore{}, *reorder{}, *edit_feature{}, *convert_hole{};
   QAction *marker_edit{}, *marker_before{}, *marker_after{}, *marker_end{};
   QWidget* prefix_bar{};
   QLabel *prefix_label{}, *prefix_message{};
@@ -756,6 +756,7 @@ ShellHistoryTools::ShellHistoryTools(ShellWindow& window, ShellRibbon& ribbon, i
   p.restore = action("restore", "Unsuppress Feature");
   p.reorder = action("reorder", "Reorder Features");
   p.edit_feature = action("edit", "Edit Feature");
+  p.convert_hole = action("convert_hole", "Convert to Hole");
   p.marker_edit = action("end_of_part", "Edit End of Part");
   p.marker_before = action("end_of_part_before", "Move End of Part Before");
   p.marker_after = action("end_of_part_after", "Move End of Part After");
@@ -771,6 +772,10 @@ ShellHistoryTools::ShellHistoryTools(ShellWindow& window, ShellRibbon& ribbon, i
   connect(p.reorder, &QAction::triggered, this, [this, invoke] { invoke(begin_reorder()); });
   connect(p.edit_feature, &QAction::triggered, this, [this, invoke] {
     invoke(impl_->window.feature_edit_tools().begin(FeatureId(impl_->selected_feature())));
+  });
+  connect(p.convert_hole, &QAction::triggered, this, [this, invoke] {
+    invoke(impl_->window.feature_edit_tools().begin_legacy_hole_conversion(
+        FeatureId(impl_->selected_feature())));
   });
   connect(p.marker_edit, &QAction::triggered, this,
           [this, invoke] { invoke(begin_prefix(impl_->history_count())); });
@@ -965,6 +970,9 @@ QAction& ShellHistoryTools::reorder_action() noexcept {
 QAction& ShellHistoryTools::edit_action() noexcept {
   return *impl_->edit_feature;
 }
+QAction& ShellHistoryTools::convert_hole_action() noexcept {
+  return *impl_->convert_hole;
+}
 QAction& ShellHistoryTools::marker_action() noexcept {
   return *impl_->marker_edit;
 }
@@ -981,8 +989,8 @@ bool ShellHistoryTools::owns_action(const QAction* action) const noexcept {
   const auto& p = *impl_;
   return action &&
          (action == p.suppress || action == p.restore || action == p.reorder ||
-          action == p.edit_feature || action == p.marker_edit || action == p.marker_before ||
-          action == p.marker_after || action == p.marker_end);
+          action == p.edit_feature || action == p.convert_hole || action == p.marker_edit ||
+          action == p.marker_before || action == p.marker_after || action == p.marker_end);
 }
 bool ShellHistoryTools::active() const noexcept {
   return impl_->active || impl_->prefix;
@@ -1178,6 +1186,12 @@ void ShellHistoryTools::refresh() {
                             : Result<std::size_t>::failure(error(
                                   "Select an editable feature without another active command."));
   p.edit_feature->setEnabled(bool(editable));
+  const auto* legacy = part ? part->find_feature(FeatureId(selected)) : nullptr;
+  p.convert_hole->setEnabled(available && !suppressed && legacy &&
+                             legacy->type() == FeatureType::SubtractiveExtrude);
+  p.convert_hole->setToolTip(
+      "Explicitly preview a legacy circle cut as a semantic Hole. Unsupported profile or "
+      "downstream mappings report a diagnostic; ordinary Edit Feature remains available.");
   p.edit_feature->setToolTip(part && part->find_body_transform(BodyTransformId(selected))
                                  ? "Body Transform editing is not supported by this property task."
                              : editable
