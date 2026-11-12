@@ -531,7 +531,7 @@ planned; discovered behavior fixes require focused proof and synchronized existi
 
 | Step | Completion boundary |
 | --- | --- |
-| 158A — planned | Fresh and real migrated legacy inputs through current Hole/Thread, Pattern, outer-edge Fillet/Chamfer, suppression/restore/reorder, material mass, bound Assembly targets and physical structured STEP/reimport; exact failure/history/reopen oracles. |
+| 158A — in progress | Fresh and pre-Hole V3 migrated inputs through current Hole/Thread, Pattern, outer-edge Fillet/Chamfer, suppression/restore/reorder, material mass, bound Assembly targets and physical structured STEP/reimport; exact failure/history/reopen oracles. Shared Geometry fixture and affected regression verified in the linked contract; native chain remains open. |
 | 158B — planned | Complete current Core/Geometry/Qt suites, native fresh/migrated 100% and compact 150%, reviewed original captures and app startup; reconcile every required skip and preserve existing imported/capability limits. |
 | 158C — planned | Isolated incremental-versus-empty-cache recompute samples with correctness equivalence, raw measurements and environment/source/binary identity; review, commit/push and normal protected delivery. |
 

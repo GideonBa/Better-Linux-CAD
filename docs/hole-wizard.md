@@ -1098,10 +1098,13 @@ Fillet/Chamfer and per-Hole Insert targets driven by the existing Assembly count
 edges must preserve the entry/seat capabilities selected for assembly. Existing B03 modeled
 hand/pitch and native/imported support/limit proofs remain required alongside the integrated chain.
 
-Execute the chain on fresh intent and a real V1 legacy document loaded through the normal reader.
-Retain its old cut and independently account for its material; use ordinary typed promotion/writing
-when adding semantic features. Preserve legacy editing and portable reopen. No new JSON spelling,
-feature interpreter, reference fallback or persistence authority is planned.
+Execute the chain on fresh intent and a pre-Hole V3 document with existing Body result contexts,
+loaded through the normal reader. Retain its old cut and independently account for its material;
+use ordinary typed promotion/writing when adding semantic features. The inspected authoring
+contract requires an explicit editable Body: zero-Body V1 documents retain their historical editing
+and loading checks in the full suites. This integration exercises the supported V3-to-Hole-format
+migration. Preserve legacy editing and portable reopen, without a new JSON spelling, feature
+interpreter, reference fallback or persistence authority.
 
 Suppress/restore modifier and creator states through existing History commands, retain unrelated
 Bodies, perform a legal independent finishing reorder and reject a dependent-before-source order.
@@ -1113,6 +1116,28 @@ Physical oracles combine analytic bore/seat/outer-edge finishing volumes, retain
 pinned density mass, actual alignment/material points and structured STEP solid/pose readback after
 native Project reimport. Compare incremental changed-node execution with an independently empty
 cache; verify unrelated results and density-only BRep reuse under the existing cache contracts.
+
+The first shared fixture uses an 80 × 60 × 8 mm base, two 3 mm bores with 5 × 1 mm Counterbores,
+3 × 2 placements with `(2,1)` excluded, a 0.5 mm top-front fillet and a separate 0.25 mm bottom-back
+chamfer. With ten retained bores, base volume is `38,400 − (22.5 − 5π) − 10 × 22π mm³`; the migrated
+variant retains a separate 2 mm through cut at `(30,20)`, subtracting another `8π mm³`. A hidden
+independent 4 × 6 × 2 mm Body contributes **48 mm³** to physical mass while keeping its own result.
+Cosmetic thread metadata leaves these material oracles unchanged. Material-point samples check
+rounded/chamfered corners, retained/excluded bores and the legacy cut independently of volume.
+`[phase-b-integration]` passes **1 case / 98 assertions** across fresh/migrated variants. Together
+with existing Thread-Pattern, finishing and B04 Assembly/physical STEP regressions, the completed
+selection passes **4 cases / 306 assertions**, no skips, exit 0. Sources are the
+[shared fixture](../tests/support/phase_b_acceptance_fixture.hpp) and
+[Geometry combination tests](../tests/geometry/hole_pattern_combined_tests.cpp). Frozen runtime:
+**1,064 files**, SHA256 `5a2173d6ad0d3029c9b1c181443ef1d55eba6c34e7c6b38ddf493b3283f64fad`.
+The earlier failed expectation run contributes no proof. Native integration, full suites and
+isolated measurements remain open; this fixture alone does not close 158.
+
+Front is +Y and Back is −Y under the existing rectangular semantic-frame contract. Hole/Thread
+parameter changes currently send `execute_plan` through complete history execution; unchanged
+Bodies retain their physical result but need not retain a BRep owner across that conservative
+fallback. Record executed-feature counts and this baseline in timing comparisons. Density-only
+reuse remains a separate existing metadata/cache contract.
 
 Run recompute measurements only after correctness and in isolation from builds or other tests.
 Record first-call and repeated raw samples, source/runtime/binary/build/OCCT/CPU identity and exact
