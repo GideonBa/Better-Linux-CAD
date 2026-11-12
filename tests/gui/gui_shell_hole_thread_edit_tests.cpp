@@ -1837,3 +1837,182 @@ TEST_CASE("Thread source rebuilds preserve an active support selector and its sc
   CHECK(w.viewport().selection_semantic_scope() == entry_scope);
   CHECK(snapshot(w) == before);
 }
+
+TEST_CASE("Editing a Hole support uses its predecessor and preserves its owned placement identity",
+          "[gui][parity-b157][hole-support-edit-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = holes::part(false, false);
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  begin(w, "holes");
+  auto& supports = field<QComboBox>(w, "/support");
+  for (int i = 0; i < supports.count(); ++i)
+    CHECK_FALSE(supports.itemData(i).toString().contains("hole/5:first/bottom"));
+  const auto bottom = supports.findData("finishing/face/4:base/bottom");
+  REQUIRE(bottom >= 0);
+  supports.setCurrentIndex(bottom);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& hole = result.hole_features().front();
+  CHECK(hole.id() == FeatureId("holes"));
+  CHECK(hole.placements().front().id == HolePlacementId("first"));
+  CHECK(std::get<SemanticFaceReference>(hole.support().source()).face() == SemanticFace::Bottom);
+  CHECK(result.parameters().size() == part.parameters().size());
+  CHECK(result.result_face_workplane_count() == 0);
+  CHECK(volume(w) == Catch::Approx(38400 - 13.5 * std::numbers::pi).margin(1e-6));
+  const auto axis = checked(
+      HoleInstanceReference::create(hole.id(), HolePlacementId("first"), HoleReferenceRole::Axis));
+  const auto frame = checked(
+      geometry::HoleInstanceGeometry::resolve(result, axis, *w.session().part_shape_cache()));
+  CHECK(frame.frame.origin.x == Catch::Approx(-20).margin(1e-7));
+  CHECK(frame.frame.origin.y == Catch::Approx(-15).margin(1e-7));
+  CHECK(frame.frame.origin.z == Catch::Approx(0).margin(1e-7));
+  CHECK(frame.frame.normal.z == Catch::Approx(1).margin(1e-7));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Existing Thread support editing retains its original reference until an explicit rebind",
+          "[gui][parity-b157][hole-support-edit-shell]") {
+  const bool rebind = GENERATE(false, true);
+  auto part = threads::pair_part();
+  REQUIRE(part.add_thread_feature(threads::external()));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  begin(w, "external");
+  if (rebind) {
+    auto& supports = field<QComboBox>(w, "/support");
+    int choice = -1;
+    for (int i = 0; i < supports.count(); ++i)
+      if (supports.itemData(i).toString() != "feature-input/current-thread-support") {
+        choice = i;
+        break;
+      }
+    REQUIRE(choice >= 0);
+    supports.setCurrentIndex(choice);
+  } else
+    rename(w);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& thread = result.thread_features().front();
+  CHECK(thread.id() == FeatureId("external"));
+  if (rebind) {
+    REQUIRE(std::holds_alternative<ResultFaceReference>(thread.support().source()));
+    CHECK(std::get<ResultFaceReference>(thread.support().source()).producer() ==
+          FeatureId("shaft"));
+  } else
+    CHECK(nlohmann::json::parse(snapshot(w))["thread_features"][0]["support"] ==
+          nlohmann::json::parse(before)["thread_features"][0]["support"]);
+  CHECK(result.parameters().size() == part.parameters().size());
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Existing support selectors exclude Bodies introduced after the edited feature",
+          "[gui][parity-b157][hole-support-edit-shell]") {
+  auto part = holes::part(false, false);
+  const auto sketch = part.features().front().input_sketch();
+  const auto context = blcad::test::history_fixture::new_body(part, "later");
+  auto feature = checked(Feature::create_additive_extrude(FeatureId("later"), "Later Body", sketch,
+                                                          ParameterId("depth")));
+  REQUIRE(part.add_feature(checked(feature.with_body_result_context(context))));
+  REQUIRE(part.apply_history_intent({{"base", "holes", "later"}, {}}));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  begin(w, "holes");
+  const auto& targets = field<QComboBox>(w, "/target_body");
+  CHECK(targets.findData("body.base") >= 0);
+  CHECK(targets.findData("body.later") == -1);
+  w.feature_edit_tools().cancel();
+}
+
+TEST_CASE("Editing a Hole onto an earlier result support owns only its used pending workplane",
+          "[gui][parity-b157][hole-support-edit-shell]") {
+  auto part = holes::part(false, false);
+  REQUIRE(part.add_parameter(checked(Parameter::create_length(
+      ParameterId("second.diameter"), "Second diameter", checked(Quantity::length_mm(1))))));
+  const auto& original = part.hole_features().front();
+  REQUIRE(part.add_hole_feature(checked(HoleFeature::create(
+      FeatureId("second"), "Second Hole", HoleKind::Plain, original.target_body(),
+      original.support(), {{HolePlacementId("second.point"), Point2{20, 15}}},
+      ParameterId("second.diameter")))));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  begin(w, "second");
+  const auto placement = checked(HoleInstanceReference::create(
+      FeatureId("holes"), HolePlacementId("first"), HoleReferenceRole::Axis));
+  const auto reference = checked(ResultFaceReference::create(
+      FeatureId("holes"), BodyId("body.base"), {placement.origin("bottom")}));
+  auto& supports = field<QComboBox>(w, "/support");
+  const auto choice =
+      supports.findData(QString::fromStdString("finishing/" + reference.identity()));
+  REQUIRE(choice >= 0);
+  supports.setCurrentIndex(choice);
+  field<QDoubleSpinBox>(w, "/placements/0/position/x").setValue(0);
+  field<QDoubleSpinBox>(w, "/placements/0/position/y").setValue(0);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  CHECK(w.session().part_document()->result_face_workplane_count() == 0);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  CHECK(result.result_face_workplane_count() == 1);
+  const auto* second = result.find_hole_feature(FeatureId("second"));
+  REQUIRE(second);
+  CHECK(second->placements().front().id == HolePlacementId("second.point"));
+  const auto& plane = std::get<DatumPlaneId>(second->support().source());
+  REQUIRE(result.find_result_face_workplane(plane));
+  CHECK(result.find_result_face_workplane(plane)->reference().producer() == FeatureId("holes"));
+  CHECK(volume(w) == Catch::Approx(38400 - 14 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Native existing Hole support picks use predecessor geometry and restore context on Cancel",
+    "[gui][parity-b157][hole-support-edit-shell][native-hole-support-edit]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native pre-feature input picking");
+  const bool apply = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, holes::part(false, false));
+  REQUIRE(w.session().selection().add({GuiSelectionKind::Body, "body/body.base"}));
+  REQUIRE(w.viewport().select_semantic("body/body.base"));
+  const auto before = snapshot(w);
+  const auto camera = w.viewport().camera_bookmark();
+  const auto scope = w.viewport().selection_semantic_scope();
+  begin(w, "holes");
+  w.viewport().set_standard_view(GuiStandardView::Bottom);
+  settle();
+  click(control<QToolButton>(w, "blcad.hole.support.pick"));
+  const auto point = checked(w.viewport().model_to_screen({-20, -15, 0}));
+  click_at(w.viewport(), {point.x, point.y});
+  CHECK(field<QComboBox>(w, "/support").currentData() == "finishing/face/4:base/bottom");
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "hole-support-edit-preview");
+  if (apply) {
+    click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+    CHECK(std::get<SemanticFaceReference>(
+              w.session().part_document()->hole_features().front().support().source())
+              .face() == SemanticFace::Bottom);
+    replay(w, dir, before);
+  } else {
+    click(control<QPushButton>(w, "blcad.feature_edit.cancel"));
+    CHECK(snapshot(w) == before);
+    CHECK(w.viewport().selection_semantic_scope() == scope);
+    REQUIRE(w.session().selection().entries().size() == 1);
+    CHECK(w.session().selection().entries().front().semantic_id == "body/body.base");
+    const auto restored = w.viewport().camera_bookmark();
+    CHECK(restored.eye.x == Catch::Approx(camera.eye.x).margin(1e-7));
+    CHECK(restored.eye.y == Catch::Approx(camera.eye.y).margin(1e-7));
+    CHECK(restored.eye.z == Catch::Approx(camera.eye.z).margin(1e-7));
+  }
+  CHECK(w.viewport().preview_selection_target_count() == 0);
+}

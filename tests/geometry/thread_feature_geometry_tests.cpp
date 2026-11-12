@@ -1,4 +1,5 @@
 #include "../support/thread_feature_fixture.hpp"
+#include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/thread_adapter.hpp"
@@ -274,4 +275,55 @@ TEST_CASE("External Thread inspection rejects planar wrong-body internal and sta
   REQUIRE(part.set_parameter_value(ParameterId("depth"), checked(Quantity::length_mm(9))));
   CHECK_FALSE(
       ThreadAdapter::inspect_support(part, BodyId("body.shaft"), f::external().support(), cache));
+}
+
+TEST_CASE("Thread support inspection requires an explicit matching pre-feature history scope",
+          "[geometry][parity-b157][thread-support-query][thread-support-prefix]") {
+  auto part = f::pair_part();
+  REQUIRE(part.add_thread_feature(f::external()));
+  const auto before = checked(serialize_part_document_to_json(part));
+  const auto history = checked(part.executable_history());
+  const auto row = std::find_if(history.begin(), history.end(),
+                                [](const auto& item) { return item.node_id == "external"; });
+  REQUIRE(row != history.end());
+  const auto prefix = std::size_t(row - history.begin());
+  auto cache = checked(ShapeCache::create(ShapeCacheId("thread.input.scope")));
+  REQUIRE(GeometryRecomputeExecutor{}.execute_history_prefix(part, prefix, cache));
+  const auto support = f::external().support();
+  CHECK_FALSE(ThreadAdapter::inspect_support(part, BodyId("body.shaft"), support, cache));
+  CHECK_FALSE(ThreadAdapter::inspect_support(part, BodyId("body.shaft"), support, cache,
+                                             ThreadDirection::AlongSupportAxis, nullptr,
+                                             prefix + 1));
+  const auto inspected =
+      checked(ThreadAdapter::inspect_support(part, BodyId("body.shaft"), support, cache,
+                                             ThreadDirection::AlongSupportAxis, nullptr, prefix));
+  CHECK(inspected.origin.x == Catch::Approx(30).margin(1e-7));
+  CHECK(inspected.origin.z == Catch::Approx(0).margin(1e-7));
+  CHECK(inspected.axis.z == Catch::Approx(1).margin(1e-7));
+  CHECK(inspected.radius_mm == Catch::Approx(5).margin(1e-7));
+  CHECK(inspected.axial_length_mm == Catch::Approx(8).margin(1e-7));
+  CHECK(volume(*cache.find_body_shape(BodyId("body.shaft"))) ==
+        Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  const auto full = evaluate(part);
+  const auto faces = checked(FinishingSelectionBuilder::build(
+      part, full, BodyId("body.shaft"), PartFeatureInputRole::ShellRemovalFace));
+  std::optional<FaceReference> downstream;
+  for (const auto& face : faces)
+    if (const auto* reference = std::get_if<FaceReference>(&face.reference))
+      if (const auto* result = std::get_if<ResultFaceReference>(&reference->source());
+          result && result->producer() == FeatureId("external")) {
+        auto selected =
+            checked(FaceReference::create_result(PartFeatureInputRole::ThreadSupportFace, *result));
+        if (ThreadAdapter::inspect_support(part, BodyId("body.shaft"), selected, full)) {
+          downstream = std::move(selected);
+          break;
+        }
+      }
+  REQUIRE(downstream);
+  CHECK_FALSE(ThreadAdapter::inspect_support(part, BodyId("body.shaft"), *downstream, cache,
+                                             ThreadDirection::AlongSupportAxis, nullptr, prefix));
+  CHECK(checked(serialize_part_document_to_json(part)) == before);
+  REQUIRE(part.set_parameter_value(ParameterId("depth"), checked(Quantity::length_mm(9))));
+  CHECK_FALSE(ThreadAdapter::inspect_support(part, BodyId("body.shaft"), support, cache,
+                                             ThreadDirection::AlongSupportAxis, nullptr, prefix));
 }

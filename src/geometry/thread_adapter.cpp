@@ -5,6 +5,7 @@
 #include "geometry_shape_internal.hpp"
 #include "helical_curve.hpp"
 #include "occt_failure_message.hpp"
+#include "part_history_evaluation.hpp"
 #include "semantic_face_resolution.hpp"
 
 #include <BRepAdaptor_Surface.hxx>
@@ -428,7 +429,8 @@ Result<Applied> apply_checked(const FeatureId& id, const TopoDS_Shape& target,
 Result<ThreadSupportInspection>
 ThreadAdapter::inspect_support(const PartDocument& part, const BodyId& body,
                                const FaceReference& reference, const ShapeCache& cache,
-                               ThreadDirection direction, StepImportTopologyContext* imports) {
+                               ThreadDirection direction, StepImportTopologyContext* imports,
+                               std::optional<std::size_t> history_prefix) {
   const auto fail = [&](std::string message) {
     return Result<ThreadSupportInspection>::failure(
         Error::geometry(body.value(), std::move(message)));
@@ -440,7 +442,9 @@ ThreadAdapter::inspect_support(const PartDocument& part, const BodyId& body,
   const auto valid = validate_part_feature_input_reference(part, reference);
   if (!valid)
     return Result<ThreadSupportInspection>::failure(valid.error());
-  const auto complete = cache.validate_complete_geometry_result(part);
+  const auto complete = history_prefix
+                            ? detail::validate_history_modeling_scope(part, cache, history_prefix)
+                            : cache.validate_complete_geometry_result(part);
   if (!complete)
     return Result<ThreadSupportInspection>::failure(complete.error());
   const auto* definition = part.find_body(body);

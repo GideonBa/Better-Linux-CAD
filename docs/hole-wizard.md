@@ -509,8 +509,8 @@ committed Part. No sampled surface, topology index or viewer identity becomes pe
 
 Focused proof is `[hole-support-shell]` / `[native-hole-support]`: imported translation and axis
 frames, supplier changes, pending/unused workplanes, exact history/reopen, and actual native model
-picks on a derived Hole bottom and placed imported top. Existing-support editing, complete limit
-collection, Thread profiles and external Thread creation remain open within 157B2b.
+picks on a derived Hole bottom and placed imported top. Existing-support editing uses the scoped
+input model described below; complete limit collection remains assigned within 157B2b.
 Original captures: [derived bottom](images/hole-derived-support.png), 1280×800, and
 [placed imported plane at compact 150%](images/hole-imported-support-compact.png), 1536×960.
 Native helpers reveal the scrolled controls and verify hit ownership and on-screen coordinates.
@@ -519,6 +519,8 @@ Native helpers reveal the scrolled controls and verify hit ownership and on-scre
 
 The Geometry authoring query `ThreadAdapter::inspect_support` is read-only and requires an editable
 Part, a typed `ThreadSupportFace`, a solid target and a complete cache for the exact document.
+Existing-feature authoring can instead supply an explicitly matching history-prefix cache and
+count. An unqualified partial cache, mismatched prefix or downstream reference is rejected.
 It shares the execution resolver and producer-axis/seam rules, returning the entry origin, unit
 axis/seam, entry radius, finite axial span and signed taper in the selected direction. It rejects
 planar faces, another Body's faces and inward-facing bore walls. Reversing direction moves the
@@ -558,8 +560,8 @@ owned dimensions and the feature publish in one transaction; rebinding to an exi
 prunes its unused draft counterpart. Invalid/corrected previews, supplier changes, Cancel and
 committed Save during preview retain the established contracts. Thread creation has an Apply
 footer and becomes the repeatable command after publication. Full configuration retention for
-Create Another, optional start/taper/source selectors and existing-support edits remain assigned
-to the remaining 157B2b/B3 scope.
+Create Another remains assigned to 157B3; optional start/taper/source selectors and existing-support
+editing are described below.
 
 Focused proof is `[thread-create-shell]` / `[native-thread-create]`: pending ownership, dimensions,
 invalid correction/cancellation, target/support changes, imported placement/freshness, new internal
@@ -611,6 +613,32 @@ Original mapped-profile previews: [100%](images/thread-standard-creation.png), 1
 [compact 150%](images/thread-standard-creation-compact.png), 1536×960 physical pixels. The native
 fixture activates its window before keyboard input and asserts focus before/after selector rebuilds.
 The field values, units and current origin planes are unmodified captures.
+
+### Existing support editing — 157B2b
+
+Editing a Hole or Thread on a currently visible solid collects target and support choices from
+the exact executable history before that feature. The existing Geometry prefix evaluator and
+typed reference resolvers own this input model; no second feature interpreter is introduced.
+Later Bodies and the edited feature's own faces are excluded. Existing references remain unchanged
+until an explicit rebind, including native cylindrical Thread references whose selectable result
+counterpart has a different identity.
+
+During a model pick, the viewport shows that predecessor geometry with transient scoped Body,
+face and datum targets. Unique preview aliases avoid collisions with current presentation IDs;
+only typed Core references enter the candidate. A result-face Hole support owns a pending
+workplane in the same final transaction. Numeric preview and Apply still recompute the complete
+downstream model. Invalid inputs block Apply and remain available for correction. Cancel restores
+the entry camera, selection and pick scope while the entry revision remains current.
+
+Focused proof is `[hole-support-edit-shell]`, `[native-hole-support-edit]` and Geometry
+`[thread-support-prefix]`: reference preservation, explicit rebinding, downstream exclusion,
+used-only workplanes, independent physical frames/volumes, exact history/reopen and actual native
+predecessor picking. Hidden/consumed targets and active user history prefixes retain their existing
+numeric edit path; their extended support-selection lifecycle remains 157B3.
+
+Original native previews: [100%](images/hole-support-edit.png), 1280×800, and
+[compact 150%](images/hole-support-edit-compact.png), 1536×960 physical pixels. Both show the
+selected predecessor bottom, complete candidate, scrolled selectors and reachable Apply/Cancel.
 
 ## Why more than a cut
 

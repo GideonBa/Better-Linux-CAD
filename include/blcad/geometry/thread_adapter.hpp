@@ -26,11 +26,14 @@ struct ThreadSupportInspection {
 class ThreadAdapter {
 public:
   // Derived, current-cache authoring information for an exterior cylinder/cone.
+  // A prefix cache requires its explicit matching history scope; omission requires
+  // a complete current result. Neither form accepts downstream or stale inputs.
   // Execution still validates the complete authored profile/material envelope.
   [[nodiscard]] static Result<ThreadSupportInspection>
   inspect_support(const PartDocument&, const BodyId&, const FaceReference&, const ShapeCache&,
                   ThreadDirection direction = ThreadDirection::AlongSupportAxis,
-                  StepImportTopologyContext* imports = nullptr);
+                  StepImportTopologyContext* imports = nullptr,
+                  std::optional<std::size_t> history_prefix = std::nullopt);
   [[nodiscard]] Result<GeometryShape> apply(const PartDocument& part, const ThreadFeature& feature,
                                             const GeometryShape& target, const ShapeCache& cache,
                                             StepImportTopologyContext* imports = nullptr) const;

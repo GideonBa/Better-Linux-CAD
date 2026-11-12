@@ -288,7 +288,9 @@ modeled switch; unsupported tapered modeling still blocks Apply. See [creation a
 contracts](hole-wizard.md#external-creation-and-new-modeled-templates--157b2b). Thread profiles expose
 explicit revision/row/typed-column mapping or custom parameters, optional start and taper controls,
 resolved units and provenance. [Incomplete/invalid mappings](hole-wizard.md#thread-sources-and-optional-intervals--157b2b)
-block Apply and remain correctable. Complete limit selection, existing-support editing,
+block Apply and remain correctable. [Existing support picks](hole-wizard.md#existing-support-editing--157b2b)
+show the model before the edited feature; numeric preview and Apply validate the whole downstream
+model. Cancel restores the entry selection/camera. Complete limit selection, extended contexts,
 support-anchored grips and the full workflow remain 157B2b/B3/C.
 
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),

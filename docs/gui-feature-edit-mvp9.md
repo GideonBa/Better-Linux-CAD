@@ -227,5 +227,13 @@ records. Mapping drafts live only in the form; complete choices become a `Thread
 Commands filter scalar edits against the resulting record's dependencies before its Core update,
 so an explicitly removed optional input cannot leak an invalid unused value. Existing shared and
 formula bindings retain their established ownership. See [source and interval controls](hole-wizard.md#thread-sources-and-optional-intervals--157b2b)
-and `[thread-source-shell]` / `[native-thread-source]`; all remaining limits/support/context scope
-and combined acceptance stay assigned.
+and `[thread-source-shell]` / `[native-thread-source]`; remaining limit/context scope and combined
+acceptance stay assigned.
+
+Existing Hole/Thread support selectors evaluate the feature's exact predecessor history in a
+separate checked input cache. Scoped preview targets show that geometry during picks; they retain
+typed references and never publish preview IDs. Existing references are preserved until explicitly
+rebound, and the full downstream candidate remains the preview/Apply authority. Cancel restores
+the entry context. See [the support-edit contract](hole-wizard.md#existing-support-editing--157b2b)
+and `[hole-support-edit-shell]` / `[native-hole-support-edit]` for the visible-solid boundary and
+retained extended-context scope.

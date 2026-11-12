@@ -411,23 +411,25 @@ not close 157B2b, parent 157 or the assigned continuation through 165.
 | Read-only exterior Thread frame/radius/span/signed taper; shared execution resolver, placed imports and stale/wrong/inner/source rejection | [Geometry contract](hole-wizard.md#exterior-thread-support-inspection--157b2b); `[thread-support-query]`, `[thread-import]` | `58b0ca7`, terminal placement correction in `8973417` |
 | External creation and new modeled cylindrical templates; transactional used inputs, scoped picks, invalid correction, exact history/reopen and physical STEP | [Creation contract and captures](hole-wizard.md#external-creation-and-new-modeled-templates--157b2b); `[thread-create-shell]`, `[native-thread-create]` | `8973417` |
 | Explicit Thread revision/row/typed columns, custom conversion, optional start/taper and live scoped selectors | [Source/interval contract](hole-wizard.md#thread-sources-and-optional-intervals--157b2b); `[thread-source-shell]`, `[native-thread-source]` | Verified on this branch in draft PR #179 |
+| Existing Hole/Thread support editing against exact predecessor history; preserved references, later-Body exclusion and used-only pending workplanes | [Support-edit contract and captures](hole-wizard.md#existing-support-editing--157b2b); `[hole-support-edit-shell]`, `[native-hole-support-edit]`, Geometry `[thread-support-prefix]` | Verified on this branch in draft PR #179 |
 
-GUI/app/export targets build. The combined creation/recipe/support/edit/Pattern/prefix/viewport/
-icon/inventory Qt selection passes **83 cases / 11 native skips / 6,382 assertions**. The relevant
-native group passes **8 cases / 682 assertions at each of 100% and compact 150%**, without
-failures/skips; it executes eight of the eleven cases skipped by that Qt selection. The fixture
-explicitly activates its native window and asserts focus before/after selector rebuilds. Separate
-PID-matched startup is viewable (intentional timeout 124).
+Geometry/GUI/app/export targets build. The combined creation/recipe/support/edit/Pattern/prefix/
+inventory Qt selection passes **70 cases / 10 native skips / 5,530 assertions**. The separate
+icon/viewport/lifecycle selection passes **10 cases / 1 native skip / 784 assertions**. The relevant
+native group passes **9 cases / 776 assertions at each of 100% and compact 150%**, without
+failures/skips; it executes nine of those eleven skipped cases. The shared feature-handle and
+viewer-lifecycle native cases are not rerun for this component. Existing source fixtures assert
+activation/focus; new real predecessor picks assert Cancel context restoration and Apply/history.
+Separate PID-matched startup is viewable (intentional timeout 124).
 
-Core/Geometry/export inputs and binary hashes are unchanged from `8973417`; retain the delivered
-Geometry query/import proof (**6 cases / 326 assertions**) and its existing Thread execution
-regression. Full Core, full Geometry and full Qt are not rerun for this GUI component. Frozen
-runtime inputs: 1,055 files, SHA256
-`2e3bbab07ae4d1b8bb03731095db209465be4946dd3782a10369f2ed5df4a307`.
+Current Geometry support/query/import and existing Thread execution regression pass **17 cases /
+1,049 assertions**. Core inputs and binary remain unchanged; full Core, full Geometry and full Qt
+are not rerun for this component. Frozen runtime inputs: 1,055 files, SHA256
+`b47d22db3d118f928972fbe0d521f90f0fe49b1ebef0f2c6707408e6a9344028`.
 Detailed earlier component runs remain in Git/PR history.
 
-Before 157B2b is ready: complete native/imported/result limit collection and existing-support
-editing, then conical seed/offset/opposite-direction combinations and combined source acceptance.
+Before 157B2b is ready: complete native/imported/result limit collection, then conical seed/offset/
+opposite-direction combinations and combined source acceptance.
 157B3 retains full recipe/thread Create Another ownership, support-anchored manipulators, referenced
 Sketch points and breadcrumb return, presets without captured targets, explicit legacy conversion
 with mapping or diagnostic, and extended shared contexts. Then complete 157C's B01–B04/UI01 gates,
