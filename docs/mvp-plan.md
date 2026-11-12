@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 157
 current_block: 158
-current_boundary: Block 157 accepted; Phase A/B integrated acceptance is the next serial delivery
+current_boundary: Block 157 delivered; Block 158 integrated acceptance in progress
 current_tag: "[parity-b158]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–157 accepted; Blocks 158–204 planned"
+  advanced_modeling_workflows: "Blocks 145–157 accepted; Block 158 in progress; Blocks 159–204 planned"
 ---
 
 # MVP Plan
@@ -35,7 +35,7 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 157
-current block        Block 158 (next assigned delivery)
+current block        Block 158 (in progress)
 current phase        Everyday modeling integrated acceptance
 current boundary     Hole/Thread authoring and combined native acceptance verified; 158 integration remains
 ```
@@ -62,7 +62,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | Next delivery | Completion boundary / proof |
 | --- | --- |
 | 156 | Delivered in PR #175: shared placements, Hole consumers, full suites, native 100%/150% and startup verified. |
-| 157 | Verified in PR #181: semantic Hole/Thread creation/editing, explicit conversion, presets and native B01–B04/UI01; final protected delivery below. |
+| 157 | Delivered in PR #181: semantic Hole/Thread creation/editing, explicit conversion, presets and native B01–B04/UI01. |
 | 158 | Phase A/B integrated acceptance, exact history/reopen/STEP and incremental-versus-fresh measurements. |
 | 159 | Persistent oriented planar G2 constraints, solver/drag integration and independent S01 derivative/rank oracles. |
 | 160–161 | Safe typed equation intent/persistence, then tolerance-controlled Geometry and real downstream S02/G01 consumers. |
@@ -483,8 +483,9 @@ results; full Geometry/Qt and whole-parent integration remain assigned to 157C/1
 
 The serial acceptance branch starts from verified merged `248d7c2`, refreshed clean Main, no open
 delivery PR and an unchanged delivered runtime. The reviewed delivery is
-[PR #181](https://github.com/GideonBa/Better-Linux-CAD/pull/181); normal protected merge remains the
-delivery step before starting 158 from refreshed Main.
+[PR #181](https://github.com/GideonBa/Better-Linux-CAD/pull/181), merged normally as `ad85b28`.
+The delivered tree matches reviewed `8e41108`. Main was refreshed and verified clean, with no open
+delivery PR and an unchanged frozen runtime, before starting 158's serial branch.
 
 The first focused correction implements Hole/Thread field-owned Ctrl+Enter validation and
 Escape handling, with local Enter/Tab and inline compact feedback. The keyboard/geometry/history
@@ -519,6 +520,24 @@ Only whole 157 is accepted here. Block 158 still owns full Core/Geometry/Qt, fre
 A/B integration with suppression/reorder/finishing/mass/Assembly/STEP, and isolated incremental-
 versus-fresh measurements. Continue through the assigned 159–165 implementations afterwards;
 all 166–204 planning remains intact.
+
+### Block 158 integration plan
+
+`feat/everyday-modeling-acceptance` starts from verified merged `ad85b28`. Block 157 is delivered;
+158 remains open until every Phase A/B integration gate and measurement below is complete. The
+[bounded integration design](hole-wizard.md#phase-ab-integration--158-design) owns exact scenario,
+compatibility, failure and measurement boundaries. No new persistent feature/schema authority is
+planned; discovered behavior fixes require focused proof and synchronized existing contracts.
+
+| Step | Completion boundary |
+| --- | --- |
+| 158A — planned | Fresh and real migrated legacy inputs through current Hole/Thread, Pattern, outer-edge Fillet/Chamfer, suppression/restore/reorder, material mass, bound Assembly targets and physical structured STEP/reimport; exact failure/history/reopen oracles. |
+| 158B — planned | Complete current Core/Geometry/Qt suites, native fresh/migrated 100% and compact 150%, reviewed original captures and app startup; reconcile every required skip and preserve existing imported/capability limits. |
+| 158C — planned | Isolated incremental-versus-empty-cache recompute samples with correctness equivalence, raw measurements and environment/source/binary identity; review, commit/push and normal protected delivery. |
+
+Record concise proof links/results here and in the existing contracts. After whole-158 acceptance
+and merged delivery, refresh Main before starting 159; the complete 159–165 assignment and all
+later planning remain unchanged.
 
 ## Later phases
 

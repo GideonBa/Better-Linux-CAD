@@ -1089,6 +1089,39 @@ including every later planned capability, is unchanged.
 These are whole-157 workflow proofs. Block 158 still owns complete Phase A/B integrated acceptance,
 full suites, migrated/fresh fixtures, suppression/reorder/finishing and isolated recompute timings.
 
+### Phase A/B integration — 158 design
+
+Reuse the existing shell property, History, Pattern, Assembly, inspection/export and structured-import
+owners. The integration fixture has material-assigned base/cover Parts, multiple Counterbore
+positions with explicit cosmetic Thread intent, rectangular count/exclusion, separate outer-edge
+Fillet/Chamfer and per-Hole Insert targets driven by the existing Assembly count binding. Finishing
+edges must preserve the entry/seat capabilities selected for assembly. Existing B03 modeled
+hand/pitch and native/imported support/limit proofs remain required alongside the integrated chain.
+
+Execute the chain on fresh intent and a real V1 legacy document loaded through the normal reader.
+Retain its old cut and independently account for its material; use ordinary typed promotion/writing
+when adding semantic features. Preserve legacy editing and portable reopen. No new JSON spelling,
+feature interpreter, reference fallback or persistence authority is planned.
+
+Suppress/restore modifier and creator states through existing History commands, retain unrelated
+Bodies, perform a legal independent finishing reorder and reject a dependent-before-source order.
+Invalid geometry or references preserve committed document/cache/history. Check one Apply and the
+complete exact Undo/Redo chain, Save during preview, final native JSON and portable reopen. Count
+changes retain valid Pattern target identities and diagnose removed ones without deleting intent.
+
+Physical oracles combine analytic bore/seat/outer-edge finishing volumes, retained legacy material,
+pinned density mass, actual alignment/material points and structured STEP solid/pose readback after
+native Project reimport. Compare incremental changed-node execution with an independently empty
+cache; verify unrelated results and density-only BRep reuse under the existing cache contracts.
+
+Run recompute measurements only after correctness and in isolation from builds or other tests.
+Record first-call and repeated raw samples, source/runtime/binary/build/OCCT/CPU identity and exact
+measurement boundaries. Compare the same changed document through the existing plan/cache path
+and an empty cache. Label Geometry-only measurements explicitly, excluding setup, file IO and UI
+history; make no portable timing-budget or pointer-latency claim. Full Core/Geometry/Qt and native
+fresh/migrated 100%/compact 150%, reviewed captures and startup are required before whole-158
+acceptance. The numbered plan owns progress and serial delivery.
+
 ## Why more than a cut
 
 ```text
