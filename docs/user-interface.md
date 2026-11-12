@@ -285,9 +285,11 @@ complete editable Part with a visible solid and no other active task/workflow. M
 Thread now creates a custom external Thread in that same task, with scoped exterior support picks
 and an explicit cosmetic/modeled choice. New cylindrical internal/external templates support the
 modeled switch; unsupported tapered modeling still blocks Apply. See [creation and support
-contracts](hole-wizard.md#external-creation-and-new-modeled-templates--157b2b). Complete standard
-Thread/start/taper/limit selectors, existing-support editing, support-anchored grips and the full
-workflow remain 157B2b/B3/C.
+contracts](hole-wizard.md#external-creation-and-new-modeled-templates--157b2b). Thread profiles expose
+explicit revision/row/typed-column mapping or custom parameters, optional start and taper controls,
+resolved units and provenance. [Incomplete/invalid mappings](hole-wizard.md#thread-sources-and-optional-intervals--157b2b)
+block Apply and remain correctable. Complete limit selection, existing-support editing,
+support-anchored grips and the full workflow remain 157B2b/B3/C.
 
 Accepted native captures: [reorder preview at 100%](images/history-reorder-preview.png),
 [compact suppression at 150%](images/history-suppression-compact.png) and

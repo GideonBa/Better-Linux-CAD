@@ -573,6 +573,45 @@ Original native captures show [external creation](images/thread-creation.png) an
 input and mouse Apply, assert no horizontal form overflow and replay exact history/reopening.
 Fit includes the current origin planes; these captures are unmodified.
 
+### Thread sources and optional intervals — 157B2b
+
+Internal and external Thread definitions share a Profile Source selector. A standard profile
+requires an explicit immutable table ID/revision, row and typed column for each system,
+designation, tolerance, major/minor diameter, pitch and included angle. A tapered profile adds an
+explicit Angle-column mapping. No column is guessed from its name or selected automatically.
+Changing the table clears row/columns; changing the row clears columns. Existing pins preload
+their persisted choices. Controls disclose keys, resolved values/units and cell provenance.
+
+Incomplete mappings are transient form state: they block preview/Apply while preserving the
+committed document and last canonical definition. A complete but invalid mapping retains its
+specific Core diagnostic and remains editable. Selecting Custom abandons an unfinished mapping:
+it retains the preceding custom definition or converts the preceding complete pin. Converting a
+complete pinned profile creates fresh owned
+dimensional parameters with the resolved values and authored labels; it retains length/start
+bindings, handedness and representation. It never overwrites another field's intentional binding
+to a formerly used profile parameter or changes a resource revision.
+
+Start offset is optional: omission means exactly zero, enabling it creates a positive 1 mm Length
+input. A custom taper toggle creates a signed Angle input initialized to 1°; straight/tapered
+compatibility still comes from the actual support and complete execution. Explicit zero taper is
+invalid; omission represents a cylinder. Unsupported modeled taper remains a diagnostic. Standard
+taper uses the mapped Angle column instead of a custom parameter.
+
+Typed commands apply numeric changes only to parameters used by the resulting Hole/Thread intent
+before the Core family update. Removing a start/taper also discards an invalid unused numeric
+draft without publishing it. Other explicitly shared bindings and expression ownership remain
+intact. Source controls remain available when current custom input is invalid; an explicit profile
+replacement discards superseded profile edits while retaining the remaining intent and used values.
+Required new inputs publish in the same final transaction, with unused draft roles pruned.
+Focused `[thread-source-shell]` / `[native-thread-source]` proof covers typed mappings, invalid
+correction, revision changes, custom ownership, optional removal, history/reopen and a native
+mapped modeled cut. Whole-block status and executed counts remain in `mvp-plan.md`.
+
+Original mapped-profile previews: [100%](images/thread-standard-creation.png), 1280×800, and
+[compact 150%](images/thread-standard-creation-compact.png), 1536×960 physical pixels. The native
+fixture activates its window before keyboard input and asserts focus before/after selector rebuilds.
+The field values, units and current origin planes are unmodified captures.
+
 ## Why more than a cut
 
 ```text

@@ -144,6 +144,7 @@ Representative entry points (select the layer where the tag exists):
 | Imported/result Hole creation supports | `[hole-support-shell]`, `[native-hole-support]`; placed imported plane/axis, supplier freshness, pending/unused workplanes, real on-screen model picks and exact history/reopen. Complete support editing/limit/Thread workflows remain within 157B2b. |
 | External Thread support inspection | Geometry `[thread-support-query],[thread-import]` plus `[parity-b155]`; independent entry frame/radius/span/taper oracles, both directions, rigid placement, current cache and supplier-byte rejection. The shared resolver also requires the existing native Thread edit regression. |
 | New internal/external Thread authoring | Qt `[thread-create-shell]` and native `[native-thread-create]`; pending/unused inputs, physical ideal-V cuts, imported placement/source guards, exact history/reopen and STEP. Combine with existing Hole creation/recipe/support/edit, shared feature editor and icon/inventory regressions. Complete selectors remain 157B2b. |
+| Thread profile and interval controls | `[thread-source-shell]` / `[native-thread-source]`; exact revision/row/typed columns, incomplete/invalid correction, custom ownership, source provenance, optional start/taper removal and native mapped modeled geometry. Combine with creation/edit regressions and preserve full 157B2b/C scope. |
 | Explicit Pattern placements and Hole consumers | `[parity-b156]`, `[pattern-placement]`, `[hole-pattern-combined]`; `part-pattern-core-mvp6.md`, `hole-wizard.md`, `file-format.md`; `[hole-pattern-consumer-shell]` exercises the existing Assembly task |
 
 The shared GUI executable owns one Qt application instance. `ShellWindow` consumes the existing
@@ -161,6 +162,9 @@ Native fixtures must fit the available screen in device-independent coordinates.
 unbounded 1280×800-DIP request exceeds a 1920×1080 display. The STEP Source fixture honors compact
 mode/screen bounds, synchronizes native layout before projection, and asserts that imported topology
 pick targets are actually on screen; keep the physical selection assertions intact.
+Native keyboard fixtures activate the main window and await activation with a bounded event loop.
+Assert actual focus before input and on the rebuilt selector afterward; reacquire widgets that a
+form rebuild replaces. Do not weaken focus assertions to accommodate an inactive test window.
 
 Use the relevant focused filter at ordinary 100% and compact 150% scale. This runnable example
 covers the existing Hole/shared-History UI; select additional affected families from their tests:

@@ -386,6 +386,15 @@ struct ShellFeatureEditTools::Impl {
   GuiSketchScreenPoint last_pointer{};
   QString buffer;
   QString pending_focus_id;
+  struct ThreadMappingDraft {
+    std::optional<EngineeringResourceKey> table;
+    std::string row;
+    std::map<std::string, std::string> columns;
+    bool taper{};
+  };
+  std::optional<ThreadMappingDraft> thread_mapping;
+  bool thread_mapping_pending{};
+  std::optional<Error> thread_mapping_error;
 
   Impl(ShellFeatureEditTools& owner_, ShellWindow& window_)
       : owner(owner_), window(window_), session(window.session()), viewport(window.viewport()) {
@@ -468,9 +477,9 @@ struct ShellFeatureEditTools::Impl {
     return form;
   }
   bool immutable_field(const QString& path) const {
-    return hole_thread() && (path.startsWith("/support/") || path.contains("/table/") ||
-                             path.contains("/columns/") || path.endsWith("/row") ||
-                             path.endsWith("/diameter_column"));
+    return hole_thread() && (path == "/thread/profile/kind" || path.startsWith("/support/") ||
+                             path.contains("/table/") || path.contains("/columns/") ||
+                             path.endsWith("/row") || path.endsWith("/diameter_column"));
   }
   bool body_available(const Body& body) const {
     return body.kind() == BodyKind::Solid && body.visibility() == BodyVisibility::Visible &&
@@ -503,6 +512,9 @@ struct ShellFeatureEditTools::Impl {
     previous_mask = viewport.selection_filter_mask();
     previous_scope = viewport.selection_semantic_scope();
     creating = true;
+    thread_mapping.reset();
+    thread_mapping_pending = false;
+    thread_mapping_error.reset();
     recipe_namespace = std::move(draft_namespace);
     picking = Pick::None;
     support_chosen = true;
@@ -933,9 +945,21 @@ struct ShellFeatureEditTools::Impl {
       }
     });
   }
-  Result<PartDocument> recipe_document() const {
-    auto part = decode();
-    if (!part || edit.kind() != Kind::Hole)
+  Result<PartDocument> recipe_document(bool parameter_edits = true,
+                                       bool canonical_thread_profile = false) const {
+    auto part = decode(parameter_edits, canonical_thread_profile);
+    if (!part)
+      return part;
+    if (edit.kind() == Kind::Thread) {
+      auto thread = selected_record(*part.value().find_thread_feature(edit.feature()));
+      if (!thread)
+        return Result<PartDocument>::failure(thread.error());
+      auto updated = part.value().update_thread_feature(std::move(thread.value()));
+      if (!updated)
+        return Result<PartDocument>::failure(updated.error());
+      return part;
+    }
+    if (edit.kind() != Kind::Hole)
       return part;
     if (pending_support_plane &&
         !part.value().find_result_face_workplane(pending_support_plane->id())) {
@@ -981,6 +1005,254 @@ struct ShellFeatureEditTools::Impl {
       return;
     }
     adopt_recipe(command(std::move(part.value())));
+  }
+  template <class Command>
+  bool thread_command(Command command, std::optional<Error>* failure = nullptr,
+                      bool replace_profile = false) {
+    auto part = recipe_document(false, replace_profile);
+    if (!part) {
+      if (failure)
+        *failure = part.error();
+      (void)reject(part.error());
+      return false;
+    }
+    auto result = command(std::move(part.value()));
+    const bool accepted = bool(result);
+    if (!result && failure)
+      *failure = result.error();
+    adopt_recipe(std::move(result));
+    return accepted;
+  }
+  std::string fresh_thread_namespace() const {
+    return "thread.draft." + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+  }
+  void materialize_thread_mapping() {
+    thread_mapping_pending = true;
+    thread_mapping_error.reset();
+    if (!thread_mapping || !thread_mapping->table || thread_mapping->row.empty()) {
+      deferred_rebuild();
+      return;
+    }
+    auto& draft = *thread_mapping;
+    for (const auto* field : {"system", "designation", "tolerance", "major_diameter",
+                              "minor_diameter", "pitch", "included_angle"})
+      if (draft.columns[field].empty()) {
+        deferred_rebuild();
+        return;
+      }
+    if (draft.taper && draft.columns["taper_angle"].empty()) {
+      deferred_rebuild();
+      return;
+    }
+    ThreadStandardColumns columns{draft.columns["system"],
+                                  draft.columns["designation"],
+                                  draft.columns["tolerance"],
+                                  draft.columns["major_diameter"],
+                                  draft.columns["minor_diameter"],
+                                  draft.columns["pitch"],
+                                  draft.columns["included_angle"],
+                                  draft.taper ? std::optional(draft.columns["taper_angle"])
+                                              : std::nullopt};
+    const ThreadStandardProfile profile{*draft.table, draft.row, std::move(columns)};
+    if (thread_command(
+            [&](PartDocument part) {
+              return GuiThreadRecipeCommands::profile(std::move(part), edit.feature(), profile,
+                                                      parameter_values);
+            },
+            &thread_mapping_error, true))
+      thread_mapping_pending = false;
+  }
+  void build_thread_mapping(QFormLayout* form) {
+    auto& draft = *thread_mapping;
+    const auto& resources = session.part_document()->engineering_resources();
+    const auto add = [&](const char* field, const QString& title) {
+      auto* input = combo(form->parentWidget());
+      input->setObjectName("blcad.thread.standard." + QString::fromLatin1(field));
+      input->setProperty("blcad.restoreFocusAfterRebuild", true);
+      form->addRow(title, input);
+      return input;
+    };
+    auto* table = add("table", "Table / Revision");
+    table->addItem("Choose a pinned revision", QStringList{});
+    std::vector<EngineeringResourceKey> keys;
+    for (const auto& entry : resources.entries())
+      if (const auto* resource = std::get_if<EngineeringStandardTable>(&entry)) {
+        keys.push_back(resource->key());
+        table->addItem(QString::fromStdString(resource->name() + " / " +
+                                              resource->key().id().value() + " / " +
+                                              resource->key().revision()),
+                       QStringList{QString::fromStdString(resource->key().id().value()),
+                                   QString::fromStdString(resource->key().revision())});
+        table->setItemData(table->count() - 1,
+                           QString::fromStdString(resource->key().id().value() + " / " +
+                                                  resource->key().revision() + "\n" +
+                                                  resource->provenance().source()),
+                           Qt::ToolTipRole);
+        if (draft.table && *draft.table == resource->key())
+          table->setCurrentIndex(table->count() - 1);
+      }
+    if (table->currentIndex() > 0)
+      table->setToolTip(table->currentData(Qt::ToolTipRole).toString());
+    QObject::connect(table, &QComboBox::currentIndexChanged, &owner, [this, keys](int index) {
+      thread_mapping = ThreadMappingDraft{};
+      if (index > 0)
+        thread_mapping->table = keys.at(std::size_t(index - 1));
+      thread_mapping_pending = true;
+      thread_mapping_error.reset();
+      deferred_rebuild();
+    });
+    const auto* selected = draft.table ? resources.find_table(*draft.table) : nullptr;
+    auto* row = add("row", "Row");
+    row->addItem("Choose a row", "");
+    if (selected)
+      for (const auto& choice : selected->rows())
+        row->addItem(QString::fromStdString(choice.name + " / " + choice.key),
+                     QString::fromStdString(choice.key));
+    row->setCurrentIndex(std::max(0, row->findData(QString::fromStdString(draft.row))));
+    QObject::connect(row, &QComboBox::currentIndexChanged, &owner, [this, row] {
+      thread_mapping->row = row->currentData().toString().toStdString();
+      thread_mapping->columns.clear();
+      thread_mapping_pending = true;
+      thread_mapping_error.reset();
+      deferred_rebuild();
+    });
+    const auto* selected_row = selected ? selected->find_row(draft.row) : nullptr;
+    auto* tapered = new QCheckBox("Map a taper Angle column", form->parentWidget());
+    tapered->setObjectName("blcad.thread.standard.taper.enabled");
+    tapered->setProperty("blcad.restoreFocusAfterRebuild", true);
+    tapered->setChecked(draft.taper);
+    form->addRow(tapered);
+    QObject::connect(tapered, &QCheckBox::toggled, &owner, [this](bool enabled) {
+      thread_mapping->taper = enabled;
+      materialize_thread_mapping();
+    });
+    for (const auto* field : {"system", "designation", "tolerance", "major_diameter",
+                              "minor_diameter", "pitch", "included_angle", "taper_angle"}) {
+      const std::string name(field);
+      if (name == "taper_angle" && !draft.taper)
+        continue;
+      const bool text = name == "system" || name == "designation" || name == "tolerance";
+      const bool angle = name == "included_angle" || name == "taper_angle";
+      auto* column = add(field, label(name));
+      column->addItem("Choose a typed column", "");
+      if (selected_row)
+        for (const auto& cell : selected_row->cells) {
+          QString value;
+          if (text) {
+            const auto* string = std::get_if<std::string>(&cell.value);
+            if (!string || QString::fromStdString(*string).trimmed().isEmpty())
+              continue;
+            value = QString::fromStdString(*string);
+          } else {
+            const auto* quantity = std::get_if<Quantity>(&cell.value);
+            if (!quantity ||
+                quantity->kind() != (angle ? QuantityKind::AngleDeg : QuantityKind::LengthMm))
+              continue;
+            value = QString::number(angle ? quantity->degrees() : quantity->millimeters()) +
+                    (angle ? " deg" : " mm");
+          }
+          column->addItem(QString::fromStdString(cell.column) + " / " + value,
+                          QString::fromStdString(cell.column));
+          column->setItemData(column->count() - 1, QString::fromStdString(cell.provenance.source()),
+                              Qt::ToolTipRole);
+        }
+      column->setCurrentIndex(
+          std::max(0, column->findData(QString::fromStdString(draft.columns[name]))));
+      if (column->currentIndex() > 0)
+        column->setToolTip(column->currentData(Qt::ToolTipRole).toString());
+      QObject::connect(column, &QComboBox::currentIndexChanged, &owner, [this, name, column] {
+        thread_mapping->columns[name] = column->currentData().toString().toStdString();
+        materialize_thread_mapping();
+      });
+    }
+  }
+  void build_thread_controls(QFormLayout* form) {
+    auto part = deserialize_part_document_from_json(source.dump());
+    if (!part)
+      return;
+    const ThreadDefinition* definition = nullptr;
+    if (edit.kind() == Kind::Thread)
+      definition = &part.value().find_thread_feature(edit.feature())->thread();
+    else if (const auto* hole = part.value().find_hole_feature(edit.feature());
+             hole && hole->thread())
+      definition = &*hole->thread();
+    if (!definition)
+      return;
+    const auto* standard = std::get_if<ThreadStandardProfile>(&definition->profile());
+    if (standard && !thread_mapping) {
+      thread_mapping = ThreadMappingDraft{standard->table,
+                                          standard->row,
+                                          {{"system", standard->columns.system},
+                                           {"designation", standard->columns.designation},
+                                           {"tolerance", standard->columns.tolerance},
+                                           {"major_diameter", standard->columns.major_diameter},
+                                           {"minor_diameter", standard->columns.minor_diameter},
+                                           {"pitch", standard->columns.pitch},
+                                           {"included_angle", standard->columns.included_angle}},
+                                          bool(standard->columns.taper_angle)};
+      if (standard->columns.taper_angle)
+        thread_mapping->columns["taper_angle"] = *standard->columns.taper_angle;
+    }
+    auto* source = combo(form->parentWidget());
+    source->setObjectName("blcad.thread.source");
+    source->setProperty("blcad.restoreFocusAfterRebuild", true);
+    source->addItem("Custom parameters", "custom");
+    source->addItem("Pinned standard profile", "standard");
+    source->setCurrentIndex(thread_mapping ? 1 : 0);
+    form->addRow("Thread Profile Source", source);
+    QObject::connect(source, &QComboBox::currentIndexChanged, &owner,
+                     [this, was_standard = bool(standard)](int index) {
+                       if (index == 1) {
+                         thread_mapping = ThreadMappingDraft{};
+                         thread_mapping_pending = true;
+                         thread_mapping_error.reset();
+                         deferred_rebuild();
+                       } else if (!was_standard) {
+                         thread_mapping.reset();
+                         thread_mapping_pending = false;
+                         thread_mapping_error.reset();
+                         deferred_rebuild();
+                       } else if (thread_command(
+                                      [&](PartDocument part) {
+                                        return GuiThreadRecipeCommands::custom_profile(
+                                            std::move(part), edit.feature(),
+                                            fresh_thread_namespace(), parameter_values);
+                                      },
+                                      nullptr, true)) {
+                         thread_mapping.reset();
+                         thread_mapping_pending = false;
+                         thread_mapping_error.reset();
+                       }
+                     });
+    if (thread_mapping)
+      build_thread_mapping(form);
+    const auto optional = [&](const char* name, const QString& title, bool checked, auto changed) {
+      auto* input = new QCheckBox(title, form->parentWidget());
+      input->setObjectName(QString::fromLatin1(name));
+      input->setProperty("blcad.restoreFocusAfterRebuild", true);
+      input->setChecked(checked);
+      form->addRow(input);
+      QObject::connect(input, &QCheckBox::toggled, &owner, changed);
+    };
+    optional("blcad.thread.start.enabled", "Start offset (omitted = 0 mm)",
+             bool(definition->start()), [this](bool enabled) {
+               thread_command([&](PartDocument part) {
+                 return GuiThreadRecipeCommands::start_offset(std::move(part), edit.feature(),
+                                                              fresh_thread_namespace(), enabled,
+                                                              parameter_values);
+               });
+             });
+    if (!thread_mapping) {
+      const auto& profile = std::get<ThreadParameterProfile>(definition->profile());
+      optional("blcad.thread.taper.enabled", "Custom taper angle", bool(profile.taper_angle),
+               [this](bool enabled) {
+                 thread_command([&](PartDocument part) {
+                   return GuiThreadRecipeCommands::taper(std::move(part), edit.feature(),
+                                                         fresh_thread_namespace(), enabled,
+                                                         parameter_values);
+                 });
+               });
+    }
   }
   static std::optional<GuiHoleDimensionSlot> dimension_slot(const QString& path) {
     using R = GuiHoleDimensionRole;
@@ -1167,6 +1439,9 @@ struct ShellFeatureEditTools::Impl {
     } else if (key == "thread") {
       add("blcad.hole.internal_thread", "Internal Thread", {"None", "Enabled"},
           record.contains("thread") ? 1 : 0, [this](int index) {
+            thread_mapping.reset();
+            thread_mapping_pending = false;
+            thread_mapping_error.reset();
             recipe_command([&](PartDocument part) {
               return GuiHoleRecipeCommands::internal_thread(std::move(part), edit.feature(),
                                                             recipe_namespace, index == 1);
@@ -1521,6 +1796,8 @@ struct ShellFeatureEditTools::Impl {
       for (const auto* key : {"name", "placements", "target_body", "support", "direction", "kind",
                               "diameter", "manufacturing", "extent", "tip", "thread"}) {
         build_hole_modes(form, key);
+        if (std::string_view(key) == "thread" && record.contains(key))
+          build_thread_controls(form);
         if (record.contains(key))
           build_fields(form, Json{{key, record.at(key)}}, {});
       }
@@ -1536,6 +1813,7 @@ struct ShellFeatureEditTools::Impl {
     const int retained = dynamic->findData(selected);
     dynamic->setCurrentIndex(retained > 0 ? retained : dynamic->count() > 1 ? 1 : 0);
     building = false;
+    pick_mode();
     if (!focus_id.isEmpty())
       QTimer::singleShot(0, &owner, [this, focus_id, draft = recipe_namespace] {
         if (!edit.active() || recipe_namespace != draft || !scroll->widget())
@@ -1584,14 +1862,18 @@ struct ShellFeatureEditTools::Impl {
       return Result<std::size_t>::success(changes.size() + added.size() + plane_count);
     };
   }
-  Result<PartDocument> decode() const {
+  Result<PartDocument> decode(bool parameter_edits = true,
+                              bool canonical_thread_profile = false) const {
     Json root = source;
     root.at(collection).at(record_index) = record;
+    if (canonical_thread_profile && record.contains("thread"))
+      root.at(collection).at(record_index).at("thread").at("profile") =
+          source.at(collection).at(record_index).at("thread").at("profile");
     const auto used = bound_parameters(record);
     for (auto& p : root.at("parameters")) {
       const auto id = p.at("id").get<std::string>();
       if (auto found = parameter_values.find(id);
-          found != parameter_values.end() && used.contains(id))
+          parameter_edits && found != parameter_values.end() && used.contains(id))
         p["value"] = found->second;
     }
     return deserialize_part_document_from_json(root.dump());
@@ -1617,6 +1899,9 @@ struct ShellFeatureEditTools::Impl {
       return Result<std::size_t>::success(0);
     if (!fresh())
       return reject(error("Feature or document changed. Restart editing."));
+    if (thread_mapping_pending)
+      return reject(thread_mapping_error.value_or(
+          error("Complete the pinned Thread revision, row and typed column mappings.")));
     if (creating) {
       const auto* body =
           session.part_document()->find_body(BodyId(record.at("target_body").get<std::string>()));
@@ -1754,6 +2039,9 @@ struct ShellFeatureEditTools::Impl {
                  : Result<std::size_t>::failure(error("Invalid Preview"));
   }
   void finish(bool applied) {
+    thread_mapping.reset();
+    thread_mapping_pending = false;
+    thread_mapping_error.reset();
     const bool restore_creation = creating && !applied && session.part_document() &&
                                   session.model_revision() == entry_revision;
     const auto camera = entry_camera;
@@ -1877,6 +2165,9 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   if (!begun)
     return begun;
   p.creating = false;
+  p.thread_mapping.reset();
+  p.thread_mapping_pending = false;
+  p.thread_mapping_error.reset();
   p.recipe_namespace =
       "hole.draft." + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
   p.pending_parameters.clear();

@@ -399,71 +399,39 @@ Next: 157B2b completes Thread profiles/start/taper, external Thread creation and
 support/limit collection. Then 157B3/C and full 158–165 remain assigned. Acceptance of 157B2a does
 not close its parent 157B2 or Block 157.
 
-### 157B2b progress — planar creation supports
+### 157B2b implementation and verification — in progress
 
-Creation now collects typed native/imported/result planar supports. Imported references retain
-catalog/capability and actual Body placement. Result supports add a required workplane only in the
-same final transaction; Cancel, committed Save during preview and support/recipe changes do not
-publish unused metadata. [Contract and raw captures](hole-wizard.md#planar-support-collection--157b2b)
-link to `[hole-support-shell]` / `[native-hole-support]` proof.
+The serial delivery remains on `feat/hole-thread-support-authoring`, based on merged `1348d19`,
+in [draft PR #179](https://github.com/GideonBa/Better-Linux-CAD/pull/179). Verified components do
+not close 157B2b, parent 157 or the assigned continuation through 165.
 
-Current proof: GUI/app/export targets built; shared Qt regression **67 passed / 8 native skips /
-4,983 assertions**. The focused native support/create/recipe/Thread-edit group passes **5 cases /
-296 assertions at both 100% and compact 150%**, with no failures/skips; controls and model targets
-are checked on screen. This group executes five of the eight native-only cases in the Qt filter,
-not every historical native case. A separate PID-matched startup is viewable (intentional timeout
-124). All five binary hashes match; backend code/tests are unchanged from the retained 156 evidence.
-Full backend/full Qt are not rerun. Frozen inputs: 1,053 files, SHA256
-`73697c1b689d6ba5e755ad40ae8969ee4df4d3928bffb76a8905b34314f1ae9b`.
+| Component | Contract / focused proof | Delivery |
+| --- | --- | --- |
+| Native/imported/result planar creation supports; current placement, source guards and used-only pending workplanes | [Support contract and captures](hole-wizard.md#planar-support-collection--157b2b); `[hole-support-shell]`, `[native-hole-support]` | `3c0b01c` |
+| Read-only exterior Thread frame/radius/span/signed taper; shared execution resolver, placed imports and stale/wrong/inner/source rejection | [Geometry contract](hole-wizard.md#exterior-thread-support-inspection--157b2b); `[thread-support-query]`, `[thread-import]` | `58b0ca7`, terminal placement correction in `8973417` |
+| External creation and new modeled cylindrical templates; transactional used inputs, scoped picks, invalid correction, exact history/reopen and physical STEP | [Creation contract and captures](hole-wizard.md#external-creation-and-new-modeled-templates--157b2b); `[thread-create-shell]`, `[native-thread-create]` | `8973417` |
+| Explicit Thread revision/row/typed columns, custom conversion, optional start/taper and live scoped selectors | [Source/interval contract](hole-wizard.md#thread-sources-and-optional-intervals--157b2b); `[thread-source-shell]`, `[native-thread-source]` | Verified on this branch in draft PR #179 |
 
-This is a verified intermediate change on `feat/hole-thread-support-authoring`, based on merged
-`1348d19`, pushed as reviewed `3c0b01c` in [draft PR #179](https://github.com/GideonBa/Better-Linux-CAD/pull/179).
-Keep that PR/branch open for Thread profiles/start/taper, external creation, complete limit
-collection and existing-support editing. 157B2b, parent 157 and the sequence through 165 stay open.
+GUI/app/export targets build. The combined creation/recipe/support/edit/Pattern/prefix/viewport/
+icon/inventory Qt selection passes **83 cases / 11 native skips / 6,382 assertions**. The relevant
+native group passes **8 cases / 682 assertions at each of 100% and compact 150%**, without
+failures/skips; it executes eight of the eleven cases skipped by that Qt selection. The fixture
+explicitly activates its native window and asserts focus before/after selector rebuilds. Separate
+PID-matched startup is viewable (intentional timeout 124).
 
-### 157B2b progress — exterior Thread support query
+Core/Geometry/export inputs and binary hashes are unchanged from `8973417`; retain the delivered
+Geometry query/import proof (**6 cases / 326 assertions**) and its existing Thread execution
+regression. Full Core, full Geometry and full Qt are not rerun for this GUI component. Frozen
+runtime inputs: 1,055 files, SHA256
+`2e3bbab07ae4d1b8bb03731095db209465be4946dd3782a10369f2ed5df4a307`.
+Detailed earlier component runs remain in Git/PR history.
 
-Geometry now supplies a read-only exterior cylinder/cone inspection sharing the actual Thread
-execution resolver. [Contract and focused proof](hole-wizard.md#exterior-thread-support-inspection--157b2b)
-cover entry frame/radius/span/signed taper in both directions, rigid placement, supplier freshness
-and rejection of stale/wrong/inner supports. This provides the required input for external authoring;
-the complete authoring UI and the remaining 157B2b/B3/C requirements stay open in draft PR #179.
-
-GUI/app/export/Core/Geometry targets built. Focused query/import proof passes **5 cases / 302
-assertions**; the complete existing Thread Geometry group passes **11 cases / 931 assertions**.
-The selected Qt creation/recipe/support/edit/prefix/inventory regression passes **53 cases / 6 native
-skips / 4,586 assertions**. The existing native modeled Thread edit passes **1 case / 46
-assertions at each of 100% and compact 150%**, without skips. This executes one of the six native
-cases skipped by that Qt selection. Core's 320 source/header/test/shared-fixture inputs are unchanged
-from retained 156 evidence; full Core, full Geometry, full Qt and additional Pattern coverage are
-not rerun for this component. A separate PID-matched app startup is viewable (intentional timeout
-124).
-Frozen runtime inputs: 1,053 files, SHA256
-`61137aa67d57872682a95c05ccad144db0fdd9fcba8bb4afc4527392ce1ff01e`.
-
-### 157B2b progress — external creation and modeled templates
-
-Model → Design → Thread now authors a typed external feature with used-only owned custom inputs,
-scoped target/support collection and the shared creation lifecycle. Both new internal/external
-cylindrical templates support an explicit modeled switch. Current imported inspection includes
-the terminal Body placement. [Contract, physical oracles and raw captures](hole-wizard.md#external-creation-and-new-modeled-templates--157b2b)
-link the creation, cancellation, freshness, exact history/reopen and physical STEP proofs.
-
-GUI/app/export/Geometry targets build. Query/import Geometry proof passes **6 cases / 326
-assertions**. The focused selection/cancellation check passes **1 case / 33 assertions**;
-the combined creation/recipe/support/edit/Pattern/prefix/viewport/icon/inventory Qt selection
-passes **76 cases / 10 native skips / 5,882 assertions**. The relevant native group passes **7
-cases / 496 assertions at each of 100% and compact 150%**, without failures/skips; it executes
-seven of the ten cases skipped by that Qt selection. Separate PID-matched startup is viewable
-(intentional timeout 124). Core's binary hash is unchanged; full Core, full Geometry and full Qt
-are not rerun. Frozen inputs: 1,055 files, SHA256
-`47ef78f129d9307b6bdfce4733efa7cd188d9508ac7d5843e9cae78fdfeeca5c`.
-
-This component stays on the existing draft PR #179. Next within 157B2b: explicit standard Thread
-revision/row/typed columns and custom conversion, optional start/taper controls, complete limit
-collection and existing-support editing. Full configuration Create Another, manipulators, Sketch
-return, presets and legacy conversion remain 157B3, then 157C and the full 158–165 sequence.
-No parent block or complete 157B2b acceptance is advanced by this component.
+Before 157B2b is ready: complete native/imported/result limit collection and existing-support
+editing, then conical seed/offset/opposite-direction combinations and combined source acceptance.
+157B3 retains full recipe/thread Create Another ownership, support-anchored manipulators, referenced
+Sketch points and breadcrumb return, presets without captured targets, explicit legacy conversion
+with mapping or diagnostic, and extended shared contexts. Then complete 157C's B01–B04/UI01 gates,
+Block 158 integrated acceptance and the full 159–165 sequence. Preserve all scope after 165.
 
 ## Later phases
 

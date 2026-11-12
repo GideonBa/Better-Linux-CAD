@@ -16,9 +16,11 @@
 #include "blcad/gui/shell/shell_window.hpp"
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDir>
 #include <QDoubleSpinBox>
+#include <QEventLoop>
 #include <QFile>
 #include <QGroupBox>
 #include <QKeyEvent>
@@ -31,6 +33,7 @@
 #include <QScrollBar>
 #include <QStatusBar>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <catch2/catch_approx.hpp>
@@ -272,6 +275,51 @@ void create_thread(ShellWindow& w) {
 void choose_hole_mode(ShellWindow& w, const char* name, int index) {
   control<QComboBox>(w, name).setCurrentIndex(index);
   settle();
+}
+void thread_choice(ShellWindow& w, const char* name, const QVariant& value, bool native = false) {
+  INFO(name);
+  auto& initial = control<QComboBox>(w, name);
+  const int target = initial.findData(value);
+  REQUIRE(target >= 0);
+  if (!native) {
+    initial.setCurrentIndex(target);
+    settle();
+    return;
+  }
+  const int attempts_limit = initial.count() + 1;
+  for (int attempts = 0; attempts < attempts_limit; ++attempts) {
+    auto& current = control<QComboBox>(w, name);
+    if (current.currentIndex() == target)
+      return;
+    control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&current);
+    current.setFocus();
+    REQUIRE(current.hasFocus());
+    key(current, current.currentIndex() < target ? Qt::Key_Down : Qt::Key_Up);
+    REQUIRE(control<QComboBox>(w, name).hasFocus());
+  }
+  FAIL("Thread selector did not reach its explicit choice");
+}
+void thread_mapping(ShellWindow& w, const char* revision = "r1", bool native = false,
+                    bool invalid_major = false) {
+  thread_choice(w, "blcad.thread.source", "standard", native);
+  REQUIRE_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  thread_choice(w, "blcad.thread.standard.table",
+                QStringList{"synthetic.threads", QString::fromLatin1(revision)}, native);
+  thread_choice(w, "blcad.thread.standard.row", "synthetic.row", native);
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.major_diameter").findData("angle") == -1);
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.included_angle").findData("major") == -1);
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.system").findData("pitch") == -1);
+  for (const auto& [field, column] : {std::pair{"system", "system"},
+                                      {"designation", "designation"},
+                                      {"tolerance", "tolerance"},
+                                      {"major_diameter", invalid_major ? "minor" : "major"},
+                                      {"minor_diameter", "minor"},
+                                      {"pitch", "pitch"},
+                                      {"included_angle", "angle"}}) {
+    const auto name = "blcad.thread.standard." + std::string(field);
+    REQUIRE(control<QComboBox>(w, name.c_str()).currentIndex() == 0);
+    thread_choice(w, name.c_str(), QString::fromLatin1(column), native);
+  }
 }
 } // namespace
 
@@ -1500,4 +1548,292 @@ TEST_CASE("Native new internal Thread template switches to valid modeled geometr
       4 * std::numbers::pi * std::tan(std::numbers::pi / 6) * 4 / 1.5 * (3. / 2 - 1. / 3);
   CHECK(volume(w) == Catch::Approx(38400 - 32 * std::numbers::pi - removed).margin(2e-4));
   replay(w, dir, before);
+}
+
+TEST_CASE(
+    "A new external Thread pins an explicitly mapped revision without publishing unused inputs",
+    "[gui][parity-b157][thread-source-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = threads::pair_part();
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_thread(w);
+  field<QDoubleSpinBox>(w, "/thread/profile/major_diameter").setValue(0);
+  auto& system = field<QLineEdit>(w, "/thread/profile/system");
+  system.setText("");
+  REQUIRE(QMetaObject::invokeMethod(&system, "editingFinished"));
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  thread_mapping(w, "r2");
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.major_diameter")
+            .toolTip()
+            .contains("Synthetic r2/major"));
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& definition = result.thread_features().front().thread();
+  const auto& pin = std::get<ThreadStandardProfile>(definition.profile());
+  CHECK(pin.table == threads::selected("r2").table);
+  CHECK(pin.row == "synthetic.row");
+  CHECK(pin.columns.major_diameter == "major");
+  const auto value = checked(resolve_thread_definition(result, definition));
+  CHECK(value.pitch_mm == 2.2);
+  CHECK(value.system == "Synthetic table system");
+  CHECK(value.provenance.size() == 7);
+  CHECK(result.engineering_resources() == part.engineering_resources());
+  CHECK(result.parameters().size() == part.parameters().size() + 1);
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Incomplete and invalid Thread mappings retain committed intent and remain correctable",
+          "[gui][parity-b157][thread-source-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part());
+  const auto before = snapshot(w);
+  create_thread(w);
+  field<QDoubleSpinBox>(w, "/thread/profile/pitch").setValue(1.9);
+  thread_choice(w, "blcad.thread.source", "standard");
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  const auto saved = dir.filePath("incomplete-thread.blcad.json");
+  REQUIRE(w.save_to(saved));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(saved.toStdString()));
+  CHECK(checked(serialize_part_document_to_json(*reopened.part_document())) == before);
+  thread_choice(w, "blcad.thread.source", "custom");
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/pitch").value() == 1.9);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  thread_mapping(w, "r1", false, true);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  CHECK(snapshot(w) == before);
+  thread_choice(w, "blcad.thread.standard.major_diameter", "major");
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  thread_choice(w, "blcad.thread.standard.table", QStringList{"synthetic.threads", "r2"});
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.row").currentIndex() == 0);
+  CHECK(control<QComboBox>(w, "blcad.thread.standard.major_diameter").currentIndex() == 0);
+  CHECK_FALSE(w.feature_edit_tools().apply());
+  w.feature_edit_tools().cancel();
+  CHECK(snapshot(w) == before);
+}
+
+TEST_CASE(
+    "Converting a pinned Thread owns fresh profile dimensions and retains shared interval bindings",
+    "[gui][parity-b157][thread-source-shell]") {
+  auto part = threads::pair_part();
+  const auto definition =
+      checked(ThreadDefinition::create(threads::selected(), ParameterId("thread.minor")));
+  REQUIRE(part.add_thread_feature(threads::external(definition)));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  begin(w, "external");
+  thread_choice(w, "blcad.thread.source", "custom");
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/minor_diameter").value() == 8);
+  CHECK(field<QDoubleSpinBox>(w, "/thread/length").value() == 8);
+  field<QDoubleSpinBox>(w, "/thread/profile/minor_diameter").setValue(7);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& thread = result.thread_features().front();
+  const auto& profile = std::get<ThreadParameterProfile>(thread.thread().profile());
+  CHECK(thread.id() == FeatureId("external"));
+  CHECK(thread.thread().length() == ParameterId("thread.minor"));
+  CHECK(profile.minor_diameter != ParameterId("thread.minor"));
+  CHECK(profile.major_diameter != ParameterId("thread.major"));
+  CHECK(result.find_parameter(ParameterId("thread.minor"))->value().millimeters() == 8);
+  CHECK(result.find_parameter(profile.minor_diameter)->value().millimeters() == 7);
+  CHECK(result.parameters().size() == part.parameters().size() + 4);
+  CHECK(result.engineering_resources() == part.engineering_resources());
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Internal Thread standard mapping retains its pilot and publishes only used dimensional inputs",
+    "[gui][parity-b157][thread-source-shell]") {
+  auto part = plate();
+  REQUIRE(part.add_engineering_resource(threads::table()));
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_hole(w);
+  field<QDoubleSpinBox>(w, "/diameter/parameter").setValue(8);
+  choose_hole_mode(w, "blcad.hole.internal_thread", 1);
+  thread_mapping(w);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& hole = result.hole_features().front();
+  REQUIRE(hole.thread());
+  CHECK(std::holds_alternative<ThreadStandardProfile>(hole.thread()->profile()));
+  CHECK(result.parameters().size() == part.parameters().size() + 2);
+  CHECK(volume(w) == Catch::Approx(38400 - 128 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Optional Thread offset and taper can discard invalid unused values without publishing inputs",
+    "[gui][parity-b157][thread-source-shell]") {
+  const bool internal = GENERATE(false, true);
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = internal ? plate() : threads::pair_part();
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  if (internal) {
+    create_hole(w);
+    choose_hole_mode(w, "blcad.hole.internal_thread", 1);
+  } else
+    create_thread(w);
+  control<QCheckBox>(w, "blcad.thread.start.enabled").setChecked(true);
+  settle();
+  CHECK(field<QDoubleSpinBox>(w, "/thread/start").value() == 1);
+  field<QDoubleSpinBox>(w, "/thread/start").setValue(0);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  control<QCheckBox>(w, "blcad.thread.start.enabled").setChecked(false);
+  settle();
+  CHECK(w.feature_edit_tools().field("/thread/start") == nullptr);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  control<QCheckBox>(w, "blcad.thread.taper.enabled").setChecked(true);
+  settle();
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/taper_angle").value() == 1);
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  field<QDoubleSpinBox>(w, "/thread/profile/taper_angle").setValue(0);
+  control<QCheckBox>(w, "blcad.thread.taper.enabled").setChecked(false);
+  settle();
+  CHECK(w.feature_edit_tools().field("/thread/profile/taper_angle") == nullptr);
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(w.session().part_document()->parameters().size() ==
+        part.parameters().size() + (internal ? 6 : 5));
+  CHECK(snapshot(w) != before);
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native standard Thread mapping retains focus through explicit typed selections and "
+          "modeled Apply",
+          "[gui][parity-b157][thread-source-shell][native-thread-source]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native standard Thread authoring");
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part());
+  const auto before = snapshot(w);
+  create_thread(w);
+  w.raise();
+  w.activateWindow();
+  QGuiApplication::sync();
+  settle();
+  if (!w.isActiveWindow()) {
+    QEventLoop activation;
+    QTimer poll, deadline;
+    deadline.setSingleShot(true);
+    QObject::connect(&poll, &QTimer::timeout, &activation, [&] {
+      if (w.isActiveWindow())
+        activation.quit();
+    });
+    QObject::connect(&deadline, &QTimer::timeout, &activation, &QEventLoop::quit);
+    poll.start(5);
+    deadline.start(2000);
+    activation.exec();
+  }
+  REQUIRE(w.isActiveWindow());
+  thread_mapping(w, "r1", true);
+  click(control<QCheckBox>(w, "blcad.thread.start.enabled"));
+  auto& length = field<QDoubleSpinBox>(w, "/thread/length");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&length);
+  length.setFocus();
+  length.selectAll();
+  key(length, Qt::Key_3, "3");
+  key(length, Qt::Key_Return);
+  auto& mode = field<QComboBox>(w, "/thread/representation");
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll").ensureWidgetVisible(&mode);
+  mode.setFocus();
+  key(mode, Qt::Key_Down);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll")
+            .horizontalScrollBar()
+            ->maximum() == 0);
+  control<QScrollArea>(w, "blcad.feature_edit.inputs_scroll")
+      .ensureWidgetVisible(&control<QComboBox>(w, "blcad.thread.standard.table"));
+  settle();
+  capture(w, "thread-standard-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  const double removed =
+      4 * std::numbers::pi * std::tan(55 * std::numbers::pi / 360) * 3 / 1.7 * (4. / 2 + 1. / 3);
+  CHECK(volume(w, "body.shaft") == Catch::Approx(200 * std::numbers::pi - removed).margin(2e-4));
+  const auto& thread = w.session().part_document()->thread_features().front();
+  REQUIRE(thread.thread().start());
+  CHECK(w.session()
+            .part_document()
+            ->find_parameter(*thread.thread().start())
+            ->value()
+            .millimeters() == 1);
+  replay(w, dir, before);
+}
+
+TEST_CASE("A mapped taper retains its signed Angle and explicit custom removal restores a "
+          "cylindrical Thread",
+          "[gui][parity-b157][thread-source-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = threads::pair_part();
+  open(w, dir, part);
+  const auto before = snapshot(w);
+  create_thread(w);
+  thread_mapping(w);
+  control<QCheckBox>(w, "blcad.thread.standard.taper.enabled").setChecked(true);
+  settle();
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  auto& columns = control<QComboBox>(w, "blcad.thread.standard.taper_angle");
+  CHECK(columns.findData("major") == -1);
+  thread_choice(w, "blcad.thread.standard.taper_angle", "taper");
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(w) == before);
+  thread_choice(w, "blcad.thread.source", "custom");
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/taper_angle").value() == -2);
+  CHECK(field<QDoubleSpinBox>(w, "/thread/profile/taper_angle").suffix().contains("deg"));
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  control<QCheckBox>(w, "blcad.thread.taper.enabled").setChecked(false);
+  settle();
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  REQUIRE(w.feature_edit_tools().apply());
+  const auto& result = *w.session().part_document();
+  const auto& profile =
+      std::get<ThreadParameterProfile>(result.thread_features().front().thread().profile());
+  CHECK_FALSE(profile.taper_angle);
+  CHECK(result.parameters().size() == part.parameters().size() + 5);
+  CHECK(result.engineering_resources() == part.engineering_resources());
+  replay(w, dir, before);
+}
+
+TEST_CASE("Thread source rebuilds preserve an active support selector and its scoped targets",
+          "[gui][parity-b157][thread-source-shell]") {
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, threads::pair_part());
+  const auto before = snapshot(w);
+  const auto entry_scope = w.viewport().selection_semantic_scope();
+  create_thread(w);
+  control<QToolButton>(w, "blcad.thread.support.pick").click();
+  const auto scoped = w.viewport().selection_semantic_scope();
+  REQUIRE(scoped);
+  REQUIRE_FALSE(scoped->empty());
+  thread_choice(w, "blcad.thread.source", "standard");
+  CHECK(control<QToolButton>(w, "blcad.thread.support.pick").isChecked());
+  CHECK(w.viewport().selection_semantic_scope() == scoped);
+  REQUIRE(w.feature_edit_tools().accept_selection({GuiSelectionKind::Face, scoped->front()}));
+  CHECK_FALSE(control<QToolButton>(w, "blcad.thread.support.pick").isChecked());
+  CHECK_FALSE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  thread_choice(w, "blcad.thread.source", "custom");
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  w.feature_edit_tools().cancel();
+  CHECK(w.viewport().selection_semantic_scope() == entry_scope);
+  CHECK(snapshot(w) == before);
 }

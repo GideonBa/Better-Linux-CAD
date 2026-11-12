@@ -221,3 +221,11 @@ The [Hole/Thread contract](hole-wizard.md#external-creation-and-new-modeled-temp
 defaults, supported representations and the remaining selectors/Create Another boundary.
 `[thread-create-shell]` and `[native-thread-create]` exercise new internal/external modeled geometry,
 actual scoped face picks and transactional history; run existing creation/edit regression alongside.
+
+Thread source/start/taper controls use `GuiThreadRecipeCommands` over the same typed Hole/Thread
+records. Mapping drafts live only in the form; complete choices become a `ThreadStandardProfile`.
+Commands filter scalar edits against the resulting record's dependencies before its Core update,
+so an explicitly removed optional input cannot leak an invalid unused value. Existing shared and
+formula bindings retain their established ownership. See [source and interval controls](hole-wizard.md#thread-sources-and-optional-intervals--157b2b)
+and `[thread-source-shell]` / `[native-thread-source]`; all remaining limits/support/context scope
+and combined acceptance stay assigned.
