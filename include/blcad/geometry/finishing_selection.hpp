@@ -11,6 +11,8 @@ namespace blcad::geometry {
 
 class StepImportTopologyContext;
 
+enum class FinishingSelectionVisibility { VisibleOnly, IncludeHiddenInputs };
+
 struct FinishingSelectionTarget {
   std::string semantic_id;
   std::string label;
@@ -26,7 +28,8 @@ public:
   [[nodiscard]] static Result<std::vector<FinishingSelectionTarget>>
   build(const PartDocument& document, const ShapeCache& cache, const BodyId& body,
         PartFeatureInputRole role, StepImportTopologyContext* import_context = nullptr,
-        std::optional<std::size_t> history_prefix = std::nullopt);
+        std::optional<std::size_t> history_prefix = std::nullopt,
+        FinishingSelectionVisibility visibility = FinishingSelectionVisibility::VisibleOnly);
 };
 
 } // namespace blcad::geometry

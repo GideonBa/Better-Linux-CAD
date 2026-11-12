@@ -319,3 +319,12 @@ are retained; center/origin values explicitly become an independent placement. U
 leave ordinary legacy editing available. The
 [conversion contract](hole-wizard.md#explicit-legacy-conversion--157b3) owns prerequisites, diagnostics,
 material tolerance and proof tags. No second edit controller or transaction system is introduced.
+
+### Hidden/consumed predecessor inputs — 157B3
+
+An existing Hole/Thread determines input availability from its exact predecessor cache, independently
+of end-state visibility or later consumption. Target/limit labels disclose hidden/input-history
+Bodies. Explicit picking displays available cached inputs through the temporary overlay without
+changing visibility intent; full downstream preview/Apply and entry-context Cancel remain authoritative.
+See the [input-history contract](hole-wizard.md#hidden-and-consumed-input-bodies--157b3) for bounds and
+focused proof. User history prefixes and enclosing workflows remain the next lifecycle component.

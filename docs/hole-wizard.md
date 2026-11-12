@@ -640,8 +640,9 @@ the entry camera, selection and pick scope while the entry revision remains curr
 Focused proof is `[hole-support-edit-shell]`, `[native-hole-support-edit]` and Geometry
 `[thread-support-prefix]`: reference preservation, explicit rebinding, downstream exclusion,
 used-only workplanes, independent physical frames/volumes, exact history/reopen and actual native
-predecessor picking. Hidden/consumed targets and active user history prefixes retain their existing
-numeric edit path; their extended support-selection lifecycle remains 157B3.
+predecessor picking. The [157B3 input-history workflow](#hidden-and-consumed-input-bodies--157b3)
+extends these selectors to hidden/consumed targets. Active user history prefixes retain their
+numeric edit path until the remaining 157B3 prefix lifecycle is verified.
 
 Original native previews: [100%](images/hole-support-edit.png), 1280×800, and
 [compact 150%](images/hole-support-edit-compact.png), 1536×960 physical pixels. Both show the
@@ -901,6 +902,37 @@ passes 150 / 12,297 with 25 native skips. Targeted native conversion/context/edi
 History regression passes 14 / 920 at 100% and 14 / 926 at compact 150%. The
 [implementation plan](mvp-plan.md#current-implementation--157b3) owns delivery/runtime evidence;
 these focused results do not close the remaining shared contexts or combined acceptance.
+
+### Hidden and consumed input Bodies — 157B3
+
+Existing Hole/Thread support editing resolves the exact predecessor cache before deciding which
+targets are available. A Body hidden by persistent intent or transient presentation, or consumed
+by a later Boolean, remains selectable when it existed before the edited feature. Later Bodies,
+the feature's own results and unavailable predecessors remain excluded. Creation still chooses
+currently visible available Solids; this edit extension changes no creation eligibility.
+
+Target/limit labels identify hidden inputs and Bodies available only in the input history. During
+an explicit pick, the task temporarily displays the predecessor cache's available Body shapes,
+including hidden inputs, through the existing candidate overlay. Canonical scope validation and
+typed face/Body references still own picking; no visibility flag or persistent display override is
+written. Closing the pick returns to normal complete candidate preview. Apply validates the full
+downstream model, including consumption, and publishes one ordinary edit. Cancel clears the input
+overlay and restores the entry camera, selection and scope under the existing revision policy.
+The shared Geometry selector requires an explicit `IncludeHiddenInputs` policy for these queries;
+its normal finishing default remains `VisibleOnly`. Scope/cache/source validation is unchanged.
+
+If the target is unavailable even before the feature (for example an unavailable creator), the
+existing numeric edit/failure policy remains; the task does not invent support geometry. Active
+user-prefix and enclosing source-workflow extensions remain assigned separately.
+
+Proof sources: [input-history shell/native regression](../tests/gui/gui_shell_hole_thread_edit_tests.cpp)
+and [explicit Geometry visibility/scope regression](../tests/geometry/finishing_selection_tests.cpp),
+tags `[hole-input-history-shell]`, `[native-hole-input-history]` and `[hidden-input-selection]`. The
+[implementation plan](mvp-plan.md#current-implementation--157b3) records verification and delivery.
+Focused Geometry passes 11 cases / 801 assertions; focused Qt passes two / 246 with two native skips.
+The broader relevant Qt selection passes 82 / 6,200 with 15 native skips. Targeted native input/
+support/source/limit/context regression passes seven / 763 at each scale. These are bounded proofs;
+remaining prefix/shared contexts and complete native combination acceptance stay assigned.
 
 ## Why more than a cut
 

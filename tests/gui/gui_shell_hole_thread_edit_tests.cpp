@@ -126,6 +126,7 @@ void begin(ShellWindow& w, const char* id) {
   const auto result = w.feature_edit_tools().begin(FeatureId(id));
   INFO((result ? "ok" : result.error().message()));
   REQUIRE(result);
+  INFO(control<QLabel>(w, "blcad.feature_edit.status").text().toStdString());
   REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
   settle();
   if (QApplication::platformName() == "xcb")
@@ -4147,4 +4148,191 @@ TEST_CASE(
   CHECK(snapshot(w) == before);
   w.feature_edit_tools().cancel();
   CHECK(snapshot(w) == before);
+}
+
+namespace {
+PartDocument hidden_hole_input(int mode) {
+  auto part = holes::part(false, false);
+  if (mode == 0)
+    REQUIRE(part.set_body_visibility(BodyId("body.base"), BodyVisibility::Hidden));
+  if (mode == 2) {
+    auto sketch =
+        checked(Sketch::create(SketchId("later.stock"), "Later stock", DatumPlaneId("datum.xy")));
+    REQUIRE(sketch.add_profile(checked(RectangleProfile::create(
+        ProfileId("later.stock"), ParameterId("width"), ParameterId("height"), {60, 0}))));
+    REQUIRE(part.add_sketch(std::move(sketch)));
+    auto feature = checked(Feature::create_additive_extrude(
+        FeatureId("later.base"), "Later stock", SketchId("later.stock"), ParameterId("depth")));
+    REQUIRE(part.add_feature(checked(
+        feature.with_body_result_context(blcad::test::history_fixture::new_body(part, "other")))));
+    REQUIRE(part.add_body_boolean_feature(checked(BodyBooleanFeature::create(
+        FeatureId("consume"), BodyBooleanOperation::Add, BodyId("body.other"),
+        {BodyId("body.base")}, BodyBooleanResultMode::ModifyTarget, std::nullopt, false))));
+    REQUIRE(part.apply_history_intent({{"base", "holes", "later.base", "consume"}, {}}));
+  }
+  return part;
+}
+PartDocument hidden_thread_input(int mode) {
+  auto part = threads::pair_part();
+  REQUIRE(part.add_thread_feature(threads::external()));
+  if (mode == 0)
+    REQUIRE(part.set_body_visibility(BodyId("body.shaft"), BodyVisibility::Hidden));
+  if (mode == 2)
+    REQUIRE(part.add_body_boolean_feature(checked(BodyBooleanFeature::create(
+        FeatureId("consume"), BodyBooleanOperation::Add, BodyId("body.base"),
+        {BodyId("body.shaft")}, BodyBooleanResultMode::ModifyTarget, std::nullopt, false))));
+  return part;
+}
+void hide_input_presentation(ShellWindow& w, int mode, const char* id) {
+  if (mode == 1) {
+    REQUIRE(w.session().set_presentation_visible(std::string("body/") + id, false));
+    w.refresh();
+    settle();
+  }
+}
+double modeled_external_removal() {
+  const double depth = 1;
+  return 4 * std::numbers::pi * depth * depth * std::tan(55 * std::numbers::pi / 360) * 4 / 1.7 *
+         (8. / 4 + depth / 3);
+}
+} // namespace
+
+TEST_CASE("Hole history selectors retain hidden and consumed predecessor targets without changing "
+          "visibility",
+          "[gui][parity-b157][hole-input-history-shell]") {
+  const int mode = GENERATE(0, 1, 2);
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = hidden_hole_input(mode);
+  open(w, dir, part);
+  hide_input_presentation(w, mode, "body.base");
+  const auto before = snapshot(w);
+  if (mode == 2)
+    CHECK_FALSE(w.session().part_shape_cache()->find_body_shape(BodyId("body.base")));
+  begin(w, "holes");
+  auto& target = field<QComboBox>(w, "/target_body");
+  CHECK(target.currentData().toString() == "body.base");
+  CHECK(target.currentText().contains(mode == 2 ? "input history" : "hidden input"));
+  CHECK(target.findData("body.other") == -1);
+  auto& supports = field<QComboBox>(w, "/support");
+  const auto bottom = supports.findData("finishing/face/4:base/bottom");
+  REQUIRE(bottom >= 0);
+  for (int i = 0; i < supports.count(); ++i)
+    CHECK_FALSE(supports.itemData(i).toString().contains("later.stock"));
+  supports.setCurrentIndex(bottom);
+  settle();
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(std::get<SemanticFaceReference>(
+            w.session().part_document()->hole_features().front().support().source())
+            .face() == SemanticFace::Bottom);
+  CHECK(w.session().part_document()->find_body(BodyId("body.base"))->visibility() ==
+        part.find_body(BodyId("body.base"))->visibility());
+  CHECK(w.session().presentation_visible("body/body.base") == (mode != 1));
+  CHECK(volume(w, mode == 2 ? "body.other" : "body.base") ==
+        Catch::Approx((mode == 2 ? 67200 : 38400) - 13.5 * std::numbers::pi).margin(1e-6));
+  replay(w, dir, before);
+}
+
+TEST_CASE(
+    "Thread history selectors use an available predecessor after its result is hidden or consumed",
+    "[gui][parity-b157][hole-input-history-shell]") {
+  const int mode = GENERATE(0, 1, 2);
+  ShellWindow w;
+  QTemporaryDir dir;
+  const auto part = hidden_thread_input(mode);
+  open(w, dir, part);
+  hide_input_presentation(w, mode, "body.shaft");
+  const auto before = snapshot(w);
+  if (mode == 2)
+    CHECK_FALSE(w.session().part_shape_cache()->find_body_shape(BodyId("body.shaft")));
+  begin(w, "external");
+  CHECK(field<QComboBox>(w, "/target_body").currentData().toString() == "body.shaft");
+  CHECK(field<QComboBox>(w, "/target_body")
+            .currentText()
+            .contains(mode == 2 ? "input history" : "hidden input"));
+  REQUIRE(field<QComboBox>(w, "/support").count() > 0);
+  auto& representation = field<QComboBox>(w, "/thread/representation");
+  representation.setCurrentIndex(representation.findData("modeled"));
+  CHECK(snapshot(w) == before);
+  REQUIRE(w.feature_edit_tools().apply());
+  CHECK(w.session().part_document()->find_body(BodyId("body.shaft"))->visibility() ==
+        part.find_body(BodyId("body.shaft"))->visibility());
+  CHECK(w.session().presentation_visible("body/body.shaft") == (mode != 1));
+  CHECK(volume(w, mode == 2 ? "body.base" : "body.shaft") ==
+        Catch::Approx((mode == 2 ? 2560 : 0) + 200 * std::numbers::pi - modeled_external_removal())
+            .margin(2e-4));
+  replay(w, dir, before);
+}
+
+TEST_CASE("Native Hole input picks temporarily expose hidden and consumed geometry and restore it "
+          "on Cancel",
+          "[gui][parity-b157][hole-input-history-shell][native-hole-input-history]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native hidden/predecessor Hole picks");
+  const int mode = GENERATE(0, 2);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, hidden_hole_input(mode));
+  const auto before = snapshot(w);
+  const auto scope = w.viewport().selection_semantic_scope();
+  const auto camera = w.viewport().camera_bookmark();
+  begin(w, "holes");
+  activate(w);
+  w.viewport().set_standard_view(GuiStandardView::Bottom);
+  click(control<QToolButton>(w, "blcad.hole.support.pick"));
+  REQUIRE(w.viewport().feature_preview_active());
+  w.viewport().fit_all();
+  settle();
+  const auto point = checked(w.viewport().model_to_screen({-20, -15, 0}));
+  click_at(w.viewport(), {point.x, point.y});
+  CHECK(field<QComboBox>(w, "/support").currentData() == "finishing/face/4:base/bottom");
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "hole-hidden-input-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.cancel"));
+  CHECK(snapshot(w) == before);
+  CHECK(w.viewport().selection_semantic_scope() == scope);
+  const auto restored_camera = w.viewport().camera_bookmark();
+  CHECK(restored_camera.eye.x == Catch::Approx(camera.eye.x).margin(1e-6));
+  CHECK(restored_camera.eye.y == Catch::Approx(camera.eye.y).margin(1e-6));
+  CHECK(restored_camera.eye.z == Catch::Approx(camera.eye.z).margin(1e-6));
+  CHECK(restored_camera.target.x == Catch::Approx(camera.target.x).margin(1e-6));
+  CHECK(restored_camera.target.y == Catch::Approx(camera.target.y).margin(1e-6));
+  CHECK(restored_camera.target.z == Catch::Approx(camera.target.z).margin(1e-6));
+  CHECK(restored_camera.scale == Catch::Approx(camera.scale).margin(1e-6));
+  CHECK_FALSE(w.viewport().feature_preview_active());
+  CHECK_FALSE(w.session().task().active());
+  CHECK(w.session().part_document()->find_body(BodyId("body.base"))->visibility() ==
+        (mode == 0 ? BodyVisibility::Hidden : BodyVisibility::Visible));
+}
+
+TEST_CASE("Native Thread input picks use the cylinder before later consumption and publish its "
+          "modeled interval once",
+          "[gui][parity-b157][hole-input-history-shell][native-hole-input-history]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native hidden/predecessor Thread picks");
+  const int mode = GENERATE(0, 2);
+  ShellWindow w;
+  QTemporaryDir dir;
+  open(w, dir, hidden_thread_input(mode));
+  const auto before = snapshot(w);
+  begin(w, "external");
+  activate(w);
+  w.viewport().set_standard_view(GuiStandardView::Right);
+  click(control<QToolButton>(w, "blcad.thread.support.pick"));
+  REQUIRE(w.viewport().feature_preview_active());
+  w.viewport().fit_all();
+  settle();
+  const auto point = checked(w.viewport().model_to_screen({35, 0, 4}));
+  click_at(w.viewport(), {point.x, point.y});
+  CHECK_FALSE(control<QToolButton>(w, "blcad.thread.support.pick").isChecked());
+  auto& representation = field<QComboBox>(w, "/thread/representation");
+  representation.setCurrentIndex(representation.findData("modeled"));
+  REQUIRE(control<QPushButton>(w, "blcad.feature_edit.apply").isEnabled());
+  capture(w, "thread-hidden-input-preview");
+  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
+  CHECK(volume(w, mode == 2 ? "body.base" : "body.shaft") ==
+        Catch::Approx((mode == 2 ? 2560 : 0) + 200 * std::numbers::pi - modeled_external_removal())
+            .margin(2e-4));
+  replay(w, dir, before);
 }

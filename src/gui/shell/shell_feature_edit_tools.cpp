@@ -548,7 +548,20 @@ struct ShellFeatureEditTools::Impl {
     return feature_input_cache ? &*feature_input_cache : session.part_shape_cache();
   }
   bool input_body_available(const Body& body) const {
-    return body_available(body) && input_cache() && input_cache()->find_body_shape(body.id());
+    return body.kind() == BodyKind::Solid && input_cache() &&
+           input_cache()->find_body_shape(body.id()) &&
+           (support_editing || (body.visibility() == BodyVisibility::Visible &&
+                                session.presentation_visible("body/" + body.id().value())));
+  }
+  std::string input_body_label(const Body& body) const {
+    if (!support_editing)
+      return body.name();
+    if (body.visibility() == BodyVisibility::Hidden ||
+        !session.presentation_visible("body/" + body.id().value()))
+      return body.name() + " (hidden input)";
+    if (!session.part_shape_cache()->find_body_shape(body.id()))
+      return body.name() + " (input history)";
+    return body.name();
   }
   std::string body_selection_id(const BodyId& body) const {
     return (feature_input_cache ? "feature-input/body/" : "body/") + body.value();
@@ -676,13 +689,17 @@ struct ShellFeatureEditTools::Impl {
     const auto* part = session.part_document();
     const auto* cache = input_cache();
     if (!part || !cache || !part->find_body(body) || !input_body_available(*part->find_body(body)))
-      return Result<std::size_t>::failure(error("Choose a current visible solid target."));
+      return Result<std::size_t>::failure(
+          error(support_editing ? "Choose a Solid available before this feature."
+                                : "Choose a current visible solid target."));
     auto context = make_step_import_context(session);
     if (!context)
       return Result<std::size_t>::failure(context.error());
     auto faces = geometry::FinishingSelectionBuilder::build(
         *part, *cache, body, PartFeatureInputRole::ShellRemovalFace, context.value().get(),
-        feature_input_prefix);
+        feature_input_prefix,
+        support_editing ? geometry::FinishingSelectionVisibility::IncludeHiddenInputs
+                        : geometry::FinishingSelectionVisibility::VisibleOnly);
     if (!faces)
       return Result<std::size_t>::failure(faces.error());
     for (const auto& face : faces.value()) {
@@ -784,7 +801,9 @@ struct ShellFeatureEditTools::Impl {
     const auto* part = session.part_document();
     const auto* cache = input_cache();
     if (!part || !cache || !part->find_body(body) || !input_body_available(*part->find_body(body)))
-      return Result<std::size_t>::failure(error("Choose a current visible solid target."));
+      return Result<std::size_t>::failure(
+          error(support_editing ? "Choose a Solid available before this feature."
+                                : "Choose a current visible solid target."));
     const auto add_plane = [&](const auto& plane, bool construction, const char* prefix) {
       if (!geometry::WorkplaneResolver{}.resolve(*part, DatumPlaneId(plane.id().value()), *cache))
         return;
@@ -811,7 +830,9 @@ struct ShellFeatureEditTools::Impl {
       return Result<std::size_t>::failure(context.error());
     auto faces = geometry::FinishingSelectionBuilder::build(
         *part, *cache, body, PartFeatureInputRole::ShellRemovalFace, context.value().get(),
-        feature_input_prefix);
+        feature_input_prefix,
+        support_editing ? geometry::FinishingSelectionVisibility::IncludeHiddenInputs
+                        : geometry::FinishingSelectionVisibility::VisibleOnly);
     if (!faces)
       return Result<std::size_t>::failure(faces.error());
     for (const auto& face : faces.value())
@@ -878,9 +899,8 @@ struct ShellFeatureEditTools::Impl {
       return Result<std::size_t>::success(0);
     const BodyId body(record.at("target_body").get<std::string>());
     const auto* target = part->find_body(body);
-    if (!target || !body_available(*target))
+    if (!target || target->kind() != BodyKind::Solid)
       return Result<std::size_t>::success(0);
-    support_editing = true;
     auto history = part->executable_history();
     if (!history)
       return Result<std::size_t>::failure(history.error());
@@ -902,6 +922,12 @@ struct ShellFeatureEditTools::Impl {
     if (!evaluated)
       return Result<std::size_t>::failure(evaluated.error());
     feature_input_cache = std::move(cache.value());
+    if (!feature_input_cache->find_body_shape(body)) {
+      feature_input_cache.reset();
+      feature_input_prefix.reset();
+      return Result<std::size_t>::success(0);
+    }
+    support_editing = true;
     auto collected =
         edit.kind() == Kind::Thread ? collect_thread_supports(body) : collect_supports(body);
     support_error = collected ? std::nullopt : std::optional(collected.error());
@@ -949,7 +975,9 @@ struct ShellFeatureEditTools::Impl {
         continue;
       auto faces = geometry::FinishingSelectionBuilder::build(
           *part, *cache, body.id(), PartFeatureInputRole::ShellRemovalFace, context.value().get(),
-          feature_input_prefix);
+          feature_input_prefix,
+          support_editing ? geometry::FinishingSelectionVisibility::IncludeHiddenInputs
+                          : geometry::FinishingSelectionVisibility::VisibleOnly);
       if (!faces)
         return Result<std::size_t>::failure(faces.error());
       for (const auto& face : faces.value()) {
@@ -1028,9 +1056,12 @@ struct ShellFeatureEditTools::Impl {
       return Result<std::size_t>::failure(scoped ? original.error() : scoped.error());
     std::vector<geometry::GeometryShape> shapes;
     std::vector<std::string> replaced;
-    for (const auto& item : scoped.value())
-      if (body_item(item) && session.presentation_visible(item.semantic_id))
-        shapes.push_back(item.shape);
+    // An explicit history edit temporarily exposes its input geometry. Display
+    // filtering belongs to the accepted scene and must not erase hidden or
+    // subsequently consumed predecessors from this disposable picking model.
+    for (const auto& cached : feature_input_cache->body_shapes())
+      if (session.part_document()->find_body(cached.body_id) && !cached.shape.empty())
+        shapes.push_back(cached.shape);
     for (const auto& item : original.value())
       if (body_item(item) || item.kind == geometry::ViewportSceneKind::Datum)
         replaced.push_back(item.semantic_id);
@@ -1248,7 +1279,7 @@ struct ShellFeatureEditTools::Impl {
       if (input_selection() && key == "target_body") {
         for (const auto& body : part.bodies())
           if (input_body_available(body))
-            result.emplace_back(body.id().value(), body.name());
+            result.emplace_back(body.id().value(), input_body_label(body));
       } else
         add(part.bodies());
     } else if (key == "source_feature" || key == "target_feature" || key == "feature") {
@@ -1985,7 +2016,7 @@ struct ShellFeatureEditTools::Impl {
       for (const auto& body : session.part_document()->bodies())
         if (input_body_available(body) &&
             body.id().value() != record.at("target_body").get<std::string>()) {
-          add_choice(input, body.id().value(), body.name());
+          add_choice(input, body.id().value(), input_body_label(body));
           if (limit_chosen &&
               body.id().value() == record.at("extent").at("body").get<std::string>())
             selected = input->count() - 1;
@@ -3388,7 +3419,8 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   p.dynamic_label->setText(p.hole_thread() ? "Canvas Control" : "Dynamic Value");
   p.guidance->setText(
       p.support_editing
-          ? "Picks use the model before this feature. Apply validates the complete downstream "
+          ? "Picks show the model before this feature, including hidden inputs. Apply validates "
+            "the complete downstream "
             "model. "
             "Shared parameters affect every use; formula values require an explicit rebind."
       : p.hole_thread()

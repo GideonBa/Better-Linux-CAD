@@ -22,11 +22,10 @@
 #include <optional>
 
 namespace blcad::geometry {
-Result<std::vector<FinishingSelectionTarget>>
-FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache& cache,
-                                 const BodyId& body, PartFeatureInputRole role,
-                                 StepImportTopologyContext* import_context,
-                                 std::optional<std::size_t> history_prefix) {
+Result<std::vector<FinishingSelectionTarget>> FinishingSelectionBuilder::build(
+    const PartDocument& document, const ShapeCache& cache, const BodyId& body,
+    PartFeatureInputRole role, StepImportTopologyContext* import_context,
+    std::optional<std::size_t> history_prefix, FinishingSelectionVisibility visibility) {
   const auto history = detail::validate_history_modeling_scope(document, cache, history_prefix);
   if (!history)
     return Result<std::vector<FinishingSelectionTarget>>::failure(history.error());
@@ -39,9 +38,14 @@ FinishingSelectionBuilder::build(const PartDocument& document, const ShapeCache&
   const auto* result = cache.find_body_result(body);
   const auto* target_body = document.find_body(body);
   if (!result || !target_body || target_body->kind() != BodyKind::Solid ||
-      target_body->visibility() != BodyVisibility::Visible || result->shape.empty())
-    return Result<std::vector<FinishingSelectionTarget>>::failure(
-        Error::validation(body.value(), "finishing requires a visible, recomputed solid Body"));
+      (visibility == FinishingSelectionVisibility::VisibleOnly &&
+       target_body->visibility() != BodyVisibility::Visible) ||
+      result->shape.empty())
+    return Result<std::vector<FinishingSelectionTarget>>::failure(Error::validation(
+        body.value(),
+        visibility == FinishingSelectionVisibility::VisibleOnly
+            ? "finishing requires a visible, recomputed solid Body"
+            : "input selection requires a recomputed solid Body in its modeling scope"));
   const auto& target = result->shape.impl_->shape;
   if (!document.imported_body_features().empty()) {
     auto observed = observe_imported_part_sources(document, import_context);

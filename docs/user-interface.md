@@ -314,6 +314,12 @@ support bindings and the independent center/origin snapshot; Apply converts once
 the legacy cut. Unsupported profiles/consumers give a diagnostic while ordinary Edit Feature remains
 available. The [conversion contract](hole-wizard.md#explicit-legacy-conversion--157b3) owns the complete
 Part prerequisite and supported mapping boundary.
+
+An existing Hole/Thread can select supports on hidden or subsequently consumed Bodies from its
+pre-feature input model. Labels identify these inputs; picking temporarily shows them without
+changing model visibility. Normal preview/Apply checks the complete result, and Cancel restores
+the entry view. The [input-history contract](hole-wizard.md#hidden-and-consumed-input-bodies--157b3)
+owns this scope; prefix/enclosing-workflow extensions remain assigned.
 Hole position controls choose independent support-local points or existing scoped Sketch points.
 They retain placement identity across source changes and support actual point picking. Edit Source
 Sketch and the return breadcrumb use the same Sketch workspace as the shared feature workflow;

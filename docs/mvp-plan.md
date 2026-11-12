@@ -456,7 +456,8 @@ No 157B3 or parent acceptance is claimed while the remaining rows are open.
 | Support-anchored interaction — implemented and verified | Shared Linear/Radial controls for owned positions, bore/seat/step dimensions, depth and Thread intervals. Candidate predecessor geometry supplies the support, and current Body placements supply the posed frame/value scale. Explicit Make Independent retains shared/formula sources. Focused Qt/manipulator/source/editor regression: 28 passed, 5 native skips / 2,428 assertions. Geometry inverse/Body-transform/result-face/support regression: 21 cases / 1,195 assertions. Native: 12 cases / 1,111 assertions at each scale (150% disjoint 11+1 runs). |
 | Property presets — implemented and verified | Canonical Core value templates, literal dimensional snapshots/aliases and immutable pinned revisions; retain current targets/support/positions/limits/profile, publish only required new inputs and report conflicts without replacing a valid draft. Typed/storage and shell regression is included in the 144-case selection below; native preset/canvas/source/repeat regression passes 10 cases / 824 assertions at both scales. [Contract](hole-wizard.md#property-presets--157b3). |
 | Explicit legacy conversion — implemented and verified | Compatible circle cuts stage a canonical Hole in the existing Part workflow; retain feature/history identity and diameter/support bindings, disclose independent center/origin values, validate downstream execution/common material, preserve supported Pattern/pose mappings or report a diagnostic. Full Core, focused Geometry, 175-case Qt regression and 14-case native regression at both scales verify the replacement, diagnostics, context restoration and exact history. [Contract](hole-wizard.md#explicit-legacy-conversion--157b3). |
-| Shared contexts — open | Complete hidden/consumed/prefix and shared-context lifecycle against existing session/history authorities. |
+| Hidden/consumed predecessor inputs — implemented and verified | Determine edit availability from the exact predecessor cache, disclose hidden/input-history Bodies, temporarily expose their pick geometry without changing visibility and validate complete downstream edits. Focused Geometry: 11 cases / 801 assertions; Qt input history: 2 passed, 2 native skips / 246 assertions. Relevant Qt regression: 82 passed, 15 skips / 6,200 assertions. Native picks/support/limit/context: 7 cases / 763 assertions at both scales. [Contract](hole-wizard.md#hidden-and-consumed-input-bodies--157b3). |
+| Prefix and shared contexts — open | Complete prefix child-command/source-return lifecycle and workspace/read-only/stale-command guards against existing session/history authorities, preserving enclosing workflows. |
 
 The conversion component uses the existing disposable Part workflow and canonical Core codec.
 The conversion proof below closes this named component; complete extended shared-context lifecycle next.
@@ -494,6 +495,18 @@ All 155 current GUI/app dependency records are valid and nonempty. Runtime manif
 SHA256 `6a3d8ec92ad74bb6e21982ff74443f328f60de56017b2b3a2623b9127e58eeb6`.
 The final GUI-only Cancel-context correction retains identical Core/Geometry/support inputs and
 Core/Geometry/export binaries, so the Core/Geometry proofs above remain current.
+
+Final hidden/consumed-input proof uses frozen runtime inputs. Focused Geometry
+visibility/finishing/support regression passes **11 cases / 801 assertions**; its inputs/binary remain
+unchanged after the GUI-only fixture history correction. Focused Qt passes **4 cases: 2 passed,
+2 native skips / 246 assertions**. Native input/support/source/limit/conversion-context regression
+passes **7 cases / 763 assertions at each of 100% and compact 150%**. The broader relevant Qt
+regression passes **97 cases: 82 passed, 15 native skips / 6,200 assertions**. The final app opens a PID-matched, viewable native window; bounded startup intentionally exits 124.
+Working/staged diffs, documentation links, manifest and binary hashes are checked before delivery. These are focused results,
+not full Geometry/Qt or parent acceptance. Core inputs (303 paths) and its full-suite binary remain
+unchanged from the preceding delivery; no new full Core run is claimed. All 155 current GUI/app
+dependency records are valid and nonempty. Manifest: **1,062 files**, SHA256
+`220e113b4acdcb2a4501e73db4cf4fc3a30a3862cb58a7fc95511e4659d68b94`.
 
 For every coherent change, synchronize the existing Hole/Feature-edit/UI/persistence contracts,
 run focused regressions and native 100%/compact 150% as applicable, review, commit and push. Then
