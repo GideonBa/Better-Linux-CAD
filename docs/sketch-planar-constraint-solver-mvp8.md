@@ -152,6 +152,34 @@ the residual switches to perpendicularity of the line to the radius there
 (`distance² − radius²`) shared the point-on-circle radial gradient at the solution and left that coupled
 system degenerate, so the solver crept to the iteration limit and reported `non_convergent`.
 
+## Planned Block 159 Smooth/G2
+
+This is the next backend design, not implemented status. Native Smooth authoring belongs to 162.
+Reuse the existing point/entity target system with ordered targets **curve A, endpoint A, curve B,
+endpoint B**. Curve identities differ, at least one operand is a spline, and the named point must
+unambiguously select an endpoint of its line, arc or spline. Shared endpoint IDs remain valid;
+coordinate proximity never chooses persistent junction identity.
+
+Let `T` be the regular unit tangent pointing from the junction into each curve and
+`K = (C'' − T(T·C'')) / |C'|²` its curvature vector. Use the current characteristic length `L`:
+
+```text
+G0  (endpointA − endpointB) / L
+G1  TA + TB
+G2  L × (KA − KB)
+```
+
+The existing exact-coincidence projection owns G0 equality; the unprojected final Jacobian still
+owns rank. Curvature vectors survive regular parameter-speed changes and curve reversal; equal
+unsigned radii alone cannot certify the junction. A regular line/inflection has zero curvature.
+Zero-speed spline endpoints and degenerate arcs fail explicitly instead of producing fabricated
+zero curvature. Preserve existing Tangent behavior and numeric diagnostic/acceptance policies.
+
+Extend the current constraint sidecar to version 2 when Smooth is present, retain version-1 output
+without it and continue reading historical records. Solved points, derivative samples, residuals,
+rank and diagnostics remain derived. S01 requires independent polynomial/conic derivatives,
+reversal/scaling, fixed/driving constraints, redundancy/conflict and accepted-catalog drag proofs.
+
 ## Characteristic scale and degeneracy policy
 
 The characteristic length is derived deterministically from topology extents with a positive floor.

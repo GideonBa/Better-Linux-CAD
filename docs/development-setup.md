@@ -224,6 +224,39 @@ complete history latency; a queued zero-timer is not physical pointer latency. F
 is excluded. `[complex-part-sequence]` remains an ordinary correctness gate, with empty-cache oracles.
 Geometry test support owns direct OCCT headers; do not add them to the GUI test target.
 
+Block 158 also provides the opt-in `blcad_phase_b_profile` executable. It is built with Geometry
+tests and is not registered as a correctness/CTest case. After correctness, run it alone with a
+verified runtime-manifest digest and the actual executable digest. For example, from the repository
+root, the same manifest policy includes tracked and untracked runtime inputs:
+
+```bash
+cmake --build --preset dev-gui --target blcad_phase_b_profile
+BLCAD_PHASE_B_RUNTIME_SHA=$(python3 - <<'PY'
+import hashlib, json, pathlib, subprocess
+roots = ['src', 'include', 'tests', 'assets', 'cmake', 'CMakeLists.txt', 'CMakePresets.json']
+paths = sorted(set(subprocess.check_output(
+    ['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', *roots]
+).decode().split('\0')) - {''})
+manifest = {name: hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest() for name in paths}
+data = json.dumps(manifest, sort_keys=True, indent=2) + '\n'
+pathlib.Path('/tmp/blcad-phase-b-runtime.json').write_text(data)
+print(hashlib.sha256(data.encode()).hexdigest())
+PY
+)
+BLCAD_PHASE_B_EXECUTABLE_SHA=$(sha256sum build/dev-gui/blcad_phase_b_profile | cut -d ' ' -f 1)
+./build/dev-gui/blcad_phase_b_profile /tmp/blcad-phase-b-profile.json \
+  "$BLCAD_PHASE_B_RUNTIME_SHA" "$BLCAD_PHASE_B_EXECUTABLE_SHA"
+```
+
+It changes the shared Core fixture's diameter from **3 mm to 4 mm**, recording fresh and migrated
+inputs, initial seeding, the first measured pair and six
+repeats in alternating execution order, physical equivalence, executed-feature/reuse diagnostics,
+and source/build/compiler/OCCT/OS/CPU identity. Paired clocks enclose synchronous executor calls;
+external mutation, planning, cache copies, oracles and IO are excluded. Hole/Thread changed-node
+execution currently uses the complete-history fallback. These are Geometry measurements, with no
+portable budget or UI/pointer-latency claim. Keep separate-process raw samples and the frozen
+runtime/binary identity with the [158 contract](hole-wizard.md#phase-ab-integration--158-design).
+
 For the existing Extrude UI baseline, execute `[workflow-interaction-baseline]` alone in three
 separate native processes with distinct `BLCAD_WORKFLOW_INTERACTION_BASELINE` JSON output paths.
 Each measures its first workflow and ten reused-window trials; synchronous Qt input, kernel work

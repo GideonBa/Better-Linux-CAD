@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 157
-current_block: 158
-current_boundary: Block 157 delivered; Block 158 integrated acceptance in progress
-current_tag: "[parity-b158]"
+implemented_through: Block 158
+current_block: 159
+current_boundary: Phase A/B integrated acceptance verified; Block 159 backend planned
+current_tag: "[parity-b159]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–157 accepted; Block 158 in progress; Blocks 159–204 planned"
+  advanced_modeling_workflows: "Blocks 145–158 accepted; Blocks 159–204 planned"
 ---
 
 # MVP Plan
@@ -34,13 +34,13 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 157
-current block        Block 158 (in progress)
-current phase        Everyday modeling integrated acceptance
-current boundary     Hole/Thread authoring and combined native acceptance verified; 158 integration remains
+implemented through  Block 158
+current block        Block 159 (planned)
+current phase        Planar and spatial sketch extensions
+current boundary     Phase A/B integrated acceptance verified; serial PR delivery pending
 ```
 
-The next assigned work is Block 158. [The consolidated sequence](inventor-parity-sequence.md)
+The next assigned work is Block 159. [The consolidated sequence](inventor-parity-sequence.md)
 contains dependencies and implementation criteria; [the test plan](inventor-parity-test-plan.md)
 contains individual and combined acceptance; [the UI contract](user-interface.md) owns the
 Inventor-like workflows and layout. These plans retain their full unimplemented scope.
@@ -63,7 +63,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | --- | --- |
 | 156 | Delivered in PR #175: shared placements, Hole consumers, full suites, native 100%/150% and startup verified. |
 | 157 | Delivered in PR #181: semantic Hole/Thread creation/editing, explicit conversion, presets and native B01–B04/UI01. |
-| 158 | Phase A/B integrated acceptance, exact history/reopen/STEP and incremental-versus-fresh measurements. |
+| 158 | Verified in PR #182: full suites, fresh/migrated native history/STEP and isolated recompute measurements; normal delivery pending. |
 | 159 | Persistent oriented planar G2 constraints, solver/drag integration and independent S01 derivative/rank oracles. |
 | 160–161 | Safe typed equation intent/persistence, then tolerance-controlled Geometry and real downstream S02/G01 consumers. |
 | 162 | Native Smooth/equation authoring, conflict correction, closed profiles and persisted history. |
@@ -153,8 +153,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–156 are **Implemented and accepted**;
-Block 157 is **In progress**; Blocks 158–204 are **Planned; not started**.
+Status authority: Blocks 145–158 are **Implemented and accepted**;
+Blocks 159–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -165,7 +165,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | Phase | Blocks | Assigned scope | Status |
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
-| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | 152–156 accepted; 157 in progress; 158 planned |
+| B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
@@ -202,10 +202,12 @@ PR links preserve individual slice provenance without copying intermediate compl
 | 154 | Counterbore/countersink/spotface/stepped/fitted/reamed/center/slot intent, table/parameter/resource integration and Part V5 persistence; physical seats/steps/cones/slots and stable seat/step/curve roots | [Hole](hole-wizard.md), [file format](file-format.md); B02 combined acceptance | [170](https://github.com/GideonBa/Better-Linux-CAD/pull/170) |
 | 155 | Shared internal/external Thread definitions, Part V6/Project snapshots and resource/history integration; cosmetic invariance/derived graphics and checked ideal-V helical cuts with explicit limits | [Hole/Thread](hole-wizard.md), [file format](file-format.md); B03 first gate, native authoring completion remains 157 | [172](https://github.com/GideonBa/Better-Linux-CAD/pull/172), [173](https://github.com/GideonBa/Better-Linux-CAD/pull/173), [174](https://github.com/GideonBa/Better-Linux-CAD/pull/174) |
 | 156 | Shared two-direction placements, dormant exclusions and Part V7; physical Hole operation copies, per-instance axes/seats and Assembly consumers; current Pattern authoring with stable checkbox rows | [Pattern](part-pattern-core-mvp6.md), [Hole](hole-wizard.md), [Pattern UI](gui-interactive-pattern-body-mvp9.md); B04 / native 100%–150% | [175](https://github.com/GideonBa/Better-Linux-CAD/pull/175) |
+| 157 | Shared semantic Hole/Thread creation/editing, presets/repeat, explicit legacy conversion, keyboard/source return and complete B01–B04/UI01 native acceptance | [Hole workflow](hole-wizard.md#whole-workflow-acceptance--157c) | [181](https://github.com/GideonBa/Better-Linux-CAD/pull/181) and its serial component PRs |
+| 158 / Phase B closure | Fresh/migrated Phase A/B integration, physical history/Assembly/STEP, fractional native picking correction and isolated recompute evidence | [Integrated contract/proof](hole-wizard.md#phase-ab-integration--158-design), [raw measurements](benchmarks/block158-phase-ab-recompute.json) | [182](https://github.com/GideonBa/Better-Linux-CAD/pull/182), verified; normal delivery pending |
 
 The initial full parity plan was delivered in [PR #138](https://github.com/GideonBa/Better-Linux-CAD/pull/138).
 
-### Latest implementation acceptance — Block 156, 2026-11-11
+### Block 156 delivery record — 2026-11-11
 
 Shared linear/circular placement intent, stable logical exclusions and per-copy Hole consumers are
 accepted within the [Hole execution limits](hole-wizard.md#shared-placement-execution-and-assembly-consumers-156).
@@ -521,23 +523,40 @@ A/B integration with suppression/reorder/finishing/mass/Assembly/STEP, and isola
 versus-fresh measurements. Continue through the assigned 159–165 implementations afterwards;
 all 166–204 planning remains intact.
 
-### Block 158 integration plan
+### Block 158 integrated acceptance — 2026-11-13
 
-`feat/everyday-modeling-acceptance` starts from verified merged `ad85b28`. Block 157 is delivered;
-158 remains open until every Phase A/B integration gate and measurement below is complete. The
-[bounded integration design](hole-wizard.md#phase-ab-integration--158-design) owns exact scenario,
-compatibility, failure and measurement boundaries. No new persistent feature/schema authority is
-planned; discovered behavior fixes require focused proof and synchronized existing contracts.
+`feat/everyday-modeling-acceptance` starts from verified merged `ad85b28`. Whole 158 is verified
+within the [integrated contract](hole-wizard.md#phase-ab-integration--158-design): fresh and pre-Hole
+V3 migration, finishing, suppression/reorder, material mass, exact history/reopen, bound Assembly
+and physical STEP/reimport. The compact native edge miss is fixed without changing persistence.
 
-| Step | Completion boundary |
+| Gate | Final result |
 | --- | --- |
-| 158A — in progress | Fresh and pre-Hole V3 migrated inputs through current Hole/Thread, Pattern, outer-edge Fillet/Chamfer, suppression/restore/reorder, material mass, bound Assembly targets and physical structured STEP/reimport; exact failure/history/reopen oracles. Shared Geometry fixture and affected regression verified in the linked contract; native chain remains open. |
-| 158B — in progress | Full Core/Geometry verified. Fractional native-pick correction and relevant picking regressions pass at both scales; full Qt is running on the corrected binary. Complete native fresh/migrated integration at both scales, final captures/startup and required-skip reconciliation. |
-| 158C — in progress | Standalone opt-in profiler built; isolated incremental-versus-empty-cache samples, physical equivalence and raw environment/source/binary records remain unmeasured. Review, commit/push and normal protected delivery remain open. |
+| Full Core / Geometry | 708 / 27,016 and 682 / 58,224; passed, no skips; unchanged input/binary closure retained |
+| Full Qt | 896 cases: 829 passed / 67 native-only skips; 101,149 assertions; exit 0 |
+| Native integration + Hole/Thread, 100% and compact 150% | 44 / 6,495 at each scale; no skips |
+| Native fractional finishing / relevant picking | 1 / 138 and 14 / 2,514 at each scale; no skips |
+| Required skips, captures and app startup | All 26 retained required cases execute at each scale; 41/67 offscreen skips covered across native selections. Original captures reviewed; separate PID-matched visible startup, intentional timeout 124. |
+| Isolated recompute | Three processes, 18 repeats/variant plus separate first pairs/seeds; independent material/cache checks pass. Plan/empty-cache repeated medians: fresh 506.1/500.5 ms, migrated 533.8/533.2 ms. Existing full-history fallback, no speedup claim. |
+| Frozen runtime | 1,065 files; SHA256 `2390a7d153bf2c8927586e94ae5b9146aa45b45d7919f21f538b6386fad533c7`; [complete inventory/raw measurements](benchmarks/block158-phase-ab-recompute.json) |
 
-Record concise proof links/results here and in the existing contracts. After whole-158 acceptance
-and merged delivery, refresh Main before starting 159; the complete 159–165 assignment and all
-later planning remain unchanged.
+Delivery: [PR #182](https://github.com/GideonBa/Better-Linux-CAD/pull/182), final review/normal merge
+pending. Refresh and verify Main after merged delivery before starting 159. The complete 159–165
+assignment and all later planning remain unchanged.
+
+### Block 159 backend preparation — planned
+
+Start its implementation branch only after whole 158 is merged and Main is refreshed. The
+[planar solver contract](sketch-planar-constraint-solver-mvp8.md#planned-block-159-smoothg2)
+records the proposed oriented endpoint equations and persistence boundary; native authoring remains
+162. No 159 implementation or acceptance is claimed here.
+
+| Step | Planned completion boundary |
+| --- | --- |
+| Intent and endpoint math | Explicit ordered curve/endpoint targets reusing current entity/point IDs; versioned existing constraint sidecar; regular rational-spline, arc and line differentials with independent analytic oracles. |
+| Numeric solve | Exact G0 through current equality groups, oriented tangent and curvature-vector residuals, existing normalized deterministic solve, final rank/DOF and conflict/redundancy attribution. |
+| Existing consumers | Accepted constraint/dimension catalogs and solver-backed drag keep the same G2 intent through exact release, rejected candidates, Undo/Redo and reopen; preserve historical G1 behavior. |
+| Whole-159 proof | S01 polynomial/rational/reversed/scaled and degenerate/inflection cases, fixed/driving and local-rank oracles, catalog/drag regression, synchronized contracts and normal serial PR delivery. |
 
 ## Later phases
 

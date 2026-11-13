@@ -1,10 +1,10 @@
 # Hole Wizard
 
 Status: supported semantic Part Hole/Thread intent, execution and shared property authoring are
-accepted through 157; [the final workflow proof](#whole-workflow-acceptance--157c) records the
+accepted through 158; [the integrated proof](#phase-ab-integration--158-design) records the
 current boundary. Numbered implementation and delivery status belong to `mvp-plan.md`. Earlier
 staged sections retain their original component boundaries; conceptual and coordinated Assembly
-scope remains assigned to later blocks. Whole Phase A/B integration remains 158.
+scope remains assigned to later blocks. Phase A/B integration is verified below.
 
 Execution planning is consolidated in [Blocks 152–157 and 196–198](inventor-parity-sequence.md).
 Blocks 149–151 own shared revisioned resources/materials; Block 156 owns integration with the existing
@@ -1086,8 +1086,8 @@ The strict `[shell-coverage]` command/API/proof audit passes **5 cases / 705 ass
 after promoting only Hole and Thread under the completed 157 GUI owner. All other capability data,
 including every later planned capability, is unchanged.
 
-These are whole-157 workflow proofs. Block 158 still owns complete Phase A/B integrated acceptance,
-full suites, migrated/fresh fixtures, suppression/reorder/finishing and isolated recompute timings.
+These are whole-157 workflow proofs. The following integrated proof adds complete Phase A/B
+acceptance, full suites, migrated/fresh fixtures, suppression/reorder/finishing and isolated timings.
 
 ### Phase A/B integration — 158 design
 
@@ -1124,14 +1124,9 @@ variant retains a separate 2 mm through cut at `(30,20)`, subtracting another `8
 independent 4 × 6 × 2 mm Body contributes **48 mm³** to physical mass while keeping its own result.
 Cosmetic thread metadata leaves these material oracles unchanged. Material-point samples check
 rounded/chamfered corners, retained/excluded bores and the legacy cut independently of volume.
-`[phase-b-integration]` passes **1 case / 98 assertions** across fresh/migrated variants. Together
-with existing Thread-Pattern, finishing and B04 Assembly/physical STEP regressions, the completed
-selection passes **4 cases / 306 assertions**, no skips, exit 0. Sources are the
-[shared fixture](../tests/support/phase_b_acceptance_fixture.hpp) and
-[Geometry combination tests](../tests/geometry/hole_pattern_combined_tests.cpp). Frozen runtime:
-**1,064 files**, SHA256 `5a2173d6ad0d3029c9b1c181443ef1d55eba6c34e7c6b38ddf493b3283f64fad`.
-The earlier failed expectation run contributes no proof. Native integration, full suites and
-isolated measurements remain open; this fixture alone does not close 158.
+The [shared fixture](../tests/support/phase_b_acceptance_fixture.hpp) and
+[Geometry combinations](../tests/geometry/hole_pattern_combined_tests.cpp) verify these independent
+oracles against incremental and empty-cache execution; the full Geometry suite includes them.
 
 Front is +Y and Back is −Y under the existing rectangular semantic-frame contract. Hole/Thread
 parameter changes currently send `execute_plan` through complete history execution; unchanged
@@ -1146,23 +1141,50 @@ History before assembling/exporting. Its record and Undo/Redo remain intact. Ear
 checks include the hidden **48 mm³**; subsequent Assembly mass excludes the explicitly suppressed
 Body. No implicit Body selection or new multi-body Assembly export policy is introduced.
 
-Run recompute measurements only after correctness and in isolation from builds or other tests.
-Record first-call and repeated raw samples, source/runtime/binary/build/OCCT/CPU identity and exact
-measurement boundaries. Compare the same changed document through the existing plan/cache path
-and an empty cache. Label Geometry-only measurements explicitly, excluding setup, file IO and UI
-history; make no portable timing-budget or pointer-latency claim. Full Core/Geometry/Qt and native
-fresh/migrated 100%/compact 150%, reviewed captures and startup are required before whole-158
-acceptance. The numbered plan owns progress and serial delivery.
+The final frozen runtime contains **1,065 files**, SHA256
+`2390a7d153bf2c8927586e94ae5b9146aa45b45d7919f21f538b6386fad533c7`.
+Full Core passes **708 cases / 27,016 assertions** and full Geometry **682 / 58,224**, exit 0;
+unchanged inputs and executable hashes retain those results through the GUI-only corrections.
+Full Qt on the final binary passes **896 cases** (**829 passed, 67 native-only skips**) and
+**101,149 assertions**, exit 0. The common native integration/Hole/Thread closure passes
+**44 cases / 6,495 assertions at each of 100% and compact 150%**, without skips, including both
+complete fresh/migrated chains. The [native acceptance source](../tests/gui/gui_shell_hole_thread_acceptance_tests.cpp)
+owns exact history, failure, Assembly and physical STEP/reimport assertions.
 
-Full Core passes **708 cases / 27,016 assertions** and full Geometry **682 cases / 58,224
-assertions**, exit 0; their inputs remain unchanged. Compact native integration exposed a missed
-thin edge caused by rounding DIP before DPR scaling. The
+Compact integration exposed a thin-edge miss caused by rounding DIP before DPR scaling. The
 [viewport correction](gui-viewport-manipulators-mvp9.md#native-projection-precision--2026-10-24)
-passes its focused fresh/migrated **1-case / 138-assertion** regression and the relevant
-**14-case / 2,514-assertion** native picking regression at both **100% and 150%**, without skips.
-Original compact captures are reviewed. Full Qt is running on the corrected binary; the complete
-native integration at both scales, final captures/startup and isolated raw measurements remain
-open. No whole-158 acceptance or full native-suite coverage is claimed.
+passes its fresh/migrated **1-case / 138-assertion** regression and the relevant
+**14-case / 2,514-assertion** native picking regression at both scales, without skips. Across the
+three native selections, **41 of the 67** offscreen-skipped case names execute at each scale,
+including all **26** required native cases retained from 157. This establishes the required
+integration scope; it does not establish full native-suite coverage.
+
+Original final captures are reviewed: [fresh Fillet](images/phase-ab-fillet-native.png),
+[compact solved Assembly](images/phase-ab-assembly-compact.png) and
+[compact migrated STEP reopen](images/phase-ab-migrated-step-native.png). The separate app startup
+has a PID-matched visible X11 window and intentional six-second timeout **124**.
+
+[Raw recompute evidence](benchmarks/block158-phase-ab-recompute.json) retains three sequential,
+separate processes after correctness, complete runtime inventory, executable/source intent hashes,
+Debug/GCC **13.3.0**, OCCT **7.6.3**, Linux/x86-64 and **i7-1370P / 20 hardware threads**.
+The [opt-in profiler](../tests/geometry/phase_b_recompute_profile.cpp) changes diameter **3→4 mm**;
+physical base/hidden-Body volumes, complete cache validation and unchanged source/seed all pass.
+Each process records a separate seed, first measured pair and six repeats per variant, alternating
+execution order. Clocks enclose synchronous executor calls only; setup, mutation, plan creation,
+cache copying, external assertions and IO are excluded. Reproduction is in
+[development setup](development-setup.md#performance-measurements).
+
+| Variant | First pair median, plan / empty cache (3 each) | Repeated median, plan / empty cache (18 each) | Repeated plan min–max |
+| --- | --- | --- | --- |
+| Fresh | 565.9 / 522.2 ms | 506.1 / 500.5 ms | 488.8–632.3 ms |
+| Migrated V3 | 550.1 / 531.2 ms | 533.8 / 533.2 ms | 528.4–569.7 ms |
+
+Fresh seed median is **498.3 ms**; migrated seed median **560.7 ms** follows the fresh workload.
+Plan and empty-cache execution both run all **6 / 7 features** respectively, with no complete-result
+reuse. Ratios **1.011 / 1.001** reflect the current conservative Hole/Thread fallback, with no
+observed speedup. These are local Geometry measurements, without a portable budget, UI/history
+latency or pointer-latency claim. Whole-158 acceptance and serial delivery belong to the numbered
+plan; all advanced modeling scope remains assigned to later blocks.
 
 ## Why more than a cut
 

@@ -698,8 +698,15 @@ if(BLCAD_BUILD_TESTS)
     target_include_directories(blcad_geometry_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/geometry)
     target_include_directories(blcad_geometry_tests SYSTEM PRIVATE ${OpenCASCADE_INCLUDE_DIR})
 
+    add_executable(blcad_phase_b_profile tests/geometry/phase_b_recompute_profile.cpp)
+    target_link_libraries(blcad_phase_b_profile PRIVATE BLCAD::geometry)
+    target_compile_definitions(blcad_phase_b_profile PRIVATE
+      BLCAD_PHASE_B_PROFILE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
+      BLCAD_PHASE_B_PROFILE_OCCT_VERSION="${OpenCASCADE_MAJOR_VERSION}.${OpenCASCADE_MINOR_VERSION}.${OpenCASCADE_MAINTENANCE_VERSION}")
+
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
       target_compile_options(blcad_geometry_tests PRIVATE -Wall -Wextra -Wpedantic)
+      target_compile_options(blcad_phase_b_profile PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
     catch_discover_tests(blcad_geometry_tests TEST_SPEC "~[step-import-profile]")
