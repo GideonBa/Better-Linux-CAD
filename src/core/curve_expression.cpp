@@ -8,7 +8,7 @@
 #include <utility>
 
 namespace blcad {
-namespace detail {
+namespace curve_expression_detail {
 enum class CurveOp {
   Constant,
   Variable,
@@ -43,11 +43,11 @@ struct CurveExpressionData {
   std::optional<DocumentId> document;
   std::string object_id;
 };
-} // namespace detail
+} // namespace curve_expression_detail
 namespace {
-using detail::CurveExpressionData;
-using detail::CurveExpressionNode;
-using detail::CurveOp;
+using curve_expression_detail::CurveExpressionData;
+using curve_expression_detail::CurveExpressionNode;
+using curve_expression_detail::CurveOp;
 bool letter(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }

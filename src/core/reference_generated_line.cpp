@@ -87,7 +87,8 @@ Result<std::size_t> Sketch::add_reference(ReferenceGeneratedLine line_reference)
   if (find_line_segment(line_reference.id()) != nullptr ||
       find_projected_point(line_reference.id()) != nullptr ||
       find_projected_line(line_reference.id()) != nullptr ||
-      find_reference_generated_line(line_reference.id()) != nullptr) {
+      find_reference_generated_line(line_reference.id()) != nullptr ||
+      find_equation_curve(line_reference.id()) != nullptr) {
     return Result<std::size_t>::failure(Error::validation(
         line_reference.id().value(), "reference-generated line id must be unique within sketch"));
   }

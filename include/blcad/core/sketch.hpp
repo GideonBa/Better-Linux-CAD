@@ -1,10 +1,11 @@
 #pragma once
 
 #include "blcad/core/datum_plane.hpp"
+#include "blcad/core/equation_curve.hpp"
 #include "blcad/core/id.hpp"
+#include "blcad/core/rational_bezier.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/spatial.hpp"
-#include "blcad/core/rational_bezier.hpp"
 
 #include <cstddef>
 #include <optional>
@@ -505,6 +506,13 @@ public:
   [[nodiscard]] Result<std::size_t> add_entity(LineSegment line_segment);
   [[nodiscard]] Result<std::size_t> add_entity(ArcSegment arc_segment);
   [[nodiscard]] Result<std::size_t> add_entity(SplineSegment spline_segment);
+  [[nodiscard]] Result<std::size_t> add_entity(EquationCurve curve);
+  [[nodiscard]] Result<std::size_t> replace_equation_curve(EquationCurve curve);
+  [[nodiscard]] Result<std::size_t> remove_equation_curve(SketchEntityId id);
+  [[nodiscard]] const std::vector<EquationCurve>& equation_curves() const noexcept {
+    return equation_curves_;
+  }
+  [[nodiscard]] const EquationCurve* find_equation_curve(SketchEntityId id) const noexcept;
   [[nodiscard]] Result<std::size_t> add_entity(SketchPoint point);
   [[nodiscard]] Result<std::size_t> add_reference(ProjectedSketchPoint point_reference);
   [[nodiscard]] Result<std::size_t> add_reference(ProjectedSketchLine line_reference);
@@ -613,6 +621,7 @@ private:
   std::vector<LineSegment> line_segments_;
   std::vector<ArcSegment> arc_segments_;
   std::vector<SplineSegment> spline_segments_;
+  std::vector<EquationCurve> equation_curves_;
   std::vector<SketchPoint> points_;
   std::vector<ProjectedSketchPoint> projected_points_;
   std::vector<ProjectedSketchLine> projected_lines_;

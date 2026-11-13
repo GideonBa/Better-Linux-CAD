@@ -253,6 +253,13 @@ public:
   [[nodiscard]] Result<std::size_t> add_arc(SketchArc3D arc);
   [[nodiscard]] Result<std::size_t> add_spline(SketchSpline3D spline);
   [[nodiscard]] Result<std::size_t> add_helix(SketchHelix3D helix);
+  [[nodiscard]] Result<std::size_t> add_equation_curve(EquationCurve curve);
+  [[nodiscard]] Result<std::size_t> replace_equation_curve(EquationCurve curve);
+  [[nodiscard]] Result<std::size_t> remove_equation_curve(SketchEntityId id);
+  [[nodiscard]] const std::vector<EquationCurve>& equation_curves() const noexcept {
+    return equation_curves_;
+  }
+  [[nodiscard]] const EquationCurve* find_equation_curve(SketchEntityId id) const noexcept;
   [[nodiscard]] Result<std::size_t> add_guide_curve(SketchGuideCurve3D guide_curve);
   [[nodiscard]] Result<std::size_t> remove_point(SketchEntityId id);
   [[nodiscard]] Result<std::size_t> remove_line(SketchEntityId id);
@@ -299,6 +306,7 @@ private:
   std::vector<SketchArc3D> arcs_;
   std::vector<SketchSpline3D> splines_;
   std::vector<SketchHelix3D> helices_;
+  std::vector<EquationCurve> equation_curves_;
   std::vector<SketchGuideCurve3D> guide_curves_;
 };
 

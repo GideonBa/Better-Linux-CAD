@@ -484,7 +484,8 @@ Result<std::size_t> Sketch::add_entity(ArcSegment arc_segment) {
       find_spline_segment(arc_segment.id()) != nullptr ||
       find_projected_point(arc_segment.id()) != nullptr ||
       find_projected_line(arc_segment.id()) != nullptr ||
-      find_reference_generated_line(arc_segment.id()) != nullptr)
+      find_reference_generated_line(arc_segment.id()) != nullptr ||
+      find_equation_curve(arc_segment.id()) != nullptr)
     return Result<std::size_t>::failure(validation_error(
         arc_segment.id().value(), "sketch entity id must be unique within sketch"));
   arc_segments_.push_back(std::move(arc_segment));
@@ -496,7 +497,8 @@ Result<std::size_t> Sketch::add_entity(SplineSegment spline_segment) {
       find_spline_segment(spline_segment.id()) != nullptr ||
       find_projected_point(spline_segment.id()) != nullptr ||
       find_projected_line(spline_segment.id()) != nullptr ||
-      find_reference_generated_line(spline_segment.id()) != nullptr)
+      find_reference_generated_line(spline_segment.id()) != nullptr ||
+      find_equation_curve(spline_segment.id()) != nullptr)
     return Result<std::size_t>::failure(validation_error(
         spline_segment.id().value(), "sketch entity id must be unique within sketch"));
   spline_segments_.push_back(std::move(spline_segment));

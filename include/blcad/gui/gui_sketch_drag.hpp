@@ -156,6 +156,8 @@ public:
           "dragged topology violates a driving Sketch dimension"));
 
     const SketchTopology expected_source = source_topology_;
+    const auto expected_equations = source_sketch_.equation_curves();
+    const auto expected_equation_inputs = source_equation_inputs_;
     const SketchConstraintSystem expected_system = source_system_;
     const SketchTopology final_topology = latest_preview_->topology();
     const SketchId target_sketch = source_topology_.sketch();
@@ -163,13 +165,23 @@ public:
     const SketchDimensionCatalog dimensions = *source_dimension_catalog_;
     auto committed = session.commit_part_transaction(
         "Drag sketch handle",
-        [expected_source, expected_system, final_topology, target_sketch,
-         constraints, dimensions](PartDocument& document) -> Result<std::size_t> {
+        [expected_source, expected_system, expected_equations, expected_equation_inputs,
+         final_topology, target_sketch, constraints,
+         dimensions](PartDocument& document) -> Result<std::size_t> {
           const auto* current = document.find_sketch(target_sketch);
           if (current == nullptr)
             return Result<std::size_t>::failure(
                 Error::validation(target_sketch.value(), "dragged Sketch no longer exists"));
           const Sketch current_snapshot = *current;
+          auto current_inputs = equation_inputs(document, current_snapshot);
+          if (!current_inputs)
+            return Result<std::size_t>::failure(current_inputs.error());
+          if (current_inputs.value() != expected_equation_inputs)
+            return Result<std::size_t>::failure(Error::dependency(
+                target_sketch.value(), "Equation inputs changed after drag preview"));
+          if (current_snapshot.equation_curves() != expected_equations)
+            return Result<std::size_t>::failure(Error::dependency(
+                target_sketch.value(), "Equation definition changed after drag preview"));
           auto current_topology = SketchTopology::migrate_legacy(current_snapshot);
           if (current_topology.has_error())
             return Result<std::size_t>::failure(current_topology.error());
@@ -218,6 +230,9 @@ public:
   [[nodiscard]] std::size_t solve_count() const noexcept;
 
 private:
+  using EquationInputs = std::vector<std::pair<ParameterId, Quantity>>;
+  [[nodiscard]] static Result<EquationInputs> equation_inputs(const PartDocument& document,
+                                                              const Sketch& sketch);
   GuiSketchDragController(Sketch source_sketch, SketchTopology source_topology,
                           SketchConstraintSystem source_system,
                           SketchSolveResult baseline_solve,
@@ -225,6 +240,7 @@ private:
 
   [[nodiscard]] Result<GuiSketchDragPreview> solve_pointer(Point2 pointer);
 
+  EquationInputs source_equation_inputs_;
   Sketch source_sketch_;
   SketchTopology source_topology_;
   SketchConstraintSystem source_system_;

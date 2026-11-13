@@ -406,6 +406,11 @@ public:
       auto added = candidate.value().add_entity(spline);
       if (added.has_error()) return Result<Sketch>::failure(added.error());
     }
+    for (const auto& curve : source.equation_curves()) {
+      auto added = candidate.value().add_entity(curve);
+      if (!added)
+        return Result<Sketch>::failure(added.error());
+    }
     for (const auto& point : source.projected_points()) {
       auto added = candidate.value().add_reference(point);
       if (added.has_error()) return Result<Sketch>::failure(added.error());

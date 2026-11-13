@@ -351,6 +351,7 @@ private:
     BLCAD_COPY_RANGE(line_segments, add_entity)
     BLCAD_COPY_RANGE(arc_segments, add_entity)
     BLCAD_COPY_RANGE(spline_segments, add_entity)
+    BLCAD_COPY_RANGE(equation_curves, add_entity)
     BLCAD_COPY_RANGE(projected_points, add_reference)
     for (const auto& item : source.projected_lines()) {
       if (skipped_projected_line != nullptr && item.id() == *skipped_projected_line) continue;

@@ -64,6 +64,24 @@ public:
       if (current.reference() &&
           (current.id() == "reference/axis/x" || current.id() == "reference/axis/y"))
         continue;
+      constexpr std::string_view entity_prefix = "entity/";
+      const auto* original_equation = std::string_view(current.id()).starts_with(entity_prefix)
+                                          ? source.find_equation_curve(SketchEntityId(
+                                                current.id().substr(entity_prefix.size())))
+                                          : nullptr;
+      if (original_equation && current.kind() != SketchTopologyEntityKind::EquationCurve)
+        return Result<Sketch>::failure(Error::validation(
+            current.id(), "Equation definitions cannot materialize as sampled editable geometry"));
+      if (current.kind() == SketchTopologyEntityKind::EquationCurve) {
+        if (!original_equation || current.reference())
+          return Result<Sketch>::failure(Error::validation(
+              current.id(), "Equation topology requires its owned source definition"));
+        auto added =
+            result.value().add_entity(original_equation->with_construction(current.construction()));
+        if (!added)
+          return Result<Sketch>::failure(added.error());
+        continue;
+      }
       if (current.kind() == SketchTopologyEntityKind::Point) {
         auto id = sketch_entity_id(current);
         if (id.has_error()) return Result<Sketch>::failure(id.error());

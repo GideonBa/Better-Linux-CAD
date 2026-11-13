@@ -37,7 +37,7 @@ struct CurveExpressionJet {
   double second{};
 };
 
-namespace detail {
+namespace curve_expression_detail {
 struct CurveExpressionData;
 }
 
@@ -60,8 +60,8 @@ public:
                                                     double parameter = 0) const;
 
 private:
-  explicit CurveExpression(std::shared_ptr<const detail::CurveExpressionData> data)
+  explicit CurveExpression(std::shared_ptr<const curve_expression_detail::CurveExpressionData> data)
       : data_(std::move(data)) {}
-  std::shared_ptr<const detail::CurveExpressionData> data_;
+  std::shared_ptr<const curve_expression_detail::CurveExpressionData> data_;
 };
 } // namespace blcad

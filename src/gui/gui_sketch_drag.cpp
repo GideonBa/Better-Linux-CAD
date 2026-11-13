@@ -307,6 +307,23 @@ const SketchTopology& GuiSketchDragPreview::topology() const noexcept { return t
 const Sketch& GuiSketchDragPreview::preview_sketch() const noexcept { return preview_sketch_; }
 const SketchSolveResult& GuiSketchDragPreview::solve() const noexcept { return solve_; }
 
+Result<std::vector<std::pair<ParameterId, Quantity>>>
+GuiSketchDragController::equation_inputs(const PartDocument& document, const Sketch& sketch) {
+  EquationInputs values;
+  for (const auto& curve : sketch.equation_curves())
+    for (const auto& id : curve.parameter_dependencies()) {
+      if (std::any_of(values.begin(), values.end(),
+                      [&](const auto& value) { return value.first == id; }))
+        continue;
+      const auto* parameter = document.find_parameter(id);
+      if (!parameter)
+        return Result<EquationInputs>::failure(
+            Error::dependency(id.value(), "Equation input no longer exists"));
+      values.emplace_back(id, parameter->value());
+    }
+  return Result<EquationInputs>::success(std::move(values));
+}
+
 Result<GuiSketchDragController>
 GuiSketchDragController::create(const PartDocument& document, SketchId sketch_id) {
   const auto* sketch = document.find_sketch(sketch_id);
@@ -324,9 +341,14 @@ GuiSketchDragController::create(const PartDocument& document, SketchId sketch_id
   if (baseline.has_error())
     return Result<GuiSketchDragController>::failure(baseline.error());
   auto handles = build_handles(source_sketch, topology.value());
-  return Result<GuiSketchDragController>::success(GuiSketchDragController(
-      std::move(source_sketch), std::move(topology.value()), std::move(system.value()),
-      std::move(baseline.value()), std::move(handles)));
+  auto inputs = equation_inputs(document, source_sketch);
+  if (!inputs)
+    return Result<GuiSketchDragController>::failure(inputs.error());
+  GuiSketchDragController controller(std::move(source_sketch), std::move(topology.value()),
+                                     std::move(system.value()), std::move(baseline.value()),
+                                     std::move(handles));
+  controller.source_equation_inputs_ = std::move(inputs.value());
+  return Result<GuiSketchDragController>::success(std::move(controller));
 }
 
 GuiSketchDragController::GuiSketchDragController(
@@ -514,17 +536,29 @@ Result<std::size_t> GuiSketchDragController::commit(GuiDocumentSession& session)
     return Result<std::size_t>::failure(drag_error("Sketch drag commit requires an active Part document"));
 
   const SketchTopology expected_source = source_topology_;
+  const auto expected_equations = source_sketch_.equation_curves();
+  const auto expected_equation_inputs = source_equation_inputs_;
   const SketchConstraintSystem expected_system = source_system_;
   const SketchTopology final_topology = latest_preview_->topology();
   const SketchId target_sketch = source_topology_.sketch();
   auto committed = session.commit_part_transaction(
       "Drag sketch handle",
-      [expected_source, expected_system, final_topology, target_sketch](PartDocument& document) {
+      [expected_source, expected_system, expected_equations, expected_equation_inputs,
+       final_topology, target_sketch](PartDocument& document) {
         const auto* current = document.find_sketch(target_sketch);
         if (current == nullptr)
           return Result<std::size_t>::failure(
               Error::validation(target_sketch.value(), "dragged Sketch no longer exists"));
         const Sketch current_snapshot = *current;
+        auto current_inputs = equation_inputs(document, current_snapshot);
+        if (!current_inputs)
+          return Result<std::size_t>::failure(current_inputs.error());
+        if (current_inputs.value() != expected_equation_inputs)
+          return Result<std::size_t>::failure(Error::dependency(
+              target_sketch.value(), "Equation inputs changed after drag preview"));
+        if (current_snapshot.equation_curves() != expected_equations)
+          return Result<std::size_t>::failure(Error::dependency(
+              target_sketch.value(), "Equation definition changed after drag preview"));
         auto current_topology = SketchTopology::migrate_legacy(current_snapshot);
         if (current_topology.has_error())
           return Result<std::size_t>::failure(current_topology.error());

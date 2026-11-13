@@ -4,9 +4,9 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 159
+implemented_through: Block 160
 current_block: 160
-current_boundary: Block 159 delivered; Block 160 typed equation intent in progress
+current_boundary: Block 160 accepted; PR 184 delivery in progress; Block 161 next
 current_tag: "[parity-b160]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–159 accepted; Block 160 in progress; Blocks 161–204 planned"
+  advanced_modeling_workflows: "Blocks 145–160 accepted; Blocks 161–204 planned"
 ---
 
 # MVP Plan
@@ -34,13 +34,14 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 159
-current block        Block 160 (in progress)
+implemented through  Block 160
+current block        Block 160 (accepted; delivery in progress)
 current phase        Planar and spatial sketch extensions
-current boundary     Block 159 delivered; typed equation intent and safe expressions in progress
+current boundary     Block 160 accepted; PR #184 delivery in progress
 ```
 
-The next assigned work is Block 160. [The consolidated sequence](inventor-parity-sequence.md)
+The next assigned work is Block 161 after normal PR #184 delivery.
+[The consolidated sequence](inventor-parity-sequence.md)
 contains dependencies and implementation criteria; [the test plan](inventor-parity-test-plan.md)
 contains individual and combined acceptance; [the UI contract](user-interface.md) owns the
 Inventor-like workflows and layout. These plans retain their full unimplemented scope.
@@ -153,8 +154,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–159 are **Implemented and accepted**;
-Block 160 is **In progress**; Blocks 161–204 are **Planned; not started**.
+Status authority: Blocks 145–160 are **Implemented and accepted**;
+Blocks 161–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -166,7 +167,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
-| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | 159 accepted; 160 in progress; 161–165 planned |
+| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | 159–160 accepted; 161–165 planned |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
@@ -205,6 +206,7 @@ PR links preserve individual slice provenance without copying intermediate compl
 | 157 | Shared semantic Hole/Thread creation/editing, presets/repeat, explicit legacy conversion, keyboard/source return and complete B01–B04/UI01 native acceptance | [Hole workflow](hole-wizard.md#whole-workflow-acceptance--157c) | [181](https://github.com/GideonBa/Better-Linux-CAD/pull/181) and its serial component PRs |
 | 158 / Phase B closure | Fresh/migrated Phase A/B integration, physical history/Assembly/STEP, fractional native picking correction and isolated recompute evidence | [Integrated contract/proof](hole-wizard.md#phase-ab-integration--158-design), [raw measurements](benchmarks/block158-phase-ab-recompute.json) | [182](https://github.com/GideonBa/Better-Linux-CAD/pull/182) |
 | 159 | Persistent oriented planar G2, rational/arc/line endpoint math, normalized rank/solve, dimension-aware authoring and exact accepted-catalog drag/history/reopen | [Planar solver/S01 proof](sketch-planar-constraint-solver-mvp8.md#block-159-smoothg2), [sidecar](file-format.md#planar-smoothg2-constraint-sidecar--159); native UI remains 162 | [183](https://github.com/GideonBa/Better-Linux-CAD/pull/183) |
+| 160 | Bounded typed equation expressions, existing Sketch/Sketch3D ownership and dependencies, atomic domains, lossless topology/edit/session paths and strict Part V8/Project persistence | [Contract and S02/Core/session proof](parameter-expression-mvp.md#curve-local-expression-contract), [format](file-format.md#equation-curve-intent--160); Geometry remains 161, native authoring 162 | [184](https://github.com/GideonBa/Better-Linux-CAD/pull/184) |
 
 The initial full parity plan was delivered in [PR #138](https://github.com/GideonBa/Better-Linux-CAD/pull/138).
 
@@ -567,18 +569,19 @@ Delivery: [PR #183](https://github.com/GideonBa/Better-Linux-CAD/pull/183) merge
 `9e5bda2`; its tree `c173a10` matches the reviewed delivery. Main was refreshed and verified clean
 before `feat/typed-equation-curve-intent`. The continuation through 165 and all 166–204 planning remain.
 
-### Block 160 typed equation intent — in progress
+### Block 160 acceptance and delivery
 
-The serial branch starts from verified merged `9e5bda2`. The
-[curve-local expression design](parameter-expression-mvp.md#curve-local-extension--block-160)
-retains the existing general-parameter grammar and defines the separate typed-domain boundary.
-Expression/intent and existing-model integration are in progress; whole 160 remains open.
+Accepted the complete typed-intent/Core S02 boundary: four curve modes, bounded safe expressions,
+stable parameter references and derived jets; existing Sketch/Sketch3D ownership and dependencies;
+atomic domain edits, zero-point topology and lossless edit/materialization/history; strict Part V8
+and Project resource persistence with historical canonical output. The
+[contract and frozen-source proof](parameter-expression-mvp.md#expressionintent-proof) records
+focused/full Core, Geometry, Qt, native 100%/150%, separate startup and reviewed captures.
 
-| Step | Planned completion boundary |
-| --- | --- |
-| Typed intent and safe expressions | Engine/raw intent checkpoint implemented: signed real coordinate lengths, typed finite expression domains, four modes, stable ID references, bounded grammar/functions and derived jets. Focused Core 6/272 and full Core 726/29,226 pass; [proof/scope](parameter-expression-mvp.md#expressionintent-checkpoint). |
-| Existing model/persistence authorities | Equation intent belongs to current Sketch/Sketch3D, participates in dependency/cycle checking and survives legacy materialization/history. No authored sample points; strict version gates retain old canonical bytes. |
-| Core proof and handoff | S02 parsing/JSON, units/scope, parameter/domain edits, malformed/unknown/singular inputs and legacy loading. Geometry/error-controlled modeling remains 161; native authoring remains 162. |
+Serial base: verified normally merged `9e5bda2`. [PR #184](https://github.com/GideonBa/Better-Linux-CAD/pull/184)
+is ready for normal delivery after final staged review. Verify its merge and refresh clean main
+before starting 161. Equation Geometry/downstream S02 remains 161; native Smooth/equation authoring
+remains 162. Complete 163–165 afterwards; retain all 166–204 planning.
 
 ## Later phases
 

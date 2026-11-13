@@ -40,8 +40,8 @@ continues to use these Core APIs; there is no separate GUI evaluator or schema.
 
 ## Curve-local extension — Block 160
 
-This extension is being implemented after the verified G2 delivery. Numbered acceptance belongs
-to `mvp-plan.md`; Geometry and native authoring remain 161/162.
+This extension adds typed equation intent to the existing Sketch authorities. Numbered acceptance
+belongs to `mvp-plan.md`; Geometry and native authoring remain 161/162.
 Keep the general parameter grammar, positive Length/Count validation and deferred scope below
 unchanged. Curve coordinates require signed real lengths, with a separately typed real independent
 variable and finite domain. Cartesian/polar/parametric 2D and parametric 3D inputs must distinguish
@@ -65,7 +65,8 @@ and native authoring remains 162. [The numbered plan](mvp-plan.md) owns progress
 Curve expressions use **`@{ParameterId}`** references, resolved in the owning Part. Bare identifiers
 name only the declared independent variable, `pi`, `e` or a supported function. These lexical
 namespaces cannot hide a persistent reference, and parameter rename cannot change expression
-meaning. Domains have unit **scalar**, **length** (mm) or **angle** (radians), plus lower/upper
+meaning. Reference tokens contain **1–256 bytes**, excluding braces and control characters.
+Domains have unit **scalar**, **length** (mm) or **angle** (radians), plus lower/upper
 expression strings evaluated without an independent variable. Bounds must be finite and ordered.
 
 The bounded grammar supports numeric/scientific literals, `mm`/`rad`/`deg` literal suffixes, unary
@@ -88,22 +89,33 @@ Modes use the existing curve entity ID and owner workplane/model frame:
 | `parametric_2d` | scalar, length or angle | x and y expressions |
 | `parametric_3d` | scalar, length or angle | x, y and z expressions |
 
-The independent-variable name is a bounded ASCII identifier, excluding reserved functions/constants.
+The independent-variable name is a **1–32 character ASCII identifier**, excluding reserved
+functions/constants.
 Planar Sketch rejects 3D mode and Sketch3D accepts only 3D mode. Domain, expressions, positive finite
 modeling tolerance, `adaptive_v1` policy, `open`/`periodic` closure and construction intent belong to
 one EquationCurve. `periodic` requests a closure proof in 161; it never authorizes snapping a gap.
 Source/domain parameter IDs feed the existing Sketch/Sketch3D dependency node. Editing ordinary
 entities or materializing solved topology must preserve equation intent and IDs exactly.
 
-### Expression/intent checkpoint
+### Expression/intent proof
 
-The bounded expression engine and raw EquationCurve type pass **6 Core cases / 272 assertions**:
-[analytic/units/safety/identity proof](../tests/core/equation_curve_tests.cpp). The complete Core
-regression passes **726 cases / 29,226 assertions**, no skips, on **1,075 frozen runtime inputs**,
-SHA256 `a17462e6ddab708c3783a3b674ac070e70426f4afd2a85b29e651fbf0492e1b1`.
-Only Core is built/tested for this pure backend checkpoint; no Geometry/Qt/native proof is claimed.
-Existing Sketch/Sketch3D ownership, dependency graph, topology/materialization and strict JSON
-integration remain in progress under 160. This checkpoint does not accept the whole block.
+[Analytic/unit/safety tests](../tests/core/equation_curve_tests.cpp) and
+[ownership/graph/persistence tests](../tests/core/equation_curve_document_tests.cpp) pass **12 Core
+cases / 368 assertions**. [Qt session proof](../tests/gui/gui_equation_curve_tests.cpp) passes
+**2 cases / 88 assertions**, including final release, exact history/reopen and definition-only or
+parameter-only stale drags on both commit paths.
+
+The five-target build passes. Full regression: Core **732 / 29,322**, Geometry **682 / 58,224**,
+and offscreen Qt **900 cases: 833 passed, 67 native-only skipped / 101,345 assertions**. The
+[relevant native Sketch consumer selection](development-setup.md#find-and-select-focused-tests)
+passes **36 cases / 1,592 assertions at 100%** and **36 / 1,593 at 150%**, without skips. The 100%/150% endpoint
+captures were reviewed after GUI exit; separate startup proved a PID-matched `IsViewable` window
+(intentional timeout 124). This verifies current consumers; equation Geometry and native authoring
+retain their 161/162 acceptance gates.
+
+All runs use **1,079 frozen runtime inputs**, SHA256
+`4a7fb09f6a30e6d69728e3fa3586616a437a4829d2c7a40abd4d1a5ec32c1895`.
+Final source/binary hashes, GUI/app dependency records, formatting and documentation links pass.
 
 ## Still deferred
 

@@ -516,6 +516,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/part_body_dependency_tests.cpp
     tests/core/parameter_expression_tests.cpp
     tests/core/equation_curve_tests.cpp
+    tests/core/equation_curve_document_tests.cpp
     tests/core/parameter_tests.cpp
     tests/core/path_extrude_feature_tests.cpp
     tests/core/path_curve_tests.cpp
@@ -804,6 +805,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_sketch_interaction_tests.cpp
       tests/gui/gui_sketch_primitive_constraints_tests.cpp
       tests/gui/gui_sketch_smooth_tests.cpp
+      tests/gui/gui_equation_curve_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
       tests/gui/gui_interactive_sketcher_acceptance_tests.cpp
       tests/gui/gui_spatial_surface_workbench_tests.cpp

@@ -22,6 +22,7 @@ enum class SketchTopologyEntityKind {
   Line,
   Arc,
   Spline,
+  EquationCurve,
   RectangleProfile,
   CircleProfile,
   ClosedProfile,
@@ -39,6 +40,8 @@ enum class SketchTopologyEntityKind {
   case SketchTopologyEntityKind::Line: return "line";
   case SketchTopologyEntityKind::Arc: return "arc";
   case SketchTopologyEntityKind::Spline: return "spline";
+  case SketchTopologyEntityKind::EquationCurve:
+    return "equation_curve";
   case SketchTopologyEntityKind::RectangleProfile: return "rectangle_profile";
   case SketchTopologyEntityKind::CircleProfile: return "circle_profile";
   case SketchTopologyEntityKind::ClosedProfile: return "closed_profile";
@@ -58,6 +61,8 @@ sketch_topology_entity_kind_from_string(std::string_view value) noexcept {
   if (value == "line") return SketchTopologyEntityKind::Line;
   if (value == "arc") return SketchTopologyEntityKind::Arc;
   if (value == "spline") return SketchTopologyEntityKind::Spline;
+  if (value == "equation_curve")
+    return SketchTopologyEntityKind::EquationCurve;
   if (value == "rectangle_profile") return SketchTopologyEntityKind::RectangleProfile;
   if (value == "circle_profile") return SketchTopologyEntityKind::CircleProfile;
   if (value == "closed_profile") return SketchTopologyEntityKind::ClosedProfile;
@@ -160,6 +165,7 @@ public:
       case SketchTopologyEntityKind::RectangleProfile:
       case SketchTopologyEntityKind::CircleProfile:
       case SketchTopologyEntityKind::CircularHolePattern: return std::size_t{1};
+      case SketchTopologyEntityKind::EquationCurve:
       case SketchTopologyEntityKind::ClosedProfile:
       case SketchTopologyEntityKind::ArcClosedProfile:
       case SketchTopologyEntityKind::CompositeClosedProfile:
@@ -366,6 +372,12 @@ public:
                             {},
                             {.construction = spline.construction()},
                             spline.weights()});
+    for (const auto& curve : sketch.equation_curves())
+      candidates.push_back({entity_id(curve.id()),
+                            SketchTopologyEntityKind::EquationCurve,
+                            {},
+                            {},
+                            {.construction = curve.construction()}});
     for (const auto& profile : sketch.rectangle_profiles())
       candidates.push_back({profile_id(profile.id()),
                             SketchTopologyEntityKind::RectangleProfile,

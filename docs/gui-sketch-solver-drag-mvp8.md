@@ -231,3 +231,14 @@ exact materialization, and one atomic history transaction.
 Block 116 introduces trim, extend, split, Sketch fillet, and Sketch chamfer. Those topology-changing
 commands must explicitly remap or reject drag handles, constraints, and dimensions before any later
 solver-backed direct manipulation occurs.
+
+## Equation definition/input freshness — 160 integration
+
+Ordinary point drags retain equation records through canonical topology materialization. Both
+bare-Part and session-catalog commit paths capture the original equation definitions and their
+stable parameter-ID/Quantity inputs. A changed definition or changed referenced value refuses a
+stale drag inside the document transaction; the accepted intervening edit and its history remain
+intact. No formula is replaced by sampled control points. Pure equation entities have no free point
+handles; equation authoring remains 162. [Session/history proof](../tests/gui/gui_equation_curve_tests.cpp)
+covers final release, exact Undo/Redo, V8 reopen and both stale-input paths: **2 cases / 88
+assertions** pass on the rebuilt GUI target. Numbered acceptance remains in the plan.

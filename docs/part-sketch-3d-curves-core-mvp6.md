@@ -49,6 +49,21 @@ the source curve. A referenced source cannot be removed before its guide metadat
 
 All Block-75/76 entities share one sketch-local `SketchEntityId` scope.
 
+## Equation intent extension — 160
+
+The existing Sketch3D owns `EquationCurve` in parametric-3D mode, sharing its entity ID namespace
+with points, lines, arcs, splines, helices and guide metadata. Definitions carry typed expression
+bounds, signed length coordinate expressions, modeling tolerance, closure and construction intent;
+[the expression contract](parameter-expression-mvp.md#curve-local-expression-contract) owns units,
+limits and stable parameter references. Planar modes are rejected in this model-space owner.
+
+Parameter IDs feed the same Sketch3D dependency node. Replacing a same-ID definition validates the
+complete candidate document; parameter changes that invalidate a domain restore parameters, graph
+and invalidation state. Equation source deletion is blocked while guide metadata references it.
+Existing direct point edits/clones retain equations exactly. Part V8 persists the definition through
+the existing [JSON authority](part-sketch-3d-json-mvp6.md). Execution remains 161; spatial constraint
+schema/solver/interaction remain 163–165. The numbered plan owns whole-160 acceptance.
+
 ## Deliberate boundary
 
 There is still no general 3D constraint solver and no OCCT curve. Block 77 now provides additive
