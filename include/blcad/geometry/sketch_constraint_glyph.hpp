@@ -123,6 +123,8 @@ private:
     case SketchSolverConstraintKind::Collinear: return "—·—";
     case SketchSolverConstraintKind::Equal: return "=";
     case SketchSolverConstraintKind::Tangent: return "T";
+    case SketchSolverConstraintKind::Smooth:
+      return "G2";
     case SketchSolverConstraintKind::Concentric: return "◎";
     case SketchSolverConstraintKind::Midpoint: return "M";
     case SketchSolverConstraintKind::Symmetric: return "↔";

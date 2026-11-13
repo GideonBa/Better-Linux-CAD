@@ -33,6 +33,18 @@ from the member roles rather than a duplicated container flag. Construction geom
 available to dimensions, constraints and references, but cannot bound an explicit solid profile or
 an implicit hole. No transient selection, role-change preview or resolved geometry is serialized.
 
+## Planar Smooth/G2 constraint sidecar — 159
+
+The existing `blcad.sketch_constraints.mvp8` Part-session sidecar uses integer version **2** when
+any catalog contains `kind: "smooth"`. Otherwise its version-1 output remains unchanged. Readers
+accept 1/2, reject Smooth in 1, and reject noninteger/unknown versions. A Smooth record retains the
+existing `id`, `source` and ordered `targets`: **entity A, endpoint point A, entity B, endpoint point B**.
+Only the two endpoint slots may share an ID; curve identities must differ. Topology validation
+requires a spline operand and a unique endpoint of each line/arc/spline. Coordinates and derivative
+samples are not identity or persisted constraint state. The main Part/Project envelope versions do
+not change. [Constraint authoring](gui-sketch-constraint-authoring-mvp8.md#persistence-schema) owns
+sidecar scope/history and the complete existing record shape; native UI remains planned in 162.
+
 ## Interleaved Part feature order — 2026-10-25
 
 Part JSON optionally includes `feature_order`, an ordered array of executable Feature and
