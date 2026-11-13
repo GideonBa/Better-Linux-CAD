@@ -38,6 +38,7 @@ constexpr int k_manufacturing_hole_version = 5;
 constexpr int k_thread_version = 6;
 constexpr int k_pattern_placement_version = 7;
 constexpr int k_equation_curve_version = 8;
+constexpr int k_spatial_constraint_version = 9;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -1690,23 +1691,22 @@ feature_body_result_context_from_json(const json& feature_json) {
       json_error("unsupported or malformed pattern source"));
 }
 
-[[nodiscard]] Result<AxisReference> pattern_axis_from_json(const json& axis_json) {
+[[nodiscard]] Result<AxisReference> axis_reference_from_json(const json& axis_json,
+                                                             PartFeatureInputRole role) {
   if (!axis_json.is_object() || !axis_json.contains("source_kind") ||
       !axis_json.at("source_kind").is_string())
     return Result<AxisReference>::failure(json_error("pattern axis requires source_kind"));
   const std::string source_kind = axis_json.at("source_kind").get<std::string>();
   if (source_kind == "imported_topology")
-    return imported_input_from_json<AxisReference>(axis_json, PartFeatureInputRole::PatternAxis, 2);
+    return imported_input_from_json<AxisReference>(axis_json, role, 2);
   if (source_kind == "datum_axis" && axis_json.size() == 2U && axis_json.contains("datum_axis") &&
       axis_json.at("datum_axis").is_string())
     return AxisReference::create_datum_axis(
-        PartFeatureInputRole::PatternAxis,
-        DatumAxisId(axis_json.at("datum_axis").get<std::string>()));
+        role, DatumAxisId(axis_json.at("datum_axis").get<std::string>()));
   if (source_kind == "construction_line" && axis_json.size() == 2U &&
       axis_json.contains("construction_line") && axis_json.at("construction_line").is_string())
     return AxisReference::create_construction_line(
-        PartFeatureInputRole::PatternAxis,
-        ConstructionLineId(axis_json.at("construction_line").get<std::string>()),
+        role, ConstructionLineId(axis_json.at("construction_line").get<std::string>()),
         PartFeatureInputCapability::Axis);
   if (source_kind == "semantic_axis" && axis_json.size() == 3U &&
       axis_json.contains("source_feature") && axis_json.contains("axis") &&
@@ -1716,19 +1716,31 @@ feature_body_result_context_from_json(const json& feature_json) {
         SemanticAxisReference::create(FeatureId(axis_json.at("source_feature").get<std::string>()));
     if (semantic.has_error())
       return Result<AxisReference>::failure(semantic.error());
-    return AxisReference::create_semantic_axis(PartFeatureInputRole::PatternAxis,
-                                               std::move(semantic.value()));
+    return AxisReference::create_semantic_axis(role, std::move(semantic.value()));
   }
   if (source_kind == "semantic_linear_edge" && axis_json.size() == 2U &&
       axis_json.contains("semantic_edge") && axis_json.at("semantic_edge").is_object()) {
     auto edge = semantic_edge_reference_from_json(axis_json.at("semantic_edge"));
     if (edge.has_error())
       return Result<AxisReference>::failure(edge.error());
-    return AxisReference::create_semantic_edge(PartFeatureInputRole::PatternAxis,
-                                               std::move(edge.value()),
+    return AxisReference::create_semantic_edge(role, std::move(edge.value()),
                                                PartFeatureInputCapability::Axis);
   }
+  if (role == PartFeatureInputRole::SpatialConstraint && source_kind == "sketch_line" &&
+      has_exact_fields(axis_json, {"source_kind", "sketch", "entity"}) &&
+      axis_json.at("sketch").is_string() && axis_json.at("entity").is_string()) {
+    auto line =
+        SketchLineReference::create(SketchId(axis_json.at("sketch").get<std::string>()),
+                                    SketchEntityId(axis_json.at("entity").get<std::string>()));
+    if (!line)
+      return Result<AxisReference>::failure(line.error());
+    return AxisReference::create_sketch_line(role, std::move(line.value()));
+  }
   return Result<AxisReference>::failure(json_error("unsupported pattern axis source kind"));
+}
+
+[[nodiscard]] Result<AxisReference> pattern_axis_from_json(const json& value) {
+  return axis_reference_from_json(value, PartFeatureInputRole::PatternAxis);
 }
 
 [[nodiscard]] json mirror_source_to_json(const MirrorSourceReference& source) {
@@ -3891,6 +3903,238 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
   return "general";
 }
 
+[[nodiscard]] json path_segment_to_json(const PathSegmentReference& segment);
+[[nodiscard]] Result<PathSegmentReference> path_segment_from_json(const json& value);
+[[nodiscard]] Result<SpatialCurveLocation> spatial_location_from_json(const json& value) {
+  if (!value.is_string())
+    return Result<SpatialCurveLocation>::failure(
+        json_error("Spatial curve location must be a string"));
+  for (auto v :
+       {SpatialCurveLocation::Whole, SpatialCurveLocation::Start, SpatialCurveLocation::End})
+    if (value == to_string(v))
+      return Result<SpatialCurveLocation>::success(v);
+  return Result<SpatialCurveLocation>::failure(json_error("Unsupported spatial curve location"));
+}
+[[nodiscard]] json spatial_target_to_json(const SpatialConstraintTarget& target) {
+  return std::visit(
+      [](const auto& v) -> json {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, SketchPointReference3D>)
+          return {{"kind", "point"}, {"reference", sketch_point_reference_3d_to_json(v)}};
+        else if constexpr (std::is_same_v<T, SpatialLocalCurve>)
+          return {{"kind", "local_curve"},
+                  {"entity", v.entity.value()},
+                  {"location", to_string(v.location)}};
+        else if constexpr (std::is_same_v<T, SpatialExternalCurve>)
+          return {{"kind", "external_curve"},
+                  {"reference", path_segment_to_json(v.reference)},
+                  {"location", to_string(v.location)}};
+        else if constexpr (std::is_same_v<T, AxisReference>)
+          return {{"kind", "axis"}, {"reference", revolve_axis_to_json(v)}};
+        else if constexpr (std::is_same_v<T, PlaneReference>)
+          return {{"kind", "plane"}, {"reference", plane_reference_to_json(v)}};
+        else
+          return {{"kind", "face"}, {"reference", face_reference_to_json(v)}};
+      },
+      target.source());
+}
+[[nodiscard]] Result<SpatialConstraintTarget> spatial_target_from_json(const json& value) {
+  const auto fail = [](std::string message) {
+    return Result<SpatialConstraintTarget>::failure(json_error(std::move(message)));
+  };
+  if (!value.is_object() || !value.contains("kind") || !value.at("kind").is_string())
+    return fail("Spatial target requires its kind");
+  const auto kind = value.at("kind").get<std::string>();
+  if (kind == "local_curve" || kind == "external_curve") {
+    if (!has_exact_fields(
+            value, kind == "local_curve"
+                       ? std::initializer_list<std::string_view>{"kind", "entity", "location"}
+                       : std::initializer_list<std::string_view>{"kind", "reference", "location"}))
+      return fail("Spatial curve target has invalid fields");
+    auto location = spatial_location_from_json(value.at("location"));
+    if (!location)
+      return Result<SpatialConstraintTarget>::failure(location.error());
+    if (kind == "local_curve") {
+      if (!value.at("entity").is_string())
+        return fail("Local curve target requires its entity id");
+      return SpatialConstraintTarget::curve(SketchEntityId(value.at("entity").get<std::string>()),
+                                            location.value());
+    }
+    auto ref = path_segment_from_json(value.at("reference"));
+    if (!ref)
+      return Result<SpatialConstraintTarget>::failure(ref.error());
+    return SpatialConstraintTarget::external_curve(std::move(ref.value()), location.value());
+  }
+  if (!has_exact_fields(value, {"kind", "reference"}))
+    return fail("Spatial target has invalid fields");
+  if (kind == "point") {
+    auto ref = sketch_point_reference_3d_from_json(value.at("reference"));
+    if (!ref)
+      return Result<SpatialConstraintTarget>::failure(ref.error());
+    return SpatialConstraintTarget::point(std::move(ref.value()));
+  }
+  if (kind == "axis") {
+    auto ref =
+        axis_reference_from_json(value.at("reference"), PartFeatureInputRole::SpatialConstraint);
+    if (!ref)
+      return Result<SpatialConstraintTarget>::failure(ref.error());
+    return SpatialConstraintTarget::axis(std::move(ref.value()));
+  }
+  if (kind == "plane") {
+    auto ref =
+        plane_reference_from_json(value.at("reference"), PartFeatureInputRole::SpatialConstraint);
+    if (!ref)
+      return Result<SpatialConstraintTarget>::failure(ref.error());
+    return SpatialConstraintTarget::plane(std::move(ref.value()));
+  }
+  if (kind == "face") {
+    auto ref =
+        face_reference_from_json(value.at("reference"), PartFeatureInputRole::SpatialConstraint);
+    if (!ref)
+      return Result<SpatialConstraintTarget>::failure(ref.error());
+    return SpatialConstraintTarget::face(std::move(ref.value()));
+  }
+  return fail("Unsupported spatial constraint target kind");
+}
+[[nodiscard]] json spatial_value_to_json(const SpatialDimensionValue& value) {
+  if (const auto* p = std::get_if<ParameterId>(&value.source()))
+    return {{"source", "parameter"}, {"parameter", p->value()}};
+  const auto& q = std::get<Quantity>(value.source());
+  return {{"source", "literal"},
+          {"unit", q.is_positive_length() ? "mm" : "deg"},
+          {"value", q.is_positive_length() ? q.millimeters() : q.degrees()}};
+}
+[[nodiscard]] Result<SpatialDimensionValue> spatial_value_from_json(const json& value) {
+  const auto fail = [](std::string message) {
+    return Result<SpatialDimensionValue>::failure(json_error(std::move(message)));
+  };
+  if (!value.is_object() || !value.contains("source") || !value.at("source").is_string())
+    return fail("Spatial dimension source is invalid");
+  if (value.at("source") == "parameter" && has_exact_fields(value, {"source", "parameter"}) &&
+      value.at("parameter").is_string())
+    return SpatialDimensionValue::parameter(ParameterId(value.at("parameter").get<std::string>()));
+  if (value.at("source") != "literal" || !has_exact_fields(value, {"source", "unit", "value"}) ||
+      !value.at("unit").is_string() || !value.at("value").is_number())
+    return fail("Spatial literal dimension has invalid fields");
+  if (value.at("unit") != "mm" && value.at("unit") != "deg")
+    return fail("Spatial dimension requires mm or deg");
+  auto quantity = value.at("unit") == "mm" ? Quantity::length_mm(value.at("value").get<double>())
+                                           : Quantity::angle_deg(value.at("value").get<double>());
+  if (!quantity)
+    return Result<SpatialDimensionValue>::failure(quantity.error());
+  return SpatialDimensionValue::literal(quantity.value());
+}
+[[nodiscard]] json spatial_constraint_to_json(const SpatialConstraint& constraint) {
+  json targets = json::array();
+  for (const auto& target : constraint.targets())
+    targets.push_back(spatial_target_to_json(target));
+  json value{{"id", constraint.id().value()},
+             {"kind", to_string(constraint.kind())},
+             {"targets", std::move(targets)}};
+  if (constraint.value())
+    value["value"] = spatial_value_to_json(*constraint.value());
+  if (constraint.fixed_position())
+    value["fixed_position_mm"] = point3_to_json(*constraint.fixed_position());
+  if (constraint.kind() == SpatialConstraintKind::Angle)
+    value["angle_convention"] = to_string(constraint.angle_convention());
+  if (constraint.curve_parameter_seed())
+    value["parameter_seed"] = *constraint.curve_parameter_seed();
+  return value;
+}
+[[nodiscard]] Result<SpatialConstraint> spatial_constraint_from_json(const json& value) {
+  const auto fail = [](std::string message) {
+    return Result<SpatialConstraint>::failure(json_error(std::move(message)));
+  };
+  if (!value.is_object() || !value.contains("id") || !value.at("id").is_string() ||
+      !value.contains("kind") || !value.at("kind").is_string() || !value.contains("targets") ||
+      !value.at("targets").is_array())
+    return fail("Spatial constraint requires id, kind and targets");
+  std::optional<SpatialConstraintKind> kind;
+  for (auto k : {SpatialConstraintKind::Coincident, SpatialConstraintKind::Fixed,
+                 SpatialConstraintKind::AxisParallel, SpatialConstraintKind::PlaneParallel,
+                 SpatialConstraintKind::PointOnLine, SpatialConstraintKind::PointOnPlane,
+                 SpatialConstraintKind::PointOnCurve, SpatialConstraintKind::PointOnFace,
+                 SpatialConstraintKind::Parallel, SpatialConstraintKind::Perpendicular,
+                 SpatialConstraintKind::Tangent, SpatialConstraintKind::Smooth,
+                 SpatialConstraintKind::Distance, SpatialConstraintKind::Angle,
+                 SpatialConstraintKind::Radius, SpatialConstraintKind::Length})
+    if (value.at("kind") == to_string(k)) {
+      kind = k;
+      break;
+    }
+  if (!kind)
+    return fail("Unsupported spatial constraint kind");
+  auto fields = value;
+  std::optional<SpatialDimensionValue> dimension;
+  if (*kind == SpatialConstraintKind::Distance || *kind == SpatialConstraintKind::Angle ||
+      *kind == SpatialConstraintKind::Radius || *kind == SpatialConstraintKind::Length) {
+    if (!value.contains("value"))
+      return fail("Dimensional spatial constraint requires value");
+    auto parsed = spatial_value_from_json(value.at("value"));
+    if (!parsed)
+      return Result<SpatialConstraint>::failure(parsed.error());
+    dimension = std::move(parsed.value());
+    fields.erase("value");
+  }
+  std::optional<Point3> fixed;
+  if (*kind == SpatialConstraintKind::Fixed) {
+    if (!value.contains("fixed_position_mm") ||
+        !has_exact_fields(value.at("fixed_position_mm"), {"x", "y", "z"}))
+      return fail("Fixed spatial constraint requires its exact anchor");
+    const auto& p = value.at("fixed_position_mm");
+    for (const auto* c : {"x", "y", "z"})
+      if (!p.at(c).is_number())
+        return fail("Fixed anchor coordinates must be numeric");
+    fixed = point3_from_json(p);
+    fields.erase("fixed_position_mm");
+  }
+  SpatialAngleConvention angle = SpatialAngleConvention::Unsigned;
+  if (*kind == SpatialConstraintKind::Angle) {
+    if (!value.contains("angle_convention") || !value.at("angle_convention").is_string())
+      return fail("Angle requires its convention");
+    const auto& name = value.at("angle_convention");
+    if (name == "oriented_about_axis")
+      angle = SpatialAngleConvention::OrientedAboutAxis;
+    else if (name != "unsigned")
+      return fail("Unsupported spatial angle convention");
+    fields.erase("angle_convention");
+  }
+  std::optional<double> seed;
+  if (*kind == SpatialConstraintKind::PointOnCurve) {
+    if (!value.contains("parameter_seed") || !value.at("parameter_seed").is_number())
+      return fail("Point-on-curve requires a numeric normalized branch seed");
+    seed = value.at("parameter_seed").get<double>();
+    fields.erase("parameter_seed");
+  }
+  if (!has_exact_fields(fields, {"id", "kind", "targets"}))
+    return fail("Spatial constraint has extra or incompatible fields");
+  std::vector<SpatialConstraintTarget> targets;
+  for (const auto& entry : value.at("targets")) {
+    auto target = spatial_target_from_json(entry);
+    if (!target)
+      return Result<SpatialConstraint>::failure(target.error());
+    targets.push_back(std::move(target.value()));
+  }
+  return SpatialConstraint::create(SketchConstraintId(value.at("id").get<std::string>()), *kind,
+                                   std::move(targets), std::move(dimension), fixed, angle, seed);
+}
+[[nodiscard]] json sketch_length_3d_to_json(const SketchLength3D& binding) {
+  if (binding.explicit_length())
+    return {{"source", "explicit"}, {"value_mm", binding.explicit_length()->millimeters()}};
+  return {{"source", "parameter"}, {"parameter", binding.parameter_id().value()}};
+}
+[[nodiscard]] Result<SketchLength3D> sketch_length_3d_from_json(const json& value) {
+  auto coordinate = sketch_coordinate_3d_from_json(value);
+  if (!coordinate)
+    return Result<SketchLength3D>::failure(coordinate.error());
+  if (coordinate.value().parameter())
+    return SketchLength3D::create_parameter(*coordinate.value().parameter());
+  auto length = Quantity::length_mm(coordinate.value().explicit_coordinate()->millimeters());
+  if (!length)
+    return Result<SketchLength3D>::failure(length.error());
+  return SketchLength3D::create_explicit(length.value());
+}
+
 [[nodiscard]] json sketch_3d_to_json(const Sketch3D& sketch) {
   json value{
       {"id", sketch.id().value()}, {"name", sketch.name()},      {"points", json::array()},
@@ -3927,15 +4171,21 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
                              ? "datum_axis"
                              : "construction_line"},
               {"id", helix.axis().referenced_node_id()}};
-    value["helices"].push_back(
-        json{{"id", helix.id().value()},
-             {"axis", std::move(axis)},
-             {"radius_parameter", helix.radius_parameter().value()},
-             {"pitch_parameter", helix.pitch_parameter().value()},
-             {"turns_parameter", helix.turns_parameter().value()},
-             {"handedness", helix.handedness() == SketchHelix3DHandedness::RightHanded
-                                ? "right_handed"
-                                : "left_handed"}});
+    json item{{"id", helix.id().value()},
+              {"axis", std::move(axis)},
+              {"turns_parameter", helix.turns_parameter().value()},
+              {"handedness", helix.handedness() == SketchHelix3DHandedness::RightHanded
+                                 ? "right_handed"
+                                 : "left_handed"}};
+    if (helix.radius_binding().source() == SketchCoordinate3DSource::Parameter &&
+        helix.pitch_binding().source() == SketchCoordinate3DSource::Parameter) {
+      item["radius_parameter"] = helix.radius_parameter().value();
+      item["pitch_parameter"] = helix.pitch_parameter().value();
+    } else {
+      item["radius"] = sketch_length_3d_to_json(helix.radius_binding());
+      item["pitch"] = sketch_length_3d_to_json(helix.pitch_binding());
+    }
+    value["helices"].push_back(std::move(item));
   }
   if (!sketch.equation_curves().empty()) {
     value["equation_curves"] = json::array();
@@ -3947,13 +4197,20 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
                                          {"source_curve", guide.source_curve().value()},
                                          {"role", std::string(guide_role_spelling(guide.role()))},
                                          {"label", guide.label()}});
+  if (!sketch.constraints().empty()) {
+    value["constraints"] = json::array();
+    for (const auto& constraint : sketch.constraints())
+      value["constraints"].push_back(spatial_constraint_to_json(constraint));
+  }
   return value;
 }
 
 [[nodiscard]] Result<Sketch3D> sketch_3d_from_json(const json& value) {
   auto legacy_fields = value;
-  if (legacy_fields.is_object())
+  if (legacy_fields.is_object()) {
     legacy_fields.erase("equation_curves");
+    legacy_fields.erase("constraints");
+  }
   if (!has_exact_fields(legacy_fields, {"id", "name", "points", "lines", "polylines", "arcs",
                                         "splines", "helices", "guide_curves"}) ||
       !value.at("id").is_string() || !value.at("name").is_string())
@@ -4066,39 +4323,58 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
       return Result<Sketch3D>::failure(added.error());
   }
   for (const auto& entry : value.at("helices")) {
-    if (!has_exact_fields(entry, {"id", "axis", "radius_parameter", "pitch_parameter",
-                                  "turns_parameter", "handedness"}) ||
-        !entry.at("id").is_string() || !entry.at("radius_parameter").is_string() ||
-        !entry.at("pitch_parameter").is_string() || !entry.at("turns_parameter").is_string() ||
+    if (!entry.is_object())
+      return Result<Sketch3D>::failure(json_error("Helix must be an object"));
+    const bool bound_form = entry.contains("radius") || entry.contains("pitch");
+    const bool fields =
+        bound_form ? has_exact_fields(
+                         entry, {"id", "axis", "radius", "pitch", "turns_parameter", "handedness"})
+                   : has_exact_fields(entry, {"id", "axis", "radius_parameter", "pitch_parameter",
+                                              "turns_parameter", "handedness"});
+    if (!fields || !entry.at("id").is_string() || !entry.at("turns_parameter").is_string() ||
         !entry.at("handedness").is_string() ||
         !has_exact_fields(entry.at("axis"), {"source", "id"}) ||
         !entry.at("axis").at("source").is_string() || !entry.at("axis").at("id").is_string())
-      return Result<Sketch3D>::failure(json_error("3D sketch helix has invalid fields"));
+      return Result<Sketch3D>::failure(json_error("Helix has invalid fields"));
     const std::string axis_source = entry.at("axis").at("source").get<std::string>();
-    Result<SketchHelixAxis3D> axis =
-        axis_source == "datum_axis"
-            ? SketchHelixAxis3D::create_datum_axis(
-                  DatumAxisId(entry.at("axis").at("id").get<std::string>()))
-            : SketchHelixAxis3D::create_construction_line(
-                  ConstructionLineId(entry.at("axis").at("id").get<std::string>()));
     if (axis_source != "datum_axis" && axis_source != "construction_line")
-      return Result<Sketch3D>::failure(json_error("unsupported 3D helix axis source"));
-    if (axis.has_error())
+      return Result<Sketch3D>::failure(json_error("Unsupported helix axis source"));
+    auto axis = axis_source == "datum_axis"
+                    ? SketchHelixAxis3D::create_datum_axis(
+                          DatumAxisId(entry.at("axis").at("id").get<std::string>()))
+                    : SketchHelixAxis3D::create_construction_line(
+                          ConstructionLineId(entry.at("axis").at("id").get<std::string>()));
+    if (!axis)
       return Result<Sketch3D>::failure(axis.error());
-    const std::string handedness = entry.at("handedness").get<std::string>();
-    if (handedness != "right_handed" && handedness != "left_handed")
-      return Result<Sketch3D>::failure(json_error("unsupported 3D helix handedness"));
-    auto helix = SketchHelix3D::create(
+    const auto hand = entry.at("handedness").get<std::string>();
+    if (hand != "right_handed" && hand != "left_handed")
+      return Result<Sketch3D>::failure(json_error("Unsupported helix handedness"));
+    const auto binding = [&](const char* name, const char* legacy) -> Result<SketchLength3D> {
+      if (bound_form)
+        return sketch_length_3d_from_json(entry.at(name));
+      if (!entry.at(legacy).is_string())
+        return Result<SketchLength3D>::failure(
+            json_error("Legacy helix parameters must be string ids"));
+      return SketchLength3D::create_parameter(ParameterId(entry.at(legacy).get<std::string>()));
+    };
+    auto radius = binding("radius", "radius_parameter"),
+         pitch = binding("pitch", "pitch_parameter");
+    if (!radius || !pitch)
+      return Result<Sketch3D>::failure(!radius ? radius.error() : pitch.error());
+    if (bound_form && radius.value().source() == SketchCoordinate3DSource::Parameter &&
+        pitch.value().source() == SketchCoordinate3DSource::Parameter)
+      return Result<Sketch3D>::failure(
+          json_error("Parameter-only helix retains historical parameter fields"));
+    auto helix = SketchHelix3D::create_with_bindings(
         SketchEntityId(entry.at("id").get<std::string>()), std::move(axis.value()),
-        ParameterId(entry.at("radius_parameter").get<std::string>()),
-        ParameterId(entry.at("pitch_parameter").get<std::string>()),
+        std::move(radius.value()), std::move(pitch.value()),
         ParameterId(entry.at("turns_parameter").get<std::string>()),
-        handedness == "right_handed" ? SketchHelix3DHandedness::RightHanded
-                                     : SketchHelix3DHandedness::LeftHanded);
-    if (helix.has_error())
+        hand == "right_handed" ? SketchHelix3DHandedness::RightHanded
+                               : SketchHelix3DHandedness::LeftHanded);
+    if (!helix)
       return Result<Sketch3D>::failure(helix.error());
     auto added = sketch.value().add_helix(std::move(helix.value()));
-    if (added.has_error())
+    if (!added)
       return Result<Sketch3D>::failure(added.error());
   }
   if (value.contains("equation_curves") && !value.at("equation_curves").is_array())
@@ -4137,6 +4413,18 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
     auto added = sketch.value().add_guide_curve(std::move(guide.value()));
     if (added.has_error())
       return Result<Sketch3D>::failure(added.error());
+  }
+  if (value.contains("constraints")) {
+    if (!value.at("constraints").is_array())
+      return Result<Sketch3D>::failure(json_error("Spatial constraints must be an array"));
+    for (const auto& item : value.at("constraints")) {
+      auto constraint = spatial_constraint_from_json(item);
+      if (!constraint)
+        return Result<Sketch3D>::failure(constraint.error());
+      auto added = sketch.value().add_constraint(std::move(constraint.value()));
+      if (!added)
+        return Result<Sketch3D>::failure(added.error());
+    }
   }
   return sketch;
 }
@@ -4435,6 +4723,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   json root;
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
+  const bool spatial =
+      std::any_of(document.sketches_3d().begin(), document.sketches_3d().end(),
+                  [](const auto& sketch) { return sketch.requires_spatial_schema(); });
   const bool equations =
       std::any_of(document.sketches().begin(), document.sketches().end(),
                   [](const auto& sketch) { return !sketch.equation_curves().empty(); }) ||
@@ -4447,8 +4738,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       std::any_of(document.circular_pattern_features().begin(),
                   document.circular_pattern_features().end(),
                   [](const auto& f) { return f.placements().has_value(); });
-  if (equations || extended_patterns || !document.engineering_resources().entries().empty() ||
-      !document.hole_features().empty() || !document.thread_features().empty()) {
+  if (spatial || equations || extended_patterns ||
+      !document.engineering_resources().entries().empty() || !document.hole_features().empty() ||
+      !document.thread_features().empty()) {
     const bool manufacturing = std::any_of(
         document.hole_features().begin(), document.hole_features().end(), [](const auto& hole) {
           return !std::holds_alternative<std::monostate>(hole.manufacturing());
@@ -4457,7 +4749,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
         !document.thread_features().empty() ||
         std::any_of(document.hole_features().begin(), document.hole_features().end(),
                     [](const auto& hole) { return hole.thread().has_value(); });
-    root["version"] = equations                          ? k_equation_curve_version
+    root["version"] = spatial                            ? k_spatial_constraint_version
+                      : equations                        ? k_equation_curve_version
                       : extended_patterns                ? k_pattern_placement_version
                       : threads                          ? k_thread_version
                       : manufacturing                    ? k_manufacturing_hole_version
@@ -4857,9 +5150,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     latest_ancestor_position[node] = latest;
   }
-  if (equations || extended_patterns || interleaved || !document.result_face_workplanes().empty() ||
-      !document.hole_features().empty() || !document.thread_features().empty() ||
-      document.authored_history_intent())
+  if (spatial || equations || extended_patterns || interleaved ||
+      !document.result_face_workplanes().empty() || !document.hole_features().empty() ||
+      !document.thread_features().empty() || document.authored_history_intent())
     root["feature_order"] = std::move(feature_order);
   if (document.authored_history_intent())
     root["suppressed_features"] = document.authored_history_intent()->suppressed;
@@ -4893,10 +5186,36 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
          root.at("version") != k_manufacturing_hole_version &&
          root.at("version") != k_thread_version &&
          root.at("version") != k_pattern_placement_version &&
-         root.at("version") != k_equation_curve_version))
+         root.at("version") != k_equation_curve_version &&
+         root.at("version") != k_spatial_constraint_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
     const auto version = root.at("version").get<int>();
-    const bool equation_envelope = version == k_equation_curve_version;
+    const bool spatial_envelope = version == k_spatial_constraint_version;
+    const bool equation_envelope = version == k_equation_curve_version || spatial_envelope;
+    bool spatial_intent = false;
+    if (root.contains("sketches_3d") && root.at("sketches_3d").is_array())
+      for (const auto& sketch : root.at("sketches_3d")) {
+        if (!sketch.is_object())
+          continue;
+        if (sketch.contains("constraints")) {
+          if (!spatial_envelope)
+            return Result<PartDocument>::failure(
+                json_error("Spatial constraints require canonical Part version 9"));
+          spatial_intent = spatial_intent || (sketch.at("constraints").is_array() &&
+                                              !sketch.at("constraints").empty());
+        }
+        if (sketch.contains("helices") && sketch.at("helices").is_array())
+          for (const auto& helix : sketch.at("helices"))
+            if (helix.is_object() && (helix.contains("radius") || helix.contains("pitch"))) {
+              if (!spatial_envelope)
+                return Result<PartDocument>::failure(
+                    json_error("Owned spatial scalars require canonical Part version 9"));
+              spatial_intent = true;
+            }
+      }
+    if (spatial_envelope && !spatial_intent)
+      return Result<PartDocument>::failure(
+          json_error("Part version 9 requires spatial constraint or scalar intent"));
     bool equation_intent = false;
     for (const auto* key : {"sketches", "sketches_3d"}) {
       if (!root.contains(key) || !root.at(key).is_array())
@@ -4910,7 +5229,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
           equation_intent = equation_intent || (curves.is_array() && !curves.empty());
         }
     }
-    if (equation_envelope && !equation_intent)
+    if (version == k_equation_curve_version && !equation_intent)
       return Result<PartDocument>::failure(
           json_error("Part version 8 requires equation curve intent"));
     int history_version = version;

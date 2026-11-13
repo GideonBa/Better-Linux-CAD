@@ -189,6 +189,11 @@ private:
     }
     for (const auto& item : source.helices()) { auto r = candidate.value().add_helix(item); if (r.has_error()) return Result<Sketch3D>::failure(r.error()); }
     for (const auto& item : source.guide_curves()) { auto r = candidate.value().add_guide_curve(item); if (r.has_error()) return Result<Sketch3D>::failure(r.error()); }
+    for (const auto& item : source.constraints()) {
+      auto r = candidate.value().add_constraint(item);
+      if (!r)
+        return Result<Sketch3D>::failure(r.error());
+    }
     return candidate;
   }
 };

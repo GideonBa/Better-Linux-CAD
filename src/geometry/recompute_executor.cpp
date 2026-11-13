@@ -2017,14 +2017,13 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
         if (helix == nullptr)
           return Result<std::vector<SweepPathSegment>>::failure(
               geometry_error(reference.entity()->value(), "3D sweep helix must exist"));
-        const Parameter* radius = document.find_parameter(helix->radius_parameter());
-        const Parameter* pitch = document.find_parameter(helix->pitch_parameter());
+        const auto radius = helix->radius_binding().resolve(document);
+        const auto pitch = helix->pitch_binding().resolve(document);
         const Parameter* turns = document.find_parameter(helix->turns_parameter());
-        if (radius == nullptr || radius->type() != ParameterType::Length || pitch == nullptr ||
-            pitch->type() != ParameterType::Length || turns == nullptr ||
-            turns->type() != ParameterType::Count || turns->value().count_value() == 0U)
+        if (!radius || !pitch || turns == nullptr || turns->type() != ParameterType::Count ||
+            turns->value().count_value() == 0U)
           return Result<std::vector<SweepPathSegment>>::failure(
-              geometry_error(helix->id().value(), "3D sweep helix parameters are invalid"));
+              geometry_error(helix->id().value(), "3D sweep helix inputs are invalid"));
         Point3 origin{};
         Vector3 axis{0.0, 0.0, 1.0};
         if (helix->axis().source() == SketchHelixAxis3DSource::ConstructionLine) {
@@ -2065,17 +2064,17 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
           const double angle =
               2.0 * k_pi * static_cast<double>(turns->value().count_value()) * fraction *
               (helix->handedness() == SketchHelix3DHandedness::RightHanded ? 1.0 : -1.0);
-          const double axial = pitch->value().millimeters() *
+          const double axial = pitch.value().millimeters() *
                                static_cast<double>(turns->value().count_value()) * fraction;
           points.push_back(
               {origin.x +
-                   radius->value().millimeters() * (x.x * std::cos(angle) + y.x * std::sin(angle)) +
+                   radius.value().millimeters() * (x.x * std::cos(angle) + y.x * std::sin(angle)) +
                    axis.x * axial,
                origin.y +
-                   radius->value().millimeters() * (x.y * std::cos(angle) + y.y * std::sin(angle)) +
+                   radius.value().millimeters() * (x.y * std::cos(angle) + y.y * std::sin(angle)) +
                    axis.y * axial,
                origin.z +
-                   radius->value().millimeters() * (x.z * std::cos(angle) + y.z * std::sin(angle)) +
+                   radius.value().millimeters() * (x.z * std::cos(angle) + y.z * std::sin(angle)) +
                    axis.z * axial});
         }
         for (std::size_t index = 1U; index < points.size(); ++index)
