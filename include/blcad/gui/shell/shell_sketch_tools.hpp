@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 
 #include "blcad/gui/gui_document_session.hpp"
 #include "blcad/gui/gui_rapid_dimension.hpp"
@@ -36,16 +37,24 @@ enum class SketchModifyKind { Trim, Extend, Split };
 // All headless controllers (create, drag, constraint, dimension, interaction
 // scene builder) are consumed unchanged. Every ribbon slot funnels through the
 // public dialog-free command surface below, which doubles as the test surface.
+class ShellSketchCurveTools;
 class ShellSketchTools final : public QObject {
 public:
   ShellSketchTools(ShellWindow& window, GuiDocumentSession& session,
                    GuiSketchWorkbench& workbench, GuiSketchWorkspace& workspace,
                    OcctViewport& viewport, ShellRibbon& ribbon, int sketch_tab);
 
+  ~ShellSketchTools() override;
+  [[nodiscard]] ShellSketchCurveTools& curve_tools() noexcept {
+    return *curve_tools_;
+  }
+
   // Lifecycle, driven by ShellWindow.
   void activate();   // publish the real interaction scene + arm the drag layer
   void deactivate(); // tear down tools, preview, handles
   void publish_scene();
+  // Disposable curve-task overlay; source controllers and catalogs remain unchanged.
+  void publish_curve_candidate(const Sketch& candidate);
   void refresh_enablement();
 
   // Dialog-free command surface (ribbon slots and tests call these).
@@ -100,6 +109,7 @@ protected:
   bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
+  std::unique_ptr<ShellSketchCurveTools> curve_tools_;
   void build_ribbon_groups();
   void build_operation_group();
   void show_operation_dialog(GuiSketchOperationKind kind);

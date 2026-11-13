@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
+#include "blcad/gui/shell/shell_sketch_curve_tools.hpp"
 
 #include "blcad/core/sketch_edit_commands.hpp"
 #include "blcad/core/sketch_topology_part_document.hpp"
@@ -447,10 +448,15 @@ ShellSketchTools::ShellSketchTools(ShellWindow& window, GuiDocumentSession& sess
     viewport_.setFocus();
     window_.refresh();
   });
+  curve_tools_ = std::make_unique<ShellSketchCurveTools>(window_, *this, workspace_);
   build_ribbon_groups();
   wire_viewport_callbacks();
   viewport_.installEventFilter(this);
   window_.installEventFilter(this);
+}
+
+ShellSketchTools::~ShellSketchTools() {
+  curve_tools_.reset();
 }
 
 void ShellSketchTools::build_ribbon_groups() {
@@ -477,6 +483,8 @@ void ShellSketchTools::build_ribbon_groups() {
   ribbon_.add_menu_button(draw_group, QStringLiteral("Arc"), make_tool_menu(kArcTools));
   ribbon_.add_menu_button(draw_group, QStringLiteral("Slot"), make_tool_menu(kSlotTools));
   ribbon_.add_button(draw_group, make_tool_action(kPointTool));
+  ribbon_.add_button(draw_group, &curve_tools_->equation_action());
+  ribbon_.add_small_button(draw_group, &curve_tools_->edit_action());
 
   auto* constrain_group = ribbon_.add_group(sketch_tab_, QStringLiteral("Constraints"));
   for (const auto& descriptor : kConstraints) {
@@ -495,6 +503,7 @@ void ShellSketchTools::build_ribbon_groups() {
     ribbon_.add_small_button(constrain_group, action);
     constraint_actions_.push_back(action);
   }
+  ribbon_.add_small_button(constrain_group, &curve_tools_->smooth_action());
   delete_constraint_action_ = new QAction(QStringLiteral("Delete (Del)"), this);
   delete_constraint_action_->setToolTip(
       QStringLiteral("Delete selected constraint, dimension, or sketch geometry"));
@@ -840,6 +849,12 @@ void ShellSketchTools::publish_scene() {
     publish_handles(drag_controller_->handles());
 }
 
+void ShellSketchTools::publish_curve_candidate(const Sketch& candidate) {
+  candidate_by_semantic_.clear();
+  publish_scene_for(candidate, false);
+  viewport_.set_sketch_drag_handles({});
+}
+
 void ShellSketchTools::publish_scene_for(const Sketch& sketch, bool include_annotations) {
   const PartDocument* part = session_.part_document();
   if (part == nullptr)
@@ -900,6 +915,8 @@ void ShellSketchTools::publish_scene_for(const Sketch& sketch, bool include_anno
 }
 
 void ShellSketchTools::refresh_enablement() {
+  if (curve_tools_)
+    curve_tools_->refresh();
   const bool active = sketch_context_ready() && !session_.task().active();
   if (rapid_dimension_action_)
     rapid_dimension_action_->setEnabled(sketch_context_ready() &&
@@ -1282,6 +1299,10 @@ void ShellSketchTools::cancel_label_drag() {
 }
 
 bool ShellSketchTools::finish_tool() {
+  if (curve_tools_ && curve_tools_->active()) {
+    report_message("Apply or cancel the curve task before Finish Sketch.");
+    return false;
+  }
   if (tool_active() && create_controller_->tool() == GuiSketchCreateTool::Spline &&
       create_controller_->complete_ready())
     return complete_tool();
@@ -1290,6 +1311,8 @@ bool ShellSketchTools::finish_tool() {
 }
 
 void ShellSketchTools::cancel_tool() {
+  if (curve_tools_)
+    curve_tools_->cancel();
   create_session_ = 0;
   cancel_operation_preview();
   if (rapid_dimension_active_) {

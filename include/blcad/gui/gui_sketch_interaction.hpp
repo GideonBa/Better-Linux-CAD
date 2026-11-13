@@ -81,7 +81,7 @@ private:
   ModelToScreen model_to_screen_;
 };
 
-enum class GuiSketchCurveKind { Line, Arc, Spline, Circle, ReferenceLine };
+enum class GuiSketchCurveKind { Line, Arc, Spline, Circle, ReferenceLine, Equation };
 enum class GuiSketchHitKind { Point, Curve, Dimension, Glyph };
 enum class GuiSketchSnapKind {
   None,

@@ -1,6 +1,7 @@
 #include "../support/equation_curve_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/equation_curve_geometry.hpp"
+#include "blcad/geometry/equation_curve_presentation.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/revolve_adapter.hpp"
 #include "blcad/geometry/sketch_finish.hpp"
@@ -356,4 +357,31 @@ TEST_CASE("Equation paths reject unsupported twist without substituting a chord 
                                         PathOrientationRule::MinimumTwist, std::nullopt, 90);
   REQUIRE_FALSE(result);
   CHECK(result.error().message().find("curve-preserving twist") != std::string::npos);
+}
+
+TEST_CASE("Equation presentation samples bounded derived chords without changing modeled policy",
+          "[geometry][parity-b162][equation-presentation]") {
+  const auto part = document();
+  const auto source = equation({"2mm*cos(u)", "2mm*sin(u)", ""}, "0", "2*pi", .001, true);
+  const auto converted = converted_geometry(part, source);
+  const auto before = f::checked(serialize_part_document_to_json(part));
+  const auto points = f::checked(sample_equation_curve_for_presentation(converted, .01));
+  REQUIRE(points.size() > 10);
+  CHECK(points.front() == points.back());
+  for (std::size_t i = 1; i < points.size(); ++i) {
+    const Point3 middle{(points[i - 1].x + points[i].x) / 2, (points[i - 1].y + points[i].y) / 2,
+                        0};
+    CHECK(2 - std::hypot(middle.x, middle.y) <= .01 + 1e-12);
+  }
+  CHECK_FALSE(sample_equation_curve_for_presentation(converted, .01, 4));
+  CHECK_FALSE(sample_equation_curve_for_presentation(converted, 0));
+  CHECK(f::checked(serialize_part_document_to_json(part)) == before);
+  const auto helix =
+      converted_geometry(part, equation({"2mm*cos(u)", "2mm*sin(u)", "u*1mm"}, "0", "2*pi", .002));
+  const auto spatial = f::checked(sample_equation_curve_for_presentation(helix, .01));
+  REQUIRE(spatial.size() > 20);
+  CHECK(spatial.front().z == 0);
+  CHECK(spatial.back().z == Catch::Approx(2 * pi));
+  for (std::size_t i = 1; i < spatial.size(); ++i)
+    CHECK(spatial[i].z > spatial[i - 1].z);
 }

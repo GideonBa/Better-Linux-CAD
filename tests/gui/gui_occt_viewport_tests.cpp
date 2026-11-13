@@ -206,3 +206,31 @@ TEST_CASE("Restored viewport camera values remain authoritative without a native
   CHECK(notifications == 1);
   REQUIRE(viewport.model_to_screen({3, 4, 5}));
 }
+
+TEST_CASE("Sketch-owned previews preserve native focus ownership and suspended modeler previews",
+          "[gui][viewport][parity-b162][sketch-preview-scope]") {
+  OcctViewport viewport;
+  viewport.resize(800, 600);
+  viewport.show();
+  QGuiApplication::sync();
+  qApp->processEvents();
+  const auto shape = box_shape();
+  viewport.set_sketch_focus("sketch.scope");
+  CHECK_FALSE(viewport.set_sketch_previews(SketchId("sketch.other"), {shape}));
+  REQUIRE(viewport.set_sketch_previews(SketchId("sketch.scope"), {shape}, {"body/source"}));
+  CHECK(viewport.feature_preview_active());
+  CHECK(viewport.feature_preview_replaces("body/source"));
+  viewport.set_sketch_focus("sketch.other");
+  CHECK_FALSE(viewport.feature_preview_active());
+  CHECK_FALSE(viewport.feature_preview_replaces("body/source"));
+  viewport.clear_sketch_focus();
+  CHECK_FALSE(viewport.feature_preview_active());
+  viewport.clear_feature_preview();
+  REQUIRE(viewport.set_feature_preview(shape));
+  CHECK(viewport.feature_preview_active());
+  viewport.set_sketch_focus("sketch.scope");
+  if (QApplication::platformName() == "xcb")
+    CHECK_FALSE(viewport.feature_preview_active());
+  viewport.clear_sketch_focus();
+  CHECK(viewport.feature_preview_active());
+}

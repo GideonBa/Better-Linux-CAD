@@ -1,5 +1,6 @@
-#include "blcad/gui/gui_sketch_dimension_layout.hpp"
 #include "blcad/gui/gui_sketch_interaction.hpp"
+#include "blcad/geometry/equation_curve_presentation.hpp"
+#include "blcad/gui/gui_sketch_dimension_layout.hpp"
 
 #include "blcad/geometry/reference_driven_sketch_helper.hpp"
 #include "blcad/geometry/shape_cache.hpp"
@@ -472,6 +473,11 @@ void build_intersections(GuiSketchInteractionScene& scene) {
     const auto& first = scene.curves[first_curve].polyline;
     for (std::size_t second_curve = first_curve + 1U; second_curve < scene.curves.size();
          ++second_curve) {
+      // Equation chords are presentation witnesses, not stable intersection
+      // targets. Avoid inventing constraints or quadratic work on dense curves.
+      if (scene.curves[first_curve].kind == GuiSketchCurveKind::Equation ||
+          scene.curves[second_curve].kind == GuiSketchCurveKind::Equation)
+        continue;
       if (!bounds_overlap(bounds[first_curve], bounds[second_curve]))
         continue;
       const auto& second = scene.curves[second_curve].polyline;
@@ -802,6 +808,27 @@ GuiSketchInteractionSceneBuilder::build_impl(const PartDocument& document, const
               sample_spline(spline));
     add_point(scene, semantic, spline.id().value() + ":start", spline.start(), GuiSketchSnapKind::Endpoint);
     add_point(scene, semantic, spline.id().value() + ":end", spline.end(), GuiSketchSnapKind::Endpoint);
+  }
+
+  for (const auto& equation : sketch.equation_curves()) {
+    auto converted = geometry::EquationCurveGeometryAdapter{}.convert(document, equation);
+    if (!converted)
+      return Result<GuiSketchInteractionScene>::failure(converted.error());
+    auto samples = geometry::sample_equation_curve_for_presentation(converted.value());
+    if (!samples)
+      return Result<GuiSketchInteractionScene>::failure(samples.error());
+    std::vector<Point2> points;
+    points.reserve(samples.value().size());
+    for (const auto p : samples.value())
+      points.push_back({p.x, p.y});
+    const auto semantic = entity_semantic(sketch, equation.id());
+    add_curve(scene, semantic, equation.id().value() + ":equation", GuiSketchCurveKind::Equation,
+              std::move(points), equation.closure() == EquationCurveClosure::Periodic);
+    const auto& ends = converted.value().endpoints;
+    add_point(scene, semantic, equation.id().value() + ":equation-start",
+              {ends[0].position.x, ends[0].position.y}, GuiSketchSnapKind::Endpoint);
+    add_point(scene, semantic, equation.id().value() + ":equation-end",
+              {ends[1].position.x, ends[1].position.y}, GuiSketchSnapKind::Endpoint);
   }
 
   for (const auto& point : sketch.points()) {
