@@ -549,3 +549,33 @@ TEST_CASE("Semantic Hole extents retain analytic material on a Sweep target",
                                              {0, 0, 20}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 480,
                                              extent);
 }
+
+TEST_CASE("Owned spatial helix values preserve the historical swept consumer policy",
+          "[geometry][parity-b163][spatial-scalar-sweep]") {
+  auto parameterized = spatial_sweep_document(true);
+  ShapeCache before = cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(parameterized, before));
+  auto explicit_values = parameterized;
+  auto sketch = *explicit_values.find_sketch_3d(Sketch3DId("sketch3d.path"));
+  const auto source = *sketch.find_helix(SketchEntityId("helix.path"));
+  auto radius = SketchLength3D::create_explicit(Quantity::length_mm(4).value());
+  auto pitch = SketchLength3D::create_explicit(Quantity::length_mm(5).value());
+  REQUIRE(radius);
+  REQUIRE(pitch);
+  auto replacement =
+      SketchHelix3D::create_with_bindings(source.id(), source.axis(), radius.value(), pitch.value(),
+                                          source.turns_parameter(), source.handedness());
+  REQUIRE(replacement);
+  REQUIRE(sketch.replace_helix(replacement.value()));
+  REQUIRE(explicit_values.update_sketch_3d(sketch));
+  ShapeCache after = cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(explicit_values, after));
+  CHECK(body_volume(after, "body.sweep") ==
+        Catch::Approx(body_volume(before, "body.sweep")).margin(1e-8));
+  const auto first = BodyTransformAdapter{}.bounds(*before.find_body_shape(BodyId("body.sweep")));
+  const auto second = BodyTransformAdapter{}.bounds(*after.find_body_shape(BodyId("body.sweep")));
+  REQUIRE(first);
+  REQUIRE(second);
+  CHECK(second.value().minimum.x == Catch::Approx(first.value().minimum.x).margin(1e-9));
+  CHECK(second.value().maximum.z == Catch::Approx(first.value().maximum.z).margin(1e-9));
+}
