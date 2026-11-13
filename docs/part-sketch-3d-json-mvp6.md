@@ -25,6 +25,13 @@ Sketches preserve Part-document insertion order. Entities preserve insertion ord
 fixed type sequence above. All entity records are strict: missing, extra, mistyped, or unsupported
 fields fail loading.
 
+Block 160 adds optional `equation_curves[]` to this same record under Part **V8**. Historical
+records retain the exact fields above and omit the new array when empty; older Part versions reject
+the reserved field. The [V8 format](file-format.md#equation-curve-intent--160)
+owns its exact typed expression/domain/policy grammar. Equations use the existing sketch-local entity
+ID scope; no evaluated points, sampled splines or compiled programs enter these arrays. Project
+resource-aware embedding preserves V8 through its existing owner/reference envelope.
+
 Coordinates use exactly one form:
 
 ```json

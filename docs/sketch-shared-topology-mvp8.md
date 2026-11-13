@@ -76,6 +76,19 @@ Distinct point ids may occupy the same coordinate. Numeric coincidence does not 
 Block 109 consumes every non-reference point as two canonical solver variables, X then Y. Reference
 points remain constant and do not contribute solver variables.
 
+## Equation definitions — 160 integration
+
+An authored equation contributes one canonical `entity/<id>` topology entity of kind
+`EquationCurve`, with **zero defining points**. Its formulas and parameter/domain/tolerance intent
+remain owned solely by the existing Sketch's EquationCurve record. Solver topology never turns
+derived samples or endpoint evaluations into authored point variables.
+
+The legacy materializer copies the same-ID definition and construction role exactly, permits
+explicit removal, and rejects replacing the equation with sampled editable line/spline geometry.
+Ordinary Split/transform/spline/offset/project rebuilds preserve unrelated equation records.
+Missing or mismatched source definitions fail explicitly. Stable derived endpoint/curve Geometry
+roles and native meaningful controls remain 161/162; this adds no free equation point grip.
+
 ## Entity topology
 
 `SketchTopologyEntity` contains:
@@ -95,6 +108,7 @@ Implemented kinds are:
 Line
 Arc
 Spline
+EquationCurve (160; no defining points)
 RectangleProfile
 CircleProfile
 ClosedProfile

@@ -1,5 +1,6 @@
 #include "blcad/core/part_document_json.hpp"
 #include "engineering_resource_json.hpp"
+#include "equation_curve_json.hpp"
 #include "imported_part_json.hpp"
 #include "imported_topology_json.hpp"
 #include "part_material_json.hpp"
@@ -36,6 +37,7 @@ constexpr int k_hole_version = 4;
 constexpr int k_manufacturing_hole_version = 5;
 constexpr int k_thread_version = 6;
 constexpr int k_pattern_placement_version = 7;
+constexpr int k_equation_curve_version = 8;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -1094,6 +1096,16 @@ driving_dimension_from_json(const json& dimension_json) {
       return Result<Sketch>::failure(spline.error());
     auto added = sketch.value().add_entity(spline.value());
     if (added.has_error())
+      return Result<Sketch>::failure(added.error());
+  }
+  if (sketch_json.contains("equation_curves") && !sketch_json.at("equation_curves").is_array())
+    return Result<Sketch>::failure(json_error("Equation curves must be an array"));
+  for (const auto& entry : sketch_json.value("equation_curves", json::array())) {
+    auto curve = detail::equation_curve_from_json(entry);
+    if (!curve)
+      return Result<Sketch>::failure(curve.error());
+    auto added = sketch.value().add_entity(std::move(curve.value()));
+    if (!added)
       return Result<Sketch>::failure(added.error());
   }
   for (const auto& point_json : sketch_json.value("sketch_points", json::array())) {
@@ -3925,6 +3937,11 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
                                 ? "right_handed"
                                 : "left_handed"}});
   }
+  if (!sketch.equation_curves().empty()) {
+    value["equation_curves"] = json::array();
+    for (const auto& curve : sketch.equation_curves())
+      value["equation_curves"].push_back(detail::equation_curve_to_json(curve));
+  }
   for (const auto& guide : sketch.guide_curves())
     value["guide_curves"].push_back(json{{"id", guide.id().value()},
                                          {"source_curve", guide.source_curve().value()},
@@ -3934,8 +3951,11 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
 }
 
 [[nodiscard]] Result<Sketch3D> sketch_3d_from_json(const json& value) {
-  if (!has_exact_fields(value, {"id", "name", "points", "lines", "polylines", "arcs", "splines",
-                                "helices", "guide_curves"}) ||
+  auto legacy_fields = value;
+  if (legacy_fields.is_object())
+    legacy_fields.erase("equation_curves");
+  if (!has_exact_fields(legacy_fields, {"id", "name", "points", "lines", "polylines", "arcs",
+                                        "splines", "helices", "guide_curves"}) ||
       !value.at("id").is_string() || !value.at("name").is_string())
     return Result<Sketch3D>::failure(
         json_error("3D sketch requires its exact identity and entity arrays"));
@@ -4079,6 +4099,16 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
       return Result<Sketch3D>::failure(helix.error());
     auto added = sketch.value().add_helix(std::move(helix.value()));
     if (added.has_error())
+      return Result<Sketch3D>::failure(added.error());
+  }
+  if (value.contains("equation_curves") && !value.at("equation_curves").is_array())
+    return Result<Sketch3D>::failure(json_error("Equation curves must be an array"));
+  for (const auto& entry : value.value("equation_curves", json::array())) {
+    auto curve = detail::equation_curve_from_json(entry);
+    if (!curve)
+      return Result<Sketch3D>::failure(curve.error());
+    auto added = sketch.value().add_equation_curve(std::move(curve.value()));
+    if (!added)
       return Result<Sketch3D>::failure(added.error());
   }
   for (const auto& entry : value.at("guide_curves")) {
@@ -4401,6 +4431,11 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   json root;
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
+  const bool equations =
+      std::any_of(document.sketches().begin(), document.sketches().end(),
+                  [](const auto& sketch) { return !sketch.equation_curves().empty(); }) ||
+      std::any_of(document.sketches_3d().begin(), document.sketches_3d().end(),
+                  [](const auto& sketch) { return !sketch.equation_curves().empty(); });
   const bool extended_patterns =
       std::any_of(document.linear_pattern_features().begin(),
                   document.linear_pattern_features().end(),
@@ -4408,7 +4443,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       std::any_of(document.circular_pattern_features().begin(),
                   document.circular_pattern_features().end(),
                   [](const auto& f) { return f.placements().has_value(); });
-  if (extended_patterns || !document.engineering_resources().entries().empty() ||
+  if (equations || extended_patterns || !document.engineering_resources().entries().empty() ||
       !document.hole_features().empty() || !document.thread_features().empty()) {
     const bool manufacturing = std::any_of(
         document.hole_features().begin(), document.hole_features().end(), [](const auto& hole) {
@@ -4418,7 +4453,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
         !document.thread_features().empty() ||
         std::any_of(document.hole_features().begin(), document.hole_features().end(),
                     [](const auto& hole) { return hole.thread().has_value(); });
-    root["version"] = extended_patterns                  ? k_pattern_placement_version
+    root["version"] = equations                          ? k_equation_curve_version
+                      : extended_patterns                ? k_pattern_placement_version
                       : threads                          ? k_thread_version
                       : manufacturing                    ? k_manufacturing_hole_version
                       : document.hole_features().empty() ? k_resource_version
@@ -4569,6 +4605,11 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       sketch_json["arc_segments"].push_back(arc_segment_to_json(arc));
     for (const auto& spline : sketch.spline_segments())
       sketch_json["spline_segments"].push_back(spline_segment_to_json(spline));
+    if (!sketch.equation_curves().empty()) {
+      sketch_json["equation_curves"] = json::array();
+      for (const auto& curve : sketch.equation_curves())
+        sketch_json["equation_curves"].push_back(detail::equation_curve_to_json(curve));
+    }
     for (const auto& point : sketch.points())
       sketch_json["sketch_points"].push_back(json{{"id", point.id().value()},
                                                   {"position", point2_to_json(point.position())}});
@@ -4812,7 +4853,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     latest_ancestor_position[node] = latest;
   }
-  if (extended_patterns || interleaved || !document.result_face_workplanes().empty() ||
+  if (equations || extended_patterns || interleaved || !document.result_face_workplanes().empty() ||
       !document.hole_features().empty() || !document.thread_features().empty() ||
       document.authored_history_intent())
     root["feature_order"] = std::move(feature_order);
@@ -4847,19 +4888,37 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
          root.at("version") != k_resource_version && root.at("version") != k_hole_version &&
          root.at("version") != k_manufacturing_hole_version &&
          root.at("version") != k_thread_version &&
-         root.at("version") != k_pattern_placement_version))
+         root.at("version") != k_pattern_placement_version &&
+         root.at("version") != k_equation_curve_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
     const auto version = root.at("version").get<int>();
+    const bool equation_envelope = version == k_equation_curve_version;
+    bool equation_intent = false;
+    for (const auto* key : {"sketches", "sketches_3d"}) {
+      if (!root.contains(key) || !root.at(key).is_array())
+        continue;
+      for (const auto& sketch : root.at(key))
+        if (sketch.is_object() && sketch.contains("equation_curves")) {
+          if (!equation_envelope)
+            return Result<PartDocument>::failure(
+                json_error("Equation intent requires canonical Part version 8"));
+          const auto& curves = sketch.at("equation_curves");
+          equation_intent = equation_intent || (curves.is_array() && !curves.empty());
+        }
+    }
+    if (equation_envelope && !equation_intent)
+      return Result<PartDocument>::failure(
+          json_error("Part version 8 requires equation curve intent"));
     int history_version = version;
     const bool hole_envelope = version == k_hole_version || version == k_manufacturing_hole_version;
     const bool thread_envelope = version == k_thread_version;
-    const bool pattern_envelope = version == k_pattern_placement_version;
+    const bool pattern_envelope = equation_envelope || version == k_pattern_placement_version;
     const auto patterns = root.value("part_patterns", json::array());
     const bool extended_patterns =
         patterns.is_array() && std::any_of(patterns.begin(), patterns.end(), [](const auto& f) {
           return f.is_object() && f.contains("placements");
         });
-    if (pattern_envelope != extended_patterns)
+    if (!equation_envelope && pattern_envelope != extended_patterns)
       return Result<PartDocument>::failure(
           json_error("Pattern placement intent requires canonical Part version 7"));
     const bool resource_envelope =

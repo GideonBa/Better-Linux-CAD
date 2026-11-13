@@ -33,6 +33,29 @@ from the member roles rather than a duplicated container flag. Construction geom
 available to dimensions, constraints and references, but cannot bound an explicit solid profile or
 an implicit hole. No transient selection, role-change preview or resolved geometry is serialized.
 
+## Equation curve intent — 160
+
+The first equation-bearing Part uses integer version **8**, retaining the V7 resource/history
+and feature envelopes. Historical documents without equation intent retain their existing canonical
+versions/bytes. Version 8 requires at least one equation record and adds optional `equation_curves`
+arrays inside current planar Sketch and Sketch3D records; empty arrays are omitted. Older Part versions reject this reserved field, including
+empty arrays, instead of silently dropping intent. Removing all equation intent permits the ordinary
+highest-required historical envelope. Project members retain this Part version through the existing
+resource ownership rules; the Project root gains no parallel equation store.
+
+Every equation record requires exactly `id`, `mode`, `variable`, `domain`, `coordinates`,
+`tolerance_mm`, `policy`, `closure`, `construction`. Domain requires exactly `unit`, `lower`, `upper`;
+its bounds are expression strings. Coordinate keys are mode-specific: `{y}` for Cartesian2D, `{r}`
+for Polar2D, `{x,y}` for Parametric2D, `{x,y,z}` for Parametric3D. All coordinate values are expression
+strings. Tolerance is a positive finite JSON number, construction a boolean; policy is
+`adaptive_v1`, closure `open` or `periodic`. Mode/unit spellings and the bounded safe grammar are
+owned by [curve expressions](parameter-expression-mvp.md#curve-local-expression-contract).
+Unknown fields/modes/units/policies, malformed expressions, duplicate IDs, unresolved/wrong-unit
+parameter references or owner-scope mismatch reject publication/loading. Samples, compiled AST,
+derivatives, endpoint tessellation and resolved geometry are never persisted.
+[Core S02/legacy and session proof](parameter-expression-mvp.md#expressionintent-proof) verifies
+this format; the numbered plan owns acceptance and delivery.
+
 ## Planar Smooth/G2 constraint sidecar — 159
 
 The existing `blcad.sketch_constraints.mvp8` Part-session sidecar uses integer version **2** when

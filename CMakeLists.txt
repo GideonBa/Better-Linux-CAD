@@ -77,6 +77,8 @@ add_library(
   src/core/part_feature_input_reference.cpp
   src/core/parameter.cpp
   src/core/parameter_expression.cpp
+  src/core/curve_expression.cpp
+  src/core/equation_curve.cpp
   src/core/path_curve.cpp
   src/core/project.cpp
   src/core/project_engineering_resources.cpp
@@ -513,6 +515,8 @@ if(BLCAD_BUILD_TESTS)
     tests/core/part_document_tests.cpp
     tests/core/part_body_dependency_tests.cpp
     tests/core/parameter_expression_tests.cpp
+    tests/core/equation_curve_tests.cpp
+    tests/core/equation_curve_document_tests.cpp
     tests/core/parameter_tests.cpp
     tests/core/path_extrude_feature_tests.cpp
     tests/core/path_curve_tests.cpp
@@ -801,6 +805,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_sketch_interaction_tests.cpp
       tests/gui/gui_sketch_primitive_constraints_tests.cpp
       tests/gui/gui_sketch_smooth_tests.cpp
+      tests/gui/gui_equation_curve_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
       tests/gui/gui_interactive_sketcher_acceptance_tests.cpp
       tests/gui/gui_spatial_surface_workbench_tests.cpp

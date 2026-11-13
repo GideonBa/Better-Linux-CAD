@@ -11,6 +11,49 @@
 namespace blcad {
 namespace {
 
+bool has_equation_intent(const PartDocument& document) {
+  return std::any_of(document.sketches().begin(), document.sketches().end(),
+                     [](const auto& sketch) { return !sketch.equation_curves().empty(); }) ||
+         std::any_of(document.sketches_3d().begin(), document.sketches_3d().end(),
+                     [](const auto& sketch) { return !sketch.equation_curves().empty(); });
+}
+// Preserve the existing fast path for historical Parts. Equation-bearing Parts
+// validate domain changes transactionally, including dependent formulas/graph.
+struct EquationParameterRollback {
+  PartDocument& document;
+  std::optional<PartDocument> before;
+  bool accepted{false};
+  explicit EquationParameterRollback(PartDocument& value) : document(value) {
+    if (has_equation_intent(value))
+      before = value;
+  }
+  ~EquationParameterRollback() {
+    if (before && !accepted)
+      document = std::move(*before);
+  }
+};
+Result<std::size_t> validate_equation_domains(const PartDocument& document,
+                                              const std::vector<std::string>& affected) {
+  std::size_t count = 0;
+  const auto validate = [&](const auto& sketches) -> Result<std::size_t> {
+    for (const auto& sketch : sketches) {
+      if (std::find(affected.begin(), affected.end(), sketch.id().value()) == affected.end())
+        continue;
+      for (const auto& curve : sketch.equation_curves()) {
+        auto program = EquationCurveProgram::compile(document, curve);
+        if (!program)
+          return Result<std::size_t>::failure(program.error());
+        ++count;
+      }
+    }
+    return Result<std::size_t>::success(count);
+  };
+  auto planar = validate(document.sketches());
+  if (!planar)
+    return planar;
+  return validate(document.sketches_3d());
+}
+
 constexpr double k_tolerance = 1.0e-9;
 
 [[nodiscard]] std::string body_dependency_node_id(const BodyId& id) {
@@ -1587,6 +1630,11 @@ Result<std::size_t> PartDocument::add_sketch_impl(Sketch sketch, const Sketch* r
           pattern.id().value(), "circular hole pattern hole diameter parameter must be "
                                 "a length parameter in part document"));
   }
+  for (const auto& curve : sketch.equation_curves()) {
+    auto program = EquationCurveProgram::compile(*this, curve);
+    if (!program)
+      return Result<std::size_t>::failure(program.error());
+  }
   auto graph = dependency_graph_;
   auto added_node = add_authored_graph_node(graph, sketch.id().value());
   if (added_node.has_error())
@@ -1599,6 +1647,12 @@ Result<std::size_t> PartDocument::add_sketch_impl(Sketch sketch, const Sketch* r
     if (workplane_dependency.has_error())
       return Result<std::size_t>::failure(workplane_dependency.error());
   }
+  for (const auto& curve : sketch.equation_curves())
+    for (const auto& parameter : curve.parameter_dependencies()) {
+      auto edge = add_dependency_if_missing(graph, parameter.value(), sketch.id().value());
+      if (!edge)
+        return Result<std::size_t>::failure(edge.error());
+    }
   auto projected_reference_dependencies = add_projected_reference_dependencies(
       graph, sketch, retained != nullptr,
       [&](std::string node) { return add_authored_graph_node(graph, std::move(node)); });
@@ -1813,6 +1867,11 @@ Result<std::size_t> PartDocument::add_sketch_3d(Sketch3D sketch) {
         return valid;
     }
 
+  for (const auto& curve : sketch.equation_curves()) {
+    auto program = EquationCurveProgram::compile(*this, curve);
+    if (!program)
+      return Result<std::size_t>::failure(program.error());
+  }
   auto graph = dependency_graph_;
   auto added_node = add_authored_graph_node(graph, sketch.id().value());
   if (added_node.has_error())
@@ -3818,6 +3877,7 @@ Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId i
   auto updated = existing->with_value(value);
   if (updated.has_error())
     return Result<std::vector<std::string>>::failure(updated.error());
+  EquationParameterRollback rollback(*this);
   for (auto& parameter : parameters_)
     if (parameter.id() == id) {
       parameter = std::move(updated.value());
@@ -3829,6 +3889,12 @@ Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId i
   auto reevaluated = reevaluate_affected_expressions(affected.value());
   if (reevaluated.has_error())
     return Result<std::vector<std::string>>::failure(reevaluated.error());
+  if (rollback.before) {
+    auto domains = validate_equation_domains(*this, affected.value());
+    if (!domains)
+      return Result<std::vector<std::string>>::failure(domains.error());
+  }
+  rollback.accepted = true;
   return affected;
 }
 
@@ -3871,6 +3937,7 @@ Result<std::vector<std::string>> PartDocument::set_parameter_formula(ParameterId
     return Result<std::vector<std::string>>::failure(Error::dependency(
         id.value(), "expression formula edit must not create a dependency cycle"));
 
+  EquationParameterRollback rollback(*this);
   auto invalidation_state = invalidation_state_;
   auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
   if (synced.has_error())
@@ -3889,6 +3956,12 @@ Result<std::vector<std::string>> PartDocument::set_parameter_formula(ParameterId
   auto reevaluated = reevaluate_affected_expressions(affected.value());
   if (reevaluated.has_error())
     return Result<std::vector<std::string>>::failure(reevaluated.error());
+  if (rollback.before) {
+    auto domains = validate_equation_domains(*this, affected.value());
+    if (!domains)
+      return Result<std::vector<std::string>>::failure(domains.error());
+  }
+  rollback.accepted = true;
   return affected;
 }
 

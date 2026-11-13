@@ -571,6 +571,42 @@ Result<Sketch> Sketch::create(SketchId id, std::string name, DatumPlaneId workpl
   return Result<Sketch>::success(Sketch(std::move(id), std::move(name), std::move(workplane)));
 }
 
+Result<std::size_t> Sketch::add_entity(EquationCurve curve) {
+  if (curve.mode() == EquationCurveMode::Parametric3D)
+    return Result<std::size_t>::failure(
+        Error::validation(curve.id().value(), "Planar Sketch requires a 2D equation mode"));
+  if (has_entity_id(curve.id()) || find_arc_segment(curve.id()) || find_spline_segment(curve.id()))
+    return Result<std::size_t>::failure(Error::validation(
+        curve.id().value(), "Equation curve entity ID must be unique within Sketch"));
+  equation_curves_.push_back(std::move(curve));
+  return Result<std::size_t>::success(equation_curves_.size() - 1);
+}
+const EquationCurve* Sketch::find_equation_curve(SketchEntityId id) const noexcept {
+  const auto found = std::find_if(equation_curves_.begin(), equation_curves_.end(),
+                                  [&](const auto& curve) { return curve.id() == id; });
+  return found == equation_curves_.end() ? nullptr : &*found;
+}
+Result<std::size_t> Sketch::replace_equation_curve(EquationCurve curve) {
+  if (curve.mode() == EquationCurveMode::Parametric3D)
+    return Result<std::size_t>::failure(
+        Error::validation(curve.id().value(), "Planar Sketch requires a 2D equation mode"));
+  const auto found = std::find_if(equation_curves_.begin(), equation_curves_.end(),
+                                  [&](const auto& value) { return value.id() == curve.id(); });
+  if (found == equation_curves_.end())
+    return Result<std::size_t>::failure(
+        Error::validation(curve.id().value(), "Equation curve must exist before replacement"));
+  *found = std::move(curve);
+  return Result<std::size_t>::success(1);
+}
+Result<std::size_t> Sketch::remove_equation_curve(SketchEntityId id) {
+  const auto removed =
+      std::erase_if(equation_curves_, [&](const auto& curve) { return curve.id() == id; });
+  if (!removed)
+    return Result<std::size_t>::failure(
+        Error::validation(id.value(), "Equation curve must exist before removal"));
+  return Result<std::size_t>::success(removed);
+}
+
 Result<std::size_t> Sketch::add_entity(LineSegment line_segment) {
   if (has_entity_id(line_segment.id())) {
     return Result<std::size_t>::failure(Error::validation(
@@ -881,7 +917,7 @@ Sketch::Sketch(SketchId id, std::string name, DatumPlaneId workplane)
 bool Sketch::has_entity_id(const SketchEntityId& id) const noexcept {
   return find_line_segment(id) != nullptr || find_point(id) != nullptr ||
          find_projected_point(id) != nullptr || find_projected_line(id) != nullptr ||
-         find_reference_generated_line(id) != nullptr;
+         find_reference_generated_line(id) != nullptr || find_equation_curve(id) != nullptr;
 }
 
 bool Sketch::has_constraint_id(const SketchConstraintId& id) const noexcept {
@@ -995,6 +1031,8 @@ bool Sketch::curve_is_construction(const SketchEntityId& id) const noexcept {
     return curve->construction();
   if (const auto* curve = find_spline_segment(id))
     return curve->construction();
+  if (const auto* curve = find_equation_curve(id))
+    return curve->construction();
   return false;
 }
 
@@ -1051,7 +1089,8 @@ Result<std::size_t> Sketch::set_construction(std::vector<SketchEntityId> curves,
       return Result<std::size_t>::failure(Error::validation(
           id.value(),
           "Projected/reference geometry is read-only; detach its reference before converting"));
-    if (!find_line_segment(id) && !find_arc_segment(id) && !find_spline_segment(id))
+    if (!find_line_segment(id) && !find_arc_segment(id) && !find_spline_segment(id) &&
+        !find_equation_curve(id))
       return Result<std::size_t>::failure(
           Error::validation(id.value(), "Select an editable line, arc, circle or spline"));
   }
@@ -1077,6 +1116,7 @@ Result<std::size_t> Sketch::set_construction(std::vector<SketchEntityId> curves,
   };
   convert(arc_segments_, selected_curve);
   convert(spline_segments_, selected_curve);
+  convert(equation_curves_, selected_curve);
   const auto selected_profile = [&](const auto& id) {
     return std::find(profiles.begin(), profiles.end(), id) != profiles.end();
   };

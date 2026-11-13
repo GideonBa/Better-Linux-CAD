@@ -472,6 +472,45 @@ Result<std::size_t> Sketch3D::add_spline(SketchSpline3D spline) {
   return Result<std::size_t>::success(splines_.size() - 1U);
 }
 
+Result<std::size_t> Sketch3D::add_equation_curve(EquationCurve curve) {
+  if (curve.mode() != EquationCurveMode::Parametric3D)
+    return Result<std::size_t>::failure(
+        validation_error(curve.id().value(), "Sketch3D requires a 3D equation mode"));
+  if (has_entity_id(curve.id()))
+    return Result<std::size_t>::failure(validation_error(
+        curve.id().value(), "Equation curve entity ID must be unique within Sketch3D"));
+  equation_curves_.push_back(std::move(curve));
+  return Result<std::size_t>::success(equation_curves_.size() - 1);
+}
+const EquationCurve* Sketch3D::find_equation_curve(SketchEntityId id) const noexcept {
+  const auto found = std::find_if(equation_curves_.begin(), equation_curves_.end(),
+                                  [&](const auto& curve) { return curve.id() == id; });
+  return found == equation_curves_.end() ? nullptr : &*found;
+}
+Result<std::size_t> Sketch3D::replace_equation_curve(EquationCurve curve) {
+  if (curve.mode() != EquationCurveMode::Parametric3D)
+    return Result<std::size_t>::failure(
+        validation_error(curve.id().value(), "Sketch3D requires a 3D equation mode"));
+  const auto found = std::find_if(equation_curves_.begin(), equation_curves_.end(),
+                                  [&](const auto& value) { return value.id() == curve.id(); });
+  if (found == equation_curves_.end())
+    return Result<std::size_t>::failure(
+        validation_error(curve.id().value(), "Equation curve must exist before replacement"));
+  *found = std::move(curve);
+  return Result<std::size_t>::success(1);
+}
+Result<std::size_t> Sketch3D::remove_equation_curve(SketchEntityId id) {
+  if (guide_references(id))
+    return Result<std::size_t>::failure(
+        Error::dependency(id.value(), "Equation curve is referenced by guide metadata"));
+  const auto removed =
+      std::erase_if(equation_curves_, [&](const auto& curve) { return curve.id() == id; });
+  if (!removed)
+    return Result<std::size_t>::failure(
+        validation_error(id.value(), "Equation curve must exist before removal"));
+  return Result<std::size_t>::success(removed);
+}
+
 Result<std::size_t> Sketch3D::add_helix(SketchHelix3D helix) {
   if (has_entity_id(helix.id()))
     return Result<std::size_t>::failure(
@@ -677,6 +716,10 @@ std::vector<ParameterId> Sketch3D::parameter_dependencies() const {
          {&helix.radius_parameter(), &helix.pitch_parameter(), &helix.turns_parameter()})
       if (std::find(result.begin(), result.end(), *parameter) == result.end())
         result.push_back(*parameter);
+  for (const auto& curve : equation_curves_)
+    for (const auto& parameter : curve.parameter_dependencies())
+      if (std::find(result.begin(), result.end(), parameter) == result.end())
+        result.push_back(parameter);
   return result;
 }
 
@@ -703,7 +746,7 @@ std::vector<std::string> Sketch3D::referenced_node_ids() const {
 
 std::size_t Sketch3D::entity_count() const noexcept {
   return points_.size() + lines_.size() + polylines_.size() + arcs_.size() + splines_.size() +
-         helices_.size() + guide_curves_.size();
+         helices_.size() + equation_curves_.size() + guide_curves_.size();
 }
 
 Sketch3D::Sketch3D(Sketch3DId id, std::string name) : id_(std::move(id)), name_(std::move(name)) {}
@@ -714,7 +757,8 @@ bool Sketch3D::has_entity_id(const SketchEntityId& id) const noexcept {
 
 bool Sketch3D::has_curve_id(const SketchEntityId& id) const noexcept {
   return find_line(id) != nullptr || find_polyline(id) != nullptr || find_arc(id) != nullptr ||
-         find_spline(id) != nullptr || find_helix(id) != nullptr;
+         find_spline(id) != nullptr || find_helix(id) != nullptr ||
+         find_equation_curve(id) != nullptr;
 }
 
 Result<std::size_t>

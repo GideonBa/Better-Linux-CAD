@@ -182,6 +182,11 @@ private:
     for (const auto& item : source.polylines()) { auto r = candidate.value().add_polyline(item); if (r.has_error()) return Result<Sketch3D>::failure(r.error()); }
     for (const auto& item : source.arcs()) { auto r = candidate.value().add_arc(item); if (r.has_error()) return Result<Sketch3D>::failure(r.error()); }
     for (const auto& item : source.splines()) { auto r = candidate.value().add_spline(item); if (r.has_error()) return Result<Sketch3D>::failure(r.error()); }
+    for (const auto& curve : source.equation_curves()) {
+      auto added = candidate.value().add_equation_curve(curve);
+      if (!added)
+        return Result<Sketch3D>::failure(added.error());
+    }
     for (const auto& item : source.helices()) { auto r = candidate.value().add_helix(item); if (r.has_error()) return Result<Sketch3D>::failure(r.error()); }
     for (const auto& item : source.guide_curves()) { auto r = candidate.value().add_guide_curve(item); if (r.has_error()) return Result<Sketch3D>::failure(r.error()); }
     return candidate;

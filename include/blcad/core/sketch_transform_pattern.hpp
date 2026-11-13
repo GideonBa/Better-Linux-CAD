@@ -387,6 +387,7 @@ private:
         auto r = add(candidate.value(), curve);
         if (r.has_error()) return Result<Sketch>::failure(r.error());
       }
+    BLCAD_COPY(equation_curves, add_entity)
     BLCAD_COPY(projected_points, add_reference)
     BLCAD_COPY(projected_lines, add_reference)
     BLCAD_COPY(reference_generated_lines, add_reference)
