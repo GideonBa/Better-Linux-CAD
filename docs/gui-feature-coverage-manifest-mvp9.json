@@ -1714,26 +1714,73 @@
       {
         "capability": "planar-g2",
         "owner": 159,
-        "disposition": "planned",
-        "contract": "docs/sketch-planar-constraint-solver-mvp8.md",
-        "planned_commands": [
-          "Smooth G2"
+        "disposition": "implemented",
+        "contract": "docs/gui-sketch-constraint-authoring-mvp8.md",
+        "commands": [
+          "blcad.action.sketch_smooth"
         ],
-        "commands": [],
-        "apis": [],
-        "proofs": []
+        "apis": [
+          {
+            "source": "include/blcad/gui/shell/shell_sketch_curve_tools.hpp",
+            "type": "ShellSketchCurveTools",
+            "methods": [
+              "begin_smooth",
+              "preview",
+              "apply",
+              "cancel"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[gui][smooth-task]",
+            "source": "tests/gui/gui_shell_sketch_curve_authoring_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][smooth-authoring]",
+            "source": "tests/gui/gui_shell_sketch_curve_authoring_tests.cpp"
+          }
+        ]
       },
       {
         "capability": "equation-curves",
         "owner": 160,
-        "disposition": "planned",
-        "contract": "docs/inventor-like-sketcher-and-feature-roadmap.md",
-        "planned_commands": [
-          "Equation Curve"
+        "disposition": "implemented",
+        "contract": "docs/gui-sketch-spline-text-mvp8.md",
+        "commands": [
+          "blcad.action.sketch_equation",
+          "blcad.action.sketch_equation_edit"
         ],
-        "commands": [],
-        "apis": [],
-        "proofs": []
+        "apis": [
+          {
+            "source": "include/blcad/gui/shell/shell_sketch_curve_tools.hpp",
+            "type": "ShellSketchCurveTools",
+            "methods": [
+              "begin_equation",
+              "preview",
+              "apply",
+              "cancel"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[gui][equation-authoring]",
+            "source": "tests/gui/gui_shell_sketch_curve_authoring_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][native-curve-workflow]",
+            "source": "tests/gui/gui_shell_sketch_curve_authoring_tests.cpp"
+          }
+        ]
       },
       {
         "capability": "spatial-constraints",

@@ -217,3 +217,48 @@ The raw closed-spline GUI regression drags that seam, reopens/re-enters the save
 checks exact Undo/Redo and finishes the resulting region. Old sidecar point IDs are remapped only
 through the explicit shared-topology migration report described in
 `docs/sketch-shared-topology-mvp8.md`.
+
+## Block 162 native curve task
+
+Candidate graphics use an explicitly Sketch-owned viewport preview. They are visible only while
+that same Sketch owns focus and never become selection targets. Generic feature previews retain
+their existing isolation during source-Sketch editing; this task does not change that workflow.
+Candidate scenes use the shared presentation-visibility filter, including hidden downstream bodies.
+
+The existing Sketch owner adds Draw → Equation Curve, selected-curve Edit Equation Curve and
+Constrain → Smooth (G2). The numbered plan records acceptance and executed gates.
+The dock scrolls inputs independently of its fixed Preview/Fit/Apply/Cancel footer. Enter validates a
+focused expression, Tab changes focus, Ctrl+Enter validates the complete current candidate before
+Apply, and Escape cancels. Finish Sketch requires applying or cancelling this task first.
+
+Equation input uses Cartesian, polar or parametric 2D modes, an explicit variable/domain unit,
+coordinate expressions, lower/upper domain, positive modeling tolerance, closure and construction
+intent. Parameter insertion writes the selected persistent `@{id}` into the focused coordinate or
+domain field. Tolerance uses roundtrip-safe numeric text; opening an editor never clamps stored
+intent. Derived start/end positions, normalized tangents and curvature are read-only diagnostics.
+Change the domain or parameters to move them; no sampled poles or free equation-point drag exists.
+
+A copied complete GuiDocumentSession validates the candidate, accepted catalogs and downstream
+paths/bodies. Preview writes no history or file state. Apply revalidates freshness and commits one
+existing transaction; invalid input, unsupported geometry, stale source and Cancel retain exact
+committed intent. Cancel clears disposable graphics and restores the entry camera. Existing spline
+handles and weights retain their current editing authority.
+
+The 2D overlay follows the disposable candidate as well: derived endpoints use the previewed domain,
+and locked spline grips are hidden during preview. Correction and Cancel restore the committed
+interaction scene. Original control points or endpoint markers cannot masquerade as candidate data.
+
+Equation selection uses bounded Geometry-owned display chords: native circles or adaptive cubic
+control bounds, independent of stored modeling tolerance, at most 32,769 points and depth 24.
+Source/endpoint roles remain stable, with zero authored topology points. These chords support
+selection and derived endpoint/nearest witnesses; they do not invent equation intersection links or
+solver targets. Their sampling never replaces the modeled curve or changes portable JSON.
+
+Proof sources: [bounded presentation](../tests/geometry/equation_curve_geometry_tests.cpp),
+[task/session and native workflows](../tests/gui/gui_shell_sketch_curve_authoring_tests.cpp).
+`[parity-b162]` covers all three planar modes, typed parameter insertion, exact tolerance/domain
+roundtrip, invalid correction, stale sources, keyboard navigation and direct curve double-click.
+Native chains finish the authored circle to Extrude and Revolve, drive its radius, edit its source
+domain, and compare actual solids with `πr²d` and `2π²Rr²` before exact history/reopen checks.
+Executed [S01/S02/UI01 gates and delivery](mvp-plan.md#block-162-native-planar-authoring)
+include full regressions, both native scales and reviewed original captures.

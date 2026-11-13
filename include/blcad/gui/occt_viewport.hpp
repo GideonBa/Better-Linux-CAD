@@ -78,6 +78,11 @@ public:
   [[nodiscard]] Result<std::size_t>
   set_feature_previews(std::vector<geometry::GeometryShape> shapes,
                        std::vector<std::string> replaced_bodies = {});
+  // Sketch-owned candidates are visible only in this active Sketch. Ordinary
+  // feature previews retain their suspended/hidden source-edit behavior.
+  [[nodiscard]] Result<std::size_t>
+  set_sketch_previews(SketchId sketch, std::vector<geometry::GeometryShape> shapes,
+                      std::vector<std::string> replaced_presentations = {});
   [[nodiscard]] std::size_t feature_preview_count() const noexcept;
   void clear_feature_preview();
   // Disposable semantic faces/edges/vertices layered over a read-only preview.

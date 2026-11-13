@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 161
-current_block: 162
-current_boundary: Block 161 verified; serial delivery pending before 162
-current_tag: "[parity-b162]"
+implemented_through: Block 162
+current_block: 163
+current_boundary: Block 162 verified; normal serial delivery pending
+current_tag: "[parity-b163]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–161 accepted; Blocks 162–204 planned"
+  advanced_modeling_workflows: "Blocks 145–162 accepted; Blocks 163–204 planned"
 ---
 
 # MVP Plan
@@ -34,13 +34,13 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 161
-current block        Block 162 (planned)
+implemented through  Block 162
+current block        Block 163 (planned)
 current phase        Planar and spatial sketch extensions
-current boundary     Block 161 verified; serial delivery pending
+current boundary     Block 162 verified; normal serial delivery pending
 ```
 
-The next assigned implementation is Block 162, after normal delivery of 161.
+The next assigned implementation is Block 163, after normal delivery of 162.
 [The consolidated sequence](inventor-parity-sequence.md)
 contains dependencies and implementation criteria; [the test plan](inventor-parity-test-plan.md)
 contains individual and combined acceptance; [the UI contract](user-interface.md) owns the
@@ -67,7 +67,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 158 | Delivered in PR #182: full suites, fresh/migrated native history/STEP and isolated recompute measurements. |
 | 159 | Delivered in PR #183: persistent oriented G2, normalized solver/rank, dimension/catalog/drag and native consumer regression; native Smooth UI remains 162. |
 | 160–161 | Accepted typed equation intent/persistence and tolerance-controlled Geometry with real S02 profile/path/solid consumers; native authoring remains 162. |
-| 162 | Native Smooth/equation authoring, conflict correction, closed profiles and persisted history. |
+| 162 | Verified native Smooth/equation authoring, conflict correction, closed-profile Extrude/Revolve and exact persisted history; normal serial delivery pending. |
 | 163–164 | Existing Sketch3D constraint schema, then deterministic solver/DOF/conflict diagnostics with S03 independent oracles. |
 | 165 | Solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 downstream acceptance. |
 
@@ -154,8 +154,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–161 are **Implemented and accepted**;
-Blocks 162–204 are **Planned; not started**.
+Status authority: Blocks 145–162 are **Implemented and accepted**;
+Blocks 163–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -167,7 +167,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
-| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | 159–161 accepted; 162–165 planned |
+| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | 159–162 accepted; 163–165 planned |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
@@ -205,9 +205,10 @@ PR links preserve individual slice provenance without copying intermediate compl
 | 156 | Shared two-direction placements, dormant exclusions and Part V7; physical Hole operation copies, per-instance axes/seats and Assembly consumers; current Pattern authoring with stable checkbox rows | [Pattern](part-pattern-core-mvp6.md), [Hole](hole-wizard.md), [Pattern UI](gui-interactive-pattern-body-mvp9.md); B04 / native 100%–150% | [175](https://github.com/GideonBa/Better-Linux-CAD/pull/175) |
 | 157 | Shared semantic Hole/Thread creation/editing, presets/repeat, explicit legacy conversion, keyboard/source return and complete B01–B04/UI01 native acceptance | [Hole workflow](hole-wizard.md#whole-workflow-acceptance--157c) | [181](https://github.com/GideonBa/Better-Linux-CAD/pull/181) and its serial component PRs |
 | 158 / Phase B closure | Fresh/migrated Phase A/B integration, physical history/Assembly/STEP, fractional native picking correction and isolated recompute evidence | [Integrated contract/proof](hole-wizard.md#phase-ab-integration--158-design), [raw measurements](benchmarks/block158-phase-ab-recompute.json) | [182](https://github.com/GideonBa/Better-Linux-CAD/pull/182) |
-| 159 | Persistent oriented planar G2, rational/arc/line endpoint math, normalized rank/solve, dimension-aware authoring and exact accepted-catalog drag/history/reopen | [Planar solver/S01 proof](sketch-planar-constraint-solver-mvp8.md#block-159-smoothg2), [sidecar](file-format.md#planar-smoothg2-constraint-sidecar--159); native UI remains 162 | [183](https://github.com/GideonBa/Better-Linux-CAD/pull/183) |
-| 160 | Bounded typed equation expressions, existing Sketch/Sketch3D ownership and dependencies, atomic domains, lossless topology/edit/session paths and strict Part V8/Project persistence | [Contract and S02/Core/session proof](parameter-expression-mvp.md#curve-local-expression-contract), [format](file-format.md#equation-curve-intent--160); Geometry remains 161, native authoring 162 | [184](https://github.com/GideonBa/Better-Linux-CAD/pull/184) |
-| 161 | Bounded analytic/adaptive equation Geometry, proven closure/regions, existing profile/PathCurve and real Extrude/Revolve/Sweep consumers | [Construction/proof](part-sketch-3d-geometry-mvp6.md#equation-construction-contract), [profile](arc-and-trim-extend-sketch-profile-mvp.md#equation-profile-contract), [PathCurve](part-path-curve-core-mvp6.md#equation-source-contract) | Verified; normal serial delivery pending |
+| 159 | Persistent oriented planar G2, rational/arc/line endpoint math, normalized rank/solve, dimension-aware authoring and exact accepted-catalog drag/history/reopen | [Planar solver/S01 proof](sketch-planar-constraint-solver-mvp8.md#block-159-smoothg2), [sidecar](file-format.md#planar-smoothg2-constraint-sidecar--159); [native task](gui-sketch-constraint-authoring-mvp8.md#block-162-native-smooth-task) | [183](https://github.com/GideonBa/Better-Linux-CAD/pull/183) |
+| 160 | Bounded typed equation expressions, existing Sketch/Sketch3D ownership and dependencies, atomic domains, lossless topology/edit/session paths and strict Part V8/Project persistence | [Contract and S02/Core/session proof](parameter-expression-mvp.md#curve-local-expression-contract), [format](file-format.md#equation-curve-intent--160); construction and native authoring are covered in 161–162 | [184](https://github.com/GideonBa/Better-Linux-CAD/pull/184) |
+| 161 | Bounded analytic/adaptive equation Geometry, proven closure/regions, existing profile/PathCurve and real Extrude/Revolve/Sweep consumers | [Construction/proof](part-sketch-3d-geometry-mvp6.md#equation-construction-contract), [profile](arc-and-trim-extend-sketch-profile-mvp.md#equation-profile-contract), [PathCurve](part-path-curve-core-mvp6.md#equation-source-contract) | [185](https://github.com/GideonBa/Better-Linux-CAD/pull/185) |
+| 162 | Native Smooth/equation tasks, typed domains/bindings/tolerance, actual differential and candidate overlays, conflict/cancel/freshness, command search and closed-profile Extrude/Revolve | [Curve task/proof](gui-sketch-spline-text-mvp8.md#block-162-native-curve-task), [Smooth](gui-sketch-constraint-authoring-mvp8.md#block-162-native-smooth-task), [focused checks](development-setup.md) | Verified; normal serial delivery pending |
 
 The initial full parity plan was delivered in [PR #138](https://github.com/GideonBa/Better-Linux-CAD/pull/138).
 
@@ -605,10 +606,49 @@ The [expression](parameter-expression-mvp.md#geometry-analysis-boundary--161),
 | Captures and startup | Six original equation/endpoint/closed-chain captures reviewed after all GUI exit; separate PID-matched visible app startup, intentional timeout 124. |
 | Frozen runtime | 1,091 files; SHA256 `3f0c5ad80a6f0dfa5249b0be537b005e27228f70ff5d74d6d770e4191827bb3e`. Binary hashes, 158 GUI/app dependency records, formatting, documentation links and working/staged review checked before delivery. |
 
-This branch is verified for normal serial PR delivery. Refresh clean Main after merge before
-starting 162. Native Smooth/equation authoring remains 162; spatial schema/solver/interaction remains
-163–165. Equation twist and historical path refinement retain their explicit 166 boundary; no whole
+Delivery: [PR #185](https://github.com/GideonBa/Better-Linux-CAD/pull/185) merged normally as
+`1041c0b` on 2026-11-13. Tree `2d908f1` matches reviewed `892847e`. Main was refreshed, clean and
+identical to upstream before `feat/planar-equation-smooth-authoring`; the runtime and five executable
+hashes are unchanged. Native Smooth/equation authoring remains 162; spatial schema/solver/interaction
+remains 163–165. Equation twist and historical path refinement retain their explicit 166 boundary; no whole
 Phase C or later scope is accepted here. Preserve all 166–204 planning.
+
+
+### Block 162 native planar authoring
+
+**Implemented and accepted — 2026-11-13.** Started from normally merged `1041c0b`, refreshed clean
+Main and no open delivery PR. The existing [S01/S02/UI01 gates](inventor-parity-test-plan.md#s01-g2-planar-spline-constraints)
+are complete for native planar authoring:
+
+| Delivered scope | Contract and proof boundary |
+| --- | --- |
+| Native Smooth | Ordered curve/endpoint selectors reuse the existing G2 catalog and solver. Actual inward tangent/curvature diagnostics, conflict correction, Cancel, exact catalog history and existing constrained grips lead to a finished closed-profile Extrude. |
+| Equation task | Draw, command search and direct double-click editing cover all three planar modes, typed parameter insertion, domain/tolerance/closure and derived endpoint diagnostics. Full-session previews update existing consumers without editable sampled poles. |
+| Candidate presentation | Sketch-scoped native graphics and candidate 2D markers preserve suspended feature preview isolation, hidden bodies and original source intent. Locked grips disappear during preview; correction/Cancel restore the committed interaction scene. |
+| Native workflow | Finish Sketch to existing Extrude/Revolve, driven radius/source-domain edits, invalid grammar/domain/tolerance correction, final native release, exact Undo/Redo/save/open, keyboard and fixed compact footer at both scales. Only the implemented planar G2/equation inventory entries are promoted. |
+
+Canonical contracts: [curve task](gui-sketch-spline-text-mvp8.md#block-162-native-curve-task),
+[Smooth](gui-sketch-constraint-authoring-mvp8.md#block-162-native-smooth-task),
+[equation source](parameter-expression-mvp.md#curve-local-expression-contract) and
+[shared UI](user-interface.md). Executable proof lives in
+[task/native tests](../tests/gui/gui_shell_sketch_curve_authoring_tests.cpp),
+[preview ownership](../tests/gui/gui_occt_viewport_tests.cpp) and
+[bounded display sampling](../tests/geometry/equation_curve_geometry_tests.cpp).
+Physical oracles use the actual release ray, `πr²d` and `2π²Rr²`, independently of the task's residuals.
+
+| Acceptance gate | Result |
+| --- | --- |
+| Build | All five Core/Geometry/Qt/app/export targets exit 0; 160 GUI/app dependency records valid and nonempty. |
+| Complete Core / Geometry | **739 / 33,751** and **694 / 68,922** cases/assertions, no skips. Inputs and binaries remain identical across the final GUI-only refinement. |
+| Complete offscreen Qt | **909 cases: 839 passed, 70 native-only skipped; 101,612 assertions**, exit 0. Native-only execution is supplied below, not inferred from skips. |
+| Focused task/inventory Qt | **13 cases: 10 passed, 3 native-only skipped; 941 assertions**, exit 0. |
+| Relevant native consumers | Final 100%: **59 / 3,266**; compact 150%: **59 / 3,267** cases/assertions, **0 skips**. Combines 159–162, existing constraint/dimension/drag/endpoint, spline, source-return and inventory regressions; this is a focused native gate, not a full native suite. |
+| Captures and startup | Twelve original equation/Smooth/grip/source-edit/Revolve captures reviewed only after all GUI exit. Separate PID-matched visible application startup succeeds; intentional timeout 124. |
+| Frozen delivery inputs | **1,096 files**, SHA256 `bd926b1df2b488283b09ad04a82a7c04f64b9a796483506d38ad4f9495cd32b7`. Five binary hashes, formatting, local documentation links and working/staged review checked. |
+
+Verified for normal serial PR delivery. Refresh clean Main after merge before beginning 163.
+The complete spatial schema/solver/interaction assignment remains 163–165; this closes no whole
+Phase C. Preserve all 166–204 planning, including equation twist and historical path refinement.
 
 ## Later phases
 

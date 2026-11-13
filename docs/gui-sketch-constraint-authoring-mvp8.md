@@ -74,7 +74,7 @@ Block 114 accepts every non-dimensional Block-109 family:
 | Collinear | line, line |
 | Equal | measurable line/arc, measurable line/arc |
 | Tangent | two line/arc/spline curves sharing one persistent endpoint |
-| Smooth/G2 (159 backend; native UI remains 162) | curve A, endpoint A, curve B, endpoint B; distinct curves, at least one spline; explicit unique endpoint membership |
+| Smooth/G2 (159 backend; native 162 task) | curve A, endpoint A, curve B, endpoint B; distinct curves, at least one spline; explicit unique endpoint membership |
 | Concentric | arc/circle-profile/hole-pattern, same center-bearing capability |
 | Midpoint | point, line |
 | Symmetric | point, point, line axis |
@@ -302,7 +302,7 @@ The two point slots may name the same shared point ID. Distinct curve IDs and ac
 membership are checked against topology; no coordinate search chooses or retargets the junction.
 The reader accepts integer versions 1/2, rejects Smooth in version 1 and rejects unknown/noninteger
 versions. Version-1 output remains unchanged when Smooth is absent; older readers reject version 2.
-Native selection compatibility and command exposure remain assigned to 162. Session-created
+Native selection compatibility and command exposure use the [162 task](#block-162-native-smooth-task). Session-created
 previews capture the model revision and refuse commit after any intervening model/dimension change.
 
 Catalogs are unique per `SketchId` and sorted by Sketch id. Constraints are unique and sorted by
@@ -349,3 +349,28 @@ redo, and enforcement of accepted constraints during later solver-backed drag.
 
 Block 115 owns driving/reference dimensions, value parameters, in-canvas dimension editing, and
 parameter/expression binding. Block 116 owns trim, extend, split, Sketch fillet, and Sketch chamfer.
+
+## Block 162 native Smooth task
+
+The native task builds the existing ordered four-target Smooth intent from two supported curves
+and explicit Start/End selectors. A spline operand is required; line, three-point arc and rational
+cubic spline endpoints retain the 159 capability matrix. Selected endpoint roles initialize the
+selectors. Equation/reference presentation samples are not free spline operands.
+
+Preview uses the complete session copy and the existing constraint controller, including accepted
+constraints and driving dimensions. Conflict and redundancy IDs stay visible and disable Apply;
+correction revalidates the current candidate. Task and canvas diagnostics report the actual inward
+unit tangents and curvature vectors and their mismatches through PlanarCurveDifferential. A control
+polygon picture never establishes G2. Apply uses the existing catalog transaction and exact history;
+Cancel and invalid/stale candidates leave the committed sketch, sidecars and downstream bodies intact.
+
+The [shared curve task contract](gui-sketch-spline-text-mvp8.md#block-162-native-curve-task)
+owns input/cancellation and derived-curve controls. Executed native authoring, closed-profile solid
+consumers, persistence and compact layout gates are recorded in the
+[numbered plan](mvp-plan.md#block-162-native-planar-authoring).
+
+`[smooth-task]` verifies rejected/cancelled intent, action re-enablement and exact catalog Undo/Redo.
+Native `[smooth-authoring]` uses the command search, corrects a conflicting endpoint, publishes G2,
+drags the existing spline grip and finishes a closed contour to Extrude. Its independent area/volume
+oracle uses the actual final native release ray; it does not assume an ideal subpixel model point.
+The saved session retains the five accepted constraints and the actual solid.

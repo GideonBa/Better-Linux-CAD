@@ -514,6 +514,7 @@ struct OcctViewport::Impl {
   std::vector<Presentation> feature_previews;
   std::vector<Presentation> preview_selection_targets;
   bool feature_preview_focus{false};
+  std::optional<SketchId> feature_preview_sketch;
   std::vector<std::string> feature_preview_replaced_bodies;
   std::unordered_map<const AIS_InteractiveObject*, std::size_t> owner_to_index;
   std::unordered_map<const AIS_InteractiveObject*, std::size_t> preview_owner_to_index;
@@ -801,6 +802,7 @@ Result<std::size_t> OcctViewport::set_feature_previews(std::vector<geometry::Geo
       impl_->context->Remove(previous.interactive, false);
   impl_->feature_previews = std::move(candidates);
   impl_->feature_preview_focus = false;
+  impl_->feature_preview_sketch.reset();
   impl_->feature_preview_replaced_bodies = std::move(replaced_bodies);
   for (const auto& preview : impl_->feature_previews)
     if (!impl_->context.IsNull() && !preview.interactive.IsNull()) {
@@ -820,7 +822,25 @@ Result<std::size_t> OcctViewport::set_feature_previews(std::vector<geometry::Geo
   return Result<std::size_t>::success(feature_preview_count());
 }
 
+Result<std::size_t> OcctViewport::set_sketch_previews(SketchId sketch,
+                                                      std::vector<geometry::GeometryShape> shapes,
+                                                      std::vector<std::string> replaced) {
+  if (!sketch_focus_active() || sketch_focus_id_ != sketch.value())
+    return Result<std::size_t>::failure(
+        viewport_error("Sketch preview requires its active Sketch focus"));
+  auto shown = set_feature_previews(std::move(shapes), std::move(replaced));
+  if (!shown)
+    return shown;
+  impl_->feature_preview_sketch = std::move(sketch);
+  apply_sketch_focus();
+  update();
+  return shown;
+}
+
 bool OcctViewport::feature_preview_replaces(std::string_view semantic_id) const noexcept {
+  if (impl_->feature_preview_sketch &&
+      (!sketch_focus_active() || impl_->feature_preview_sketch->value() != sketch_focus_id_))
+    return false;
   const auto replaced = [&](std::string_view id) {
     return std::find(impl_->feature_preview_replaced_bodies.begin(),
                      impl_->feature_preview_replaced_bodies.end(),
@@ -837,6 +857,7 @@ bool OcctViewport::feature_preview_replaces(std::string_view semantic_id) const 
 
 void OcctViewport::clear_feature_preview() {
   impl_->feature_preview_focus = false;
+  impl_->feature_preview_sketch.reset();
   if (impl_->feature_previews.empty() && impl_->feature_preview_replaced_bodies.empty())
     return;
   for (const auto& preview : impl_->feature_previews)
@@ -858,6 +879,7 @@ void OcctViewport::clear_scene() {
   impl_->preview_owner_to_index.clear();
   impl_->feature_previews.clear();
   impl_->feature_preview_focus = false;
+  impl_->feature_preview_sketch.reset();
   impl_->feature_preview_replaced_bodies.clear();
   apply_sketch_focus();
   impl_->owner_to_index.clear();
@@ -1360,6 +1382,9 @@ std::size_t OcctViewport::feature_preview_count() const noexcept {
 }
 
 bool OcctViewport::feature_preview_active() const noexcept {
+  if (impl_->feature_preview_sketch &&
+      (!sketch_focus_active() || impl_->feature_preview_sketch->value() != sketch_focus_id_))
+    return false;
   if (impl_->feature_previews.empty())
     return false;
   if (impl_->context.IsNull())
@@ -1966,10 +1991,14 @@ void OcctViewport::apply_sketch_focus() {
   }
   for (const auto& preview : impl_->feature_previews)
     if (!preview.interactive.IsNull()) {
-      if (sketch_focus_active())
-        impl_->context->Erase(preview.interactive, false);
-      else
+      const bool visible =
+          impl_->feature_preview_sketch
+              ? sketch_focus_active() && impl_->feature_preview_sketch->value() == sketch_focus_id_
+              : !sketch_focus_active();
+      if (visible)
         impl_->context->Display(preview.interactive, false);
+      else
+        impl_->context->Erase(preview.interactive, false);
       // Visibility changes must never turn a disposable result into a pick owner.
       impl_->context->SetSelectionModeActive(preview.interactive, 0, false,
                                              AIS_SelectionModesConcurrency_Single, true);
