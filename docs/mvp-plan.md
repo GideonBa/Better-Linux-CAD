@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 158
 current_block: 159
-current_boundary: Phase A/B integrated acceptance verified; Block 159 backend planned
+current_boundary: Block 158 delivered; Block 159 Smooth/G2 backend in progress
 current_tag: "[parity-b159]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–158 accepted; Blocks 159–204 planned"
+  advanced_modeling_workflows: "Blocks 145–158 accepted; Block 159 in progress; Blocks 160–204 planned"
 ---
 
 # MVP Plan
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 158
-current block        Block 159 (planned)
+current block        Block 159 (in progress)
 current phase        Planar and spatial sketch extensions
-current boundary     Phase A/B integrated acceptance verified; serial PR delivery pending
+current boundary     Block 158 delivered; Smooth/G2 backend in progress
 ```
 
 The next assigned work is Block 159. [The consolidated sequence](inventor-parity-sequence.md)
@@ -63,7 +63,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | --- | --- |
 | 156 | Delivered in PR #175: shared placements, Hole consumers, full suites, native 100%/150% and startup verified. |
 | 157 | Delivered in PR #181: semantic Hole/Thread creation/editing, explicit conversion, presets and native B01–B04/UI01. |
-| 158 | Verified in PR #182: full suites, fresh/migrated native history/STEP and isolated recompute measurements; normal delivery pending. |
+| 158 | Delivered in PR #182: full suites, fresh/migrated native history/STEP and isolated recompute measurements. |
 | 159 | Persistent oriented planar G2 constraints, solver/drag integration and independent S01 derivative/rank oracles. |
 | 160–161 | Safe typed equation intent/persistence, then tolerance-controlled Geometry and real downstream S02/G01 consumers. |
 | 162 | Native Smooth/equation authoring, conflict correction, closed profiles and persisted history. |
@@ -154,7 +154,7 @@ raw samples, benchmark limits and future performance scope remain in their exist
 ## Blocks 145–204 — Advanced modeling workflows
 
 Status authority: Blocks 145–158 are **Implemented and accepted**;
-Blocks 159–204 are **Planned; not started**.
+Block 159 is **In progress**; Blocks 160–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -166,7 +166,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
-| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Planned; not started |
+| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | 159 in progress; 160–165 planned |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
@@ -203,7 +203,7 @@ PR links preserve individual slice provenance without copying intermediate compl
 | 155 | Shared internal/external Thread definitions, Part V6/Project snapshots and resource/history integration; cosmetic invariance/derived graphics and checked ideal-V helical cuts with explicit limits | [Hole/Thread](hole-wizard.md), [file format](file-format.md); B03 first gate, native authoring completion remains 157 | [172](https://github.com/GideonBa/Better-Linux-CAD/pull/172), [173](https://github.com/GideonBa/Better-Linux-CAD/pull/173), [174](https://github.com/GideonBa/Better-Linux-CAD/pull/174) |
 | 156 | Shared two-direction placements, dormant exclusions and Part V7; physical Hole operation copies, per-instance axes/seats and Assembly consumers; current Pattern authoring with stable checkbox rows | [Pattern](part-pattern-core-mvp6.md), [Hole](hole-wizard.md), [Pattern UI](gui-interactive-pattern-body-mvp9.md); B04 / native 100%–150% | [175](https://github.com/GideonBa/Better-Linux-CAD/pull/175) |
 | 157 | Shared semantic Hole/Thread creation/editing, presets/repeat, explicit legacy conversion, keyboard/source return and complete B01–B04/UI01 native acceptance | [Hole workflow](hole-wizard.md#whole-workflow-acceptance--157c) | [181](https://github.com/GideonBa/Better-Linux-CAD/pull/181) and its serial component PRs |
-| 158 / Phase B closure | Fresh/migrated Phase A/B integration, physical history/Assembly/STEP, fractional native picking correction and isolated recompute evidence | [Integrated contract/proof](hole-wizard.md#phase-ab-integration--158-design), [raw measurements](benchmarks/block158-phase-ab-recompute.json) | [182](https://github.com/GideonBa/Better-Linux-CAD/pull/182), verified; normal delivery pending |
+| 158 / Phase B closure | Fresh/migrated Phase A/B integration, physical history/Assembly/STEP, fractional native picking correction and isolated recompute evidence | [Integrated contract/proof](hole-wizard.md#phase-ab-integration--158-design), [raw measurements](benchmarks/block158-phase-ab-recompute.json) | [182](https://github.com/GideonBa/Better-Linux-CAD/pull/182) |
 
 The initial full parity plan was delivered in [PR #138](https://github.com/GideonBa/Better-Linux-CAD/pull/138).
 
@@ -540,23 +540,23 @@ and physical STEP/reimport. The compact native edge miss is fixed without changi
 | Isolated recompute | Three processes, 18 repeats/variant plus separate first pairs/seeds; independent material/cache checks pass. Plan/empty-cache repeated medians: fresh 506.1/500.5 ms, migrated 533.8/533.2 ms. Existing full-history fallback, no speedup claim. |
 | Frozen runtime | 1,065 files; SHA256 `2390a7d153bf2c8927586e94ae5b9146aa45b45d7919f21f538b6386fad533c7`; [complete inventory/raw measurements](benchmarks/block158-phase-ab-recompute.json) |
 
-Delivery: [PR #182](https://github.com/GideonBa/Better-Linux-CAD/pull/182), final review/normal merge
-pending. Refresh and verify Main after merged delivery before starting 159. The complete 159–165
-assignment and all later planning remain unchanged.
+Delivery: [PR #182](https://github.com/GideonBa/Better-Linux-CAD/pull/182) merged normally as
+`b1f34f7`; its tree `a87c9dd` matches the reviewed delivery. Main was refreshed and verified clean
+before starting `feat/planar-smooth-g2`. The complete 159–165 assignment and later planning remain.
 
-### Block 159 backend preparation — planned
+### Block 159 backend implementation — in progress
 
-Start its implementation branch only after whole 158 is merged and Main is refreshed. The
-[planar solver contract](sketch-planar-constraint-solver-mvp8.md#planned-block-159-smoothg2)
-records the proposed oriented endpoint equations and persistence boundary; native authoring remains
-162. No 159 implementation or acceptance is claimed here.
+The serial branch starts from verified merged `b1f34f7`. The
+[planar solver contract](sketch-planar-constraint-solver-mvp8.md#block-159-smoothg2)
+records oriented endpoint equations, transient normalization and the persistence boundary; native authoring remains
+162. Backend implementation and independent regression proofs are in progress; whole 159 remains open.
 
 | Step | Planned completion boundary |
 | --- | --- |
 | Intent and endpoint math | Explicit ordered curve/endpoint targets reusing current entity/point IDs; versioned existing constraint sidecar; regular rational-spline, arc and line differentials with independent analytic oracles. |
 | Numeric solve | Exact G0 through current equality groups, oriented tangent and curvature-vector residuals, existing normalized deterministic solve, final rank/DOF and conflict/redundancy attribution. |
 | Existing consumers | Accepted constraint/dimension catalogs and solver-backed drag keep the same G2 intent through exact release, rejected candidates, Undo/Redo and reopen; preserve historical G1 behavior. |
-| Whole-159 proof | S01 polynomial/rational/reversed/scaled and degenerate/inflection cases, fixed/driving and local-rank oracles, catalog/drag regression, synchronized contracts and normal serial PR delivery. |
+| Whole-159 proof | S01 polynomial/rational/reversed/scaled and degenerate/inflection cases, fixed/driving and local-rank oracles, catalog/drag regression, synchronized contracts and normal serial PR delivery. Five-target build passed; focused Core 12/1,938 and Qt 2/108 pass. Full Core 720/28,954 and Geometry 682/58,224 pass without skips; full Qt is running. Native regression and delivery remain open. |
 
 ## Later phases
 

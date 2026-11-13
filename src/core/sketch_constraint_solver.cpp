@@ -1,4 +1,5 @@
 #include "blcad/core/sketch_constraint_solver.hpp"
+#include "blcad/core/planar_curve_differential.hpp"
 
 #include <algorithm>
 #include <array>
@@ -50,6 +51,8 @@ constexpr double kPivotTolerance = 1.0e-14;
   case SketchSolverConstraintKind::AlignedDistance:
   case SketchSolverConstraintKind::Angular:
     return 2U;
+  case SketchSolverConstraintKind::Smooth:
+    return 4U;
   case SketchSolverConstraintKind::Symmetric:
     return 3U;
   }
@@ -113,11 +116,47 @@ constexpr double kPivotTolerance = 1.0e-14;
   return std::max(1.0, std::hypot(max_x - min_x, max_y - min_y));
 }
 
+// Smooth systems use dimensionless increments and their actual extent. Keep
+// the historical normalization unchanged for systems without the new family.
+[[nodiscard]] double
+smooth_characteristic_length(const SketchTopology& topology,
+                             const std::vector<SketchSolverConstraint>& constraints) {
+  std::vector<SketchPointId> relevant;
+  for (const auto& point : topology.points())
+    if (!point.reference())
+      relevant.push_back(point.id());
+  for (const auto& constraint : constraints)
+    for (const auto& target : constraint.targets()) {
+      if (target.kind() == SketchSolverTargetKind::Point)
+        relevant.emplace_back(target.id());
+      else if (const auto* entity = topology.find_entity(target.id()))
+        relevant.insert(relevant.end(), entity->points().begin(), entity->points().end());
+    }
+  std::optional<Point2> low, high;
+  for (const auto& id : relevant) {
+    const auto* point = topology.find_point(id);
+    if (!point)
+      continue; // Target validation owns missing-reference diagnostics.
+    const auto p = point->position();
+    if (!low) {
+      low = p;
+      high = p;
+    }
+    low->x = std::min(low->x, p.x);
+    low->y = std::min(low->y, p.y);
+    high->x = std::max(high->x, p.x);
+    high->y = std::max(high->y, p.y);
+  }
+  const double length = low ? std::hypot(high->x - low->x, high->y - low->y) : 0;
+  return std::isfinite(length) && length > 0 ? length : 1.0;
+}
+
 struct SolveContext {
   const SketchTopology& topology;
   std::vector<SketchSolverVariable> variable_order;
   std::unordered_map<std::string, std::size_t> point_variable_base;
   double length_scale;
+  double variable_scale{1.0};
   // All constraints in the system, so a single constraint's residual can see
   // its neighbours (e.g. line↔circle tangent checks whether an endpoint is
   // held on the circle by a coincidence). Null while the context is built.
@@ -197,7 +236,8 @@ struct CoincidentProjection {
 coincident_projection(const SolveContext& context,
                       const std::vector<SketchSolverConstraint>& constraints) {
   if (std::none_of(constraints.begin(), constraints.end(), [](const auto& constraint) {
-        return constraint.kind() == SketchSolverConstraintKind::Coincident;
+        return constraint.kind() == SketchSolverConstraintKind::Coincident ||
+               constraint.kind() == SketchSolverConstraintKind::Smooth;
       }))
     return {};
   const auto& points = context.topology.points();
@@ -217,9 +257,11 @@ coincident_projection(const SolveContext& context,
     return index;
   };
   for (const auto& constraint : constraints) {
-    if (constraint.kind() == SketchSolverConstraintKind::Coincident) {
-      const auto first = root(indices.at(constraint.targets()[0].id()));
-      const auto second = root(indices.at(constraint.targets()[1].id()));
+    if (constraint.kind() == SketchSolverConstraintKind::Coincident ||
+        constraint.kind() == SketchSolverConstraintKind::Smooth) {
+      const bool smooth = constraint.kind() == SketchSolverConstraintKind::Smooth;
+      const auto first = root(indices.at(constraint.targets()[smooth ? 1U : 0U].id()));
+      const auto second = root(indices.at(constraint.targets()[smooth ? 3U : 1U].id()));
       parent[std::max(first, second)] = std::min(first, second);
     } else if (constraint.kind() == SketchSolverConstraintKind::Fixed) {
       const auto& target = constraint.targets()[0];
@@ -270,6 +312,14 @@ resolved_entity(const SolveContext& context, const SketchSolverTarget& target) n
          (entity->kind() == SketchTopologyEntityKind::Line ||
           entity->kind() == SketchTopologyEntityKind::Arc ||
           entity->kind() == SketchTopologyEntityKind::Spline);
+}
+
+[[nodiscard]] bool unique_curve_endpoint(const SketchTopologyEntity& entity,
+                                         const SketchPointId& point) noexcept {
+  const std::size_t last = entity.kind() == SketchTopologyEntityKind::Spline ? 3U
+                           : entity.kind() == SketchTopologyEntityKind::Arc  ? 2U
+                                                                             : 1U;
+  return (entity.points()[0] == point) != (entity.points()[last] == point);
 }
 
 [[nodiscard]] bool has_center(const SketchTopologyEntity* entity) noexcept {
@@ -357,6 +407,19 @@ validate_constraint_targets(const SolveContext& context, const SketchSolverConst
     if (!has_length_measure(require_entity(0U)) || !has_length_measure(require_entity(1U)))
       return fail("equal constraint requires two measurable line or arc entities");
     break;
+  case SketchSolverConstraintKind::Smooth: {
+    const auto* first = require_entity(0U);
+    const auto* second = require_entity(2U);
+    if (!is_curve(first) || !is_curve(second) || first->id() == second->id() ||
+        (first->kind() != SketchTopologyEntityKind::Spline &&
+         second->kind() != SketchTopologyEntityKind::Spline))
+      return fail("Smooth requires distinct line/arc/spline curves and a spline operand");
+    if (!require_point(1U) || !require_point(3U) ||
+        !unique_curve_endpoint(*first, SketchPointId(targets[1U].id())) ||
+        !unique_curve_endpoint(*second, SketchPointId(targets[3U].id())))
+      return fail("Smooth requires explicit unambiguous curve endpoint point identities");
+    break;
+  }
   case SketchSolverConstraintKind::Tangent: {
     const auto* first_entity = require_entity(0U);
     const auto* second_entity = require_entity(1U);
@@ -715,6 +778,27 @@ shared_curve_endpoint_pair(const SolveContext& context, const SketchTopologyEnti
   return best;
 }
 
+[[nodiscard]] Result<PlanarEndpointDifferential>
+endpoint_differential(const SolveContext& context, const NumericVector& variables,
+                      const SketchTopologyEntity& entity, const SketchPointId& endpoint,
+                      const std::string& object_id) {
+  const std::size_t last = entity.kind() == SketchTopologyEntityKind::Spline ? 3U
+                           : entity.kind() == SketchTopologyEntityKind::Arc  ? 2U
+                                                                             : 1U;
+  const bool at_end = entity.points()[last] == endpoint;
+  const auto position = [&](std::size_t index) {
+    return point_position(context, variables, entity.points()[index]);
+  };
+  if (entity.kind() == SketchTopologyEntityKind::Line)
+    return PlanarCurveDifferential::line(position(at_end ? 1U : 0U), position(at_end ? 0U : 1U),
+                                         context.length_scale, object_id);
+  if (entity.kind() == SketchTopologyEntityKind::Spline)
+    return PlanarCurveDifferential::spline(cubic_bezier_geometry(context, variables, entity),
+                                           at_end, context.length_scale, object_id);
+  return PlanarCurveDifferential::arc({position(0U), position(1U), position(2U)}, at_end,
+                                      context.length_scale, object_id);
+}
+
 [[nodiscard]] double wrapped_angle(double angle) noexcept {
   while (angle <= -kPi) angle += 2.0 * kPi;
   while (angle > kPi) angle -= 2.0 * kPi;
@@ -832,6 +916,30 @@ evaluate_constraint(const SolveContext& context, const NumericVector& variables,
         {(entity_measure(context, variables, entity(0U)) -
           entity_measure(context, variables, entity(1U))) /
          length_scale});
+  case SketchSolverConstraintKind::Smooth: {
+    auto first = endpoint_differential(context, variables, entity(0U),
+                                       SketchPointId(targets[1U].id()), constraint.id());
+    if (!first)
+      return Result<NumericVector>::failure(first.error());
+    auto second = endpoint_differential(context, variables, entity(2U),
+                                        SketchPointId(targets[3U].id()), constraint.id());
+    if (!second)
+      return Result<NumericVector>::failure(second.error());
+    const auto delta = subtract(point(1U), point(3U));
+    const auto& a = first.value();
+    const auto& b = second.value();
+    NumericVector residuals{delta.x / length_scale,
+                            delta.y / length_scale,
+                            a.inward_tangent.x + b.inward_tangent.x,
+                            a.inward_tangent.y + b.inward_tangent.y,
+                            length_scale * (a.curvature_vector.x - b.curvature_vector.x),
+                            length_scale * (a.curvature_vector.y - b.curvature_vector.y)};
+    if (!std::all_of(residuals.begin(), residuals.end(),
+                     [](double value) { return std::isfinite(value); }))
+      return Result<NumericVector>::failure(
+          validation_error(constraint.id(), "Smooth residual exceeds numeric range"));
+    return Result<NumericVector>::success(std::move(residuals));
+  }
   case SketchSolverConstraintKind::Tangent: {
     const bool first_is_circle =
         entity(0U).kind() == SketchTopologyEntityKind::CircleProfile;
@@ -1061,8 +1169,8 @@ build_jacobian(const SolveContext& context, const NumericVector& variables,
       return Result<NumericMatrix>::failure(Error::internal(
           "sketch.solver", "solver residual dimension changed during finite difference"));
     for (std::size_t row = 0U; row < jacobian.size(); ++row)
-      jacobian[row][column] =
-          (plus_residuals.value()[row] - minus_residuals.value()[row]) / (2.0 * step);
+      jacobian[row][column] = (plus_residuals.value()[row] - minus_residuals.value()[row]) /
+                              (2.0 * step / context.variable_scale);
   }
   return Result<NumericMatrix>::success(std::move(jacobian));
 }
@@ -1204,7 +1312,7 @@ solve_numeric(const SolveContext& context, const std::vector<SketchSolverConstra
         const double factor = std::ldexp(1.0, -static_cast<int>(line_search));
         NumericVector candidate = variables;
         for (std::size_t index = 0U; index < candidate.size(); ++index)
-          candidate[index] += factor * step[index];
+          candidate[index] += factor * step[index] * context.variable_scale;
         projection.apply(context, candidate);
         auto candidate_residuals = evaluate_constraints(context, candidate, constraints);
         if (candidate_residuals.has_error())
@@ -1405,6 +1513,8 @@ std::string_view to_string(SketchSolverConstraintKind kind) noexcept {
   case SketchSolverConstraintKind::Collinear: return "collinear";
   case SketchSolverConstraintKind::Equal: return "equal";
   case SketchSolverConstraintKind::Tangent: return "tangent";
+  case SketchSolverConstraintKind::Smooth:
+    return "smooth";
   case SketchSolverConstraintKind::Concentric: return "concentric";
   case SketchSolverConstraintKind::Midpoint: return "midpoint";
   case SketchSolverConstraintKind::Symmetric: return "symmetric";
@@ -1540,6 +1650,11 @@ SketchConstraintSolver::solve(const SketchTopology& topology, const SketchConstr
         system.sketch().value(), "Sketch constraint system and topology must reference the same Sketch"));
 
   SolveContext context = make_context(topology);
+  if (std::any_of(system.constraints().begin(), system.constraints().end(),
+                  [](const auto& c) { return c.kind() == SketchSolverConstraintKind::Smooth; })) {
+    context.length_scale = smooth_characteristic_length(topology, system.constraints());
+    context.variable_scale = context.length_scale;
+  }
   context.constraints = &system.constraints();
   const NumericVector initial = initial_variables(context);
   for (const auto& constraint : system.constraints()) {

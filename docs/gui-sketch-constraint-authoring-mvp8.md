@@ -74,6 +74,7 @@ Block 114 accepts every non-dimensional Block-109 family:
 | Collinear | line, line |
 | Equal | measurable line/arc, measurable line/arc |
 | Tangent | two line/arc/spline curves sharing one persistent endpoint |
+| Smooth/G2 (159 backend; native UI remains 162) | curve A, endpoint A, curve B, endpoint B; distinct curves, at least one spline; explicit unique endpoint membership |
 | Concentric | arc/circle-profile/hole-pattern, same center-bearing capability |
 | Midpoint | point, line |
 | Symmetric | point, point, line axis |
@@ -131,7 +132,9 @@ constraint.
 2. Migrate the current historical Sketch to stable `SketchTopology`.
 3. Adapt all historical embedded constraints into a `SketchConstraintSystem`.
 4. Add every accepted sidecar constraint with stable `intent/<id>` solver identity.
-5. Add the candidate and solve through the existing Block-109 solver.
+5. Add the candidate and solve through the existing Block-109 solver. Session previews also compose
+   all accepted driving dimensions through `SketchDimensionCatalogSystemBuilder`, including its
+   bounded ArcLength calibration; the bare-Part overload remains available without sidecars.
 6. Publish stable conflict/redundancy ids with the internal prefix removed.
 7. Materialize a complete solved Sketch only for `under_constrained` or `fully_constrained`.
 
@@ -266,7 +269,7 @@ Canonical sidecar marker:
 
 ```text
 schema  = blcad.sketch_constraints.mvp8
-version = 1
+version = 1 without Smooth; 2 when Smooth is present
 ```
 
 Document-level shape:
@@ -293,6 +296,14 @@ Document-level shape:
   ]
 }
 ```
+
+Smooth uses `kind: "smooth"` and exactly four ordered target kinds **entity, point, entity, point**.
+The two point slots may name the same shared point ID. Distinct curve IDs and actual unique endpoint
+membership are checked against topology; no coordinate search chooses or retargets the junction.
+The reader accepts integer versions 1/2, rejects Smooth in version 1 and rejects unknown/noninteger
+versions. Version-1 output remains unchanged when Smooth is absent; older readers reject version 2.
+Native selection compatibility and command exposure remain assigned to 162. Session-created
+previews capture the model revision and refuse commit after any intervening model/dimension change.
 
 Catalogs are unique per `SketchId` and sorted by Sketch id. Constraints are unique and sorted by
 constraint id. The sidecar stores only authored scope and intent. It does not store solved coordinates,

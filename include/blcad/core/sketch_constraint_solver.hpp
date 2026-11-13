@@ -44,6 +44,7 @@ enum class SketchSolverConstraintKind {
   Collinear,
   Equal,
   Tangent,
+  Smooth,
   Concentric,
   Midpoint,
   Symmetric,

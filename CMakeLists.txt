@@ -95,6 +95,7 @@ add_library(
   src/core/sketch_arc_profile.cpp
   src/core/sketch_constraints.cpp
   src/core/sketch_constraint_solver.cpp
+  src/core/sketch_constraint_authoring.cpp
   src/core/sketch_solver_legacy_adapter.cpp
   src/core/sketch_diagnostics.cpp
   src/core/sketch_repair_command_labels.cpp
@@ -545,6 +546,8 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_arc_profile_tests.cpp
     tests/core/sketch_diagnostics_tests.cpp
     tests/core/sketch_constraint_solver_tests.cpp
+    tests/core/planar_curve_differential_tests.cpp
+    tests/core/sketch_smooth_constraint_solver_tests.cpp
     tests/core/sketch_dimension_tests.cpp
     tests/core/sketch_tangent_creation_tests.cpp
     tests/core/sketch_conic_tests.cpp
@@ -797,6 +800,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_coincident_closure_tests.cpp
       tests/gui/gui_sketch_interaction_tests.cpp
       tests/gui/gui_sketch_primitive_constraints_tests.cpp
+      tests/gui/gui_sketch_smooth_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
       tests/gui/gui_interactive_sketcher_acceptance_tests.cpp
       tests/gui/gui_spatial_surface_workbench_tests.cpp

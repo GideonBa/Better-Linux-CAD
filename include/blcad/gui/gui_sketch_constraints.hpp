@@ -24,7 +24,7 @@ class GuiSketchConstraintController {
 public:
   [[nodiscard]] static Result<GuiSketchConstraintController>
   create(const PartDocument& document, SketchConstraintCatalog catalog,
-         SketchConstraintIntent candidate) {
+         SketchConstraintIntent candidate, const SketchDimensionCatalog* dimensions = nullptr) {
     if (document.id() != catalog.document())
       return Result<GuiSketchConstraintController>::failure(Error::validation(
           catalog.document().value(), "constraint controller catalog belongs to another Part"));
@@ -35,7 +35,10 @@ public:
     auto topology = SketchTopology::migrate_legacy(*sketch);
     if (topology.has_error())
       return Result<GuiSketchConstraintController>::failure(topology.error());
-    auto preview = SketchConstraintAuthoringService{}.preview(document, catalog, candidate);
+    auto preview =
+        dimensions
+            ? SketchConstraintAuthoringService{}.preview(document, catalog, *dimensions, candidate)
+            : SketchConstraintAuthoringService{}.preview(document, catalog, candidate);
     if (preview.has_error())
       return Result<GuiSketchConstraintController>::failure(preview.error());
     const auto state = preview.value().accepted
@@ -64,8 +67,14 @@ public:
     auto catalog = session.sketch_constraint_catalog(sketch);
     if (catalog.has_error())
       return Result<GuiSketchConstraintController>::failure(catalog.error());
-    return create(*session.part_document(), std::move(catalog.value()),
-                  std::move(candidate));
+    auto dimensions = session.sketch_dimension_catalog(sketch);
+    if (!dimensions)
+      return Result<GuiSketchConstraintController>::failure(dimensions.error());
+    auto controller = create(*session.part_document(), std::move(catalog.value()),
+                             std::move(candidate), &dimensions.value());
+    if (controller)
+      controller.value().source_model_revision_ = session.model_revision();
+    return controller;
   }
 
   [[nodiscard]] const GuiSketchConstraintPreview& preview() const noexcept { return preview_; }
@@ -122,6 +131,10 @@ public:
       return Result<std::size_t>::failure(Error::validation(
           document_.value(), "constraint commit requires the original active Part"));
 
+    if (source_model_revision_ && *source_model_revision_ != session.model_revision())
+      return Result<std::size_t>::failure(
+          Error::dependency(catalog_before_.sketch().value(),
+                            "constraint model or dimensions changed after preview"));
     auto current_catalog = session.sketch_constraint_catalog(catalog_before_.sketch());
     if (current_catalog.has_error())
       return Result<std::size_t>::failure(current_catalog.error());
@@ -465,6 +478,7 @@ private:
   SketchTopology source_topology_;
   SketchConstraintCatalog catalog_before_;
   GuiSketchConstraintPreview preview_;
+  std::optional<std::size_t> source_model_revision_;
   bool committed_{false};
   bool undone_{false};
 };

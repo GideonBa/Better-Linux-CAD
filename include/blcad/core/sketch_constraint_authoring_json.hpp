@@ -40,6 +40,8 @@ sketch_constraint_intent_kind_from_string(std::string_view value) noexcept {
   if (value == "collinear") return SketchSolverConstraintKind::Collinear;
   if (value == "equal") return SketchSolverConstraintKind::Equal;
   if (value == "tangent") return SketchSolverConstraintKind::Tangent;
+  if (value == "smooth")
+    return SketchSolverConstraintKind::Smooth;
   if (value == "concentric") return SketchSolverConstraintKind::Concentric;
   if (value == "midpoint") return SketchSolverConstraintKind::Midpoint;
   if (value == "symmetric") return SketchSolverConstraintKind::Symmetric;
@@ -117,8 +119,14 @@ serialize_sketch_constraint_catalogs_to_json(
           catalogs[index].sketch().value(), "constraint sidecar Sketch catalogs must be unique"));
   }
 
+  const bool smooth = std::any_of(catalogs.begin(), catalogs.end(), [](const auto& catalog) {
+    return std::any_of(catalog.constraints().begin(), catalog.constraints().end(),
+                       [](const auto& constraint) {
+                         return constraint.kind() == SketchSolverConstraintKind::Smooth;
+                       });
+  });
   json root{{"schema", "blcad.sketch_constraints.mvp8"},
-            {"version", 1},
+            {"version", smooth ? 2 : 1},
             {"document", document.value()},
             {"catalogs", json::array()}};
   for (const auto& catalog : catalogs) {
@@ -139,7 +147,8 @@ deserialize_sketch_constraint_catalogs_from_json(std::string_view content) {
     const json root = json::parse(content.begin(), content.end());
     if (!root.is_object() ||
         root.value("schema", std::string{}) != "blcad.sketch_constraints.mvp8" ||
-        root.value("version", 0) != 1 || !root.contains("document") ||
+        !root.contains("version") || !root.at("version").is_number_integer() ||
+        (root.at("version") != 1 && root.at("version") != 2) || !root.contains("document") ||
         !root.at("document").is_string() || !root.contains("catalogs") ||
         !root.at("catalogs").is_array())
       return Result<std::vector<SketchConstraintCatalog>>::failure(Error::validation(
@@ -158,6 +167,10 @@ deserialize_sketch_constraint_catalogs_from_json(std::string_view content) {
         auto constraint = detail::sketch_constraint_intent_from_json(value);
         if (constraint.has_error())
           return Result<std::vector<SketchConstraintCatalog>>::failure(constraint.error());
+        if (root.at("version") == 1 &&
+            constraint.value().kind() == SketchSolverConstraintKind::Smooth)
+          return Result<std::vector<SketchConstraintCatalog>>::failure(Error::validation(
+              constraint.value().id().value(), "Smooth requires constraint sidecar version 2"));
         constraints.push_back(std::move(constraint.value()));
       }
       auto catalog = SketchConstraintCatalog::create(

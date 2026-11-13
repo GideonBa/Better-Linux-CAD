@@ -92,7 +92,8 @@ public:
           object_id, "constraint intent target kinds are incompatible with the selected family"));
     for (std::size_t index = 0U; index < targets.size(); ++index)
       for (std::size_t previous = 0U; previous < index; ++previous)
-        if (targets[index] == targets[previous] && kind != SketchSolverConstraintKind::Fixed)
+        if (targets[index] == targets[previous] && kind != SketchSolverConstraintKind::Fixed &&
+            !(kind == SketchSolverConstraintKind::Smooth && previous == 1U && index == 3U))
           return Result<SketchConstraintIntent>::failure(
               Error::validation(object_id, "constraint intent targets must be distinct"));
     return Result<SketchConstraintIntent>::success(
@@ -125,6 +126,7 @@ private:
     case SketchSolverConstraintKind::Collinear:
     case SketchSolverConstraintKind::Equal:
     case SketchSolverConstraintKind::Tangent:
+    case SketchSolverConstraintKind::Smooth:
     case SketchSolverConstraintKind::Concentric:
     case SketchSolverConstraintKind::Midpoint:
     case SketchSolverConstraintKind::Symmetric:
@@ -145,6 +147,8 @@ private:
     case SketchSolverConstraintKind::Fixed:
     case SketchSolverConstraintKind::Horizontal:
     case SketchSolverConstraintKind::Vertical: return 1U;
+    case SketchSolverConstraintKind::Smooth:
+      return 4U;
     case SketchSolverConstraintKind::Symmetric: return 3U;
     default: return 2U;
     }
@@ -169,6 +173,8 @@ private:
     case SketchSolverConstraintKind::Equal:
     case SketchSolverConstraintKind::Tangent:
     case SketchSolverConstraintKind::Concentric: return entity(0U) && entity(1U);
+    case SketchSolverConstraintKind::Smooth:
+      return entity(0U) && point(1U) && entity(2U) && point(3U);
     case SketchSolverConstraintKind::Collinear: {
       // Variable arity: two-plus lines, a point and a line, or three-plus
       // points. Every target must be a point or an entity, and the mix must
@@ -305,8 +311,14 @@ tangent_circle_radius_for_intent(const SketchConstraintIntent& intent,
   return std::nullopt;
 }
 
+class SketchDimensionCatalog;
+
 class SketchConstraintAuthoringService {
 public:
+  [[nodiscard]] Result<SketchConstraintAuthoringPreview>
+  preview(const PartDocument& document, const SketchConstraintCatalog& catalog,
+          const SketchDimensionCatalog& dimensions, const SketchConstraintIntent& candidate) const;
+
   [[nodiscard]] Result<SketchConstraintAuthoringPreview>
   preview(const PartDocument& document, const SketchConstraintCatalog& catalog,
           const SketchConstraintIntent& candidate) const {
