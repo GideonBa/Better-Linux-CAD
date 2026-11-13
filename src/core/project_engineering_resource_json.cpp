@@ -18,7 +18,7 @@ Result<nlohmann::json> resource_part_to_project_json(const PartDocument& part,
     if (!serialized)
       return Result<nlohmann::json>::failure(serialized.error());
     auto value = nlohmann::json::parse(serialized.value());
-    if (value.at("version") == 7 || value.at("version") == 8 ||
+    if (value.at("version") == 7 || value.at("version") == 8 || value.at("version") == 9 ||
         !part.engineering_resources().entries().empty() || !part.hole_features().empty() ||
         !part.thread_features().empty()) {
       auto refs = nlohmann::json::array();
@@ -42,7 +42,8 @@ Result<PartDocument> resource_part_from_project_json(const nlohmann::json& value
   try {
     if (!value.at("version").is_number_integer() ||
         (value.at("version") != 3 && value.at("version") != 4 && value.at("version") != 5 &&
-         value.at("version") != 6 && value.at("version") != 7 && value.at("version") != 8))
+         value.at("version") != 6 && value.at("version") != 7 && value.at("version") != 8 &&
+         value.at("version") != 9))
       return deserialize_part_document_from_json(value.dump());
     if (value.contains("engineering_resources") || !value.contains("engineering_resource_refs") ||
         !value.at("engineering_resource_refs").is_array())

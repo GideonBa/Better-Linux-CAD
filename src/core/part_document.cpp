@@ -11,29 +11,31 @@
 namespace blcad {
 namespace {
 
-bool has_equation_intent(const PartDocument& document) {
+bool has_extended_sketch_intent(const PartDocument& document) {
   return std::any_of(document.sketches().begin(), document.sketches().end(),
                      [](const auto& sketch) { return !sketch.equation_curves().empty(); }) ||
          std::any_of(document.sketches_3d().begin(), document.sketches_3d().end(),
-                     [](const auto& sketch) { return !sketch.equation_curves().empty(); });
+                     [](const auto& sketch) {
+                       return !sketch.equation_curves().empty() || sketch.requires_spatial_schema();
+                     });
 }
-// Preserve the existing fast path for historical Parts. Equation-bearing Parts
-// validate domain changes transactionally, including dependent formulas/graph.
-struct EquationParameterRollback {
+// Preserve the existing fast path for historical Parts. Extended Sketch Parts
+// validate typed input changes transactionally, including dependent formulas/graph.
+struct SketchParameterRollback {
   PartDocument& document;
   std::optional<PartDocument> before;
   bool accepted{false};
-  explicit EquationParameterRollback(PartDocument& value) : document(value) {
-    if (has_equation_intent(value))
+  explicit SketchParameterRollback(PartDocument& value) : document(value) {
+    if (has_extended_sketch_intent(value))
       before = value;
   }
-  ~EquationParameterRollback() {
+  ~SketchParameterRollback() {
     if (before && !accepted)
       document = std::move(*before);
   }
 };
-Result<std::size_t> validate_equation_domains(const PartDocument& document,
-                                              const std::vector<std::string>& affected) {
+Result<std::size_t> validate_sketch_parameter_intent(const PartDocument& document,
+                                                     const std::vector<std::string>& affected) {
   std::size_t count = 0;
   const auto validate = [&](const auto& sketches) -> Result<std::size_t> {
     for (const auto& sketch : sketches) {
@@ -51,7 +53,16 @@ Result<std::size_t> validate_equation_domains(const PartDocument& document,
   auto planar = validate(document.sketches());
   if (!planar)
     return planar;
-  return validate(document.sketches_3d());
+  auto spatial_equations = validate(document.sketches_3d());
+  if (!spatial_equations)
+    return spatial_equations;
+  for (const auto& sketch : document.sketches_3d())
+    if (std::find(affected.begin(), affected.end(), sketch.id().value()) != affected.end()) {
+      auto valid = validate_spatial_constraints(document, sketch);
+      if (!valid)
+        return valid;
+    }
+  return Result<std::size_t>::success(count);
 }
 
 constexpr double k_tolerance = 1.0e-9;
@@ -1168,6 +1179,13 @@ Result<std::size_t> validate_path_curve(const PartDocument& document, const Path
 
 } // namespace
 
+Result<std::size_t> validate_path_segment_source(const PartDocument& document,
+                                                 const PathSegmentReference& segment) {
+  auto endpoints = path_segment_endpoints(document, segment);
+  return endpoints ? Result<std::size_t>::success(1)
+                   : Result<std::size_t>::failure(endpoints.error());
+}
+
 Result<PartDocument> PartDocument::create(DocumentId id, std::string name) {
   const auto object_id = id.empty() ? std::string("part_document") : id.value();
   if (id.empty())
@@ -1835,6 +1853,11 @@ Result<std::size_t> PartDocument::update_sketch(Sketch sketch) {
   candidate.sketches_.insert(candidate.sketches_.begin() + static_cast<std::ptrdiff_t>(index),
                              std::move(replacement));
 
+  for (const auto& owner : candidate.sketches_3d()) {
+    auto valid = validate_spatial_constraints(candidate, owner);
+    if (!valid)
+      return valid;
+  }
   for (const auto& path : candidate.path_curves_) {
     const bool equation_consumer =
         std::any_of(path.segments().begin(), path.segments().end(), [&](const auto& segment) {
@@ -1889,11 +1912,10 @@ Result<std::size_t> PartDocument::add_sketch_3d(Sketch3D sketch) {
             "3D sketch coordinate parameters must be existing Length parameters"));
     }
   for (const SketchHelix3D& helix : sketch.helices()) {
-    for (const ParameterId* parameter_id : {&helix.radius_parameter(), &helix.pitch_parameter()}) {
-      const Parameter* parameter = find_parameter(*parameter_id);
-      if (parameter == nullptr || parameter->type() != ParameterType::Length)
-        return Result<std::size_t>::failure(Error::validation(
-            helix.id().value(), "3D helix radius and pitch must be existing Length parameters"));
+    for (const auto* binding : {&helix.radius_binding(), &helix.pitch_binding()}) {
+      auto resolved = binding->resolve(*this);
+      if (!resolved)
+        return Result<std::size_t>::failure(resolved.error());
     }
     const Parameter* turns = find_parameter(helix.turns_parameter());
     if (turns == nullptr || turns->type() != ParameterType::Count ||
@@ -1950,6 +1972,9 @@ Result<std::size_t> PartDocument::add_sketch_3d(Sketch3D sketch) {
     if (!program)
       return Result<std::size_t>::failure(program.error());
   }
+  auto spatial_valid = validate_spatial_constraints(*this, sketch);
+  if (!spatial_valid)
+    return spatial_valid;
   auto graph = dependency_graph_;
   auto added_node = add_authored_graph_node(graph, sketch.id().value());
   if (added_node.has_error())
@@ -1985,6 +2010,11 @@ Result<std::size_t> PartDocument::update_sketch_3d(Sketch3D sketch) {
       &PartDocument::sketches_3d_, std::move(sketch), &PartDocument::add_sketch_3d);
   if (!updated)
     return updated;
+  for (const auto& owner : candidate.sketches_3d()) {
+    auto valid = validate_spatial_constraints(candidate, owner);
+    if (!valid)
+      return valid;
+  }
   for (const auto& path : candidate.path_curves()) {
     const auto& segments = path.segments();
     if (std::any_of(segments.begin(), segments.end(),
@@ -3955,7 +3985,7 @@ Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId i
   auto updated = existing->with_value(value);
   if (updated.has_error())
     return Result<std::vector<std::string>>::failure(updated.error());
-  EquationParameterRollback rollback(*this);
+  SketchParameterRollback rollback(*this);
   for (auto& parameter : parameters_)
     if (parameter.id() == id) {
       parameter = std::move(updated.value());
@@ -3968,7 +3998,7 @@ Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId i
   if (reevaluated.has_error())
     return Result<std::vector<std::string>>::failure(reevaluated.error());
   if (rollback.before) {
-    auto domains = validate_equation_domains(*this, affected.value());
+    auto domains = validate_sketch_parameter_intent(*this, affected.value());
     if (!domains)
       return Result<std::vector<std::string>>::failure(domains.error());
   }
@@ -4015,7 +4045,7 @@ Result<std::vector<std::string>> PartDocument::set_parameter_formula(ParameterId
     return Result<std::vector<std::string>>::failure(Error::dependency(
         id.value(), "expression formula edit must not create a dependency cycle"));
 
-  EquationParameterRollback rollback(*this);
+  SketchParameterRollback rollback(*this);
   auto invalidation_state = invalidation_state_;
   auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
   if (synced.has_error())
@@ -4035,7 +4065,7 @@ Result<std::vector<std::string>> PartDocument::set_parameter_formula(ParameterId
   if (reevaluated.has_error())
     return Result<std::vector<std::string>>::failure(reevaluated.error());
   if (rollback.before) {
-    auto domains = validate_equation_domains(*this, affected.value());
+    auto domains = validate_sketch_parameter_intent(*this, affected.value());
     if (!domains)
       return Result<std::vector<std::string>>::failure(domains.error());
   }

@@ -94,6 +94,7 @@ add_library(
   src/core/revolve_feature.cpp
   src/core/sketch.cpp
   src/core/sketch_3d.cpp
+  src/core/sketch_3d_constraints.cpp
   src/core/sketch_ownership.cpp
   src/core/sketch_arc_profile.cpp
   src/core/sketch_constraints.cpp

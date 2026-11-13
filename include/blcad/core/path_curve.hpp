@@ -11,6 +11,7 @@
 #include <vector>
 
 namespace blcad {
+class PartDocument;
 
 enum class PathSegmentSourceKind {
   PlanarSketchCurve,
@@ -72,6 +73,9 @@ private:
   std::optional<Sketch3DPathCurveKind> sketch_3d_curve_kind_;
   bool reversed_;
 };
+
+[[nodiscard]] Result<std::size_t> validate_path_segment_source(const PartDocument&,
+                                                               const PathSegmentReference&);
 
 enum class PathClosure { Open, Closed };
 enum class PathOrientationRule { ProfileNormal, MinimumTwist, FixedUpVector };

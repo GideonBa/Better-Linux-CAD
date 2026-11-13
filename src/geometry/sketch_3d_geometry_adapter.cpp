@@ -273,13 +273,13 @@ struct ResolvedAxis {
   auto axis = resolve_axis(document, helix.axis());
   if (axis.has_error())
     return Result<TopoDS_Shape>::failure(axis.error());
-  const Parameter* radius = document.find_parameter(helix.radius_parameter());
-  const Parameter* pitch = document.find_parameter(helix.pitch_parameter());
+  const auto radius = helix.radius_binding().resolve(document);
+  const auto pitch = helix.pitch_binding().resolve(document);
   const Parameter* turns = document.find_parameter(helix.turns_parameter());
-  if (radius == nullptr || pitch == nullptr || turns == nullptr)
+  if (!radius || !pitch || turns == nullptr)
     return Result<TopoDS_Shape>::failure(
         geometry_error(helix.id().value(), "helix parameters must exist"));
-  const double pitch_per_radian = pitch->value().millimeters() / (2.0 * k_pi);
+  const double pitch_per_radian = pitch.value().millimeters() / (2.0 * k_pi);
   const double sign = helix.handedness() == SketchHelix3DHandedness::RightHanded ? 1.0 : -1.0;
   const double direction_length = std::hypot(1.0, pitch_per_radian);
   Handle(Geom2d_Line) curve = new Geom2d_Line(
@@ -287,7 +287,7 @@ struct ResolvedAxis {
   Handle(Geom_CylindricalSurface) surface = new Geom_CylindricalSurface(
       gp_Ax3(point(axis.value().origin),
              gp_Dir(axis.value().direction.x, axis.value().direction.y, axis.value().direction.z)),
-      radius->value().millimeters());
+      radius.value().millimeters());
   const double last =
       direction_length * 2.0 * k_pi * static_cast<double>(turns->value().count_value());
   BRepBuilderAPI_MakeEdge builder(curve, surface, 0.0, last);

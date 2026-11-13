@@ -88,6 +88,8 @@ std::string_view to_string(PartFeatureInputRole role) noexcept {
     return "hole_limit_face";
   case PartFeatureInputRole::ThreadSupportFace:
     return "thread_support_face";
+  case PartFeatureInputRole::SpatialConstraint:
+    return "spatial_constraint";
   case PartFeatureInputRole::FilletEdge:
     return "fillet_edge";
   case PartFeatureInputRole::ChamferEdge:
@@ -145,6 +147,11 @@ std::string_view to_string(PartFeatureInputSourceKind source_kind) noexcept {
 bool part_feature_input_role_accepts(PartFeatureInputRole role,
                                      PartFeatureInputCapability capability) noexcept {
   switch (role) {
+  case PartFeatureInputRole::SpatialConstraint:
+    return capability == PartFeatureInputCapability::Axis ||
+           capability == PartFeatureInputCapability::Line ||
+           capability == PartFeatureInputCapability::Plane ||
+           capability == PartFeatureInputCapability::Face;
   case PartFeatureInputRole::ProfileRegion:
   case PartFeatureInputRole::RevolveProfile:
   case PartFeatureInputRole::SweepProfile:

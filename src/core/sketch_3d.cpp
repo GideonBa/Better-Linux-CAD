@@ -1,4 +1,5 @@
 #include "blcad/core/sketch_3d.hpp"
+#include "blcad/core/part_document.hpp"
 
 #include <algorithm>
 #include <string>
@@ -337,30 +338,46 @@ SketchHelixAxis3D::SketchHelixAxis3D(SketchHelixAxis3DSource source,
       construction_line_(std::move(construction_line)) {}
 
 Result<SketchHelix3D> SketchHelix3D::create(SketchEntityId id, SketchHelixAxis3D axis,
-                                            ParameterId radius_parameter,
-                                            ParameterId pitch_parameter,
-                                            ParameterId turns_parameter,
-                                            SketchHelix3DHandedness handedness) {
-  const std::string object_id = id.empty() ? "sketch_3d_helix" : id.value();
-  if (id.empty() || radius_parameter.empty() || pitch_parameter.empty() || turns_parameter.empty())
+                                            ParameterId radius, ParameterId pitch,
+                                            ParameterId turns, SketchHelix3DHandedness handedness) {
+  if (id.empty() || radius.empty() || pitch.empty() || turns.empty())
     return Result<SketchHelix3D>::failure(validation_error(
-        object_id, "3D sketch helix id and radius, pitch, and turns parameters must not be empty"));
-  return Result<SketchHelix3D>::success(
-      SketchHelix3D(std::move(id), std::move(axis), std::move(radius_parameter),
-                    std::move(pitch_parameter), std::move(turns_parameter), handedness));
+        id.empty() ? "sketch_3d_helix" : id.value(),
+        "3D sketch helix id and radius, pitch, and turns parameters must not be empty"));
+  return create_with_bindings(
+      std::move(id), std::move(axis), SketchLength3D::create_parameter(std::move(radius)).value(),
+      SketchLength3D::create_parameter(std::move(pitch)).value(), std::move(turns), handedness);
 }
-
+Result<SketchHelix3D> SketchHelix3D::create_with_bindings(SketchEntityId id, SketchHelixAxis3D axis,
+                                                          SketchLength3D radius,
+                                                          SketchLength3D pitch, ParameterId turns,
+                                                          SketchHelix3DHandedness handedness) {
+  if (id.empty() || turns.empty() ||
+      (handedness != SketchHelix3DHandedness::RightHanded &&
+       handedness != SketchHelix3DHandedness::LeftHanded))
+    return Result<SketchHelix3D>::failure(validation_error(
+        id.value(), "Helix requires an id, positive Count binding and supported handedness"));
+  return Result<SketchHelix3D>::success(SketchHelix3D(std::move(id), std::move(axis),
+                                                      std::move(radius), std::move(pitch),
+                                                      std::move(turns), handedness));
+}
 const SketchEntityId& SketchHelix3D::id() const noexcept {
   return id_;
 }
 const SketchHelixAxis3D& SketchHelix3D::axis() const noexcept {
   return axis_;
 }
+const SketchLength3D& SketchHelix3D::radius_binding() const noexcept {
+  return radius_;
+}
+const SketchLength3D& SketchHelix3D::pitch_binding() const noexcept {
+  return pitch_;
+}
 const ParameterId& SketchHelix3D::radius_parameter() const noexcept {
-  return radius_parameter_;
+  return radius_.parameter_id();
 }
 const ParameterId& SketchHelix3D::pitch_parameter() const noexcept {
-  return pitch_parameter_;
+  return pitch_.parameter_id();
 }
 const ParameterId& SketchHelix3D::turns_parameter() const noexcept {
   return turns_parameter_;
@@ -368,13 +385,11 @@ const ParameterId& SketchHelix3D::turns_parameter() const noexcept {
 SketchHelix3DHandedness SketchHelix3D::handedness() const noexcept {
   return handedness_;
 }
-
-SketchHelix3D::SketchHelix3D(SketchEntityId id, SketchHelixAxis3D axis,
-                             ParameterId radius_parameter, ParameterId pitch_parameter,
-                             ParameterId turns_parameter, SketchHelix3DHandedness handedness)
-    : id_(std::move(id)), axis_(std::move(axis)), radius_parameter_(std::move(radius_parameter)),
-      pitch_parameter_(std::move(pitch_parameter)), turns_parameter_(std::move(turns_parameter)),
-      handedness_(handedness) {}
+SketchHelix3D::SketchHelix3D(SketchEntityId id, SketchHelixAxis3D axis, SketchLength3D radius,
+                             SketchLength3D pitch, ParameterId turns,
+                             SketchHelix3DHandedness handedness)
+    : id_(std::move(id)), axis_(std::move(axis)), radius_(std::move(radius)),
+      pitch_(std::move(pitch)), turns_parameter_(std::move(turns)), handedness_(handedness) {}
 
 Result<SketchGuideCurve3D> SketchGuideCurve3D::create(SketchEntityId id,
                                                       SketchEntityId source_curve,
@@ -500,6 +515,9 @@ Result<std::size_t> Sketch3D::replace_equation_curve(EquationCurve curve) {
   return Result<std::size_t>::success(1);
 }
 Result<std::size_t> Sketch3D::remove_equation_curve(SketchEntityId id) {
+  if (constraint_references(id))
+    return Result<std::size_t>::failure(
+        validation_error(id.value(), "Equation curve is retained by a spatial constraint"));
   if (guide_references(id))
     return Result<std::size_t>::failure(
         Error::dependency(id.value(), "Equation curve is referenced by guide metadata"));
@@ -532,6 +550,9 @@ Result<std::size_t> Sketch3D::add_guide_curve(SketchGuideCurve3D guide_curve) {
 }
 
 Result<std::size_t> Sketch3D::remove_point(SketchEntityId id) {
+  if (constraint_references(id))
+    return Result<std::size_t>::failure(validation_error(
+        id.value(), "Spatial entity is retained by a constraint; delete or rebind it first"));
   const auto point = std::find_if(points_.begin(), points_.end(),
                                   [&id](const SketchPoint3D& value) { return value.id() == id; });
   if (point == points_.end())
@@ -560,6 +581,9 @@ Result<std::size_t> Sketch3D::remove_point(SketchEntityId id) {
 }
 
 Result<std::size_t> Sketch3D::remove_line(SketchEntityId id) {
+  if (constraint_references(id))
+    return Result<std::size_t>::failure(validation_error(
+        id.value(), "Spatial entity is retained by a constraint; delete or rebind it first"));
   const auto line = std::find_if(lines_.begin(), lines_.end(),
                                  [&id](const SketchLine3D& value) { return value.id() == id; });
   if (line == lines_.end())
@@ -572,6 +596,9 @@ Result<std::size_t> Sketch3D::remove_line(SketchEntityId id) {
 }
 
 Result<std::size_t> Sketch3D::remove_polyline(SketchEntityId id) {
+  if (constraint_references(id))
+    return Result<std::size_t>::failure(validation_error(
+        id.value(), "Spatial entity is retained by a constraint; delete or rebind it first"));
   const auto polyline =
       std::find_if(polylines_.begin(), polylines_.end(),
                    [&id](const SketchPolyline3D& value) { return value.id() == id; });
@@ -586,6 +613,9 @@ Result<std::size_t> Sketch3D::remove_polyline(SketchEntityId id) {
 }
 
 Result<std::size_t> Sketch3D::remove_arc(SketchEntityId id) {
+  if (constraint_references(id))
+    return Result<std::size_t>::failure(validation_error(
+        id.value(), "Spatial entity is retained by a constraint; delete or rebind it first"));
   const auto found = std::find_if(arcs_.begin(), arcs_.end(),
                                   [&id](const SketchArc3D& value) { return value.id() == id; });
   if (found == arcs_.end())
@@ -598,6 +628,9 @@ Result<std::size_t> Sketch3D::remove_arc(SketchEntityId id) {
 }
 
 Result<std::size_t> Sketch3D::remove_spline(SketchEntityId id) {
+  if (constraint_references(id))
+    return Result<std::size_t>::failure(validation_error(
+        id.value(), "Spatial entity is retained by a constraint; delete or rebind it first"));
   const auto found = std::find_if(splines_.begin(), splines_.end(),
                                   [&id](const SketchSpline3D& value) { return value.id() == id; });
   if (found == splines_.end())
@@ -611,6 +644,9 @@ Result<std::size_t> Sketch3D::remove_spline(SketchEntityId id) {
 }
 
 Result<std::size_t> Sketch3D::remove_helix(SketchEntityId id) {
+  if (constraint_references(id))
+    return Result<std::size_t>::failure(validation_error(
+        id.value(), "Spatial entity is retained by a constraint; delete or rebind it first"));
   const auto found = std::find_if(helices_.begin(), helices_.end(),
                                   [&id](const SketchHelix3D& value) { return value.id() == id; });
   if (found == helices_.end())
@@ -714,10 +750,15 @@ std::vector<ParameterId> Sketch3D::parameter_dependencies() const {
   for (const SketchHelix3D& helix : helices_)
     for (const ParameterId* parameter :
          {&helix.radius_parameter(), &helix.pitch_parameter(), &helix.turns_parameter()})
-      if (std::find(result.begin(), result.end(), *parameter) == result.end())
+      if (!parameter->empty() &&
+          std::find(result.begin(), result.end(), *parameter) == result.end())
         result.push_back(*parameter);
   for (const auto& curve : equation_curves_)
     for (const auto& parameter : curve.parameter_dependencies())
+      if (std::find(result.begin(), result.end(), parameter) == result.end())
+        result.push_back(parameter);
+  for (const auto& constraint : constraints_)
+    for (const auto& parameter : constraint.parameter_dependencies())
       if (std::find(result.begin(), result.end(), parameter) == result.end())
         result.push_back(parameter);
   return result;
@@ -741,6 +782,10 @@ std::vector<std::string> Sketch3D::referenced_node_ids() const {
     if (std::find(result.begin(), result.end(), node) == result.end())
       result.push_back(node);
   }
+  for (const auto& constraint : constraints_)
+    for (const auto& node : constraint.referenced_node_ids())
+      if (std::find(result.begin(), result.end(), node) == result.end())
+        result.push_back(node);
   return result;
 }
 
@@ -775,6 +820,135 @@ Sketch3D::validate_point_references(const std::vector<SketchPointReference3D>& r
 bool Sketch3D::guide_references(const SketchEntityId& id) const noexcept {
   return std::ranges::any_of(
       guide_curves_, [&id](const SketchGuideCurve3D& guide) { return guide.source_curve() == id; });
+}
+
+SketchLength3D::SketchLength3D(std::optional<Quantity> length, ParameterId parameter)
+    : length_(std::move(length)), parameter_(std::move(parameter)) {}
+Result<SketchLength3D> SketchLength3D::create_explicit(Quantity length) {
+  if (!length.is_positive_length())
+    return Result<SketchLength3D>::failure(
+        validation_error("sketch3d.length", "Owned scalar must be a positive Length"));
+  return Result<SketchLength3D>::success(SketchLength3D(length, {}));
+}
+Result<SketchLength3D> SketchLength3D::create_parameter(ParameterId id) {
+  if (id.empty())
+    return Result<SketchLength3D>::failure(
+        validation_error("sketch3d.length", "Length parameter id must not be empty"));
+  return Result<SketchLength3D>::success(SketchLength3D(std::nullopt, std::move(id)));
+}
+SketchCoordinate3DSource SketchLength3D::source() const noexcept {
+  return length_ ? SketchCoordinate3DSource::Explicit : SketchCoordinate3DSource::Parameter;
+}
+const std::optional<Quantity>& SketchLength3D::explicit_length() const noexcept {
+  return length_;
+}
+const ParameterId& SketchLength3D::parameter_id() const noexcept {
+  return parameter_;
+}
+Result<Quantity> SketchLength3D::resolve(const PartDocument& part) const {
+  if (length_)
+    return Result<Quantity>::success(*length_);
+  const auto* parameter = part.find_parameter(parameter_);
+  if (!parameter || parameter->type() != ParameterType::Length ||
+      !parameter->value().is_positive_length())
+    return Result<Quantity>::failure(validation_error(
+        parameter_.value(), "Scalar binding requires an existing positive Length parameter"));
+  return Result<Quantity>::success(parameter->value());
+}
+template <class T>
+Result<std::size_t> Sketch3D::replace_record(std::vector<T> Sketch3D::*records, T value,
+                                             Result<std::size_t> (Sketch3D::*add)(T)) {
+  auto candidate = *this;
+  auto& values = candidate.*records;
+  const auto old = std::find_if(values.begin(), values.end(),
+                                [&](const auto& item) { return item.id() == value.id(); });
+  if (old == values.end())
+    return Result<std::size_t>::failure(
+        validation_error(value.id().value(), "Spatial entity to replace must exist"));
+  const auto index = static_cast<std::size_t>(old - values.begin());
+  values.erase(old);
+  auto added = (candidate.*add)(std::move(value));
+  if (!added)
+    return added;
+  std::rotate(values.begin() + index, values.end() - 1, values.end());
+  for (const auto& constraint : candidate.constraints_) {
+    auto valid = validate_spatial_constraint(candidate, constraint);
+    if (!valid)
+      return valid;
+  }
+  *this = std::move(candidate);
+  return Result<std::size_t>::success(index);
+}
+Result<std::size_t> Sketch3D::replace_point(SketchPoint3D value) {
+  return replace_record(&Sketch3D::points_, std::move(value), &Sketch3D::add_point);
+}
+Result<std::size_t> Sketch3D::replace_line(SketchLine3D value) {
+  return replace_record(&Sketch3D::lines_, std::move(value), &Sketch3D::add_line);
+}
+Result<std::size_t> Sketch3D::replace_polyline(SketchPolyline3D value) {
+  return replace_record(&Sketch3D::polylines_, std::move(value), &Sketch3D::add_polyline);
+}
+Result<std::size_t> Sketch3D::replace_arc(SketchArc3D value) {
+  return replace_record(&Sketch3D::arcs_, std::move(value), &Sketch3D::add_arc);
+}
+Result<std::size_t> Sketch3D::replace_spline(SketchSpline3D value) {
+  return replace_record(&Sketch3D::splines_, std::move(value), &Sketch3D::add_spline);
+}
+Result<std::size_t> Sketch3D::replace_helix(SketchHelix3D value) {
+  return replace_record(&Sketch3D::helices_, std::move(value), &Sketch3D::add_helix);
+}
+Result<std::size_t> Sketch3D::add_constraint(SpatialConstraint constraint) {
+  if (find_constraint(constraint.id()))
+    return Result<std::size_t>::failure(validation_error(
+        constraint.id().value(), "Spatial constraint id must be unique in its sketch"));
+  auto valid = validate_spatial_constraint(*this, constraint);
+  if (!valid)
+    return valid;
+  constraints_.push_back(std::move(constraint));
+  return Result<std::size_t>::success(constraints_.size() - 1);
+}
+Result<std::size_t> Sketch3D::replace_constraint(SpatialConstraint constraint) {
+  const auto it = std::find_if(constraints_.begin(), constraints_.end(),
+                               [&](const auto& item) { return item.id() == constraint.id(); });
+  if (it == constraints_.end())
+    return Result<std::size_t>::failure(
+        validation_error(constraint.id().value(), "Spatial constraint to replace must exist"));
+  auto valid = validate_spatial_constraint(*this, constraint);
+  if (!valid)
+    return valid;
+  const auto index = static_cast<std::size_t>(it - constraints_.begin());
+  *it = std::move(constraint);
+  return Result<std::size_t>::success(index);
+}
+Result<std::size_t> Sketch3D::remove_constraint(SketchConstraintId id) {
+  const auto it = std::find_if(constraints_.begin(), constraints_.end(),
+                               [&](const auto& item) { return item.id() == id; });
+  if (it == constraints_.end())
+    return Result<std::size_t>::failure(
+        validation_error(id.value(), "Spatial constraint to remove must exist"));
+  const auto index = static_cast<std::size_t>(it - constraints_.begin());
+  constraints_.erase(it);
+  return Result<std::size_t>::success(index);
+}
+const SpatialConstraint* Sketch3D::find_constraint(SketchConstraintId id) const noexcept {
+  const auto it = std::find_if(constraints_.begin(), constraints_.end(),
+                               [&](const auto& item) { return item.id() == id; });
+  return it == constraints_.end() ? nullptr : &*it;
+}
+const std::vector<SpatialConstraint>& Sketch3D::constraints() const noexcept {
+  return constraints_;
+}
+bool Sketch3D::constraint_references(const SketchEntityId& id) const noexcept {
+  return std::any_of(constraints_.begin(), constraints_.end(), [&](const auto& item) {
+    return std::any_of(item.targets().begin(), item.targets().end(),
+                       [&](const auto& t) { return t.local_entity() == id; });
+  });
+}
+bool Sketch3D::requires_spatial_schema() const noexcept {
+  return !constraints_.empty() || std::any_of(helices_.begin(), helices_.end(), [](const auto& h) {
+    return h.radius_binding().source() == SketchCoordinate3DSource::Explicit ||
+           h.pitch_binding().source() == SketchCoordinate3DSource::Explicit;
+  });
 }
 
 } // namespace blcad

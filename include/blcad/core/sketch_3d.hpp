@@ -4,6 +4,8 @@
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/sketch.hpp"
+#include "blcad/core/sketch_3d_constraints.hpp"
+#include "blcad/core/sketch_3d_reference.hpp"
 
 #include <cstddef>
 #include <optional>
@@ -11,6 +13,7 @@
 #include <vector>
 
 namespace blcad {
+class PartDocument;
 
 enum class SketchCoordinate3DSource { Explicit, Parameter };
 
@@ -83,38 +86,6 @@ private:
 
   SketchEntityId id_;
   std::vector<SketchEntityId> ordered_vertices_;
-};
-
-enum class SketchPointReference3DSource { LocalPoint, ConstructionPoint, PlanarSketchPoint };
-
-class SketchPointReference3D {
-public:
-  [[nodiscard]] static Result<SketchPointReference3D> create_local_point(SketchEntityId point);
-  [[nodiscard]] static Result<SketchPointReference3D>
-  create_construction_point(ConstructionPointId point);
-  [[nodiscard]] static Result<SketchPointReference3D>
-  create_planar_sketch_point(SketchId sketch, SketchReferenceTarget point);
-
-  [[nodiscard]] SketchPointReference3DSource source() const noexcept;
-  [[nodiscard]] const std::optional<SketchEntityId>& local_point() const noexcept;
-  [[nodiscard]] const std::optional<ConstructionPointId>& construction_point() const noexcept;
-  [[nodiscard]] const std::optional<SketchId>& planar_sketch() const noexcept;
-  [[nodiscard]] const std::optional<SketchReferenceTarget>& planar_point() const noexcept;
-  [[nodiscard]] std::optional<std::string> referenced_node_id() const;
-  [[nodiscard]] bool same_source(const SketchPointReference3D& other) const noexcept;
-
-private:
-  SketchPointReference3D(SketchPointReference3DSource source,
-                         std::optional<SketchEntityId> local_point,
-                         std::optional<ConstructionPointId> construction_point,
-                         std::optional<SketchId> planar_sketch,
-                         std::optional<SketchReferenceTarget> planar_point);
-
-  SketchPointReference3DSource source_;
-  std::optional<SketchEntityId> local_point_;
-  std::optional<ConstructionPointId> construction_point_;
-  std::optional<SketchId> planar_sketch_;
-  std::optional<SketchReferenceTarget> planar_point_;
 };
 
 class SketchArc3D {
@@ -191,6 +162,21 @@ private:
 
 enum class SketchHelix3DHandedness { RightHanded, LeftHanded };
 
+class SketchLength3D {
+public:
+  [[nodiscard]] static Result<SketchLength3D> create_explicit(Quantity length);
+  [[nodiscard]] static Result<SketchLength3D> create_parameter(ParameterId parameter);
+  [[nodiscard]] SketchCoordinate3DSource source() const noexcept;
+  [[nodiscard]] const std::optional<Quantity>& explicit_length() const noexcept;
+  [[nodiscard]] const ParameterId& parameter_id() const noexcept;
+  [[nodiscard]] Result<Quantity> resolve(const PartDocument&) const;
+
+private:
+  SketchLength3D(std::optional<Quantity> length, ParameterId parameter);
+  std::optional<Quantity> length_;
+  ParameterId parameter_;
+};
+
 class SketchHelix3D {
 public:
   [[nodiscard]] static Result<SketchHelix3D> create(SketchEntityId id, SketchHelixAxis3D axis,
@@ -198,6 +184,13 @@ public:
                                                     ParameterId pitch_parameter,
                                                     ParameterId turns_parameter,
                                                     SketchHelix3DHandedness handedness);
+  [[nodiscard]] static Result<SketchHelix3D>
+  create_with_bindings(SketchEntityId id, SketchHelixAxis3D axis, SketchLength3D radius,
+                       SketchLength3D pitch, ParameterId turns_parameter,
+                       SketchHelix3DHandedness handedness);
+  [[nodiscard]] const SketchLength3D& radius_binding() const noexcept;
+  [[nodiscard]] const SketchLength3D& pitch_binding() const noexcept;
+  // Historical parameter accessors return an empty id for a new explicit source.
 
   [[nodiscard]] const SketchEntityId& id() const noexcept;
   [[nodiscard]] const SketchHelixAxis3D& axis() const noexcept;
@@ -207,14 +200,14 @@ public:
   [[nodiscard]] SketchHelix3DHandedness handedness() const noexcept;
 
 private:
-  SketchHelix3D(SketchEntityId id, SketchHelixAxis3D axis, ParameterId radius_parameter,
-                ParameterId pitch_parameter, ParameterId turns_parameter,
+  SketchHelix3D(SketchEntityId id, SketchHelixAxis3D axis, SketchLength3D radius,
+                SketchLength3D pitch, ParameterId turns_parameter,
                 SketchHelix3DHandedness handedness);
 
   SketchEntityId id_;
   SketchHelixAxis3D axis_;
-  ParameterId radius_parameter_;
-  ParameterId pitch_parameter_;
+  SketchLength3D radius_;
+  SketchLength3D pitch_;
   ParameterId turns_parameter_;
   SketchHelix3DHandedness handedness_;
 };
@@ -248,6 +241,19 @@ public:
   [[nodiscard]] static Result<Sketch3D> create(Sketch3DId id, std::string name);
 
   [[nodiscard]] Result<std::size_t> add_point(SketchPoint3D point);
+  [[nodiscard]] Result<std::size_t> replace_point(SketchPoint3D value);
+  [[nodiscard]] Result<std::size_t> replace_line(SketchLine3D value);
+  [[nodiscard]] Result<std::size_t> replace_polyline(SketchPolyline3D value);
+  [[nodiscard]] Result<std::size_t> replace_arc(SketchArc3D value);
+  [[nodiscard]] Result<std::size_t> replace_spline(SketchSpline3D value);
+  [[nodiscard]] Result<std::size_t> replace_helix(SketchHelix3D value);
+  [[nodiscard]] Result<std::size_t> add_constraint(SpatialConstraint constraint);
+  [[nodiscard]] Result<std::size_t> replace_constraint(SpatialConstraint constraint);
+  [[nodiscard]] Result<std::size_t> remove_constraint(SketchConstraintId id);
+  [[nodiscard]] const SpatialConstraint* find_constraint(SketchConstraintId id) const noexcept;
+  [[nodiscard]] const std::vector<SpatialConstraint>& constraints() const noexcept;
+  [[nodiscard]] bool requires_spatial_schema() const noexcept;
+
   [[nodiscard]] Result<std::size_t> add_line(SketchLine3D line);
   [[nodiscard]] Result<std::size_t> add_polyline(SketchPolyline3D polyline);
   [[nodiscard]] Result<std::size_t> add_arc(SketchArc3D arc);
@@ -297,6 +303,10 @@ private:
   validate_point_references(const std::vector<SketchPointReference3D>& references,
                             const SketchEntityId& owner) const;
   [[nodiscard]] bool guide_references(const SketchEntityId& id) const noexcept;
+  [[nodiscard]] bool constraint_references(const SketchEntityId& id) const noexcept;
+  template <class T>
+  [[nodiscard]] Result<std::size_t> replace_record(std::vector<T> Sketch3D::*records, T value,
+                                                   Result<std::size_t> (Sketch3D::*add)(T));
 
   Sketch3DId id_;
   std::string name_;
@@ -308,6 +318,7 @@ private:
   std::vector<SketchHelix3D> helices_;
   std::vector<EquationCurve> equation_curves_;
   std::vector<SketchGuideCurve3D> guide_curves_;
+  std::vector<SpatialConstraint> constraints_;
 };
 
 } // namespace blcad
