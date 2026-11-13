@@ -64,7 +64,10 @@ current context, `Aspect_NeutralWindow`, default-FBO wrapping (`InitWrapper`) in
 options `buffersNoSwap`/`buffersOpaqueAlpha`/`useSystemBuffer=false`, `SetImmediateUpdate(false)`.
 `paint_gl()` is the only place OCCT redraws; every state change funnels through
 `render_update()` (a scheduled Qt repaint). Input handlers pass device-pixel coordinates
-(`to_render_point`, DPR-scaled). Fail-closed behavior is unchanged: non-xcb platforms (offscreen
+(`to_render_point`, DPR-scaled). Native hover and left-button picking preserve `QPointF` event
+positions until the single device-pixel rounding; rounding in DIP first can miss a thin edge at
+fractional desktop scale. [Projection and picking precision](gui-viewport-manipulators-mvp9.md#native-projection-precision--2026-10-24)
+owns the focused contract. Fail-closed behavior is unchanged: non-xcb platforms (offscreen
 tests) never create the render surface and keep the painted fallback message.
 
 X11 implementation constraints (discovered by crash analysis, do not regress):

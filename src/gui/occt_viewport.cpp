@@ -596,9 +596,10 @@ void OcctViewport::release_interaction_mouse() {
   }
 }
 
-QPoint OcctViewport::to_render_point(QPoint point) const {
+QPoint OcctViewport::to_render_point(QPointF point) const {
   // OCCT window/framebuffer coordinates are device pixels; Qt events are
-  // logical pixels.
+  // logical pixels. Preserve fractional positions until the one device-pixel
+  // rounding so a fractional desktop scale cannot shift a thin-edge pick.
   const qreal scale =
       gl_surface_ != nullptr ? gl_surface_->devicePixelRatioF() : devicePixelRatioF();
   return {static_cast<int>(std::lround(point.x() * scale)),
@@ -1535,7 +1536,7 @@ void OcctViewport::mouseMoveEvent(QMouseEvent* event) {
     }
     update_sketch_pointer({event->position().x(), event->position().y()});
   } else if (!impl_->context.IsNull()) {
-    const QPoint point = to_render_point(current);
+    const QPoint point = to_render_point(event->position());
     impl_->context->MoveTo(point.x(), point.y(), impl_->view, false);
     render_update();
   }
@@ -1595,7 +1596,7 @@ void OcctViewport::mouseReleaseEvent(QMouseEvent* event) {
     static_cast<SketchInteractionOverlay*>(sketch_overlay_)->set_box(std::nullopt);
     update_sketch_pointer(current);
   } else if (event->button() == Qt::LeftButton && !impl_->context.IsNull()) {
-    const QPoint current = to_render_point(event->position().toPoint());
+    const QPoint current = to_render_point(event->position());
     impl_->context->MoveTo(current.x(), current.y(), impl_->view, false);
     if (impl_->context->HasDetected()) {
       // OCCT may rank a datum plane/axis ahead of a coplanar translucent
@@ -1798,7 +1799,7 @@ void OcctViewport::initialize_gl() {
       std::free(xcb_get_input_focus_reply(x11_app->connection(),
                                           xcb_get_input_focus(x11_app->connection()), nullptr));
     neutral_window->SetNativeHandle(impl_->native_drawable);
-    const QPoint size = to_render_point({gl_surface_->width(), gl_surface_->height()});
+    const QPoint size = to_render_point(QPoint(gl_surface_->width(), gl_surface_->height()));
     neutral_window->SetSize(size.x(), size.y());
     impl_->view->SetWindow(neutral_window, gl_context->RenderingContext());
     if (impl_->feature_preview_focus)

@@ -229,6 +229,20 @@ before the correction with a zero-length displacement. The Thin Extrude pointer/
 also exercises separate depth/thickness handles in an oblique view. Full/native GUI evidence lives
 in `docs/gui-shell-acceptance-mvp9r.md`.
 
+Native hover and left-button release also retain the event's fractional DIP position until
+`to_render_point` multiplies by the actual render-surface DPR and rounds once. For example,
+`228.61 DIP × 1.5` rounds to **343 device pixels**; rounding to `229 DIP` first instead yields
+**344** and can miss a thin edge. Integer navigation state does not quantize this picking path.
+The native `[native-finishing-precision]` regression uses exact projected fractional events on
+separate top-front Fillet and bottom-back Chamfer edges. It checks the selected semantic role,
+independent finished volume/corner samples and exact Undo/Redo for fresh and migrated inputs.
+It reproduces the missed edge before the correction and passes **1 case / 138 assertions** for
+fresh/migrated inputs at both native **100% and 150%**, without skips. The relevant projection,
+finishing, Pattern/Hole Pattern, Body, spatial/surface, construction, imported topology, Measure and
+Assembly picking regression passes **14 cases / 2,514 assertions** at each scale. The
+[original compact capture](images/viewport-fractional-finishing-compact.png) is unedited. Complete
+Qt and integrated acceptance remain owned by [Block 158](mvp-plan.md#block-158-integration-plan).
+
 ## Camera restoration and interaction capture — 2026-10-24
 
 Named-view restoration switches the native OCCT projection before restoring eye/target/up/scale.

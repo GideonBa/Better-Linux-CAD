@@ -1,6 +1,7 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -16,6 +17,7 @@
 #include <QListWidget>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QScreen>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QTemporaryDir>
@@ -338,6 +340,16 @@ TEST_CASE("Native surface tools pick target and boundary then refine and apply a
     SKIP("Requires native OCCT surface picking");
   ShellWindow window;
   fixture(window);
+  auto size = qEnvironmentVariableIsSet("BLCAD_UI_COMPACT") ? QSize(1024, 640) : QSize(1280, 800);
+  window.resize(size.boundedTo(window.screen()->availableGeometry().size() - QSize(48, 48)));
+  int surface_tab = -1;
+  for (int tab = 0; tab < window.ribbon().tab_count(); ++tab)
+    if (window.ribbon().tab_title(tab) == QStringLiteral("Surface"))
+      surface_tab = tab;
+  REQUIRE(surface_tab >= 0);
+  window.ribbon().set_current_tab(surface_tab);
+  qApp->processEvents();
+  window.viewport().fit_all();
   auto& tools = window.feature_tools();
   const auto before = snapshot(window);
   auto& extend_action = action(window, "surface_extend");

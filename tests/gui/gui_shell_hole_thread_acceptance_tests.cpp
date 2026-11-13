@@ -1,6 +1,7 @@
 #include "../support/engineering_resource_fixture.hpp"
 #include "../support/geometry_volume_oracle.hpp"
 #include "../support/hole_pattern_fixture.hpp"
+#include "../support/phase_b_acceptance_fixture.hpp"
 #include "../support/thread_feature_fixture.hpp"
 #include "blcad/core/assembly_leaf_occurrence.hpp"
 #include "blcad/core/hole_instance_reference.hpp"
@@ -9,11 +10,14 @@
 #include "blcad/geometry/assembly_hierarchy_transform_evaluator.hpp"
 #include "blcad/geometry/assembly_insert_constraint_equation_builder.hpp"
 #include "blcad/geometry/body_result_inspector.hpp"
+#include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/step_import_reader.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/shell/shell_history_tools.hpp"
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
+#include "blcad/gui/shell/shell_material_tools.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_step_import_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
@@ -41,11 +45,15 @@
 #include <QTemporaryDir>
 #include <QTimer>
 #include <QTreeWidget>
+#include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <cmath>
 #include <nlohmann/json.hpp>
 #include <numbers>
+#include <tuple>
+#include <vector>
 
 using namespace blcad;
 using namespace blcad::gui;
@@ -126,7 +134,8 @@ void capture(ShellWindow& window, const char* name) {
     return;
   REQUIRE(QDir().mkpath(directory));
   settle();
-  REQUIRE(window.grab().save(QDir(directory).filePath(QString::fromLatin1(name) + ".png")));
+  REQUIRE(window.grab().save(QDir(directory).filePath(
+      window.property("acceptancePrefix").toString() + QString::fromLatin1(name) + ".png")));
 }
 void task_layout(ShellWindow& window) {
   for (const auto* name : {"blcad.feature_edit.apply", "blcad.feature_edit.cancel"}) {
@@ -140,7 +149,7 @@ void task_layout(ShellWindow& window) {
   CHECK(guidance.height() >= required);
   CHECK_FALSE(control<QDockWidget>(window, "blcad.shell.diagnostics_dock").isVisible());
 }
-void click(QWidget& widget, QPoint point) {
+void click_at(QWidget& widget, QPointF point) {
   visible(widget);
   REQUIRE(widget.isEnabled());
   for (const auto type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
@@ -150,6 +159,9 @@ void click(QWidget& widget, QPoint point) {
     QApplication::sendEvent(&widget, &event);
     settle();
   }
+}
+void click(QWidget& widget, QPoint point) {
+  click_at(widget, QPointF(point));
 }
 void number(ShellWindow& window, const char* path, const QString& value) {
   auto& spin = field<QDoubleSpinBox>(window, path);
@@ -316,6 +328,200 @@ void thread_samples(ShellWindow& window, bool internal, double pitch, ThreadHand
   CHECK(cut > 5);
   CHECK(solid > 5);
 }
+template <class Record> void phase_b_finishing(ShellWindow& window, bool migrated, Record record) {
+  for (const auto& [command, role, direction, amount] :
+       {std::tuple{ShellFeatureTools::Command::Fillet, "top_front", Vector3{0, 1, 1}, "0.5 mm"},
+        {ShellFeatureTools::Command::Chamfer, "bottom_back", Vector3{0, -1, -1}, "0.25 mm"}}) {
+    CAPTURE(role);
+    auto& tools = window.feature_tools();
+    window.viewport().clear_selection();
+    REQUIRE(tools.begin_finishing(command));
+    auto& bodies = tools.finishing_body_editor();
+    choose(bodies, bodies.findData("body.base"));
+    visible(window.viewport());
+    // Top/Bottom views superimpose opposite edges. An oblique camera makes
+    // the authored edge physically distinct at both desktop pixel scales.
+    REQUIRE(window.viewport().set_plane_camera({0, 0, 4}, direction, {0, -1, 1}));
+    window.viewport().fit_all();
+    settle();
+    const Point3 anchor =
+        command == ShellFeatureTools::Command::Fillet ? Point3{10, 30, 8} : Point3{10, -30, 0};
+    capture(window, (std::string("integrated-before-pick-") + role).c_str());
+    const auto screen = checked(window.viewport().model_to_screen(anchor));
+    INFO("screen=" << screen.x << "," << screen.y << " viewport=" << window.viewport().width()
+                   << "x" << window.viewport().height());
+    const auto& scope = window.viewport().selection_semantic_scope();
+    INFO("filter=" << window.viewport().selection_filter_mask()
+                   << " scoped targets=" << (scope ? scope->size() : 0));
+    REQUIRE(window.viewport().rect().contains(QPoint(qRound(screen.x), qRound(screen.y))));
+    click_at(window.viewport(), {screen.x, screen.y});
+    INFO("selected=" << (window.viewport().selected_semantic()
+                             ? window.viewport().selected_semantic()->semantic_id
+                             : "none"));
+    if (tools.finishing_target_editor().selectedItems().size() != 1)
+      capture(window, (std::string("integrated-failed-pick-") + role).c_str());
+    REQUIRE(tools.finishing_target_editor().selectedItems().size() == 1);
+    const auto targets = tools.finishing_selection_items();
+    const int row = tools.finishing_target_editor().row(
+        tools.finishing_target_editor().selectedItems().front());
+    REQUIRE(row >= 0);
+    REQUIRE(static_cast<std::size_t>(row) < targets.size());
+    CHECK(targets[static_cast<std::size_t>(row)].semantic_id.ends_with(role));
+    text(tools.numeric_editor(), amount);
+    key(tools.numeric_editor(), Qt::Key_Return);
+    REQUIRE(window.viewport().feature_preview_active());
+    capture(window, command == ShellFeatureTools::Command::Fillet ? "integrated-fillet-preview"
+                                                                  : "integrated-chamfer-preview");
+    button(window, "blcad.feature.apply");
+    REQUIRE_FALSE(tools.active());
+    record();
+  }
+  CHECK(volume(window, "body.base") ==
+        Catch::Approx(blcad::test::phase_b_fixture::base_volume(10, migrated)).margin(1e-5));
+  const auto* finished = window.session().part_shape_cache()->find_body_shape(BodyId("body.base"));
+  REQUIRE(finished);
+  for (Point3 point : {Point3{0, 29.99, 7.99}, Point3{0, -29.99, .01}})
+    CHECK(blcad::test::classify_solid_point(*finished, point) ==
+          blcad::test::SolidPointLocation::Outside);
+}
+void phase_b_part_history(ShellWindow& window, QTemporaryDir& directory, bool migrated,
+                          std::vector<std::string> stages) {
+  const auto hole = window.session().part_document()->hole_features().front().id();
+  const auto pattern = window.session().part_document()->linear_pattern_features().front().id();
+  const auto record = [&] {
+    const auto after = snapshot(window);
+    REQUIRE(after != stages.back());
+    stages.push_back(after);
+  };
+  phase_b_finishing(window, migrated, record);
+  const auto suppression = [&](const std::string& id, bool suppressed) {
+    REQUIRE(window.history_tools().begin_suppression(id, suppressed));
+    button(window, "blcad.history.apply");
+    REQUIRE_FALSE(window.history_tools().active());
+    record();
+  };
+  suppression(pattern.value(), true);
+  CHECK(volume(window, "body.base") ==
+        Catch::Approx(blcad::test::phase_b_fixture::base_volume(2, migrated)).margin(1e-5));
+  CHECK(volume(window, "body.unrelated") == Catch::Approx(48).margin(1e-7));
+  suppression(pattern.value(), false);
+  suppression("unrelated", true);
+  CHECK_FALSE(window.session().part_shape_cache()->find_body_shape(BodyId("body.unrelated")));
+  suppression("unrelated", false);
+  CHECK(volume(window, "body.unrelated") == Catch::Approx(48).margin(1e-7));
+  const auto valid = snapshot(window);
+  REQUIRE(window.history_tools().begin_suppression(hole.value(), true));
+  CHECK_FALSE(control<QPushButton>(window, "blcad.history.apply").isEnabled());
+  CHECK(snapshot(window) == valid);
+  window.history_tools().cancel();
+  CHECK(snapshot(window) == valid);
+
+  const auto fillet = window.session().part_document()->fillet_features().front().id();
+  const auto chamfer = window.session().part_document()->chamfer_features().front().id();
+  REQUIRE(window.history_tools().begin_reorder());
+  auto& order = control<QListWidget>(window, "blcad.history.order");
+  const auto row = [&](const FeatureId& id) {
+    for (int i = 0; i < order.count(); ++i)
+      if (order.item(i)->data(Qt::UserRole).toString().toStdString() == id.value())
+        return i;
+    FAIL("Missing ordered feature " + id.value());
+    return -1;
+  };
+  const int from = row(chamfer), to = row(fillet);
+  order.setCurrentRow(from);
+  visible(order);
+  for (int i = 0; i < std::abs(from - to); ++i)
+    key(order, from > to ? Qt::Key_Up : Qt::Key_Down, Qt::ControlModifier);
+  button(window, "blcad.history.apply");
+  REQUIRE_FALSE(window.history_tools().active());
+  record();
+  CHECK(volume(window, "body.base") ==
+        Catch::Approx(blcad::test::phase_b_fixture::base_volume(10, migrated)).margin(1e-5));
+  const auto reordered = snapshot(window);
+  REQUIRE(window.history_tools().begin_reorder());
+  auto& invalid_order = control<QListWidget>(window, "blcad.history.order");
+  int source_row = -1;
+  for (int i = 0; i < invalid_order.count(); ++i)
+    if (invalid_order.item(i)->data(Qt::UserRole).toString().toStdString() == pattern.value())
+      source_row = i;
+  REQUIRE(source_row > 0);
+  invalid_order.setCurrentRow(source_row);
+  visible(invalid_order);
+  for (int i = 0; i < source_row; ++i)
+    key(invalid_order, Qt::Key_Up, Qt::ControlModifier);
+  CHECK_FALSE(control<QPushButton>(window, "blcad.history.apply").isEnabled());
+  CHECK(snapshot(window) == reordered);
+  key(invalid_order, Qt::Key_Escape);
+  REQUIRE_FALSE(window.history_tools().active());
+
+  REQUIRE(window.feature_edit_tools().begin(hole));
+  number(window, "/diameter/parameter", "800");
+  REQUIRE_FALSE(control<QPushButton>(window, "blcad.feature_edit.apply").isEnabled());
+  CHECK(snapshot(window) == reordered);
+  const auto draft_save = directory.filePath("integrated-draft.blcad.json");
+  REQUIRE(window.save_to(draft_save));
+  GuiDocumentSession draft;
+  REQUIRE(draft.open_file(draft_save.toStdString()));
+  CHECK(checked(serialize_part_document_to_json(*draft.part_document())) == reordered);
+  number(window, "/diameter/parameter", "4");
+  number(window, "/thread/profile/minor_diameter", "4");
+  task_layout(window);
+  button(window, "blcad.feature_edit.apply");
+  REQUIRE_FALSE(window.feature_edit_tools().active());
+  record();
+  CHECK(volume(window, "body.base") ==
+        Catch::Approx(blcad::test::phase_b_fixture::base_volume(10, migrated, 4)).margin(1e-5));
+  for (const auto* revision : {"r2", "r1"}) {
+    const auto* shape = window.session().part_shape_cache()->find_body_shape(BodyId("body.base"));
+    REQUIRE(shape);
+    const auto owner = *shape;
+    REQUIRE(window.material_tools().begin());
+    auto& body = control<QComboBox>(window, "blcad.material.body");
+    choose(body, body.findData(QString{}));
+    auto& assignment = control<QComboBox>(window, "blcad.material.assignment");
+    choose(assignment, assignment.findText(QString(" @ ") + revision, Qt::MatchContains));
+    button(window, "blcad.material.assign");
+    CHECK(snapshot(window) == stages.back());
+    button(window, "blcad.material.apply");
+    REQUIRE_FALSE(window.material_tools().active());
+    record();
+    CHECK(geometry::OcctShapeView::get(*window.session().part_shape_cache()->find_body_shape(
+              BodyId("body.base"))) == geometry::OcctShapeView::get(owner));
+    const auto report = checked(geometry::BodyResultInspector{}.inspect_physical_properties(
+        *window.session().part_document()));
+    REQUIRE(report.data().complete_mass());
+    const double density = std::string_view(revision) == "r2" ? 6e-6 : 4e-6;
+    CHECK(report.data().complete_mass()->mass_kg ==
+          Catch::Approx((blcad::test::phase_b_fixture::base_volume(10, migrated, 4) + 48) * density)
+              .margin(1e-9));
+  }
+  capture(window, "integrated-material-history");
+  const auto before_export_scope = snapshot(window);
+  const auto ambiguous = geometry::BodyResultInspector{}.resolve_compatible_final_shape(
+      *window.session().part_document(), *window.session().part_shape_cache());
+  REQUIRE_FALSE(ambiguous);
+  CHECK(ambiguous.error().message().find("exactly one available solid Body") != std::string::npos);
+  CHECK(snapshot(window) == before_export_scope);
+  // Assembly shape consumers require one available Solid. Preserve the hidden
+  // Body's intent and use the existing explicit History operation to select scope.
+  suppression("unrelated", true);
+  REQUIRE_FALSE(window.session().part_shape_cache()->find_body_shape(BodyId("body.unrelated")));
+  for (std::size_t i = stages.size() - 1; i > 0; --i) {
+    REQUIRE(window.undo());
+    CHECK(snapshot(window) == stages[i - 1]);
+    REQUIRE(window.session().derived_results_fresh());
+  }
+  CHECK_FALSE(window.session().can_undo());
+  for (std::size_t i = 1; i < stages.size(); ++i) {
+    REQUIRE(window.redo());
+    CHECK(snapshot(window) == stages[i]);
+    REQUIRE(window.session().derived_results_fresh());
+  }
+  CHECK_FALSE(window.session().can_redo());
+  window.viewport().set_standard_view(GuiStandardView::Isometric);
+  window.viewport().fit_all();
+  settle();
+}
 } // namespace
 
 TEST_CASE("Hole and Thread keyboard input validates focused values and publishes one operation",
@@ -419,13 +625,17 @@ TEST_CASE("Hole and Thread keyboard input validates focused values and publishes
   capture(window, thread ? "thread-keyboard-accepted" : "hole-keyboard-accepted");
 }
 
-TEST_CASE("New native Hole positions continue through Pattern Assembly and structured STEP",
-          "[gui][parity-b157][native-hole-thread-combined][hole-combined-b04]") {
+namespace {
+void run_b04(bool integrated, bool migrated) {
   if (QApplication::platformName() != "xcb")
     SKIP("Requires native Hole picking and combined OCCT interaction");
-  auto stock = plate_fixture::part(false, false);
-  REQUIRE(stock.remove_hole_feature(FeatureId("holes")));
+  auto stock = integrated ? blcad::test::phase_b_fixture::stock(migrated)
+                          : plate_fixture::part(false, false);
+  if (!integrated)
+    REQUIRE(stock.remove_hole_feature(FeatureId("holes")));
   ShellWindow window;
+  if (integrated)
+    window.setProperty("acceptancePrefix", migrated ? "integrated-migrated-" : "integrated-fresh-");
   QTemporaryDir directory;
   open(window, directory, stock);
   const auto stock_json = snapshot(window);
@@ -438,6 +648,13 @@ TEST_CASE("New native Hole positions continue through Pattern Assembly and struc
   choose(control<QComboBox>(window, "blcad.hole.extent"), 1);
   number(window, "/manufacturing/diameter/parameter", "5");
   number(window, "/manufacturing/depth/parameter", "1");
+  if (integrated) {
+    choose(control<QComboBox>(window, "blcad.hole.internal_thread"), 1);
+    auto& offset = control<QCheckBox>(window, "blcad.thread.start.enabled");
+    click(offset, offset.rect().center());
+    number(window, "/thread/start", "1");
+    number(window, "/thread/length", "3");
+  }
   auto& add = control<QPushButton>(window, "blcad.feature_edit.add/placements");
   click(add, add.rect().center());
   number(window, "/placements/1/position/x", "-20");
@@ -448,7 +665,9 @@ TEST_CASE("New native Hole positions continue through Pattern Assembly and struc
   auto& apply = control<QPushButton>(window, "blcad.feature_edit.apply");
   click(apply, apply.rect().center());
   REQUIRE_FALSE(window.feature_edit_tools().active());
-  CHECK(volume(window, "body.base") == Catch::Approx(38400 - 44 * std::numbers::pi).margin(1e-6));
+  const double legacy_material = migrated ? 8 * std::numbers::pi : 0;
+  CHECK(volume(window, "body.base") ==
+        Catch::Approx(38400 - legacy_material - 44 * std::numbers::pi).margin(1e-6));
   const auto hole_json = snapshot(window);
   REQUIRE(window.undo());
   CHECK(snapshot(window) == stock_json);
@@ -499,22 +718,26 @@ TEST_CASE("New native Hole positions continue through Pattern Assembly and struc
   auto& pattern_apply = control<QPushButton>(window, "blcad.feature.apply");
   click(pattern_apply, pattern_apply.rect().center());
   REQUIRE_FALSE(patterns.active());
-  CHECK(volume(window, "body.base") == Catch::Approx(38400 - 220 * std::numbers::pi).margin(1e-6));
+  CHECK(volume(window, "body.base") ==
+        Catch::Approx(38400 - legacy_material - 220 * std::numbers::pi).margin(1e-6));
   const auto patterned_json = snapshot(window);
   REQUIRE(window.undo());
   CHECK(snapshot(window) == hole_json);
   REQUIRE(window.redo());
   CHECK(snapshot(window) == patterned_json);
+  if (integrated)
+    phase_b_part_history(window, directory, migrated, {stock_json, hole_json, patterned_json});
+  const auto authored_json = snapshot(window);
   REQUIRE(window.save_to(directory.filePath("authored.blcad.json")));
   GuiDocumentSession authored;
   REQUIRE(authored.open_file(directory.filePath("authored.blcad.json").toStdString()));
-  CHECK(checked(serialize_part_document_to_json(*authored.part_document())) == patterned_json);
+  CHECK(checked(serialize_part_document_to_json(*authored.part_document())) == authored_json);
 
   auto base = *authored.part_document();
   const auto hole = base.hole_features().front();
   const auto pattern = base.linear_pattern_features().front();
   REQUIRE(hole.placements().size() == 2);
-  auto cover_json = nlohmann::json::parse(patterned_json);
+  auto cover_json = nlohmann::json::parse(authored_json);
   cover_json["document"]["id"] = "cover";
   auto cover = checked(deserialize_part_document_from_json(cover_json.dump()));
   REQUIRE(cover.set_parameter_value(ParameterId("depth"), checked(Quantity::length_mm(4))));
@@ -531,10 +754,12 @@ TEST_CASE("New native Hole positions continue through Pattern Assembly and struc
       hole.id(), hole.name(), hole.kind(), hole.target_body(), underside,
       {{hole.placements()[0].id, Point2{-20, 15}}, {hole.placements()[1].id, Point2{-20, 6}}},
       hole.diameter(), HoleThroughAllExtent{}, HoleDirection::OppositeSupportNormal, hole.tip(),
-      hole.manufacturing()))));
+      hole.manufacturing(), hole.thread()))));
   namespace material = blcad::test::engineering_fixture;
-  material::annotate(base);
-  material::annotate(cover);
+  if (!integrated) {
+    material::annotate(base);
+    material::annotate(cover);
+  }
   REQUIRE(cover.set_default_material(material::key("synthetic.material", "r2")));
   auto root = checked(AssemblyDocument::create(DocumentId("combined.root"), "Plate and cover"));
   REQUIRE(root.add_parameter(
@@ -588,9 +813,18 @@ TEST_CASE("New native Hole positions continue through Pattern Assembly and struc
   CHECK(point.x == Catch::Approx(4).margin(1e-6));
   CHECK(point.y == Catch::Approx(0).margin(1e-6));
   CHECK(point.z == Catch::Approx(8).margin(1e-6));
-  const auto expected_mass = [](unsigned holes) {
-    return (38400 - holes * 22 * std::numbers::pi) * 4e-6 +
-           (19200 - holes * 11 * std::numbers::pi) * 6e-6;
+  const auto expected_base = [&](unsigned holes) {
+    return integrated ? blcad::test::phase_b_fixture::base_volume(holes, migrated, 4)
+                      : 38400 - holes * 22 * std::numbers::pi;
+  };
+  const auto expected_cover = [&](unsigned holes) {
+    return integrated
+               ? 19200 - (22.5 - 5 * std::numbers::pi) - (migrated ? 4 * std::numbers::pi : 0) -
+                     holes * 17.125 * std::numbers::pi
+               : 19200 - holes * 11 * std::numbers::pi;
+  };
+  const auto expected_mass = [&](unsigned holes) {
+    return expected_base(holes) * 4e-6 + expected_cover(holes) * 6e-6;
   };
   const auto mass = [&] {
     const auto report = checked(
@@ -620,7 +854,7 @@ TEST_CASE("New native Hole positions continue through Pattern Assembly and struc
   REQUIRE(reopened.open_file(project_path.toStdString()));
   CHECK(checked(serialize_project_to_json(*reopened.project())) == accepted);
   const auto step_path = directory.filePath("roundtrip.step");
-  REQUIRE(window.inspect_tools().export_step(
+  (void)checked(window.inspect_tools().export_step(
       {GuiStepExportMode::AssemblyStructured, step_path.toStdString()}));
   CHECK(project_snapshot(window) == accepted);
   QFile step(step_path);
@@ -638,8 +872,9 @@ TEST_CASE("New native Hole positions continue through Pattern Assembly and struc
     for (const auto& body : product.bodies)
       volumes.push_back(body.volume_mm3);
   std::sort(volumes.begin(), volumes.end());
-  CHECK(volumes[0] == Catch::Approx(19200 - 88 * std::numbers::pi).margin(1e-6));
-  CHECK(volumes[1] == Catch::Approx(38400 - 176 * std::numbers::pi).margin(1e-6));
+  const double volume_tolerance = integrated ? 1e-5 : 1e-6;
+  CHECK(volumes[0] == Catch::Approx(expected_cover(8)).margin(volume_tolerance));
+  CHECK(volumes[1] == Catch::Approx(expected_base(8)).margin(volume_tolerance));
   CHECK(
       std::any_of(imported.occurrences.begin(), imported.occurrences.end(), [](const auto& value) {
         return std::abs(value.transform.matrix[11] - 8) < 1e-6;
@@ -707,6 +942,46 @@ TEST_CASE("New native Hole positions continue through Pattern Assembly and struc
   REQUIRE(portable.open_file(copy.toStdString()));
   CHECK(checked(serialize_project_to_json(*portable.project())) == reopened_json);
   capture(window, "combined-hole-step-reopened");
+}
+} // namespace
+
+TEST_CASE("New native Hole positions continue through Pattern Assembly and structured STEP",
+          "[gui][parity-b157][native-hole-thread-combined][hole-combined-b04]") {
+  run_b04(false, false);
+}
+
+TEST_CASE(
+    "Native Phase B integrates fresh and migrated history finishing material Assembly and STEP",
+    "[gui][parity-b158][phase-b-native-integration]") {
+  const bool migrated = GENERATE(false, true);
+  CAPTURE(migrated);
+  run_b04(true, migrated);
+}
+
+TEST_CASE("Native finishing preserves fractional pixel picks on separate physical outer edges",
+          "[gui][parity-b158][native-finishing-precision]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Requires native OCCT edge detection at desktop pixel scale");
+  const bool migrated = GENERATE(false, true);
+  CAPTURE(migrated);
+  auto part = blcad::test::phase_b_fixture::complete(migrated);
+  REQUIRE(part.remove_chamfer_feature(FeatureId("chamfer")));
+  REQUIRE(part.remove_fillet_feature(FeatureId("fillet")));
+  ShellWindow window;
+  window.setProperty("acceptancePrefix", migrated ? "precision-migrated-" : "precision-fresh-");
+  QTemporaryDir directory;
+  open(window, directory, part);
+  const auto before = snapshot(window);
+  phase_b_finishing(window, migrated, [] {});
+  const auto accepted = snapshot(window);
+  REQUIRE(window.undo());
+  REQUIRE(window.undo());
+  CHECK(snapshot(window) == before);
+  CHECK_FALSE(window.session().can_undo());
+  REQUIRE(window.redo());
+  REQUIRE(window.redo());
+  CHECK(snapshot(window) == accepted);
+  CHECK_FALSE(window.session().can_redo());
 }
 
 TEST_CASE("Native internal and external Threads combine pins hands interval correction and "

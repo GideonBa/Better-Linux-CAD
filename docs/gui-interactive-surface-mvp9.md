@@ -79,6 +79,9 @@ and solid conversion, cancels Boundary and an invalid open-shell conversion, rej
 removes/reorders list entries, edits upstream depth, checks six-step history, reopens canonically and
 exports STEP. Active browser curve and Surface Body collection is exercised as well. Existing native
 Surface tests additionally cover actual target/edge mouse picking and extension dragging.
+The native ribbon test opens the current **Surface** tab before checking Extend visibility and
+bounds its ordinary/compact window to the actual screen. The native picking regression passes at
+100% and 150%; this is the existing Surface workflow, with no new Surface capability claim.
 Reproduction: `docs/development-setup.md`; current full/native evidence and remaining work:
 `docs/gui-shell-acceptance-mvp9r.md` and `docs/mvp-plan.md`.
 

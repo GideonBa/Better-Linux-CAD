@@ -1,5 +1,6 @@
 #include "../support/engineering_resource_fixture.hpp"
 #include "../support/hole_pattern_fixture.hpp"
+#include "../support/phase_b_acceptance_fixture.hpp"
 #include "../support/thread_feature_fixture.hpp"
 #include "assembly_hole_geometry_scope.hpp"
 #include "blcad/core/assembly_reference_target.hpp"
@@ -23,6 +24,7 @@
 #include <GProp_GProps.hxx>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <nlohmann/json.hpp>
 #include <numbers>
 #include <set>
@@ -673,4 +675,88 @@ TEST_CASE("B04 plate and cover share bound Hole counts physical seats mass and s
       imported.occurrences.begin(), imported.occurrences.end(),
       [](const auto& occurrence) { return std::abs(occurrence.transform.matrix[11] - 8) < 1e-6; }));
   CHECK(checked(serialize_project_to_json(project)) == saved);
+}
+
+TEST_CASE("Phase B fresh and migrated material history matches independent finished Hole solids",
+          "[geometry][parity-b158][phase-b-integration]") {
+  namespace integrated = blcad::test::phase_b_fixture;
+  const bool migrated = GENERATE(false, true);
+  CAPTURE(migrated);
+  auto part = integrated::complete(migrated);
+  const auto saved = checked(serialize_part_document_to_json(part));
+  CHECK(nlohmann::json::parse(saved).at("version") == 7);
+  REQUIRE(part.hole_features().front().thread());
+  CHECK(part.hole_features().front().thread()->representation() == ThreadRepresentation::Cosmetic);
+  auto cache = evaluate(part);
+  const auto* result = cache.find_body_shape(BodyId("body.base"));
+  REQUIRE(result);
+  CHECK(volume(*result) == Catch::Approx(integrated::base_volume(10, migrated)).margin(1e-5));
+  for (const auto& [point, state] : {std::pair{gp_Pnt(0, 29.99, 7.99), TopAbs_OUT},
+                                     {gp_Pnt(0, 29.5, 7.99), TopAbs_IN},
+                                     {gp_Pnt(0, -29.99, .01), TopAbs_OUT},
+                                     {gp_Pnt(0, -29.7, .01), TopAbs_IN},
+                                     {gp_Pnt(-8, 0, 4), TopAbs_OUT},
+                                     {gp_Pnt(4, 0, 4), TopAbs_IN},
+                                     {gp_Pnt(30, 20, 4), migrated ? TopAbs_OUT : TopAbs_IN}}) {
+    CAPTURE(point.X(), point.Y(), point.Z());
+    CHECK(BRepClass3d_SolidClassifier(*OcctShapeView::get(*result), point, 1e-7).State() == state);
+  }
+  const auto* unrelated = cache.find_body_shape(BodyId("body.unrelated"));
+  REQUIRE(unrelated);
+  const auto unrelated_owner = *unrelated;
+  CHECK(volume(*unrelated) == Catch::Approx(48).margin(1e-7));
+  CHECK(part.find_body(BodyId("body.unrelated"))->visibility() == BodyVisibility::Hidden);
+  const auto mass = checked(BodyResultInspector{}.inspect_physical_properties(part));
+  REQUIRE(mass.data().complete_mass());
+  CHECK(mass.data().complete_mass()->mass_kg ==
+        Catch::Approx((integrated::base_volume(10, migrated) + 48) * 4e-6).margin(1e-9));
+
+  length(part, "diameter", 4);
+  const auto plan =
+      checked(RecomputePlan::from_graph_and_changed_nodes(part.dependency_graph(), {"diameter"}));
+  const auto execution = checked(GeometryRecomputeExecutor{}.execute_plan(part, plan, cache));
+  CHECK_FALSE(execution.reused_complete_geometry);
+  CHECK(execution.executed_feature_count == (migrated ? 7 : 6));
+  CHECK(volume(*cache.find_body_shape(BodyId("body.base"))) ==
+        Catch::Approx(integrated::base_volume(10, migrated, 4)).margin(1e-5));
+  REQUIRE(cache.find_body_shape(BodyId("body.unrelated")));
+  CHECK(volume(*cache.find_body_shape(BodyId("body.unrelated"))) ==
+        Catch::Approx(volume(unrelated_owner)).margin(1e-7));
+  const auto fresh = evaluate(part);
+  CHECK(volume(*fresh.find_body_shape(BodyId("body.base"))) ==
+        Catch::Approx(volume(*cache.find_body_shape(BodyId("body.base")))).margin(1e-7));
+  length(part, "diameter", 3);
+
+  std::vector<std::string> order;
+  for (const auto& row : checked(part.executable_history()))
+    order.push_back(row.node_id);
+  const auto suppressed = checked(part.with_history_intent({order, {"pattern"}}));
+  const auto bypassed = evaluate(suppressed);
+  CHECK(volume(*bypassed.find_body_shape(BodyId("body.base"))) ==
+        Catch::Approx(integrated::base_volume(2, migrated)).margin(1e-5));
+  REQUIRE(bypassed.find_body_shape(BodyId("body.unrelated")));
+  const auto creator_suppressed = checked(part.with_history_intent({order, {"unrelated"}}));
+  const auto unavailable = evaluate(creator_suppressed);
+  CHECK_FALSE(unavailable.find_body_shape(BodyId("body.unrelated")));
+  CHECK(volume(*unavailable.find_body_shape(BodyId("body.base"))) ==
+        Catch::Approx(integrated::base_volume(10, migrated)).margin(1e-5));
+  const auto fillet = std::find(order.begin(), order.end(), "fillet");
+  const auto chamfer = std::find(order.begin(), order.end(), "chamfer");
+  REQUIRE(fillet != order.end());
+  REQUIRE(chamfer != order.end());
+  std::iter_swap(fillet, chamfer);
+  const auto reordered = checked(part.with_history_intent({order, {}}));
+  const auto reordered_shapes = evaluate(reordered);
+  CHECK(volume(*reordered_shapes.find_body_shape(BodyId("body.base"))) ==
+        Catch::Approx(integrated::base_volume(10, migrated)).margin(1e-5));
+  const auto pattern = std::find(order.begin(), order.end(), "pattern");
+  REQUIRE(pattern != order.end());
+  std::rotate(order.begin(), pattern, pattern + 1);
+  CHECK_FALSE(part.with_history_intent({order, {}}));
+  CHECK(checked(serialize_part_document_to_json(part)) == saved);
+  auto reopened = checked(deserialize_part_document_from_json(saved));
+  CHECK(checked(serialize_part_document_to_json(reopened)) == saved);
+  const auto replay = evaluate(reopened);
+  CHECK(volume(*replay.find_body_shape(BodyId("body.base"))) ==
+        Catch::Approx(integrated::base_volume(10, migrated)).margin(1e-5));
 }
