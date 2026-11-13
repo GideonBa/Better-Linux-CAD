@@ -38,6 +38,27 @@ continues to use these Core APIs; there is no separate GUI evaluator or schema.
 
 `tests/geometry/parameter_expression_pipeline_tests.cpp`: a plate thickness driven by `width / 10 - 2 mm` recomputes exactly (volume `120*80*10` → `160*80*14`) through the incremental recompute plan after one width change.
 
+## Planned curve-local extension — Block 160
+
+This extension is assigned after the verified G2 backend delivery; it is not implemented here.
+Keep the general parameter grammar, positive Length/Count validation and deferred scope below
+unchanged. Curve coordinates require signed real lengths, with a separately typed real independent
+variable and finite domain. Cartesian/polar/parametric 2D and parametric 3D inputs must distinguish
+coordinate, angle and domain units explicitly. Curve-local products may need intermediate powers
+outside `{0,1}` without making those expressions valid general parameter formulas.
+
+Extend the expression subsystem with bounded parsing/compiled evaluation and an explicit supported
+function grammar. Parameter references must retain stable IDs and join the existing Sketch/Sketch3D
+dependency graph; independent variables cannot silently shadow persistent references. Define rename,
+unit/range, malformed input, cycle, unsupported-function and singularity failures before the writer
+changes. No general language evaluation or filesystem/network capability is part of this grammar.
+
+Persist expression/domain/modeling-policy intent in the existing Sketch and
+[Sketch3D](part-sketch-3d-curves-core-mvp6.md) authorities with strict version gates and historical
+canonical-byte compatibility. Samples and compiled derivatives remain derived. Core S02 owns
+parsing/JSON/dependency proof in 160; tolerance-controlled Geometry/downstream profiles remain 161,
+and native authoring remains 162. [The numbered plan](mvp-plan.md) owns progress and serial delivery.
+
 ## Still deferred
 
 - converting a plain parameter into an expression parameter (and back).

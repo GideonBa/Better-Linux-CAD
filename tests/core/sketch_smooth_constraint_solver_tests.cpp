@@ -154,8 +154,9 @@ TEST_CASE("Smooth does not certify a fixed cusp from zero unsigned curvature",
   const auto historical = SketchConstraintSolver{}.solve(source, g1);
   REQUIRE(historical);
   CHECK(historical.value().residuals.final_max_abs == 0);
-  const auto system =
-      SketchConstraintSystem::create(source.sketch(), {fixed_spline, fixed_line, smooth()}).value();
+  auto combined = g1.constraints();
+  combined.push_back(smooth());
+  const auto system = SketchConstraintSystem::create(source.sketch(), std::move(combined)).value();
   const auto result = SketchConstraintSolver{}.solve(source, system);
   REQUIRE(result);
   CHECK(result.value().status == SketchSolveStatus::Conflicting);

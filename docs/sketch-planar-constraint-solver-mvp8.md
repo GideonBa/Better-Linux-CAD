@@ -154,7 +154,7 @@ system degenerate, so the solver crept to the iteration limit and reported `non_
 
 ## Block 159 Smooth/G2
 
-The backend extension is under verification; numbered acceptance belongs to `mvp-plan.md`.
+The backend extension is implemented; numbered acceptance belongs to `mvp-plan.md`.
 Native Smooth authoring belongs to 162.
 Reuse the existing point/entity target system with ordered targets **curve A, endpoint A, curve B,
 endpoint B**. Curve identities differ, at least one operand is a spline, and the named point must
@@ -196,10 +196,22 @@ S01 proofs are in [endpoint differentials](../tests/core/planar_curve_differenti
 [accepted catalog/dimension/drag consumers](../tests/gui/gui_sketch_smooth_tests.cpp).
 Independent polynomial/conic derivatives, reversal and unequal speeds, scales `1e-6…1e6`, fixed and
 driving equations, signed curvature/cusps, redundancy, exact release/history and reopen are tested.
-Focused Core passes **12 cases / 1,938 assertions** and Qt **2 / 108**. Full Core passes
-**720 / 28,954** and Geometry **682 / 58,224**, without skips; full Qt and relevant native
-regression remain open. The frozen runtime has **1,070 files**, SHA256
-`2b01b0edeb4a7a28673a6f8a0a87f6f0c01ef2b516dc37c5a534dd6248139e80`.
+Focused Core passes **12 cases / 1,938 assertions** and Qt **2 / 108**. The impossible fixed cusp
+retains the already satisfied G1 equation in the same G2 system, with explicit conflict attribution.
+Full Core passes **720 / 28,954** and Geometry **682 / 58,224**, without skips. Full Qt passes
+**898 cases**: **831 passed / 67 native-only skips**, **101,256 assertions**, exit 0. After the
+Core-only conflict-fixture extension, the final Core binary is rerun; all other runtime inputs and
+Geometry/Qt/app/exporter executable hashes remain identical, retaining their complete results.
+
+The relevant native filter combines `[parity-b159]`, `[endpoint-native-workflow]`,
+`[sketch-constraints]`, `[sketch-drag]`, `[sketch-live-solve]`, `[sketch-dimensions]` and
+`[shell-coverage]`. It passes **34 cases / 1,504 assertions at 100%** and **34 / 1,505 at 150%**,
+without skips. Original overlap/closed-chain drag captures at both scales are reviewed; the separate
+app startup has a PID-matched visible X11 window and intentional six-second timeout **124**.
+These are backend and existing native consumer proofs. Native Smooth command/diagnostic authoring
+and S01 closed-contour solid acceptance remain assigned to 162; full native-suite coverage is not
+claimed. The final frozen runtime has **1,070 files**, SHA256
+`61b8d4be6dab4d40bc20241f4006e9429c0a3f9f292ba4bc3859cbf09585fdf9`.
 
 ## Characteristic scale and degeneracy policy
 
