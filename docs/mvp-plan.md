@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 159
 current_block: 160
-current_boundary: Planar G2 backend verified; Block 160 typed curve expressions planned
+current_boundary: Block 159 delivered; Block 160 typed equation intent in progress
 current_tag: "[parity-b160]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–159 accepted; Blocks 160–204 planned"
+  advanced_modeling_workflows: "Blocks 145–159 accepted; Block 160 in progress; Blocks 161–204 planned"
 ---
 
 # MVP Plan
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 159
-current block        Block 160 (planned)
+current block        Block 160 (in progress)
 current phase        Planar and spatial sketch extensions
-current boundary     Planar G2 backend verified; serial PR delivery before typed curve expressions
+current boundary     Block 159 delivered; typed equation intent and safe expressions in progress
 ```
 
 The next assigned work is Block 160. [The consolidated sequence](inventor-parity-sequence.md)
@@ -64,7 +64,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 156 | Delivered in PR #175: shared placements, Hole consumers, full suites, native 100%/150% and startup verified. |
 | 157 | Delivered in PR #181: semantic Hole/Thread creation/editing, explicit conversion, presets and native B01–B04/UI01. |
 | 158 | Delivered in PR #182: full suites, fresh/migrated native history/STEP and isolated recompute measurements. |
-| 159 | Verified in PR #183: persistent oriented G2, normalized solver/rank, dimension/catalog/drag and native consumer regression; native Smooth UI remains 162. |
+| 159 | Delivered in PR #183: persistent oriented G2, normalized solver/rank, dimension/catalog/drag and native consumer regression; native Smooth UI remains 162. |
 | 160–161 | Safe typed equation intent/persistence, then tolerance-controlled Geometry and real downstream S02/G01 consumers. |
 | 162 | Native Smooth/equation authoring, conflict correction, closed profiles and persisted history. |
 | 163–164 | Existing Sketch3D constraint schema, then deterministic solver/DOF/conflict diagnostics with S03 independent oracles. |
@@ -154,7 +154,7 @@ raw samples, benchmark limits and future performance scope remain in their exist
 ## Blocks 145–204 — Advanced modeling workflows
 
 Status authority: Blocks 145–159 are **Implemented and accepted**;
-Blocks 160–204 are **Planned; not started**.
+Block 160 is **In progress**; Blocks 161–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -166,7 +166,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
-| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | 159 accepted; 160–165 planned |
+| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | 159 accepted; 160 in progress; 161–165 planned |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
@@ -563,20 +563,20 @@ remains 162; no later block or whole Phase C is accepted here.
 | Captures and startup | Original overlap/closed-chain drag captures reviewed at both scales; separate PID-matched visible app startup, intentional timeout 124 |
 | Final runtime / retained proof | 1,070 files; SHA256 `61b8d4be6dab4d40bc20241f4006e9429c0a3f9f292ba4bc3859cbf09585fdf9`. Final Core-only combined-conflict fixture rebuilt/rerun; unchanged Geometry/GUI/app/exporter inputs and hashes retain their complete results. |
 
-Delivery: [PR #183](https://github.com/GideonBa/Better-Linux-CAD/pull/183). Complete the normal
-protected merge, then refresh/verify clean Main before starting 160. The assigned continuation
-through 165 and the complete 166–204 planning remain unchanged.
+Delivery: [PR #183](https://github.com/GideonBa/Better-Linux-CAD/pull/183) merged normally as
+`9e5bda2`; its tree `c173a10` matches the reviewed delivery. Main was refreshed and verified clean
+before `feat/typed-equation-curve-intent`. The continuation through 165 and all 166–204 planning remain.
 
-### Block 160 implementation preparation — planned
+### Block 160 typed equation intent — in progress
 
-Begin only after PR #183 is normally merged and Main is refreshed. The
-[curve-local expression design](parameter-expression-mvp.md#planned-curve-local-extension--block-160)
+The serial branch starts from verified merged `9e5bda2`. The
+[curve-local expression design](parameter-expression-mvp.md#curve-local-extension--block-160)
 retains the existing general-parameter grammar and defines the separate typed-domain boundary.
-No 160 implementation or acceptance is claimed on the 159 branch.
+Expression/intent and existing-model integration are in progress; whole 160 remains open.
 
 | Step | Planned completion boundary |
 | --- | --- |
-| Typed intent and safe expressions | Signed real coordinate lengths, finite typed independent variable/domain, explicit Cartesian/polar/parametric modes, stable parameter references, bounded grammar/functions and deterministic validation. |
+| Typed intent and safe expressions | Engine/raw intent checkpoint implemented: signed real coordinate lengths, typed finite expression domains, four modes, stable ID references, bounded grammar/functions and derived jets. Focused Core 6/272 and full Core 726/29,226 pass; [proof/scope](parameter-expression-mvp.md#expressionintent-checkpoint). |
 | Existing model/persistence authorities | Equation intent belongs to current Sketch/Sketch3D, participates in dependency/cycle checking and survives legacy materialization/history. No authored sample points; strict version gates retain old canonical bytes. |
 | Core proof and handoff | S02 parsing/JSON, units/scope, parameter/domain edits, malformed/unknown/singular inputs and legacy loading. Geometry/error-controlled modeling remains 161; native authoring remains 162. |
 
