@@ -580,6 +580,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_3d_tests.cpp
     tests/core/sketch_3d_curve_tests.cpp
     tests/core/sketch_3d_json_tests.cpp
+    tests/core/sketch_3d_constraint_tests.cpp
     tests/core/subassembly_instance_tests.cpp
     tests/core/sweep_feature_tests.cpp
   )
@@ -688,6 +689,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/shape_cache_tests.cpp
       tests/geometry/equation_curve_geometry_tests.cpp
       tests/geometry/sketch_3d_geometry_adapter_tests.cpp
+      tests/geometry/sketch_3d_constraint_geometry_tests.cpp
       tests/geometry/sketch_reference_projector_tests.cpp
       tests/geometry/sketch_region_finder_tests.cpp
       tests/geometry/spline_profile_pipeline_tests.cpp
@@ -816,6 +818,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_sketch_primitive_constraints_tests.cpp
       tests/gui/gui_sketch_smooth_tests.cpp
       tests/gui/gui_equation_curve_tests.cpp
+      tests/gui/gui_spatial_constraint_schema_tests.cpp
       tests/gui/gui_shell_sketch_curve_authoring_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
       tests/gui/gui_interactive_sketcher_acceptance_tests.cpp

@@ -4,9 +4,9 @@ History intent has the explicit Part-version-2 contract below. Revision-pinned r
 Part version 3 and Project version 2 as specified in the owning 149B sections. Semantic Hole intent
 uses the Part-version-4 extension owned by 152B below; manufacturing variants use Part V5 as
 specified in the 154 section. Thread integration uses Part V6 (155B); explicit Pattern placements
-use Part V7 (156) below. Planned evolution
+use Part V7 (156), equations use V8 (160), and spatial constraint/scalar intent uses V9 (163) below. Planned evolution
 in [Blocks 145–204](inventor-parity-sequence.md) additionally assigns new feature families,
-equation/spatial constraints, model states, occurrence poses and cross-document references.
+spatial solving/interaction, model states, occurrence poses and cross-document references.
 Their future intent is not implied by the current JSON fields. Each owning block must specify
 exact spellings, schema/version/defaults, strict unknown-intent behavior and legacy migration here
 before its first writer change. Preserve current `feature_order`, imported source/catalog
@@ -64,8 +64,22 @@ closure, connectivity and intersections before a filled region/solid is publishe
 
 Planar and spatial PathCurve records use `curve_kind: "equation_curve"` with the existing exact
 owner/entity fields and authored reversal. The source must resolve to the corresponding existing
-equation, so Part V8 remains the canonical envelope. A single-source path's open/closed intent must
+equation, so equations require at least Part V8; new spatial intent uses the V9 envelope below. A single-source path's open/closed intent must
 match its equation. No derived endpoint positions, native curves or subdivision counts are stored.
+
+## Spatial Sketch intent — 163
+
+Part version **9** is the necessary-only extension for nonempty Sketch3D `constraints[]` or
+entity-owned helix Length sources. It retains the V8 equation definition, older feature/resource
+and authored-history envelopes and the same Part schema name. V9 requires actual spatial intent;
+older versions reject reserved spatial fields. Documents without that intent retain their existing
+canonical V1–V8 writer output.
+
+The [Sketch3D JSON authority](part-sketch-3d-json-mvp6.md#spatial-constraints-and-owned-scalars--163)
+specifies exact targets, typed dimensional values, fixed anchors, angle conventions, branch seeds
+and legacy/new helix fields. Existing point/curve identity and all historical geometric definitions
+remain unchanged. Project resource references preserve V9 within the existing shared ownership
+contract. Solver state and Geometry remain derived, never a second portable format.
 
 ## Planar Smooth/G2 constraint sidecar — 159
 

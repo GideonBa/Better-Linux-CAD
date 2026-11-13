@@ -91,3 +91,13 @@ sketches on three differently oriented workplanes.
 
 Blocks 48–94 are implemented. Block 83 Path-following Extrude and Extruded Cut is implemented;
 Block 84 ProfileSectionReference and Loft Core intent plus JSON is implemented; Block 85 Two-section Loft Geometry on arbitrary planes is implemented; Block 86 Multi-section Loft is implemented; Block 87 Guided and continuity-controlled Loft is implemented; Block 88 Surface feature Core intent and JSON is implemented; Block 89 Boundary and Fill Surface Geometry is implemented; Block 90 Trim and Extend Surface Geometry is implemented; Block 91 Stitch/Knit/Sew shell Geometry is implemented; Block 92 Closed shell to solid conversion is implemented; Block 93 multi-body STEP export is implemented; Block 94 integrated Part Construction MVP acceptance is implemented; Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is next.
+
+## Spatial scalar compatibility — 163
+
+Helix radius/pitch resolve from the active positive Length binding, including entity-owned explicit
+values; Count turns, axis frame, handedness and native construction remain unchanged. Constraint
+records do not create Geometry products or alter historical arc/spline/helix definitions. This
+schema boundary does not imply solving; differential/projection execution and diagnostics belong
+to 164. The [native-curve witnesses](../tests/geometry/sketch_3d_constraint_geometry_tests.cpp) and
+[existing swept consumer](../tests/geometry/sweep_feature_pipeline_tests.cpp) compare equal literal
+and parameter sources without upgrading the historical path policy assigned to 166.
