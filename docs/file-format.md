@@ -56,6 +56,17 @@ derivatives, endpoint tessellation and resolved geometry are never persisted.
 [Core S02/legacy and session proof](parameter-expression-mvp.md#expressionintent-proof) verifies
 this format; the numbered plan owns acceptance and delivery.
 
+Equation consumers retain the current profile and PathCurve stores. A single source ID in an
+`arc_closed_profiles[].curve_segments` array is permitted only when it resolves to an owned,
+non-construction equation with closed intent; the historical unscoped factory still requires two
+curves. Multi-curve equation contours retain their ordered source IDs. Part-context Geometry proves
+closure, connectivity and intersections before a filled region/solid is published.
+
+Planar and spatial PathCurve records use `curve_kind: "equation_curve"` with the existing exact
+owner/entity fields and authored reversal. The source must resolve to the corresponding existing
+equation, so Part V8 remains the canonical envelope. A single-source path's open/closed intent must
+match its equation. No derived endpoint positions, native curves or subdivision counts are stored.
+
 ## Planar Smooth/G2 constraint sidecar — 159
 
 The existing `blcad.sketch_constraints.mvp8` Part-session sidecar uses integer version **2** when

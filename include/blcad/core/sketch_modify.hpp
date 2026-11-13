@@ -1239,7 +1239,8 @@ private:
           [&](const auto& id) { return edited.sketch.find_line_segment(id) == nullptr; });
       Result<std::size_t> added = [&]() {
         if (curved) {
-          auto replacement = ArcClosedProfile::create(profile.id(), contour.value());
+          auto replacement =
+              ArcClosedProfile::create_for_sketch(profile.id(), contour.value(), edited.sketch);
           if (!replacement) return Result<std::size_t>::failure(replacement.error());
           return edited.sketch.add_profile(replacement.value());
         }
@@ -1254,7 +1255,8 @@ private:
       if (!affected(profile.id())) continue;
       auto contour = rewrite(profile.curve_segments());
       if (!contour) return Result<SketchModifyResult>::failure(contour.error());
-      auto replacement = ArcClosedProfile::create(profile.id(), contour.value());
+      auto replacement =
+          ArcClosedProfile::create_for_sketch(profile.id(), contour.value(), edited.sketch);
       if (!replacement) return Result<SketchModifyResult>::failure(replacement.error());
       auto added = edited.sketch.add_profile(replacement.value());
       if (!added) return Result<SketchModifyResult>::failure(added.error());

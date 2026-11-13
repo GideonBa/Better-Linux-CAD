@@ -144,6 +144,8 @@ std::string_view to_string(PlanarPathCurveKind value) noexcept {
     return "projected_line";
   case PlanarPathCurveKind::ReferenceGeneratedLine:
     return "reference_generated_line";
+  case PlanarPathCurveKind::EquationCurve:
+    return "equation_curve";
   }
   return "line";
 }
@@ -159,6 +161,8 @@ std::string_view to_string(Sketch3DPathCurveKind value) noexcept {
     return "spline";
   case Sketch3DPathCurveKind::Helix:
     return "helix";
+  case Sketch3DPathCurveKind::EquationCurve:
+    return "equation_curve";
   }
   return "line";
 }

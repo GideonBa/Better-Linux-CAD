@@ -1,4 +1,5 @@
 #include "blcad/geometry/sketch_3d_geometry_adapter.hpp"
+#include "blcad/geometry/equation_curve_geometry.hpp"
 
 #include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
@@ -405,6 +406,14 @@ Result<Sketch3DGeometryResult> Sketch3DGeometryAdapter::convert(const PartDocume
         return Result<Sketch3DGeometryResult>::failure(product.error());
       products.push_back({source.id(), Sketch3DGeometryProductKind::Helix,
                           wrap_shape(std::move(product.value())), 2U, 1U, 0U});
+    }
+    for (const auto& equation : sketch->equation_curves()) {
+      auto product = EquationCurveGeometryAdapter{}.convert(document, equation);
+      if (!product)
+        return Result<Sketch3DGeometryResult>::failure(product.error());
+      products.push_back({equation.id(), Sketch3DGeometryProductKind::EquationCurve,
+                          std::move(product.value().shape),
+                          equation.closure() == EquationCurveClosure::Periodic ? 1U : 2U, 1U, 0U});
     }
     return Result<Sketch3DGeometryResult>::success(
         Sketch3DGeometryResult(sketch->id(), std::move(points), std::move(products)));

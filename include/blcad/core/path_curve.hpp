@@ -18,8 +18,15 @@ enum class PathSegmentSourceKind {
   Sketch3DCurve,
   SemanticGeneratedEdge
 };
-enum class PlanarPathCurveKind { Line, Arc, Spline, ProjectedLine, ReferenceGeneratedLine };
-enum class Sketch3DPathCurveKind { Line, Polyline, Arc, Spline, Helix };
+enum class PlanarPathCurveKind {
+  Line,
+  Arc,
+  Spline,
+  ProjectedLine,
+  ReferenceGeneratedLine,
+  EquationCurve
+};
+enum class Sketch3DPathCurveKind { Line, Polyline, Arc, Spline, Helix, EquationCurve };
 
 class PathSegmentReference {
 public:

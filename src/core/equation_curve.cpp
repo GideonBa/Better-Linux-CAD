@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace blcad {
 std::string_view to_string(CurveUnit unit) noexcept {
@@ -184,5 +185,103 @@ Result<EquationCurveJet> EquationCurveProgram::evaluate(const PartDocument& docu
       return Result<EquationCurveJet>::failure(Error::validation(
           curve_.id().value(), "Equation coordinate/derivative exceeds finite numeric range"));
   return Result<EquationCurveJet>::success(result);
+}
+
+Result<EquationCurveIntervalAnalysis>
+EquationCurveProgram::analyze_interval(const PartDocument& document, double lower,
+                                       double upper) const {
+  const auto fail = [&](std::string text) {
+    return Result<EquationCurveIntervalAnalysis>::failure(
+        Error::validation(curve_.id().value(), std::move(text)));
+  };
+  auto domain_bounds = domain(document);
+  if (!domain_bounds)
+    return Result<EquationCurveIntervalAnalysis>::failure(domain_bounds.error());
+  if (!std::isfinite(lower) || !std::isfinite(upper) || lower > upper ||
+      lower < domain_bounds.value().first || upper > domain_bounds.value().second)
+    return fail("Interval lies outside the equation domain");
+  auto lower_bound = lower_.bounds(document, 0, 0), upper_bound = upper_.bounds(document, 0, 0);
+  if (!lower_bound || !upper_bound)
+    return Result<EquationCurveIntervalAnalysis>::failure(!lower_bound ? lower_bound.error()
+                                                                       : upper_bound.error());
+  const double domain_error =
+      std::max(lower_bound.value().rounding_error, upper_bound.value().rounding_error);
+  const auto maximum = [](CurveInterval a) {
+    return std::max(std::abs(a.lower), std::abs(a.upper));
+  };
+  const auto minimum = [](CurveInterval a) {
+    return a.lower <= 0 && a.upper >= 0 ? 0 : std::min(std::abs(a.lower), std::abs(a.upper));
+  };
+  std::array<CurveExpressionBounds, 3> values{};
+  for (std::size_t i = 0; i < 3; ++i)
+    if (coordinates_[i]) {
+      auto interval = coordinates_[i]->bounds(document, lower - domain_error, upper + domain_error);
+      if (!interval)
+        return Result<EquationCurveIntervalAnalysis>::failure(interval.error());
+      values[i] = interval.value();
+    }
+  EquationCurveIntervalAnalysis result;
+  if (curve_.mode() == EquationCurveMode::Cartesian2D) {
+    result.maximum_second_derivative = maximum(values[1].second);
+    result.minimum_speed = std::hypot(1., minimum(values[1].first));
+    result.maximum_speed = std::hypot(1., maximum(values[1].first));
+    result.rounding_error_mm = values[1].rounding_error;
+  } else if (curve_.mode() == EquationCurveMode::Polar2D) {
+    const auto r = values[0];
+    result.maximum_second_derivative =
+        std::hypot(maximum(r.second) + maximum(r.value), 2 * maximum(r.first));
+    result.minimum_speed = std::hypot(minimum(r.value), minimum(r.first));
+    result.maximum_speed = std::hypot(maximum(r.value), maximum(r.first));
+    result.rounding_error_mm =
+        std::sqrt(2.) * (r.rounding_error + 64 * std::numeric_limits<double>::epsilon() *
+                                                std::max(1., maximum(r.value)));
+  } else {
+    for (const auto& v : values) {
+      result.maximum_second_derivative =
+          std::hypot(result.maximum_second_derivative, maximum(v.second));
+      result.minimum_speed = std::hypot(result.minimum_speed, minimum(v.first));
+      result.maximum_speed = std::hypot(result.maximum_speed, maximum(v.first));
+      result.rounding_error_mm = std::hypot(result.rounding_error_mm, v.rounding_error);
+    }
+  }
+  result.rounding_error_mm += result.maximum_speed * domain_error;
+  if (result.maximum_second_derivative > 0)
+    result.maximum_second_derivative =
+        std::nextafter(result.maximum_second_derivative, std::numeric_limits<double>::infinity());
+  if (result.minimum_speed > 0)
+    result.minimum_speed = std::nextafter(result.minimum_speed, 0.);
+  if (result.maximum_speed > 0)
+    result.maximum_speed =
+        std::nextafter(result.maximum_speed, std::numeric_limits<double>::infinity());
+  if (result.rounding_error_mm > 0)
+    result.rounding_error_mm =
+        std::nextafter(result.rounding_error_mm, std::numeric_limits<double>::infinity());
+  if (!std::isfinite(result.maximum_second_derivative) || !std::isfinite(result.minimum_speed) ||
+      !std::isfinite(result.maximum_speed) || !std::isfinite(result.rounding_error_mm))
+    return fail("Equation interval exceeds finite numeric resolution");
+  return Result<EquationCurveIntervalAnalysis>::success(result);
+}
+Result<bool> EquationCurveProgram::proves_closure(const PartDocument& document) const {
+  if (curve_.mode() == EquationCurveMode::Cartesian2D)
+    return Result<bool>::success(false);
+  for (const auto& coordinate : coordinates_)
+    if (coordinate) {
+      auto periodic = coordinate->proves_period(document, lower_, upper_);
+      if (!periodic)
+        return periodic;
+      if (!periodic.value()) {
+        auto identical = coordinate->proves_endpoint_identity(document, lower_, upper_);
+        if (!identical || !identical.value())
+          return identical;
+      }
+    }
+  if (curve_.mode() == EquationCurveMode::Polar2D) {
+    auto angular = CurveExpression::compile(document, "sin(" + curve_.variable().name + ")",
+                                            curve_.variable(), curve_.id().value());
+    if (!angular)
+      return Result<bool>::failure(angular.error());
+    return angular.value().proves_period(document, lower_, upper_);
+  }
+  return Result<bool>::success(true);
 }
 } // namespace blcad

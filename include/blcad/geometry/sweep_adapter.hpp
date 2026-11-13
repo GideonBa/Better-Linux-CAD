@@ -10,13 +10,14 @@
 
 namespace blcad::geometry {
 
-enum class SweepPathSegmentKind { Line, CircularArc };
+enum class SweepPathSegmentKind { Line, CircularArc, DerivedEquation };
 
 struct SweepPathSegment {
   SweepPathSegmentKind kind = SweepPathSegmentKind::Line;
   Point3 start;
   Point3 mid;
   Point3 end;
+  DerivedCurveRef derived_curve{};
 };
 
 class SweepAdapter {

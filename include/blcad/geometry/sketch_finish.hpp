@@ -1,5 +1,6 @@
 #pragma once
 
+#include "blcad/geometry/equation_curve_geometry.hpp"
 #include "blcad/geometry/sketch_region_finder.hpp"
 
 #include <algorithm>
@@ -51,6 +52,17 @@ public:
         curves.push_back({line.id(), line.start(), line.end()});
     collect(sketch.arc_segments());
     collect(sketch.spline_segments());
+    for (const auto& equation : sketch.equation_curves()) {
+      if (equation.construction())
+        continue;
+      auto resolved = EquationCurveGeometryAdapter{}.convert(document, equation);
+      if (!resolved)
+        return Result<SketchRegionAnalysis>::failure(resolved.error());
+      const auto& ends = resolved.value().endpoints;
+      curves.push_back({equation.id(),
+                        {ends[0].position.x, ends[0].position.y},
+                        {ends[1].position.x, ends[1].position.y}});
+    }
     std::sort(curves.begin(), curves.end(), [](const auto& a, const auto& b) {
       return a.id.value() < b.id.value();
     });
@@ -87,6 +99,8 @@ public:
             return subset.value().add_entity(*line);
           if (const auto* arc = sketch.find_arc_segment(id))
             return subset.value().add_entity(*arc);
+          if (const auto* equation = sketch.find_equation_curve(id))
+            return subset.value().add_entity(*equation);
           return subset.value().add_entity(*sketch.find_spline_segment(id));
         }();
         if (added.has_error()) return Result<SketchRegionAnalysis>::failure(added.error());
@@ -172,9 +186,9 @@ public:
       }
       return Result<std::size_t>::success(entities.size());
     };
-    for (const auto& copied : {copy_unowned(sketch.line_segments()),
-                              copy_unowned(sketch.arc_segments()),
-                              copy_unowned(sketch.spline_segments())})
+    for (const auto& copied :
+         {copy_unowned(sketch.line_segments()), copy_unowned(sketch.arc_segments()),
+          copy_unowned(sketch.spline_segments()), copy_unowned(sketch.equation_curves())})
       if (!copied) return Result<SketchRegionAnalysis>::failure(copied.error());
 
     auto analysis = analyze(document, raw.value());

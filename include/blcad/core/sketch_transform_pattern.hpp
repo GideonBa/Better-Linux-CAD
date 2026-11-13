@@ -279,7 +279,8 @@ private:
       auto ids = remap(p.curve_segments());
       if (ids.empty())
         continue;
-      auto profile = ArcClosedProfile::create(profile_id(p.id()), std::move(ids));
+      auto profile =
+          ArcClosedProfile::create_for_sketch(profile_id(p.id()), std::move(ids), candidate);
       if (!profile)
         return Result<std::vector<SketchEntityId>>::failure(profile.error());
       auto added = candidate.add_profile(std::move(profile.value()));

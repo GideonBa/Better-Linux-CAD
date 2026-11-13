@@ -78,6 +78,7 @@ add_library(
   src/core/parameter.cpp
   src/core/parameter_expression.cpp
   src/core/curve_expression.cpp
+  src/core/curve_expression_analysis.cpp
   src/core/equation_curve.cpp
   src/core/path_curve.cpp
   src/core/project.cpp
@@ -240,6 +241,9 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
     src/geometry/sketch_3d_geometry_adapter.cpp
+    src/geometry/derived_curve.cpp
+    src/geometry/equation_curve_geometry.cpp
+    src/geometry/sketch_curve_contour.cpp
     src/geometry/sketch_curved_region_finder.cpp
     src/geometry/sketch_reference_projector.cpp
     src/geometry/sketch_region_finder.cpp
@@ -516,6 +520,8 @@ if(BLCAD_BUILD_TESTS)
     tests/core/part_body_dependency_tests.cpp
     tests/core/parameter_expression_tests.cpp
     tests/core/equation_curve_tests.cpp
+    tests/core/curve_expression_analysis_tests.cpp
+    tests/core/equation_curve_consumer_tests.cpp
     tests/core/equation_curve_document_tests.cpp
     tests/core/parameter_tests.cpp
     tests/core/path_extrude_feature_tests.cpp
@@ -677,6 +683,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/semantic_reference_evaluator_tests.cpp
       tests/geometry/finishing_selection_tests.cpp
       tests/geometry/shape_cache_tests.cpp
+      tests/geometry/equation_curve_geometry_tests.cpp
       tests/geometry/sketch_3d_geometry_adapter_tests.cpp
       tests/geometry/sketch_reference_projector_tests.cpp
       tests/geometry/sketch_region_finder_tests.cpp

@@ -1,4 +1,8 @@
+#include "blcad/geometry/equation_curve_geometry.hpp"
 #include "blcad/geometry/sketch_region_finder.hpp"
+#include "derived_curve_internal.hpp"
+#include <GeomAPI.hxx>
+#include <gp_Pln.hxx>
 
 #include "blcad/core/sketch_contour.hpp"
 #include "occt_failure_message.hpp"
@@ -31,6 +35,7 @@ struct RegionCurve {
   Point2 end;
   Handle(Geom2d_Curve) curve;
   bool spline{false};
+  bool closed{false};
 };
 
 bool same(Point2 a, Point2 b, double tolerance = kConnectivityTolerance) {
@@ -56,8 +61,35 @@ Result<std::size_t> validate_intersections(const std::vector<RegionCurve>& curve
       Geom2dAPI_InterCurveCurve self(curves[i].curve, kIntersectionTolerance);
       if (!self.Intersector().IsDone())
         return fail("automatic curved region intersection validation did not converge");
-      if (self.NbPoints() || self.NbSegments())
-        return fail("automatic region detection rejects self-intersecting spline edges");
+      const auto seam_pair = [&](const IntRes2d_IntersectionPoint& witness) {
+        const double first = curves[i].curve->FirstParameter(),
+                     last = curves[i].curve->LastParameter();
+        const double tolerance = 1e-10 * std::max(1., last - first);
+        const double a = witness.ParamOnFirst(), b = witness.ParamOnSecond();
+        const bool endpoints =
+            (std::abs(a - first) <= tolerance && std::abs(b - last) <= tolerance) ||
+            (std::abs(b - first) <= tolerance && std::abs(a - last) <= tolerance);
+        return curves[i].closed && endpoints &&
+               same(point(witness.Value()), curves[i].start, 16 * kIntersectionTolerance);
+      };
+      for (int n = 1; n <= self.NbPoints(); ++n)
+        if (!seam_pair(self.Intersector().Point(n)))
+          return fail("automatic region detection rejects self-intersecting spline edges");
+      for (int n = 1; n <= self.NbSegments(); ++n) {
+        const auto& segment = self.Intersector().Segment(n);
+        if (!curves[i].closed || !segment.HasFirstPoint() || !segment.HasLastPoint())
+          return fail("automatic region detection rejects overlapping equation spans");
+        const auto& first = segment.FirstPoint();
+        const auto& last = segment.LastPoint();
+        if (!seam_pair(first) || !seam_pair(last))
+          return fail("automatic region detection rejects overlapping equation spans");
+        for (const auto p :
+             {point(first.Value()), point(last.Value()),
+              point(curves[i].curve->Value((first.ParamOnFirst() + last.ParamOnFirst()) * .5)),
+              point(curves[i].curve->Value((first.ParamOnSecond() + last.ParamOnSecond()) * .5))})
+          if (!same(p, curves[i].start, 16 * kIntersectionTolerance))
+            return fail("automatic region detection rejects overlapping equation spans");
+      }
     }
     for (std::size_t j = i + 1; j < curves.size(); ++j) {
       Geom2dAPI_InterCurveCurve intersection(curves[i].curve, curves[j].curve,
@@ -93,8 +125,9 @@ Result<std::vector<SketchEntityId>> order_loop(const std::vector<RegionCurve>& c
   const auto fail = [&](const char* message) {
     return Result<std::vector<SketchEntityId>>::failure(Error::validation(object_id, message));
   };
-  if (curves.size() < 2)
-    return fail("automatic curved region detection requires at least two edges");
+  if (curves.empty() || (curves.size() < 2 && !curves.front().closed))
+    return fail(
+        "automatic curved region detection requires a closed equation or at least two edges");
   for (const auto& curve : curves) {
     for (const Point2 endpoint : {curve.start, curve.end}) {
       std::size_t degree = 0;
@@ -136,7 +169,8 @@ Result<std::vector<SketchEntityId>> order_loop(const std::vector<RegionCurve>& c
 
 Result<GeneratedClosedProfileCandidate>
 SketchRegionFinder::find_single_curve_region(const PartDocument& document, const Sketch& sketch) const {
-  if (sketch.arc_segments().empty() && sketch.spline_segments().empty())
+  if (sketch.arc_segments().empty() && sketch.spline_segments().empty() &&
+      sketch.equation_curves().empty())
     return find_single_region(document, sketch);
   const auto fail = [&](std::string message) {
     return Result<GeneratedClosedProfileCandidate>::failure(
@@ -172,6 +206,25 @@ SketchRegionFinder::find_single_curve_region(const PartDocument& document, const
       }
       Handle(Geom2d_BezierCurve) curve = new Geom2d_BezierCurve(poles, weights);
       curves.push_back({spline.id(), spline.start(), spline.end(), curve, true});
+    }
+    for (const auto& equation : sketch.equation_curves()) {
+      if (equation.construction())
+        continue;
+      auto resolved = EquationCurveGeometryAdapter{}.convert(document, equation);
+      if (!resolved)
+        return Result<GeneratedClosedProfileCandidate>::failure(resolved.error());
+      const auto& value = resolved.value();
+      const auto& ends = value.endpoints;
+      auto projected = GeomAPI::To2d(value.curve->curve, gp_Pln(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)));
+      if (projected.IsNull())
+        return fail("Equation curve could not be resolved in its Sketch plane");
+      curves.push_back({equation.id(),
+                        {ends[0].position.x, ends[0].position.y},
+                        {ends[1].position.x, ends[1].position.y},
+                        projected,
+                        value.kind != EquationCurveGeometryKind::AnalyticCircle &&
+                            Geom2dAdaptor_Curve(projected).GetType() != GeomAbs_Line,
+                        equation.closure() == EquationCurveClosure::Periodic});
     }
     std::sort(curves.begin(), curves.end(), [](const auto& a, const auto& b) {
       return a.id.value() < b.id.value();

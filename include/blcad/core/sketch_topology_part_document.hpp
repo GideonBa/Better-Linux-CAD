@@ -248,7 +248,8 @@ public:
               current.value()->id(), "arc profile topology dependency is not a Sketch entity"));
         curve_ids.emplace_back(dependency.substr(prefix.size()));
       }
-      auto profile = ArcClosedProfile::create(legacy.id(), std::move(curve_ids));
+      auto profile =
+          ArcClosedProfile::create_for_sketch(legacy.id(), std::move(curve_ids), result.value());
       if (profile.has_error()) return Result<Sketch>::failure(profile.error());
       auto added = result.value().add_profile(std::move(profile.value()));
       if (added.has_error()) return Result<Sketch>::failure(added.error());

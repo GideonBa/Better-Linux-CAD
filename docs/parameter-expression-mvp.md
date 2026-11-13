@@ -117,6 +117,30 @@ All runs use **1,079 frozen runtime inputs**, SHA256
 `4a7fb09f6a30e6d69728e3fa3586616a437a4829d2c7a40abd4d1a5ec32c1895`.
 Final source/binary hashes, GUI/app dependency records, formatting and documentation links pass.
 
+### Geometry analysis boundary — 161
+
+The same immutable AST supplies interval jets and conservative analytic recognition; no second
+formula parser or persisted compiled representation is introduced. Whole-domain bounds must resolve
+singular divisions/functions and zero-speed intervals within fixed work limits. Generic approximation
+bounds analytic-to-chord error by `max_norm(second_derivative) * span^2 / 8`, adds the modeled
+smooth-curve deviation from that chord and numeric resolution, then subdivides until the sum is within
+half the authored modeling tolerance. Midpoint agreement alone cannot accept an interval.
+
+Exact polynomial spans and structurally recognized circles may use native analytic Geometry.
+`periodic` requires a supported structural periodicity or exact polynomial endpoint identity.
+Closure alone is G0; tangent/curvature continuity at the seam needs its own diagnostics. Endpoint proximity
+cannot authorize closing a gap. Curve/start/end roles retain source identity independently of
+subdivision or display tessellation. Existing profile/path authorities consume immutable derived
+curves, while equations and tolerance/policy remain the sole authored definition. The historical
+non-equation path policies remain assigned to 166. Implementation and acceptance are tracked only
+in the numbered plan.
+
+The [interval/analytic tests](../tests/core/curve_expression_analysis_tests.cpp) use independent
+values, derivatives and exact closure oracles. The
+[profile/path tests](../tests/core/equation_curve_consumer_tests.cpp) exercise existing ownership,
+closure, atomic replacement and V8 replay. Geometry and downstream evidence is indexed in
+[the shared construction contract](part-sketch-3d-geometry-mvp6.md#equation-construction-contract).
+
 ## Still deferred
 
 - converting a plain parameter into an expression parameter (and back).

@@ -1,4 +1,5 @@
 #include "blcad/geometry/revolve_adapter.hpp"
+#include "derived_curve_internal.hpp"
 
 #include "geometry_shape_internal.hpp"
 
@@ -13,6 +14,8 @@
 #include <BRep_Tool.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GProp_GProps.hxx>
+#include <GeomAdaptor_Curve.hxx>
+#include <Geom_BSplineCurve.hxx>
 #include <Geom_BezierCurve.hxx>
 #include <Standard_Failure.hxx>
 #include <TColStd_Array1OfReal.hxx>
@@ -128,6 +131,8 @@ polygon_wire(const FeatureId& id, const std::vector<Point3>& vertices, std::stri
 
 [[nodiscard]] Result<TopoDS_Edge> curve_edge(const FeatureId& id,
                                              const ClosedProfileCurveSegment& curve) {
+  if (curve.kind == ClosedProfileCurveKind::DerivedEquation)
+    return derived_curve_edge(curve.derived_curve, id.value());
   if (curve.kind == ClosedProfileCurveKind::Line) {
     if (same_point(curve.start, curve.end))
       return Result<TopoDS_Edge>::failure(revolve_error(id, "revolve line must not be degenerate"));
@@ -168,7 +173,9 @@ polygon_wire(const FeatureId& id, const std::vector<Point3>& vertices, std::stri
 
 [[nodiscard]] Result<TopoDS_Face> curve_face(const FeatureId& id,
                                              const std::vector<ClosedProfileCurveSegment>& curves) {
-  if (curves.size() < 2U)
+  if (curves.size() < 2U &&
+      !(curves.size() == 1 && curves.front().kind == ClosedProfileCurveKind::DerivedEquation &&
+        curves.front().derived_curve && curves.front().derived_curve->closure_proven))
     return Result<TopoDS_Face>::failure(
         revolve_error(id, "revolve curve profile requires at least two segments"));
   BRepBuilderAPI_MakeWire wire;
@@ -367,6 +374,55 @@ Result<GeometryShape> RevolveAdapter::revolve_profile_curves(
   std::vector<Point3> samples;
   samples.reserve(curves.size() * 4U);
   for (const auto& curve : curves) {
+    if (curve.kind == ClosedProfileCurveKind::DerivedEquation) {
+      if (!curve.derived_curve || curve.derived_curve->curve.IsNull())
+        return Result<GeometryShape>::failure(
+            revolve_error(feature_id, "Revolve requires a resolved equation curve"));
+      GeomAdaptor_Curve native(curve.derived_curve->curve);
+      const auto append = [&](double u) {
+        const auto p = native.Value(u);
+        samples.push_back({p.X(), p.Y(), p.Z()});
+      };
+      append(native.FirstParameter());
+      append(native.LastParameter());
+      if (native.GetType() == GeomAbs_Circle) {
+        const auto circle = native.Circle();
+        const auto x = circle.XAxis().Direction(), y = circle.YAxis().Direction(),
+                   n = circle.Axis().Direction();
+        const auto radial = cross({n.X(), n.Y(), n.Z()}, axis_direction);
+        // Include exact radial extrema, plus in-plane extrema witnessing the
+        // actual curve plane. Respect a partial circle's trimmed domain.
+        for (const auto direction :
+             {Vector3{1, 0, 0}, Vector3{0, 1, 0}, Vector3{0, 0, 1}, radial}) {
+          const double phase =
+              std::atan2(direction.x * y.X() + direction.y * y.Y() + direction.z * y.Z(),
+                         direction.x * x.X() + direction.y * x.Y() + direction.z * x.Z());
+          for (int side = 0; side < 2; ++side) {
+            const double angle = phase + side * kPi;
+            const double station =
+                angle + 2 * kPi * std::ceil((native.FirstParameter() - angle) / (2 * kPi));
+            if (station >= native.FirstParameter() && station <= native.LastParameter())
+              append(station);
+          }
+        }
+      } else if (native.GetType() == GeomAbs_BezierCurve) {
+        const auto spline = native.Bezier();
+        for (int i = 1; i <= spline->NbPoles(); ++i) {
+          const auto p = spline->Pole(i);
+          samples.push_back({p.X(), p.Y(), p.Z()});
+        }
+      } else if (native.GetType() == GeomAbs_BSplineCurve) {
+        const auto spline = native.BSpline();
+        for (int i = 1; i <= spline->NbPoles(); ++i) {
+          const auto p = spline->Pole(i);
+          samples.push_back({p.X(), p.Y(), p.Z()});
+        }
+      } else if (native.GetType() != GeomAbs_Line) {
+        return Result<GeometryShape>::failure(
+            revolve_error(feature_id, "Equation curve envelope is unsupported for Revolve"));
+      }
+      continue;
+    }
     samples.push_back(curve.start);
     samples.push_back(curve.mid);
     samples.push_back(curve.end);

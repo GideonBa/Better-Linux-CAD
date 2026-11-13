@@ -1,5 +1,6 @@
 #include "blcad/geometry/loft_adapter.hpp"
 #include "blcad/geometry/loft_section_compatibility.hpp"
+#include "derived_curve_internal.hpp"
 
 #include "geometry_shape_internal.hpp"
 
@@ -89,6 +90,12 @@ constexpr std::size_t kControlSamplesPerSpan = 4U;
         span_length =
             GCPnts_AbscissaPoint::Length(curve, arc->FirstParameter(), arc->LastParameter());
       }
+      if (segment.kind == SweepPathSegmentKind::DerivedEquation) {
+        auto resolved = derived_curve_length(segment.derived_curve, id.value());
+        if (!resolved)
+          return Result<Point3>::failure(resolved.error());
+        span_length = resolved.value();
+      }
       if (!std::isfinite(span_length) || span_length <= kTolerance)
         return Result<Point3>::failure(
             loft_error(id, std::string(role) + " contains a degenerate segment"));
@@ -101,6 +108,8 @@ constexpr std::size_t kControlSamplesPerSpan = 4U;
       const auto& span = spans[i];
       if (target <= accumulated + span.length || i + 1 == spans.size()) {
         const double t = std::clamp((target - accumulated) / span.length, 0.0, 1.0);
+        if (span.segment->kind == SweepPathSegmentKind::DerivedEquation)
+          return derived_curve_point_at_length_fraction(span.segment->derived_curve, t, id.value());
         if (span.arc.IsNull())
           return Result<Point3>::success(interpolate(span.segment->start, span.segment->end, t));
         const auto value =
@@ -148,6 +157,7 @@ void translate_closed_section(std::vector<ClosedProfileCurveSegment>& section, V
     return Point3{value.x + delta.x, value.y + delta.y, value.z + delta.z};
   };
   for (auto& segment : section) {
+    segment.derived_curve = translated_derived_curve(segment.derived_curve, delta);
     segment.start = translated(segment.start);
     segment.end = translated(segment.end);
     if (segment.kind != ClosedProfileCurveKind::Line)
@@ -162,6 +172,7 @@ void translate_open_section(std::vector<SweepPathSegment>& section, Vector3 delt
     return Point3{value.x + delta.x, value.y + delta.y, value.z + delta.z};
   };
   for (auto& segment : section) {
+    segment.derived_curve = translated_derived_curve(segment.derived_curve, delta);
     segment.start = translated(segment.start);
     segment.end = translated(segment.end);
     if (segment.kind == SweepPathSegmentKind::CircularArc)
@@ -442,6 +453,8 @@ controlled_open_sections(const FeatureId& id,
 
 [[nodiscard]] Result<TopoDS_Edge> closed_edge(const FeatureId& id,
                                               const ClosedProfileCurveSegment& segment) {
+  if (segment.kind == ClosedProfileCurveKind::DerivedEquation)
+    return derived_curve_edge(segment.derived_curve, id.value());
   if (distance(segment.start, segment.end) <= kTolerance)
     return Result<TopoDS_Edge>::failure(loft_error(id, "loft section edge is degenerate"));
   if (segment.kind == ClosedProfileCurveKind::Line) {
@@ -475,6 +488,8 @@ controlled_open_sections(const FeatureId& id,
 }
 
 [[nodiscard]] Result<TopoDS_Edge> open_edge(const FeatureId& id, const SweepPathSegment& segment) {
+  if (segment.kind == SweepPathSegmentKind::DerivedEquation)
+    return derived_curve_edge(segment.derived_curve, id.value());
   if (distance(segment.start, segment.end) <= kTolerance)
     return Result<TopoDS_Edge>::failure(loft_error(id, "open loft section edge is degenerate"));
   if (segment.kind == SweepPathSegmentKind::Line) {

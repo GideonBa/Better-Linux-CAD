@@ -1217,9 +1217,9 @@ driving_dimension_from_json(const json& dimension_json) {
       return Result<Sketch>::failure(added.error());
   }
   for (const auto& profile_json : sketch_json.value("arc_closed_profiles", json::array())) {
-    auto profile =
-        ArcClosedProfile::create(ProfileId(profile_json.at("id").get<std::string>()),
-                                 sketch_entity_ids_from_json(profile_json.at("curve_segments")));
+    auto profile = ArcClosedProfile::create_for_sketch(
+        ProfileId(profile_json.at("id").get<std::string>()),
+        sketch_entity_ids_from_json(profile_json.at("curve_segments")), sketch.value());
     if (profile.has_error())
       return Result<Sketch>::failure(profile.error());
     auto added = sketch.value().add_profile(profile.value());
@@ -4189,6 +4189,8 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
       parsed = PlanarPathCurveKind::ProjectedLine;
     else if (kind == "reference_generated_line")
       parsed = PlanarPathCurveKind::ReferenceGeneratedLine;
+    else if (kind == "equation_curve")
+      parsed = PlanarPathCurveKind::EquationCurve;
     if (!parsed.has_value())
       return Result<PathSegmentReference>::failure(
           json_error("unsupported planar path curve kind"));
@@ -4222,6 +4224,8 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
       parsed = Sketch3DPathCurveKind::Spline;
     else if (kind == "helix")
       parsed = Sketch3DPathCurveKind::Helix;
+    else if (kind == "equation_curve")
+      parsed = Sketch3DPathCurveKind::EquationCurve;
     if (!parsed.has_value())
       return Result<PathSegmentReference>::failure(
           json_error("unsupported 3D-sketch path curve kind"));

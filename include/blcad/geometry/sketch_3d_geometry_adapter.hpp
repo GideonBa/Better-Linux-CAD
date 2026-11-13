@@ -10,7 +10,7 @@
 
 namespace blcad::geometry {
 
-enum class Sketch3DGeometryProductKind { Point, Line, Polyline, Arc, Spline, Helix };
+enum class Sketch3DGeometryProductKind { Point, Line, Polyline, Arc, Spline, Helix, EquationCurve };
 
 struct Sketch3DGeometryProduct {
   SketchEntityId entity_id;
