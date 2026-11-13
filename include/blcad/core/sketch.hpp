@@ -445,10 +445,13 @@ private:
   ProfileId id_;
   std::vector<SketchEntityId> line_segments_;
 };
+class Sketch;
 class ArcClosedProfile {
 public:
   [[nodiscard]] static Result<ArcClosedProfile> create(ProfileId id,
                                                        std::vector<SketchEntityId> curve_segments);
+  [[nodiscard]] static Result<ArcClosedProfile>
+  create_for_sketch(ProfileId id, std::vector<SketchEntityId> curve_segments, const Sketch& source);
   [[nodiscard]] const ProfileId& id() const noexcept;
   [[nodiscard]] const std::vector<SketchEntityId>& curve_segments() const noexcept;
 

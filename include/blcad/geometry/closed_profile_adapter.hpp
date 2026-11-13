@@ -3,6 +3,7 @@
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/spatial.hpp"
+#include "blcad/geometry/derived_curve.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 
 #include <array>
@@ -16,6 +17,7 @@ enum class ClosedProfileCurveKind {
   Line,
   CircularArc,
   CubicBezierSpline,
+  DerivedEquation,
 };
 
 struct ClosedProfileCurveSegment {
@@ -25,6 +27,7 @@ struct ClosedProfileCurveSegment {
   Point3 end;
   Point3 control2{};
   std::array<double, 4> weights{1, 1, 1, 1};
+  DerivedCurveRef derived_curve{};
 };
 
 struct AxisProjectionSpan {

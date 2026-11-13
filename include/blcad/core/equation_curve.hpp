@@ -82,6 +82,9 @@ private:
 struct EquationCurveJet {
   Point3 value, first, second;
 };
+struct EquationCurveIntervalAnalysis {
+  double maximum_second_derivative{}, minimum_speed{}, maximum_speed{}, rounding_error_mm{};
+};
 class EquationCurveProgram {
 public:
   [[nodiscard]] static Result<EquationCurveProgram> compile(const PartDocument& document,
@@ -89,6 +92,9 @@ public:
   [[nodiscard]] Result<std::pair<double, double>> domain(const PartDocument& document) const;
   [[nodiscard]] Result<EquationCurveJet> evaluate(const PartDocument& document,
                                                   double parameter) const;
+  [[nodiscard]] Result<EquationCurveIntervalAnalysis>
+  analyze_interval(const PartDocument& document, double lower, double upper) const;
+  [[nodiscard]] Result<bool> proves_closure(const PartDocument& document) const;
   [[nodiscard]] const EquationCurve& curve() const noexcept {
     return curve_;
   }

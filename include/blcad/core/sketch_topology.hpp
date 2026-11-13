@@ -436,6 +436,36 @@ public:
     };
     const auto connect_contour = [&](const std::vector<SketchEntityId>& contour) {
       if (contour.empty()) return;
+      if (std::any_of(contour.begin(), contour.end(),
+                      [&](const auto& id) { return sketch.find_equation_curve(id) != nullptr; })) {
+        const auto positions =
+            [&](const SketchEntityId& id) -> std::optional<std::array<Point2, 2>> {
+          if (const auto* curve = sketch.find_line_segment(id))
+            return std::array{curve->start(), curve->end()};
+          if (const auto* curve = sketch.find_arc_segment(id))
+            return std::array{curve->start(), curve->end()};
+          if (const auto* curve = sketch.find_spline_segment(id))
+            return std::array{curve->start(), curve->end()};
+          return std::nullopt;
+        };
+        for (std::size_t i = 0; i < contour.size(); ++i) {
+          const auto next = (i + 1) % contour.size();
+          const auto a = positions(contour[i]), b = positions(contour[next]);
+          const auto au = endpoint_usages(contour[i]), bu = endpoint_usages(contour[next]);
+          if (!a || !b || !au || !bu)
+            continue;
+          const std::array aid{au->first, au->second}, bid{bu->first, bu->second};
+          std::vector<std::pair<std::string, std::string>> matches;
+          for (std::size_t ai = 0; ai < 2; ++ai)
+            for (std::size_t bi = 0; bi < 2; ++bi)
+              if (std::abs((*a)[ai].x - (*b)[bi].x) <= 1e-9 &&
+                  std::abs((*a)[ai].y - (*b)[bi].y) <= 1e-9)
+                matches.emplace_back(aid[ai], bid[bi]);
+          if (matches.size() == 1)
+            shared_usage_pairs.push_back(matches.front());
+        }
+        return;
+      }
       auto traversal = resolve_sketch_contour(sketch, contour);
       for (std::size_t index = 0; index < contour.size(); ++index) {
         auto current = endpoint_usages(contour[index]);

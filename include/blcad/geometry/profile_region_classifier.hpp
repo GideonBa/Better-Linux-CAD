@@ -1,4 +1,6 @@
 #pragma once
+#include "blcad/geometry/equation_curve_geometry.hpp"
+#include "blcad/geometry/sketch_curve_contour.hpp"
 
 #include "blcad/core/part_document.hpp"
 #include "blcad/core/sketch_contour.hpp"
@@ -289,6 +291,8 @@ resolve_curved_profile_hole(const PartDocument& document, const Sketch& sketch, 
         return subset.value().add_entity(*arc);
       if (const auto* spline = sketch.find_spline_segment(entity))
         return subset.value().add_entity(*spline);
+      if (const auto* equation = sketch.find_equation_curve(entity))
+        return subset.value().add_entity(*equation);
       return Result<std::size_t>::failure(
           Error::validation(id.value(), "profile curve must exist"));
     }();
@@ -298,7 +302,7 @@ resolve_curved_profile_hole(const PartDocument& document, const Sketch& sketch, 
   auto region = SketchRegionFinder{}.find_single_curve_region(document, subset.value());
   if (!region)
     return Result<ContainedProfileHole>::failure(region.error());
-  auto traversal = resolve_sketch_contour(sketch, region.value().source_entities());
+  auto traversal = resolve_sketch_curve_contour(document, sketch, region.value().source_entities());
   if (!traversal)
     return Result<ContainedProfileHole>::failure(traversal.error());
   ContainedProfileHole result{
@@ -311,7 +315,18 @@ resolve_curved_profile_hole(const PartDocument& document, const Sketch& sketch, 
     else if (const auto* arc = sketch.find_arc_segment(entry.id))
       curve = {ClosedProfileCurveKind::CircularArc, point(arc->start()), point(arc->mid()),
                point(arc->end())};
-    else {
+    else if (const auto* equation = sketch.find_equation_curve(entry.id)) {
+      auto resolved = EquationCurveGeometryAdapter{}.convert(document, *equation);
+      if (!resolved)
+        return Result<ContainedProfileHole>::failure(resolved.error());
+      curve = {ClosedProfileCurveKind::DerivedEquation,
+               resolved.value().endpoints[0].position,
+               {},
+               resolved.value().endpoints[1].position,
+               {},
+               {1, 1, 1, 1},
+               resolved.value().curve};
+    } else {
       const auto& spline = *sketch.find_spline_segment(entry.id);
       curve = {ClosedProfileCurveKind::CubicBezierSpline,
                point(spline.start()),
@@ -322,6 +337,7 @@ resolve_curved_profile_hole(const PartDocument& document, const Sketch& sketch, 
     }
     if (entry.reversed) {
       std::swap(curve.start, curve.end);
+      curve.derived_curve = reversed_derived_curve(curve.derived_curve);
       if (curve.kind == ClosedProfileCurveKind::CubicBezierSpline) {
         std::swap(curve.mid, curve.control2);
         std::reverse(curve.weights.begin(), curve.weights.end());

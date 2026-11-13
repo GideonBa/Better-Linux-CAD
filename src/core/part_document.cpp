@@ -410,6 +410,35 @@ path_point_reference_endpoint(const PartDocument& document, const Sketch3D& owne
   return Result<PathEndpoint>::success(std::move(result));
 }
 
+[[nodiscard]] Result<std::pair<Point3, Point3>>
+path_equation_endpoints(const PartDocument& document, const EquationCurve* curve,
+                        const SketchEntityId& id) {
+  if (!curve)
+    return Result<std::pair<Point3, Point3>>::failure(
+        Error::validation(id.value(), "Equation path source must exist"));
+  auto program = EquationCurveProgram::compile(document, *curve);
+  if (!program)
+    return Result<std::pair<Point3, Point3>>::failure(program.error());
+  auto bounds = program.value().domain(document);
+  if (!bounds)
+    return Result<std::pair<Point3, Point3>>::failure(bounds.error());
+  auto first = program.value().evaluate(document, bounds.value().first),
+       last = program.value().evaluate(document, bounds.value().second);
+  if (!first || !last)
+    return Result<std::pair<Point3, Point3>>::failure(!first ? first.error() : last.error());
+  auto end = last.value().value;
+  if (curve->closure() == EquationCurveClosure::Periodic) {
+    auto closure = program.value().proves_closure(document);
+    if (!closure)
+      return Result<std::pair<Point3, Point3>>::failure(closure.error());
+    if (!closure.value())
+      return Result<std::pair<Point3, Point3>>::failure(
+          Error::validation(id.value(), "Equation path closure has no supported exact proof"));
+    end = first.value().value;
+  }
+  return Result<std::pair<Point3, Point3>>::success({first.value().value, end});
+}
+
 [[nodiscard]] Result<std::pair<PathEndpoint, PathEndpoint>>
 path_segment_endpoints(const PartDocument& document, const PathSegmentReference& segment) {
   PathEndpoint start, end;
@@ -446,6 +475,15 @@ path_segment_endpoints(const PartDocument& document, const PathSegmentReference&
             Error::validation(segment.entity()->value(), "path planar spline must exist"));
       first = curve->start();
       last = curve->end();
+      break;
+    }
+    case PlanarPathCurveKind::EquationCurve: {
+      auto ends = path_equation_endpoints(document, sketch->find_equation_curve(*segment.entity()),
+                                          *segment.entity());
+      if (!ends)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(ends.error());
+      first = {ends.value().first.x, ends.value().first.y};
+      last = {ends.value().second.x, ends.value().second.y};
       break;
     }
     case PlanarPathCurveKind::ProjectedLine:
@@ -525,6 +563,16 @@ path_segment_endpoints(const PartDocument& document, const PathSegmentReference&
             first.has_error() ? first.error() : last.error());
       start = first.value();
       end = last.value();
+      break;
+    }
+    case Sketch3DPathCurveKind::EquationCurve: {
+      auto ends = path_equation_endpoints(document, sketch->find_equation_curve(*segment.entity()),
+                                          *segment.entity());
+      if (!ends)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(ends.error());
+      const auto base = "equation:" + sketch->id().value() + ":" + segment.entity()->value();
+      start = {base + ":start", "model", ends.value().first, true};
+      end = {base + ":end", "model", ends.value().second, true};
       break;
     }
     case Sketch3DPathCurveKind::Helix:
@@ -1063,6 +1111,24 @@ add_projected_reference_dependencies(DependencyGraph& graph, const Sketch& sketc
 }
 
 Result<std::size_t> validate_path_curve(const PartDocument& document, const PathCurve& path_curve) {
+  if (path_curve.segments().size() == 1) {
+    const auto& segment = path_curve.segments().front();
+    const EquationCurve* equation = nullptr;
+    if (segment.planar_curve_kind() == PlanarPathCurveKind::EquationCurve) {
+      const auto* sketch = document.find_sketch(*segment.planar_sketch());
+      if (sketch)
+        equation = sketch->find_equation_curve(*segment.entity());
+    } else if (segment.sketch_3d_curve_kind() == Sketch3DPathCurveKind::EquationCurve) {
+      const auto* sketch = document.find_sketch_3d(*segment.sketch_3d());
+      if (sketch)
+        equation = sketch->find_equation_curve(*segment.entity());
+    }
+    if (equation && (path_curve.closure() == PathClosure::Closed) !=
+                        (equation->closure() == EquationCurveClosure::Periodic))
+      return Result<std::size_t>::failure(
+          Error::validation(path_curve.id().value(),
+                            "Single equation PathCurve closure must match its source intent"));
+  }
   std::vector<std::pair<PathEndpoint, PathEndpoint>> endpoints;
   endpoints.reserve(path_curve.segments().size());
   for (const auto& segment : path_curve.segments()) {
@@ -1769,6 +1835,18 @@ Result<std::size_t> PartDocument::update_sketch(Sketch sketch) {
   candidate.sketches_.insert(candidate.sketches_.begin() + static_cast<std::ptrdiff_t>(index),
                              std::move(replacement));
 
+  for (const auto& path : candidate.path_curves_) {
+    const bool equation_consumer =
+        std::any_of(path.segments().begin(), path.segments().end(), [&](const auto& segment) {
+          return segment.planar_curve_kind() == PlanarPathCurveKind::EquationCurve &&
+                 segment.planar_sketch() == candidate.sketches_[index].id();
+        });
+    if (equation_consumer) {
+      auto valid = validate_path_curve(candidate, path);
+      if (!valid)
+        return valid;
+    }
+  }
   for (const auto& dependent : downstream) {
     if (!candidate.dependency_graph_.has_node(dependent))
       continue;

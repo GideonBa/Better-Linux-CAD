@@ -113,6 +113,19 @@ sharing, topology materialization and analytic circle/semicircle extrusion volum
 
 A checked-in example model is available at `examples/arc_profile_prism.blcad.json`.
 
+## Equation profile contract
+
+`ArcClosedProfile::create_for_sketch` extends this same profile authority with one owned closed
+equation, while the historical factory retains its two-curve minimum. Mixed contours retain current
+line/arc/spline/equation IDs. Core checks ownership and construction roles; Part-context Geometry
+checks derived traversal, closure and intersections. Endpoint witnesses are not authored SketchPoints
+or freely editable spline poles. Existing topology materialization and ordinary edits preserve the
+raw equation and profile identities; no tessellated polyline replaces the modeled curve.
+Workplane bounds conservatively contain the complete native curve. Revolve uses analytic circle
+extrema or polynomial/spline control envelopes for coplanarity and axis-side checks; an envelope
+crossing the axis is rejected conservatively. Existing Loft section compatibility remains bounded
+to its supported kinds; equation section refinement is not silently converted into cubic controls.
+
 ## Test coverage
 
 The tests cover:

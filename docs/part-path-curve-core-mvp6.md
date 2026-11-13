@@ -46,6 +46,20 @@ ambiguous records fail loading. Files from before Block 79 load with zero PathCu
 
 No resolved endpoints, sampled curves, or OCCT identities are persisted.
 
+## Equation source contract
+
+Both planar and spatial sources add the `equation_curve` kind in the same owner/entity reference.
+Current parameter/domain inputs resolve endpoint witnesses through the shared Core program; no
+OCCT enters source validation. A closed single-source path requires the equation's closed intent
+and exact closure proof. Owner/ID loss, mismatched closure and invalid endpoints reject publication.
+Sketch replacement revalidates its equation paths atomically. Physical execution uses the immutable
+Geometry curve, preserving reversal and stable source roles. Existing non-equation path policies
+and their later 166 upgrade boundary remain unchanged. Equation paths support the current
+orientation/guide executor using the actual curve and start tangent. Equation inputs set the Pipe
+kernel's 3D/boundary approximation to OCCT confusion resolution and angular tolerance to `1e-6`;
+the historical non-equation default remains unchanged. Nonzero twist is rejected
+explicitly until the curve-preserving twist policy in 166, rather than constructing a chord guide.
+
 ## Verification
 
 ```text

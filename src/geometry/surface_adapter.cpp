@@ -2,6 +2,7 @@
 
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 
+#include "derived_curve_internal.hpp"
 #include "geometry_shape_internal.hpp"
 
 #include <BRepAdaptor_Curve.hxx>
@@ -78,6 +79,8 @@ constexpr double kTolerance = 1.0e-7;
 }
 
 [[nodiscard]] Result<TopoDS_Edge> make_edge(const FeatureId& id, const SweepPathSegment& segment) {
+  if (segment.kind == SweepPathSegmentKind::DerivedEquation)
+    return derived_curve_edge(segment.derived_curve, id.value());
   if (same_point(segment.start, segment.end))
     return Result<TopoDS_Edge>::failure(
         surface_error(id, "surface boundary segment endpoints must be distinct"));

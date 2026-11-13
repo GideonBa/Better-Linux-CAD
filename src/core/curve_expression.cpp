@@ -1,53 +1,23 @@
 #include "blcad/core/curve_expression.hpp"
 #include "blcad/core/part_document.hpp"
+#include "curve_expression_internal.hpp"
 
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <cstdint>
+#include <limits>
 #include <numbers>
+#include <numeric>
 #include <utility>
 
 namespace blcad {
-namespace curve_expression_detail {
-enum class CurveOp {
-  Constant,
-  Variable,
-  Parameter,
-  Add,
-  Subtract,
-  Multiply,
-  Divide,
-  Negate,
-  Power,
-  Sin,
-  Cos,
-  Tan,
-  Sqrt,
-  Exp,
-  Log,
-  Abs
-};
-struct CurveExpressionNode {
-  CurveOp op{CurveOp::Constant};
-  std::size_t a{}, b{};
-  double number{};
-  int exponent{};
-  std::string parameter;
-  CurveExpressionUnit unit;
-  bool unknown_unit{false};
-  bool variable{false};
-};
-struct CurveExpressionData {
-  std::vector<CurveExpressionNode> nodes;
-  std::vector<ParameterId> dependencies;
-  std::optional<DocumentId> document;
-  std::string object_id;
-};
-} // namespace curve_expression_detail
+
 namespace {
 using curve_expression_detail::CurveExpressionData;
 using curve_expression_detail::CurveExpressionNode;
 using curve_expression_detail::CurveOp;
+using curve_expression_detail::parameter_unit;
 bool letter(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
@@ -71,13 +41,7 @@ std::optional<CurveOp> function(std::string_view name) {
     return CurveOp::Abs;
   return std::nullopt;
 }
-CurveExpressionUnit parameter_unit(const Parameter& parameter) {
-  if (parameter.type() == ParameterType::Length)
-    return {1, 0};
-  if (parameter.type() == ParameterType::Angle)
-    return {0, 1};
-  return {0, 0};
-}
+
 struct Parser {
   std::string_view source;
   std::optional<CurveVariable> variable;
@@ -112,10 +76,14 @@ struct Parser {
     data.nodes.push_back(std::move(node));
     return data.nodes.size() - 1;
   }
-  std::size_t constant(double number, CurveExpressionUnit unit = {}) {
+  std::size_t constant(double number, CurveExpressionUnit unit = {}, bool pi_symbol = false,
+                       double pi_scale = 1, int pi_divisor = 1) {
     CurveExpressionNode node;
     node.number = number;
     node.unit = unit;
+    node.pi_symbol = pi_symbol;
+    node.pi_scale = pi_scale;
+    node.pi_divisor = pi_divisor;
     return append(std::move(node));
   }
   std::size_t operation(CurveOp op, std::size_t a, std::size_t b = 0, int exponent = 0) {
@@ -247,7 +215,7 @@ struct Parser {
       if (suffix == "rad")
         return constant(number, {0, 1});
       if (suffix == "deg")
-        return constant(number * (std::numbers::pi / 180), {0, 1});
+        return constant(number * (std::numbers::pi / 180), {0, 1}, true, number, 180);
       position = start;
       return constant(number);
     }
@@ -295,7 +263,7 @@ struct Parser {
         return operation(*op, a);
       }
       if (name == "pi")
-        return constant(std::numbers::pi);
+        return constant(std::numbers::pi, {}, true);
       if (name == "e")
         return constant(std::numbers::e);
       if (variable && name == variable->name) {
@@ -333,6 +301,8 @@ CurveExpressionData parse(std::string_view source, std::optional<CurveVariable> 
                           const PartDocument* document, std::string object_id) {
   CurveExpressionData data;
   data.object_id = std::move(object_id);
+  if (variable)
+    data.variable_unit = CurveExpressionUnit::from(variable->unit);
   if (document)
     data.document = document->id();
   return Parser{source, std::move(variable), document, std::move(data)}.parse();
@@ -513,4 +483,5 @@ Result<CurveExpressionJet> CurveExpression::evaluate(const PartDocument& documen
     return Result<CurveExpressionJet>::failure(error);
   }
 }
+
 } // namespace blcad

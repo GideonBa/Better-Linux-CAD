@@ -13,6 +13,7 @@
 #include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/dimension_driven_profile_resolver.hpp"
+#include "blcad/geometry/equation_curve_geometry.hpp"
 #include "blcad/geometry/profile_region_classifier.hpp"
 #include "blcad/geometry/reference_generated_profile_resolver.hpp"
 #include "blcad/geometry/reference_part_geometry.hpp"
@@ -21,6 +22,7 @@
 #include "blcad/geometry/sketch_reference_projector.hpp"
 #include "blcad/geometry/sketch_region_finder.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
+#include "derived_curve_internal.hpp"
 #include "loft_section_alignment_internal.hpp"
 
 #include <algorithm>
@@ -1554,9 +1556,51 @@ evaluate_arc_curve_segment(const WorkplaneResolver& resolver, const ResolvedWork
 }
 
 [[nodiscard]] Result<std::vector<ClosedProfileCurveSegment>>
-evaluate_bounded_arc_profile_curves(const WorkplaneResolver& resolver,
+evaluate_bounded_arc_profile_curves(const PartDocument& document, const WorkplaneResolver& resolver,
                                     const ResolvedWorkplane& workplane, const Sketch& sketch,
                                     const ArcClosedProfile& profile) {
+  const bool equation =
+      std::any_of(profile.curve_segments().begin(), profile.curve_segments().end(),
+                  [&](const auto& id) { return sketch.find_equation_curve(id) != nullptr; });
+  if (equation) {
+    auto local =
+        resolve_curved_profile_hole(document, sketch, profile.id(), profile.curve_segments());
+    if (!local)
+      return Result<std::vector<ClosedProfileCurveSegment>>::failure(local.error());
+    auto curves = std::move(local.value().curves);
+    for (auto& curve : curves) {
+      if (curve.kind == ClosedProfileCurveKind::DerivedEquation) {
+        auto bounds = derived_curve_bounds(curve.derived_curve, profile.id().value());
+        if (!bounds)
+          return Result<std::vector<ClosedProfileCurveSegment>>::failure(bounds.error());
+        for (const auto& p : {bounds.value().first, bounds.value().second}) {
+          auto valid = validate_point_inside_bounds(workplane, profile.id().value(), {p.x, p.y});
+          if (!valid)
+            return Result<std::vector<ClosedProfileCurveSegment>>::failure(valid.error());
+        }
+        curve.derived_curve =
+            transformed_derived_curve(curve.derived_curve, workplane.origin, workplane.x_axis,
+                                      workplane.y_axis, workplane.normal);
+      } else {
+        std::vector<Point3> controls{curve.start, curve.end};
+        if (curve.kind != ClosedProfileCurveKind::Line)
+          controls.push_back(curve.mid);
+        if (curve.kind == ClosedProfileCurveKind::CubicBezierSpline)
+          controls.push_back(curve.control2);
+        for (const auto& p : controls) {
+          auto valid = validate_point_inside_bounds(workplane, profile.id().value(), {p.x, p.y});
+          if (!valid)
+            return Result<std::vector<ClosedProfileCurveSegment>>::failure(valid.error());
+        }
+      }
+      const auto map = [&](Point3 p) { return resolver.evaluate_point(workplane, {p.x, p.y}); };
+      curve.start = map(curve.start);
+      curve.mid = map(curve.mid);
+      curve.end = map(curve.end);
+      curve.control2 = map(curve.control2);
+    }
+    return Result<std::vector<ClosedProfileCurveSegment>>::success(std::move(curves));
+  }
   auto vertices = sketch.arc_closed_profile_vertices(profile);
   if (vertices.has_error())
     return Result<std::vector<ClosedProfileCurveSegment>>::failure(vertices.error());
@@ -1682,6 +1726,8 @@ evaluate_composite_local_vertices(const PartDocument& document, const Sketch& sk
 
 [[nodiscard]] SweepPathSegment reversed_sweep_segment(SweepPathSegment segment) {
   std::swap(segment.start, segment.end);
+  if (segment.kind == SweepPathSegmentKind::DerivedEquation)
+    segment.derived_curve = reversed_derived_curve(segment.derived_curve);
   return segment;
 }
 
@@ -1854,6 +1900,23 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
         }
         resolved.insert(resolved.end(), sampled.begin(), sampled.end());
         continue;
+      } else if (*reference.planar_curve_kind() == PlanarPathCurveKind::EquationCurve) {
+        const auto* source = sketch->find_equation_curve(*reference.entity());
+        if (!source)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(reference.entity()->value(), "Equation path source must exist"));
+        auto curve = EquationCurveGeometryAdapter{}.convert(document, *source);
+        if (!curve)
+          return Result<std::vector<SweepPathSegment>>::failure(curve.error());
+        const auto& frame = workplane.value();
+        segment = {SweepPathSegmentKind::DerivedEquation,
+                   resolver.evaluate_point(frame, {curve.value().endpoints[0].position.x,
+                                                   curve.value().endpoints[0].position.y}),
+                   {},
+                   resolver.evaluate_point(frame, {curve.value().endpoints[1].position.x,
+                                                   curve.value().endpoints[1].position.y}),
+                   transformed_derived_curve(curve.value().curve, frame.origin, frame.x_axis,
+                                             frame.y_axis, frame.normal)};
       } else if (*reference.planar_curve_kind() == PlanarPathCurveKind::ReferenceGeneratedLine) {
         if (!allow_surface_boundary_sources)
           return Result<std::vector<SweepPathSegment>>::failure(
@@ -1884,7 +1947,20 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
         return Result<std::vector<SweepPathSegment>>::failure(
             geometry_error(reference.source_node_id(), "3D path sketch must exist"));
       std::vector<SweepPathSegment> spatial;
-      if (*reference.sketch_3d_curve_kind() == Sketch3DPathCurveKind::Line) {
+      if (*reference.sketch_3d_curve_kind() == Sketch3DPathCurveKind::EquationCurve) {
+        const auto* source = sketch->find_equation_curve(*reference.entity());
+        if (!source)
+          return Result<std::vector<SweepPathSegment>>::failure(
+              geometry_error(reference.entity()->value(), "Equation path source must exist"));
+        auto curve = EquationCurveGeometryAdapter{}.convert(document, *source);
+        if (!curve)
+          return Result<std::vector<SweepPathSegment>>::failure(curve.error());
+        spatial.push_back({SweepPathSegmentKind::DerivedEquation,
+                           curve.value().endpoints[0].position,
+                           {},
+                           curve.value().endpoints[1].position,
+                           curve.value().curve});
+      } else if (*reference.sketch_3d_curve_kind() == Sketch3DPathCurveKind::Line) {
         const SketchLine3D* line = sketch->find_line(*reference.entity());
         if (line == nullptr)
           return Result<std::vector<SweepPathSegment>>::failure(
@@ -2092,6 +2168,10 @@ contained_hole_curves(const WorkplaneResolver& resolver, const ResolvedWorkplane
       curve.mid = map(curve.mid);
       curve.end = map(curve.end);
       curve.control2 = map(curve.control2);
+      if (curve.kind == ClosedProfileCurveKind::DerivedEquation)
+        curve.derived_curve =
+            transformed_derived_curve(curve.derived_curve, workplane.origin, workplane.x_axis,
+                                      workplane.y_axis, workplane.normal);
     }
     return curves;
   }
@@ -2171,6 +2251,12 @@ extrude_curves_span(const FeatureId& feature, std::vector<ClosedProfileCurveSegm
 
 [[nodiscard]] ClosedProfileCurveSegment
 reversed_loft_curve(const ClosedProfileCurveSegment& segment) {
+  if (segment.kind == ClosedProfileCurveKind::DerivedEquation) {
+    auto reversed = segment;
+    std::swap(reversed.start, reversed.end);
+    reversed.derived_curve = reversed_derived_curve(segment.derived_curve);
+    return reversed;
+  }
   if (segment.kind == ClosedProfileCurveKind::Line)
     return {segment.kind, segment.end, {}, segment.start};
   if (segment.kind == ClosedProfileCurveKind::CircularArc)
@@ -2213,6 +2299,15 @@ void apply_loft_section_controls(std::vector<ClosedProfileCurveSegment>& curves,
   center = {center.x / count, center.y / count, center.z / count};
   const double angle = rotation_deg * k_pi / 180.0;
   for (auto& curve : curves) {
+    if (curve.kind == ClosedProfileCurveKind::DerivedEquation) {
+      const auto origin = rotate_about_axis({}, center, workplane.normal, angle);
+      const auto vector = [&](Point3 p) {
+        const auto r = rotate_about_axis(p, center, workplane.normal, angle);
+        return Vector3{r.x - origin.x, r.y - origin.y, r.z - origin.z};
+      };
+      curve.derived_curve = transformed_derived_curve(
+          curve.derived_curve, origin, vector({1, 0, 0}), vector({0, 1, 0}), vector({0, 0, 1}));
+    }
     curve.start = rotate_about_axis(curve.start, center, workplane.normal, angle);
     curve.end = rotate_about_axis(curve.end, center, workplane.normal, angle);
     if (curve.kind != ClosedProfileCurveKind::Line)
@@ -2271,7 +2366,8 @@ resolve_loft_closed_section(const PartDocument& document, const ProfileSectionRe
     curves = line_profile_curves(vertices.value());
     align_loft_section(curves, closed->line_segments(), section.alignment_reference());
   } else if (const ArcClosedProfile* arc = sketch->find_arc_closed_profile(profile_id)) {
-    auto resolved = evaluate_bounded_arc_profile_curves(resolver, workplane.value(), *sketch, *arc);
+    auto resolved =
+        evaluate_bounded_arc_profile_curves(document, resolver, workplane.value(), *sketch, *arc);
     if (resolved.has_error())
       return Result<std::vector<ClosedProfileCurveSegment>>::failure(resolved.error());
     curves = std::move(resolved.value());
@@ -2319,6 +2415,9 @@ surface_path_from_closed_curves(const std::vector<ClosedProfileCurveSegment>& cu
       result.push_back({SweepPathSegmentKind::Line, curve.start, {}, curve.end});
     } else if (curve.kind == ClosedProfileCurveKind::CircularArc) {
       result.push_back({SweepPathSegmentKind::CircularArc, curve.start, curve.mid, curve.end});
+    } else if (curve.kind == ClosedProfileCurveKind::DerivedEquation) {
+      result.push_back(
+          {SweepPathSegmentKind::DerivedEquation, curve.start, {}, curve.end, curve.derived_curve});
     } else {
       auto sampled = sampled_path({curve.start, curve.mid, curve.control2, curve.end},
                                   32U, {curve.weights.begin(), curve.weights.end()});
@@ -2721,8 +2820,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_path_extrude(const PartDo
       return Result<std::size_t>::failure(vertices.error());
     curves = line_profile_curves(vertices.value());
   } else if (const ArcClosedProfile* arc = extrude_arc_profile(*sketch, feature)) {
-    auto resolved =
-        evaluate_bounded_arc_profile_curves(workplane_resolver_, workplane.value(), *sketch, *arc);
+    auto resolved = evaluate_bounded_arc_profile_curves(document, workplane_resolver_,
+                                                        workplane.value(), *sketch, *arc);
     if (resolved.has_error())
       return Result<std::size_t>::failure(resolved.error());
     curves = std::move(resolved.value());
@@ -2842,8 +2941,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_richer_extrude(
       return Result<std::size_t>::failure(classified.error());
     holes = std::move(classified.value());
   } else if (const ArcClosedProfile* arc = extrude_arc_profile(*sketch, feature)) {
-    auto resolved =
-        evaluate_bounded_arc_profile_curves(workplane_resolver_, workplane.value(), *sketch, *arc);
+    auto resolved = evaluate_bounded_arc_profile_curves(document, workplane_resolver_,
+                                                        workplane.value(), *sketch, *arc);
     if (!resolved)
       return Result<std::size_t>::failure(resolved.error());
     curves = std::move(resolved.value());
@@ -3016,8 +3115,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_revolve(const PartDocumen
                                             axis.value().second, angles.start_deg, angles.sweep_deg,
                                             roles);
   } else if (const ArcClosedProfile* arc = sketch->find_arc_closed_profile(profile_id)) {
-    auto curves =
-        evaluate_bounded_arc_profile_curves(workplane_resolver_, workplane.value(), *sketch, *arc);
+    auto curves = evaluate_bounded_arc_profile_curves(document, workplane_resolver_,
+                                                      workplane.value(), *sketch, *arc);
     if (curves.has_error())
       return Result<std::size_t>::failure(curves.error());
     tool = revolve_adapter_.revolve_profile_curves(feature->id(), curves.value(),
@@ -3197,8 +3296,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
         return Result<std::size_t>::failure(vertices.error());
       curves = line_profile_curves(vertices.value());
     } else if (const ArcClosedProfile* arc = sketch->find_arc_closed_profile(profile_id)) {
-      auto resolved = evaluate_bounded_arc_profile_curves(workplane_resolver_, workplane.value(),
-                                                          *sketch, *arc);
+      auto resolved = evaluate_bounded_arc_profile_curves(document, workplane_resolver_,
+                                                          workplane.value(), *sketch, *arc);
       if (resolved.has_error())
         return Result<std::size_t>::failure(resolved.error());
       curves = std::move(resolved.value());
@@ -4100,7 +4199,7 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_additive_extrude(
         extrude_direction_vector(resolved_workplane.value(), feature->direction());
 
     if (arc != nullptr) {
-      auto curves = evaluate_bounded_arc_profile_curves(workplane_resolver_,
+      auto curves = evaluate_bounded_arc_profile_curves(document, workplane_resolver_,
                                                         resolved_workplane.value(), *sketch, *arc);
       if (curves.has_error())
         return Result<std::size_t>::failure(curves.error());
@@ -4374,9 +4473,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
   }
 
   if (has_exactly_one_arc_closed_profile(*sketch)) {
-    auto curves =
-        evaluate_bounded_arc_profile_curves(workplane_resolver_, resolved_workplane.value(),
-                                            *sketch, sketch->arc_closed_profiles().front());
+    auto curves = evaluate_bounded_arc_profile_curves(document, workplane_resolver_,
+                                                      resolved_workplane.value(), *sketch,
+                                                      sketch->arc_closed_profiles().front());
     if (curves.has_error())
       return Result<std::size_t>::failure(curves.error());
 
@@ -4671,8 +4770,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_hole(const PartDocument& 
     auto frame = workplane_resolver_.resolve_for_sketch(document, *sketch, working);
     if (!frame)
       return Result<std::size_t>::failure(frame.error());
-    auto curves =
-        evaluate_bounded_arc_profile_curves(workplane_resolver_, frame.value(), *sketch, *profile);
+    auto curves = evaluate_bounded_arc_profile_curves(document, workplane_resolver_, frame.value(),
+                                                      *sketch, *profile);
     if (!curves)
       return Result<std::size_t>::failure(curves.error());
     slot_curves = std::move(curves.value());

@@ -3,6 +3,10 @@
 #include "blcad/gui/gui_sketch_constraints.hpp"
 #include "blcad/gui/gui_sketch_drag.hpp"
 
+#include "blcad/gui/shell/shell_window.hpp"
+#include <QApplication>
+#include <QDir>
+#include <QScreen>
 #include <QTemporaryDir>
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
@@ -114,4 +118,76 @@ TEST_CASE("Equation definition and input changes refuse stale drags without losi
       REQUIRE(session.redo());
       CHECK(snapshot(session) == edited);
     }
+}
+
+TEST_CASE("Derived equation profiles render and retain solid history in the native shell",
+          "[gui][parity-b161][equation-native]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Equation consumers"));
+  REQUIRE(window.session().commit_part_transaction(
+      "Equation profile and solid", [](PartDocument& part) {
+        auto sketch = f::checked(Sketch::create(SketchId("equation.sketch"), "Equation circle",
+                                                DatumPlaneId("datum.xy")));
+        REQUIRE(part.add_parameter(f::checked(Parameter::create_length(
+            ParameterId("r"), "Radius", f::checked(Quantity::length_mm(10))))));
+        REQUIRE(part.add_parameter(f::checked(Parameter::create_length(
+            ParameterId("h"), "Height", f::checked(Quantity::length_mm(6))))));
+        auto source = f::checked(EquationCurve::create(
+            SketchEntityId("circle"), EquationCurveMode::Parametric2D, {"u", CurveUnit::Scalar},
+            "0", "2*pi", {"@{r}*cos(u)", "@{r}*sin(u)", ""}, .001, EquationCurveClosure::Periodic));
+        REQUIRE(sketch.add_entity(source));
+        REQUIRE(sketch.add_profile(f::checked(
+            ArcClosedProfile::create_for_sketch(ProfileId("profile"), {source.id()}, sketch))));
+        REQUIRE(part.add_sketch(sketch));
+        auto feature = f::checked(Feature::create_additive_extrude(
+            FeatureId("extrude"), "Equation solid", sketch.id(), ParameterId("h")));
+        REQUIRE(part.add_feature(f::checked(feature.with_profile(ProfileId("profile")))));
+        return Result<std::size_t>::success(1);
+      }));
+  window.resize(1100, 760);
+  if (QApplication::platformName() == "xcb") {
+    const auto available =
+        QGuiApplication::primaryScreen()->availableGeometry().adjusted(12, 12, -12, -12);
+    window.move(available.topLeft());
+    window.resize(std::min(1100, available.width()), std::min(760, available.height()));
+  }
+  window.show();
+  window.raise();
+  window.activateWindow();
+  window.refresh();
+  QGuiApplication::sync();
+  qApp->processEvents();
+  if (QApplication::platformName() == "xcb")
+    REQUIRE(window.viewport().native_viewer_available());
+  REQUIRE(window.viewport().select_semantic("sketch/equation.sketch/entity/circle"));
+  const auto before = snapshot(window.session());
+  REQUIRE(
+      window.session().commit_part_transaction("Change equation radius", [](PartDocument& part) {
+        auto result =
+            part.set_parameter_value(ParameterId("r"), f::checked(Quantity::length_mm(12)));
+        return result ? Result<std::size_t>::success(result.value().size())
+                      : Result<std::size_t>::failure(result.error());
+      }));
+  window.refresh();
+  const auto edited = snapshot(window.session());
+  CHECK(edited != before);
+  REQUIRE(window.session().undo());
+  CHECK(snapshot(window.session()) == before);
+  REQUIRE(window.session().redo());
+  CHECK(snapshot(window.session()) == edited);
+  window.refresh();
+  QGuiApplication::sync();
+  qApp->processEvents();
+  const auto captures = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
+  if (!captures.isEmpty()) {
+    REQUIRE(QDir().mkpath(captures));
+    REQUIRE(window.grab().save(captures + "/equation-solid.png"));
+  }
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const auto path = directory.filePath("equation-solid.blcad.json").toStdString();
+  REQUIRE(window.session().save_as(path));
+  GuiDocumentSession reopened;
+  REQUIRE(reopened.open_file(path));
+  CHECK(snapshot(reopened) == edited);
 }

@@ -469,6 +469,19 @@ Result<ArcClosedProfile> ArcClosedProfile::create(ProfileId id,
   return Result<ArcClosedProfile>::success(
       ArcClosedProfile(std::move(id), std::move(curve_segments)));
 }
+Result<ArcClosedProfile>
+ArcClosedProfile::create_for_sketch(ProfileId id, std::vector<SketchEntityId> curve_segments,
+                                    const Sketch& source) {
+  if (curve_segments.size() != 1)
+    return create(std::move(id), std::move(curve_segments));
+  const auto* equation = source.find_equation_curve(curve_segments.front());
+  if (id.empty() || !equation || equation->construction() ||
+      equation->closure() != EquationCurveClosure::Periodic)
+    return Result<ArcClosedProfile>::failure(Error::validation(
+        id.value(), "Single-curve profiles require an owned non-construction closed equation"));
+  return Result<ArcClosedProfile>::success(
+      ArcClosedProfile(std::move(id), std::move(curve_segments)));
+}
 const ProfileId& ArcClosedProfile::id() const noexcept {
   return id_;
 }
@@ -594,6 +607,23 @@ Sketch::arc_closed_profile_vertices(const ArcClosedProfile& profile) const {
 
 Result<std::vector<Point2>>
 Sketch::validate_arc_closed_profile(const ArcClosedProfile& profile) const {
+  if (std::any_of(profile.curve_segments().begin(), profile.curve_segments().end(),
+                  [&](const auto& id) { return find_equation_curve(id) != nullptr; })) {
+    for (const auto& id : profile.curve_segments())
+      if ((!find_line_segment(id) && !find_arc_segment(id) && !find_spline_segment(id) &&
+           !find_equation_curve(id)) ||
+          curve_is_construction(id))
+        return Result<std::vector<Point2>>::failure(Error::validation(
+            profile.id().value(), "Equation profile requires existing non-construction curves"));
+    if (profile.curve_segments().size() == 1 &&
+        find_equation_curve(profile.curve_segments().front())->closure() !=
+            EquationCurveClosure::Periodic)
+      return Result<std::vector<Point2>>::failure(Error::validation(
+          profile.id().value(), "Single equation profile requires closed intent"));
+    // The owning Part supplies parameter/domain context. Geometry alone proves
+    // derived connectivity, closure and intersections; no sampled points enter Core.
+    return Result<std::vector<Point2>>::success({});
+  }
   auto traversal = resolve_sketch_contour(*this, profile.curve_segments());
   if (!traversal)
     return Result<std::vector<Point2>>::failure(traversal.error());

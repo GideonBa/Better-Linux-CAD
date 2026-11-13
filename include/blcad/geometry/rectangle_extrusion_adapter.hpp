@@ -70,6 +70,7 @@ private:
   friend class ReferencePartGeometry;
   friend class AssemblyStepExporter;
   friend class Sketch3DGeometryAdapter;
+  friend class EquationCurveGeometryAdapter;
   friend class OcctShapeView;
   friend class ViewportSceneBuilder;
   friend class FinishingSelectionBuilder;

@@ -1,4 +1,5 @@
 #include "blcad/geometry/closed_profile_adapter.hpp"
+#include "derived_curve_internal.hpp"
 
 #include "geometry_shape_internal.hpp"
 #include "occt_failure_message.hpp"
@@ -100,8 +101,10 @@ struct ThroughAllPlacement {
                              min_projection - kThroughAllMargin};
 }
 
-[[nodiscard]] ClosedProfileCurveSegment
-translate_curve_along_axis(ClosedProfileCurveSegment curve, Vector3 axis, double delta) noexcept {
+[[nodiscard]] ClosedProfileCurveSegment translate_curve_along_axis(ClosedProfileCurveSegment curve,
+                                                                   Vector3 axis, double delta) {
+  curve.derived_curve = translated_derived_curve(curve.derived_curve,
+                                                 {axis.x * delta, axis.y * delta, axis.z * delta});
   curve.start = translate_along_axis(curve.start, axis, delta);
   curve.mid = translate_along_axis(curve.mid, axis, delta);
   curve.end = translate_along_axis(curve.end, axis, delta);
@@ -110,6 +113,8 @@ translate_curve_along_axis(ClosedProfileCurveSegment curve, Vector3 axis, double
 }
 
 [[nodiscard]] Result<TopoDS_Edge> make_curve_edge(const ClosedProfileCurveSegment& curve) {
+  if (curve.kind == ClosedProfileCurveKind::DerivedEquation)
+    return derived_curve_edge(curve.derived_curve, kArcProfileId);
   if (curve.kind == ClosedProfileCurveKind::Line) {
     if (same_point(curve.start, curve.end)) {
       return Result<TopoDS_Edge>::failure(
@@ -161,7 +166,9 @@ translate_curve_along_axis(ClosedProfileCurveSegment curve, Vector3 axis, double
 
 [[nodiscard]] Result<TopoDS_Wire>
 make_curve_wire(const std::vector<ClosedProfileCurveSegment>& curves) {
-  if (curves.size() < 2U) {
+  if (curves.size() < 2U &&
+      !(curves.size() == 1 && curves.front().kind == ClosedProfileCurveKind::DerivedEquation &&
+        curves.front().derived_curve && curves.front().derived_curve->closure_proven)) {
     return Result<TopoDS_Wire>::failure(
         make_geometry_error("arc closed profile requires at least two curve segments"));
   }

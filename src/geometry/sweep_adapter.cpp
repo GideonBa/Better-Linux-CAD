@@ -1,4 +1,5 @@
 #include "blcad/geometry/sweep_adapter.hpp"
+#include "derived_curve_internal.hpp"
 
 #include "geometry_shape_internal.hpp"
 
@@ -11,9 +12,10 @@
 #include <GC_MakeArcOfCircle.hxx>
 #include <GProp_GProps.hxx>
 #include <Geom_BezierCurve.hxx>
+#include <Precision.hxx>
 #include <Standard_Failure.hxx>
-#include <TColgp_Array1OfPnt.hxx>
 #include <TColStd_Array1OfReal.hxx>
+#include <TColgp_Array1OfPnt.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Edge.hxx>
@@ -22,6 +24,7 @@
 #include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
 
+#include <algorithm>
 #include <cmath>
 #include <exception>
 #include <memory>
@@ -106,6 +109,8 @@ make_twist_guide(const std::vector<SweepPathSegment>& path, double twist_angle_d
 
 [[nodiscard]] Result<TopoDS_Edge> path_edge(const FeatureId& id, const SweepPathSegment& segment,
                                             std::string_view role) {
+  if (segment.kind == SweepPathSegmentKind::DerivedEquation)
+    return derived_curve_edge(segment.derived_curve, id.value());
   if (same_point(segment.start, segment.end))
     return Result<TopoDS_Edge>::failure(
         sweep_error(id, std::string(role) + " segment endpoints must be distinct"));
@@ -132,6 +137,8 @@ make_twist_guide(const std::vector<SweepPathSegment>& path, double twist_angle_d
 
 [[nodiscard]] Result<TopoDS_Edge> profile_edge(const FeatureId& id,
                                                const ClosedProfileCurveSegment& segment) {
+  if (segment.kind == ClosedProfileCurveKind::DerivedEquation)
+    return derived_curve_edge(segment.derived_curve, id.value());
   if (segment.kind == ClosedProfileCurveKind::Line)
     return path_edge(id, {SweepPathSegmentKind::Line, segment.start, {}, segment.end}, "profile");
   if (segment.kind == ClosedProfileCurveKind::CircularArc)
@@ -198,16 +205,32 @@ make_wire(const FeatureId& id, const std::vector<Segment>& segments, std::string
   return Result<TopoDS_Wire>::success(wire.Wire());
 }
 
+template <class Segment> bool has_equation_curve(const std::vector<Segment>& segments) {
+  return std::any_of(segments.begin(), segments.end(),
+                     [](const auto& segment) { return bool(segment.derived_curve); });
+}
+
 [[nodiscard]] Result<TopoDS_Shape>
 execute_sweep(const FeatureId& id, const TopoDS_Wire& profile, const TopoDS_Wire& spine,
               const SweepPathSegment& first_path, PathOrientationRule orientation_rule,
               std::optional<Vector3> fixed_up_vector, const std::optional<TopoDS_Wire>& guide,
-              bool solid) {
+              bool solid, bool equation_curve) {
   try {
-    const Vector3 tangent = between(first_path.start, first_path.end);
+    Vector3 tangent = between(first_path.start, first_path.end);
+    if (first_path.kind == SweepPathSegmentKind::DerivedEquation) {
+      auto resolved = derived_curve_start_tangent(first_path.derived_curve, id.value());
+      if (!resolved)
+        return Result<TopoDS_Shape>::failure(resolved.error());
+      tangent = resolved.value();
+    }
     if (length(tangent) <= kTolerance)
       return Result<TopoDS_Shape>::failure(sweep_error(id, "sweep path has no start tangent"));
     BRepOffsetAPI_MakePipeShell builder(spine);
+    if (equation_curve) {
+      // Dense, certified equation spans need matching pipe approximation
+      // accuracy; the historical 1e-4 default can dominate small sections.
+      builder.SetTolerance(Precision::Confusion(), Precision::Confusion(), 1e-6);
+    }
     if (guide.has_value()) {
       builder.SetMode(*guide, Standard_True, BRepFill_NoContact);
     } else if (orientation_rule == PathOrientationRule::ProfileNormal)
@@ -283,6 +306,12 @@ Result<GeometryShape> SweepAdapter::sweep_closed_profile(
   if (guide != nullptr && std::abs(twist_angle_deg) > kTolerance)
     return Result<GeometryShape>::failure(
         sweep_error(feature_id, "combined guide and twist are not supported"));
+  if (std::abs(twist_angle_deg) > kTolerance &&
+      std::any_of(path.begin(), path.end(), [](const auto& segment) {
+        return segment.kind == SweepPathSegmentKind::DerivedEquation;
+      }))
+    return Result<GeometryShape>::failure(sweep_error(
+        feature_id, "Twist on equation paths requires a curve-preserving twist policy"));
   std::vector<SweepPathSegment> generated;
   if (guide == nullptr && std::abs(twist_angle_deg) > kTolerance) {
     generated = make_twist_guide(path, twist_angle_deg);
@@ -299,7 +328,9 @@ Result<GeometryShape> SweepAdapter::sweep_closed_profile(
     guide_wire = built.value();
   }
   auto shape = execute_sweep(feature_id, profile_wire.value(), path_wire.value(), path.front(),
-                             orientation_rule, fixed_up_vector, guide_wire, true);
+                             orientation_rule, fixed_up_vector, guide_wire, true,
+                             has_equation_curve(path) || has_equation_curve(profile) ||
+                                 (guide && has_equation_curve(*guide)));
   if (shape.has_error())
     return Result<GeometryShape>::failure(shape.error());
   return Result<GeometryShape>::success(
@@ -329,6 +360,12 @@ SweepAdapter::sweep_open_profile(FeatureId feature_id, const std::vector<SweepPa
   if (guide != nullptr && std::abs(twist_angle_deg) > kTolerance)
     return Result<GeometryShape>::failure(
         sweep_error(feature_id, "combined guide and twist are not supported"));
+  if (std::abs(twist_angle_deg) > kTolerance &&
+      std::any_of(path.begin(), path.end(), [](const auto& segment) {
+        return segment.kind == SweepPathSegmentKind::DerivedEquation;
+      }))
+    return Result<GeometryShape>::failure(sweep_error(
+        feature_id, "Twist on equation paths requires a curve-preserving twist policy"));
   std::vector<SweepPathSegment> generated;
   if (guide == nullptr && std::abs(twist_angle_deg) > kTolerance) {
     generated = make_twist_guide(path, twist_angle_deg);
@@ -345,7 +382,9 @@ SweepAdapter::sweep_open_profile(FeatureId feature_id, const std::vector<SweepPa
     guide_wire = built.value();
   }
   auto shape = execute_sweep(feature_id, profile_wire.value(), path_wire.value(), path.front(),
-                             orientation_rule, fixed_up_vector, guide_wire, false);
+                             orientation_rule, fixed_up_vector, guide_wire, false,
+                             has_equation_curve(path) || has_equation_curve(profile) ||
+                                 (guide && has_equation_curve(*guide)));
   if (shape.has_error())
     return Result<GeometryShape>::failure(shape.error());
   return Result<GeometryShape>::success(

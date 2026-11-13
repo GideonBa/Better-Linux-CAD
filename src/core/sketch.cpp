@@ -595,10 +595,22 @@ Result<std::size_t> Sketch::replace_equation_curve(EquationCurve curve) {
   if (found == equation_curves_.end())
     return Result<std::size_t>::failure(
         Error::validation(curve.id().value(), "Equation curve must exist before replacement"));
+  for (const auto& profile : arc_closed_profiles_)
+    if (std::find(profile.curve_segments().begin(), profile.curve_segments().end(), curve.id()) !=
+            profile.curve_segments().end() &&
+        (curve.construction() || (profile.curve_segments().size() == 1 &&
+                                  curve.closure() != EquationCurveClosure::Periodic)))
+      return Result<std::size_t>::failure(Error::dependency(
+          curve.id().value(), "Equation profile requires retained geometry/closure intent"));
   *found = std::move(curve);
   return Result<std::size_t>::success(1);
 }
 Result<std::size_t> Sketch::remove_equation_curve(SketchEntityId id) {
+  for (const auto& profile : arc_closed_profiles_)
+    if (std::find(profile.curve_segments().begin(), profile.curve_segments().end(), id) !=
+        profile.curve_segments().end())
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "Equation is owned by an existing curve profile"));
   const auto removed =
       std::erase_if(equation_curves_, [&](const auto& curve) { return curve.id() == id; });
   if (!removed)

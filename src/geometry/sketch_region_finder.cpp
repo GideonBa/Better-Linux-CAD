@@ -307,7 +307,8 @@ Result<std::size_t>
 SketchRegionFinder::materialize_profile(Sketch& sketch,
                                        const GeneratedClosedProfileCandidate& candidate) const {
   if (!candidate.curve_segments.empty()) {
-    auto profile = ArcClosedProfile::create(candidate.id, candidate.curve_segments);
+    auto profile =
+        ArcClosedProfile::create_for_sketch(candidate.id, candidate.curve_segments, sketch);
     if (!profile) return Result<std::size_t>::failure(profile.error());
     return sketch.add_profile(std::move(profile.value()));
   }

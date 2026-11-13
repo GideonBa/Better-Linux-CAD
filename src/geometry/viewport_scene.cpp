@@ -1,6 +1,9 @@
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/core/sketch_contour.hpp"
+#include "blcad/geometry/equation_curve_geometry.hpp"
+#include "blcad/geometry/sketch_curve_contour.hpp"
 #include "blcad/geometry/thread_adapter.hpp"
+#include "derived_curve_internal.hpp"
 #include "part_history_evaluation.hpp"
 
 #include "assembly_occt_rigid_transform.hpp"
@@ -523,6 +526,23 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
              spline.construction() ? SketchLineRole::Construction : SketchLineRole::Geometry});
       }
 
+      for (const auto& equation : sketch.equation_curves()) {
+        auto product = EquationCurveGeometryAdapter{}.convert(document, equation);
+        if (!product)
+          return Result<std::vector<ViewportSceneItem>>::failure(product.error());
+        const auto& frame = workplane.value();
+        auto edge =
+            derived_curve_edge(transformed_derived_curve(product.value().curve, frame.origin,
+                                                         frame.x_axis, frame.y_axis, frame.normal),
+                               equation.id().value());
+        if (!edge)
+          return Result<std::vector<ViewportSceneItem>>::failure(edge.error());
+        items.push_back(
+            {ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, equation.id()),
+             wrap(edge.value()),
+             equation.construction() ? SketchLineRole::Construction : SketchLineRole::Geometry});
+      }
+
       const SketchReferenceProjector projector;
       for (const auto& reference : sketch.projected_lines()) {
         auto resolved = projector.resolve_line(document, sketch, reference, shape_cache);
@@ -609,7 +629,7 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
       // curves, but still need a dedicated compound presentation so the
       // finished profile region can be selected as one feature input. The
       // individual curves remain visible/selectable under their entity ids.
-      const auto curve_edge = [&sketch,
+      const auto curve_edge = [&sketch, &document, &workplane,
                                &point](const SketchEntityId& entity) -> Result<TopoDS_Edge> {
         if (const auto* line = sketch.find_line_segment(entity))
           return Result<TopoDS_Edge>::success(
@@ -628,9 +648,20 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
           poles.SetValue(3, point(spline->control2()));
           poles.SetValue(4, point(spline->end()));
           TColStd_Array1OfReal weights(1, 4);
-          for (int i = 1; i <= 4; ++i) weights.SetValue(i, spline->weights()[i-1]);
+          for (int i = 1; i <= 4; ++i)
+            weights.SetValue(i, spline->weights()[i - 1]);
           const Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles, weights);
           return Result<TopoDS_Edge>::success(BRepBuilderAPI_MakeEdge(curve).Edge());
+        }
+        if (const auto* equation = sketch.find_equation_curve(entity)) {
+          auto product = EquationCurveGeometryAdapter{}.convert(document, *equation);
+          if (!product)
+            return Result<TopoDS_Edge>::failure(product.error());
+          const auto& frame = workplane.value();
+          return derived_curve_edge(transformed_derived_curve(product.value().curve, frame.origin,
+                                                              frame.x_axis, frame.y_axis,
+                                                              frame.normal),
+                                    entity.value());
         }
         return Result<TopoDS_Edge>::failure(
             scene_error("closed profile references an unavailable sketch curve"));
@@ -649,14 +680,18 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
       const std::vector<std::vector<SketchEntityId>> no_inner_contours;
       const std::vector<ContainedProfileHole> no_profile_holes;
       const auto append_curve_profile =
-          [&items, &profile_prefix, &wrap, &curve_edge, &contour_is_counter_clockwise,
-           &point, &sketch](const ProfileId& id, const std::vector<SketchEntityId>& outer,
-                   const std::vector<std::vector<SketchEntityId>>& inner,
-                   const std::vector<ContainedProfileHole>& holes) -> Result<std::size_t> {
+          [&items, &profile_prefix, &wrap, &curve_edge, &contour_is_counter_clockwise, &point,
+           &sketch,
+           &document](const ProfileId& id, const std::vector<SketchEntityId>& outer,
+                      const std::vector<std::vector<SketchEntityId>>& inner,
+                      const std::vector<ContainedProfileHole>& holes) -> Result<std::size_t> {
         const auto make_wire =
-            [&curve_edge, &sketch](const std::vector<SketchEntityId>& contour) -> Result<TopoDS_Wire> {
+            [&curve_edge, &sketch,
+             &document](const std::vector<SketchEntityId>& contour) -> Result<TopoDS_Wire> {
           BRepBuilderAPI_MakeWire wire;
-          auto traversal = resolve_sketch_contour(sketch, contour);
+          auto traversal = resolve_sketch_curve_contour(document, sketch, contour);
+          if (!traversal)
+            return Result<TopoDS_Wire>::failure(traversal.error());
           for (std::size_t index = 0; index < contour.size(); ++index) {
             const auto& entity = contour[index];
             auto edge = curve_edge(entity);
