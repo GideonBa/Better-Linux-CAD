@@ -38,6 +38,12 @@ rejecting a duplicate stable key. Open/Closed closure and the orientation rule
 fixed up-vector. Apply adds one `PathCurve`; connectivity and tolerance are validated by the frozen
 Core contract, which fails closed on a disconnected or ambiguous chain.
 
+The replacement shell's path source catalog includes planar and spatial equation curves. These
+choices retain typed source IDs and the equation's modeling tolerance; they use the same checked
+preview/execution path as other supported curves. [Spatial guide and equation consumer proofs](gui-sketch3d-interaction-mvp8.md#spatial-guides-and-downstream-consumers--165)
+cover native authoring through real Sweep/Loft results. This does not upgrade historical spline/helix
+sampling or enable the separate curve-preserving twist policy assigned to 166.
+
 ## Sweep authoring
 
 Sweep mode picks a `SweepProfileReference` (closed region or open path), a trajectory `PathCurve`, and

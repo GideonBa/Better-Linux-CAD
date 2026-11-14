@@ -836,6 +836,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_spatial_constraint_authoring_tests.cpp
       tests/gui/gui_spatial_curve_grip_tests.cpp
       tests/gui/gui_spatial_source_selection_tests.cpp
+      tests/gui/gui_spatial_guide_loft_tests.cpp
       tests/gui/gui_shell_sketch_curve_authoring_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
       tests/gui/gui_interactive_sketcher_acceptance_tests.cpp

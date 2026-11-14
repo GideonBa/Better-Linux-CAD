@@ -50,7 +50,7 @@ Error error(std::string message) {
 bool has_entity(const Sketch3D& sketch, const SketchEntityId& id) {
   return sketch.find_point(id) || sketch.find_line(id) || sketch.find_polyline(id) ||
          sketch.find_arc(id) || sketch.find_spline(id) || sketch.find_helix(id) ||
-         sketch.find_guide_curve(id);
+         sketch.find_equation_curve(id) || sketch.find_guide_curve(id);
 }
 SketchEntityId next_entity(const Sketch3D& sketch, const char* prefix) {
   for (std::size_t index = 1;; ++index) {
@@ -123,6 +123,7 @@ struct ShellSketch3DTools::Impl {
   QComboBox* end{};
   QLabel* summary{};
   QLabel* solver_info{};
+  QString accepted_dof;
   QTabWidget* tabs{};
   std::unique_ptr<SpatialSketchCurveEditor> curves;
   std::unique_ptr<SpatialSketchConstraintEditor> constraints;
@@ -204,6 +205,8 @@ struct ShellSketch3DTools::Impl {
                                                           : QStringLiteral(": redundant")));
     if (!issues.empty())
       solver_info->setText(solver_info->text() + "\n" + issues.join(" · "));
+    if (result.accepted())
+      accepted_dof = solver_info->text();
   }
   Result<Sketch3D> solve_candidate(const Sketch3D& source,
                                    const SpatialSolverOptions& options = {}) {
@@ -1411,7 +1414,8 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
       [&ui](SketchEntityId point) {
         ui.fill_points(point);
         ui.tabs->setCurrentIndex(0);
-      }};
+      },
+      [&ui] { ui.solver_info->setText(ui.accepted_dof); }};
   ui.constraints = std::make_unique<SpatialSketchConstraintEditor>(
       constraint_scroll,
       SpatialSketchConstraintCallbacks{
@@ -1458,9 +1462,11 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   ui.summary = new QLabel(panel);
   ui.summary->setObjectName("blcad.sketch3d.summary");
   ui.summary->setWordWrap(true);
+  ui.summary->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
   ui.solver_info = new QLabel(panel);
   ui.solver_info->setObjectName("blcad.sketch3d.solver_info");
   ui.solver_info->setWordWrap(true);
+  ui.solver_info->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
   layout->addWidget(ui.solver_info);
   layout->addWidget(ui.summary);
   auto* buttons = new QHBoxLayout;
@@ -1636,6 +1642,7 @@ Result<std::size_t> ShellSketch3DTools::open(Sketch3D sketch, bool editing) {
   ui.resources = {};
   ui.solve_context.reset();
   ui.solver_info->clear();
+  ui.accepted_dof.clear();
   ui.draft = std::move(sketch);
   ui.editing = editing;
   ui.changed = false;
