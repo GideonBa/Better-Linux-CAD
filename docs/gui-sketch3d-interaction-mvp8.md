@@ -283,5 +283,34 @@ the document and undo history, while its diagnostic invalidates borrowed session
 
 [Task/session proofs](../tests/gui/gui_spatial_solver_interaction_tests.cpp) verify exact typed
 positions, independent wire length, conflict correction preserving earlier edits, graph-cycle
-rejection, Undo/Redo and canonical reopening. Arc/spline/Helix authoring, scalar grips, constraint
-forms and complete native S03–S04 acceptance remain the remaining work within 165.
+rejection, Undo/Redo and canonical reopening. Scalar grips, constraint forms and complete native
+S03–S04 acceptance remain the remaining work within 165. Typed curve authoring extends this task.
+
+## Typed spatial curve forms — 165
+
+The fixed Points/Curves register bar and fixed DOF/Preview/Apply/Cancel area surround independently
+scrollable forms. Curves create, edit, delete and explicitly rebind lines, polylines, three-point
+arcs, fit/control splines, helices and parametric 3D equations. Existing identities and curve types
+remain fixed during edits. Ordered selectors retain typed local, construction-point or planar-point
+references. Linked references keep their source dependencies; the historical Points-tab planar copy
+still creates independent XYZ values. Local defining points reuse the existing point/triad editor.
+
+Helix radius/pitch may be owned Length values or existing Length parameters. Bound values display
+their current resolved values and remain read-only until an explicit source change. Choosing a
+literal creates a curve-owned value; it never edits or removes the former shared parameter/formula.
+Turns select an existing integer Count or a new owned Count. Principal axes and new Counts remain
+in a local resource ledger until the same final Apply transaction. Cancel discards them. Windings
+remain discrete sources, outside numerical drag variables.
+
+Equation forms retain variable name/unit, typed domain, XYZ expressions, modeling tolerance,
+closure and construction intent. Derived poles are not editable. Internal spline C0/C1/C2 remains
+distinct from an endpoint Smooth/G2 relation. Guide aliases can be created, removed or rebound to
+an existing curve with their stable identity; referenced curves cannot be deleted implicitly.
+Incomplete/rejected forms remain correctable, block competing point edits and Preview, and change
+neither the accepted local draft nor the document. Accept stages through the shared solver/context;
+Preview revalidates all downstream geometry and Apply creates one history operation.
+
+[Curve form tests](../tests/gui/gui_spatial_curve_authoring_tests.cpp) cover every family, linked
+reference rebinding, formula preservation, point-free Helix resource ownership, metadata guards,
+correction, exact history and reopening. The native case checks the visible footer, viewport,
+vertical-only scrolling, preview and complete Cancel at ordinary and compact/scaled sizes.

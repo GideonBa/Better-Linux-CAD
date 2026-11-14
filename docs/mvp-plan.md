@@ -762,6 +762,16 @@ These runs do not establish the remaining curve/constraint authoring or complete
 Runtime manifest: **1,116 inputs**, SHA-256
 `2baf7948e0313aafd36c506cdd3b9be846c5d6cff70ac54bd3d44488942251f7`.
 
+Typed curve-form slice verified: all five native targets build; focused Qt **41 cases: 40 passed,
+one native-only skip / 4,580 assertions**, including the existing point/grip/placement/copy and
+combined Sweep regression. Native curve forms/layout/Cancel pass **5 / 233** at 100% and compact
+150%, no skips; both final captures were inspected after all CAD processes exited. The
+[form contract and proofs](gui-sketch3d-interaction-mvp8.md#typed-spatial-curve-forms--165) cover
+all seven curve choices, explicit linked reference rebinding, formula preservation, owned Helix
+resources and exact history/reopen. Runtime: **1,119 inputs**, SHA-256
+`15c095ff54ab0f0c298d019807812633ef5035a8e567205e6e7487df478b827b`.
+Constraint forms, scalar grips/native selection and the complete S03–S04 gate remain open.
+
 Historical fixed-sample execution and equation twist retain their explicit 166 boundary. Native
 Surface-boundary G2, later workflows and integrated acceptance remain 168–174. No whole-165
 acceptance is claimed here; preserve all later scope.

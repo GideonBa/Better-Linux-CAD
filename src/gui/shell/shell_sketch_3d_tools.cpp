@@ -11,6 +11,7 @@
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
+#include "spatial_sketch_curve_editor.hpp"
 #include "spatial_sketch_task_context.hpp"
 
 #include <QAction>
@@ -30,6 +31,7 @@
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QStringList>
+#include <QTabWidget>
 #include <QVBoxLayout>
 #include <array>
 #include <numbers>
@@ -115,6 +117,8 @@ struct ShellSketch3DTools::Impl {
   QComboBox* end{};
   QLabel* summary{};
   QLabel* solver_info{};
+  QTabWidget* tabs{};
+  std::unique_ptr<SpatialSketchCurveEditor> curves;
   QPushButton* apply{};
   QComboBox* pick{};
   QComboBox* lock{};
@@ -199,6 +203,36 @@ struct ShellSketch3DTools::Impl {
          {SpatialVariableKind::PointX, SpatialVariableKind::PointY, SpatialVariableKind::PointZ})
       options.fixed_variables.push_back({kind, id.value()});
     return options;
+  }
+  Result<std::size_t> begin_curve_input() {
+    if (!current())
+      return Result<std::size_t>::failure(error("Reopen the current 3D sketch task."));
+    cancel_drag();
+    cancel_placement();
+    if (pending_point || has_direction_input())
+      return Result<std::size_t>::failure(
+          error("Accept or discard the point/direction input first."));
+    invalidate();
+    refresh_handles();
+    return Result<std::size_t>::success(0);
+  }
+  Result<std::size_t> accept_curve(Sketch3D candidate, SpatialSketchTaskResources inputs) {
+    auto ready = begin_curve_input();
+    if (!ready)
+      return ready;
+    auto authority = context(inputs);
+    if (!authority)
+      return Result<std::size_t>::failure(authority.error());
+    auto solved = authority.value()->solve(candidate);
+    show_dof(solved);
+    if (!solved.accepted())
+      return Result<std::size_t>::failure(error(solved.diagnostic));
+    const auto selected = SketchEntityId(point->currentData().toString().toStdString());
+    draft = std::move(solved.sketch);
+    resources = std::move(inputs);
+    changed = true;
+    fill_points(selected);
+    return Result<std::size_t>::success(draft->entity_count());
   }
 
   bool available() const {
@@ -300,11 +334,13 @@ struct ShellSketch3DTools::Impl {
     restore(end, previous_end, end->count() - 1);
     restore(placement_anchor, previous_anchor, 0);
     select_point();
+    if (curves)
+      curves->refresh();
   }
   Result<std::size_t> stage_point() {
     if (!current())
       return Result<std::size_t>::failure(error("Reopen 3D sketch: model or command changed."));
-    if (drag || placement_pressed || has_direction_input())
+    if (drag || placement_pressed || has_direction_input() || (curves && curves->pending()))
       return Result<std::size_t>::failure(
           error("Finish pointer gesture and complete or clear direction input."));
     for (auto* spin : coordinates)
@@ -337,7 +373,8 @@ struct ShellSketch3DTools::Impl {
     return Result<std::size_t>::success(draft->entity_count());
   }
   Result<std::size_t> stage_line() {
-    if (!current() || pending_point || drag || placement_pressed || has_direction_input())
+    if (!current() || pending_point || drag || placement_pressed || has_direction_input() ||
+        (curves && curves->pending()))
       return Result<std::size_t>::failure(
           error("Accept the point change locally first or select again."));
     invalidate();
@@ -408,7 +445,7 @@ struct ShellSketch3DTools::Impl {
         detach->setChecked(false);
     }
     if (current() && grips->isChecked() && pick->currentIndex() == 0 && !pending_point &&
-        !has_direction_input() && selected &&
+        (!curves || !curves->pending()) && !has_direction_input() && selected &&
         (selected->parameter_dependencies().empty() || detach->isChecked())) {
       const auto value = resolved_point(*selected);
       const std::array values{value.x, value.y, value.z};
@@ -652,7 +689,7 @@ struct ShellSketch3DTools::Impl {
     update_projection_info();
   }
   Result<std::size_t> stage_projection() {
-    if (!current() || drag || placement_pressed)
+    if (!current() || drag || placement_pressed || (curves && curves->pending()))
       return Result<std::size_t>::failure(
           error("Open the current 3D sketch and finish the pointer gesture."));
     for (auto* spin : coordinates)
@@ -692,7 +729,7 @@ struct ShellSketch3DTools::Impl {
     return Result<std::size_t>::success(draft->entity_count());
   }
   Result<std::size_t> stage_direction() {
-    if (!current() || drag || placement_pressed)
+    if (!current() || drag || placement_pressed || (curves && curves->pending()))
       return Result<std::size_t>::failure(
           error("Open the current 3D sketch and finish the pointer gesture."));
     for (auto* spin : coordinates)
@@ -788,7 +825,7 @@ struct ShellSketch3DTools::Impl {
     return Result<Point3>::success(value);
   }
   void update_placement(GuiSketchScreenPoint pointer) {
-    if (pending_point || has_direction_input()) {
+    if (pending_point || has_direction_input() || (curves && curves->pending())) {
       placement_hover.reset();
       summary->setText(QStringLiteral("Accept or discard point/direction input first."));
     } else {
@@ -805,6 +842,8 @@ struct ShellSketch3DTools::Impl {
     synchronize_overlay();
   }
   Result<std::size_t> stage_placement(Point3 value) {
+    if (curves && curves->pending())
+      return Result<std::size_t>::failure(error("Accept or discard the curve form first."));
     const auto id = next_entity(*draft, "point");
     auto candidate = Sketch3DInteractionService::add_point(*draft, id, {value.x, value.y, value.z});
     if (!candidate)
@@ -1014,13 +1053,15 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   ui.action = new QAction(QStringLiteral("3D Sketch"), this);
   ui.action->setObjectName("blcad.action.sketch_3d");
   ribbon.add_button(ribbon.add_group(model_tab, QStringLiteral("Spatial Sketch")), ui.action);
-  ui.dock = new QDockWidget(QStringLiteral("3D Sketch: Points and Lines"), &window);
+  ui.dock = new QDockWidget(QStringLiteral("3D Sketch"), &window);
   ui.dock->setObjectName("blcad.shell.sketch3d_task");
   auto* panel = new QWidget(ui.dock);
   auto* layout = new QVBoxLayout(panel);
   auto* scroll = new QScrollArea(panel);
   scroll->setWidgetResizable(true);
   scroll->setFrameShape(QFrame::NoFrame);
+  ui.tabs = new QTabWidget(panel);
+  ui.tabs->setObjectName("blcad.sketch3d.tabs");
   auto* inputs = new QWidget(scroll);
   auto* column = new QVBoxLayout(inputs);
   ui.title = new QLabel(inputs);
@@ -1143,7 +1184,27 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   column->addWidget(placement_hint);
   column->addStretch();
   scroll->setWidget(inputs);
-  layout->addWidget(scroll, 1);
+  ui.tabs->addTab(scroll, QStringLiteral("Points"));
+  auto* curve_scroll = new QScrollArea(ui.tabs);
+  curve_scroll->setWidgetResizable(true);
+  curve_scroll->setFrameShape(QFrame::NoFrame);
+  ui.curves = std::make_unique<SpatialSketchCurveEditor>(
+      curve_scroll,
+      SpatialSketchEditorCallbacks{
+          [&ui] { return ui.current() ? &*ui.draft : nullptr; },
+          [&ui]() -> const PartDocument& { return *ui.window.session().part_document(); },
+          [&ui]() -> const SpatialSketchTaskResources& { return ui.resources; },
+          [&ui](Sketch3D candidate, SpatialSketchTaskResources inputs) {
+            return ui.accept_curve(std::move(candidate), std::move(inputs));
+          },
+          [&ui] { return ui.begin_curve_input(); },
+          [&ui](SketchEntityId point) {
+            ui.fill_points(point);
+            ui.tabs->setCurrentIndex(0);
+          }});
+  curve_scroll->setWidget(ui.curves->page());
+  ui.tabs->addTab(curve_scroll, QStringLiteral("Curves"));
+  layout->addWidget(ui.tabs, 1);
   ui.summary = new QLabel(panel);
   ui.summary->setObjectName("blcad.sketch3d.summary");
   ui.summary->setWordWrap(true);
@@ -1301,6 +1362,12 @@ Result<std::size_t> ShellSketch3DTools::open(Sketch3D sketch, bool editing) {
   ui.fill_points(editing && !ui.draft->points().empty() ? ui.draft->points().front().id()
                                                         : SketchEntityId{});
   ui.fill_projection_sources();
+  ui.curves->reset();
+  ui.tabs->setCurrentIndex(0);
+  if (ui.draft->constraints().empty())
+    ui.show_dof(solve_spatial_sketch(*session.part_document(), *ui.draft));
+  else
+    (void)ui.solve_candidate(*ui.draft);
   ui.dock->show();
   ui.dock->raise();
   ui.refresh_mapping();
@@ -1324,6 +1391,8 @@ Result<std::size_t> ShellSketch3DTools::preview() {
     return Result<std::size_t>::failure(error("Correct the invalid handle value or press Escape."));
   if (!ui.changed || ui.pending_point || ui.draft->entity_count() == 0)
     return Result<std::size_t>::failure(error("Accept points/lines locally first."));
+  if (ui.curves->pending())
+    return Result<std::size_t>::failure(error("Accept or discard the curve form first."));
   // The complete session copy validates catalogs, reference connectivity and
   // downstream Geometry without publishing history, dirty state or file I/O.
   auto candidate = ui.window.session();

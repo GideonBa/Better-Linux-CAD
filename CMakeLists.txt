@@ -379,6 +379,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_step_import_tools.cpp
     src/gui/shell/shell_sketch_3d_tools.cpp
     src/gui/shell/spatial_sketch_task_context.cpp
+    src/gui/shell/spatial_sketch_curve_editor.cpp
     src/gui/shell/shell_construction_tools.cpp
     src/gui/shell/shell_construction_manipulators.cpp
     src/gui/shell/shell_assembly_tools.cpp
@@ -828,6 +829,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_spatial_constraint_schema_tests.cpp
       tests/gui/gui_spatial_parametric_session_tests.cpp
       tests/gui/gui_spatial_solver_interaction_tests.cpp
+      tests/gui/gui_spatial_curve_authoring_tests.cpp
       tests/gui/gui_shell_sketch_curve_authoring_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
       tests/gui/gui_interactive_sketcher_acceptance_tests.cpp
