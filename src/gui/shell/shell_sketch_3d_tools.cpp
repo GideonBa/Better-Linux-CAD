@@ -1,13 +1,17 @@
 #include "blcad/gui/shell/shell_sketch_3d_tools.hpp"
-#include "blcad/gui/gui_icons.hpp"
 #include "blcad/core/sketch_3d_interaction.hpp"
+#include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
+#include "blcad/gui/gui_icons.hpp"
+#include "blcad/gui/gui_presentation_visibility.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/gui_viewport_manipulator.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
+#include "spatial_sketch_task_context.hpp"
 
 #include <QAction>
 #include <QApplication>
@@ -110,6 +114,7 @@ struct ShellSketch3DTools::Impl {
   QComboBox* start{};
   QComboBox* end{};
   QLabel* summary{};
+  QLabel* solver_info{};
   QPushButton* apply{};
   QComboBox* pick{};
   QComboBox* lock{};
@@ -149,6 +154,52 @@ struct ShellSketch3DTools::Impl {
   bool pending_point{false};
   bool previewed{false};
   std::size_t revision{};
+  std::optional<std::size_t> history_prefix;
+  SpatialSketchTaskResources resources;
+  std::shared_ptr<SpatialSketchTaskContext> solve_context;
+  std::size_t context_generation{};
+
+  Result<std::shared_ptr<SpatialSketchTaskContext>>
+  context(const SpatialSketchTaskResources& inputs) {
+    if (solve_context && context_generation == inputs.generation)
+      return Result<std::shared_ptr<SpatialSketchTaskContext>>::success(solve_context);
+    auto next = SpatialSketchTaskContext::create(window.session(), draft->id(), inputs);
+    if (next) {
+      solve_context = next.value();
+      context_generation = inputs.generation;
+    }
+    return next;
+  }
+  void show_dof(const SpatialSolveResult& result) {
+    solver_info->setText(result.accepted()
+                             ? QStringLiteral("DOF: %1 total · %2 rigid · %3 internal\n%4")
+                                   .arg(result.degrees_of_freedom)
+                                   .arg(result.gauge_degrees_of_freedom)
+                                   .arg(result.internal_degrees_of_freedom)
+                                   .arg(text(result.diagnostic))
+                             : text(result.diagnostic));
+  }
+  Result<Sketch3D> solve_candidate(const Sketch3D& source,
+                                   const SpatialSolverOptions& options = {}) {
+    auto input = context(resources);
+    if (!input)
+      return Result<Sketch3D>::failure(input.error());
+    auto solved = input.value()->solve(source, options);
+    if (!solved.accepted()) {
+      show_dof(solved);
+      return Result<Sketch3D>::failure(error(solved.diagnostic));
+    }
+    // Interaction pins do not change the persistent system's reported freedom.
+    show_dof(options.fixed_variables.empty() ? solved : input.value()->solve(solved.sketch));
+    return Result<Sketch3D>::success(std::move(solved.sketch));
+  }
+  SpatialSolverOptions point_pins(const SketchEntityId& id) const {
+    SpatialSolverOptions options;
+    for (auto kind :
+         {SpatialVariableKind::PointX, SpatialVariableKind::PointY, SpatialVariableKind::PointZ})
+      options.fixed_variables.push_back({kind, id.value()});
+    return options;
+  }
 
   bool available() const {
     const auto& session = window.session();
@@ -160,7 +211,8 @@ struct ShellSketch3DTools::Impl {
     const auto& session = window.session();
     return draft && session.part_document() && session.part_modeling_ready() &&
            !session.reference_repair_mode() && !window.active_sketch() &&
-           session.task().command_id() == task_id && session.model_revision() == revision;
+           session.task().command_id() == task_id && session.model_revision() == revision &&
+           session.history_prefix_count() == history_prefix;
   }
   bool has_direction_input() const {
     return std::any_of(direction.begin(), direction.end(),
@@ -270,6 +322,12 @@ struct ShellSketch3DTools::Impl {
                               : Sketch3DInteractionService::add_point(*draft, id, value);
     if (!candidate)
       return Result<std::size_t>::failure(candidate.error());
+    if (!draft->constraints().empty()) {
+      auto solved = solve_candidate(candidate.value().sketch, point_pins(id));
+      if (!solved)
+        return Result<std::size_t>::failure(solved.error());
+      candidate.value().sketch = std::move(solved.value());
+    }
     draft = std::move(candidate.value().sketch);
     changed = true;
     fill_points(id);
@@ -419,9 +477,9 @@ struct ShellSketch3DTools::Impl {
     }
     refresh_handles();
   }
-  void accept_drag(const GuiViewportManipulatorCandidate& candidate) {
+  bool accept_drag(const GuiViewportManipulatorCandidate& candidate) {
     if (!current() || !drag)
-      return;
+      return false;
     auto value = drag->origin;
     if (candidate.handle_id.ends_with(".x"))
       value.x = candidate.scalar_value;
@@ -433,11 +491,23 @@ struct ShellSketch3DTools::Impl {
         {drag->origin.x, drag->origin.y, drag->origin.z}, {value.x, value.y, value.z},
         static_cast<Sketch3DLock>(lock->currentIndex()));
     if (!resolved)
-      return;
+      return false;
     auto candidate_sketch =
         Sketch3DInteractionService::move_point(drag->source, drag->point, resolved.value());
     if (!candidate_sketch)
-      return;
+      return false;
+    if (!drag->source.constraints().empty()) {
+      auto solved = solve_candidate(candidate_sketch.value().sketch, point_pins(drag->point));
+      if (!solved) {
+        draft = drag->source;
+        changed = drag->changed;
+        invalidate();
+        display_point(drag->origin);
+        summary->setText(text(solved.error().message()));
+        return false;
+      }
+      candidate_sketch.value().sketch = std::move(solved.value());
+    }
     draft = std::move(candidate_sketch.value().sketch);
     changed = true;
     display_point({resolved.value().x, resolved.value().y, resolved.value().z});
@@ -445,6 +515,7 @@ struct ShellSketch3DTools::Impl {
     if (!result)
       summary->setText(text(result.error().message()));
     synchronize_overlay();
+    return bool(result);
   }
   void edit_numeric() {
     if (!drag)
@@ -907,7 +978,12 @@ struct ShellSketch3DTools::Impl {
           cancel_drag();
           return true;
         }
-        accept_drag(*candidate);
+        if (!accept_drag(*candidate)) {
+          const auto diagnostic = summary->text();
+          cancel_drag();
+          summary->setText(diagnostic);
+          return true;
+        }
         drag.reset();
         viewport.release_interaction_mouse();
         numeric->setReadOnly(true);
@@ -921,11 +997,14 @@ struct ShellSketch3DTools::Impl {
     return false;
   }
   Result<std::size_t> commit(GuiDocumentSession& session) const {
-    return session.commit_part_transaction(editing ? "Edit 3D sketch" : "Create 3D sketch",
-                                           [sketch = *draft, update = editing](PartDocument& part) {
-                                             return update ? part.update_sketch_3d(sketch)
-                                                           : part.add_sketch_3d(sketch);
-                                           });
+    return session.commit_part_transaction(
+        editing ? "Edit 3D sketch" : "Create 3D sketch",
+        [sketch = *draft, update = editing, inputs = resources](PartDocument& part) {
+          auto added = inputs.add_to(part);
+          if (!added)
+            return added;
+          return update ? part.update_sketch_3d(sketch) : part.add_sketch_3d(sketch);
+        });
   }
 };
 
@@ -1068,6 +1147,10 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   ui.summary = new QLabel(panel);
   ui.summary->setObjectName("blcad.sketch3d.summary");
   ui.summary->setWordWrap(true);
+  ui.solver_info = new QLabel(panel);
+  ui.solver_info->setObjectName("blcad.sketch3d.solver_info");
+  ui.solver_info->setWordWrap(true);
+  layout->addWidget(ui.solver_info);
   layout->addWidget(ui.summary);
   auto* buttons = new QHBoxLayout;
   const auto button = [&](const char* id, const QString& label) {
@@ -1173,6 +1256,21 @@ Result<std::size_t> ShellSketch3DTools::begin_edit(Sketch3DId id) {
   const auto* source = ui.window.session().part_document()->find_sketch_3d(id);
   if (!source)
     return Result<std::size_t>::failure(error("3D sketch not found."));
+  if (!source->constraints().empty()) {
+    auto resolved = query_with_step_import_context(ui.window.session(), [&](auto* imports) {
+      const geometry::SpatialGeometryScope scope =
+          ui.window.session().history_prefix_count()
+              ? geometry::SpatialGeometryScope{geometry::SpatialHistoryPrefixScope{
+                    *ui.window.session().history_prefix_count()}}
+              : geometry::SpatialGeometryScope{geometry::SpatialCompleteGeometryScope{}};
+      return geometry::resolve_spatial_sketch_geometry(*ui.window.session().part_document(), id,
+                                                       *ui.window.session().part_shape_cache(),
+                                                       imports, scope);
+    });
+    if (!resolved)
+      return Result<std::size_t>::failure(resolved.error());
+    return open(std::move(resolved.value()), true);
+  }
   return open(*source, true);
 }
 Result<std::size_t> ShellSketch3DTools::open(Sketch3D sketch, bool editing) {
@@ -1181,6 +1279,10 @@ Result<std::size_t> ShellSketch3DTools::open(Sketch3D sketch, bool editing) {
   (void)session.task().begin(std::string(task_id));
   (void)session.task().begin_parameter_editing();
   ui.revision = session.model_revision();
+  ui.history_prefix = session.history_prefix_count();
+  ui.resources = {};
+  ui.solve_context.reset();
+  ui.solver_info->clear();
   ui.draft = std::move(sketch);
   ui.editing = editing;
   ui.changed = false;
@@ -1220,7 +1322,7 @@ Result<std::size_t> ShellSketch3DTools::preview() {
     return Result<std::size_t>::failure(error("Complete or clear direction input first."));
   if (ui.numeric_invalid)
     return Result<std::size_t>::failure(error("Correct the invalid handle value or press Escape."));
-  if (!ui.changed || ui.pending_point || ui.draft->points().empty())
+  if (!ui.changed || ui.pending_point || ui.draft->entity_count() == 0)
     return Result<std::size_t>::failure(error("Accept points/lines locally first."));
   // The complete session copy validates catalogs, reference connectivity and
   // downstream Geometry without publishing history, dirty state or file I/O.
@@ -1228,17 +1330,47 @@ Result<std::size_t> ShellSketch3DTools::preview() {
   auto checked = ui.commit(candidate);
   if (!checked)
     return checked;
-  auto scene = geometry::ViewportSceneBuilder{}.build_part(
-      *candidate.part_document(), *candidate.part_shape_cache(), candidate.history_prefix_count());
+  auto scene = query_with_step_import_context(candidate, [&](auto* imports) {
+    auto full = geometry::ShapeCache::create(ShapeCacheId("spatial.task.preview"));
+    if (!full)
+      return Result<std::vector<geometry::ViewportSceneItem>>::failure(full.error());
+    auto executed = geometry::GeometryRecomputeExecutor{imports}.execute_document(
+        *candidate.part_document(), full.value());
+    if (!executed)
+      return Result<std::vector<geometry::ViewportSceneItem>>::failure(executed.error());
+    return geometry::ViewportSceneBuilder{imports}.build_part(*candidate.part_document(),
+                                                              full.value());
+  });
   if (!scene)
     return Result<std::size_t>::failure(scene.error());
+  // Include removed source presentations in the replacement set before visibility filtering.
+  auto original = query_with_step_import_context(ui.window.session(), [&](auto* imports) {
+    return geometry::ViewportSceneBuilder{imports}.build_part(
+        *ui.window.session().part_document(), *ui.window.session().part_shape_cache(),
+        ui.window.session().history_prefix_count());
+  });
+  if (!original)
+    return Result<std::size_t>::failure(original.error());
   std::vector<geometry::GeometryShape> shapes;
   std::vector<std::string> replaced;
   const auto prefix = "sketch3d/" + ui.draft->id().value() + "/";
+  const auto affected =
+      ui.window.session().part_document()->dependency_graph().transitive_dependents(
+          ui.draft->id().value());
+  const auto selected = [&](const auto& item) {
+    bool spatial = item.semantic_id.starts_with(prefix);
+    for (const auto& id : affected)
+      spatial = spatial || item.semantic_id.starts_with("sketch3d/" + id + "/");
+    return spatial || item.kind == geometry::ViewportSceneKind::Path ||
+           item.kind == geometry::ViewportSceneKind::SolidBody ||
+           item.kind == geometry::ViewportSceneKind::SurfaceBody;
+  };
+  for (const auto& item : original.value())
+    if (selected(item))
+      replaced.push_back(item.semantic_id);
+  filter_presentation_visibility(candidate, scene.value());
   for (auto& item : scene.value())
-    if (item.semantic_id.starts_with(prefix) || item.kind == geometry::ViewportSceneKind::Path ||
-        item.kind == geometry::ViewportSceneKind::SolidBody ||
-        item.kind == geometry::ViewportSceneKind::SurfaceBody) {
+    if (selected(item)) {
       replaced.push_back(item.semantic_id);
       shapes.push_back(std::move(item.shape));
     }
@@ -1277,6 +1409,9 @@ void ShellSketch3DTools::cancel() {
   ui.cancel_drag(false);
   ui.cancel_placement();
   ui.draft.reset();
+  ui.resources = {};
+  ui.solve_context.reset();
+  ui.solver_info->clear();
   ui.reset_direction();
   ui.copied_sources.clear();
   ui.planar_sources.clear();
