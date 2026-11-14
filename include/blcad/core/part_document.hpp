@@ -129,6 +129,8 @@ public:
   [[nodiscard]] Result<std::size_t> remove_sketch_3d(Sketch3DId id);
   [[nodiscard]] Result<std::size_t> add_path_curve(PathCurve path_curve);
   [[nodiscard]] Result<std::size_t> remove_path_curve(PathCurveId id);
+  [[nodiscard]] Result<std::vector<std::string>>
+  set_path_execution_policy(PathCurveId id, PathExecutionPolicy policy);
   [[nodiscard]] Result<std::size_t> add_feature(Feature feature);
   [[nodiscard]] Result<std::size_t> add_revolve_feature(RevolveFeature feature);
   [[nodiscard]] Result<std::size_t> add_sweep_feature(SweepFeature feature);

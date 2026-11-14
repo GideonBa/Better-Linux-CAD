@@ -2097,6 +2097,36 @@ Result<std::size_t> PartDocument::add_path_curve(PathCurve path_curve) {
   return Result<std::size_t>::success(path_curves_.size() - 1U);
 }
 
+Result<std::vector<std::string>>
+PartDocument::set_path_execution_policy(PathCurveId id, PathExecutionPolicy policy) {
+  if (is_reference_part())
+    return Result<std::vector<std::string>>::failure(reference_part_edit_error());
+  if (id.empty())
+    return Result<std::vector<std::string>>::failure(
+        Error::validation("path", "Path id must not be empty"));
+  const auto* path = find_path_curve(id);
+  if (!path)
+    return Result<std::vector<std::string>>::failure(
+        Error::validation(id.value(), "Path must exist"));
+  if (path->execution_policy() == policy)
+    return Result<std::vector<std::string>>::success({});
+  auto updated = path->with_execution_policy(std::move(policy));
+  if (!updated)
+    return Result<std::vector<std::string>>::failure(updated.error());
+  auto candidate = *this;
+  for (auto& value : candidate.path_curves_)
+    if (value.id() == id) {
+      value = std::move(updated.value());
+      break;
+    }
+  auto affected =
+      candidate.invalidation_state_.mark_changed(candidate.dependency_graph_, id.value());
+  if (!affected)
+    return affected;
+  *this = std::move(candidate);
+  return affected;
+}
+
 Result<std::size_t> PartDocument::remove_path_curve(PathCurveId id) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());

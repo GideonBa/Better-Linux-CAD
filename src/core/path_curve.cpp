@@ -192,12 +192,24 @@ std::string_view to_string(PathContinuityHint value) noexcept {
   return "c0";
 }
 
+PathExecutionPolicy PathExecutionPolicy::legacy() noexcept {
+  return {PathGeometryPolicyKind::LegacyFixed, std::nullopt};
+}
+Result<PathExecutionPolicy> PathExecutionPolicy::curve_preserving(double tolerance_mm) {
+  if (!std::isfinite(tolerance_mm) || tolerance_mm < 1e-9 || tolerance_mm > 1)
+    return Result<PathExecutionPolicy>::failure(Error::validation(
+        "path.execution_policy", "Modeling tolerance must be finite and between 1e-9 and 1 mm"));
+  return Result<PathExecutionPolicy>::success(
+      {PathGeometryPolicyKind::CurvePreserving, tolerance_mm});
+}
+
 Result<PathCurve> PathCurve::create(PathCurveId id, std::string name,
                                     std::vector<PathSegmentReference> segments, PathClosure closure,
                                     PathOrientationRule orientation_rule,
                                     std::optional<Vector3> fixed_up_vector,
                                     std::optional<PathContinuityHint> continuity_hint,
-                                    double connection_tolerance_mm) {
+                                    double connection_tolerance_mm,
+                                    PathExecutionPolicy execution_policy) {
   if (id.empty())
     return Result<PathCurve>::failure(
         Error::validation("path_curve", "path curve id must not be empty"));
@@ -226,19 +238,20 @@ Result<PathCurve> PathCurve::create(PathCurveId id, std::string name,
     if (!unique_sources.insert(segment.stable_key()).second)
       return Result<PathCurve>::failure(
           Error::validation(id.value(), "path curve must not repeat a source segment"));
-  return Result<PathCurve>::success(PathCurve(std::move(id), std::move(name), std::move(segments),
-                                              closure, orientation_rule, fixed_up_vector,
-                                              continuity_hint, connection_tolerance_mm));
+  return Result<PathCurve>::success(PathCurve(
+      std::move(id), std::move(name), std::move(segments), closure, orientation_rule,
+      fixed_up_vector, continuity_hint, connection_tolerance_mm, std::move(execution_policy)));
 }
 
 PathCurve::PathCurve(PathCurveId id, std::string name, std::vector<PathSegmentReference> segments,
                      PathClosure closure, PathOrientationRule orientation_rule,
                      std::optional<Vector3> fixed_up_vector,
                      std::optional<PathContinuityHint> continuity_hint,
-                     double connection_tolerance_mm)
+                     double connection_tolerance_mm, PathExecutionPolicy execution_policy)
     : id_(std::move(id)), name_(std::move(name)), segments_(std::move(segments)), closure_(closure),
       orientation_rule_(orientation_rule), fixed_up_vector_(fixed_up_vector),
-      continuity_hint_(continuity_hint), connection_tolerance_mm_(connection_tolerance_mm) {}
+      continuity_hint_(continuity_hint), connection_tolerance_mm_(connection_tolerance_mm),
+      execution_policy_(std::move(execution_policy)) {}
 const PathCurveId& PathCurve::id() const noexcept {
   return id_;
 }
@@ -262,6 +275,13 @@ const std::optional<PathContinuityHint>& PathCurve::continuity_hint() const noex
 }
 double PathCurve::connection_tolerance_mm() const noexcept {
   return connection_tolerance_mm_;
+}
+const PathExecutionPolicy& PathCurve::execution_policy() const noexcept {
+  return execution_policy_;
+}
+Result<PathCurve> PathCurve::with_execution_policy(PathExecutionPolicy policy) const {
+  return create(id_, name_, segments_, closure_, orientation_rule_, fixed_up_vector_,
+                continuity_hint_, connection_tolerance_mm_, std::move(policy));
 }
 
 } // namespace blcad

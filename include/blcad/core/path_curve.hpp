@@ -88,6 +88,28 @@ enum class PathContinuityHint { C0, G1, G2 };
 [[nodiscard]] std::string_view to_string(PathOrientationRule value) noexcept;
 [[nodiscard]] std::string_view to_string(PathContinuityHint value) noexcept;
 
+enum class PathGeometryPolicyKind { LegacyFixed, CurvePreserving };
+
+// Modeling intent only. Connection, solver and display tolerances keep their own contracts.
+class PathExecutionPolicy {
+public:
+  [[nodiscard]] static PathExecutionPolicy legacy() noexcept;
+  [[nodiscard]] static Result<PathExecutionPolicy> curve_preserving(double tolerance_mm);
+  [[nodiscard]] PathGeometryPolicyKind kind() const noexcept {
+    return kind_;
+  }
+  [[nodiscard]] const std::optional<double>& tolerance_mm() const noexcept {
+    return tolerance_;
+  }
+  bool operator==(const PathExecutionPolicy&) const = default;
+
+private:
+  PathExecutionPolicy(PathGeometryPolicyKind kind, std::optional<double> tolerance)
+      : kind_(kind), tolerance_(tolerance) {}
+  PathGeometryPolicyKind kind_;
+  std::optional<double> tolerance_;
+};
+
 class PathCurve {
 public:
   [[nodiscard]] static Result<PathCurve>
@@ -95,7 +117,8 @@ public:
          PathClosure closure, PathOrientationRule orientation_rule,
          std::optional<Vector3> fixed_up_vector = std::nullopt,
          std::optional<PathContinuityHint> continuity_hint = std::nullopt,
-         double connection_tolerance_mm = 1.0e-7);
+         double connection_tolerance_mm = 1.0e-7,
+         PathExecutionPolicy execution_policy = PathExecutionPolicy::legacy());
 
   [[nodiscard]] const PathCurveId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
@@ -105,12 +128,15 @@ public:
   [[nodiscard]] const std::optional<Vector3>& fixed_up_vector() const noexcept;
   [[nodiscard]] const std::optional<PathContinuityHint>& continuity_hint() const noexcept;
   [[nodiscard]] double connection_tolerance_mm() const noexcept;
+  [[nodiscard]] const PathExecutionPolicy& execution_policy() const noexcept;
+  [[nodiscard]] Result<PathCurve> with_execution_policy(PathExecutionPolicy) const;
 
 private:
   PathCurve(PathCurveId id, std::string name, std::vector<PathSegmentReference> segments,
             PathClosure closure, PathOrientationRule orientation_rule,
             std::optional<Vector3> fixed_up_vector,
-            std::optional<PathContinuityHint> continuity_hint, double connection_tolerance_mm);
+            std::optional<PathContinuityHint> continuity_hint, double connection_tolerance_mm,
+            PathExecutionPolicy execution_policy);
 
   PathCurveId id_;
   std::string name_;
@@ -120,6 +146,7 @@ private:
   std::optional<Vector3> fixed_up_vector_;
   std::optional<PathContinuityHint> continuity_hint_;
   double connection_tolerance_mm_;
+  PathExecutionPolicy execution_policy_;
 };
 
 } // namespace blcad

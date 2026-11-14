@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 165
 current_block: 166
-current_boundary: Block 165 verified; delivery pending; Block 166 planned
+current_boundary: Block 165 delivered; Block 166 explicit path policy in progress
 current_tag: "[parity-b166]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–165 accepted; Blocks 166–204 planned"
+  advanced_modeling_workflows: "Blocks 145–165 accepted; Block 166 in progress; Blocks 167–204 planned"
 ---
 
 # MVP Plan
@@ -35,13 +35,12 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 165
-current block        Block 166 (planned; not started)
+current block        Block 166 (in progress)
 current phase        Curves, paths and surfaces
-current boundary     Block 165 verified; PR delivery pending
+current boundary     Block 165 delivered; explicit compatible path policy in progress
 ```
 
-The assigned sequence continues through Block 174. Block 165 is verified with delivery pending;
-Block 166 is next and remains unstarted until that delivery is merged.
+The assigned sequence continues through Block 174. Block 165 is delivered; Block 166 is active.
 [The consolidated sequence](inventor-parity-sequence.md)
 contains dependencies and implementation criteria; [the test plan](inventor-parity-test-plan.md)
 contains individual and combined acceptance; [the UI contract](user-interface.md) owns the
@@ -71,7 +70,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 162 | Delivered in PR #186: native Smooth/equation authoring, conflict correction, closed-profile Extrude/Revolve and exact persisted history. |
 | 163 | Delivered in PR #187: spatial constraint ownership, strict V9 and actual legacy Geometry/session preservation. |
 | 164 | Delivered in PR #188: deterministic spatial solver, normalized native queries, physical rank/gauge and exact rejection with independent S03 oracles. |
-| 165 | Verified solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 consumers; [PR #189](https://github.com/GideonBa/Better-Linux-CAD/pull/189) delivery pending. |
+| 165 | Delivered in [PR #189](https://github.com/GideonBa/Better-Linux-CAD/pull/189): solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 consumers. |
 | 166–167 | Explicit compatible curve-preserving path execution, semantic-edge inputs and multi-wire Sweep with G01 physical oracles. |
 | 168–169 | Persistent Loft boundary/guide intent followed by independently verified G2 execution and G02 acceptance. |
 | 170–172 | Offset/Thicken intent and checked Geometry, curved Trim/Extend and derived gap diagnostics with G03–G04 acceptance. |
@@ -165,7 +164,7 @@ raw samples, benchmark limits and future performance scope remain in their exist
 ## Blocks 145–204 — Advanced modeling workflows
 
 Status authority: Blocks 145–165 are **Implemented and accepted**;
-Blocks 166–204 are **Planned; not started**. Block 165 delivery is pending.
+Block 166 is **In progress**; Blocks 167–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -178,7 +177,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
-| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
+| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166 in progress; 167–174 planned |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
 | G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
@@ -732,10 +731,10 @@ as `d8770ae` and `87db752` (1,395 and 790 added lines). Tree `b06b8ed` matches r
 Main was refreshed and clean before `feat/spatial-curve-constraint-workflow`. Continue serially
 through 174 and preserve all 175–204 planning.
 
-### Block 165 spatial curve and constraint workflow — verified; delivery pending
+### Block 165 spatial curve and constraint workflow — delivered
 
 The existing Sketch3D authority now supplies the contracts below. The implementation is on
-`feat/spatial-curve-constraint-workflow`; finish the verification/delivery gate before starting 166.
+the delivered `feat/spatial-curve-constraint-workflow` branch.
 Every commit remains at or below 1,500 added lines. Intermediate run chronology is retained in Git.
 
 | Implemented contract | Focused proof |
@@ -756,12 +755,27 @@ verified a visible process-owned X11 window (intentional timeout 124).
 
 Frozen runtime: **1,130 inputs**, SHA-256
 `4f5b40808a21e7f3fc29ebf35ee44f2daae61ebcd3184dfd861397186739a8e3`.
-Delivery: [PR #189](https://github.com/GideonBa/Better-Linux-CAD/pull/189), normal rebase merge pending.
-The implementation commits preserve the 1,500-added-line limit. Do not start the 166 branch before
-this PR is merged and main refreshed.
+Delivery: [PR #189](https://github.com/GideonBa/Better-Linux-CAD/pull/189), rebase merged
+2026-11-14. Eight commits each remain below 1,500 added lines (maximum 1,331). Merged tree
+`4ec55b9` matches reviewed head `0fbf793`; main was refreshed and clean before starting
+`feat/curve-preserving-path-policy`.
 
 Historical fixed-sample execution and equation twist retain their explicit 166 boundary. Native
 Surface-boundary G2 and later workflows remain 168–174. Preserve all planned scope through 204.
+
+### Block 166 compatible path execution — in progress
+
+Keep the accepted source entities and historical path interpretation. Deliver serially on
+`feat/curve-preserving-path-policy`; partial model work does not close the block.
+
+| Slice | Completion boundary |
+| --- | --- |
+| Core policy / V10 | Implemented: immutable legacy/curve-preserving policy, distinct modeling tolerance, strict necessary-only persistence, atomic source-preserving edits and downstream invalidation. Focused Core **37 cases / 1,311 assertions**, Geometry **8 / 10,377** pass after all five targets build. The existing path/Loft/history Qt regression passes **19 / 1,261**. Unsupported execution fails atomically until the next slice supplies native curves. [Contract](part-path-curve-core-mvp6.md#explicit-execution-policy--166), [Core proofs](../tests/core/path_execution_policy_tests.cpp), [Geometry rollback](../tests/geometry/path_execution_policy_tests.cpp). |
+| Native Geometry | Preserve actual supported spline/rational curves; bound Helix approximation, keep semantic endpoint identity/order/reversal/frames and implement the explicit equation-twist policy. Existing documents retain their old behavior. |
+| Native upgrade | Compare and preview an explicit upgrade before one Apply; retain the complete original document on invalid geometry or Cancel. No silent upgrade during read/save/source edits. |
+| G01 acceptance | Independent distance/tangent/length oracles, mixed/reversed paths, seams/twists/guides, near-degeneracy and real Sweep/Cut/Surface/path Extrude/Loft consumers; appropriate native checks. |
+
+The complete 166 Geometry/GUI/acceptance gate remains open. Preserve all 167–204 requirements.
 
 ## Later phases
 
