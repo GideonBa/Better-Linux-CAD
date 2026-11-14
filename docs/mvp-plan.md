@@ -770,20 +770,25 @@ Keep the accepted source entities and historical path interpretation. Deliver se
 
 | Slice | Implemented contract and remaining boundary |
 | --- | --- |
-| Core policy / V10 | Immutable legacy/curve-preserving policy, separate modeling tolerance, necessary-only strict persistence, atomic source-preserving edits and downstream invalidation. [Contract](part-path-curve-core-mvp6.md#explicit-execution-policy--166), [Core proofs](../tests/core/path_execution_policy_tests.cpp). Resource-aware Project V10 integration still needs its adapter gate and focused proof. |
+| Core policy / V10 | Immutable legacy/curve-preserving policy, separate modeling tolerance, necessary-only strict persistence, atomic source-preserving edits and downstream invalidation. [Contract](part-path-curve-core-mvp6.md#explicit-execution-policy--166), [Core proofs](../tests/core/path_execution_policy_tests.cpp). Resource-aware Project V10 integration preserves exact revision subsets, empty local subsets and pinned material/Body assignments. |
 | Native Geometry | Exact rational Bézier/shared Sketch3D splines, tolerance-checked Helix, exact native Loft-section refinement and atomic singular-path rejection. [Construction contract](part-path-curve-core-mvp6.md#native-curve-construction), [independent distance/tangent/length and refinement proofs](../tests/geometry/path_execution_policy_tests.cpp). |
 | Native upgrade | Explicit existing/new-path policy controls, actual length/span comparison, affected Body preview, retained invalid tolerance text, stale-source guard and one reversible Apply. [Task contract](gui-interactive-path-sweep-loft-mvp9.md#explicit-path-execution-comparison), [widget/history/native proofs](../tests/gui/gui_path_execution_policy_tests.cpp). Native capture review confirms readable units, visible candidate geometry and reachable actions. No implicit upgrade during read/save/source edits. |
 | G01 acceptance | Still open: curve-preserving equation twist and the remaining mixed/reversed, seam/guide, near-degenerate and physical Sweep/Cut/Surface/path Extrude/Loft combinations. |
 
-All five targets build. Focused Core **7 cases / 369 assertions**, Geometry **25 / 5,972** and
-Qt **39 cases: 37 passed, two native-only skipped / 4,184 assertions** pass. The selected native
+All five targets build. Full Core **762 cases / 34,452 assertions** and focused Project/material/
+history Qt **27 cases: 26 passed, one native-only skipped / 1,202 assertions** pass. Native curve
+construction has focused Geometry **25 / 5,972** evidence. The unchanged native task controls pass
+Qt **39 cases: 37 passed, two native-only skipped / 4,184 assertions**. The selected native
 filter `[native-path-policy],[native-shell-spatial],[shell-mixed-path-loft]` passes **3 / 687** at
 both 100% and compact 150%, without skips. It includes real keyboard correction, visible tolerance
 units, candidate Body replacement, fixed actions and exact history/reopening. Native artifacts:
 `/tmp/blcad-166-native{100,150}-14/` and matching `.log` files. All eight original captures were
 inspected after CAD exit. Separate app startup proved a visible process-owned X11 window
-(intentional timeout 124; `/tmp/blcad-166-startup14-proof.log`). Frozen runtime: **1,136 inputs**, SHA-256
+(intentional timeout 124; `/tmp/blcad-166-startup14-proof.log`). Native-task runtime: **1,136 inputs**, SHA-256
 `895e94f605f2b3fc3082204ca446ebb95f66dc313ce2d38bd114e6d4412806a4`.
+The subsequent resource-adapter proof uses `/tmp/blcad-166-core17-full.log`,
+`/tmp/blcad-166-project-qt17.log` and runtime SHA-256
+`bd7d99ddc7b33024fc19750086610dc294ed3f18c187cb5aa8308d726d8f23f1`.
 Delivery remains draft [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190).
 The complete 166 acceptance gate remains open. Preserve all 167–204 requirements.
 
