@@ -33,7 +33,8 @@ SpatialSketchTaskContext::constraint_targets(const Sketch3D& owner) const {
         "sketch3d/" + owner.id().value() + "/entity/" + product.entity_id.value(), product.shape);
   const auto add = [&](Result<SpatialConstraintTarget> target, std::string label,
                        std::string semantic, bool line = false, bool radius = false,
-                       geometry::GeometryShape shape = {}) {
+                       geometry::GeometryShape shape = {}, std::string visibility_owner = {},
+                       bool model_hidden = false) {
     if (!target || !allowed(target.value()))
       return;
     const auto& t = target.value();
@@ -58,7 +59,7 @@ SpatialSketchTaskContext::constraint_targets(const Sketch3D& owner) const {
         shape = found->second;
     }
     result.push_back({std::move(label), std::move(semantic), std::move(target.value()), line,
-                      radius, std::move(shape)});
+                      radius, std::move(shape), std::move(visibility_owner), model_hidden});
   };
   for (const auto& p : owner.points())
     add(SpatialConstraintTarget::local_point(p.id()), "Local point / " + p.id().value(),
@@ -138,6 +139,13 @@ SpatialSketchTaskContext::constraint_targets(const Sketch3D& owner) const {
           "datum-axis/" + a.id().value(), true);
   }
   for (const auto& a : part_.construction_lines()) {
+    auto curve = PathSegmentReference::create_construction_line(a.id());
+    if (curve)
+      for (auto location :
+           {SpatialCurveLocation::Whole, SpatialCurveLocation::Start, SpatialCurveLocation::End})
+        add(SpatialConstraintTarget::external_curve(curve.value(), location),
+            "Linked line / " + a.name() + " / " + std::string(to_string(location)),
+            "construction-line/" + a.id().value(), true);
     auto ref = AxisReference::create_construction_line(PartFeatureInputRole::SpatialConstraint,
                                                        a.id(), PartFeatureInputCapability::Line);
     if (ref)
@@ -191,7 +199,8 @@ SpatialSketchTaskContext::constraint_targets(const Sketch3D& owner) const {
           if (retagged)
             add(SpatialConstraintTarget::face(retagged.value()),
                 "Face / " + body.name() + " / " + item.label, item.semantic_id, false, false,
-                item.shape);
+                item.shape, "body/" + body.id().value(),
+                body.visibility() != BodyVisibility::Visible);
         }
     if (body.kind() == BodyKind::Surface) {
       auto faces = geometry::ResultFaceSupportGeometry::selectable_faces(part_, cache_, body.id(),
@@ -203,7 +212,8 @@ SpatialSketchTaskContext::constraint_targets(const Sketch3D& owner) const {
           if (ref)
             add(SpatialConstraintTarget::face(ref.value()),
                 "Surface face / " + body.name() + " / " + item.label, item.semantic_id, false,
-                false, item.shape);
+                false, item.shape, "body/" + body.id().value(),
+                body.visibility() != BodyVisibility::Visible);
         }
     }
   }

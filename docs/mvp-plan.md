@@ -793,6 +793,16 @@ Runtime: **1,127 inputs**, SHA-256
 `c563e10f66d9332ec622b4445eb9d3dc9a0d357319ce71ace34ca468abb1d1aa`.
 Direct native source collection and the complete combined S03–S04 gate remain required for 165.
 
+Native source-selection slice verified: all five targets build; focused Qt **6 / 239**, Geometry
+selection/spatial/Thread/Hole/Body-transform regression **31 / 1,634**, all passed. Native typed
+sources, hidden physical support, curve selection through preview, endpoint disambiguation,
+double-click and existing constraint regression pass **3 / 171** at 100% and 150%, no skips.
+[Selection contract/proofs](gui-sketch3d-interaction-mvp8.md#native-spatial-source-selection--165)
+and [historical supplier scope](feature-system.md#native-prefix-integration--verified) retain the
+same typed references and exact history. Runtime: **1,129 inputs**, SHA-256
+`fac83111fcf33dc5d7a062c2de34a973958f8681eb3bb634fabafb9d629eeffd`.
+The combined S03–S04 downstream acceptance and final whole-block gate remain in progress.
+
 Historical fixed-sample execution and equation twist retain their explicit 166 boundary. Native
 Surface-boundary G2, later workflows and integrated acceptance remain 168–174. No whole-165
 acceptance is claimed here; preserve all later scope.

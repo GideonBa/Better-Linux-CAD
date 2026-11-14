@@ -363,7 +363,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
     std::vector<ViewportSceneItem> items;
     items.reserve(shape_cache.body_shape_count() + document.datum_plane_count() +
                   document.datum_axis_count() + document.sketch_3d_count());
-    auto observed = observe_imported_part_sources(document, import_context_);
+    auto observed =
+        observe_imported_part_sources(document, import_context_, shape_cache.history_plan());
     if (!observed)
       return Result<std::vector<ViewportSceneItem>>::failure(observed.error());
     if (document.is_reference_part()) {

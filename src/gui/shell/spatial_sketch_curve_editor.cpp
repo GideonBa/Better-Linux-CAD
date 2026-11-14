@@ -51,6 +51,13 @@ SpatialSketchCurveEditor::SpatialSketchCurveEditor(QWidget* parent,
                                                    SpatialSketchEditorCallbacks callbacks)
     : callbacks_(std::move(callbacks)), page_(new QWidget(parent)) {
   auto* column = new QVBoxLayout(page_);
+  auto* pick_curve = make_gui_button("Pick Curve in Model", page_);
+  pick_curve->setObjectName("blcad.sketch3d.curve_pick");
+  column->addWidget(pick_curve);
+  connect(pick_curve, &QPushButton::clicked, this, [this] {
+    if (callbacks_.pick_curve)
+      callbacks_.pick_curve();
+  });
   auto* form = new QFormLayout;
   auto combo = [&](const char* name, const QString& label, QFormLayout* target = nullptr) {
     auto* value = new QComboBox(page_);

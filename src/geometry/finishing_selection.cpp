@@ -48,7 +48,7 @@ Result<std::vector<FinishingSelectionTarget>> FinishingSelectionBuilder::build(
             : "input selection requires a recomputed solid Body in its modeling scope"));
   const auto& target = result->shape.impl_->shape;
   if (!document.imported_body_features().empty()) {
-    auto observed = observe_imported_part_sources(document, import_context);
+    auto observed = observe_imported_part_sources(document, import_context, cache.history_plan());
     if (!observed)
       return Result<std::vector<FinishingSelectionTarget>>::failure(observed.error());
     for (const auto& base : document.imported_body_features()) {

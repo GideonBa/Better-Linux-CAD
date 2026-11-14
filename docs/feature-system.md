@@ -185,6 +185,13 @@ preview helper inserts pending executable rows at the marker before prefix evalu
 constant-document complete-preview overload remains compatible. Path/resource previews use the
 same complete retained intent and qualified input cache. Inspection/export remain complete-only.
 
+Feature-input guards, scene construction and native/result-face selectors observe imported supplier
+authorities within that same evaluated plan. A later or suppressed import cannot make an earlier
+native support unavailable; active imported inputs retain their verified-source checks. The
+[future-import regression](../tests/geometry/finishing_selection_tests.cpp) checks prefix execution,
+scene and face selection together, and rejects an unqualified/mismatched scope or complete replay
+with the unavailable supplier.
+
 The native owner uses a transient Qt marker in the existing Features group; it is not a Core feature
 or a second executable inventory. Context/search actions, marker drag/drop and double-click feed
 the same session context. Core `OutsidePrefix` rows display “after End of Part” separately from

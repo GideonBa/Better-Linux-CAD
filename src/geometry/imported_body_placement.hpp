@@ -17,7 +17,7 @@ inline Result<std::size_t> validate_imported_feature_inputs(const PartDocument& 
                                                             StepImportTopologyContext* context) {
   if (document.imported_body_features().empty())
     return Result<std::size_t>::success(0);
-  auto observed = observe_imported_part_sources(document, context);
+  auto observed = observe_imported_part_sources(document, context, cache.history_plan());
   if (!observed)
     return observed;
   std::set<std::string> ancestors;

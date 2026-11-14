@@ -13,6 +13,7 @@
 #include "blcad/gui/shell/shell_window.hpp"
 #include "spatial_sketch_constraint_editor.hpp"
 #include "spatial_sketch_curve_editor.hpp"
+#include "spatial_sketch_selection_scope.hpp"
 #include "spatial_sketch_task_context.hpp"
 
 #include <QAction>
@@ -108,6 +109,10 @@ private:
 struct ShellSketch3DTools::Impl {
   ShellWindow& window;
   ShellSketch3DTools& owner;
+  SpatialSketchSelectionScope selection_scope{window.viewport()};
+  bool picking_curve{false};
+  std::optional<QPointF> pick_pointer;
+  std::vector<std::pair<std::string, SketchEntityId>> curve_aliases;
   QAction* action{};
   QDockWidget* dock{};
   QLabel* title{};
@@ -285,10 +290,66 @@ struct ShellSketch3DTools::Impl {
     summary->setText(
         QStringLiteral("Complete distance, azimuth, and elevation or clear direction input."));
   }
+  void finish_picking() {
+    if (selection_scope.active() && summary)
+      summary->setText(QStringLiteral("Input selection finished. Local changes are retained."));
+    picking_curve = false;
+    curve_aliases.clear();
+    if (constraints)
+      constraints->stop_picking();
+    selection_scope.finish();
+    pick_pointer.reset();
+  }
+  void refresh_picking() {
+    cancel_drag();
+    cancel_placement();
+    pick_pointer.reset();
+    if (!current() || (!picking_curve && !constraints->picking())) {
+      finish_picking();
+      refresh_handles();
+      return;
+    }
+    auto authority = context(resources);
+    auto ready = authority ? authority.value()->validate_sources()
+                           : Result<std::size_t>::failure(authority.error());
+    if (!ready) {
+      finish_picking();
+      summary->setText(text(ready.error().message()));
+      refresh_handles();
+      return;
+    }
+    std::vector<geometry::ViewportSceneItem> items;
+    if (picking_curve) {
+      curve_aliases.clear();
+      auto targets = authority.value()->constraint_targets(*draft);
+      if (!targets) {
+        finish_picking();
+        summary->setText(text(targets.error().message()));
+        return;
+      }
+      for (const auto& c : targets.value()) {
+        const auto* local = std::get_if<SpatialLocalCurve>(&c.target.source());
+        if (!local || c.target.curve_location() != SpatialCurveLocation::Whole || c.shape.empty())
+          continue;
+        const auto alias = "spatial-curve/" + std::to_string(items.size());
+        curve_aliases.push_back({alias, local->entity});
+        items.push_back({geometry::ViewportSceneKind::Edge, alias, c.shape});
+      }
+    } else
+      items = constraints->pick_presentations();
+    auto shown = selection_scope.show(std::move(items));
+    if (!shown) {
+      finish_picking();
+      summary->setText(text(shown.error().message()));
+    } else
+      summary->setText(QStringLiteral("Pick a compatible model input. Escape finishes selection."));
+    refresh_handles();
+  }
   void invalidate() {
     previewed = false;
     apply->setEnabled(false);
     window.viewport().clear_feature_preview();
+    finish_picking();
     if (window.session().task().command_id() == task_id)
       (void)window.session().task().return_to_editing();
   }
@@ -453,6 +514,12 @@ struct ShellSketch3DTools::Impl {
   void refresh_handles() {
     if (!overlay)
       return;
+    if (selection_scope.active()) {
+      layer.clear_handles();
+      numeric_row->hide();
+      synchronize_overlay();
+      return;
+    }
     if (drag) {
       synchronize_overlay();
       return;
@@ -997,6 +1064,11 @@ struct ShellSketch3DTools::Impl {
     }
     if (watched != &viewport || !current())
       return false;
+    if (selection_scope.active()) {
+      if (event->type() == QEvent::MouseButtonPress)
+        pick_pointer = static_cast<QMouseEvent*>(event)->position();
+      return false;
+    }
     if (event->type() == QEvent::UngrabMouse && placement_pressed) {
       cancel_placement();
       return false;
@@ -1309,6 +1381,15 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
             ui.cancel_drag();
             ui.cancel_placement();
             ui.refresh_handles();
+          },
+          [&ui] {
+            if (ui.picking_curve)
+              ui.finish_picking();
+            else {
+              ui.finish_picking();
+              ui.picking_curve = true;
+            }
+            ui.refresh_picking();
           }});
   curve_scroll->setWidget(ui.curves->page());
   ui.tabs->addTab(curve_scroll, QStringLiteral("Curves"));
@@ -1350,6 +1431,20 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
             auto context = ui.context(ui.resources);
             return context ? context.value()->position(*ui.draft, target)
                            : Result<Point3>::failure(context.error());
+          },
+          [&ui](Point3 p) {
+            auto projected = ui.window.viewport().model_to_screen(p);
+            return projected ? Result<QPointF>::success({projected.value().x, projected.value().y})
+                             : Result<QPointF>::failure(projected.error());
+          },
+          [&ui](const SpatialSketchTargetChoice& c) {
+            const auto& session = ui.window.session();
+            return !c.model_hidden && session.presentation_visible(c.semantic_id) &&
+                   (c.visibility_owner.empty() || session.presentation_visible(c.visibility_owner));
+          },
+          [&ui] {
+            ui.picking_curve = false;
+            ui.refresh_picking();
           }});
   constraint_scroll->setWidget(ui.constraints->page());
   ui.tabs->addTab(constraint_scroll, QStringLiteral("Constraints"));
@@ -1439,6 +1534,7 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   connect(ui.tabs, &QTabWidget::currentChanged, this, [this] {
     impl_->cancel_drag();
     impl_->cancel_placement();
+    impl_->finish_picking();
     impl_->pick->setCurrentIndex(0);
     impl_->refresh_handles();
   });
@@ -1453,6 +1549,41 @@ ShellSketch3DTools::~ShellSketch3DTools() {
 }
 bool ShellSketch3DTools::active() const noexcept {
   return impl_->draft.has_value();
+}
+bool ShellSketch3DTools::accept_selection(const std::optional<GuiSelection>& selected) {
+  auto& ui = *impl_;
+  if (ui.selection_scope.restoring())
+    return true;
+  if (!ui.selection_scope.active())
+    return false;
+  if (!ui.current()) {
+    cancel();
+    return true;
+  }
+  if (!selected)
+    return true;
+  auto authority = ui.context(ui.resources);
+  auto ready = authority ? authority.value()->validate_sources()
+                         : Result<std::size_t>::failure(authority.error());
+  if (!ready) {
+    ui.finish_picking();
+    ui.summary->setText(text(ready.error().message()));
+    ui.refresh_handles();
+    return true;
+  }
+  if (ui.picking_curve) {
+    const auto found =
+        std::find_if(ui.curve_aliases.begin(), ui.curve_aliases.end(),
+                     [&](const auto& c) { return c.first == selected->semantic_id; });
+    if (found != ui.curve_aliases.end()) {
+      const auto id = found->second;
+      ui.finish_picking();
+      ui.curves->select_curve(id);
+      ui.refresh_handles();
+    }
+  } else
+    ui.constraints->accept_pick(selected->semantic_id, ui.pick_pointer);
+  return true;
 }
 Result<std::size_t> ShellSketch3DTools::begin() {
   auto& ui = *impl_;
@@ -1679,13 +1810,46 @@ const GuiViewportManipulatorLayer& ShellSketch3DTools::manipulators() const noex
   return impl_->layer;
 }
 bool ShellSketch3DTools::eventFilter(QObject* watched, QEvent* event) {
+  if (!active() && watched == &impl_->window.viewport() &&
+      event->type() == QEvent::MouseButtonDblClick &&
+      static_cast<QMouseEvent*>(event)->button() == Qt::LeftButton && impl_->available()) {
+    const auto selected = impl_->window.viewport().selected_semantic();
+    if (selected)
+      for (const auto& s : impl_->window.session().part_document()->sketches_3d()) {
+        const auto match = [&](const auto& records) -> std::optional<SketchEntityId> {
+          for (const auto& c : records)
+            if (selected->semantic_id == "sketch3d/" + s.id().value() + "/entity/" + c.id().value())
+              return c.id();
+          return std::nullopt;
+        };
+        auto id = match(s.lines());
+        if (!id)
+          id = match(s.polylines());
+        if (!id)
+          id = match(s.arcs());
+        if (!id)
+          id = match(s.splines());
+        if (!id)
+          id = match(s.helices());
+        if (!id)
+          id = match(s.equation_curves());
+        if (id && begin_edit(s.id())) {
+          impl_->tabs->setCurrentIndex(1);
+          impl_->curves->select_curve(*id);
+          return true;
+        }
+      }
+  }
   if (impl_->pointer_event(watched, event))
     return true;
   auto* widget = qobject_cast<QWidget*>(watched);
   if (active() && event->type() == QEvent::KeyPress && widget &&
       (widget == &impl_->window || impl_->window.isAncestorOf(widget)) &&
       static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
-    if (impl_->drag)
+    if (impl_->selection_scope.active()) {
+      impl_->finish_picking();
+      impl_->refresh_handles();
+    } else if (impl_->drag)
       impl_->cancel_drag();
     else if (impl_->pick->currentIndex() == 5) {
       impl_->cancel_placement();

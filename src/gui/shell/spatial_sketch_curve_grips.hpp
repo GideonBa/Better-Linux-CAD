@@ -11,7 +11,7 @@ struct SpatialCurveGrip {
   Vector3 plane_normal;
   double value;
   double model_units_per_value{1};
-  std::vector<SketchEntityId> points;
+  std::vector<SketchEntityId> points{};
 };
 struct SpatialCurveGripCandidate {
   Sketch3D sketch;

@@ -20,6 +20,7 @@ struct SpatialSketchEditorCallbacks {
   std::function<Result<std::size_t>()> edit;
   std::function<void(SketchEntityId)> select_point;
   std::function<void()> selection_changed{};
+  std::function<void()> pick_curve{};
 };
 // Forms propose typed records to the existing task authority. They own neither a second Sketch3D
 // nor persistent parameter edits. Incomplete forms remain separate from the accepted draft.
