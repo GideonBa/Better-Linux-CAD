@@ -29,7 +29,10 @@ uses interpolation of those original centers, preventing refinement density from
 
 The control sampler retains resolved lines and circular arcs. Arc lengths and sampled positions
 use the actual circle, including reversed arcs; replacing an arc with two chords changes the section
-stations and is incorrect. Splines retain the shared resolver's deterministic 32 line spans. Four
+stations and is incorrect. Historical splines retain the shared resolver's deterministic 32 line
+spans. Explicitly upgraded paths retain native spline/equation curves and checked Helix geometry;
+the sampler queries their actual arc length and native curve position. Modeling tolerance belongs
+to that source construction. Four
 subintervals per authored section interval (three intermediate control sections) constrain the Loft.
 The resulting interpolated surface is not an exact analytic sweep of the entire trajectory.
 

@@ -61,9 +61,10 @@ or executable lifetime. Repeating the same policy is a no-op; Reference Parts re
 
 Only non-legacy policy intent adds the strict V10 `execution_policy` record described in
 [the format contract](file-format.md#curve-preserving-path-policy--part-v10). Returning the final
-upgraded path to legacy restores its prior necessary envelope and canonical fields. Typed Core
-intent is the first slice; curve-preserving Geometry, explicit native comparison/preview/Apply and
-the complete G01 gate remain in progress under 166. No sampled curve product is save-file intent.
+upgraded path to legacy restores its prior necessary envelope and canonical fields when the
+historical source-validation contract permits that path. A newly authored mixed path that requires
+native model-space validation cannot be downgraded into an unreadable legacy record; that edit
+rejects atomically. No sampled curve product is save-file intent.
 
 Resource-aware Project members retain V10 through the existing Project-owned revision-reference
 adapter, including empty local subsets. Material pins/Body overrides remain unchanged and portable
@@ -72,7 +73,7 @@ original necessary member envelope without adopting or discarding unrelated Proj
 
 ### Native curve construction
 
-The Geometry slice under verification preserves planar rational cubic Bézier poles/weights and
+Native construction preserves planar rational cubic Bézier poles/weights and
 the existing Sketch3D control-point or fit-point B-spline definition. Sketch3D and upgraded paths
 share that constructor; changing path tolerance does not redefine the source fit. Lines, ordered
 polyline spans and three-point arcs retain their exact interpretation. Reversal reverses the native
@@ -88,8 +89,27 @@ Native Loft-section compatibility trims native curves without converting them to
 derived vertex map retains authored section vertices. Degenerate or singular path starts reject;
 failed construction never changes the committed document or previously certified cache. Independent
 distance/tangent/length and native refinement proofs live in
-[the path Geometry tests](../tests/geometry/path_execution_policy_tests.cpp). Equation twist,
-native comparison/Apply and the remaining consumer combinations still require their own gates.
+[the path Geometry tests](../tests/geometry/path_execution_policy_tests.cpp). Explicit upgrade
+comparison/Apply is defined in the [native task contract](gui-interactive-path-sweep-loft-mvp9.md#explicit-path-execution-comparison);
+native twist uses the [arc-length contract](part-sweep-3d-geometry-mvp6.md#explicit-curve-preserving-twist).
+
+For opt-in paths, Core retains semantic endpoint roles and checks known connections in the same
+coordinate space. A construction-derived endpoint or connection between different workplanes
+requires Geometry to resolve both sources in model space. Complete recompute validates every
+modern path, including standalone paths, before publishing a candidate cache. Unresolved Core
+coordinates therefore never constitute successful physical connection or closure. Known static
+gaps and repeated identities still fail in Core. Historical policy keeps its previous validation.
+Mixed reversed rational/construction/spatial paths and rejected model-space gaps are covered by
+[consumer Geometry proofs](../tests/geometry/native_path_consumer_tests.cpp).
+These include actual Sweep, SweepCut, SweepSurface and additive/subtractive path Extrude, explicit
+native guide paths, source-length edits and fresh/reopened execution. Independent normal-plane
+sections, material/void classification, area and volume checks inspect output topology. Native
+Helix consumers preserve historical path phase in both hands, with and without explicit roll.
+Very short standalone paths distinguish connection tolerance from physical curve resolution.
+
+Both full and planned recompute use the complete history executor for modern paths, so a path
+without an executable consumer cannot bypass model-space validation. This currently performs
+full candidate geometry work; selective reuse is not a new performance claim.
 
 ## Equation source contract
 
@@ -102,8 +122,8 @@ Geometry curve, preserving reversal and stable source roles. Existing non-equati
 and their later 166 upgrade boundary remain unchanged. Equation paths support the current
 orientation/guide executor using the actual curve and start tangent. Equation inputs set the Pipe
 kernel's 3D/boundary approximation to OCCT confusion resolution and angular tolerance to `1e-6`;
-the historical non-equation default remains unchanged. Nonzero twist is rejected
-explicitly until the curve-preserving twist policy in 166, rather than constructing a chord guide.
+the historical non-equation default remains unchanged. Historical equation paths reject nonzero
+twist; explicitly upgraded paths use the native arc-length twist contract above.
 
 ## Verification
 

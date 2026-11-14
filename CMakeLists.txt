@@ -682,6 +682,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/path_extrude_pipeline_tests.cpp
       tests/geometry/path_execution_policy_tests.cpp
       tests/geometry/native_twist_geometry_tests.cpp
+      tests/geometry/native_path_consumer_tests.cpp
       tests/support/geometry_volume_oracle.cpp
       tests/geometry/part_construction_mvp_acceptance_tests.cpp
       tests/geometry/recompute_executor_tests.cpp
