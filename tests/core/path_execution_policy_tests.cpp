@@ -1,3 +1,4 @@
+#include "../support/engineering_resource_fixture.hpp"
 #include "../support/spatial_constraint_feature_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
@@ -10,6 +11,7 @@ using namespace blcad;
 using json = nlohmann::json;
 namespace f = blcad::test::spatial_fixture;
 namespace sf = blcad::test::spatial_feature_fixture;
+namespace ef = blcad::test::engineering_fixture;
 namespace {
 PartDocument simple() {
   auto p = f::part();
@@ -159,4 +161,56 @@ TEST_CASE("Path policy rejects malformed tolerance modes and unnecessary version
   unnecessary["version"] = 10;
   CHECK_FALSE(deserialize_part_document_from_json(unnecessary.dump()));
   CHECK(snapshot(f::checked(deserialize_part_document_from_json(original))) == original);
+}
+
+TEST_CASE("Resource-aware Projects retain V10 path intent and exact member revision subsets",
+          "[core][parity-b166][path-execution-policy][project-engineering-resources]") {
+  for (bool owns_resources : {true, false}) {
+    CAPTURE(owns_resources);
+    auto part = simple();
+    if (owns_resources) {
+      ef::annotate(part);
+      REQUIRE(part.set_body_material(BodyId("base.body"), ef::key("synthetic.material", "r2")));
+    }
+    auto assembly =
+        f::checked(AssemblyDocument::create(DocumentId("resources.assembly"), "Assembly"));
+    (void)f::checked(assembly.add_member_part(part.id()));
+    auto project =
+        f::checked(Project::create(DocumentId("resources.project"), "Project", assembly));
+    REQUIRE(project.add_part_document(part));
+    if (!owns_resources)
+      REQUIRE(project.add_engineering_resource(ef::material()));
+    const auto legacy = f::checked(serialize_project_to_json(project));
+    REQUIRE(project.find_part_document(part.id())->set_path_execution_policy(
+        PathCurveId("path"), f::checked(PathExecutionPolicy::curve_preserving(1e-5))));
+    const auto saved = f::checked(serialize_project_to_json(project));
+    const auto data = json::parse(saved);
+    CHECK(data.at("version") == 2);
+    const auto& member = data.at("parts").at(0);
+    CHECK(member.at("version") == 10);
+    CHECK_FALSE(member.contains("engineering_resources"));
+    REQUIRE(member.contains("engineering_resource_refs"));
+    CHECK(member.at("engineering_resource_refs").size() == (owns_resources ? 3 : 0));
+    CHECK_FALSE(deserialize_part_document_from_json(member.dump()));
+    auto loaded = f::checked(deserialize_project_from_json(saved));
+    CHECK(f::checked(serialize_project_to_json(loaded)) == saved);
+    CHECK(loaded.engineering_resources() == project.engineering_resources());
+    const auto* restored = loaded.find_part_document(part.id());
+    REQUIRE(restored);
+    CHECK(restored->engineering_resources() == part.engineering_resources());
+    CHECK(restored->default_material() == part.default_material());
+    CHECK(restored->body_materials() == part.body_materials());
+    const auto portable = f::checked(serialize_part_document_to_json(*restored));
+    CHECK(snapshot(f::checked(deserialize_part_document_from_json(portable))) == portable);
+    auto malformed = data;
+    malformed["parts"][0]["engineering_resource_refs"] =
+        json::array({json{{"id", "missing"}, {"revision", "r1"}}});
+    CHECK_FALSE(deserialize_project_from_json(malformed.dump()));
+    malformed = data;
+    malformed["parts"][0]["engineering_resources"] = data.at("engineering_resources");
+    CHECK_FALSE(deserialize_project_from_json(malformed.dump()));
+    REQUIRE(loaded.find_part_document(part.id())->set_path_execution_policy(
+        PathCurveId("path"), PathExecutionPolicy::legacy()));
+    CHECK(f::checked(serialize_project_to_json(loaded)) == legacy);
+  }
 }

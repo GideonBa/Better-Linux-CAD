@@ -65,6 +65,11 @@ upgraded path to legacy restores its prior necessary envelope and canonical fiel
 intent is the first slice; curve-preserving Geometry, explicit native comparison/preview/Apply and
 the complete G01 gate remain in progress under 166. No sampled curve product is save-file intent.
 
+Resource-aware Project members retain V10 through the existing Project-owned revision-reference
+adapter, including empty local subsets. Material pins/Body overrides remain unchanged and portable
+standalone extraction restores only that member's values. Explicit policy downgrade restores the
+original necessary member envelope without adopting or discarding unrelated Project resources.
+
 ### Native curve construction
 
 The Geometry slice under verification preserves planar rational cubic Bézier poles/weights and
