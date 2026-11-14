@@ -95,6 +95,7 @@ add_library(
   src/core/sketch.cpp
   src/core/sketch_3d.cpp
   src/core/sketch_3d_constraints.cpp
+  src/core/sketch_3d_solver.cpp
   src/core/sketch_ownership.cpp
   src/core/sketch_arc_profile.cpp
   src/core/sketch_constraints.cpp
@@ -581,6 +582,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/sketch_3d_curve_tests.cpp
     tests/core/sketch_3d_json_tests.cpp
     tests/core/sketch_3d_constraint_tests.cpp
+    tests/core/sketch_3d_solver_tests.cpp
     tests/core/subassembly_instance_tests.cpp
     tests/core/sweep_feature_tests.cpp
   )
