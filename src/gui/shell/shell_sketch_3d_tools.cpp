@@ -138,6 +138,7 @@ struct ShellSketch3DTools::Impl {
   std::vector<Sketch3DProjectedPointIntent> copied_sources;
   QCheckBox* grips{};
   QLineEdit* numeric{};
+  QWidget* numeric_row{};
   QWidget* overlay{};
   PlacementOverlay* placement_overlay{};
   Point3 placement_origin{};
@@ -151,8 +152,10 @@ struct ShellSketch3DTools::Impl {
     SketchEntityId point;
     Point3 origin;
     bool changed, previewed;
+    std::optional<SpatialCurveGrip> curve{};
   };
   std::optional<Drag> drag;
+  std::vector<SpatialCurveGrip> curve_frames;
   bool numeric_invalid{false};
   std::optional<Sketch3D> draft;
   bool editing{false};
@@ -181,12 +184,13 @@ struct ShellSketch3DTools::Impl {
   }
   void show_dof(const SpatialSolveResult& result) {
     solver_info->setText(result.accepted()
-                             ? QStringLiteral("DOF: %1 total · %2 rigid · %3 internal\n%4")
+                             ? QStringLiteral("DOF: %1 total · %2 rigid · %3 internal")
                                    .arg(result.degrees_of_freedom)
                                    .arg(result.gauge_degrees_of_freedom)
                                    .arg(result.internal_degrees_of_freedom)
-                                   .arg(text(result.diagnostic))
                              : text(result.diagnostic));
+    if (result.accepted() && !result.diagnostic.empty())
+      solver_info->setText(solver_info->text() + "\n" + text(result.diagnostic));
     QStringList issues;
     for (const auto& relation : result.constraints)
       if ((relation.conflicting || relation.redundant) && issues.size() < 3)
@@ -454,6 +458,7 @@ struct ShellSketch3DTools::Impl {
       return;
     }
     std::vector<GuiViewportManipulatorHandle> handles;
+    curve_frames.clear();
     const auto* selected = selected_point();
     if (current()) {
       QSignalBlocker blocker(detach);
@@ -462,8 +467,35 @@ struct ShellSketch3DTools::Impl {
       if (!bound)
         detach->setChecked(false);
     }
-    if (current() && grips->isChecked() && pick->currentIndex() == 0 && !pending_point &&
-        !pending_forms() && !has_direction_input() && selected &&
+    if (current() && tabs->currentIndex() == 1 && curves->handles_requested() && !pending_point &&
+        !pending_forms() && !has_direction_input()) {
+      auto authority = context(resources);
+      auto frames = authority ? authority.value()->curve_grips(*draft, curves->selected_curve())
+                              : Result<std::vector<SpatialCurveGrip>>::failure(authority.error());
+      if (frames) {
+        curve_frames = std::move(frames.value());
+        for (const auto& frame : curve_frames) {
+          GuiViewportManipulatorHandle handle;
+          handle.id = frame.kind == SpatialCurveGripKind::HelixPitch ? "sketch3d.curve.pitch"
+                                                                     : "sketch3d.curve.radius";
+          handle.kind = frame.kind == SpatialCurveGripKind::HelixPitch
+                            ? GuiViewportManipulatorKind::Linear
+                            : GuiViewportManipulatorKind::Radial;
+          handle.origin = frame.origin;
+          handle.axis = frame.direction;
+          handle.plane_normal = frame.plane_normal;
+          handle.reference_direction = frame.direction;
+          handle.reference_value = frame.value;
+          handle.model_units_per_value = frame.model_units_per_value;
+          handle.minimum_value = spatial_curve_grip_minimum;
+          handle.maximum_value = spatial_curve_grip_maximum;
+          handles.push_back(std::move(handle));
+        }
+      } else
+        summary->setText(text(frames.error().message()));
+    }
+    if (current() && tabs->currentIndex() == 0 && grips->isChecked() && pick->currentIndex() == 0 &&
+        !pending_point && !pending_forms() && !has_direction_input() && selected &&
         (selected->parameter_dependencies().empty() || detach->isChecked())) {
       const auto value = resolved_point(*selected);
       const std::array values{value.x, value.y, value.z};
@@ -483,6 +515,7 @@ struct ShellSketch3DTools::Impl {
       }
     }
     (void)layer.set_handles(std::move(handles));
+    numeric_row->setVisible(current() && !layer.handles().empty());
     numeric->setReadOnly(true);
     synchronize_overlay();
   }
@@ -524,6 +557,15 @@ struct ShellSketch3DTools::Impl {
     if (current())
       if (const auto* selected = selected_point())
         display_point(resolved_point(*selected));
+    if (current()) {
+      curves->refresh();
+      constraints->refresh();
+      if (draft->constraints().empty())
+        show_dof(solve_spatial_sketch(
+            solve_context ? solve_context->part() : *window.session().part_document(), *draft));
+      else
+        (void)solve_candidate(*draft);
+    }
     invalidate();
     if (restore_preview && start.previewed && current()) {
       auto result = owner.preview();
@@ -535,6 +577,26 @@ struct ShellSketch3DTools::Impl {
   bool accept_drag(const GuiViewportManipulatorCandidate& candidate) {
     if (!current() || !drag)
       return false;
+    if (drag->curve) {
+      auto moved = move_spatial_curve_grip(drag->source, *drag->curve, candidate.scalar_value);
+      auto solved = moved ? solve_candidate(moved.value().sketch, moved.value().options)
+                          : Result<Sketch3D>::failure(moved.error());
+      if (!solved) {
+        draft = drag->source;
+        changed = drag->changed;
+        invalidate();
+        summary->setText(text(solved.error().message()));
+        return false;
+      }
+      draft = std::move(solved.value());
+      changed = true;
+      curves->refresh();
+      auto shown = owner.preview();
+      if (!shown)
+        summary->setText(text(shown.error().message()));
+      synchronize_overlay();
+      return bool(shown);
+    }
     auto value = drag->origin;
     if (candidate.handle_id.ends_with(".x"))
       value.x = candidate.scalar_value;
@@ -575,11 +637,16 @@ struct ShellSketch3DTools::Impl {
   void edit_numeric() {
     if (!drag)
       return;
-    numeric_invalid = !layer.set_numeric_input(numeric->text().toStdString());
+    numeric_invalid =
+        (drag->curve && !valid_spatial_curve_grip_text(numeric->text().toStdString())) ||
+        !layer.set_numeric_input(numeric->text().toStdString());
     if (numeric_invalid) {
       invalidate();
       summary->setText(
-          QStringLiteral("Invalid handle value. Enter an XYZ coordinate in mm or press Escape."));
+          drag->curve
+              ? QStringLiteral("Enter a positive radius/pitch from 1e-9 to 1e9 mm or press Escape.")
+              : QStringLiteral(
+                    "Invalid handle value. Enter an XYZ coordinate in mm or press Escape."));
     } else
       accept_drag(*layer.candidate());
   }
@@ -934,6 +1001,10 @@ struct ShellSketch3DTools::Impl {
       cancel_placement();
       return false;
     }
+    if (event->type() == QEvent::UngrabMouse && drag) {
+      cancel_drag();
+      return false;
+    }
     if (event->type() == QEvent::Resize) {
       refresh_mapping();
       return false;
@@ -995,11 +1066,20 @@ struct ShellSketch3DTools::Impl {
       if (!layer.begin_drag(p))
         return false;
       const auto* selected = selected_point();
-      if (!selected) {
+      const auto frame =
+          std::find_if(curve_frames.begin(), curve_frames.end(), [&](const auto& item) {
+            return layer.active_handle_id() == (item.kind == SpatialCurveGripKind::HelixPitch
+                                                    ? "sketch3d.curve.pitch"
+                                                    : "sketch3d.curve.radius");
+          });
+      if (frame != curve_frames.end())
+        drag = Drag{*draft, {}, {}, changed, previewed, *frame};
+      else if (selected)
+        drag = Drag{*draft, selected->id(), resolved_point(*selected), changed, previewed};
+      else {
         layer.cancel();
         return false;
       }
-      drag = Drag{*draft, selected->id(), resolved_point(*selected), changed, previewed};
       viewport.grab_interaction_mouse();
       numeric_invalid = false;
       numeric->setReadOnly(false);
@@ -1149,12 +1229,11 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   ui.lock->addItems({QStringLiteral("XYZ"), QStringLiteral("X Axis"), QStringLiteral("Y Axis"),
                      QStringLiteral("Z Axis"), QStringLiteral("XY Plane"),
                      QStringLiteral("YZ Plane"), QStringLiteral("ZX Plane")});
-  ui.numeric = new QLineEdit(inputs);
+  ui.numeric = new QLineEdit(panel);
   ui.numeric->setObjectName("blcad.sketch3d.grip_numeric");
   ui.numeric->setReadOnly(true);
   ui.numeric->setPlaceholderText(
-      QStringLiteral("Drag a handle, then enter an XYZ coordinate in mm"));
-  form->addRow(QStringLiteral("Handle Value (XYZ)"), ui.numeric);
+      QStringLiteral("During drag: coordinate, radius or pitch in mm"));
   const std::array direction_ids{"distance", "azimuth", "elevation"};
   const std::array direction_labels{QStringLiteral("Distance (mm)"), QStringLiteral("Azimuth (°)"),
                                     QStringLiteral("Elevation (°)")};
@@ -1224,6 +1303,12 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
           [&ui](SketchEntityId point) {
             ui.fill_points(point);
             ui.tabs->setCurrentIndex(0);
+            ui.grips->setChecked(true);
+          },
+          [&ui] {
+            ui.cancel_drag();
+            ui.cancel_placement();
+            ui.refresh_handles();
           }});
   curve_scroll->setWidget(ui.curves->page());
   ui.tabs->addTab(curve_scroll, QStringLiteral("Curves"));
@@ -1269,6 +1354,12 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   constraint_scroll->setWidget(ui.constraints->page());
   ui.tabs->addTab(constraint_scroll, QStringLiteral("Constraints"));
   layout->addWidget(ui.tabs, 1);
+  ui.numeric_row = new QWidget(panel);
+  auto* numeric_form = new QFormLayout(ui.numeric_row);
+  numeric_form->setContentsMargins(0, 0, 0, 0);
+  numeric_form->addRow(QStringLiteral("Handle Value (mm)"), ui.numeric);
+  layout->addWidget(ui.numeric_row);
+  ui.numeric_row->hide();
   ui.summary = new QLabel(panel);
   ui.summary->setObjectName("blcad.sketch3d.summary");
   ui.summary->setWordWrap(true);
@@ -1343,6 +1434,12 @@ ShellSketch3DTools::ShellSketch3DTools(ShellWindow& window, ShellRibbon& ribbon,
   connect(ui.grips, &QCheckBox::toggled, this, [this] {
     impl_->cancel_drag();
     impl_->cancel_placement();
+    impl_->refresh_handles();
+  });
+  connect(ui.tabs, &QTabWidget::currentChanged, this, [this] {
+    impl_->cancel_drag();
+    impl_->cancel_placement();
+    impl_->pick->setCurrentIndex(0);
     impl_->refresh_handles();
   });
   connect(ui.numeric, &QLineEdit::textEdited, this, [this] { impl_->edit_numeric(); });

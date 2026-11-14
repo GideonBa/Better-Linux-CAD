@@ -283,9 +283,8 @@ the document and undo history, while its diagnostic invalidates borrowed session
 
 [Task/session proofs](../tests/gui/gui_spatial_solver_interaction_tests.cpp) verify exact typed
 positions, independent wire length, conflict correction preserving earlier edits, graph-cycle
-rejection, Undo/Redo and canonical reopening. Scalar grips, native source collection and complete
-native S03–S04 acceptance remain the remaining work within 165. Typed curve and constraint authoring
-extend this task.
+rejection, Undo/Redo and canonical reopening. Native source collection and complete native S03–S04
+acceptance remain the remaining work within 165. Typed authoring and curve grips extend this task.
 
 ## Typed spatial curve forms — 165
 
@@ -346,4 +345,37 @@ reusing former target choices. [GUI physical/continuity/selector proofs](../test
 check a dimension-driven native Sweep, exact Fixed anchors, G1-only rejection from actual derivatives,
 all relation modes, numeric correction, dependency guards, Undo/Redo and reopening. Native runs also
 check visible actions and vertical scrolling at ordinary and compact/scaled sizes. Direct native
-source picking, scalar grips and complete combined S03–S04 remain the next interaction work.
+source picking and complete combined S03–S04 remain the next interaction work.
+
+## Radius, pitch and defining-point grips — 165
+
+Curves offers radius/pitch handles for the selected existing curve. The same fixed task area hosts
+the absolute handle-value input for both Points and Curves. Selecting a curve or toggling handles
+retains an unchanged valid preview; switching registers cancels capture before changing its mode.
+Native camera/ray mapping remains authoritative at ordinary and scaled resolutions.
+
+Arc radius derives its center, plane, direction and radius from the actual circular edge. It scales
+all three local, unbound defining points about the frozen center and pins their nine coordinates
+while the solver adjusts other free variables. Referenced/parameter-bound defining points require
+explicit rebinding/detachment first. Fit/control spline and arc defining points reuse the existing
+local point selector and translation triad, preserving their stable reference identities.
+
+Helix handles expose only owned radius/pitch values. Shared/formula bindings remain read-only until
+explicitly rebound. Radius uses the actual starting radial frame; pitch uses the native endpoint
+and resolved axis, with world movement scaled by the immutable integer turn count. Changing one
+scalar preserves the other binding, handedness, axis and Count source. No continuous turns grip or
+implicit shared-parameter write exists. Numeric scalar input accepts finite **1e-9…1e9 mm** values;
+invalid text rejects before the generic manipulator's clamping behavior can change the request.
+
+Every move and final release rebuilds from the complete pre-gesture source. Transient hard pins keep
+requested values exact; failed solve/downstream preview rejects the whole gesture. Escape, lost
+mouse capture, camera/size/focus changes and curve selection restore earlier local edits and their
+valid preview. Apply remains one final operation for the accepted draft. Cancel or a stale task
+context publishes nothing. Geometry products, glyph frames and pins are transient.
+
+[Curve-grip proofs](../tests/gui/gui_spatial_curve_grip_tests.cpp) check actual endpoint radius/height
+and curvature-derived circle radius, exact owned values and point coordinates, discrete/shared
+source preservation, successful arc/spline editing, incompatible-radius rollback, six interruption
+paths and exact Undo/Redo/reopening. Existing point-grip regression runs with these cases. Historical
+path sampling and the separate verified Surface G2 work remain unchanged requirements of 166/169;
+direct native source collection and combined S03–S04 remain required before whole-165 acceptance.

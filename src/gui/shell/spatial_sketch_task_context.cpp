@@ -90,6 +90,10 @@ Result<SpatialCurveJet> SpatialSketchTaskContext::jet(const Sketch3D& candidate,
     return Result<SpatialCurveJet>::failure(ready.error());
   return query.curve(candidate, target, u);
 }
+Result<std::vector<SpatialCurveGrip>>
+SpatialSketchTaskContext::curve_grips(const Sketch3D& candidate, SketchEntityId id) const {
+  return spatial_curve_grips(part_, candidate, std::move(id), queries());
+}
 Result<Point3> SpatialSketchTaskContext::position(const Sketch3D& candidate,
                                                   const SpatialConstraintTarget& target) const {
   if (const auto* reference = std::get_if<SketchPointReference3D>(&target.source())) {

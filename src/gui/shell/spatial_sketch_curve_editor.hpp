@@ -19,6 +19,7 @@ struct SpatialSketchEditorCallbacks {
   std::function<Result<std::size_t>(Sketch3D, SpatialSketchTaskResources)> accept;
   std::function<Result<std::size_t>()> edit;
   std::function<void(SketchEntityId)> select_point;
+  std::function<void()> selection_changed{};
 };
 // Forms propose typed records to the existing task authority. They own neither a second Sketch3D
 // nor persistent parameter edits. Incomplete forms remain separate from the accepted draft.
@@ -34,6 +35,8 @@ public:
     return pending_;
   }
   bool select_curve(SketchEntityId);
+  [[nodiscard]] SketchEntityId selected_curve() const;
+  [[nodiscard]] bool handles_requested() const;
 
 private:
   enum class Kind { Line, Polyline, Arc, FitSpline, ControlSpline, Helix, Equation };
@@ -56,6 +59,7 @@ private:
   QSpinBox *degree_{}, *turns_{};
   QDoubleSpinBox *radius_{}, *pitch_{}, *tolerance_{};
   QCheckBox* construction_{};
+  QCheckBox* handles_{};
   QComboBox *guide_{}, *guide_role_{};
   QLabel *feedback_{}, *binding_info_{};
   QWidget *point_fields_{}, *spline_fields_{}, *helix_fields_{}, *equation_fields_{};

@@ -783,6 +783,16 @@ SHA-256 `64a5756188f11c32e1ca47ba5eef3f2f60c6e7b6eea3522dcd9e636aff173efa`.
 Scalar grips, direct native source collection and the complete S03–S04 interaction gate remain open;
 the block status stays in progress on this branch.
 
+Curve-grip slice verified: all five native targets build; combined Qt **63 cases: 62 passed,
+one native-only skip / 5,927 assertions**. Native arc/spline/Helix gestures, six interruption paths,
+existing point grips and curve layout pass **11 / 911** at 100% and compact 150%, no skips. Final
+captures inspected after CAD exit. [Grip contract and independent native oracles](gui-sketch3d-interaction-mvp8.md#radius-pitch-and-defining-point-grips--165)
+cover exact owned values/coordinates, actual endpoint height/radius and curvature-derived circle
+radius, shared/discrete sources, conflicting-radius rollback, one history operation and reopening.
+Runtime: **1,127 inputs**, SHA-256
+`c563e10f66d9332ec622b4445eb9d3dc9a0d357319ce71ace34ca468abb1d1aa`.
+Direct native source collection and the complete combined S03–S04 gate remain required for 165.
+
 Historical fixed-sample execution and equation twist retain their explicit 166 boundary. Native
 Surface-boundary G2, later workflows and integrated acceptance remain 168–174. No whole-165
 acceptance is claimed here; preserve all later scope.
