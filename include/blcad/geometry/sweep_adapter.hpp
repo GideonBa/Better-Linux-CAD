@@ -29,6 +29,8 @@ struct SweepPathSegment {
 
 class SweepAdapter {
 public:
+  [[nodiscard]] Result<double>
+  measure_path_length(PathCurveId path, const std::vector<SweepPathSegment>& segments) const;
   [[nodiscard]] Result<GeometryShape>
   path_shape(PathCurveId path, const std::vector<SweepPathSegment>& segments, bool closed) const;
   [[nodiscard]] Result<GeometryShape> sweep_closed_profile(

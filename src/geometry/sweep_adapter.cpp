@@ -284,6 +284,24 @@ execute_sweep(const FeatureId& id, const TopoDS_Wire& profile, const TopoDS_Wire
 
 } // namespace
 
+Result<double>
+SweepAdapter::measure_path_length(PathCurveId path,
+                                  const std::vector<SweepPathSegment>& segments) const {
+  double total = 0;
+  for (const auto& segment : segments) {
+    auto edge = path_edge(FeatureId(path.value()), segment, "path");
+    if (!edge)
+      return Result<double>::failure(edge.error());
+    GProp_GProps properties;
+    BRepGProp::LinearProperties(edge.value(), properties);
+    total += properties.Mass();
+  }
+  if (!std::isfinite(total) || total <= 0)
+    return Result<double>::failure(
+        Error::geometry(path.value(), "Path length must be positive and finite"));
+  return Result<double>::success(total);
+}
+
 Result<GeometryShape> SweepAdapter::sweep_closed_profile(
     FeatureId feature_id, const std::vector<ClosedProfileCurveSegment>& profile,
     const std::vector<SweepPathSegment>& path, PathOrientationRule orientation_rule,

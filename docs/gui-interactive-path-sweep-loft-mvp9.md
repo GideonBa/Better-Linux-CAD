@@ -44,6 +44,30 @@ preview/execution path as other supported curves. [Spatial guide and equation co
 cover native authoring through real Sweep/Loft results. This does not upgrade historical spline/helix
 sampling or enable the separate curve-preserving twist policy assigned to 166.
 
+### Explicit path execution comparison
+
+The path task offers **Create New Path** or an existing path, **Historical** or **Curve Preserving**
+execution, and a separate modeling tolerance in mm. Creation defaults to Historical. Selecting an
+existing path restores its authored policy and full-precision tolerance; its source order, reversal,
+closure and frame controls remain preserved. The task changes only execution policy for that path.
+
+An existing-path preview recomputes the candidate and compares actual current/candidate modeled
+lengths and span counts. The original path remains presented alongside the candidate. Affected Body
+results are previewed with their current presentations temporarily replaced; unrelated Bodies remain
+visible. This makes the downstream shape change visible even when the Body covers the centerline.
+The displayed comparison and disposable Body previews are derived from the successful geometry preview, never persistent intent or Apply authority.
+Invalid numeric text remains visible for correction, disables Apply and clears the candidate ghost.
+No range clamping silently changes an invalid tolerance. The modeling, connection, solver and display
+tolerances keep their independent contracts.
+
+Apply repeats geometry validation and commits one existing Part transaction. Cancel and Save during
+preview retain the committed document. Undo/Redo and reopening use the normal history/Part V10 codec;
+explicitly restoring Historical removes that path's policy field. A comparison captures both canonical
+source intent and the session model revision: upstream edits or replaced documents require reopening
+the task. The common selector scope and pinned Apply/Cancel lifecycle remain owned by the shell.
+The [widget/history/native proofs](../tests/gui/gui_path_execution_policy_tests.cpp) verify ordinary
+and compact/scaled correction, visible units and candidate Bodies; `mvp-plan.md` records acceptance. Curve-preserving equation twist remains a separate gate.
+
 ## Sweep authoring
 
 Sweep mode picks a `SweepProfileReference` (closed region or open path), a trajectory `PathCurve`, and

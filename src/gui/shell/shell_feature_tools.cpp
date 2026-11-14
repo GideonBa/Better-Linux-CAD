@@ -1081,7 +1081,14 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     synchronize_overlay();
     return Result<GuiPartFeaturePreview>::failure(shapes.error());
   }
+  const bool path_policy = command_ == Command::PathCurve &&
+                           coordinator_.path_sweep().mode() == GuiPathSweepMode::PathPolicy;
+  if (path_policy)
+    for (const auto& body : coordinator_.path_sweep().last_policy_body_previews())
+      shapes.value().push_back(body);
   std::vector<std::string> replacements;
+  if (path_policy)
+    replacements = coordinator_.path_sweep().last_policy_body_replacements();
   if (body_operation())
     replacements = body_preview_replacements();
   else if (command_ == Command::Extrude && extrude_operation_->currentIndex() != 0)

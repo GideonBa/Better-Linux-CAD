@@ -766,25 +766,26 @@ Surface-boundary G2 and later workflows remain 168–174. Preserve all planned s
 ### Block 166 compatible path execution — in progress
 
 Keep the accepted source entities and historical path interpretation. Deliver serially on
-`feat/curve-preserving-path-policy`; partial model work does not close the block.
+`feat/curve-preserving-path-policy`; partial work does not close the block.
 
-| Slice | Completion boundary |
+| Slice | Implemented contract and remaining boundary |
 | --- | --- |
-| Core policy / V10 | Implemented: immutable legacy/curve-preserving policy, distinct modeling tolerance, strict necessary-only persistence, atomic source-preserving edits and downstream invalidation. Focused Core **37 cases / 1,311 assertions**, Geometry **8 / 10,377** pass after all five targets build. The existing path/Loft/history Qt regression passes **19 / 1,261**. Legacy compatibility, strict schema and source-preserving invalidation are verified; native execution and its failure gate are tracked in the next row. [Contract](part-path-curve-core-mvp6.md#explicit-execution-policy--166), [Core proofs](../tests/core/path_execution_policy_tests.cpp), [Geometry rollback](../tests/geometry/path_execution_policy_tests.cpp). |
-| Native Geometry | Native rational Bézier/shared Sketch3D spline construction, tolerance-checked Helix and exact native Loft refinement pass the focused Geometry regression: **38 cases / 17,518 assertions**. All five targets build; Core policy/spatial regression passes **37 / 1,311** and existing Qt regression **20 passed, one native-only skipped / 3,247 assertions**. [Construction contract](part-path-curve-core-mvp6.md#native-curve-construction), [analytic proofs](../tests/geometry/path_execution_policy_tests.cpp). Equation twist and all remaining combinations are still open. Existing documents retain their old behavior. |
-| Native upgrade | Compare and preview an explicit upgrade before one Apply; retain the complete original document on invalid geometry or Cancel. No silent upgrade during read/save/source edits. |
-| G01 acceptance | Independent distance/tangent/length oracles, mixed/reversed paths, seams/twists/guides, near-degeneracy and real Sweep/Cut/Surface/path Extrude/Loft consumers; appropriate native checks. |
+| Core policy / V10 | Immutable legacy/curve-preserving policy, separate modeling tolerance, necessary-only strict persistence, atomic source-preserving edits and downstream invalidation. [Contract](part-path-curve-core-mvp6.md#explicit-execution-policy--166), [Core proofs](../tests/core/path_execution_policy_tests.cpp). Resource-aware Project V10 integration still needs its adapter gate and focused proof. |
+| Native Geometry | Exact rational Bézier/shared Sketch3D splines, tolerance-checked Helix, exact native Loft-section refinement and atomic singular-path rejection. [Construction contract](part-path-curve-core-mvp6.md#native-curve-construction), [independent distance/tangent/length and refinement proofs](../tests/geometry/path_execution_policy_tests.cpp). |
+| Native upgrade | Explicit existing/new-path policy controls, actual length/span comparison, affected Body preview, retained invalid tolerance text, stale-source guard and one reversible Apply. [Task contract](gui-interactive-path-sweep-loft-mvp9.md#explicit-path-execution-comparison), [widget/history/native proofs](../tests/gui/gui_path_execution_policy_tests.cpp). Native capture review confirms readable units, visible candidate geometry and reachable actions. No implicit upgrade during read/save/source edits. |
+| G01 acceptance | Still open: curve-preserving equation twist and the remaining mixed/reversed, seam/guide, near-degenerate and physical Sweep/Cut/Surface/path Extrude/Loft combinations. |
 
-The complete 166 Geometry/GUI/acceptance gate remains open. Preserve all 167–204 requirements.
-
-The native regression filter `[native-shell-spatial],[shell-mixed-path-loft],
-[block136-path-extrude]` passes **8 cases / 1,499 assertions** at each of 100% and 150%.
-Six original captures were inspected after CAD exit; separate app startup proved a visible X11
-window (intentional timeout 124). These exercise existing workflows; the explicit upgrade panel
-and its native acceptance are still pending. Artifacts: `/tmp/blcad-166-native{100,150}-7/`,
-matching `.log` files and `/tmp/blcad-166-startup7-proof.log`. Frozen runtime: 1,135 inputs,
-SHA-256 `59399c3ab5bee1f4d1552780f75a4478643a0e9237a9d597971e7e74f3d89698`.
-Delivery remains the draft [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190).
+All five targets build. Focused Core **7 cases / 369 assertions**, Geometry **25 / 5,972** and
+Qt **39 cases: 37 passed, two native-only skipped / 4,184 assertions** pass. The selected native
+filter `[native-path-policy],[native-shell-spatial],[shell-mixed-path-loft]` passes **3 / 687** at
+both 100% and compact 150%, without skips. It includes real keyboard correction, visible tolerance
+units, candidate Body replacement, fixed actions and exact history/reopening. Native artifacts:
+`/tmp/blcad-166-native{100,150}-14/` and matching `.log` files. All eight original captures were
+inspected after CAD exit. Separate app startup proved a visible process-owned X11 window
+(intentional timeout 124; `/tmp/blcad-166-startup14-proof.log`). Frozen runtime: **1,136 inputs**, SHA-256
+`895e94f605f2b3fc3082204ca446ebb95f66dc313ce2d38bd114e6d4412806a4`.
+Delivery remains draft [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190).
+The complete 166 acceptance gate remains open. Preserve all 167–204 requirements.
 
 ## Later phases
 
