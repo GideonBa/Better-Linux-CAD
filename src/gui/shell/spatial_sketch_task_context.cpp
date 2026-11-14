@@ -90,4 +90,31 @@ Result<SpatialCurveJet> SpatialSketchTaskContext::jet(const Sketch3D& candidate,
     return Result<SpatialCurveJet>::failure(ready.error());
   return query.curve(candidate, target, u);
 }
+Result<Point3> SpatialSketchTaskContext::position(const Sketch3D& candidate,
+                                                  const SpatialConstraintTarget& target) const {
+  if (const auto* reference = std::get_if<SketchPointReference3D>(&target.source())) {
+    if (reference->local_point()) {
+      const auto* p = candidate.find_point(*reference->local_point());
+      if (!p)
+        return Result<Point3>::failure(
+            Error::validation(candidate.id().value(), "Point is unavailable"));
+      const auto coordinate = [&](const SketchCoordinate3D& value) {
+        return value.explicit_coordinate()
+                   ? value.explicit_coordinate()->millimeters()
+                   : part_.find_parameter(*value.parameter())->value().millimeters();
+      };
+      return Result<Point3>::success({coordinate(p->x()), coordinate(p->y()), coordinate(p->z())});
+    }
+    return queries().external_point(*reference);
+  }
+  if (target.kind() == SpatialTargetKind::Curve &&
+      target.curve_location() != SpatialCurveLocation::Whole) {
+    auto value =
+        jet(candidate, target, target.curve_location() == SpatialCurveLocation::Start ? 0 : 1);
+    return value ? Result<Point3>::success(value.value().point)
+                 : Result<Point3>::failure(value.error());
+  }
+  return Result<Point3>::failure(
+      Error::validation(candidate.id().value(), "Select a point or curve endpoint"));
+}
 } // namespace blcad::gui

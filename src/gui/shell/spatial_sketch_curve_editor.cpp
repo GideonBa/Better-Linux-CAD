@@ -1,5 +1,6 @@
 #include "spatial_sketch_curve_editor.hpp"
 #include "blcad/gui/gui_icons.hpp"
+#include "spatial_sketch_form_input.hpp"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -78,6 +79,15 @@ SpatialSketchCurveEditor::SpatialSketchCurveEditor(QWidget* parent,
     value->setKeyboardTracking(false);
     target->addRow(label, value);
     connect(value, &QDoubleSpinBox::valueChanged, this, [this] { changed(); });
+    new SpatialFormNumberGuard(*this, *value, [this, value] {
+      if (value == radius_)
+        radius_changed_ = true;
+      if (value == pitch_)
+        pitch_changed_ = true;
+      if (value == tolerance_)
+        tolerance_changed_ = true;
+      changed();
+    });
     return value;
   };
   auto button = [&](const char* name, const QString& label, QVBoxLayout* target) {
@@ -114,7 +124,7 @@ SpatialSketchCurveEditor::SpatialSketchCurveEditor(QWidget* parent,
   spline_form->setContentsMargins(0, 0, 0, 0);
   degree_ = new QSpinBox(page_);
   degree_->setObjectName(object("curve_degree"));
-  degree_->setRange(1, 16);
+  degree_->setRange(1, 5);
   degree_->setValue(3);
   spline_form->addRow("Degree", degree_);
   representation_continuity_ =
@@ -189,7 +199,21 @@ SpatialSketchCurveEditor::SpatialSketchCurveEditor(QWidget* parent,
   connect(kind_, &QComboBox::currentIndexChanged, this, [this] { mode(); });
   connect(degree_, &QSpinBox::valueChanged, this, [this] { changed(); });
   connect(turns_, &QSpinBox::valueChanged, this, [this] { changed(); });
+  new SpatialFormNumberGuard(*this, *degree_, [this] { changed(); });
+  new SpatialFormNumberGuard(*this, *turns_, [this] { changed(); });
   connect(construction_, &QCheckBox::toggled, this, [this] { changed(); });
+  connect(radius_, &QDoubleSpinBox::valueChanged, this, [this] {
+    if (!loading_)
+      radius_changed_ = true;
+  });
+  connect(pitch_, &QDoubleSpinBox::valueChanged, this, [this] {
+    if (!loading_)
+      pitch_changed_ = true;
+  });
+  connect(tolerance_, &QDoubleSpinBox::valueChanged, this, [this] {
+    if (!loading_)
+      tolerance_changed_ = true;
+  });
   for (auto* source : {radius_source_, pitch_source_, turns_source_})
     connect(source, &QComboBox::currentIndexChanged, this, [this] { mode(); });
   connect(add_point, &QPushButton::clicked, this, [this] {
@@ -274,6 +298,18 @@ void SpatialSketchCurveEditor::mode() {
   radius_->setEnabled(radius_source_->currentData().toString().isEmpty());
   pitch_->setEnabled(pitch_source_->currentData().toString().isEmpty());
   turns_->setEnabled(turns_source_->currentData().toString().isEmpty());
+  if (callbacks_.sketch())
+    for (const auto& pair :
+         {std::pair{radius_source_, radius_}, std::pair{pitch_source_, pitch_}}) {
+      const ParameterId id(pair.first->currentData().toString().toStdString());
+      const Parameter* selected = callbacks_.part().find_parameter(id);
+      if (!selected)
+        for (const auto& p : callbacks_.resources().parameters)
+          if (p.id() == id)
+            selected = &p;
+      if (selected)
+        pair.second->setValue(selected->value().millimeters());
+    }
 }
 QString SpatialSketchCurveEditor::point_label(const SketchPointReference3D& ref) const {
   for (const auto& p : point_sources_)
@@ -507,6 +543,7 @@ void SpatialSketchCurveEditor::load() {
     }
     show_points();
     mode();
+    radius_changed_ = pitch_changed_ = tolerance_changed_ = false;
     loading_ = false;
     pending_ = false;
     feedback_->setText("Point references retain their sources. Internal spline C2 is distinct from "
@@ -515,6 +552,19 @@ void SpatialSketchCurveEditor::load() {
   loading_ = false;
 }
 void SpatialSketchCurveEditor::stage() {
+  const auto selected_kind = static_cast<Kind>(kind_->currentIndex());
+  if (selected_kind == Kind::Helix) {
+    if (radius_->isEnabled())
+      finish_spatial_number(*radius_);
+    if (pitch_->isEnabled())
+      finish_spatial_number(*pitch_);
+    if (turns_->isEnabled())
+      finish_spatial_number(*turns_);
+  }
+  if (selected_kind == Kind::FitSpline || selected_kind == Kind::ControlSpline)
+    finish_spatial_number(*degree_);
+  if (selected_kind == Kind::Equation)
+    finish_spatial_number(*tolerance_);
   take(callbacks_.edit());
   auto candidate = *callbacks_.sketch();
   auto resources = callbacks_.resources();
@@ -570,6 +620,13 @@ void SpatialSketchCurveEditor::stage() {
     }();
     const auto binding = [&](QComboBox* box, QDoubleSpinBox* value) {
       const auto parameter = box->currentData().toString();
+      if (existing) {
+        const auto* old = candidate.find_helix(id);
+        const auto& original = box == radius_source_ ? old->radius_binding() : old->pitch_binding();
+        const bool edited = box == radius_source_ ? radius_changed_ : pitch_changed_;
+        if (!edited && parameter == q(original.parameter_id().value()))
+          return original;
+      }
       return parameter.isEmpty()
                  ? take(SketchLength3D::create_explicit(take(Quantity::length_mm(value->value()))))
                  : take(SketchLength3D::create_parameter(ParameterId(parameter.toStdString())));
@@ -594,8 +651,9 @@ void SpatialSketchCurveEditor::stage() {
         {variable_->text().trimmed().toStdString(),
          static_cast<CurveUnit>(variable_unit_->currentIndex())},
         lower_->text().toStdString(), upper_->text().toStdString(), expressions,
-        tolerance_->value(), static_cast<EquationCurveClosure>(closure_->currentIndex()),
-        construction_->isChecked()));
+        existing && !tolerance_changed_ ? candidate.find_equation_curve(id)->tolerance_mm()
+                                        : tolerance_->value(),
+        static_cast<EquationCurveClosure>(closure_->currentIndex()), construction_->isChecked()));
     take(existing ? candidate.replace_equation_curve(value) : candidate.add_equation_curve(value));
   }
   take(callbacks_.accept(std::move(candidate), std::move(resources)));

@@ -5,6 +5,14 @@
 
 namespace blcad::gui {
 class GuiDocumentSession;
+struct SpatialSketchTargetChoice {
+  std::string label;
+  std::string semantic_id;
+  SpatialConstraintTarget target;
+  bool straight{false};
+  bool circular{false};
+  geometry::GeometryShape shape;
+};
 struct SpatialSketchTaskResources {
   std::vector<Parameter> parameters;
   std::vector<DatumAxis> axes;
@@ -20,6 +28,9 @@ public:
   [[nodiscard]] SpatialSolveResult solve(const Sketch3D&, const SpatialSolverOptions& = {}) const;
   [[nodiscard]] Result<SpatialCurveJet> jet(const Sketch3D&, const SpatialConstraintTarget&,
                                             double) const;
+  [[nodiscard]] Result<Point3> position(const Sketch3D&, const SpatialConstraintTarget&) const;
+  [[nodiscard]] Result<std::vector<SpatialSketchTargetChoice>>
+  constraint_targets(const Sketch3D&) const;
   [[nodiscard]] const PartDocument& part() const noexcept {
     return part_;
   }

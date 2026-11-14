@@ -772,6 +772,17 @@ resources and exact history/reopen. Runtime: **1,119 inputs**, SHA-256
 `15c095ff54ab0f0c298d019807812633ef5035a8e567205e6e7487df478b827b`.
 Constraint forms, scalar grips/native selection and the complete S03–S04 gate remain open.
 
+Typed constraint/dimension slice verified: all five native targets build; selected Qt **59 cases:
+58 passed, one native-only skip / 5,612 assertions**, covering existing spatial and history-prefix
+workflows. Native constraints, numeric correction, curve layout and existing grips pass **12 / 838**
+at 100% and compact 150%, no skips; both final constraint captures inspected after CAD exit.
+[Contract and physical/continuity proofs](gui-sketch3d-interaction-mvp8.md#spatial-constraints-and-dimensions--165)
+cover actual Sweep volume, exact anchors/unchanged scalar precision, G1-only rejection as Smooth/G2,
+typed sources, correction, closed-context guards and exact history/reopen. Runtime: **1,124 inputs**,
+SHA-256 `64a5756188f11c32e1ca47ba5eef3f2f60c6e7b6eea3522dcd9e636aff173efa`.
+Scalar grips, direct native source collection and the complete S03–S04 interaction gate remain open;
+the block status stays in progress on this branch.
+
 Historical fixed-sample execution and equation twist retain their explicit 166 boundary. Native
 Surface-boundary G2, later workflows and integrated acceptance remain 168–174. No whole-165
 acceptance is claimed here; preserve all later scope.
