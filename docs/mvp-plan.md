@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 164
-current_block: 165
-current_boundary: Block 164 delivered; Block 165 spatial curve/constraint workflow in progress
-current_tag: "[parity-b165]"
+implemented_through: Block 165
+current_block: 166
+current_boundary: Block 165 verified; delivery pending; Block 166 planned
+current_tag: "[parity-b166]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–164 accepted; Block 165 in progress; Blocks 166–204 planned"
+  advanced_modeling_workflows: "Blocks 145–165 accepted; Blocks 166–204 planned"
 ---
 
 # MVP Plan
@@ -34,13 +34,14 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 164
-current block        Block 165 (in progress)
-current phase        Planar and spatial sketch extensions
-current boundary     Block 164 delivered; spatial curve/constraint workflow in progress
+implemented through  Block 165
+current block        Block 166 (planned; not started)
+current phase        Curves, paths and surfaces
+current boundary     Block 165 verified; PR delivery pending
 ```
 
-The assigned sequence continues through Block 174; Block 165 is the active delivery.
+The assigned sequence continues through Block 174. Block 165 is verified with delivery pending;
+Block 166 is next and remains unstarted until that delivery is merged.
 [The consolidated sequence](inventor-parity-sequence.md)
 contains dependencies and implementation criteria; [the test plan](inventor-parity-test-plan.md)
 contains individual and combined acceptance; [the UI contract](user-interface.md) owns the
@@ -70,7 +71,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 162 | Delivered in PR #186: native Smooth/equation authoring, conflict correction, closed-profile Extrude/Revolve and exact persisted history. |
 | 163 | Delivered in PR #187: spatial constraint ownership, strict V9 and actual legacy Geometry/session preservation. |
 | 164 | Delivered in PR #188: deterministic spatial solver, normalized native queries, physical rank/gauge and exact rejection with independent S03 oracles. |
-| 165 | Solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 downstream acceptance. |
+| 165 | Verified solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 consumers; [PR #189](https://github.com/GideonBa/Better-Linux-CAD/pull/189) delivery pending. |
 | 166–167 | Explicit compatible curve-preserving path execution, semantic-edge inputs and multi-wire Sweep with G01 physical oracles. |
 | 168–169 | Persistent Loft boundary/guide intent followed by independently verified G2 execution and G02 acceptance. |
 | 170–172 | Offset/Thicken intent and checked Geometry, curved Trim/Extend and derived gap diagnostics with G03–G04 acceptance. |
@@ -163,8 +164,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–164 are **Implemented and accepted**;
-Block 165 is **In progress**; Blocks 166–204 are **Planned; not started**.
+Status authority: Blocks 145–165 are **Implemented and accepted**;
+Blocks 166–204 are **Planned; not started**. Block 165 delivery is pending.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -176,7 +177,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
-| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | 159–164 accepted; 165 in progress |
+| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
@@ -731,9 +732,9 @@ as `d8770ae` and `87db752` (1,395 and 790 added lines). Tree `b06b8ed` matches r
 Main was refreshed and clean before `feat/spatial-curve-constraint-workflow`. Continue serially
 through 174 and preserve all 175–204 planning.
 
-### Block 165 spatial curve and constraint workflow — in progress
+### Block 165 spatial curve and constraint workflow — verified; delivery pending
 
-Extend the existing Sketch3D authority. The implementation is on
+The existing Sketch3D authority now supplies the contracts below. The implementation is on
 `feat/spatial-curve-constraint-workflow`; finish the verification/delivery gate before starting 166.
 Every commit remains at or below 1,500 added lines. Intermediate run chronology is retained in Git.
 
@@ -745,15 +746,19 @@ Every commit remains at or below 1,500 added lines. Intermediate run chronology 
 | Exact point/arc/spline/Helix gestures preserve source identities and formulas; rejection/interruption restores earlier local edits. Native picks, hidden inputs and direct curve editing restore selection context. | [Point/context](../tests/gui/gui_spatial_solver_interaction_tests.cpp), [curve grips](../tests/gui/gui_spatial_curve_grip_tests.cpp), [native selection](../tests/gui/gui_spatial_source_selection_tests.cpp). |
 | S03–S04 authoring feeds native Sweep/Loft; guide/section witnesses measure actual faces. Invalid bindings/conflicts reject atomically; complete history and file reopening retain intent. Equation curves feed path creation without entity-ID collisions. | [Combined contract](gui-sketch3d-interaction-mvp8.md#spatial-guides-and-downstream-consumers--165), [independent geometry/history proofs](../tests/gui/gui_spatial_guide_loft_tests.cpp). |
 
-Final verification is **in progress** on runtime **1,130 inputs**, SHA-256
+Final verification: all five native targets build. Full Core **758 / 34,349**, Geometry
+**706 / 69,373**, and corrected Qt **933 cases: 860 passed, 73 native-only skipped /
+102,801 assertions**, all passed. Core/Geometry inputs and binaries are unchanged from their
+full run; the final GUI was rebuilt and its full suite repeated after the diagnostic correction.
+The selected combined native regression passes **80 / 8,790** at both 100% and compact 150%, no
+skips. Final guide/constraint/curve-grip captures were inspected after CAD exit. Separate app startup
+verified a visible process-owned X11 window (intentional timeout 124).
+
+Frozen runtime: **1,130 inputs**, SHA-256
 `4f5b40808a21e7f3fc29ebf35ee44f2daae61ebcd3184dfd861397186739a8e3`.
-All five targets build. Core **758 / 34,349** and Geometry **706 / 69,373** full suites passed;
-their inputs/binaries remain unchanged after the final GUI-only correction. The preceding Qt full
-run passed **933 cases: 860 passed, 73 native-only skipped / 102,799 assertions**; repeat it on the
-corrected GUI before acceptance; that full run is active. Corrected native combined regression
-passes **80 / 8,790** at both 100% and compact 150%, no skips. Final guide/constraint/curve-grip
-captures were inspected after CAD exit. Separate app startup verified a visible process-owned X11
-window (intentional timeout 124). Qt completion and delivery remain pending.
+Delivery: [PR #189](https://github.com/GideonBa/Better-Linux-CAD/pull/189), normal rebase merge pending.
+The implementation commits preserve the 1,500-added-line limit. Do not start the 166 branch before
+this PR is merged and main refreshed.
 
 Historical fixed-sample execution and equation twist retain their explicit 166 boundary. Native
 Surface-boundary G2 and later workflows remain 168–174. Preserve all planned scope through 204.
