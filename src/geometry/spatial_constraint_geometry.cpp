@@ -10,6 +10,7 @@
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 #include "derived_curve_internal.hpp"
+#include "part_history_evaluation.hpp"
 #include "semantic_face_resolution.hpp"
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
@@ -70,13 +71,39 @@ struct State {
   const PartDocument& part;
   const ShapeCache& cache;
   StepImportTopologyContext* imports;
+  SpatialGeometryScope scope;
+  SpatialExternalSketchResolver resolve_external;
   std::optional<Sketch3DGeometryResult> candidate{};
   std::map<std::string, Sketch3DGeometryResult> external{};
+  std::map<std::string, Sketch3D> external_owners{};
+  Result<Sketch3D> external_owner(const Sketch3D& source) {
+    if (const auto found = external_owners.find(source.id().value());
+        found != external_owners.end())
+      return Result<Sketch3D>::success(found->second);
+    auto resolved =
+        resolve_external ? resolve_external(source.id()) : Result<Sketch3D>::success(source);
+    if (resolved)
+      external_owners.emplace(source.id().value(), resolved.value());
+    return resolved;
+  }
   Result<std::size_t> fresh() const {
-    auto valid = cache.validate_complete_history_result(part);
+    auto valid = std::visit(
+        [&](const auto& selected) {
+          using T = std::decay_t<decltype(selected)>;
+          if constexpr (std::is_same_v<T, SpatialHistoryPrefixScope>)
+            return detail::validate_history_modeling_scope(part, cache, selected.count);
+          else if constexpr (std::is_same_v<T, SpatialFeatureInputScope>) {
+            if (!cache.has_history_scope())
+              return Result<std::size_t>::failure(
+                  error("Spatial feature input requires a matched history cache"));
+            return cache.validate_history_input(part);
+          } else
+            return cache.validate_complete_geometry_result(part);
+        },
+        scope);
     if (!valid)
       return valid;
-    auto observed = observe_imported_part_sources(part, imports);
+    auto observed = observe_imported_part_sources(part, imports, cache.history_plan());
     if (!observed)
       return observed;
     return imports ? imports->validate_sources() : Result<std::size_t>::success(0);
@@ -89,7 +116,10 @@ struct State {
       candidate = std::move(converted.value());
     }
     if (!local && !external.contains(s.id().value())) {
-      auto converted = Sketch3DGeometryAdapter{}.convert(part, s);
+      auto owner = external_owner(s);
+      if (!owner)
+        return Result<TopoDS_Shape>::failure(owner.error());
+      auto converted = Sketch3DGeometryAdapter{}.convert(part, owner.value());
       if (!converted)
         return Result<TopoDS_Shape>::failure(converted.error());
       external.emplace(s.id().value(), std::move(converted.value()));
@@ -267,12 +297,16 @@ struct State {
     if (const auto* external_ref = std::get_if<SpatialExternalCurve>(&t.source());
         external_ref && external_ref->reference.sketch_3d()) {
       const auto* owner = part.find_sketch_3d(*external_ref->reference.sketch_3d());
-      if (owner)
-        if (const auto* helix = owner->find_helix(*external_ref->reference.entity())) {
+      if (owner) {
+        const auto resolved = external_owner(*owner);
+        if (!resolved)
+          return Result<double>::failure(resolved.error());
+        if (const auto* helix = resolved.value().find_helix(*external_ref->reference.entity())) {
           auto q = helix->radius_binding().resolve(part);
           return q ? Result<double>::success(q.value().millimeters())
                    : Result<double>::failure(q.error());
         }
+      }
     }
     auto native_curve = curve(s, t);
     if (!native_curve)
@@ -340,10 +374,12 @@ struct State {
   }
 };
 } // namespace
-SpatialSolverGeometry SpatialConstraintGeometry::queries(const PartDocument& part,
-                                                         const ShapeCache& cache,
-                                                         StepImportTopologyContext* imports) const {
-  auto state = std::make_shared<State>(State{part, cache, imports});
+SpatialSolverGeometry
+SpatialConstraintGeometry::queries(const PartDocument& part, const ShapeCache& cache,
+                                   StepImportTopologyContext* imports, SpatialGeometryScope scope,
+                                   SpatialExternalSketchResolver external) const {
+  auto state =
+      std::make_shared<State>(State{part, cache, imports, std::move(scope), std::move(external)});
   SpatialSolverGeometry queries;
   queries.validate_sources = [state] { return state->fresh(); };
   queries.prepare_candidate = [state](const Sketch3D&) {

@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 164
 current_block: 165
-current_boundary: Block 164 verified; normal serial delivery pending
+current_boundary: Block 164 delivered; Block 165 spatial curve/constraint workflow in progress
 current_tag: "[parity-b165]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–164 accepted; Blocks 165–204 planned"
+  advanced_modeling_workflows: "Blocks 145–164 accepted; Block 165 in progress; Blocks 166–204 planned"
 ---
 
 # MVP Plan
@@ -35,13 +35,12 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 164
-current block        Block 165 (planned)
+current block        Block 165 (in progress)
 current phase        Planar and spatial sketch extensions
-current boundary     Block 164 verified; normal serial delivery pending
+current boundary     Block 164 delivered; spatial curve/constraint workflow in progress
 ```
 
-The assigned sequence continues through Block 174. Deliver verified 164 normally, then start 165
-from clean updated main.
+The assigned sequence continues through Block 174; Block 165 is the active delivery.
 [The consolidated sequence](inventor-parity-sequence.md)
 contains dependencies and implementation criteria; [the test plan](inventor-parity-test-plan.md)
 contains individual and combined acceptance; [the UI contract](user-interface.md) owns the
@@ -70,7 +69,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 160–161 | Accepted typed equation intent/persistence and tolerance-controlled Geometry with real S02 profile/path/solid consumers; native authoring remains 162. |
 | 162 | Delivered in PR #186: native Smooth/equation authoring, conflict correction, closed-profile Extrude/Revolve and exact persisted history. |
 | 163 | Delivered in PR #187: spatial constraint ownership, strict V9 and actual legacy Geometry/session preservation. |
-| 164 | Verified deterministic spatial solver, normalized native queries, physical rank/gauge and exact rejection with independent S03 oracles; serial delivery pending. |
+| 164 | Delivered in PR #188: deterministic spatial solver, normalized native queries, physical rank/gauge and exact rejection with independent S03 oracles. |
 | 165 | Solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 downstream acceptance. |
 | 166–167 | Explicit compatible curve-preserving path execution, semantic-edge inputs and multi-wire Sweep with G01 physical oracles. |
 | 168–169 | Persistent Loft boundary/guide intent followed by independently verified G2 execution and G02 acceptance. |
@@ -165,7 +164,7 @@ raw samples, benchmark limits and future performance scope remain in their exist
 ## Blocks 145–204 — Advanced modeling workflows
 
 Status authority: Blocks 145–164 are **Implemented and accepted**;
-Blocks 165–204 are **Planned; not started**.
+Block 165 is **In progress**; Blocks 166–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -177,7 +176,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | --- | --- | --- | --- |
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
-| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | 159–164 accepted; 165 planned |
+| C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | 159–164 accepted; 165 in progress |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Planned; not started |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
@@ -220,7 +219,7 @@ PR links preserve individual slice provenance without copying intermediate compl
 | 161 | Bounded analytic/adaptive equation Geometry, proven closure/regions, existing profile/PathCurve and real Extrude/Revolve/Sweep consumers | [Construction/proof](part-sketch-3d-geometry-mvp6.md#equation-construction-contract), [profile](arc-and-trim-extend-sketch-profile-mvp.md#equation-profile-contract), [PathCurve](part-path-curve-core-mvp6.md#equation-source-contract) | [185](https://github.com/GideonBa/Better-Linux-CAD/pull/185) |
 | 162 | Native Smooth/equation tasks, typed domains/bindings/tolerance, actual differential and candidate overlays, conflict/cancel/freshness, command search and closed-profile Extrude/Revolve | [Curve task/proof](gui-sketch-spline-text-mvp8.md#block-162-native-curve-task), [Smooth](gui-sketch-constraint-authoring-mvp8.md#block-162-native-smooth-task), [focused checks](development-setup.md) | [186](https://github.com/GideonBa/Better-Linux-CAD/pull/186) |
 | 163 | Stable owned spatial constraint targets/dimensions, deterministic coordinate/scalar/auxiliary layout, literal Helix bindings, atomic source/graph protection and strict necessary-only V9/Project persistence | [Ownership and proof](part-sketch-3d-core-mvp6.md#spatial-constraint-ownership--163), [curve bindings](part-sketch-3d-curves-core-mvp6.md), [JSON](part-sketch-3d-json-mvp6.md); solving/DOF and authoring remain 164/165 | [187](https://github.com/GideonBa/Better-Linux-CAD/pull/187) |
-| 164 | Bounded normalized spatial solve, native differential/projection queries, deterministic physical rank/redundancy, admissible rigid gauge/internal DOF and exact source rejection | [Solver contract/proofs](part-sketch-3d-core-mvp6.md#spatial-solver-boundary--164), [native capabilities](part-sketch-3d-geometry-mvp6.md#spatial-solver-queries--164); native authoring remains 165 | Verified; normal serial delivery pending |
+| 164 | Bounded normalized spatial solve, native differential/projection queries, deterministic physical rank/redundancy, admissible rigid gauge/internal DOF and exact source rejection | [Solver contract/proofs](part-sketch-3d-core-mvp6.md#spatial-solver-boundary--164), [native capabilities](part-sketch-3d-geometry-mvp6.md#spatial-solver-queries--164); native authoring remains 165 | [188](https://github.com/GideonBa/Better-Linux-CAD/pull/188) |
 
 The initial full parity plan was delivered in [PR #138](https://github.com/GideonBa/Better-Linux-CAD/pull/138).
 
@@ -727,8 +726,37 @@ not global uniqueness, surface-boundary G2 Loft or a historical path-policy upgr
 
 [Core oracle assertions](../tests/core/sketch_3d_solver_tests.cpp) and
 [native Geometry assertions](../tests/geometry/spatial_solver_geometry_tests.cpp) own the proofs.
-Deliver normally with bounded commits; refresh clean main after merge before 165. Continue through
-174 without accepting any later partial scope; preserve all 175–204 planning.
+Delivery: [PR #188](https://github.com/GideonBa/Better-Linux-CAD/pull/188) merged normally by rebase
+as `d8770ae` and `87db752` (1,395 and 790 added lines). Tree `b06b8ed` matches reviewed `61ae6e4`.
+Main was refreshed and clean before `feat/spatial-curve-constraint-workflow`. Continue serially
+through 174 and preserve all 175–204 planning.
+
+### Block 165 spatial curve and constraint workflow — in progress
+
+Extend the existing Sketch3D task and model authority. Complete each coherent checked change in a
+commit of at most 1,500 added lines; merge only after the complete 165 gate is met.
+
+| Step | Completion boundary |
+| --- | --- |
+| Parametric execution | Resolve constrained spatial geometry from authored seeds/current parameter sources for native scene and existing PathCurve/Sweep/Loft consumers. Keep source intent immutable during derived recompute; use explicit complete/prefix/evaluating cache scopes and current external-source authority. |
+| Curve authoring | Create/edit/delete/rebind arcs, fit/control splines, helices and supported equation curves in the existing task. Explicitly own or bind Length scalars and integer Count turns; preserve existing point/line, copying and placement behavior. |
+| Constraints and diagnostics | Ordered capability-compatible targets, dimensions/parameter bindings, correctable conflicts and visible total/gauge/internal DOF plus actual endpoint tangent/curvature. |
+| Interaction and S03–S04 | Arc/spline/Helix grips with explicit override/rebind, immutable formulas/shared parameters, anchored locks and exact-release source transactions. Native camera/high-DPI/cancellation/lost-capture, full downstream preview, history/reopen and independent actual surface/section witnesses. |
+
+Parametric execution foundation verified: all five native targets build; Core **757 cases / 34,325
+assertions**, Geometry **705 / 69,346**, focused Qt **41 cases: 40 passed, one native-only skipped /
+3,476 assertions**, and native existing spatial tools **8 / 1,382**, no native skips. Filters with
+no cases are excluded from coverage claims. The focused Geometry schema/solver/replay set passes
+**11 / 424**. The new [replay/stage/path proofs](../tests/geometry/spatial_sketch_recompute_tests.cpp)
+and [session rollback/reopen proofs](../tests/gui/gui_spatial_parametric_session_tests.cpp) establish
+this slice. Runtime manifest: **1,113 inputs**, SHA-256
+`6ec50107fa5542f29f3c9a892970aea005e58695b6e1405c0dafdadf7886adb5`.
+Curve/constraint authoring and the complete native interaction gate remain in progress on the same
+branch; this foundation does not close Block 165.
+
+Historical fixed-sample execution and equation twist retain their explicit 166 boundary. Native
+Surface-boundary G2, later workflows and integrated acceptance remain 168–174. No whole-165
+acceptance is claimed here; preserve all later scope.
 
 ## Later phases
 

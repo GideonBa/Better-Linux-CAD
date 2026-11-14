@@ -2,6 +2,7 @@
 
 #include "blcad/core/step_import_freshness.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <map>
 #include <string>
@@ -53,12 +54,22 @@ const std::filesystem::path& StepImportTopologyContext::root_directory() const n
 }
 
 Result<std::size_t> observe_imported_part_sources(const PartDocument& document,
-                                                  StepImportTopologyContext* context) {
+                                                  StepImportTopologyContext* context,
+                                                  const PartHistoryEvaluationPlan* scope) {
   std::vector<const ImportedPartDefinition*> definitions;
   if (const auto* definition = document.reference_part_definition())
     definitions.push_back(definition);
-  for (const auto& feature : document.imported_body_features())
+  for (const auto& feature : document.imported_body_features()) {
+    if (scope) {
+      const auto found =
+          std::find_if(scope->entries.begin(), scope->entries.end(), [&](const auto& entry) {
+            return entry.feature.node_id == feature.id().value();
+          });
+      if (found == scope->entries.end() || found->state != PartHistoryExecutionState::Active)
+        continue;
+    }
     definitions.push_back(&feature.definition());
+  }
   if (definitions.empty())
     return Result<std::size_t>::success(0);
   if (context == nullptr)

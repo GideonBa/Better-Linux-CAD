@@ -408,6 +408,7 @@ void ShapeCache::clear_final_shape() noexcept {
 }
 
 void ShapeCache::clear() noexcept {
+  spatial_sketch_solutions_.reset();
   invalidate_history_result();
   feature_shapes_.clear();
   body_shapes_.clear();

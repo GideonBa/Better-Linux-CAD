@@ -1141,34 +1141,47 @@ Result<std::size_t> validate_path_curve(const PartDocument& document, const Path
                             "Single equation PathCurve closure must match its source intent"));
   }
   std::vector<std::pair<PathEndpoint, PathEndpoint>> endpoints;
+  std::vector<bool> derived;
   endpoints.reserve(path_curve.segments().size());
   for (const auto& segment : path_curve.segments()) {
     auto resolved = path_segment_endpoints(document, segment);
     if (resolved.has_error())
       return Result<std::size_t>::failure(resolved.error());
     endpoints.push_back(std::move(resolved.value()));
+    const auto* owner =
+        segment.sketch_3d() ? document.find_sketch_3d(*segment.sketch_3d()) : nullptr;
+    derived.push_back(owner && !owner->constraints().empty());
   }
   for (std::size_t index = 1; index < endpoints.size(); ++index)
-    if (!path_endpoints_connect(endpoints[index - 1U].second, endpoints[index].first,
+    if (!derived[index - 1] && !derived[index] &&
+        !path_endpoints_connect(endpoints[index - 1U].second, endpoints[index].first,
                                 path_curve.connection_tolerance_mm()))
       return Result<std::size_t>::failure(Error::validation(
           path_curve.id().value(), "path segments must be ordered and connected within tolerance"));
-  if (path_curve.closure() == PathClosure::Closed &&
+  if (path_curve.closure() == PathClosure::Closed && !derived.back() && !derived.front() &&
       !path_endpoints_connect(endpoints.back().second, endpoints.front().first,
                               path_curve.connection_tolerance_mm()))
     return Result<std::size_t>::failure(Error::validation(
         path_curve.id().value(), "closed path endpoints must connect within tolerance"));
   std::vector<PathEndpoint> junctions;
+  std::vector<bool> derived_junctions{derived.front()};
   junctions.reserve(endpoints.size() + 1U);
   junctions.push_back(endpoints.front().first);
-  for (const auto& endpoint : endpoints)
-    junctions.push_back(endpoint.second);
+  for (std::size_t i = 0; i < endpoints.size(); ++i) {
+    junctions.push_back(endpoints[i].second);
+    derived_junctions.push_back(derived[i]);
+  }
   for (std::size_t right = 1U; right < junctions.size(); ++right)
     for (std::size_t left = 0U; left < right; ++left) {
       const bool permitted_closed_seam = path_curve.closure() == PathClosure::Closed &&
                                          left == 0U && right + 1U == junctions.size();
-      if (!permitted_closed_seam && path_endpoints_connect(junctions[left], junctions[right],
-                                                           path_curve.connection_tolerance_mm()))
+      const bool same_identity = !junctions[left].identity.empty() &&
+                                 junctions[left].identity == junctions[right].identity;
+      const bool same_static_position =
+          !derived_junctions[left] && !derived_junctions[right] &&
+          path_endpoints_connect(junctions[left], junctions[right],
+                                 path_curve.connection_tolerance_mm());
+      if (!permitted_closed_seam && (same_identity || same_static_position))
         return Result<std::size_t>::failure(Error::validation(
             path_curve.id().value(),
             "path curve must not contain branch points or repeated internal junctions"));
