@@ -8,13 +8,17 @@
 
 #include "blcad/core/loft_feature.hpp"
 #include "blcad/core/parameter.hpp"
+#include "blcad/core/part_document_json.hpp"
 #include "blcad/core/part_feature_input_reference.hpp"
 #include "blcad/core/path_curve.hpp"
 #include "blcad/core/quantity.hpp"
 #include "blcad/core/sweep_feature.hpp"
 #include "blcad/geometry/loft_section_alignment.hpp"
 
+#include <iomanip>
+#include <locale>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -31,10 +35,44 @@ namespace blcad::gui {
 // Each previews a throwaway PartDocument clone and commits one transaction.
 inline constexpr std::string_view kSweepTwistHandleId = "sweep.twist";
 
-enum class GuiPathSweepMode { PathCurve, Sweep };
+enum class GuiPathSweepMode { PathCurve, Sweep, PathPolicy };
 
 class GuiInteractivePathSweepController {
 public:
+  [[nodiscard]] Result<std::size_t> begin_path_policy(const GuiDocumentSession& session,
+                                                      PathCurveId id) {
+    const auto* part = session.part_document();
+    const auto* path = part ? part->find_path_curve(id) : nullptr;
+    if (!path || part->is_reference_part())
+      return fail("Path execution editing requires an editable existing path");
+    auto source = serialize_part_document_to_json(*part);
+    if (!source)
+      return Result<std::size_t>::failure(source.error());
+    reset();
+    mode_ = GuiPathSweepMode::PathPolicy;
+    policy_source_json_ = std::move(source.value());
+    policy_source_revision_ = session.model_revision();
+    path_id_ = std::move(id);
+    feature_ = FeatureId(path_id_.value());
+    name_ = path->name();
+    execution_policy_ = path->execution_policy();
+    active_ = true;
+    return Result<std::size_t>::success(1);
+  }
+  void set_execution_policy(PathExecutionPolicy policy) {
+    execution_policy_ = std::move(policy);
+  }
+  [[nodiscard]] const std::string& last_policy_comparison() const noexcept {
+    return comparison_;
+  }
+  // Disposable products of the last successful geometry preview, never Apply authority.
+  [[nodiscard]] const std::vector<geometry::GeometryShape>&
+  last_policy_body_previews() const noexcept {
+    return policy_body_previews_;
+  }
+  [[nodiscard]] const std::vector<std::string>& last_policy_body_replacements() const noexcept {
+    return policy_body_replacements_;
+  }
   [[nodiscard]] Result<std::size_t>
   begin_path_curve(const GuiDocumentSession& session, PathCurveId path_id, std::string name,
                    PathClosure closure = PathClosure::Open,
@@ -152,6 +190,12 @@ public:
     if (!active_) return preview_fail("no path/sweep command is active");
     const auto* part = session.part_document();
     if (part == nullptr) return preview_fail("preview requires an active Part document");
+    if (mode_ == GuiPathSweepMode::PathPolicy) {
+      auto current = serialize_part_document_to_json(*part);
+      if (!current || current.value() != policy_source_json_ ||
+          session.model_revision() != policy_source_revision_)
+        return preview_fail("Path inputs changed; reopen the execution comparison");
+    }
     PartDocument candidate = *part;
     if (auto seeded = seed_parameters(candidate); seeded.has_error())
       return Result<GuiPartFeaturePreview>::failure(seeded.error());
@@ -164,6 +208,7 @@ public:
 
   [[nodiscard]] Result<geometry::GeometryShape>
   preview_shape(const GuiDocumentSession& session) const {
+    clear_policy_preview();
     auto checked = preview(session);
     if (!checked)
       return Result<geometry::GeometryShape>::failure(checked.error());
@@ -181,8 +226,13 @@ public:
       if (!cache)
         return Result<geometry::GeometryShape>::failure(cache.error());
       return query_with_step_import_context(session, [&](auto* context) {
-        return geometry::GeometryRecomputeExecutor{context}.preview_path_curve(candidate, path_id_,
-                                                                               cache.value());
+        if (mode_ == GuiPathSweepMode::PathPolicy) {
+          auto compared = compare_policy(session, candidate, cache.value(), context);
+          if (!compared)
+            return Result<geometry::GeometryShape>::failure(compared.error());
+        }
+        return finish_path_preview(geometry::GeometryRecomputeExecutor{context}.preview_path_curve(
+            candidate, path_id_, cache.value()));
       });
     }
     return query_with_step_import_context(session, [&](auto* context) {
@@ -193,28 +243,96 @@ public:
       auto recomputed = executor.execute_document(candidate, cache.value());
       if (!recomputed)
         return Result<geometry::GeometryShape>::failure(recomputed.error());
-      return executor.preview_path_curve(candidate, path_id_, cache.value());
+      if (mode_ == GuiPathSweepMode::PathPolicy) {
+        auto compared = compare_policy(session, candidate, cache.value(), context);
+        if (!compared)
+          return Result<geometry::GeometryShape>::failure(compared.error());
+      }
+      return finish_path_preview(executor.preview_path_curve(candidate, path_id_, cache.value()));
     });
   }
 
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
+    if (mode_ == GuiPathSweepMode::PathPolicy) {
+      auto geometry = preview_shape(session);
+      if (!geometry)
+        return Result<std::size_t>::failure(geometry.error());
+    }
     auto checked = preview(session);
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
     auto committed = session.commit_part_transaction(
-        std::string(mode_ == GuiPathSweepMode::PathCurve ? "Create Path Curve" : "Apply Sweep"),
+        std::string(mode_ == GuiPathSweepMode::PathCurve    ? "Create Path Curve"
+                    : mode_ == GuiPathSweepMode::PathPolicy ? "Change Path Execution"
+                                                            : "Apply Sweep"),
         [this](PartDocument& part) -> Result<std::size_t> {
-          if (auto seeded = seed_parameters(part); seeded.has_error()) return seeded;
+          if (auto seeded = seed_parameters(part); seeded.has_error())
+            return seeded;
           return add_record(part);
         });
     if (committed.has_error()) return committed;
     active_ = false;
+    clear_policy_preview();
     return committed;
   }
 
-  void cancel() noexcept { active_ = false; }
+  void cancel() noexcept {
+    active_ = false;
+    clear_policy_preview();
+  }
 
 private:
+  void clear_policy_preview() const noexcept {
+    comparison_.clear();
+    policy_body_previews_.clear();
+    policy_body_replacements_.clear();
+  }
+  [[nodiscard]] Result<geometry::GeometryShape>
+  finish_path_preview(Result<geometry::GeometryShape> result) const {
+    if (!result)
+      clear_policy_preview();
+    return result;
+  }
+  [[nodiscard]] Result<std::size_t>
+  compare_policy(const GuiDocumentSession& session, const PartDocument& candidate,
+                 const geometry::ShapeCache& cache,
+                 geometry::StepImportTopologyContext* context) const {
+    if (!session.part_shape_cache())
+      return fail("Current path result is unavailable");
+    const geometry::GeometryRecomputeExecutor executor{context};
+    auto before = executor.resolve_path_segments(*session.part_document(), path_id_,
+                                                 *session.part_shape_cache());
+    auto after = executor.resolve_path_segments(candidate, path_id_, cache);
+    if (!before || !after)
+      return Result<std::size_t>::failure(!before ? before.error() : after.error());
+    const geometry::SweepAdapter adapter;
+    auto old_length = adapter.measure_path_length(path_id_, before.value());
+    auto new_length = adapter.measure_path_length(path_id_, after.value());
+    if (!old_length || !new_length)
+      return Result<std::size_t>::failure(!old_length ? old_length.error() : new_length.error());
+    std::ostringstream text;
+    text.imbue(std::locale::classic());
+    text << std::setprecision(12) << "Current: " << old_length.value() << " mm, "
+         << before.value().size() << " spans. Candidate: " << new_length.value() << " mm, "
+         << after.value().size() << " spans. ";
+    if (execution_policy_.tolerance_mm())
+      text << "Modeling tolerance: " << *execution_policy_.tolerance_mm() << " mm.";
+    else
+      text << "Historical execution.";
+    comparison_ = text.str();
+    for (const auto& body : cache.body_shapes()) {
+      const auto* state = candidate.invalidation_state().find(body.source_feature_id.value());
+      if (state && state->status != InvalidationStatus::Clean) {
+        policy_body_previews_.push_back(body.shape);
+        policy_body_replacements_.push_back("body/" + body.body_id.value());
+      }
+    }
+    return Result<std::size_t>::success(1);
+  }
   void reset() {
+    policy_source_json_.clear();
+    policy_source_revision_ = 0;
+    execution_policy_ = PathExecutionPolicy::legacy();
+    clear_policy_preview();
     segments_.clear();
     profile_.reset();
     twist_parameter_.reset();
@@ -252,11 +370,16 @@ private:
   }
 
   [[nodiscard]] Result<std::size_t> add_record(PartDocument& part) const {
+    if (mode_ == GuiPathSweepMode::PathPolicy) {
+      auto changed = part.set_path_execution_policy(path_id_, execution_policy_);
+      return changed ? Result<std::size_t>::success(changed.value().size())
+                     : Result<std::size_t>::failure(changed.error());
+    }
     if (mode_ == GuiPathSweepMode::PathCurve) {
       if (segments_.empty())
         return fail("path curve requires at least one segment");
       auto path = PathCurve::create(path_id_, name_, segments_, closure_, orientation_, up_vector_,
-                                    continuity_hint_);
+                                    continuity_hint_, 1e-7, execution_policy_);
       if (path.has_error()) return Result<std::size_t>::failure(path.error());
       return part.add_path_curve(std::move(path.value()));
     }
@@ -292,6 +415,8 @@ private:
   }
 
   [[nodiscard]] std::string summary() const {
+    if (mode_ == GuiPathSweepMode::PathPolicy)
+      return "Compare path execution for " + name_;
     if (mode_ == GuiPathSweepMode::PathCurve)
       return "path curve, " + std::to_string(segments_.size()) + " segments, " +
              std::string(to_string(closure_));
@@ -315,6 +440,12 @@ private:
   FeatureId feature_{""};
   std::string name_;
   // Path state.
+  PathExecutionPolicy execution_policy_ = PathExecutionPolicy::legacy();
+  mutable std::string comparison_;
+  mutable std::vector<geometry::GeometryShape> policy_body_previews_;
+  mutable std::vector<std::string> policy_body_replacements_;
+  std::string policy_source_json_;
+  std::uint64_t policy_source_revision_ = 0;
   std::vector<PathSegmentReference> segments_;
   PathClosure closure_{PathClosure::Open};
   PathOrientationRule orientation_{PathOrientationRule::MinimumTwist};

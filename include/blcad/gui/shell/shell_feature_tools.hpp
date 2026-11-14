@@ -608,6 +608,9 @@ private:
   std::vector<SpatialInput> spatial_inputs_;
   std::vector<std::pair<Command, QAction*>> spatial_actions_;
   QWidget* spatial_controls_{nullptr};
+  QComboBox* spatial_policy_target_{nullptr};
+  QComboBox* spatial_policy_{nullptr};
+  QLineEdit* spatial_model_tolerance_{nullptr};
   QComboBox* spatial_source_{nullptr};
   QListWidget* spatial_order_{nullptr};
   QComboBox* spatial_mode_{nullptr};

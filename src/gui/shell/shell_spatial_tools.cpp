@@ -9,6 +9,7 @@
 #include <QAction>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDockWidget>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -50,6 +51,8 @@ bool ShellFeatureTools::spatial_scalar() const noexcept {
   return command_ == Command::Sweep && sweep_twist_->isChecked();
 }
 QString ShellFeatureTools::spatial_summary() const {
+  if (command_ == Command::PathCurve && !spatial_policy_target_->currentData().toString().isEmpty())
+    return QString::fromStdString(coordinator_.path_sweep().last_policy_comparison());
   if (command_ == Command::PathCurve)
     return QStringLiteral("%1 connected segments. Path preview valid.")
         .arg(spatial_order_->count());
@@ -137,6 +140,60 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   spatial_controls_ = new QWidget(panel);
   spatial_controls_->setMinimumWidth(280);
   auto* form = new QFormLayout(spatial_controls_);
+  form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+  form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+  spatial_policy_target_ = new QComboBox(spatial_controls_);
+  spatial_policy_target_->setObjectName("blcad.spatial.policy_target");
+  form->addRow(QStringLiteral("Path"), spatial_policy_target_);
+  spatial_policy_ = new QComboBox(spatial_controls_);
+  spatial_policy_->setObjectName("blcad.spatial.execution_policy");
+  spatial_policy_->addItems({QStringLiteral("Historical"), QStringLiteral("Curve Preserving")});
+  form->addRow(QStringLiteral("Execution"), spatial_policy_);
+  auto* tolerance_group = new QWidget(spatial_controls_);
+  tolerance_group->setObjectName("blcad.spatial.modeling_tolerance_group");
+  auto* tolerance_layout = new QVBoxLayout(tolerance_group);
+  tolerance_layout->setContentsMargins(0, 0, 0, 0);
+  spatial_model_tolerance_ = new QLineEdit(QStringLiteral("0.0001"), tolerance_group);
+  spatial_model_tolerance_->setObjectName("blcad.spatial.modeling_tolerance");
+  spatial_model_tolerance_->setToolTip(
+      QStringLiteral("Modeling tolerance in mm (1e-9 to 1). Independent of display, solver and "
+                     "connection tolerances."));
+  auto* tolerance_label = new QLabel(QStringLiteral("Modeling Tolerance (mm)"), tolerance_group);
+  tolerance_label->setObjectName("blcad.spatial.modeling_tolerance_label");
+  tolerance_label->setWordWrap(true);
+  tolerance_label->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
+  tolerance_layout->addWidget(tolerance_label);
+  tolerance_layout->addWidget(spatial_model_tolerance_);
+  form->addRow(tolerance_group);
+  connect(spatial_policy_target_, &QComboBox::currentIndexChanged, this, [this] {
+    if (command_ != Command::PathCurve)
+      return;
+    const auto* part = session_.part_document();
+    const auto* path = part ? part->find_path_curve(PathCurveId(
+                                  spatial_policy_target_->currentData().toString().toStdString()))
+                            : nullptr;
+    task_dock_->setWindowTitle(path ? QStringLiteral("Path Execution")
+                                    : QStringLiteral("Create Path"));
+    {
+      const QSignalBlocker policy(spatial_policy_), tolerance(spatial_model_tolerance_);
+      spatial_policy_->setCurrentIndex(
+          path && path->execution_policy().kind() == PathGeometryPolicyKind::CurvePreserving ? 1
+                                                                                             : 0);
+      spatial_model_tolerance_->setText(
+          path && path->execution_policy().tolerance_mm()
+              ? QString::number(*path->execution_policy().tolerance_mm(), 'g', 17)
+              : QStringLiteral("0.0001"));
+    }
+    refresh_spatial_preview();
+  });
+  connect(spatial_policy_, &QComboBox::currentIndexChanged, this, [this] {
+    if (command_ == Command::PathCurve)
+      refresh_spatial_preview();
+  });
+  connect(spatial_model_tolerance_, &QLineEdit::textChanged, this, [this] {
+    if (command_ == Command::PathCurve)
+      refresh_spatial_preview();
+  });
   spatial_mode_ = new QComboBox(spatial_controls_);
   spatial_mode_->setObjectName("blcad.spatial.mode");
   spatial_mode_->addItems({QStringLiteral("Solid"), QStringLiteral("Cut"), QStringLiteral("Face")});
@@ -332,6 +389,15 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
       (command == Command::Sweep && (paths < 1 || (profiles < 1 && paths < 2))) ||
       (command == Command::Loft && profiles < 2 && paths < 2))
     return fail("Create suitable profiles and connected paths first");
+  const QSignalBlocker policy_target(spatial_policy_target_), policy(spatial_policy_),
+      tolerance(spatial_model_tolerance_);
+  spatial_policy_target_->clear();
+  spatial_policy_target_->addItem(QStringLiteral("Create New Path"), QString());
+  for (const auto& existing : part->path_curves())
+    spatial_policy_target_->addItem(QString::fromStdString(existing.name()),
+                                    QString::fromStdString(existing.id().value()));
+  spatial_policy_->setCurrentIndex(0);
+  spatial_model_tolerance_->setText(QStringLiteral("0.0001"));
   const QSignalBlocker source(spatial_source_), mode(spatial_mode_), target(spatial_target_),
       path(spatial_path_), guide(spatial_guide_), order(spatial_order_), guides(spatial_guides_),
       closed(spatial_closed_), orientation(spatial_orientation_), continuity(spatial_continuity_),
@@ -429,21 +495,36 @@ void ShellFeatureTools::update_spatial_controls() {
   auto* form = static_cast<QFormLayout*>(spatial_controls_->layout());
   const bool path = command_ == Command::PathCurve, sweep = command_ == Command::Sweep,
              loft = command_ == Command::Loft;
+  const bool policy_edit = path && !spatial_policy_target_->currentData().toString().isEmpty();
+  form->setRowVisible(spatial_policy_target_, path);
+  form->setRowVisible(spatial_policy_, path);
+  auto* tolerance_group = spatial_model_tolerance_->parentWidget();
+  auto* tolerance_label =
+      tolerance_group->findChild<QLabel*>(QStringLiteral("blcad.spatial.modeling_tolerance_label"));
+  tolerance_label->ensurePolished();
+  tolerance_label->setMinimumHeight(
+      std::max(tolerance_label->fontMetrics().height(),
+               tolerance_label->heightForWidth(std::max(1, tolerance_group->width()))));
+  tolerance_group->layout()->invalidate();
+  tolerance_group->setMinimumHeight(tolerance_group->layout()->sizeHint().height());
+  form->setRowVisible(spatial_model_tolerance_->parentWidget(),
+                      path && spatial_policy_->currentIndex() == 1);
+  form->setRowVisible(spatial_source_, !policy_edit);
   form->setRowVisible(spatial_mode_, !path);
   form->setRowVisible(spatial_target_, !path && spatial_mode_->currentIndex() == 1);
   form->setRowVisible(spatial_pick_, !path);
   for (QWidget* widget :
        std::array<QWidget*, 3>{spatial_add_, spatial_order_, spatial_order_buttons_})
-    form->setRowVisible(widget, !sweep);
+    form->setRowVisible(widget, !sweep && !policy_edit);
   form->setRowVisible(spatial_path_, !path);
   form->setRowVisible(spatial_guide_, !path);
   form->setRowVisible(spatial_add_guide_, loft);
   form->setRowVisible(spatial_guides_, loft);
   form->setRowVisible(spatial_remove_guide_, loft);
-  form->setRowVisible(spatial_closed_, path);
-  form->setRowVisible(spatial_orientation_, path);
+  form->setRowVisible(spatial_closed_, path && !policy_edit);
+  form->setRowVisible(spatial_orientation_, path && !policy_edit);
   for (auto* input : spatial_up_)
-    form->setRowVisible(input, path && spatial_orientation_->currentIndex() == 2);
+    form->setRowVisible(input, path && !policy_edit && spatial_orientation_->currentIndex() == 2);
   form->setRowVisible(spatial_continuity_, loft);
   form->setRowVisible(spatial_auto_align_, loft);
   bool closed_sections = true;
@@ -457,7 +538,10 @@ void ShellFeatureTools::update_spatial_controls() {
   value_label_->setVisible(spatial_scalar());
   // QFormLayout can allocate less than its row widgets' minimum heights
   // inside a resizable scroll child. Keep its preferred row heights scrollable.
-  spatial_controls_->setMinimumHeight(form->sizeHint().height());
+  form->invalidate();
+  const int height =
+      std::max(form->sizeHint().height(), form->heightForWidth(spatial_controls_->width()));
+  spatial_controls_->setMinimumHeight(height);
   spatial_controls_->updateGeometry();
 }
 
@@ -526,12 +610,34 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
   coordinator_.cancel();
   auto& sweep = coordinator_.path_sweep();
   if (command_ == Command::PathCurve) {
+    const auto policy = [&]() -> Result<PathExecutionPolicy> {
+      if (spatial_policy_->currentIndex() == 0)
+        return Result<PathExecutionPolicy>::success(PathExecutionPolicy::legacy());
+      bool numeric = false;
+      const double value = spatial_model_tolerance_->text().toDouble(&numeric);
+      if (!numeric)
+        return Result<PathExecutionPolicy>::failure(Error::validation(
+            "path.execution_policy", "Enter a finite modeling tolerance between 1e-9 and 1 mm"));
+      return PathExecutionPolicy::curve_preserving(value);
+    }();
+    if (!policy)
+      return Result<std::size_t>::failure(policy.error());
+    const auto existing = spatial_policy_target_->currentData().toString();
+    if (!existing.isEmpty()) {
+      auto begun = sweep.begin_path_policy(session_, PathCurveId(existing.toStdString()));
+      if (!begun)
+        return begun;
+      sweep.set_execution_policy(policy.value());
+      coordinator_.refresh_handles();
+      return Result<std::size_t>::success(1);
+    }
     auto begun = sweep.begin_path_curve(
         session_, spatial_path_id_, spatial_name_,
         spatial_closed_->isChecked() ? PathClosure::Closed : PathClosure::Open,
         static_cast<PathOrientationRule>(spatial_orientation_->currentIndex()));
     if (!begun)
       return begun;
+    sweep.set_execution_policy(policy.value());
     if (spatial_orientation_->currentIndex() == 2)
       sweep.set_up_vector(
           Vector3{spatial_up_[0]->value(), spatial_up_[1]->value(), spatial_up_[2]->value()});
@@ -672,6 +778,8 @@ bool ShellFeatureTools::select_spatial_profile(SketchId sketch, ProfileId profil
 }
 
 bool ShellFeatureTools::accept_spatial_selection(const GuiSelection& selection) {
+  if (command_ == Command::PathCurve && !spatial_policy_target_->currentData().toString().isEmpty())
+    return false;
   if (!spatial())
     return false;
   const auto matches = [&](const SpatialInput& input) {
