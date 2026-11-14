@@ -2,6 +2,7 @@
 #include "blcad/core/id.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/sketch_3d.hpp"
+#include "blcad/gui/gui_types.hpp"
 #include <QObject>
 #include <memory>
 
@@ -18,6 +19,7 @@ public:
   [[nodiscard]] Result<std::size_t> preview();
   [[nodiscard]] Result<std::size_t> apply();
   [[nodiscard]] bool active() const noexcept;
+  bool accept_selection(const std::optional<GuiSelection>&);
   void cancel();
   void refresh();
   void refresh_presentation();

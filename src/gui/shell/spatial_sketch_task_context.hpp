@@ -13,6 +13,8 @@ struct SpatialSketchTargetChoice {
   bool straight{false};
   bool circular{false};
   geometry::GeometryShape shape;
+  std::string visibility_owner{};
+  bool model_hidden{false};
 };
 struct SpatialSketchTaskResources {
   std::vector<Parameter> parameters;
@@ -30,6 +32,7 @@ public:
   [[nodiscard]] Result<SpatialCurveJet> jet(const Sketch3D&, const SpatialConstraintTarget&,
                                             double) const;
   [[nodiscard]] Result<Point3> position(const Sketch3D&, const SpatialConstraintTarget&) const;
+  [[nodiscard]] Result<std::size_t> validate_sources() const;
   [[nodiscard]] Result<std::vector<SpatialSketchTargetChoice>>
   constraint_targets(const Sketch3D&) const;
   [[nodiscard]] Result<std::vector<SpatialCurveGrip>> curve_grips(const Sketch3D&,

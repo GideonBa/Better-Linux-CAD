@@ -1474,6 +1474,8 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& in
   const auto selection = incoming;
   if (synchronizing_selection_)
     return;
+  if (sketch_3d_tools_ && sketch_3d_tools_->accept_selection(selection))
+    return;
   if (!selection && step_import_tools_)
     step_import_tools_->clear_selected_reference();
   synchronize_selection_filter();

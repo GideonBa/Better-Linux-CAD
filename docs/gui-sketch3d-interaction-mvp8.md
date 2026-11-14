@@ -378,4 +378,23 @@ and curvature-derived circle radius, exact owned values and point coordinates, d
 source preservation, successful arc/spline editing, incompatible-radius rollback, six interruption
 paths and exact Undo/Redo/reopening. Existing point-grip regression runs with these cases. Historical
 path sampling and the separate verified Surface G2 work remain unchanged requirements of 166/169;
-direct native source collection and combined S03–S04 remain required before whole-165 acceptance.
+combined S03–S04 remains required before whole-165 acceptance.
+
+## Native spatial source selection — 165
+
+Constraint targets reuse the shared Pick/Clear control. Picking offers only compatible, currently
+resolved typed inputs at the task's pre-consumer scope. Include Hidden Inputs enables disposable
+presentations without changing document visibility. Curve endpoints share their original edge;
+the pointer chooses the uniquely nearer projected endpoint, while an ambiguous view requires an
+explicit Start/End choice. Clearing a target leaves an incomplete form and cannot select target zero.
+
+Pick Curve in Model selects an existing local curve even while a downstream feature preview replaces
+its source presentation. A model curve double-click opens the same existing editor. Selection never
+changes accepted intent. Escape first finishes collection and retains the local task; the next Escape
+cancels it. Tab changes, form edits, Cancel and stale contexts clear disposable targets. Selection
+filters, semantic scope and supported preselection are restored without publishing temporary alias
+identities to the session selection model. Supplier freshness is checked again when a pick arrives.
+
+[Selection proofs](../tests/gui/gui_spatial_source_selection_tests.cpp) cover typed routing, empty
+targets, scope restoration and native physical support/curve picking. Whole-block verification and
+combined S03–S04 acceptance remain in progress.

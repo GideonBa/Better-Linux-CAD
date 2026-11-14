@@ -186,7 +186,7 @@ ResultFaceSupportGeometry::resolve_face(const PartDocument& document, const Shap
         if (!owned)
           return Result<GeometryShape>::failure(owned.error());
       }
-  auto fresh = observe_imported_part_sources(document, import_context);
+  auto fresh = observe_imported_part_sources(document, import_context, cache.history_plan());
   if (!fresh)
     return Result<GeometryShape>::failure(fresh.error());
   const auto fail = [&](const char* message) {
@@ -337,7 +337,7 @@ ResultFaceSupportGeometry::resolve(const PartDocument& document, const ResultFac
       return Result<ResolvedWorkplane>::failure(owned.error());
   }
   if (import_context) {
-    auto observed = observe_imported_part_sources(document, import_context);
+    auto observed = observe_imported_part_sources(document, import_context, cache.history_plan());
     if (!observed)
       return Result<ResolvedWorkplane>::failure(observed.error());
   }
@@ -380,7 +380,7 @@ Result<ResolvedResultFace> ResultFaceSupportGeometry::resolve_current(
           return Result<ResolvedResultFace>::failure(owned.error());
       }
   if (import_context) {
-    auto observed = observe_imported_part_sources(document, import_context);
+    auto observed = observe_imported_part_sources(document, import_context, cache.history_plan());
     if (!observed)
       return Result<ResolvedResultFace>::failure(observed.error());
   }

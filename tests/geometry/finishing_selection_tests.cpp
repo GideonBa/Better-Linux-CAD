@@ -1,10 +1,11 @@
-#include "blcad/geometry/result_face_support.hpp"
-#include <nlohmann/json.hpp>
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
+#include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
+#include <nlohmann/json.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -669,4 +670,60 @@ TEST_CASE(
   CHECK_FALSE(FinishingSelectionBuilder::build(part, cache, BodyId("body"),
                                                PartFeatureInputRole::ShellRemovalFace, nullptr, 1,
                                                FinishingSelectionVisibility::IncludeHiddenInputs));
+}
+
+TEST_CASE("Historical native face selection does not observe an unavailable future import",
+          "[geometry][finishing-selection][parity-b165][finishing-prefix-sources]") {
+  auto part = drawn_box();
+  const auto source = StepImportSource::create(StepImportSourceId("future.source"), "Future",
+                                               "unavailable-future.step", std::string(64, '1'),
+                                               StepImportMode::EditableBody)
+                          .value();
+  REQUIRE(part.add_step_import_source(source));
+  ImportedTopologyDescriptor descriptor;
+  descriptor.kind = ImportedTopologyKind::Body;
+  descriptor.geometry = ImportedGeometryClass::Opaque;
+  descriptor.body_kind = BodyKind::Solid;
+  descriptor.bounds_mm = {0, 0, 0, 1, 1, 1};
+  descriptor.centroid = {.5, .5, .5};
+  descriptor.measure = 1;
+  descriptor.geometry_key = std::string(64, 'a');
+  const auto catalog =
+      ImportedTopologyCatalog::create(
+          ImportedTopologyCatalogId("future.catalog"), source.id(), source.sha256_digest(),
+          std::string(64, '2'), {{ImportedTopologyId("future.topology"), std::nullopt, descriptor}})
+          .value();
+  REQUIRE(part.add_imported_topology_catalog(catalog));
+  const auto definition = ImportedPartDefinition::create(source.id(), catalog.id(),
+                                                         {{ImportedTopologyId("future.topology"),
+                                                           BodyId("future.body"), BodyKind::Solid}})
+                              .value();
+  REQUIRE(
+      part.add_body(Body::create(BodyId("future.body"), "Future body", BodyKind::Solid).value()));
+  REQUIRE(part.add_imported_body_feature(
+      ImportedBodyFeature::create(FeatureId("future.import"), "Future import", definition)
+          .value()));
+  REQUIRE(part.apply_history_intent({{"base:/odd", "future.import"}, {}}));
+  const auto before = serialize_part_document_to_json(part).value();
+  auto cache = ShapeCache::create(ShapeCacheId("historical.sources")).value();
+  auto historical = GeometryRecomputeExecutor{}.execute_history_prefix(part, 1, cache);
+  INFO((historical ? "historical prefix ready" : historical.error().message()));
+  REQUIRE(historical);
+  auto faces = FinishingSelectionBuilder::build(part, cache, BodyId("body"),
+                                                PartFeatureInputRole::ShellRemovalFace, nullptr, 1);
+  REQUIRE(faces);
+  CHECK(faces.value().size() == 6);
+  REQUIRE(ViewportSceneBuilder{}.build_part(part, cache, 1));
+  auto result_faces =
+      ResultFaceSupportGeometry::selectable_faces(part, cache, BodyId("body"), nullptr, 1);
+  REQUIRE(result_faces);
+  REQUIRE_FALSE(result_faces.value().empty());
+  REQUIRE(
+      ResultFaceSupportGeometry::resolve_face(part, cache, result_faces.value().front().reference));
+  CHECK_FALSE(FinishingSelectionBuilder::build(part, cache, BodyId("body"),
+                                               PartFeatureInputRole::ShellRemovalFace));
+  CHECK_FALSE(FinishingSelectionBuilder::build(part, cache, BodyId("body"),
+                                               PartFeatureInputRole::ShellRemovalFace, nullptr, 2));
+  CHECK_FALSE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+  CHECK(serialize_part_document_to_json(part).value() == before);
 }

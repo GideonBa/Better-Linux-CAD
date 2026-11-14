@@ -1,6 +1,8 @@
 #include "spatial_sketch_constraint_editor.hpp"
-#include "spatial_sketch_form_input.hpp"
 #include "blcad/gui/gui_icons.hpp"
+#include "blcad/gui/shell/shell_property_controls.hpp"
+#include "spatial_sketch_form_input.hpp"
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
@@ -10,6 +12,7 @@
 #include <QVBoxLayout>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 namespace blcad::gui {
 namespace {
@@ -78,10 +81,14 @@ SpatialSketchConstraintEditor::SpatialSketchConstraintEditor(
     box->setKeyboardTracking(false);
     form->addRow(label, box);
     connect(box, &QDoubleSpinBox::valueChanged, this, [this] { changed(); });
-    new SpatialFormNumberGuard(*this,*box,[this,box] {
-      if (box == value_) value_changed_ = true;
-      if (box == seed_) seed_changed_ = true;
-      for (std::size_t i=0;i<3;++i) if (box == fixed_[i]) fixed_changed_[i] = true;
+    new SpatialFormNumberGuard(*this, *box, [this, box] {
+      if (box == value_)
+        value_changed_ = true;
+      if (box == seed_)
+        seed_changed_ = true;
+      for (std::size_t i = 0; i < 3; ++i)
+        if (box == fixed_[i])
+          fixed_changed_[i] = true;
       changed();
     });
     return box;
@@ -94,9 +101,32 @@ SpatialSketchConstraintEditor::SpatialSketchConstraintEditor(
   id_ = new QLineEdit(page_);
   id_->setObjectName("blcad.sketch3d.constraint_id");
   form->addRow("Identity", id_);
-  for (std::size_t i = 0; i < 3; ++i)
-    targets_[i] =
-        combo(("constraint_target_" + std::to_string(i)).c_str(), QString("Target ") + "ABC"[i]);
+  for (std::size_t i = 0; i < 3; ++i) {
+    auto* box = targets_[i] = new QComboBox(page_);
+    const auto id = QStringLiteral("blcad.sketch3d.constraint_target_") + QString::number(i);
+    box->setObjectName(id);
+    box->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    box->setMinimumContentsLength(10);
+    selectors_[i] = new ShellPropertySelector(
+        id + ".selector", QString("Target ") + "ABC"[i], *box, *this,
+        [this, i](bool active) {
+          stop_picking();
+          if (active) {
+            pick_slot_ = i;
+            selectors_[i]->set_active(true);
+          }
+          callbacks_.pick_changed();
+        },
+        page_);
+    form->addRow(selectors_[i]);
+  }
+  hidden_ = new QCheckBox("Include Hidden Inputs", page_);
+  hidden_->setObjectName("blcad.sketch3d.constraint_hidden_inputs");
+  form->addRow(hidden_);
+  connect(hidden_, &QCheckBox::toggled, this, [this] {
+    if (picking())
+      callbacks_.pick_changed();
+  });
   source_ = combo("constraint_source", "Dimension Source");
   value_ = spin("constraint_value", "Value", 1e-9, 1e9, 10);
   angle_ = combo("constraint_angle", "Angle Convention");
@@ -185,6 +215,84 @@ SpatialSketchConstraintEditor::SpatialSketchConstraintEditor(
   connect(erase, &QPushButton::clicked, this, [this] { report([&] { remove(); }); });
   connect(discard, &QPushButton::clicked, this, [this] { load(); });
 }
+void SpatialSketchConstraintEditor::stop_picking() {
+  pick_slot_.reset();
+  pick_aliases_.clear();
+  for (auto* selector : selectors_)
+    if (selector)
+      selector->set_active(false);
+}
+std::vector<geometry::ViewportSceneItem> SpatialSketchConstraintEditor::pick_presentations() {
+  pick_aliases_.clear();
+  std::vector<geometry::ViewportSceneItem> items;
+  if (!pick_slot_)
+    return items;
+  std::vector<std::string> sources;
+  for (std::size_t i = 0; i < choices_.size(); ++i) {
+    const auto& c = choices_[i];
+    if (!compatible(c, *pick_slot_) || c.shape.empty() ||
+        (!hidden_->isChecked() && !callbacks_.visible(c)))
+      continue;
+    auto found = std::find(sources.begin(), sources.end(), c.semantic_id);
+    if (found != sources.end()) {
+      pick_aliases_[static_cast<std::size_t>(found - sources.begin())].second.push_back(i);
+      continue;
+    }
+    auto alias = "spatial-target/" + std::to_string(items.size());
+    sources.push_back(c.semantic_id);
+    pick_aliases_.push_back({alias, {i}});
+    const auto kind =
+        c.target.kind() == SpatialTargetKind::Face    ? geometry::ViewportSceneKind::Face
+        : c.target.kind() == SpatialTargetKind::Point ? geometry::ViewportSceneKind::Vertex
+        : c.target.kind() == SpatialTargetKind::Curve ? geometry::ViewportSceneKind::Edge
+                                                      : geometry::ViewportSceneKind::Datum;
+    items.push_back({kind, std::move(alias), c.shape});
+  }
+  return items;
+}
+bool SpatialSketchConstraintEditor::accept_pick(std::string_view alias,
+                                                std::optional<QPointF> pointer) {
+  if (!pick_slot_)
+    return false;
+  const auto found = std::find_if(pick_aliases_.begin(), pick_aliases_.end(),
+                                  [&](const auto& entry) { return entry.first == alias; });
+  if (found == pick_aliases_.end())
+    return false;
+  std::optional<std::size_t> choice;
+  if (found->second.size() == 1)
+    choice = found->second.front();
+  else if (pointer) {
+    double best = std::numeric_limits<double>::infinity(), second = best;
+    for (const auto index : found->second) {
+      auto p = callbacks_.position(choices_[index].target);
+      auto screen = p ? callbacks_.project(p.value()) : Result<QPointF>::failure(p.error());
+      if (!screen)
+        continue;
+      const auto d =
+          std::hypot(screen.value().x() - pointer->x(), screen.value().y() - pointer->y());
+      if (d < best) {
+        second = best;
+        best = d;
+        choice = index;
+      } else
+        second = std::min(second, d);
+    }
+    if (second - best <= 1)
+      choice.reset();
+  }
+  if (!choice) {
+    feedback_->setText(
+        "Endpoint selection is ambiguous. Choose Start/End explicitly or change the view.");
+    return true;
+  }
+  const auto slot = *pick_slot_;
+  const int row = targets_[slot]->findData(static_cast<int>(*choice));
+  stop_picking();
+  if (row >= 0)
+    targets_[slot]->setCurrentIndex(row);
+  callbacks_.pick_changed();
+  return true;
+}
 void SpatialSketchConstraintEditor::report(std::function<void()> operation) {
   try {
     operation();
@@ -244,6 +352,8 @@ bool SpatialSketchConstraintEditor::compatible(const SpatialSketchTargetChoice& 
   return false;
 }
 const SpatialSketchTargetChoice& SpatialSketchConstraintEditor::selected(std::size_t slot) const {
+  if (targets_.at(slot)->currentIndex() < 0 || !targets_[slot]->currentData().isValid())
+    throw std::runtime_error("Select each compatible target in order.");
   const auto row = targets_.at(slot)->currentData().toInt();
   if (row < 0 || static_cast<std::size_t>(row) >= choices_.size())
     throw std::runtime_error("Select each compatible target in order.");
@@ -255,18 +365,23 @@ void SpatialSketchConstraintEditor::fill_targets() {
   for (std::size_t slot = 0; slot < 3; ++slot) {
     const auto previous = targets_[slot]->currentData();
     targets_[slot]->clear();
-    targets_[slot]->addItem("Select Target", -1);
+    targets_[slot]->addItem("Select Target");
     for (std::size_t i = 0; i < choices_.size(); ++i)
       if (compatible(choices_[i], slot))
         targets_[slot]->addItem(q(choices_[i].label), static_cast<int>(i));
     const int row = targets_[slot]->findData(previous);
     targets_[slot]->setCurrentIndex(row >= 0 ? row : 0);
-    targets_[slot]->setEnabled(slot < target_count());
+    selectors_[slot]->setEnabled(slot < target_count());
   }
   loading_ = was_loading;
 }
 void SpatialSketchConstraintEditor::mode() {
-  if (!callbacks_.edit.sketch()) return;
+  const bool was_picking = picking();
+  stop_picking();
+  if (was_picking)
+    callbacks_.pick_changed();
+  if (!callbacks_.edit.sketch())
+    return;
   const auto k = static_cast<K>(kind_->currentIndex());
   const bool dimensional = k == K::Distance || k == K::Angle || k == K::Radius || k == K::Length;
   const bool was_loading = loading_;
@@ -297,6 +412,7 @@ void SpatialSketchConstraintEditor::mode() {
   loading_ = was_loading;
 }
 void SpatialSketchConstraintEditor::reset() {
+  stop_picking();
   pending_ = false;
   loading_ = true;
   record_->clear();
@@ -323,6 +439,10 @@ void SpatialSketchConstraintEditor::refresh() {
   load();
 }
 void SpatialSketchConstraintEditor::load() {
+  const bool was_picking = picking();
+  stop_picking();
+  if (was_picking)
+    callbacks_.pick_changed();
   if (!callbacks_.edit.sketch())
     return;
   report([&] {
@@ -394,9 +514,13 @@ void SpatialSketchConstraintEditor::load() {
   loading_ = false;
 }
 void SpatialSketchConstraintEditor::stage() {
-  if (value_->isEnabled()) finish_spatial_number(*value_);
-  if (seed_->isEnabled()) finish_spatial_number(*seed_);
-  for (auto* field : fixed_) if (field->isEnabled()) finish_spatial_number(*field);
+  if (value_->isEnabled())
+    finish_spatial_number(*value_);
+  if (seed_->isEnabled())
+    finish_spatial_number(*seed_);
+  for (auto* field : fixed_)
+    if (field->isEnabled())
+      finish_spatial_number(*field);
   take(callbacks_.edit.edit());
   auto candidate = *callbacks_.edit.sketch();
   const SketchConstraintId id(id_->text().trimmed().toStdString());
