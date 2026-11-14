@@ -10,8 +10,8 @@
 #include "assembly_posed_leaf_shapes.hpp"
 #include "geometry_shape_internal.hpp"
 
-#include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/body_rotation_axis_resolver.hpp"
+#include "blcad/geometry/construction_line_resolver.hpp"
 #include "blcad/geometry/construction_point_resolver.hpp"
 #include "blcad/geometry/profile_region_classifier.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
@@ -19,6 +19,7 @@
 #include "blcad/geometry/sketch_3d_geometry_adapter.hpp"
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/sketch_reference_projector.hpp"
+#include "blcad/geometry/spatial_constraint_geometry.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
@@ -894,9 +895,16 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
 
     const Sketch3DGeometryAdapter sketch_3d_adapter;
     for (const Sketch3D& sketch : document.sketches_3d()) {
-      if (!available(sketch.id().value()))
+      if (!available(sketch.id().value()) && !shape_cache.find_spatial_sketch_solution(sketch.id()))
         continue;
-      auto converted = sketch_3d_adapter.convert(document, sketch.id());
+      const SpatialGeometryScope scope =
+          history_prefix ? SpatialGeometryScope{SpatialHistoryPrefixScope{*history_prefix}}
+                         : SpatialGeometryScope{SpatialCompleteGeometryScope{}};
+      auto solved = resolve_spatial_sketch_geometry(document, sketch.id(), shape_cache,
+                                                    import_context_, scope);
+      if (!solved)
+        return Result<std::vector<ViewportSceneItem>>::failure(solved.error());
+      auto converted = sketch_3d_adapter.convert(document, solved.value());
       if (converted.has_error())
         return Result<std::vector<ViewportSceneItem>>::failure(converted.error());
       for (const Sketch3DGeometryProduct& product : converted.value().products()) {
@@ -910,8 +918,8 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
     for (const PathCurve& path : document.path_curves()) {
       if (!available(path.id().value()))
         continue;
-      auto preview =
-          GeometryRecomputeExecutor{}.preview_path_curve(document, path.id(), shape_cache);
+      auto preview = GeometryRecomputeExecutor{import_context_}.preview_path_curve(
+          document, path.id(), shape_cache);
       if (preview) {
         items.push_back(
             {ViewportSceneKind::Path, "path/" + path.id().value(), std::move(preview.value())});

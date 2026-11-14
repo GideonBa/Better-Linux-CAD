@@ -11,6 +11,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -18,9 +19,13 @@
 
 namespace blcad {
 class PartDocument;
+class Sketch3D;
 }
 
 namespace blcad::geometry {
+namespace detail {
+struct SpatialSketchSolutions;
+}
 
 struct CachedReferenceBodyShape {
   ImportedBodyOutput output;
@@ -69,6 +74,9 @@ struct CachedReferenceTransform {
 
 class ShapeCache {
 public:
+  // Derived numeric products from the current history evaluation, frozen before first use.
+  // Consumers must validate this cache's source/scope before borrowing a product.
+  [[nodiscard]] const Sketch3D* find_spatial_sketch_solution(const Sketch3DId&) const noexcept;
   [[nodiscard]] static Result<ShapeCache> create(ShapeCacheId id);
 
   [[nodiscard]] Result<std::size_t> store_feature_shape(FeatureId feature_id, GeometryShape shape);
@@ -147,6 +155,8 @@ public:
 
 private:
   friend class GeometryRecomputeExecutor;
+  void store_spatial_sketch_solution(Sketch3D);
+  std::shared_ptr<const detail::SpatialSketchSolutions> spatial_sketch_solutions_{};
   struct HistoryResult {
     std::string source_json;
     std::uint64_t executable_generation;

@@ -244,6 +244,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/shape_cache.cpp
     src/geometry/sketch_3d_geometry_adapter.cpp
     src/geometry/spatial_constraint_geometry.cpp
+    src/geometry/spatial_sketch_solution.cpp
     src/geometry/derived_curve.cpp
     src/geometry/equation_curve_geometry.cpp
     src/geometry/equation_curve_presentation.cpp
@@ -694,6 +695,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/sketch_3d_geometry_adapter_tests.cpp
       tests/geometry/sketch_3d_constraint_geometry_tests.cpp
       tests/geometry/spatial_solver_geometry_tests.cpp
+      tests/geometry/spatial_sketch_recompute_tests.cpp
       tests/geometry/sketch_reference_projector_tests.cpp
       tests/geometry/sketch_region_finder_tests.cpp
       tests/geometry/spline_profile_pipeline_tests.cpp
@@ -823,6 +825,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_sketch_smooth_tests.cpp
       tests/gui/gui_equation_curve_tests.cpp
       tests/gui/gui_spatial_constraint_schema_tests.cpp
+      tests/gui/gui_spatial_parametric_session_tests.cpp
       tests/gui/gui_shell_sketch_curve_authoring_tests.cpp
       tests/gui/gui_sketch_workbench_tests.cpp
       tests/gui/gui_interactive_sketcher_acceptance_tests.cpp

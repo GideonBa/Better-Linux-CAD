@@ -36,8 +36,9 @@ private:
 
 // Observe actual imported result authorities, including a converted editable base. Opaque source
 // registration alone does not imply that external geometry participates in this operation.
-[[nodiscard]] Result<std::size_t> observe_imported_part_sources(const PartDocument& document,
-                                                                StepImportTopologyContext* context);
+[[nodiscard]] Result<std::size_t>
+observe_imported_part_sources(const PartDocument& document, StepImportTopologyContext* context,
+                              const PartHistoryEvaluationPlan* scope = nullptr);
 
 // Canonical analytic frames are derived from the recovered normalized descriptor. Generic
 // topology has no analytic fallback; it cannot be approximated as a plane, line or cylinder.

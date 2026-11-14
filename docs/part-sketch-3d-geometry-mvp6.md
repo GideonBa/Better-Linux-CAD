@@ -121,3 +121,30 @@ Face constraints use native closest-point projection on the selected trimmed fac
 interior projection is supported; trim-edge/corner contacts and ambiguous projections reject rather than
 reporting the DOF of an infinite underlying surface. Solver-supported G2 is checked from actual endpoint
 derivatives; it does not imply curve-preserving downstream Sweep or verified surface-boundary G2 Loft.
+
+## Parametric spatial replay — 165
+
+Constraint-bearing owners are evaluated from their authored seeds and current parameter bindings.
+Derived results never rewrite Part coordinates, formulas or constraint records during recompute.
+The native scene and existing PathCurve/Sweep/Loft consumers read the same solved owner; historical
+fixed spline/Helix sampling remains unchanged until an explicit 166 policy upgrade.
+
+Such Parts use atomic history evaluation, including independent owners without a solid consumer.
+A numeric solution is frozen in a private immutable cache product before its first consuming
+feature; later consumers and the scene reuse it. This prevents a downstream Join/finishing result
+from becoming feedback into its own support definition. Unconsumed owners are checked at the
+matching final/prefix scope. Cache copies share immutable products; each new history run starts
+fresh. The source/scope certificate and imported bytes are checked before borrowing a result.
+
+Queries distinguish complete executor provenance, an explicitly matching history prefix and an
+active history input. Active inputs require an actual matched history cache. Imported sources
+outside the evaluated prefix or suppressed by the plan do not become prerequisites of that scope.
+No opaque unscoped cache is promoted to a current result.
+
+Core still validates source identity, capability and repeated semantic junctions. Numeric
+connectivity involving constrained spatial endpoints is checked on solved logical segment
+boundaries in Geometry, including unused paths, before publishing any cache. Failed solutions or
+path checks preserve the preceding cache; the session transaction also preserves intent/history.
+[Physical replay/source/stage proofs](../tests/geometry/spatial_sketch_recompute_tests.cpp) and
+[session history/reopen/rejection](../tests/gui/gui_spatial_parametric_session_tests.cpp) cover the
+boundary. Native authoring and integrated S03–S04 acceptance remain the separate UI work in 165.

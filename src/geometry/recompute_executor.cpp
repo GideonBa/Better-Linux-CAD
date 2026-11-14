@@ -4,10 +4,12 @@
 #include "blcad/core/sketch_profile_roles.hpp"
 #include "blcad/geometry/pattern_placement_adapter.hpp"
 #include "blcad/geometry/result_face_support.hpp"
+#include "blcad/geometry/spatial_constraint_geometry.hpp"
 #include "blcad/geometry/thread_adapter.hpp"
 #include "imported_body_placement.hpp"
 #include "material_geometry_source.hpp"
 #include "part_history_evaluation.hpp"
+#include <map>
 
 #include "blcad/geometry/body_rotation_axis_resolver.hpp"
 #include "blcad/geometry/construction_line_resolver.hpp"
@@ -1832,7 +1834,8 @@ evaluate_composite_local_vertices(const PartDocument& document, const Sketch& sk
 resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
                          const ShapeCache& shape_cache, const WorkplaneResolver& resolver,
                          std::string_view role, PathClosure required_closure = PathClosure::Open,
-                         bool allow_surface_boundary_sources = false) {
+                         bool allow_surface_boundary_sources = false,
+                         StepImportTopologyContext* import_context = nullptr) {
   if (path.closure() != required_closure)
     return Result<std::vector<SweepPathSegment>>::failure(
         geometry_error(path.id().value(), std::string(role) + (required_closure == PathClosure::Open
@@ -1840,6 +1843,7 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
                                                                    : " must be closed")));
   std::vector<SweepPathSegment> resolved;
   resolved.reserve(path.segments().size());
+  std::map<std::string, Sketch3D> spatial_solutions;
   for (const auto& reference : path.segments()) {
     SweepPathSegment segment;
     if (reference.source_kind() == PathSegmentSourceKind::ConstructionLine) {
@@ -1946,6 +1950,17 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
       if (sketch == nullptr)
         return Result<std::vector<SweepPathSegment>>::failure(
             geometry_error(reference.source_node_id(), "3D path sketch must exist"));
+      if (!sketch->constraints().empty()) {
+        auto found = spatial_solutions.find(sketch->id().value());
+        if (found == spatial_solutions.end()) {
+          auto solved = resolve_spatial_sketch_geometry(document, sketch->id(), shape_cache,
+                                                        import_context, SpatialFeatureInputScope{});
+          if (!solved)
+            return Result<std::vector<SweepPathSegment>>::failure(solved.error());
+          found = spatial_solutions.emplace(sketch->id().value(), std::move(solved.value())).first;
+        }
+        sketch = &found->second;
+      }
       std::vector<SweepPathSegment> spatial;
       if (*reference.sketch_3d_curve_kind() == Sketch3DPathCurveKind::EquationCurve) {
         const auto* source = sketch->find_equation_curve(*reference.entity());
@@ -2105,7 +2120,8 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
 
 [[nodiscard]] Result<std::vector<SweepPathSegment>>
 resolve_surface_boundary(const PartDocument& document, const BoundaryCurveReference& boundary,
-                         const ShapeCache& shape_cache, const WorkplaneResolver& resolver) {
+                         const ShapeCache& shape_cache, const WorkplaneResolver& resolver,
+                         StepImportTopologyContext* import_context = nullptr) {
   if (boundary.source_kind() == BoundaryCurveSourceKind::PathCurve) {
     const PathCurveId& path_id = std::get<PathCurveId>(boundary.source());
     const PathCurve* path = document.find_path_curve(path_id);
@@ -2113,7 +2129,7 @@ resolve_surface_boundary(const PartDocument& document, const BoundaryCurveRefere
       return Result<std::vector<SweepPathSegment>>::failure(
           geometry_error(path_id.value(), "surface boundary PathCurve must exist"));
     return resolve_basic_sweep_path(document, *path, shape_cache, resolver, "surface boundary",
-                                    path->closure(), true);
+                                    path->closure(), true, import_context);
   }
   const auto& reference = std::get<SemanticEdgeReference>(boundary.source());
   auto edge = SemanticReferenceEvaluator{}.resolve_edge(document, reference, shape_cache);
@@ -2428,10 +2444,11 @@ surface_path_from_closed_curves(const std::vector<ClosedProfileCurveSegment>& cu
 
 [[nodiscard]] Result<std::vector<SweepPathSegment>>
 resolve_surface_trimming(const PartDocument& document, const TrimmingReference& trimming,
-                         const ShapeCache& cache, const WorkplaneResolver& resolver) {
+                         const ShapeCache& cache, const WorkplaneResolver& resolver,
+                         StepImportTopologyContext* import_context = nullptr) {
   if (trimming.source_kind() == TrimmingReferenceSourceKind::BoundaryCurve)
     return resolve_surface_boundary(document, std::get<BoundaryCurveReference>(trimming.source()),
-                                    cache, resolver);
+                                    cache, resolver, import_context);
   auto section = ProfileSectionReference::create_closed_region(
       std::get<ProfileRegionReference>(trimming.source()));
   if (section.has_error())
@@ -2753,7 +2770,7 @@ GeometryRecomputeExecutor::resolve_path_segments(const PartDocument& document, P
     return Result<std::vector<SweepPathSegment>>::failure(
         geometry_error(id.value(), "PathCurve must exist"));
   return resolve_basic_sweep_path(document, *path, cache, workplane_resolver_, "path preview",
-                                  path->closure(), true);
+                                  path->closure(), true, import_context_);
 }
 
 Result<GeometryShape> GeometryRecomputeExecutor::preview_path_curve(const PartDocument& document,
@@ -2781,7 +2798,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_path_extrude(const PartDo
     return Result<std::size_t>::failure(
         geometry_error(feature.path_curve()->value(), "path extrude PathCurve must exist"));
   auto trajectory = resolve_basic_sweep_path(document, *path, working_cache, workplane_resolver_,
-                                             "path extrude trajectory");
+                                             "path extrude trajectory", PathClosure::Open, false,
+                                             import_context_);
   if (trajectory.has_error())
     return Result<std::size_t>::failure(trajectory.error());
 
@@ -3226,8 +3244,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
   if (trajectory == nullptr)
     return Result<std::size_t>::failure(
         geometry_error(feature->path().value(), "sweep trajectory must exist"));
-  auto path = resolve_basic_sweep_path(document, *trajectory, working_cache, workplane_resolver_,
-                                       "sweep trajectory");
+  auto path =
+      resolve_basic_sweep_path(document, *trajectory, working_cache, workplane_resolver_,
+                               "sweep trajectory", PathClosure::Open, false, import_context_);
   if (path.has_error())
     return Result<std::size_t>::failure(path.error());
 
@@ -3246,8 +3265,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
     if (guide_path == nullptr)
       return Result<std::size_t>::failure(
           geometry_error(feature->guide_path()->value(), "sweep guide must exist"));
-    auto resolved_guide = resolve_basic_sweep_path(document, *guide_path, working_cache,
-                                                   workplane_resolver_, "sweep guide");
+    auto resolved_guide =
+        resolve_basic_sweep_path(document, *guide_path, working_cache, workplane_resolver_,
+                                 "sweep guide", PathClosure::Open, false, import_context_);
     if (resolved_guide.has_error())
       return Result<std::size_t>::failure(resolved_guide.error());
     guide_segments = std::move(resolved_guide.value());
@@ -3268,8 +3288,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
     if (profile == nullptr)
       return Result<std::size_t>::failure(
           geometry_error(profile_id.value(), "surface sweep profile PathCurve must exist"));
-    auto profile_segments = resolve_basic_sweep_path(document, *profile, working_cache,
-                                                     workplane_resolver_, "surface profile");
+    auto profile_segments =
+        resolve_basic_sweep_path(document, *profile, working_cache, workplane_resolver_,
+                                 "surface profile", PathClosure::Open, false, import_context_);
     if (profile_segments.has_error())
       return Result<std::size_t>::failure(profile_segments.error());
     tool = sweep_adapter_.sweep_open_profile(feature->id(), profile_segments.value(), path.value(),
@@ -3404,8 +3425,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
     if (path == nullptr)
       return Result<std::size_t>::failure(
           geometry_error(feature->path_curve()->value(), "loft center path must exist"));
-    auto resolved = resolve_basic_sweep_path(document, *path, working_cache, workplane_resolver_,
-                                             "loft center path");
+    auto resolved =
+        resolve_basic_sweep_path(document, *path, working_cache, workplane_resolver_,
+                                 "loft center path", PathClosure::Open, false, import_context_);
     if (resolved.has_error())
       return Result<std::size_t>::failure(resolved.error());
     center_path_segments = std::move(resolved.value());
@@ -3418,8 +3440,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
     if (guide == nullptr)
       return Result<std::size_t>::failure(
           geometry_error(guide_id.value(), "loft guide curve must exist"));
-    auto resolved = resolve_basic_sweep_path(document, *guide, working_cache, workplane_resolver_,
-                                             "loft guide curve");
+    auto resolved =
+        resolve_basic_sweep_path(document, *guide, working_cache, workplane_resolver_,
+                                 "loft guide curve", PathClosure::Open, false, import_context_);
     if (resolved.has_error())
       return Result<std::size_t>::failure(resolved.error());
     guide_segments.push_back(std::move(resolved.value()));
@@ -3446,8 +3469,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
       if (path == nullptr)
         return Result<std::size_t>::failure(
             geometry_error(path_id.value(), "open loft section PathCurve must exist"));
-      auto resolved = resolve_basic_sweep_path(document, *path, working_cache, workplane_resolver_,
-                                               "open loft section");
+      auto resolved =
+          resolve_basic_sweep_path(document, *path, working_cache, workplane_resolver_,
+                                   "open loft section", PathClosure::Open, false, import_context_);
       if (resolved.has_error())
         return Result<std::size_t>::failure(resolved.error());
       if (section.flip_normal()) {
@@ -3548,7 +3572,8 @@ Result<SurfaceExtensionFrame> GeometryRecomputeExecutor::surface_extension_frame
   auto shape = resolve_surface_target(document, target, cache, surface_adapter_, preview_id);
   if (!shape)
     return Result<SurfaceExtensionFrame>::failure(shape.error());
-  auto segments = resolve_surface_boundary(document, boundary, cache, workplane_resolver_);
+  auto segments =
+      resolve_surface_boundary(document, boundary, cache, workplane_resolver_, import_context_);
   if (!segments)
     return Result<SurfaceExtensionFrame>::failure(segments.error());
   return surface_adapter_.extension_frame(preview_id, shape.value(), segments.value());
@@ -3586,8 +3611,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     std::vector<std::vector<SweepPathSegment>> boundaries;
     boundaries.reserve(authored_boundaries.size());
     for (const auto& authored : authored_boundaries) {
-      auto resolved =
-          resolve_surface_boundary(document, authored, working_cache, workplane_resolver_);
+      auto resolved = resolve_surface_boundary(document, authored, working_cache,
+                                               workplane_resolver_, import_context_);
       if (resolved.has_error())
         return Result<std::size_t>::failure(resolved.error());
       boundaries.push_back(std::move(resolved.value()));
@@ -3601,8 +3626,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
                                          feature_id);
     if (target.has_error())
       return Result<std::size_t>::failure(target.error());
-    auto trimming =
-        resolve_surface_trimming(document, trim.trimming(), working_cache, workplane_resolver_);
+    auto trimming = resolve_surface_trimming(document, trim.trimming(), working_cache,
+                                             workplane_resolver_, import_context_);
     if (trimming.has_error())
       return Result<std::size_t>::failure(trimming.error());
     result = surface_adapter_.trim_surface(feature_id, target.value(), trimming.value());
@@ -3612,8 +3637,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
                                          feature_id);
     if (target.has_error())
       return Result<std::size_t>::failure(target.error());
-    auto boundary =
-        resolve_surface_boundary(document, extend.boundary(), working_cache, workplane_resolver_);
+    auto boundary = resolve_surface_boundary(document, extend.boundary(), working_cache,
+                                             workplane_resolver_, import_context_);
     if (boundary.has_error())
       return Result<std::size_t>::failure(boundary.error());
     const Parameter* distance = document.find_parameter(extend.distance_parameter());
@@ -5547,8 +5572,11 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_imported_body_feature(
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const RecomputePlan& plan,
                                         ShapeCache& shape_cache) const {
+  const bool constrained_spatial =
+      std::any_of(document.sketches_3d().begin(), document.sketches_3d().end(),
+                  [](const auto& owner) { return !owner.constraints().empty(); });
   if (document.authored_history_intent() || !document.hole_features().empty() ||
-      !document.thread_features().empty())
+      !document.thread_features().empty() || constrained_spatial)
     return execute_history(document, std::nullopt, shape_cache);
   if (shape_cache.has_history_scope()) {
     auto fresh_cache = ShapeCache::create(shape_cache.id());
@@ -5689,8 +5717,11 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
 Result<GeometryRecomputeSummary>
 GeometryRecomputeExecutor::execute_document(const PartDocument& document,
                                             ShapeCache& shape_cache) const {
+  const bool constrained_spatial =
+      std::any_of(document.sketches_3d().begin(), document.sketches_3d().end(),
+                  [](const auto& owner) { return !owner.constraints().empty(); });
   if (document.authored_history_intent() || !document.hole_features().empty() ||
-      !document.thread_features().empty())
+      !document.thread_features().empty() || constrained_spatial)
     return execute_history(document, std::nullopt, shape_cache);
   if (shape_cache.has_history_scope()) {
     auto fresh_cache = ShapeCache::create(shape_cache.id());
@@ -5990,6 +6021,18 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
       continue;
     const auto& id = entry.feature.node_id;
     working.history_result_->current_feature = id;
+    for (const auto& owner : document.sketches_3d()) {
+      if (owner.constraints().empty() || working.find_spatial_sketch_solution(owner.id()))
+        continue;
+      const auto consumers = document.dependency_graph().transitive_dependents(owner.id().value());
+      if (std::find(consumers.begin(), consumers.end(), id) == consumers.end())
+        continue;
+      auto solved = resolve_spatial_sketch_geometry(document, owner.id(), working, import_context_,
+                                                    SpatialFeatureInputScope{});
+      if (!solved)
+        return Result<GeometryRecomputeSummary>::failure(solved.error());
+      working.store_spatial_sketch_solution(std::move(solved.value()));
+    }
     const auto executed = [&]() -> Result<std::size_t> {
       const FeatureId feature(id);
       switch (entry.feature.family) {
@@ -6085,6 +6128,77 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
   working.history_result_->sealed = true;
   if (!prefix_count)
     record_complete_geometry_source(document, working);
+  for (const auto& owner : document.sketches_3d()) {
+    if (owner.constraints().empty())
+      continue;
+    if (!working.find_spatial_sketch_solution(owner.id())) {
+      const auto available =
+          detail::validate_history_source(document, owner.id().value(), &working);
+      if (prefix_count && !available)
+        continue;
+      if (!available)
+        return Result<GeometryRecomputeSummary>::failure(available.error());
+    }
+    const SpatialGeometryScope scope =
+        prefix_count ? SpatialGeometryScope{SpatialHistoryPrefixScope{*prefix_count}}
+                     : SpatialGeometryScope{SpatialCompleteGeometryScope{}};
+    const auto solved =
+        resolve_spatial_sketch_geometry(document, owner.id(), working, import_context_, scope);
+    if (!solved)
+      return Result<GeometryRecomputeSummary>::failure(solved.error());
+    working.store_spatial_sketch_solution(solved.value());
+  }
+  // Core cannot compare authored seeds with solved endpoints. Validate the original logical
+  // segment boundaries here, using the same declared historical curve policy as consumers.
+  for (const auto& path : document.path_curves()) {
+    const bool driven =
+        std::any_of(path.segments().begin(), path.segments().end(), [&](const auto& segment) {
+          const auto* owner =
+              segment.sketch_3d() ? document.find_sketch_3d(*segment.sketch_3d()) : nullptr;
+          return owner && !owner->constraints().empty();
+        });
+    if (!driven)
+      continue;
+    const auto available = detail::validate_history_source(document, path.id().value(), &working);
+    if (prefix_count && !available)
+      continue;
+    if (!available)
+      return Result<GeometryRecomputeSummary>::failure(available.error());
+    std::vector<Point3> junctions;
+    for (const auto& segment : path.segments()) {
+      auto one = PathCurve::create(path.id(), path.name(), {segment}, PathClosure::Open,
+                                   PathOrientationRule::MinimumTwist);
+      if (!one)
+        return Result<GeometryRecomputeSummary>::failure(one.error());
+      auto resolved = resolve_basic_sweep_path(document, one.value(), working, workplane_resolver_,
+                                               "spatial path validation", PathClosure::Open, true,
+                                               import_context_);
+      if (!resolved)
+        return Result<GeometryRecomputeSummary>::failure(resolved.error());
+      if (resolved.value().empty())
+        return Result<GeometryRecomputeSummary>::failure(
+            geometry_error(path.id().value(), "Path segment produced no modeled span"));
+      if (!junctions.empty() && distance(junctions.back(), resolved.value().front().start) >
+                                    path.connection_tolerance_mm())
+        return Result<GeometryRecomputeSummary>::failure(
+            geometry_error(path.id().value(), "Solved path segments are disconnected"));
+      if (junctions.empty())
+        junctions.push_back(resolved.value().front().start);
+      junctions.push_back(resolved.value().back().end);
+    }
+    const bool closed = path.closure() == PathClosure::Closed;
+    if (closed && distance(junctions.front(), junctions.back()) > path.connection_tolerance_mm())
+      return Result<GeometryRecomputeSummary>::failure(
+          geometry_error(path.id().value(), "Solved closed path endpoints are disconnected"));
+    for (std::size_t r = 1; r < junctions.size(); ++r)
+      for (std::size_t l = 0; l < r; ++l) {
+        if (closed && l == 0 && r + 1 == junctions.size())
+          continue;
+        if (distance(junctions[l], junctions[r]) <= path.connection_tolerance_mm())
+          return Result<GeometryRecomputeSummary>::failure(
+              geometry_error(path.id().value(), "Solved path has repeated internal junctions"));
+      }
+  }
   shape_cache = std::move(working);
   return Result<GeometryRecomputeSummary>::success(summary);
 }
