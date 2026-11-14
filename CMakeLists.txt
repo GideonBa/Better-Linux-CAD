@@ -243,6 +243,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
     src/geometry/sketch_3d_geometry_adapter.cpp
+    src/geometry/spatial_constraint_geometry.cpp
     src/geometry/derived_curve.cpp
     src/geometry/equation_curve_geometry.cpp
     src/geometry/equation_curve_presentation.cpp
@@ -692,6 +693,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/equation_curve_geometry_tests.cpp
       tests/geometry/sketch_3d_geometry_adapter_tests.cpp
       tests/geometry/sketch_3d_constraint_geometry_tests.cpp
+      tests/geometry/spatial_solver_geometry_tests.cpp
       tests/geometry/sketch_reference_projector_tests.cpp
       tests/geometry/sketch_region_finder_tests.cpp
       tests/geometry/spline_profile_pipeline_tests.cpp

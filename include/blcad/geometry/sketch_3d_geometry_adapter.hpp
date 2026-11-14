@@ -47,6 +47,9 @@ class Sketch3DGeometryAdapter {
 public:
   [[nodiscard]] Result<Sketch3DGeometryResult> convert(const PartDocument& document,
                                                        Sketch3DId sketch_id) const;
+  [[nodiscard]] Result<Sketch3DGeometryResult> convert(const PartDocument&, const Sketch3D&) const;
+  [[nodiscard]] Result<Point3> resolve_point(const PartDocument&,
+                                             const SketchPointReference3D&) const;
 };
 
 } // namespace blcad::geometry

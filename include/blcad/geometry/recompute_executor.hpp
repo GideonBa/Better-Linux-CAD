@@ -58,6 +58,8 @@ public:
   [[nodiscard]] Result<std::pair<Point3, Vector3>>
   resolve_feature_axis(const PartDocument& document, const AxisReference& reference,
                        const ShapeCache& cache) const;
+  [[nodiscard]] Result<std::pair<Point3, Vector3>>
+  resolve_feature_plane(const PartDocument&, const PlaneReference&, const ShapeCache&) const;
 
   // Read-only authoring query over the exact support resolver used by Hole execution.
   // A prefix cache is accepted only with its explicit matching history scope.
