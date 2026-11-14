@@ -2730,6 +2730,18 @@ Result<std::pair<Point3, Vector3>> GeometryRecomputeExecutor::resolve_feature_ax
   return resolve_axis_reference(document, reference, cache, workplane_resolver_, import_context_);
 }
 
+Result<std::pair<Point3, Vector3>> GeometryRecomputeExecutor::resolve_feature_plane(
+    const PartDocument& document, const PlaneReference& reference, const ShapeCache& cache) const {
+  auto valid = detail::validate_history_input(document, cache);
+  if (!valid)
+    return Result<std::pair<Point3, Vector3>>::failure(valid.error());
+  auto frame = resolve_hole_plane(document, reference.source(), cache, workplane_resolver_,
+                                  import_context_, FeatureId{});
+  return frame ? Result<std::pair<Point3, Vector3>>::success(
+                     {frame.value().plane.origin, frame.value().plane.normal})
+               : Result<std::pair<Point3, Vector3>>::failure(frame.error());
+}
+
 Result<std::vector<SweepPathSegment>>
 GeometryRecomputeExecutor::resolve_path_segments(const PartDocument& document, PathCurveId id,
                                                  const ShapeCache& cache) const {

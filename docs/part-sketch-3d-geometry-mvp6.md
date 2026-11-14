@@ -101,3 +101,23 @@ schema boundary does not imply solving; differential/projection execution and di
 to 164. The [native-curve witnesses](../tests/geometry/sketch_3d_constraint_geometry_tests.cpp) and
 [existing swept consumer](../tests/geometry/sweep_feature_pipeline_tests.cpp) compare equal literal
 and parameter sources without upgrading the historical path policy assigned to 166.
+
+## Spatial solver queries — 164
+
+`SpatialConstraintGeometry` borrows a fixed document/cache/import context for one synchronous solve.
+The Sketch3D adapter's candidate overload converts the supplied sketch directly; it does not publish
+Part updates or reuse the committed owner's curve shape. Per-evaluation native products are disposable.
+External axes/planes reuse the feature resolvers; source/cache and imported-byte freshness are checked
+before and after solving. The complete session/downstream preview remains a separate publication gate.
+
+Supported regular arc, fit/control spline, Helix and equation products provide native modeled-parameter
+jets and curve measures. Straight planar/construction/semantic and spatial sources retain their authored
+orientation/reversal. Multi-edge polylines use equal parameter spans in authored order; internal joints
+have no unique differential and reject. Derived planar infinite/reference-line sources require an
+explicit supported finite curve source at this boundary. No historical PathCurve sampling policy is
+upgraded here.
+
+Face constraints use native closest-point projection on the selected trimmed face. Only a unique regular
+interior projection is supported; trim-edge/corner contacts and ambiguous projections reject rather than
+reporting the DOF of an infinite underlying surface. Solver-supported G2 is checked from actual endpoint
+derivatives; it does not imply curve-preserving downstream Sweep or verified surface-boundary G2 Loft.

@@ -103,3 +103,59 @@ Parameter/formula edits validate dependent typed intent transactionally.
 records. [Core schema tests](../tests/core/sketch_3d_constraint_tests.cpp) cover the matrix, units,
 ordering, source/cycle guards, exact replacements and compatibility. Solver/diagnostics and native
 constraint/curve authoring remain the separate 164/165 boundaries in the numbered plan.
+
+## Spatial solver boundary — 164
+
+`solve_spatial_sketch` consumes the existing Sketch3D plus fixed Part parameter sources and optional
+Geometry queries. Its result owns a candidate Sketch3D and derived diagnostics. Every rejected
+result contains the exact source sketch: coordinates, active bindings, owned scalars, constraint
+IDs and authored curve-parameter seeds. Numerical perturbations never update Part/history. Core
+has no OCCT or file-I/O dependency; the caller publishes one fully checked downstream transaction. Geometry may
+validate all final owner curves before acceptance, including curves not directly queried by a
+relation. Unchanged coordinate components and bindings retain their original records.
+
+The stable variable layout from the ownership contract is normalized about the initial point
+centroid. A rigid-motion-invariant characteristic length uses twice the maximum centroid radius and active
+Length dimensions, with an explicit positive scale override. Length residuals divide by that scale;
+direction/angle residuals are dimensionless and curvature-vector residuals multiply by it. Every
+normalized residual component must meet `convergence_rms`; reported RMS is descriptive. Solver,
+modeling and display tolerances remain separate. Parameter coordinates/scalars and integer turns
+remain immutable. Auxiliary `[0,1]` curve parameters are derived solve variables; the authored seed
+selects a bounded local closest-projection initialization and is never replaced by the numerical
+solution. A feasible source on that selected branch remains stationary across repeated solves;
+auxiliary-only changes do not rewrite authored coordinates.
+
+| Relation | Derived residual / convention |
+| --- | --- |
+| Coincident / Fixed / Distance | Model-space position difference or Euclidean distance; Fixed uses the authored anchor. |
+| Point on line / plane | Orthogonal cross-product or signed normal distance. Directions are normalized and singular lines reject. |
+| Point on curve / face | Position minus current-candidate native curve evaluation, or the closest point on the supported trimmed-face interior. A curve parameter is normalized modeled parameter, not arc length. |
+| Parallel / perpendicular | Cross-product or dot-product of normalized directions. Parallel permits either orientation. |
+| Angle | Unsigned `[0,180]` degrees; exact zero/half-turn use directional vector residuals to retain endpoint rank. Oriented `(-180,180]` degrees is the wrapped angle of directions projected about the named axis; zero projected speed rejects. |
+| Tangent / Smooth | Endpoint coincidence plus opposed inward unit tangents; Smooth additionally equates actual normal curvature vectors `(d2 - T·dot(T,d2))/speed²`. A regular unconstrained join has physical rank five/seven. |
+| Radius / Length | Supported native circular/helix radius or actual modeled curve length; no control-polygon length or historical Sweep chord substitute. |
+
+Entity, free-variable and constraint counts are bounded before numerical work.
+
+Bounded damped Gauss–Newton uses the same dense linear elimination and matrix-rank helpers as the
+planar solver. Stable ID ordering, finite-difference step bounds, iteration/damping/line-search and
+evaluation budgets are explicit. The work budget includes residual evaluations and curve-branch
+initialization queries; branch projection also has a separate iteration bound. Domain-bound auxiliary and positive scalar variables use one-sided
+derivatives where required. Invalid capabilities, singular Geometry, exhausted budgets and rejected
+iterations return source geometry; no last iterate is published as an approximate success.
+
+Final Jacobian rank gives total DOF, including auxiliaries. Per-ID attribution accounts for the
+auxiliary introduced by point-on-curve; a constraint that only fixes its auxiliary is geometrically
+redundant. Residual diagnostics identify unsatisfied relation blocks. Gauge is the image of locally
+admissible rigid velocities in free point coordinates, allowing auxiliary compensation and respecting
+bound coordinate rows and external constraints; it is not an unconditional subtraction of six.
+Internal DOF is total DOF minus this admissible gauge. Gauge rank accounts for finite-difference
+cancellation uncertainty from the original Jacobian. Failure reports describe the attempted local
+solve while the returned model remains the exact source. This is a local differential report, not a
+claim of global uniqueness or of a different curve branch being infeasible.
+
+Independent rigidity/scale/repeatability and exact-rejection proofs belong to
+[Core solver tests](../tests/core/sketch_3d_solver_tests.cpp). Geometry differential/projection and
+fixed G1-only impostor checks belong to
+[native solver tests](../tests/geometry/spatial_solver_geometry_tests.cpp). Native interaction remains
+owned by the existing [Sketch3D task contract](gui-sketch3d-interaction-mvp8.md).

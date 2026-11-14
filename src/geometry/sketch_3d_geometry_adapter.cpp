@@ -332,6 +332,12 @@ Result<Sketch3DGeometryResult> Sketch3DGeometryAdapter::convert(const PartDocume
   if (sketch == nullptr)
     return Result<Sketch3DGeometryResult>::failure(
         geometry_error(sketch_id.value(), "3D sketch must exist in part document"));
+  return convert(document, *sketch);
+}
+Result<Sketch3DGeometryResult> Sketch3DGeometryAdapter::convert(const PartDocument& document,
+                                                                const Sketch3D& source) const {
+  const auto* sketch = &source;
+  const auto& sketch_id = source.id();
   try {
     const auto wrap_shape = [](TopoDS_Shape value) {
       return GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(value)));
@@ -424,6 +430,12 @@ Result<Sketch3DGeometryResult> Sketch3DGeometryAdapter::convert(const PartDocume
     return Result<Sketch3DGeometryResult>::failure(
         geometry_error(sketch_id.value(), exception.what()));
   }
+}
+
+Result<Point3>
+Sketch3DGeometryAdapter::resolve_point(const PartDocument& document,
+                                       const SketchPointReference3D& reference) const {
+  return resolve_point_reference(document, {}, reference);
 }
 
 } // namespace blcad::geometry
