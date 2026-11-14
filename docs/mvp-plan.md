@@ -773,7 +773,8 @@ Keep the accepted source entities and historical path interpretation. Deliver se
 | Core policy / V10 | Immutable legacy/curve-preserving policy, separate modeling tolerance, necessary-only strict persistence, atomic source-preserving edits and downstream invalidation. [Contract](part-path-curve-core-mvp6.md#explicit-execution-policy--166), [Core proofs](../tests/core/path_execution_policy_tests.cpp). Resource-aware Project V10 integration preserves exact revision subsets, empty local subsets and pinned material/Body assignments. |
 | Native Geometry | Exact rational Bézier/shared Sketch3D splines, tolerance-checked Helix, exact native Loft-section refinement and atomic singular-path rejection. [Construction contract](part-path-curve-core-mvp6.md#native-curve-construction), [independent distance/tangent/length and refinement proofs](../tests/geometry/path_execution_policy_tests.cpp). |
 | Native upgrade | Explicit existing/new-path policy controls, actual length/span comparison, affected Body preview, retained invalid tolerance text, stale-source guard and one reversible Apply. [Task contract](gui-interactive-path-sweep-loft-mvp9.md#explicit-path-execution-comparison), [widget/history/native proofs](../tests/gui/gui_path_execution_policy_tests.cpp). Native capture review confirms readable units, visible candidate geometry and reachable actions. No implicit upgrade during read/save/source edits. |
-| G01 acceptance | Still open: curve-preserving equation twist and the remaining mixed/reversed, seam/guide, near-degenerate and physical Sweep/Cut/Surface/path Extrude/Loft combinations. |
+| Native twist | Actual-arc-length roll on the native spine, three frames, bounded derived normal-plane guide and checked pipe approximation. [Contract](part-sweep-3d-geometry-mvp6.md#explicit-curve-preserving-twist), [independent section/volume/area and atomic recompute proofs](../tests/geometry/native_twist_geometry_tests.cpp). |
+| G01 acceptance | Still open: remaining mixed/reversed, seam/guide, near-degenerate and physical Sweep/Cut/Surface/path Extrude/Loft combinations. |
 
 All five targets build. Full Core **762 cases / 34,452 assertions** and focused Project/material/
 history Qt **27 cases: 26 passed, one native-only skipped / 1,202 assertions** pass. Native curve
@@ -789,6 +790,12 @@ inspected after CAD exit. Separate app startup proved a visible process-owned X1
 The subsequent resource-adapter proof uses `/tmp/blcad-166-core17-full.log`,
 `/tmp/blcad-166-project-qt17.log` and runtime SHA-256
 `bd7d99ddc7b33024fc19750086610dc294ed3f18c187cb5aa8308d726d8f23f1`.
+The native-twist slice builds all five targets and passes Geometry **18 / 2,186** plus Qt
+**16 cases: 15 passed, one native-only skipped / 1,854 assertions**. The selected native filter
+passes **3 / 679** at 100% and **3 / 687** at 150%, without skips; the latter includes capture
+assertions. The new policy capture was inspected after CAD exit. Runtime: **1,139 inputs**, SHA-256
+`2053a9550d642071f535cad2959db4f91403b3df751ce54a22c5eda3a5e6fcbe`;
+logs `/tmp/blcad-166-{twist24-regression,twist24-qt,native100-24,native150-24}.log`.
 Delivery remains draft [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190).
 The complete 166 acceptance gate remains open. Preserve all 167–204 requirements.
 
