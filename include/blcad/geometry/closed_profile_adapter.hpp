@@ -17,7 +17,8 @@ enum class ClosedProfileCurveKind {
   Line,
   CircularArc,
   CubicBezierSpline,
-  DerivedEquation,
+  DerivedNative,
+  DerivedEquation = DerivedNative,
 };
 
 struct ClosedProfileCurveSegment {

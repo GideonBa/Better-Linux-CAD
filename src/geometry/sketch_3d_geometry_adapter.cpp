@@ -6,7 +6,9 @@
 #include "blcad/geometry/sketch_reference_projector.hpp"
 #include "blcad/geometry/workplane_resolver.hpp"
 
+#include "derived_curve_internal.hpp"
 #include "geometry_shape_internal.hpp"
+#include "native_path_curve.hpp"
 
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
@@ -14,13 +16,8 @@
 #include <BRepLib.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <Geom2d_Line.hxx>
-#include <GeomAPI_PointsToBSpline.hxx>
-#include <Geom_BSplineCurve.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Standard_Failure.hxx>
-#include <TColStd_Array1OfInteger.hxx>
-#include <TColStd_Array1OfReal.hxx>
-#include <TColgp_Array1OfPnt.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Wire.hxx>
@@ -180,67 +177,15 @@ resolve_references(const PartDocument& document,
   return Result<TopoDS_Shape>::success(builder.Edge());
 }
 
-[[nodiscard]] GeomAbs_Shape continuity(SketchSpline3DContinuity value) {
-  switch (value) {
-  case SketchSpline3DContinuity::Positional:
-    return GeomAbs_C0;
-  case SketchSpline3DContinuity::Tangent:
-    return GeomAbs_C1;
-  case SketchSpline3DContinuity::Curvature:
-    return GeomAbs_C2;
-  }
-  return GeomAbs_C0;
-}
-
-[[nodiscard]] Result<Handle(Geom_BSplineCurve)>
-make_control_spline(const std::vector<Point3>& points, std::size_t degree,
-                    const SketchEntityId& id) {
-  const Standard_Integer pole_count = static_cast<Standard_Integer>(points.size());
-  const Standard_Integer knot_count = pole_count - static_cast<Standard_Integer>(degree) + 1;
-  TColgp_Array1OfPnt poles(1, pole_count);
-  for (Standard_Integer index = 1; index <= pole_count; ++index)
-    poles.SetValue(index, point(points[static_cast<std::size_t>(index - 1)]));
-  TColStd_Array1OfReal knots(1, knot_count);
-  TColStd_Array1OfInteger multiplicities(1, knot_count);
-  for (Standard_Integer index = 1; index <= knot_count; ++index) {
-    knots.SetValue(index, static_cast<double>(index - 1));
-    multiplicities.SetValue(
-        index, index == 1 || index == knot_count ? static_cast<Standard_Integer>(degree) + 1 : 1);
-  }
-  try {
-    return Result<Handle(Geom_BSplineCurve)>::success(new Geom_BSplineCurve(
-        poles, knots, multiplicities, static_cast<Standard_Integer>(degree), false));
-  } catch (const Standard_Failure& failure) {
-    return Result<Handle(Geom_BSplineCurve)>::failure(
-        geometry_error(id.value(), failure_message(failure)));
-  }
-}
-
 [[nodiscard]] Result<TopoDS_Shape> make_spline(const std::vector<Point3>& points,
                                                const SketchSpline3D& spline) {
-  Handle(Geom_BSplineCurve) curve;
-  if (spline.representation() == SketchSpline3DRepresentation::ControlPoints) {
-    auto built = make_control_spline(points, spline.degree(), spline.id());
-    if (built.has_error())
-      return Result<TopoDS_Shape>::failure(built.error());
-    curve = built.value();
-  } else {
-    TColgp_Array1OfPnt fit_points(1, static_cast<Standard_Integer>(points.size()));
-    for (Standard_Integer index = 1; index <= fit_points.Length(); ++index)
-      fit_points.SetValue(index, point(points[static_cast<std::size_t>(index - 1)]));
-    GeomAPI_PointsToBSpline builder(fit_points, static_cast<Standard_Integer>(spline.degree()),
-                                    static_cast<Standard_Integer>(spline.degree()),
-                                    continuity(spline.continuity()), 1.0e-7);
-    if (!builder.IsDone())
-      return Result<TopoDS_Shape>::failure(
-          geometry_error(spline.id().value(), "could not build fit-point 3D spline"));
-    curve = builder.Curve();
-  }
-  BRepBuilderAPI_MakeEdge edge(curve);
-  if (!edge.IsDone())
-    return Result<TopoDS_Shape>::failure(
-        geometry_error(spline.id().value(), "could not build 3D spline edge"));
-  return Result<TopoDS_Shape>::success(edge.Edge());
+  auto curve = detail::native_spatial_spline(points, spline);
+  if (!curve)
+    return Result<TopoDS_Shape>::failure(curve.error());
+  auto edge = derived_curve_edge(curve.value(), spline.id().value());
+  if (!edge)
+    return Result<TopoDS_Shape>::failure(edge.error());
+  return Result<TopoDS_Shape>::success(edge.value());
 }
 
 struct ResolvedAxis {

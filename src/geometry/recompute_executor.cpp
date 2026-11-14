@@ -26,6 +26,7 @@
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include "derived_curve_internal.hpp"
 #include "loft_section_alignment_internal.hpp"
+#include "native_path_curve.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1836,9 +1837,7 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
                          std::string_view role, PathClosure required_closure = PathClosure::Open,
                          bool allow_surface_boundary_sources = false,
                          StepImportTopologyContext* import_context = nullptr) {
-  if (path.execution_policy().kind() == PathGeometryPolicyKind::CurvePreserving)
-    return Result<std::vector<SweepPathSegment>>::failure(
-        geometry_error(path.id().value(), "Curve-preserving path execution is not available"));
+  const bool preserving = path.execution_policy().kind() == PathGeometryPolicyKind::CurvePreserving;
   if (path.closure() != required_closure)
     return Result<std::vector<SweepPathSegment>>::failure(
         geometry_error(path.id().value(), std::string(role) + (required_closure == PathClosure::Open
@@ -1899,6 +1898,19 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
                                      resolver.evaluate_point(workplane.value(), spline->control1()),
                                      resolver.evaluate_point(workplane.value(), spline->control2()),
                                      resolver.evaluate_point(workplane.value(), spline->end())};
+        if (preserving) {
+          auto curve =
+              detail::native_rational_bezier(controls, spline->weights(), spline->id().value());
+          if (!curve)
+            return Result<std::vector<SweepPathSegment>>::failure(curve.error());
+          segment = {SweepPathSegmentKind::DerivedNative,
+                     controls.front(),
+                     {},
+                     controls.back(),
+                     curve.value()};
+          resolved.push_back(reference.reversed() ? reversed_sweep_segment(segment) : segment);
+          continue;
+        }
         auto sampled = sampled_path(controls, 32U, {spline->weights().begin(), spline->weights().end()});
         if (reference.reversed()) {
           std::reverse(sampled.begin(), sampled.end());
@@ -2029,7 +2041,19 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
             return Result<std::vector<SweepPathSegment>>::failure(resolved_point.error());
           controls.push_back(resolved_point.value());
         }
-        spatial = sampled_path(controls);
+        if (preserving) {
+          auto curve = detail::native_spatial_spline(controls, *spline);
+          if (!curve)
+            return Result<std::vector<SweepPathSegment>>::failure(curve.error());
+          const auto& c = curve.value()->curve;
+          const auto a = c->Value(c->FirstParameter()), b = c->Value(c->LastParameter());
+          spatial.push_back({SweepPathSegmentKind::DerivedNative,
+                             {a.X(), a.Y(), a.Z()},
+                             {},
+                             {b.X(), b.Y(), b.Z()},
+                             curve.value()});
+        } else
+          spatial = sampled_path(controls);
       } else {
         const SketchHelix3D* helix = sketch->find_helix(*reference.entity());
         if (helix == nullptr)
@@ -2075,28 +2099,47 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
                                       axis.x * helper.y - axis.y * helper.x});
         const Vector3 y = {axis.y * x.z - axis.z * x.y, axis.z * x.x - axis.x * x.z,
                            axis.x * x.y - axis.y * x.x};
-        const std::size_t count = turns->value().count_value() * 48U;
-        std::vector<Point3> points;
-        for (std::size_t index = 0U; index <= count; ++index) {
-          const double fraction = static_cast<double>(index) / static_cast<double>(count);
-          const double angle =
-              2.0 * k_pi * static_cast<double>(turns->value().count_value()) * fraction *
-              (helix->handedness() == SketchHelix3DHandedness::RightHanded ? 1.0 : -1.0);
-          const double axial = pitch.value().millimeters() *
-                               static_cast<double>(turns->value().count_value()) * fraction;
-          points.push_back(
-              {origin.x +
-                   radius.value().millimeters() * (x.x * std::cos(angle) + y.x * std::sin(angle)) +
-                   axis.x * axial,
-               origin.y +
-                   radius.value().millimeters() * (x.y * std::cos(angle) + y.y * std::sin(angle)) +
-                   axis.y * axial,
-               origin.z +
-                   radius.value().millimeters() * (x.z * std::cos(angle) + y.z * std::sin(angle)) +
-                   axis.z * axial});
+        if (preserving) {
+          auto curve = detail::native_path_helix(
+              origin, axis, x, radius.value().millimeters(), pitch.value().millimeters(),
+              turns->value().count_value(),
+              helix->handedness() == SketchHelix3DHandedness::RightHanded,
+              *path.execution_policy().tolerance_mm(), helix->id().value());
+          if (!curve)
+            return Result<std::vector<SweepPathSegment>>::failure(curve.error());
+          const auto& c = curve.value()->curve;
+          const auto a = c->Value(c->FirstParameter()), b = c->Value(c->LastParameter());
+          spatial.push_back({SweepPathSegmentKind::DerivedNative,
+                             {a.X(), a.Y(), a.Z()},
+                             {},
+                             {b.X(), b.Y(), b.Z()},
+                             curve.value()});
+        } else {
+          const std::size_t count = turns->value().count_value() * 48U;
+          std::vector<Point3> points;
+          for (std::size_t index = 0U; index <= count; ++index) {
+            const double fraction = static_cast<double>(index) / static_cast<double>(count);
+            const double angle =
+                2.0 * k_pi * static_cast<double>(turns->value().count_value()) * fraction *
+                (helix->handedness() == SketchHelix3DHandedness::RightHanded ? 1.0 : -1.0);
+            const double axial = pitch.value().millimeters() *
+                                 static_cast<double>(turns->value().count_value()) * fraction;
+            points.push_back({origin.x +
+                                  radius.value().millimeters() *
+                                      (x.x * std::cos(angle) + y.x * std::sin(angle)) +
+                                  axis.x * axial,
+                              origin.y +
+                                  radius.value().millimeters() *
+                                      (x.y * std::cos(angle) + y.y * std::sin(angle)) +
+                                  axis.y * axial,
+                              origin.z +
+                                  radius.value().millimeters() *
+                                      (x.z * std::cos(angle) + y.z * std::sin(angle)) +
+                                  axis.z * axial});
+          }
+          for (std::size_t index = 1U; index < points.size(); ++index)
+            spatial.push_back({SweepPathSegmentKind::Line, points[index - 1U], {}, points[index]});
         }
-        for (std::size_t index = 1U; index < points.size(); ++index)
-          spatial.push_back({SweepPathSegmentKind::Line, points[index - 1U], {}, points[index]});
       }
       if (reference.reversed()) {
         std::reverse(spatial.begin(), spatial.end());
@@ -2118,6 +2161,17 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
     }
     resolved.push_back(reference.reversed() ? reversed_sweep_segment(segment) : segment);
   }
+  if (preserving)
+    for (auto& segment : resolved) {
+      segment.modeling_tolerance_mm = *path.execution_policy().tolerance_mm();
+      if (segment.derived_curve) {
+        auto extent = derived_curve_length(segment.derived_curve, path.id().value());
+        auto tangent = derived_curve_start_tangent(segment.derived_curve, path.id().value());
+        if (!extent || !tangent || extent.value() <= 1e-8)
+          return Result<std::vector<SweepPathSegment>>::failure(geometry_error(
+              path.id().value(), "Curve-preserving path has a degenerate or singular curve"));
+      }
+    }
   return Result<std::vector<SweepPathSegment>>::success(std::move(resolved));
 }
 
@@ -6160,7 +6214,7 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
               segment.sketch_3d() ? document.find_sketch_3d(*segment.sketch_3d()) : nullptr;
           return owner && !owner->constraints().empty();
         });
-    if (!driven)
+    if (!driven && path.execution_policy().kind() != PathGeometryPolicyKind::CurvePreserving)
       continue;
     const auto available = detail::validate_history_source(document, path.id().value(), &working);
     if (prefix_count && !available)
@@ -6170,7 +6224,8 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
     std::vector<Point3> junctions;
     for (const auto& segment : path.segments()) {
       auto one = PathCurve::create(path.id(), path.name(), {segment}, PathClosure::Open,
-                                   PathOrientationRule::MinimumTwist);
+                                   PathOrientationRule::MinimumTwist, std::nullopt, std::nullopt,
+                                   path.connection_tolerance_mm(), path.execution_policy());
       if (!one)
         return Result<GeometryRecomputeSummary>::failure(one.error());
       auto resolved = resolve_basic_sweep_path(document, one.value(), working, workplane_resolver_,

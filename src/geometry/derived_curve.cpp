@@ -37,16 +37,16 @@ Result<TopoDS_Edge> derived_curve_edge(const DerivedCurveRef& source,
     if (!source || source->curve.IsNull() || !std::isfinite(source->curve->FirstParameter()) ||
         !std::isfinite(source->curve->LastParameter()) ||
         source->curve->FirstParameter() >= source->curve->LastParameter())
-      return fail("Derived equation curve requires a finite resolved domain");
+      return fail("Derived native curve requires a finite resolved domain");
     if (source->curve->IsClosed() != source->closure_proven)
-      return fail("Equation curve closure differs from its proven modeling intent");
+      return fail("Native curve closure differs from its proven modeling intent");
     BRepBuilderAPI_MakeEdge edge(source->curve);
     if (!edge.IsDone())
-      return fail("Could not construct the derived equation edge");
+      return fail("Could not construct the derived native edge");
     return Result<TopoDS_Edge>::success(edge.Edge());
   } catch (const Standard_Failure& failure) {
     return fail(failure.GetMessageString() ? failure.GetMessageString()
-                                           : "OCCT equation edge failed");
+                                           : "OCCT native edge failed");
   }
 }
 
