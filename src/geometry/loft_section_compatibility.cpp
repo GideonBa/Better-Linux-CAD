@@ -1,4 +1,5 @@
 #include "blcad/geometry/loft_section_compatibility.hpp"
+#include "derived_curve_internal.hpp"
 
 #include <GC_MakeArcOfCircle.hxx>
 #include <Geom_BezierCurve.hxx>
@@ -35,6 +36,11 @@ bool finite(Point3 p) {
   return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
 }
 Handle(Geom_Curve) curve(const Segment& s) {
+  if (s.kind == ClosedProfileCurveKind::DerivedNative) {
+    if (!s.derived_curve || s.derived_curve->curve.IsNull())
+      throw std::runtime_error("Loft section is missing its native curve");
+    return s.derived_curve->curve;
+  }
   if (s.kind == ClosedProfileCurveKind::CircularArc) {
     GC_MakeArcOfCircle arc(point(s.start), point(s.mid), point(s.end));
     if (!arc.IsDone())
@@ -83,6 +89,14 @@ Segment trim(const Segment& s, double first, double last) {
     result.start = at(first);
     result.mid = at((first + last) / 2);
     result.end = at(last);
+  } else if (s.kind == ClosedProfileCurveKind::DerivedNative) {
+    auto c = curve(s);
+    auto trimmed =
+        new Geom_TrimmedCurve(c, std::lerp(c->FirstParameter(), c->LastParameter(), first),
+                              std::lerp(c->FirstParameter(), c->LastParameter(), last));
+    result.derived_curve = std::make_shared<const DerivedCurve>(trimmed, false);
+    result.start = point(trimmed->StartPoint());
+    result.end = point(trimmed->EndPoint());
   } else {
     auto c = Handle(Geom_BezierCurve)::DownCast(curve(s));
     c->Segment(first, last);
@@ -152,7 +166,8 @@ Result<Compatible> refine(const FeatureId& id, const std::vector<std::vector<Seg
           return fail("Loft section has invalid rational spline controls");
         if (s.kind != ClosedProfileCurveKind::Line &&
             s.kind != ClosedProfileCurveKind::CircularArc &&
-            s.kind != ClosedProfileCurveKind::CubicBezierSpline)
+            s.kind != ClosedProfileCurveKind::CubicBezierSpline &&
+            s.kind != ClosedProfileCurveKind::DerivedNative)
           return fail("Loft section has an unsupported edge kind");
         if (i && distance(section[i - 1].end, s.start) > tolerance)
           return fail("Loft section edges must remain connected in authored order");
@@ -225,13 +240,20 @@ make_loft_sections_compatible(const FeatureId& id,
   for (const auto& section : sections) {
     converted.emplace_back();
     for (const auto& s : section) {
-      if (s.kind != SweepPathSegmentKind::Line && s.kind != SweepPathSegmentKind::CircularArc)
+      if (s.kind != SweepPathSegmentKind::Line && s.kind != SweepPathSegmentKind::CircularArc &&
+          s.kind != SweepPathSegmentKind::DerivedNative)
         return Result<LoftCompatibleSections<SweepPathSegment>>::failure(
             Error::geometry(id.value(), "Loft section has an unsupported edge kind"));
-      converted.back().push_back({s.kind == SweepPathSegmentKind::Line
-                                      ? ClosedProfileCurveKind::Line
-                                      : ClosedProfileCurveKind::CircularArc,
-                                  s.start, s.mid, s.end});
+      converted.back().push_back(
+          {s.kind == SweepPathSegmentKind::Line          ? ClosedProfileCurveKind::Line
+           : s.kind == SweepPathSegmentKind::CircularArc ? ClosedProfileCurveKind::CircularArc
+                                                         : ClosedProfileCurveKind::DerivedNative,
+           s.start,
+           s.mid,
+           s.end,
+           {},
+           {1, 1, 1, 1},
+           s.derived_curve});
     }
   }
   auto refined = refine(id, converted, false);
@@ -243,10 +265,11 @@ make_loft_sections_compatible(const FeatureId& id,
   for (const auto& section : refined.value().sections) {
     result.sections.emplace_back();
     for (const auto& s : section)
-      result.sections.back().push_back({s.kind == ClosedProfileCurveKind::Line
-                                            ? SweepPathSegmentKind::Line
-                                            : SweepPathSegmentKind::CircularArc,
-                                        s.start, s.mid, s.end});
+      result.sections.back().push_back(
+          {s.kind == ClosedProfileCurveKind::Line          ? SweepPathSegmentKind::Line
+           : s.kind == ClosedProfileCurveKind::CircularArc ? SweepPathSegmentKind::CircularArc
+                                                           : SweepPathSegmentKind::DerivedNative,
+           s.start, s.mid, s.end, s.derived_curve});
   }
   return Result<LoftCompatibleSections<SweepPathSegment>>::success(std::move(result));
 }

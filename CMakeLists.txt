@@ -246,6 +246,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/spatial_constraint_geometry.cpp
     src/geometry/spatial_sketch_solution.cpp
     src/geometry/derived_curve.cpp
+    src/geometry/native_path_curve.cpp
     src/geometry/equation_curve_geometry.cpp
     src/geometry/equation_curve_presentation.cpp
     src/geometry/sketch_curve_contour.cpp

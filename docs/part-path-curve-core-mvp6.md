@@ -65,6 +65,27 @@ upgraded path to legacy restores its prior necessary envelope and canonical fiel
 intent is the first slice; curve-preserving Geometry, explicit native comparison/preview/Apply and
 the complete G01 gate remain in progress under 166. No sampled curve product is save-file intent.
 
+### Native curve construction
+
+The Geometry slice under verification preserves planar rational cubic Bézier poles/weights and
+the existing Sketch3D control-point or fit-point B-spline definition. Sketch3D and upgraded paths
+share that constructor; changing path tolerance does not redefine the source fit. Lines, ordered
+polyline spans and three-point arcs retain their exact interpretation. Reversal reverses the native
+curve and its endpoint roles together, independently of subdivision counts.
+
+An upgraded Helix uses its analytic cylinder pcurve and a C2 3D approximation with the authored
+modeling tolerance, at most 4,096 spans/degree 14 and **1–128 turns**. Both the kernel completion
+status and reported maximum error must satisfy the tolerance; a partial result is rejected.
+The historical PathCurve radial frame/phase is retained, including its start/end positions in a
+mixed chain. This does not silently replace the separate historical Sketch3D display frame.
+
+Native Loft-section compatibility trims native curves without converting them to chords. The
+derived vertex map retains authored section vertices. Degenerate or singular path starts reject;
+failed construction never changes the committed document or previously certified cache. Independent
+distance/tangent/length and native refinement proofs live in
+[the path Geometry tests](../tests/geometry/path_execution_policy_tests.cpp). Equation twist,
+native comparison/Apply and the remaining consumer combinations still require their own gates.
+
 ## Equation source contract
 
 Both planar and spatial sources add the `equation_curve` kind in the same owner/entity reference.
