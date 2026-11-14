@@ -46,6 +46,25 @@ ambiguous records fail loading. Files from before Block 79 load with zero PathCu
 
 No resolved endpoints, sampled curves, or OCCT identities are persisted.
 
+## Explicit execution policy — 166
+
+`PathExecutionPolicy::legacy()` is the default for every historical constructor/record. It retains
+the existing interpretation, including fixed spline/Helix subdivisions and the existing equation
+curve behavior. Reading, saving or editing an unrelated source never upgrades a path implicitly.
+
+The explicit `curve_preserving(tolerance_mm)` policy owns a finite modeling tolerance in
+**1e-9…1 mm**. It is separate from connection tolerance, solver tolerances and display tessellation.
+Changing only this policy preserves path identity, ordered typed segment references/reversal,
+closure, orientation/up-vector, continuity hint and connection tolerance. The atomic Part setter
+invalidates the path and its dependent features without replacing source entities, dependency edges
+or executable lifetime. Repeating the same policy is a no-op; Reference Parts remain immutable.
+
+Only non-legacy policy intent adds the strict V10 `execution_policy` record described in
+[the format contract](file-format.md#curve-preserving-path-policy--part-v10). Returning the final
+upgraded path to legacy restores its prior necessary envelope and canonical fields. Typed Core
+intent is the first slice; curve-preserving Geometry, explicit native comparison/preview/Apply and
+the complete G01 gate remain in progress under 166. No sampled curve product is save-file intent.
+
 ## Equation source contract
 
 Both planar and spatial sources add the `equation_curve` kind in the same owner/entity reference.

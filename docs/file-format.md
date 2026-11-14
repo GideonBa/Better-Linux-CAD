@@ -4,7 +4,8 @@ History intent has the explicit Part-version-2 contract below. Revision-pinned r
 Part version 3 and Project version 2 as specified in the owning 149B sections. Semantic Hole intent
 uses the Part-version-4 extension owned by 152B below; manufacturing variants use Part V5 as
 specified in the 154 section. Thread integration uses Part V6 (155B); explicit Pattern placements
-use Part V7 (156), equations use V8 (160), and spatial constraint/scalar intent uses V9 (163) below. Planned evolution
+use Part V7 (156), equations use V8 (160), spatial constraint/scalar intent uses V9 (163), and explicit
+curve-preserving path policy uses V10 (166) below. Planned evolution
 in [Blocks 145–204](inventor-parity-sequence.md) additionally assigns new feature families,
 spatial solving/interaction, model states, occurrence poses and cross-document references.
 Their future intent is not implied by the current JSON fields. Each owning block must specify
@@ -80,6 +81,30 @@ specifies exact targets, typed dimensional values, fixed anchors, angle conventi
 and legacy/new helix fields. Existing point/curve identity and all historical geometric definitions
 remain unchanged. Project resource references preserve V9 within the existing shared ownership
 contract. Solver state and Geometry remain derived, never a second portable format.
+
+## Curve-preserving path policy — Part V10
+
+A Part with at least one explicitly upgraded path uses integer version **10** in the same Part
+schema. Only those path records add this exact object:
+
+```json
+"execution_policy": {"kind": "curve_preserving", "tolerance_mm": 0.0001}
+```
+
+The finite authored modeling tolerance is **1e-9…1 mm**. Unknown kinds/fields, missing fields,
+non-numeric/nonfinite or out-of-range tolerances reject loading. Legacy policy has no object;
+explicit `legacy_fixed`, null and empty policy records are noncanonical and rejected. Absence
+retains the historical path interpretation, including the original spline/Helix sampling and
+existing equation behavior. Path order, source identities, reversal, frames and connection tolerance
+retain their current independent fields. Resolved curves/subdivisions/frames/error products remain
+derived and are never written here.
+
+Versions 1–9 reject the reserved policy field. V10 requires actual upgraded-path intent and retains
+all prior resource/history/spatial/equation fields under their existing contracts. Without upgraded
+paths the writer retains the original necessary V1–V9 envelope; explicitly returning the final
+upgraded path to legacy removes the policy field and restores that envelope. Project members reuse
+the same Part codec. Core intent is implemented first; Geometry and native upgrade comparison remain
+under Block 166 verification in `mvp-plan.md`.
 
 ## Planar Smooth/G2 constraint sidecar — 159
 

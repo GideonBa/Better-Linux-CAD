@@ -1836,6 +1836,9 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
                          std::string_view role, PathClosure required_closure = PathClosure::Open,
                          bool allow_surface_boundary_sources = false,
                          StepImportTopologyContext* import_context = nullptr) {
+  if (path.execution_policy().kind() == PathGeometryPolicyKind::CurvePreserving)
+    return Result<std::vector<SweepPathSegment>>::failure(
+        geometry_error(path.id().value(), "Curve-preserving path execution is not available"));
   if (path.closure() != required_closure)
     return Result<std::vector<SweepPathSegment>>::failure(
         geometry_error(path.id().value(), std::string(role) + (required_closure == PathClosure::Open

@@ -39,6 +39,7 @@ constexpr int k_thread_version = 6;
 constexpr int k_pattern_placement_version = 7;
 constexpr int k_equation_curve_version = 8;
 constexpr int k_spatial_constraint_version = 9;
+constexpr int k_curve_policy_version = 10;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -4549,12 +4550,19 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
     value["fixed_up_vector"] = vector3_to_json(*path.fixed_up_vector());
   if (path.continuity_hint().has_value())
     value["continuity_hint"] = std::string(to_string(*path.continuity_hint()));
+  if (path.execution_policy().kind() == PathGeometryPolicyKind::CurvePreserving)
+    value["execution_policy"] = {{"kind", "curve_preserving"},
+                                 {"tolerance_mm", *path.execution_policy().tolerance_mm()}};
   return value;
 }
 
 [[nodiscard]] Result<PathCurve> path_curve_from_json(const json& value) {
-  if (!has_exact_fields(value, {"id", "name", "segments", "closure", "orientation_rule",
-                                "fixed_up_vector", "continuity_hint", "connection_tolerance_mm"}) ||
+  auto legacy_fields = value;
+  if (legacy_fields.is_object())
+    legacy_fields.erase("execution_policy");
+  if (!has_exact_fields(legacy_fields,
+                        {"id", "name", "segments", "closure", "orientation_rule", "fixed_up_vector",
+                         "continuity_hint", "connection_tolerance_mm"}) ||
       !value.at("id").is_string() || !value.at("name").is_string() ||
       !value.at("segments").is_array() || !value.at("closure").is_string() ||
       !value.at("orientation_rule").is_string() ||
@@ -4600,10 +4608,23 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
     else
       return Result<PathCurve>::failure(json_error("unsupported path continuity hint"));
   }
-  return PathCurve::create(
-      PathCurveId(value.at("id").get<std::string>()), value.at("name").get<std::string>(),
-      std::move(segments), closure_name == "open" ? PathClosure::Open : PathClosure::Closed,
-      *orientation, fixed_up, continuity, value.at("connection_tolerance_mm").get<double>());
+  auto policy = PathExecutionPolicy::legacy();
+  if (value.contains("execution_policy")) {
+    const auto& authored = value.at("execution_policy");
+    if (!has_exact_fields(authored, {"kind", "tolerance_mm"}) ||
+        authored.at("kind") != "curve_preserving" || !authored.at("tolerance_mm").is_number())
+      return Result<PathCurve>::failure(
+          json_error("Path execution policy requires its exact kind and modeling tolerance"));
+    auto parsed = PathExecutionPolicy::curve_preserving(authored.at("tolerance_mm").get<double>());
+    if (!parsed)
+      return Result<PathCurve>::failure(parsed.error());
+    policy = std::move(parsed.value());
+  }
+  return PathCurve::create(PathCurveId(value.at("id").get<std::string>()),
+                           value.at("name").get<std::string>(), std::move(segments),
+                           closure_name == "open" ? PathClosure::Open : PathClosure::Closed,
+                           *orientation, fixed_up, continuity,
+                           value.at("connection_tolerance_mm").get<double>(), std::move(policy));
 }
 
 [[nodiscard]] json result_face_workplane_to_json(const ResultFaceWorkplane& plane) {
@@ -4723,6 +4744,10 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   json root;
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
+  const bool curve_policy = std::any_of(
+      document.path_curves().begin(), document.path_curves().end(), [](const auto& path) {
+        return path.execution_policy().kind() == PathGeometryPolicyKind::CurvePreserving;
+      });
   const bool spatial =
       std::any_of(document.sketches_3d().begin(), document.sketches_3d().end(),
                   [](const auto& sketch) { return sketch.requires_spatial_schema(); });
@@ -4738,7 +4763,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       std::any_of(document.circular_pattern_features().begin(),
                   document.circular_pattern_features().end(),
                   [](const auto& f) { return f.placements().has_value(); });
-  if (spatial || equations || extended_patterns ||
+  if (curve_policy || spatial || equations || extended_patterns ||
       !document.engineering_resources().entries().empty() || !document.hole_features().empty() ||
       !document.thread_features().empty()) {
     const bool manufacturing = std::any_of(
@@ -4749,7 +4774,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
         !document.thread_features().empty() ||
         std::any_of(document.hole_features().begin(), document.hole_features().end(),
                     [](const auto& hole) { return hole.thread().has_value(); });
-    root["version"] = spatial                            ? k_spatial_constraint_version
+    root["version"] = curve_policy                       ? k_curve_policy_version
+                      : spatial                          ? k_spatial_constraint_version
                       : equations                        ? k_equation_curve_version
                       : extended_patterns                ? k_pattern_placement_version
                       : threads                          ? k_thread_version
@@ -5150,7 +5176,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     latest_ancestor_position[node] = latest;
   }
-  if (spatial || equations || extended_patterns || interleaved ||
+  if (curve_policy || spatial || equations || extended_patterns || interleaved ||
       !document.result_face_workplanes().empty() || !document.hole_features().empty() ||
       !document.thread_features().empty() || document.authored_history_intent())
     root["feature_order"] = std::move(feature_order);
@@ -5187,10 +5213,24 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
          root.at("version") != k_thread_version &&
          root.at("version") != k_pattern_placement_version &&
          root.at("version") != k_equation_curve_version &&
-         root.at("version") != k_spatial_constraint_version))
+         root.at("version") != k_spatial_constraint_version &&
+         root.at("version") != k_curve_policy_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
     const auto version = root.at("version").get<int>();
-    const bool spatial_envelope = version == k_spatial_constraint_version;
+    const bool curve_policy_envelope = version == k_curve_policy_version;
+    bool curve_policy_intent = false;
+    if (root.contains("path_curves") && root.at("path_curves").is_array())
+      for (const auto& path : root.at("path_curves"))
+        if (path.is_object() && path.contains("execution_policy")) {
+          if (!curve_policy_envelope)
+            return Result<PartDocument>::failure(
+                json_error("Curve-preserving paths require Part version 10"));
+          curve_policy_intent = true;
+        }
+    if (curve_policy_envelope && !curve_policy_intent)
+      return Result<PartDocument>::failure(
+          json_error("Part version 10 requires curve-preserving path intent"));
+    const bool spatial_envelope = version == k_spatial_constraint_version || curve_policy_envelope;
     const bool equation_envelope = version == k_equation_curve_version || spatial_envelope;
     bool spatial_intent = false;
     if (root.contains("sketches_3d") && root.at("sketches_3d").is_array())
@@ -5213,7 +5253,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
               spatial_intent = true;
             }
       }
-    if (spatial_envelope && !spatial_intent)
+    if (version == k_spatial_constraint_version && !spatial_intent)
       return Result<PartDocument>::failure(
           json_error("Part version 9 requires spatial constraint or scalar intent"));
     bool equation_intent = false;
