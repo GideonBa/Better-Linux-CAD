@@ -247,6 +247,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/spatial_sketch_solution.cpp
     src/geometry/derived_curve.cpp
     src/geometry/native_path_curve.cpp
+    src/geometry/native_twist_guide.cpp
     src/geometry/equation_curve_geometry.cpp
     src/geometry/equation_curve_presentation.cpp
     src/geometry/sketch_curve_contour.cpp
@@ -680,6 +681,8 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/parameter_expression_pipeline_tests.cpp
       tests/geometry/path_extrude_pipeline_tests.cpp
       tests/geometry/path_execution_policy_tests.cpp
+      tests/geometry/native_twist_geometry_tests.cpp
+      tests/support/geometry_volume_oracle.cpp
       tests/geometry/part_construction_mvp_acceptance_tests.cpp
       tests/geometry/recompute_executor_tests.cpp
       tests/geometry/rectangle_extrusion_adapter_tests.cpp

@@ -1,8 +1,8 @@
 # Part Sweep 3D Geometry MVP-6
 
-Planned extension: [Blocks 166–167](inventor-parity-sequence.md) own curve-preserving/tolerance
-policies and semantic-edge/multi-wire paths. Preserve the historical fixed-subdivision behavior
-below until an explicit compatible policy upgrade is implemented.
+Extension: [the explicit path policy](part-path-curve-core-mvp6.md#explicit-execution-policy--166)
+selects native curve construction. Historical documents retain the fixed-subdivision behavior
+below until an explicit, previewed upgrade. Semantic-edge/multi-wire paths remain planned in 167.
 
 Status: implemented in Block 82.
 
@@ -48,6 +48,35 @@ the trajectory. An optional `guide_path` identifies a distinct open `PathCurve`;
 auxiliary spine with curvilinear correspondence and without contact/section scaling. Combining a
 guide and explicit non-zero twist is rejected because the two controls would compete for the same
 section orientation authority.
+
+## Explicit curve-preserving twist
+
+An upgraded path keeps its original native spine during solid and open-profile Sweep. Nonzero
+twist uses the selected native frame and distributes roll by actual arc length, including curves
+with nonuniform parameter speed. A transient normal-plane auxiliary guide controls orientation;
+it neither replaces the spine nor becomes authored geometry. Explicit user guides retain their
+existing curvilinear correspondence. Combining a user guide and nonzero twist remains an error.
+
+Native twist currently supports open, connected, tangent-continuous spans, finite angles through
+four turns in either direction and at most 512 native frame spans. Fixed-up vectors parallel to a
+sampled tangent, including either endpoint, are rejected. Closed spines and tangent-discontinuous
+joins require the later frame contract; they receive explicit errors. No failed native construction
+falls back to historical chords. Historical equation paths retain their nonzero-twist rejection.
+
+The guide offset adapts to native span length and curvature sampled at 65 stations per span.
+This is a construction safeguard, not a proven global curvature bound. Guide approximation must
+complete within its 256-span/degree-14 budget and meet its stricter derived tolerance. The pipe
+builder's reported surface approximation error must also meet the authored modeling tolerance;
+valid topology and positive solid volume remain required. These checks are separate from display
+tessellation and solver tolerances.
+
+Independent physical oracles in
+[`native_twist_geometry_tests.cpp`](../tests/geometry/native_twist_geometry_tests.cpp) cover
+nonuniform straight and circular spines, all three frames, signed and full-turn roll, three model
+scales, noncircular section witnesses and exact volume. Open-profile tests compare actual faces
+with a helicoid and its analytic area. A real parameter-driven Sweep additionally checks exact
+reopening, unchanged unrelated geometry, correction and retention of the certified last-valid
+result after rejected intent. This focused proof does not close the whole G01 acceptance gate.
 
 ## Persistence and dependencies
 
