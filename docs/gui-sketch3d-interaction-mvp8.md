@@ -283,8 +283,9 @@ the document and undo history, while its diagnostic invalidates borrowed session
 
 [Task/session proofs](../tests/gui/gui_spatial_solver_interaction_tests.cpp) verify exact typed
 positions, independent wire length, conflict correction preserving earlier edits, graph-cycle
-rejection, Undo/Redo and canonical reopening. Scalar grips, constraint forms and complete native
-S03–S04 acceptance remain the remaining work within 165. Typed curve authoring extends this task.
+rejection, Undo/Redo and canonical reopening. Scalar grips, native source collection and complete
+native S03–S04 acceptance remain the remaining work within 165. Typed curve and constraint authoring
+extend this task.
 
 ## Typed spatial curve forms — 165
 
@@ -314,3 +315,35 @@ Preview revalidates all downstream geometry and Apply creates one history operat
 reference rebinding, formula preservation, point-free Helix resource ownership, metadata guards,
 correction, exact history and reopening. The native case checks the visible footer, viewport,
 vertical-only scrolling, preview and complete Cancel at ordinary and compact/scaled sizes.
+
+## Spatial constraints and dimensions — 165
+
+The Constraints register creates, edits, deletes and explicitly rebinds all sixteen relations in
+[the solver contract](part-sketch-3d-core-mvp6.md#spatial-solver-boundary--164). Ordered target
+selectors distinguish points, curve endpoints/whole curves, straight directions, axes, planes and
+faces. The source catalog checks actual supported Geometry at the task's pre-consumer scope and
+excludes cyclic descendants. Native/imported/result faces retain typed identities. Existing
+references are retained as typed current-target choices until explicitly rebound.
+
+Dimensions select an owned literal in mm/degrees or an existing compatible shared/formula parameter;
+changing the binding never writes that parameter. Oriented angles add an explicit third axis.
+Fixed anchors may copy the current target position exactly or accept explicit XYZ components.
+Point-on-curve retains its authored normalized branch seed. Unedited literals, anchor components,
+branch seeds, Helix scalars and equation modeling tolerance retain their full stored precision,
+independently of the displayed decimal count. Incomplete numeric text survives focus changes;
+Accept validates it before solving and preserves the accepted local draft on failure.
+
+DOF distinguishes total, admissible rigid and internal freedom; bounded per-ID conflict/redundancy
+feedback accompanies the report. Endpoint inspection displays actual native unit tangents and normal
+curvature vectors in inverse mm. A fixed G1-only join rejects Smooth/G2 and can be corrected to
+Tangent without publishing the failed relation. These curve diagnostics do not claim surface-boundary
+G2 Loft or upgrade a saved path policy.
+
+Curve and constraint forms share the existing task's local authority, resources, complete downstream
+preview and single Apply operation. Unaccepted forms block competing edits and publication;
+Discard clears only their form input. Closed/stale document contexts invalidate the task rather than
+reusing former target choices. [GUI physical/continuity/selector proofs](../tests/gui/gui_spatial_constraint_authoring_tests.cpp)
+check a dimension-driven native Sweep, exact Fixed anchors, G1-only rejection from actual derivatives,
+all relation modes, numeric correction, dependency guards, Undo/Redo and reopening. Native runs also
+check visible actions and vertical scrolling at ordinary and compact/scaled sizes. Direct native
+source picking, scalar grips and complete combined S03–S04 remain the next interaction work.

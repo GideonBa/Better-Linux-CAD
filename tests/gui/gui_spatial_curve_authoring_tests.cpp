@@ -282,3 +282,46 @@ TEST_CASE("Native spatial curve controls preserve a reachable footer and cancel 
   CHECK(control<QDoubleSpinBox>(w, "helix_radius").value() == 4);
   w.sketch_3d_tools().cancel();
 }
+
+TEST_CASE("Spatial curve edits retain untouched owned scalar and modeling tolerance precision",
+          "[gui][parity-b165][spatial-curve-bindings]") {
+  ShellWindow w;
+  REQUIRE(w.new_part("Precision"));
+  constexpr double radius = 4.12345678912345, pitch = 5.23456789123456,
+                   tolerance = .000123456789123;
+  REQUIRE(w.session().commit_part_transaction("Source", [&](PartDocument& part) {
+    part = f::part();
+    auto owner = f::sketch("spatial", true);
+    const auto helix = *owner.find_helix(SketchEntityId("helix"));
+    (void)f::checked(owner.replace_helix(f::checked(SketchHelix3D::create_with_bindings(
+        helix.id(), helix.axis(),
+        f::checked(SketchLength3D::create_explicit(f::checked(Quantity::length_mm(radius)))),
+        f::checked(SketchLength3D::create_explicit(f::checked(Quantity::length_mm(pitch)))),
+        helix.turns_parameter(), helix.handedness()))));
+    const auto equation = *owner.find_equation_curve(SketchEntityId("equation"));
+    (void)f::checked(owner.replace_equation_curve(f::checked(
+        EquationCurve::create(equation.id(), equation.mode(), equation.variable(), equation.lower(),
+                              equation.upper(), equation.coordinates(), tolerance))));
+    return part.add_sketch_3d(owner);
+  }));
+  w.refresh();
+  REQUIRE(w.sketch_3d_tools().begin_edit(Sketch3DId("spatial")));
+  select(w, "curve", "helix");
+  control<QComboBox>(w, "helix_handedness").setCurrentIndex(1);
+  click(w, "curve_accept");
+  select(w, "curve", "equation");
+  control<QLineEdit>(w, "equation_x").setText("2mm*u");
+  click(w, "curve_accept");
+  REQUIRE(w.sketch_3d_tools().preview());
+  REQUIRE(w.sketch_3d_tools().apply());
+  const auto* owner = w.session().part_document()->find_sketch_3d(Sketch3DId("spatial"));
+  CHECK(owner->find_helix(SketchEntityId("helix"))
+            ->radius_binding()
+            .explicit_length()
+            ->millimeters() == radius);
+  CHECK(owner->find_helix(SketchEntityId("helix"))
+            ->pitch_binding()
+            .explicit_length()
+            ->millimeters() == pitch);
+  CHECK(owner->find_equation_curve(SketchEntityId("equation"))->tolerance_mm() == tolerance);
+}

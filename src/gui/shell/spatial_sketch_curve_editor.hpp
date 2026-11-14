@@ -64,6 +64,7 @@ private:
   std::vector<SketchPointReference3D> ordered_;
   std::vector<SketchHelixAxis3D> axes_;
   bool loading_{false}, pending_{false};
+  bool radius_changed_{false}, pitch_changed_{false}, tolerance_changed_{false};
   void changed();
   void load();
   void mode();
