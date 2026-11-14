@@ -159,3 +159,14 @@ Independent rigidity/scale/repeatability and exact-rejection proofs belong to
 fixed G1-only impostor checks belong to
 [native solver tests](../tests/geometry/spatial_solver_geometry_tests.cpp). Native interaction remains
 owned by the existing [Sketch3D task contract](gui-sketch3d-interaction-mvp8.md).
+
+### Exact interaction variables — 165
+
+Transient `SpatialSolverOptions::fixed_variables` identify distinct free point components or
+entity-owned Helix scalars in the supplied candidate. These values are removed from the numerical
+system, so an accepted solve preserves the requested double exactly. Unknown/duplicate keys,
+parameter-bound coordinates/scalars and auxiliary curve parameters reject. Fixed point components
+also restrict the admissible rigid gauge. These pins are never constraints or persisted records;
+the task analyzes the accepted candidate again without pins for its persistent DOF display.
+[Independent exactness/conflict/gauge proofs](../tests/core/sketch_3d_solver_tests.cpp) cover this
+boundary; pinning cannot silently override a formula or relax an incompatible requested position.

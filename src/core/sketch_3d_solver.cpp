@@ -530,14 +530,14 @@ std::size_t gauge(Context& c, const Sketch3D& solved, const Matrix& j) {
                                      Vector{0, 0, 1, r.y, -r.x, 0}};
     const std::array<const SketchCoordinate3D*, 3> coordinates{&p.x(), &p.y(), &p.z()};
     for (std::size_t axis = 0; axis < 3; ++axis) {
-      if (coordinates[axis]->parameter()) {
+      const auto variable = std::find_if(c.layout.begin(), c.layout.end(), [&](const auto& v) {
+        return v.owner_id == p.id().value() && static_cast<std::size_t>(v.kind) == axis;
+      });
+      if (coordinates[axis]->parameter() || variable == c.layout.end()) {
         auto row = rows[axis];
         row.resize(width);
         bound.push_back(std::move(row));
       } else {
-        auto variable = std::find_if(c.layout.begin(), c.layout.end(), [&](const auto& v) {
-          return v.owner_id == p.id().value() && static_cast<std::size_t>(v.kind) == axis;
-        });
         if (variable != c.layout.end())
           rigid[static_cast<std::size_t>(variable - c.layout.begin())] = rows[axis];
       }
@@ -606,10 +606,18 @@ SpatialSolveResult solve_spatial_sketch(const PartDocument& part, const Sketch3D
   if (!layout)
     return fail(reason(layout.error()));
   c.layout = layout.value();
-  result.variable_order = c.layout;
   if (c.layout.size() > options.maximum_variables ||
       source.constraints().size() > options.maximum_constraints)
     return fail("Spatial system exceeds its deterministic size budget");
+  for (const auto& pin : options.fixed_variables) {
+    const auto found = std::find_if(c.layout.begin(), c.layout.end(), [&](const auto& v) {
+      return v.kind == pin.kind && v.owner_id == pin.owner_id;
+    });
+    if (pin.kind == SpatialVariableKind::CurveParameter || found == c.layout.end())
+      return fail("Interaction pin must identify a distinct free geometric variable");
+    c.layout.erase(found);
+  }
+  result.variable_order = c.layout;
   if (geometry.validate_sources) {
     auto valid = geometry.validate_sources();
     if (!valid)

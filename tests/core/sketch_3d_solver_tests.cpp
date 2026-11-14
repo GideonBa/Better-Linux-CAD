@@ -407,3 +407,46 @@ TEST_CASE("Spatial positional and directional relations have independently known
       {f::curve("a", SpatialCurveLocation::End), f::curve("b", SpatialCurveLocation::Start)}))));
   counts(solve_spatial_sketch(part, tangent), 5, 7, 5, 2);
 }
+
+TEST_CASE("Spatial interaction pins preserve exact requested coordinates and admissible gauge",
+          "[core][parity-b165][spatial-interaction-pins]") {
+  const auto part = f::part();
+  auto source = wire({{1.23456789123456, 2.34567891234567, 3.45678912345678}, {8, 3, 4}});
+  distance_constraint(source, "length", 0, 1, 4);
+  SpatialSolverOptions options;
+  for (auto kind :
+       {SpatialVariableKind::PointX, SpatialVariableKind::PointY, SpatialVariableKind::PointZ})
+    options.fixed_variables.push_back({kind, "p0"});
+  const auto before = snapshot(part, source);
+  const auto result = solve_spatial_sketch(part, source, {}, options);
+  counts(result, 1, 2, 2, 0);
+  const auto pinned = resolved(part, *source.find_point(SketchEntityId("p0")));
+  const auto actual = resolved(part, *result.sketch.find_point(SketchEntityId("p0")));
+  CHECK(actual == pinned);
+  CHECK(result.variable_order.size() == 3);
+  CHECK(distance(actual, resolved(part, *result.sketch.find_point(SketchEntityId("p1")))) ==
+        Catch::Approx(4).margin(1e-7));
+  CHECK(snapshot(part, source) == before);
+  counts(solve_spatial_sketch(part, result.sketch), 1, 5, 5, 0);
+  auto conflicting = source;
+  fixed(conflicting, "fixed", 0, {});
+  const auto failed = solve_spatial_sketch(part, conflicting, {}, options);
+  CHECK_FALSE(failed.accepted());
+  CHECK(snapshot(part, failed.sketch) == snapshot(part, conflicting));
+  for (const auto invalid :
+       {SpatialSolverOptions::FixedVariable{SpatialVariableKind::PointX, "missing"},
+        SpatialSolverOptions::FixedVariable{SpatialVariableKind::CurveParameter, "length"},
+        options.fixed_variables.front()}) {
+    auto bad = options;
+    bad.fixed_variables.push_back(invalid);
+    const auto rejected = solve_spatial_sketch(part, source, {}, bad);
+    CHECK_FALSE(rejected.accepted());
+    CHECK(snapshot(part, rejected.sketch) == before);
+  }
+  auto bound = source;
+  const auto* p = bound.find_point(SketchEntityId("p0"));
+  REQUIRE(bound.replace_point(f::checked(SketchPoint3D::create(
+      p->id(), f::checked(SketchCoordinate3D::create_parameter(ParameterId("coordinate.x"))),
+      p->y(), p->z()))));
+  CHECK_FALSE(solve_spatial_sketch(part, bound, {}, options).accepted());
+}

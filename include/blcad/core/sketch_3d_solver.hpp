@@ -43,6 +43,14 @@ struct SpatialSolverOptions {
   std::size_t maximum_curve_projection_iterations{16};
   // Zero selects twice the centroid radius and active Length dimensions.
   double length_scale_mm{0};
+  // Transient interaction pins. The source already contains the exact requested values;
+  // remove these free variables from the numerical system rather than adding soft residuals.
+  // Parameter bindings and auxiliary branch variables cannot be pinned through this interface.
+  struct FixedVariable {
+    SpatialVariableKind kind;
+    std::string owner_id;
+  };
+  std::vector<FixedVariable> fixed_variables{};
 };
 struct SpatialConstraintReport {
   SketchConstraintId id;

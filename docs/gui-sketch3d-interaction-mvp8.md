@@ -1,10 +1,11 @@
 # Interactive Sketch3D MVP-8
 
-Planned extension: [Blocks 163–165](inventor-parity-sequence.md) own persistent spatial
+Current extension: [Blocks 163–165](inventor-parity-sequence.md) own persistent spatial
 constraints, solver diagnostics and arc/spline/helix interaction. Reuse this existing Sketch3D
 authority; the accepted point/line boundary below is not a second implementation queue.
 
-Status: implemented in Block 120.
+Historical foundation: implemented in Block 120. Numbered extension status belongs to
+[`mvp-plan.md`](mvp-plan.md); the Block 165 work below is not complete family acceptance.
 
 Block 120 adds a headless direct-manipulation authority around the existing persistent `Sketch3D` model. It does not introduce a second spatial-curve representation and does not claim a full variational 3D constraint solver.
 
@@ -256,3 +257,31 @@ gesture rollback, coordinate bounds, source-edit independence, exact history and
 two explicit endpoint copies, a direction point, shared lines, PathCurve/Sweep, failed/corrected
 endpoint edits, four-step history, canonical reopening and STEP. Inspect native controls and receipts
 at 1280×800. This restores the bounded Sketch3D/PathCurve family; Block 136 remains in progress.
+
+## Solver-backed task foundation — 165
+
+The existing task owns one accepted local Sketch3D. Editing a constrained owner starts from its
+current derived geometry without publishing seed normalization. Typed point edits and point grips
+pin all three requested coordinates exactly; the solver may move other free components or reject
+the edit. Explicit parameter-detachment consent remains required. Rejected typed values remain
+correctable and block Preview; rejected final grip release restores the complete pre-gesture draft,
+including earlier local edits. Persistent constraints, shared parameter values and formulas remain
+unchanged. DOF reports distinguish total, admissible rigid and internal freedom without transient
+interaction pins.
+
+An immutable editing context evaluates current source intent before the first executable consumer,
+limited further by any active End-of-Part prefix. Graph/source/cycle validation precedes numerical
+work; external constrained owners resolve from the same source scope. Imported authorities retain
+the saved document root and byte-freshness checks. Pending owned resources are local until the same
+final transaction adds them with the Sketch3D; they never mutate existing parameters.
+
+Preview uses a disposable complete session and validates the entire downstream feature suffix,
+including when the real session is in a prefix context. Presentation filtering respects hidden
+inputs. Removed source presentations are included in the replacement set; Cancel restores the
+committed scene. Apply repeats validation and publishes one operation. Failed publication preserves
+the document and undo history, while its diagnostic invalidates borrowed session contexts.
+
+[Task/session proofs](../tests/gui/gui_spatial_solver_interaction_tests.cpp) verify exact typed
+positions, independent wire length, conflict correction preserving earlier edits, graph-cycle
+rejection, Undo/Redo and canonical reopening. Arc/spline/Helix authoring, scalar grips, constraint
+forms and complete native S03–S04 acceptance remain the remaining work within 165.

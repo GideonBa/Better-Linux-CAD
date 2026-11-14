@@ -754,6 +754,14 @@ this slice. Runtime manifest: **1,113 inputs**, SHA-256
 Curve/constraint authoring and the complete native interaction gate remain in progress on the same
 branch; this foundation does not close Block 165.
 
+Exact point interaction/context slice verified: all five native targets build; focused Core
+**22 / 2,278**, Geometry **11 / 424**, Qt **28 / 2,721**, all passed. Native new task/context cases
+plus existing schema and point-grip regression pass **10 / 626** at both 100% and 150%, no skips.
+These runs do not establish the remaining curve/constraint authoring or complete native S03–S04 gate.
+[Interaction contract/proofs](gui-sketch3d-interaction-mvp8.md#solver-backed-task-foundation--165).
+Runtime manifest: **1,116 inputs**, SHA-256
+`2baf7948e0313aafd36c506cdd3b9be846c5d6cff70ac54bd3d44488942251f7`.
+
 Historical fixed-sample execution and equation twist retain their explicit 166 boundary. Native
 Surface-boundary G2, later workflows and integrated acceptance remain 168–174. No whole-165
 acceptance is claimed here; preserve all later scope.
