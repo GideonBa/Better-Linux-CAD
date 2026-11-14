@@ -102,9 +102,11 @@ derived and are never written here.
 Versions 1–9 reject the reserved policy field. V10 requires actual upgraded-path intent and retains
 all prior resource/history/spatial/equation fields under their existing contracts. Without upgraded
 paths the writer retains the original necessary V1–V9 envelope; explicitly returning the final
-upgraded path to legacy removes the policy field and restores that envelope. Project members reuse
+upgraded path to legacy removes the policy field and restores that envelope when the legacy
+source-validation contract permits the path. An incompatible downgrade rejects atomically.
+Project members reuse
 the same Part codec and resource-reference adapter. Geometry and explicit native comparison use the
-owning PathCurve/task contracts; `mvp-plan.md` records the remaining Block 166 acceptance boundary.
+owning PathCurve/task contracts; `mvp-plan.md` records numbered acceptance and the next boundary.
 
 Within a resource-aware Project V2, V10 members store only `engineering_resource_refs`, including
 an empty array for a member without local resources. The Project owns each revision once; loading

@@ -43,6 +43,13 @@ namespace {
 constexpr double k_tolerance = 1.0e-9;
 constexpr double k_pi = 3.14159265358979323846;
 
+bool has_modern_paths(const PartDocument& document) {
+  return std::any_of(
+      document.path_curves().begin(), document.path_curves().end(), [](const auto& path) {
+        return path.execution_policy().kind() == PathGeometryPolicyKind::CurvePreserving;
+      });
+}
+
 const ImportedBodyFeature* imported_body_feature(const PartDocument& document,
                                                  std::string_view id) {
   const auto& features = document.imported_body_features();
@@ -5633,7 +5640,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
       std::any_of(document.sketches_3d().begin(), document.sketches_3d().end(),
                   [](const auto& owner) { return !owner.constraints().empty(); });
   if (document.authored_history_intent() || !document.hole_features().empty() ||
-      !document.thread_features().empty() || constrained_spatial)
+      !document.thread_features().empty() || constrained_spatial || has_modern_paths(document))
     return execute_history(document, std::nullopt, shape_cache);
   if (shape_cache.has_history_scope()) {
     auto fresh_cache = ShapeCache::create(shape_cache.id());
@@ -5778,7 +5785,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
       std::any_of(document.sketches_3d().begin(), document.sketches_3d().end(),
                   [](const auto& owner) { return !owner.constraints().empty(); });
   if (document.authored_history_intent() || !document.hole_features().empty() ||
-      !document.thread_features().empty() || constrained_spatial)
+      !document.thread_features().empty() || constrained_spatial || has_modern_paths(document))
     return execute_history(document, std::nullopt, shape_cache);
   if (shape_cache.has_history_scope()) {
     auto fresh_cache = ShapeCache::create(shape_cache.id());

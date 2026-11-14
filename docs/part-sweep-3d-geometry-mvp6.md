@@ -67,7 +67,10 @@ The guide offset adapts to native span length and curvature sampled at 65 statio
 This is a construction safeguard, not a proven global curvature bound. Guide approximation must
 complete within its 256-span/degree-14 budget and meet its stricter derived tolerance. The pipe
 builder's reported surface approximation error must also meet the authored modeling tolerance;
-valid topology and positive solid volume remain required. These checks are separate from display
+valid topology and positive solid volume remain required. Pipe approximation is bounded to 256
+spans/degree 14. A tangent-continuous mixed chain may require a larger explicitly authored tolerance
+than a single smooth span; the measured error is reported and the stricter request rejects rather
+than returning the less accurate result. These checks are separate from display
 tessellation and solver tolerances.
 
 Independent physical oracles in

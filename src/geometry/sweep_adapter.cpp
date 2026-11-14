@@ -26,6 +26,7 @@
 #include <TopoDS_Wire.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
+#include <sstream>
 
 #include <algorithm>
 #include <cmath>
@@ -265,6 +266,7 @@ execute_sweep(const FeatureId& id, const TopoDS_Wire& profile, const TopoDS_Wire
       const double tolerance = std::min(Precision::Confusion(), modeling_tolerance * .1);
       builder.SetTolerance(tolerance, tolerance, 1e-7);
       builder.SetMaxSegments(256);
+      builder.SetMaxDegree(14);
     } else if (equation_curve) {
       // Dense, certified equation spans need matching pipe approximation
       // accuracy; the historical 1e-4 default can dominate small sections.
@@ -293,9 +295,12 @@ execute_sweep(const FeatureId& id, const TopoDS_Wire& profile, const TopoDS_Wire
       return Result<TopoDS_Shape>::failure(sweep_error(id, "OCCT sweep did not complete"));
     if (modeling_tolerance > 0) {
       const double error = builder.ErrorOnSurface();
-      if (!std::isfinite(error) || error < 0 || error > modeling_tolerance)
-        return Result<TopoDS_Shape>::failure(
-            sweep_error(id, "Sweep surface approximation did not meet the modeling tolerance"));
+      if (!std::isfinite(error) || error < 0 || error > modeling_tolerance) {
+        std::ostringstream message;
+        message << std::scientific << "Sweep surface approximation error " << error
+                << " mm exceeds modeling tolerance " << modeling_tolerance << " mm";
+        return Result<TopoDS_Shape>::failure(sweep_error(id, message.str()));
+      }
     }
     if (solid && !builder.MakeSolid())
       return Result<TopoDS_Shape>::failure(

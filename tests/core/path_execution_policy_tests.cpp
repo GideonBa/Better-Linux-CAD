@@ -12,6 +12,48 @@ using json = nlohmann::json;
 namespace f = blcad::test::spatial_fixture;
 namespace sf = blcad::test::spatial_feature_fixture;
 namespace ef = blcad::test::engineering_fixture;
+TEST_CASE("Native path intent defers unresolved connections but rejects known coordinate gaps",
+          "[core][parity-b166][path-execution-policy]") {
+  auto part = f::part();
+  REQUIRE(part.add_construction_point(f::checked(
+      ConstructionPoint::create_explicit(ConstructionPointId("join"), "Join", {7, 3, 0}))));
+  REQUIRE(part.add_construction_point(f::checked(
+      ConstructionPoint::create_explicit(ConstructionPointId("end"), "End", {7, 3, 5}))));
+  REQUIRE(part.add_construction_line(f::checked(ConstructionLine::create_through_two_points(
+      ConstructionLineId("tail"), "Tail",
+      f::checked(ConstructionRelation::create_line_through_two_points(
+          ConstructionRelationId("relation"), ConstructionPointId("join"),
+          ConstructionPointId("end")))))));
+  const auto first = f::checked(PathSegmentReference::create_planar(
+      SketchId("reference.planar"), SketchEntityId("source.line"), PlanarPathCurveKind::Line));
+  const auto tail =
+      f::checked(PathSegmentReference::create_construction_line(ConstructionLineId("tail")));
+  const auto legacy =
+      f::checked(PathCurve::create(PathCurveId("mixed"), "Mixed", {first, tail}, PathClosure::Open,
+                                   PathOrientationRule::MinimumTwist));
+  CHECK_FALSE(part.add_path_curve(legacy));
+  const auto native = f::checked(
+      legacy.with_execution_policy(f::checked(PathExecutionPolicy::curve_preserving(1e-6))));
+  REQUIRE(part.add_path_curve(native));
+  const auto json = f::checked(serialize_part_document_to_json(part));
+  CHECK_FALSE(part.set_path_execution_policy(native.id(), PathExecutionPolicy::legacy()));
+  CHECK(f::checked(serialize_part_document_to_json(part)) == json);
+  CHECK(f::checked(serialize_part_document_to_json(
+            f::checked(deserialize_part_document_from_json(json)))) == json);
+  auto disconnected = f::checked(Sketch::create(SketchId("gap"), "Gap", DatumPlaneId("datum.xy")));
+  REQUIRE(disconnected.add_entity(
+      f::checked(LineSegment::create(SketchEntityId("line"), {8, 3}, {10, 3}))));
+  REQUIRE(part.add_sketch(disconnected));
+  const auto bad = f::checked(PathCurve::create(
+      PathCurveId("bad"), "Bad",
+      {first, f::checked(PathSegmentReference::create_planar(
+                  disconnected.id(), SketchEntityId("line"), PlanarPathCurveKind::Line))},
+      PathClosure::Open, PathOrientationRule::MinimumTwist, {}, {}, 1e-7,
+      f::checked(PathExecutionPolicy::curve_preserving(1e-6))));
+  const auto before = f::checked(serialize_part_document_to_json(part));
+  CHECK_FALSE(part.add_path_curve(bad));
+  CHECK(f::checked(serialize_part_document_to_json(part)) == before);
+}
 namespace {
 PartDocument simple() {
   auto p = f::part();

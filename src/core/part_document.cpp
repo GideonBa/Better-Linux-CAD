@@ -1152,15 +1152,25 @@ Result<std::size_t> validate_path_curve(const PartDocument& document, const Path
         segment.sketch_3d() ? document.find_sketch_3d(*segment.sketch_3d()) : nullptr;
     derived.push_back(owner && !owner->constraints().empty());
   }
+  const auto connects = [&](std::size_t left, std::size_t right) {
+    if (derived[left] || derived[right])
+      return true;
+    const auto& end = endpoints[left].second;
+    const auto& start = endpoints[right].first;
+    // Core owns source/endpoint identity, but cannot evaluate construction or
+    // workplane transforms. Opt-in paths require a complete Geometry check
+    // before publication; coordinates from distinct spaces are not comparable.
+    if (path_curve.execution_policy().kind() == PathGeometryPolicyKind::CurvePreserving &&
+        (!end.has_position || !start.has_position ||
+         end.coordinate_space != start.coordinate_space))
+      return true;
+    return path_endpoints_connect(end, start, path_curve.connection_tolerance_mm());
+  };
   for (std::size_t index = 1; index < endpoints.size(); ++index)
-    if (!derived[index - 1] && !derived[index] &&
-        !path_endpoints_connect(endpoints[index - 1U].second, endpoints[index].first,
-                                path_curve.connection_tolerance_mm()))
+    if (!connects(index - 1, index))
       return Result<std::size_t>::failure(Error::validation(
           path_curve.id().value(), "path segments must be ordered and connected within tolerance"));
-  if (path_curve.closure() == PathClosure::Closed && !derived.back() && !derived.front() &&
-      !path_endpoints_connect(endpoints.back().second, endpoints.front().first,
-                              path_curve.connection_tolerance_mm()))
+  if (path_curve.closure() == PathClosure::Closed && !connects(endpoints.size() - 1, 0))
     return Result<std::size_t>::failure(Error::validation(
         path_curve.id().value(), "closed path endpoints must connect within tolerance"));
   std::vector<PathEndpoint> junctions;
@@ -2113,6 +2123,9 @@ PartDocument::set_path_execution_policy(PathCurveId id, PathExecutionPolicy poli
   auto updated = path->with_execution_policy(std::move(policy));
   if (!updated)
     return Result<std::vector<std::string>>::failure(updated.error());
+  auto valid = validate_path_curve(*this, updated.value());
+  if (!valid)
+    return Result<std::vector<std::string>>::failure(valid.error());
   auto candidate = *this;
   for (auto& value : candidate.path_curves_)
     if (value.id() == id) {

@@ -150,8 +150,10 @@ their authored correspondence; the checkbox is disabled for those task configura
 The effective seam/flip references are stored in the existing Loft intent. Existing saved Loft
 features retain their references during recompute and reopening. Invalid/self-intersecting results,
 unsupported continuity and incompatible guide anchors still clear the preview and prevent Apply.
-Circular path/guide arcs retain their true length and sampled circle positions in Loft control;
-splines remain 32-span approximations. See `docs/part-guided-loft-geometry-mvp6.md`.
+Circular path/guide arcs retain their true length and sampled circle positions in Loft control.
+Historical splines keep 32 spans; explicitly upgraded paths query their native curves by actual
+arc length. The existing Loft control-section density retains its separate contract in
+`docs/part-guided-loft-geometry-mvp6.md`.
 G1 remains verified by Geometry; it is not silently substituted for G2.
 
 The Loft task states that profiles are reconciled automatically. The complex
