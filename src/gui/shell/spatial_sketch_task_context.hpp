@@ -1,6 +1,7 @@
 #pragma once
 #include "blcad/core/part_document.hpp"
 #include "blcad/geometry/spatial_constraint_geometry.hpp"
+#include "spatial_sketch_curve_grips.hpp"
 #include <memory>
 
 namespace blcad::gui {
@@ -31,6 +32,8 @@ public:
   [[nodiscard]] Result<Point3> position(const Sketch3D&, const SpatialConstraintTarget&) const;
   [[nodiscard]] Result<std::vector<SpatialSketchTargetChoice>>
   constraint_targets(const Sketch3D&) const;
+  [[nodiscard]] Result<std::vector<SpatialCurveGrip>> curve_grips(const Sketch3D&,
+                                                                  SketchEntityId) const;
   [[nodiscard]] const PartDocument& part() const noexcept {
     return part_;
   }

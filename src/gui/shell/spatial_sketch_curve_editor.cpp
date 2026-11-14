@@ -102,6 +102,14 @@ SpatialSketchCurveEditor::SpatialSketchCurveEditor(QWidget* parent,
                    "Equation 3D"});
   id_ = field("curve_id", "Identity", {});
   column->addLayout(form);
+  handles_ = new QCheckBox("Show Curve Radius / Pitch Handles", page_);
+  handles_->setObjectName(object("curve_grips"));
+  column->addWidget(handles_);
+  auto* handle_hint = new QLabel("Bound scalars and linked defining points remain read-only until "
+                                 "explicitly rebound. Integer turns are discrete sources.",
+                                 page_);
+  handle_hint->setWordWrap(true);
+  column->addWidget(handle_hint);
   point_fields_ = new QWidget(page_);
   auto* point_column = new QVBoxLayout(point_fields_);
   point_column->setContentsMargins(0, 0, 0, 0);
@@ -192,9 +200,9 @@ SpatialSketchCurveEditor::SpatialSketchCurveEditor(QWidget* parent,
   feedback_->setWordWrap(true);
   column->addWidget(feedback_);
   column->addStretch();
-  connect(curve_, &QComboBox::currentIndexChanged, this, [this] {
-    if (!loading_)
-      load();
+  connect(handles_, &QCheckBox::toggled, this, [this] {
+    if (!loading_ && callbacks_.selection_changed)
+      callbacks_.selection_changed();
   });
   connect(kind_, &QComboBox::currentIndexChanged, this, [this] { mode(); });
   connect(degree_, &QSpinBox::valueChanged, this, [this] { changed(); });
@@ -270,8 +278,12 @@ SpatialSketchCurveEditor::SpatialSketchCurveEditor(QWidget* parent,
   for (auto* selector : {curve_, point_source_, guide_, guide_role_})
     disconnect(selector, &QComboBox::currentIndexChanged, this, nullptr);
   connect(curve_, &QComboBox::currentIndexChanged, this, [this] {
-    if (!loading_)
+    if (!loading_) {
+      pending_ = false;
+      if (callbacks_.selection_changed)
+        callbacks_.selection_changed();
       load();
+    }
   });
 }
 void SpatialSketchCurveEditor::report(std::function<void()> action) {
@@ -394,6 +406,7 @@ void SpatialSketchCurveEditor::fill_sources() {
 void SpatialSketchCurveEditor::reset() {
   pending_ = false;
   loading_ = true;
+  handles_->setChecked(false);
   kind_->setCurrentIndex(0);
   radius_->setValue(4);
   pitch_->setValue(5);
@@ -458,6 +471,12 @@ bool SpatialSketchCurveEditor::select_curve(SketchEntityId id) {
     return false;
   curve_->setCurrentIndex(i);
   return true;
+}
+SketchEntityId SpatialSketchCurveEditor::selected_curve() const {
+  return SketchEntityId(curve_->currentData().toString().toStdString());
+}
+bool SpatialSketchCurveEditor::handles_requested() const {
+  return handles_->isChecked();
 }
 void SpatialSketchCurveEditor::load() {
   if (!callbacks_.sketch())
