@@ -733,79 +733,30 @@ through 174 and preserve all 175–204 planning.
 
 ### Block 165 spatial curve and constraint workflow — in progress
 
-Extend the existing Sketch3D task and model authority. Complete each coherent checked change in a
-commit of at most 1,500 added lines; merge only after the complete 165 gate is met.
+Extend the existing Sketch3D authority. The implementation is on
+`feat/spatial-curve-constraint-workflow`; finish the verification/delivery gate before starting 166.
+Every commit remains at or below 1,500 added lines. Intermediate run chronology is retained in Git.
 
-| Step | Completion boundary |
+| Implemented contract | Focused proof |
 | --- | --- |
-| Parametric execution | Resolve constrained spatial geometry from authored seeds/current parameter sources for native scene and existing PathCurve/Sweep/Loft consumers. Keep source intent immutable during derived recompute; use explicit complete/prefix/evaluating cache scopes and current external-source authority. |
-| Curve authoring | Create/edit/delete/rebind arcs, fit/control splines, helices and supported equation curves in the existing task. Explicitly own or bind Length scalars and integer Count turns; preserve existing point/line, copying and placement behavior. |
-| Constraints and diagnostics | Ordered capability-compatible targets, dimensions/parameter bindings, correctable conflicts and visible total/gauge/internal DOF plus actual endpoint tangent/curvature. |
-| Interaction and S03–S04 | Arc/spline/Helix grips with explicit override/rebind, immutable formulas/shared parameters, anchored locks and exact-release source transactions. Native camera/high-DPI/cancellation/lost-capture, full downstream preview, history/reopen and independent actual surface/section witnesses. |
+| Constrained geometry resolves before its first consumer, with explicit complete/prefix scopes, immutable authored seeds and guarded imported authorities. Scene, PathCurve/Sweep/Loft use the same solved owner. | [Geometry replay/stage/path](../tests/geometry/spatial_sketch_recompute_tests.cpp), [session rollback/reopen](../tests/gui/gui_spatial_parametric_session_tests.cpp), [historical supplier scope](feature-system.md#native-prefix-integration--verified). |
+| Existing task creates/edits/deletes/rebinds all seven curve families; pending owned resources publish once. Shared/formula sources require explicit rebinding. | [Curve forms](gui-sketch3d-interaction-mvp8.md#typed-spatial-curve-forms--165), [authoring tests](../tests/gui/gui_spatial_curve_authoring_tests.cpp). |
+| All sixteen constraints/dimensions use ordered typed targets, visible DOF and actual endpoint tangent/curvature. Invalid numeric forms remain correctable. Discard restores accepted DOF and diagnostics remain readable above fixed actions. | [Constraint contract](gui-sketch3d-interaction-mvp8.md#spatial-constraints-and-dimensions--165), [physical/continuity proofs](../tests/gui/gui_spatial_constraint_authoring_tests.cpp). |
+| Exact point/arc/spline/Helix gestures preserve source identities and formulas; rejection/interruption restores earlier local edits. Native picks, hidden inputs and direct curve editing restore selection context. | [Point/context](../tests/gui/gui_spatial_solver_interaction_tests.cpp), [curve grips](../tests/gui/gui_spatial_curve_grip_tests.cpp), [native selection](../tests/gui/gui_spatial_source_selection_tests.cpp). |
+| S03–S04 authoring feeds native Sweep/Loft; guide/section witnesses measure actual faces. Invalid bindings/conflicts reject atomically; complete history and file reopening retain intent. Equation curves feed path creation without entity-ID collisions. | [Combined contract](gui-sketch3d-interaction-mvp8.md#spatial-guides-and-downstream-consumers--165), [independent geometry/history proofs](../tests/gui/gui_spatial_guide_loft_tests.cpp). |
 
-Parametric execution foundation verified: all five native targets build; Core **757 cases / 34,325
-assertions**, Geometry **705 / 69,346**, focused Qt **41 cases: 40 passed, one native-only skipped /
-3,476 assertions**, and native existing spatial tools **8 / 1,382**, no native skips. Filters with
-no cases are excluded from coverage claims. The focused Geometry schema/solver/replay set passes
-**11 / 424**. The new [replay/stage/path proofs](../tests/geometry/spatial_sketch_recompute_tests.cpp)
-and [session rollback/reopen proofs](../tests/gui/gui_spatial_parametric_session_tests.cpp) establish
-this slice. Runtime manifest: **1,113 inputs**, SHA-256
-`6ec50107fa5542f29f3c9a892970aea005e58695b6e1405c0dafdadf7886adb5`.
-Curve/constraint authoring and the complete native interaction gate remain in progress on the same
-branch; this foundation does not close Block 165.
-
-Exact point interaction/context slice verified: all five native targets build; focused Core
-**22 / 2,278**, Geometry **11 / 424**, Qt **28 / 2,721**, all passed. Native new task/context cases
-plus existing schema and point-grip regression pass **10 / 626** at both 100% and 150%, no skips.
-These runs do not establish the remaining curve/constraint authoring or complete native S03–S04 gate.
-[Interaction contract/proofs](gui-sketch3d-interaction-mvp8.md#solver-backed-task-foundation--165).
-Runtime manifest: **1,116 inputs**, SHA-256
-`2baf7948e0313aafd36c506cdd3b9be846c5d6cff70ac54bd3d44488942251f7`.
-
-Typed curve-form slice verified: all five native targets build; focused Qt **41 cases: 40 passed,
-one native-only skip / 4,580 assertions**, including the existing point/grip/placement/copy and
-combined Sweep regression. Native curve forms/layout/Cancel pass **5 / 233** at 100% and compact
-150%, no skips; both final captures were inspected after all CAD processes exited. The
-[form contract and proofs](gui-sketch3d-interaction-mvp8.md#typed-spatial-curve-forms--165) cover
-all seven curve choices, explicit linked reference rebinding, formula preservation, owned Helix
-resources and exact history/reopen. Runtime: **1,119 inputs**, SHA-256
-`15c095ff54ab0f0c298d019807812633ef5035a8e567205e6e7487df478b827b`.
-Constraint forms, scalar grips/native selection and the complete S03–S04 gate remain open.
-
-Typed constraint/dimension slice verified: all five native targets build; selected Qt **59 cases:
-58 passed, one native-only skip / 5,612 assertions**, covering existing spatial and history-prefix
-workflows. Native constraints, numeric correction, curve layout and existing grips pass **12 / 838**
-at 100% and compact 150%, no skips; both final constraint captures inspected after CAD exit.
-[Contract and physical/continuity proofs](gui-sketch3d-interaction-mvp8.md#spatial-constraints-and-dimensions--165)
-cover actual Sweep volume, exact anchors/unchanged scalar precision, G1-only rejection as Smooth/G2,
-typed sources, correction, closed-context guards and exact history/reopen. Runtime: **1,124 inputs**,
-SHA-256 `64a5756188f11c32e1ca47ba5eef3f2f60c6e7b6eea3522dcd9e636aff173efa`.
-Scalar grips, direct native source collection and the complete S03–S04 interaction gate remain open;
-the block status stays in progress on this branch.
-
-Curve-grip slice verified: all five native targets build; combined Qt **63 cases: 62 passed,
-one native-only skip / 5,927 assertions**. Native arc/spline/Helix gestures, six interruption paths,
-existing point grips and curve layout pass **11 / 911** at 100% and compact 150%, no skips. Final
-captures inspected after CAD exit. [Grip contract and independent native oracles](gui-sketch3d-interaction-mvp8.md#radius-pitch-and-defining-point-grips--165)
-cover exact owned values/coordinates, actual endpoint height/radius and curvature-derived circle
-radius, shared/discrete sources, conflicting-radius rollback, one history operation and reopening.
-Runtime: **1,127 inputs**, SHA-256
-`c563e10f66d9332ec622b4445eb9d3dc9a0d357319ce71ace34ca468abb1d1aa`.
-Direct native source collection and the complete combined S03–S04 gate remain required for 165.
-
-Native source-selection slice verified: all five targets build; focused Qt **6 / 239**, Geometry
-selection/spatial/Thread/Hole/Body-transform regression **31 / 1,634**, all passed. Native typed
-sources, hidden physical support, curve selection through preview, endpoint disambiguation,
-double-click and existing constraint regression pass **3 / 171** at 100% and 150%, no skips.
-[Selection contract/proofs](gui-sketch3d-interaction-mvp8.md#native-spatial-source-selection--165)
-and [historical supplier scope](feature-system.md#native-prefix-integration--verified) retain the
-same typed references and exact history. Runtime: **1,129 inputs**, SHA-256
-`fac83111fcf33dc5d7a062c2de34a973958f8681eb3bb634fabafb9d629eeffd`.
-The combined S03–S04 downstream acceptance and final whole-block gate remain in progress.
+Final verification is **in progress** on runtime **1,130 inputs**, SHA-256
+`4f5b40808a21e7f3fc29ebf35ee44f2daae61ebcd3184dfd861397186739a8e3`.
+All five targets build. Core **758 / 34,349** and Geometry **706 / 69,373** full suites passed;
+their inputs/binaries remain unchanged after the final GUI-only correction. The preceding Qt full
+run passed **933 cases: 860 passed, 73 native-only skipped / 102,799 assertions**; repeat it on the
+corrected GUI before acceptance; that full run is active. Corrected native combined regression
+passes **80 / 8,790** at both 100% and compact 150%, no skips. Final guide/constraint/curve-grip
+captures were inspected after CAD exit. Separate app startup verified a visible process-owned X11
+window (intentional timeout 124). Qt completion and delivery remain pending.
 
 Historical fixed-sample execution and equation twist retain their explicit 166 boundary. Native
-Surface-boundary G2, later workflows and integrated acceptance remain 168–174. No whole-165
-acceptance is claimed here; preserve all later scope.
+Surface-boundary G2 and later workflows remain 168–174. Preserve all planned scope through 204.
 
 ## Later phases
 

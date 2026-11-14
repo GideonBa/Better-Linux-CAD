@@ -94,6 +94,7 @@ ShellFeatureTools::spatial_inputs_for(Command command) const {
       add_segments(sketch.line_segments(), PlanarPathCurveKind::Line);
       add_segments(sketch.arc_segments(), PlanarPathCurveKind::Arc);
       add_segments(sketch.spline_segments(), PlanarPathCurveKind::Spline);
+      add_segments(sketch.equation_curves(), PlanarPathCurveKind::EquationCurve);
     }
   }
   if (command == Command::PathCurve) {
@@ -121,6 +122,7 @@ ShellFeatureTools::spatial_inputs_for(Command command) const {
       add(sketch.polylines(), Sketch3DPathCurveKind::Polyline);
       add(sketch.splines(), Sketch3DPathCurveKind::Spline);
       add(sketch.helices(), Sketch3DPathCurveKind::Helix);
+      add(sketch.equation_curves(), Sketch3DPathCurveKind::EquationCurve);
     }
   } else {
     for (const auto& path : part->path_curves())

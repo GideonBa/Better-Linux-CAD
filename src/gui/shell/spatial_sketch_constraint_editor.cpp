@@ -61,8 +61,10 @@ bool straight(const Sketch3D& owner, const SpatialConstraintTarget& t) {
 SpatialSketchConstraintEditor::SpatialSketchConstraintEditor(
     QWidget* parent, SpatialSketchConstraintCallbacks callbacks)
     : callbacks_(std::move(callbacks)), page_(new QWidget(parent)) {
+  page_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
   auto* column = new QVBoxLayout(page_);
   auto* form = new QFormLayout;
+  form->setRowWrapPolicy(QFormLayout::WrapLongRows);
   const auto combo = [&](const char* id, const QString& label) {
     auto* box = new QComboBox(page_);
     box->setObjectName(QStringLiteral("blcad.sketch3d.") + id);
@@ -151,10 +153,12 @@ SpatialSketchConstraintEditor::SpatialSketchConstraintEditor(
   differential_ = new QLabel(page_);
   differential_->setObjectName("blcad.sketch3d.constraint_differential");
   differential_->setWordWrap(true);
+  differential_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
   column->addWidget(differential_);
   feedback_ = new QLabel(page_);
   feedback_->setObjectName("blcad.sketch3d.constraint_feedback");
   feedback_->setWordWrap(true);
+  feedback_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
   column->addWidget(feedback_);
   column->addStretch();
   connect(record_, &QComboBox::currentIndexChanged, this, [this] {
@@ -510,6 +514,8 @@ void SpatialSketchConstraintEditor::load() {
     differential_->clear();
     feedback_->setText(
         "Choose compatible ordered targets. Shared dimensions require an explicit source rebind.");
+    if (callbacks_.edit.selection_changed)
+      callbacks_.edit.selection_changed();
   });
   loading_ = false;
 }

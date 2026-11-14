@@ -17,4 +17,7 @@ enum class SolidPointLocation { Inside, Outside, Boundary, Unknown };
 [[nodiscard]] SolidPointLocation classify_solid_point(const geometry::GeometryShape& shape,
                                                       Point3 point, double tolerance_mm = 1e-7);
 
+// Distance to actual trimmed faces, excluding the interior of a Solid.
+[[nodiscard]] double distance_to_faces(const geometry::GeometryShape&, Point3);
+
 } // namespace blcad::test

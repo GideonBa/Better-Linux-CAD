@@ -5,7 +5,7 @@ constraints, solver diagnostics and arc/spline/helix interaction. Reuse this exi
 authority; the accepted point/line boundary below is not a second implementation queue.
 
 Historical foundation: implemented in Block 120. Numbered extension status belongs to
-[`mvp-plan.md`](mvp-plan.md); the Block 165 work below is not complete family acceptance.
+[`mvp-plan.md`](mvp-plan.md). Advanced curve/Surface scope continues through Blocks 166–174.
 
 Block 120 adds a headless direct-manipulation authority around the existing persistent `Sketch3D` model. It does not introduce a second spatial-curve representation and does not claim a full variational 3D constraint solver.
 
@@ -102,11 +102,8 @@ exercise four-step exact Undo/Redo, cancel another edit, reopen canonically and 
 on both offscreen and native backends; native OCCT presentation and reachable controls at 1280×800
 remain required evidence.
 
-This initial typed slice left native collection, direct handles, distance/direction entry and
-planar-point projection open. The collection/grip extension below supplies the bounded point/line
-interactions; pointer placement, distance/direction and projection remain unfinished.
-New arc/spline/helix parameter tools and variational 3D constraints remain later extensions of the
-historical bounded Core contract, rather than implied capabilities of this editor.
+The point/line collection, placement, direction and independent planar-copy contracts follow below.
+The solver-backed curve/constraint extension is specified in the 165 sections.
 
 ## Replacement shell: point/line collection and direct grips — Block 136, 2026-10-23
 
@@ -144,9 +141,7 @@ candidate-only picking, all seven lock modes, precise explicit detachment, raw f
 Escape rollback, invalid text and lifecycle/camera/focus boundaries. Both backends execute the same
 cases: `[block136-sketch3d-grips]` and `[shell-sketch3d-grips-workflow]`.
 
-This collection/grip slice left pointer placement, explicit distance/azimuth/elevation entry and
-planar-point projection open. The anchored placement extension below supplies pointer input;
-distance/direction and projection remain unfinished. The family and Block 136 remain partial.
+Anchored placement, distance/direction and planar copying extend these same local transactions below.
 
 ## Replacement shell: anchored pointer placement — Block 136, 2026-10-23
 
@@ -255,8 +250,8 @@ cached generated faces/semantic vertices, precision, source identity, per-copy c
 gesture rollback, coordinate bounds, source-edit independence, exact history and persistence/expiry.
 `[shell-combined-projected-sweep]` adds a fully UI-authored workflow: XZ source and XY profile Sketches,
 two explicit endpoint copies, a direction point, shared lines, PathCurve/Sweep, failed/corrected
-endpoint edits, four-step history, canonical reopening and STEP. Inspect native controls and receipts
-at 1280×800. This restores the bounded Sketch3D/PathCurve family; Block 136 remains in progress.
+endpoint edits, four-step history, canonical reopening and STEP. Native controls and receipts at
+1280×800 form part of that proof. Numbered acceptance status belongs to `mvp-plan.md`.
 
 ## Solver-backed task foundation — 165
 
@@ -283,8 +278,8 @@ the document and undo history, while its diagnostic invalidates borrowed session
 
 [Task/session proofs](../tests/gui/gui_spatial_solver_interaction_tests.cpp) verify exact typed
 positions, independent wire length, conflict correction preserving earlier edits, graph-cycle
-rejection, Undo/Redo and canonical reopening. Native source collection and complete native S03–S04
-acceptance remain the remaining work within 165. Typed authoring and curve grips extend this task.
+rejection, Undo/Redo and canonical reopening. The native source and combined consumer proofs below
+exercise this same authority.
 
 ## Typed spatial curve forms — 165
 
@@ -338,14 +333,18 @@ curvature vectors in inverse mm. A fixed G1-only join rejects Smooth/G2 and can 
 Tangent without publishing the failed relation. These curve diagnostics do not claim surface-boundary
 G2 Loft or upgrade a saved path policy.
 
+Selecting or discarding a constraint form restores the accepted draft's DOF report after a rejected
+solve. Wrapped diagnostics retain their required height above the fixed action row; constraint inputs
+resize within their vertical scroll area rather than clipping the footer or adding horizontal scroll.
+
 Curve and constraint forms share the existing task's local authority, resources, complete downstream
 preview and single Apply operation. Unaccepted forms block competing edits and publication;
 Discard clears only their form input. Closed/stale document contexts invalidate the task rather than
 reusing former target choices. [GUI physical/continuity/selector proofs](../tests/gui/gui_spatial_constraint_authoring_tests.cpp)
 check a dimension-driven native Sweep, exact Fixed anchors, G1-only rejection from actual derivatives,
 all relation modes, numeric correction, dependency guards, Undo/Redo and reopening. Native runs also
-check visible actions and vertical scrolling at ordinary and compact/scaled sizes. Direct native
-source picking and complete combined S03–S04 remain the next interaction work.
+check visible actions and vertical scrolling at ordinary and compact/scaled sizes. Native source
+picking and combined consumers extend these controls below.
 
 ## Radius, pitch and defining-point grips — 165
 
@@ -377,8 +376,7 @@ context publishes nothing. Geometry products, glyph frames and pins are transien
 and curvature-derived circle radius, exact owned values and point coordinates, discrete/shared
 source preservation, successful arc/spline editing, incompatible-radius rollback, six interruption
 paths and exact Undo/Redo/reopening. Existing point-grip regression runs with these cases. Historical
-path sampling and the separate verified Surface G2 work remain unchanged requirements of 166/169;
-combined S03–S04 remains required before whole-165 acceptance.
+path sampling and the separate verified Surface G2 work remain requirements of 166/169.
 
 ## Native spatial source selection — 165
 
@@ -396,5 +394,26 @@ filters, semantic scope and supported preselection are restored without publishi
 identities to the session selection model. Supplier freshness is checked again when a pick arrives.
 
 [Selection proofs](../tests/gui/gui_spatial_source_selection_tests.cpp) cover typed routing, empty
-targets, scope restoration and native physical support/curve picking. Whole-block verification and
-combined S03–S04 acceptance remain in progress.
+targets, scope restoration and native physical support/curve picking. The combined consumer proof
+below retains that same scope and transaction authority.
+
+## Spatial guides and downstream consumers — 165
+
+The existing task can author a cubic control spline, retain its guide alias, and add spatial
+dimensions before the normal PathCurve/Loft tasks consume it. Definition edits preview every
+dependent feature. A dimension change that breaks a guide/section binding fails the complete
+preview; correcting the complementary dimension retains earlier local edits. A conflicting new
+relation remains a correctable form and cannot publish over the accepted draft.
+
+The combined [guide/Loft and equation/Sweep proofs](../tests/gui/gui_spatial_guide_loft_tests.cpp)
+use three ordered open sections and a dimensioned spatial guide. Independent cubic-polynomial and
+arc-length calculations follow the historical 32-chord path/four-stations-per-section-span policy.
+They measure guide and section witnesses against actual trimmed OCCT faces, with separated negative
+witnesses, after edits, complete Undo/Redo and file reopening. This proves the current policy;
+curve-preserving upgrades and Surface-boundary G2 remain the separate 166/168–169 requirements.
+
+Path creation now lists planar and spatial equation curves with their typed source identities.
+A newly authored spatial equation feeds a native solid Sweep, whose volume is checked independently.
+Equation identities also participate in point allocation, preventing a later point from reusing a
+curve's ID. The equations, owned dimensions, stable source identities and downstream history persist
+exactly; derived curve products and surface witnesses remain transient.
