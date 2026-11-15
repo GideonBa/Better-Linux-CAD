@@ -59,8 +59,9 @@ existing curvilinear correspondence. Combining a user guide and nonzero twist re
 
 Native twist currently supports open, connected, tangent-continuous spans, finite angles through
 four turns in either direction and at most 512 native frame spans. Fixed-up vectors parallel to a
-sampled tangent, including either endpoint, are rejected. Closed spines and tangent-discontinuous
-joins require the later frame contract; they receive explicit errors. No failed native construction
+sampled tangent, including either endpoint, are rejected. The checked circular closed-spine extension
+below supplies a bounded cyclic contract in 167; other closed spines and tangent-discontinuous joins
+receive explicit errors. No failed native construction
 falls back to historical chords. Historical equation paths retain their nonzero-twist rejection.
 
 The guide offset adapts to native span length and curvature sampled at 65 stations per span.
@@ -99,3 +100,29 @@ The proof covers guide dependency and compatible JSON, Angle-driven twist, an au
 solid sweep along a spatial spline, solid helical sweep, and the explicit guide-plus-twist failure.
 
 Blocks 48–94 are implemented. Block 83 Path-following Extrude and Extruded Cut is implemented; Block 84 ProfileSectionReference and Loft Core intent plus JSON is implemented; Block 85 Two-section Loft Geometry on arbitrary planes is implemented; Block 86 Multi-section Loft is implemented; Block 87 Guided and continuity-controlled Loft is implemented; Block 88 Surface feature Core intent and JSON is implemented; Block 89 Boundary and Fill Surface Geometry is implemented; Block 90 Trim and Extend Surface Geometry is implemented; Block 91 Stitch/Knit/Sew shell Geometry is implemented; Block 92 Closed shell to solid conversion is implemented; Block 93 multi-body STEP export is implemented; Block 94 integrated Part Construction MVP acceptance is implemented; Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is next.
+
+## Circular closed-spine capability — 167
+
+Closed solid Sweep requires explicit `CurvePreserving` intent and an exact circle traversed once
+by consistent connected circular spans. Center/radius matching uses `min(1e-9 mm, .05 × modeling tolerance)`; axis mismatch is bounded by that linear precision divided by radius. Near-circles reject. Other closed spines and closed-spine open-profile Surface
+Sweep reject explicitly. Every profile curve must lie in the path start-normal plane within `min(1e-7 mm, .05 × modeling tolerance)`. The selected
+Frenet/corrected-Frenet frame must close in tangent, normal and binormal; Fixed Up additionally
+requires its vector parallel to the circle axis. Authored guides remain incompatible with this
+closed capability. Twist is restricted to integer complete turns through ±4. The verified full-circle frame closes
+cyclically. Nonzero roll uses four exact open circular spans with rigidly placed start sections at
+the authored global roll phase, each using the checked arc-length guide. Checked non-destructive
+union removes coincident internal caps and must produce one connected solid. This avoids the ambiguous opposite-side intersection of
+a full-circle normal plane with a closed auxiliary guide.
+
+The complete profile extent around the path start must be strictly smaller than the circle radius
+with margin `max(1e-7 mm, modeling tolerance)`. Lines use endpoints, circles use center offset plus
+radius, and positive rational Bezier/B-spline curves use their conservative planar control hull.
+Unsupported hulls reject. Verified coincident circular spans are coalesced to one exact transient
+circle for periodic zero-roll construction; authored source/section IDs remain unchanged. This
+normal-bundle bound excludes intra-face spindle folds that OCCT's
+validity and generic Boolean self-interference checks can otherwise accept. It remains a conservative
+capability test: an overly large hull rejects instead of guessing a valid smaller section.
+
+Inner wires use the same cyclic policy and checked subtraction. The finished pipe must also meet
+the authored surface-approximation tolerance, valid topology and positive volume. Acceptance is
+tracked separately in `mvp-plan.md`; no wider closed-spine claim follows from this capability.

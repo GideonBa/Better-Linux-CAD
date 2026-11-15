@@ -3318,9 +3318,12 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
   if (trajectory == nullptr)
     return Result<std::size_t>::failure(
         geometry_error(feature->path().value(), "sweep trajectory must exist"));
-  auto path =
-      resolve_basic_sweep_path(document, *trajectory, working_cache, workplane_resolver_,
-                               "sweep trajectory", PathClosure::Open, false, import_context_);
+  auto path = resolve_basic_sweep_path(
+      document, *trajectory, working_cache, workplane_resolver_, "sweep trajectory",
+      trajectory->execution_policy().kind() == PathGeometryPolicyKind::CurvePreserving
+          ? trajectory->closure()
+          : PathClosure::Open,
+      false, import_context_);
   if (path.has_error())
     return Result<std::size_t>::failure(path.error());
 
