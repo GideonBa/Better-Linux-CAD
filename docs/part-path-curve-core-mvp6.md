@@ -151,3 +151,18 @@ The focused suite covers tolerance-sensitive planar connectivity, mixed authored
 strict JSON, and backward compatibility.
 
 Blocks 48–94 are implemented. Block 80 Sweep feature Core intent and JSON is implemented; Block 81 Basic Sweep Geometry is implemented; Block 82 3D path, twist, and guide-controlled Sweep is implemented; Block 83 Path-following Extrude and Extruded Cut is implemented; Block 84 ProfileSectionReference and Loft Core intent plus JSON is implemented; Block 85 Two-section Loft Geometry on arbitrary planes is implemented; Block 86 Multi-section Loft is implemented; Block 87 Guided and continuity-controlled Loft is implemented; Block 88 Surface feature Core intent and JSON is implemented; Block 89 Boundary and Fill Surface Geometry is implemented; Block 90 Trim and Extend Surface Geometry is implemented; Block 91 Stitch/Knit/Sew shell Geometry is implemented; Block 92 Closed shell to solid conversion is implemented; Block 93 multi-body STEP export is implemented; Block 94 integrated Part Construction MVP acceptance is implemented; Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is next.
+
+### Semantic native-curve execution — 167
+
+Under `CurvePreserving`, feature-edge references recover exactly one edge from the anchored producer
+result. The bounded, located native curve is copied and trimmed; endpoint chords and display type
+are not substitutes. Canonical persisted result-witness samples establish direction before path reversal. Linear semantic roles use their source endpoints.
+Lost, split or ambiguous witnesses reject the entire candidate and retain the last accepted cache.
+
+Imported references select an explicit immutable imported-base output. The current normalized
+source descriptor must match uniquely on that output, and source bytes are checked again before
+publication. A transformed imported result uses a producer-anchored result witness; later Body
+transforms never move an earlier base reference implicitly. Complete analytic circles use the
+source Sketch frame (semantic rims) or normalized descriptor axis with OCCT's canonical `gp_Ax2`
+X direction (imported circles) for phase. Open imported curves use the lexicographically smaller actual endpoint as their positive direction; the catalog's sorted recovery samples carry no traversal order. Closed non-circular imported curves remain explicitly unsupported.
+This execution slice does not yet enable closed-spine Sweep or material-region execution.
