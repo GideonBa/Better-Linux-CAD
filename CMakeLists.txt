@@ -528,6 +528,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/generated_topology_reference_tests.cpp
     tests/core/invalidation_state_tests.cpp
     tests/core/loft_feature_tests.cpp
+    tests/core/loft_constraint_intent_tests.cpp
     tests/core/surface_feature_tests.cpp
     tests/core/mirror_feature_tests.cpp
     tests/core/part_document_json_tests.cpp

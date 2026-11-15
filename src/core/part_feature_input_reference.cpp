@@ -92,6 +92,8 @@ std::string_view to_string(PartFeatureInputRole role) noexcept {
     return "spatial_constraint";
   case PartFeatureInputRole::PathSegment:
     return "path_segment";
+  case PartFeatureInputRole::LoftBoundarySupport:
+    return "loft_boundary_support";
   case PartFeatureInputRole::FilletEdge:
     return "fillet_edge";
   case PartFeatureInputRole::ChamferEdge:
@@ -172,6 +174,7 @@ bool part_feature_input_role_accepts(PartFeatureInputRole role,
   case PartFeatureInputRole::ExtrudeLimitFace:
   case PartFeatureInputRole::HoleLimitFace:
   case PartFeatureInputRole::ThreadSupportFace:
+  case PartFeatureInputRole::LoftBoundarySupport:
   case PartFeatureInputRole::ShellRemovalFace:
   case PartFeatureInputRole::DraftFace:
     return capability == PartFeatureInputCapability::Face;

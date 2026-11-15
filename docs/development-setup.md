@@ -98,6 +98,12 @@ Do not weaken the export assertions. If an incremental build crashes after a pub
 change, inspect Ninja's header-dependency records: stale objects with zero recorded dependencies
 have caused stack corruption here. Rebuild affected artifacts and rerun the relevant suites.
 
+Constrained Loft intent is covered by `[loft-constraints]` in Core/Geometry, together with
+`[loft-feature]` and `[loft-section-compatibility]`. UI consumer regressions use
+`[interactive-loft],[interactive-surface],[block136-feature-edit]`; native checks use
+`[native-path-policy],[native-shell-spatial],[shell-mixed-path-loft],[native-feature-edit]`.
+Boundary construction/derivative verification remains the separate 169 gate.
+
 ## Find and select focused tests
 
 `tests/{core,geometry,gui}/` owns assertions/tags; `CMakeLists.txt` owns source registration and

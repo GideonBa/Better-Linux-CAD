@@ -217,7 +217,6 @@ memory. A prefix never removes suffix definitions or changes persisted active/su
 Version-1 canonical byte oracles and version-2 intent remain unchanged. Runtime/native acceptance
 is recorded in `mvp-plan.md` and `development-setup.md`; visible history editing remains 148.
 
-
 ## Engineering resource foundation — Block 149A
 
 The new typed material/standards catalog has no Part/Project JSON fields or writer in A. Existing
@@ -226,7 +225,6 @@ must define the exact resource snapshot, pin/default/override, deduplication and
 contract here before introducing its first writer. Standalone Parts retain their pinned values
 offline; embedded Project resources use the same catalog authority. Typed quantities/provenance and
 immutable revision collision rules are owned by `engineering-modules.md`, not a second format.
-
 
 ## Engineering resource JSON and standalone Part pins — Block 149B1
 
@@ -1461,7 +1459,6 @@ later BLCAD features remain ordinary persistent model intent. Missing or digest-
 fail closed, and an explicit source refresh is required before persisted digest/topology recovery
 state may change.
 
-
 ### Sketch-line rotation axes — Issue #110
 
 Revolve axis payloads add the strict source family
@@ -1528,7 +1525,6 @@ existing supports. An ID present under a different record kind is not missing. T
 mode retains repairable intent without calling its geometry fresh. Rebinding keeps the
 support and Sketch IDs, validates the complete graph and requires successful recompute
 before leaving repair mode. Old files without this array use the existing reader.
-
 
 ## Semantic Hole intent — Block 152B
 
@@ -1731,3 +1727,20 @@ new executables append to the preference and deletion removes their entries. Thi
 preference introduces no new JSON field and does not create authored suppression/history intent
 or silently promote the document to history version 2. Explicit authored history remains the
 existing strict order/suppression authority.
+
+## Authored Loft boundary and guide bindings — Part V12
+
+Part V12 is necessary exactly when a Loft record contains authored `constraints`. Each strict
+constraint record stores `linear_tolerance` (Length parameter ID), `angular_tolerance_rad`,
+`curvature_tolerance_per_mm`, nullable `start`/`end`, and ordered `guides`. A boundary stores
+`section_identity`, typed Face-role `support`, nullable imported `source_body`, `continuity`
+(`g1`/`g2`), `reverse_normal` and `tangent_scale`. A guide stores `guide`, `reversed` and `anchors`;
+each anchor stores `section_identity`, nullable `boundary_entity`, `boundary_fraction` and
+`guide_fraction`. Unknown, missing, null-in-place-of-object or out-of-range values fail closed.
+
+V1–V11 reject the reserved new Loft field. V12 requires actual constraint intent and inherits V11
+native-path/material-region capabilities without requiring them to be present. Historical global
+Loft `g2` retains its unsupported execution diagnostic. Constraint-free files retain the lowest
+necessary old version. Both Project resource directions support V12, preserve pinned local subsets
+and reject foreign/unresolved resource ownership. The authored history version remains independent;
+V12 does not manufacture history/suppression intent.

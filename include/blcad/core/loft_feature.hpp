@@ -16,6 +16,40 @@ enum class LoftFeatureKind { Loft, LoftCut, LoftSurface };
 enum class LoftSectionKind { ClosedRegion, OpenPath };
 enum class LoftContinuity { C0, G1, G2 };
 
+// Boundary continuity is independent of longitudinal LoftContinuity.
+enum class LoftBoundaryContinuity { G1, G2 };
+
+struct LoftBoundaryCondition {
+  std::string section_identity;
+  FaceReference support;
+  std::optional<BodyId> imported_source_body;
+  LoftBoundaryContinuity continuity = LoftBoundaryContinuity::G1;
+  bool reverse_normal = false;
+  double tangent_scale = 1.0;
+};
+
+struct LoftGuideAnchor {
+  std::string section_identity;
+  std::optional<SketchEntityId> boundary_entity;
+  double boundary_fraction = 0.0;
+  double guide_fraction = 0.0;
+};
+
+struct LoftGuideBinding {
+  PathCurveId guide;
+  bool reversed = false;
+  std::vector<LoftGuideAnchor> anchors;
+};
+
+struct LoftConstraintIntent {
+  ParameterId linear_tolerance;
+  double angular_tolerance_rad = 1e-5;
+  double curvature_tolerance_per_mm = 1e-5;
+  std::optional<LoftBoundaryCondition> start;
+  std::optional<LoftBoundaryCondition> end;
+  std::vector<LoftGuideBinding> guides;
+};
+
 [[nodiscard]] std::string_view to_string(LoftFeatureKind kind) noexcept;
 [[nodiscard]] std::string_view to_string(LoftSectionKind kind) noexcept;
 [[nodiscard]] std::string_view to_string(LoftContinuity continuity) noexcept;
@@ -37,6 +71,7 @@ public:
   [[nodiscard]] bool flip_normal() const noexcept;
   [[nodiscard]] const std::optional<ParameterId>& rotation_offset() const noexcept;
   [[nodiscard]] std::string source_node_id() const;
+  [[nodiscard]] std::string identity() const;
 
 private:
   ProfileSectionReference(LoftSectionKind kind,
@@ -72,6 +107,10 @@ public:
                       std::vector<PathCurveId> guide_curves = {},
                       LoftContinuity continuity = LoftContinuity::C0);
 
+  [[nodiscard]] Result<LoftFeature>
+  with_constraints(std::optional<LoftConstraintIntent> constraints) const;
+  [[nodiscard]] const std::optional<LoftConstraintIntent>& constraints() const noexcept;
+
   [[nodiscard]] const FeatureId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
   [[nodiscard]] LoftFeatureKind kind() const noexcept;
@@ -100,6 +139,7 @@ private:
   std::optional<PathCurveId> path_curve_;
   std::vector<PathCurveId> guide_curves_;
   LoftContinuity continuity_ = LoftContinuity::C0;
+  std::optional<LoftConstraintIntent> constraints_;
 };
 
 } // namespace blcad

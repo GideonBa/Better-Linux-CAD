@@ -370,3 +370,36 @@ TEST_CASE("Planar Loft cap supports preserve source identity through section and
   REQUIRE(GeometryRecomputeExecutor{}.execute_document(reopened.value(), full));
   CHECK(volume(cache, "body.loft") == Catch::Approx(volume(full, "body.loft")).margin(1e-7));
 }
+
+TEST_CASE("Authored Loft constraints cannot silently execute the historical unconstrained builder",
+          "[geometry][loft-constraints][parity-b168]") {
+  auto document = body_operation_document(FeatureBodyOperationMode::Join);
+  auto shapes = cache();
+  REQUIRE(GeometryRecomputeExecutor{}.execute_document(document, shapes));
+  const auto before = volume(shapes, "body.result");
+  REQUIRE(document.add_parameter(length_parameter("loft.tolerance", 1e-5)));
+  const auto* feature = document.find_loft_feature(FeatureId("loft.operation"));
+  REQUIRE(feature);
+  auto support = FaceReference::create_planar(
+      PartFeatureInputRole::LoftBoundarySupport,
+      SemanticFaceReference::create(FeatureId("feature.base"), SemanticFace::Top).value());
+  REQUIRE(support);
+  LoftConstraintIntent intent{ParameterId("loft.tolerance"),
+                              1e-5,
+                              1e-5,
+                              LoftBoundaryCondition{feature->sections().front().identity(),
+                                                    support.value(),
+                                                    {},
+                                                    LoftBoundaryContinuity::G2,
+                                                    false,
+                                                    1.0},
+                              {},
+                              {}};
+  auto constrained = feature->with_constraints(intent);
+  REQUIRE(constrained);
+  REQUIRE(document.update_loft_feature(constrained.value()));
+  const auto failed = GeometryRecomputeExecutor{}.execute_document(document, shapes);
+  REQUIRE_FALSE(failed);
+  CHECK(failed.error().message().find("verified boundary construction") != std::string::npos);
+  CHECK(volume(shapes, "body.result") == before);
+}
