@@ -31,6 +31,12 @@ QString title(ShellFeatureTools::Command command) {
                                  : QStringLiteral("Loft");
 }
 PathSegmentReference with_reversal(const PathSegmentReference& source, bool reversed) {
+  if (source.source_kind() == PathSegmentSourceKind::FeatureEdge)
+    return PathSegmentReference::create_feature_edge(*source.feature_edge(),
+                                                     source.imported_source_body(), reversed)
+        .value();
+  if (source.source_kind() == PathSegmentSourceKind::SemanticGeneratedEdge)
+    return PathSegmentReference::create_semantic_edge(*source.semantic_edge(), reversed).value();
   if (source.source_kind() == PathSegmentSourceKind::PlanarSketchCurve)
     return PathSegmentReference::create_planar(*source.planar_sketch(), *source.entity(),
                                                *source.planar_curve_kind(), reversed)

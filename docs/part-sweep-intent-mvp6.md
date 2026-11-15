@@ -16,6 +16,19 @@ referenced sketches, regions, PathCurves, parameters, and Bodies already exist.
 The profile and trajectory PathCurves of a surface Sweep must be different. An open profile is
 not accepted for a solid operation, and a closed region is not accepted for a surface operation.
 
+## Explicit material-region profiles — 167
+
+Closed-region profiles retain `outer_boundary` replay by default, with no additional save field.
+An explicitly authored `SweepRegionPolicy::MaterialRegion` requests the selected outer contour
+and its directly nested inner loops. This is persisted as `region_policy: "material_region"` in
+the closed profile object under necessary Part V11. Open-path profiles cannot carry this field.
+Returning to the legacy region policy restores the previous necessary envelope and canonical data.
+
+This distinction prevents existing Sweep documents from acquiring holes through an unrelated
+upgrade. The mode defines authored region interpretation; resolved inner wires and topology remain
+derived. Multi-wire Geometry and physical validity are separate acceptance work under 167; the
+intent slice rejects execution explicitly until those capabilities are implemented.
+
 ## Orientation and twist
 
 By default the Sweep inherits the trajectory's orientation rule. A feature can override that

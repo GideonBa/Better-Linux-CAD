@@ -40,6 +40,7 @@ constexpr int k_pattern_placement_version = 7;
 constexpr int k_equation_curve_version = 8;
 constexpr int k_spatial_constraint_version = 9;
 constexpr int k_curve_policy_version = 10;
+constexpr int k_semantic_sweep_version = 11;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -2970,6 +2971,8 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
     const auto& source = std::get<ProfileRegionReference>(feature.profile().source());
     profile["sketch"] = source.sketch().value();
     profile["profile"] = source.profile().value();
+    if (feature.profile().region_policy() == SweepRegionPolicy::MaterialRegion)
+      profile["region_policy"] = "material_region";
   } else {
     profile["path_curve"] = std::get<PathCurveId>(feature.profile().source()).value();
   }
@@ -3028,7 +3031,11 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
   Result<SweepProfileReference> profile =
       Result<SweepProfileReference>::failure(json_error("unsupported sweep profile kind"));
   const std::string profile_kind = profile_json.at("kind").get<std::string>();
-  if (profile_kind == "closed_region" && profile_json.size() == 3U &&
+  const bool material_region = profile_json.contains("region_policy");
+  if (material_region && (!profile_json.at("region_policy").is_string() ||
+                          profile_json.at("region_policy") != "material_region"))
+    return Result<SweepFeature>::failure(json_error("Unsupported Sweep region policy"));
+  if (profile_kind == "closed_region" && profile_json.size() == (material_region ? 4U : 3U) &&
       profile_json.contains("sketch") && profile_json.at("sketch").is_string() &&
       profile_json.contains("profile") && profile_json.at("profile").is_string()) {
     auto region =
@@ -3037,7 +3044,9 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
                                        PartFeatureInputRole::SweepProfile);
     if (region.has_error())
       return Result<SweepFeature>::failure(region.error());
-    profile = SweepProfileReference::create_closed_region(std::move(region.value()));
+    profile = SweepProfileReference::create_closed_region(
+        std::move(region.value()),
+        material_region ? SweepRegionPolicy::MaterialRegion : SweepRegionPolicy::OuterBoundary);
   } else if (profile_kind == "open_path" && profile_json.size() == 2U &&
              profile_json.contains("path_curve") && profile_json.at("path_curve").is_string()) {
     profile = SweepProfileReference::create_open_path(
@@ -4450,6 +4459,12 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
   case PathSegmentSourceKind::SemanticGeneratedEdge:
     value["semantic_edge"] = semantic_edge_reference_to_json(*segment.semantic_edge());
     break;
+  case PathSegmentSourceKind::FeatureEdge:
+    value["edge_reference"] = edge_treatment_edge_to_json(*segment.feature_edge());
+    value["source_body"] = segment.imported_source_body()
+                               ? json(segment.imported_source_body()->value())
+                               : json(nullptr);
+    break;
   }
   return value;
 }
@@ -4530,6 +4545,21 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
     if (edge.has_error())
       return Result<PathSegmentReference>::failure(edge.error());
     return PathSegmentReference::create_semantic_edge(std::move(edge.value()), reversed);
+  }
+  if (source == "feature_edge") {
+    if (!has_exact_fields(value, {"source", "reversed", "edge_reference", "source_body"}) ||
+        (!value.at("source_body").is_null() && !value.at("source_body").is_string()))
+      return Result<PathSegmentReference>::failure(
+          json_error("Feature-edge path has invalid fields"));
+    auto edge = edge_treatment_edge_from_json(value.at("edge_reference"),
+                                              PartFeatureInputRole::PathSegment);
+    if (!edge)
+      return Result<PathSegmentReference>::failure(edge.error());
+    std::optional<BodyId> body;
+    if (!value.at("source_body").is_null())
+      body = BodyId(value.at("source_body").get<std::string>());
+    return PathSegmentReference::create_feature_edge(std::move(edge.value()), std::move(body),
+                                                     reversed);
   }
   return Result<PathSegmentReference>::failure(json_error("unsupported path segment source"));
 }
@@ -4744,6 +4774,18 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   json root;
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
+  const bool semantic_sweep =
+      std::any_of(document.path_curves().begin(), document.path_curves().end(),
+                  [](const auto& path) {
+                    return std::any_of(
+                        path.segments().begin(), path.segments().end(), [](const auto& segment) {
+                          return segment.source_kind() == PathSegmentSourceKind::FeatureEdge;
+                        });
+                  }) ||
+      std::any_of(document.sweep_features().begin(), document.sweep_features().end(),
+                  [](const auto& feature) {
+                    return feature.profile().region_policy() == SweepRegionPolicy::MaterialRegion;
+                  });
   const bool curve_policy = std::any_of(
       document.path_curves().begin(), document.path_curves().end(), [](const auto& path) {
         return path.execution_policy().kind() == PathGeometryPolicyKind::CurvePreserving;
@@ -4763,7 +4805,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       std::any_of(document.circular_pattern_features().begin(),
                   document.circular_pattern_features().end(),
                   [](const auto& f) { return f.placements().has_value(); });
-  if (curve_policy || spatial || equations || extended_patterns ||
+  if (semantic_sweep || curve_policy || spatial || equations || extended_patterns ||
       !document.engineering_resources().entries().empty() || !document.hole_features().empty() ||
       !document.thread_features().empty()) {
     const bool manufacturing = std::any_of(
@@ -4774,7 +4816,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
         !document.thread_features().empty() ||
         std::any_of(document.hole_features().begin(), document.hole_features().end(),
                     [](const auto& hole) { return hole.thread().has_value(); });
-    root["version"] = curve_policy                       ? k_curve_policy_version
+    root["version"] = semantic_sweep                     ? k_semantic_sweep_version
+                      : curve_policy                     ? k_curve_policy_version
                       : spatial                          ? k_spatial_constraint_version
                       : equations                        ? k_equation_curve_version
                       : extended_patterns                ? k_pattern_placement_version
@@ -5176,7 +5219,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     latest_ancestor_position[node] = latest;
   }
-  if (curve_policy || spatial || equations || extended_patterns || interleaved ||
+  if (semantic_sweep || curve_policy || spatial || equations || extended_patterns || interleaved ||
       !document.result_face_workplanes().empty() || !document.hole_features().empty() ||
       !document.thread_features().empty() || document.authored_history_intent())
     root["feature_order"] = std::move(feature_order);
@@ -5214,10 +5257,29 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
          root.at("version") != k_pattern_placement_version &&
          root.at("version") != k_equation_curve_version &&
          root.at("version") != k_spatial_constraint_version &&
-         root.at("version") != k_curve_policy_version))
+         root.at("version") != k_curve_policy_version &&
+         root.at("version") != k_semantic_sweep_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
     const auto version = root.at("version").get<int>();
-    const bool curve_policy_envelope = version == k_curve_policy_version;
+    const bool semantic_sweep_envelope = version == k_semantic_sweep_version;
+    bool semantic_sweep_intent = false;
+    if (root.contains("path_curves") && root.at("path_curves").is_array())
+      for (const auto& path : root.at("path_curves"))
+        if (path.is_object() && path.contains("segments") && path.at("segments").is_array())
+          for (const auto& segment : path.at("segments"))
+            if (segment.is_object() &&
+                (segment.value("source", std::string{}) == "feature_edge" ||
+                 segment.contains("edge_reference") || segment.contains("source_body")))
+              semantic_sweep_intent = true;
+    if (root.contains("sweep_features") && root.at("sweep_features").is_array())
+      for (const auto& feature : root.at("sweep_features"))
+        if (feature.is_object() && feature.contains("profile") &&
+            feature.at("profile").is_object() && feature.at("profile").contains("region_policy"))
+          semantic_sweep_intent = true;
+    if (semantic_sweep_envelope != semantic_sweep_intent)
+      return Result<PartDocument>::failure(json_error(
+          "Semantic-edge and material-region Sweep intent requires necessary Part version 11"));
+    const bool curve_policy_envelope = version == k_curve_policy_version || semantic_sweep_envelope;
     bool curve_policy_intent = false;
     if (root.contains("path_curves") && root.at("path_curves").is_array())
       for (const auto& path : root.at("path_curves"))
@@ -5227,7 +5289,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
                 json_error("Curve-preserving paths require Part version 10"));
           curve_policy_intent = true;
         }
-    if (curve_policy_envelope && !curve_policy_intent)
+    if (version == k_curve_policy_version && !curve_policy_intent)
       return Result<PartDocument>::failure(
           json_error("Part version 10 requires curve-preserving path intent"));
     const bool spatial_envelope = version == k_spatial_constraint_version || curve_policy_envelope;

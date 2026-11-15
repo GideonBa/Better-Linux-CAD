@@ -111,6 +111,21 @@ Both full and planned recompute use the complete history executor for modern pat
 without an executable consumer cannot bypass model-space validation. This currently performs
 full candidate geometry work; selective reuse is not a new performance claim.
 
+## Typed feature-edge source intent — 167
+
+The `feature_edge` source adds a typed `EdgeReference` with the `path_segment` capability role.
+It retains generated linear/circular roles, producer-anchored result witnesses or an imported
+catalog entry. It requires explicit curve-preserving execution. Reversal belongs to the logical
+source reference and does not depend on tessellation or kernel traversal order. Fixed selection
+witnesses retain authored recovery evidence; modeled curves and execution subdivisions remain derived.
+
+Imported edges additionally require an explicit source Body, checked against the catalog entry's
+parent and imported output mapping. Both catalog/edge and Body dependencies protect the source.
+Generated/result references omit that owner field. Spatial-constraint curve inputs retain their
+existing capability boundary; accepting an edge as a path does not enable it as a solver input.
+Part V11 persists this authored reference; native edge recovery and physical acceptance remain
+tracked in `mvp-plan.md`. Unsupported new Geometry requests fail explicitly during the intent slice.
+
 ## Equation source contract
 
 Both planar and spatial sources add the `equation_curve` kind in the same owner/entity reference.

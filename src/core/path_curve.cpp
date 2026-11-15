@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <set>
+#include <type_traits>
 #include <utility>
 
 namespace blcad {
@@ -18,12 +19,14 @@ PathSegmentReference::PathSegmentReference(
     std::optional<ConstructionLineId> construction_line,
     std::optional<SemanticEdgeReference> semantic_edge,
     std::optional<PlanarPathCurveKind> planar_curve_kind,
-    std::optional<Sketch3DPathCurveKind> sketch_3d_curve_kind, bool reversed)
+    std::optional<Sketch3DPathCurveKind> sketch_3d_curve_kind, bool reversed,
+    std::optional<EdgeReference> feature_edge, std::optional<BodyId> imported_source_body)
     : source_kind_(source_kind), planar_sketch_(std::move(planar_sketch)),
       sketch_3d_(std::move(sketch_3d)), entity_(std::move(entity)),
       construction_line_(std::move(construction_line)), semantic_edge_(std::move(semantic_edge)),
       planar_curve_kind_(planar_curve_kind), sketch_3d_curve_kind_(sketch_3d_curve_kind),
-      reversed_(reversed) {}
+      reversed_(reversed), feature_edge_(std::move(feature_edge)),
+      imported_source_body_(std::move(imported_source_body)) {}
 
 Result<PathSegmentReference> PathSegmentReference::create_planar(SketchId sketch,
                                                                  SketchEntityId entity,
@@ -55,6 +58,19 @@ PathSegmentReference::create_sketch_3d(Sketch3DId sketch, SketchEntityId entity,
       std::nullopt, std::nullopt, std::nullopt, curve_kind, reversed));
 }
 
+Result<PathSegmentReference> PathSegmentReference::create_feature_edge(
+    EdgeReference edge, std::optional<BodyId> imported_source_body, bool reversed) {
+  if (edge.role() != PartFeatureInputRole::PathSegment)
+    return invalid_segment("Feature-edge paths require the path_segment role");
+  const bool imported = edge.source_kind() == PartFeatureInputSourceKind::ImportedTopology;
+  if (imported != imported_source_body.has_value() ||
+      (imported_source_body && imported_source_body->empty()))
+    return invalid_segment("Imported edge paths require exactly one explicit source Body");
+  return Result<PathSegmentReference>::success(
+      PathSegmentReference(PathSegmentSourceKind::FeatureEdge, {}, {}, {}, {}, {}, {}, {}, reversed,
+                           std::move(edge), std::move(imported_source_body)));
+}
+
 Result<PathSegmentReference> PathSegmentReference::create_semantic_edge(SemanticEdgeReference edge,
                                                                         bool reversed) {
   return Result<PathSegmentReference>::success(PathSegmentReference(
@@ -80,6 +96,12 @@ const std::optional<ConstructionLineId>& PathSegmentReference::construction_line
 const std::optional<SemanticEdgeReference>& PathSegmentReference::semantic_edge() const noexcept {
   return semantic_edge_;
 }
+const std::optional<EdgeReference>& PathSegmentReference::feature_edge() const noexcept {
+  return feature_edge_;
+}
+const std::optional<BodyId>& PathSegmentReference::imported_source_body() const noexcept {
+  return imported_source_body_;
+}
 const std::optional<PlanarPathCurveKind>& PathSegmentReference::planar_curve_kind() const noexcept {
   return planar_curve_kind_;
 }
@@ -101,6 +123,8 @@ std::string PathSegmentReference::source_node_id() const {
     return sketch_3d_->value();
   case PathSegmentSourceKind::SemanticGeneratedEdge:
     return semantic_edge_->source_feature().value();
+  case PathSegmentSourceKind::FeatureEdge:
+    return feature_edge_->source_node_id();
   }
   return {};
 }
@@ -115,6 +139,28 @@ std::string PathSegmentReference::stable_key() const {
     return "sketch_3d:" + sketch_3d_->value() + ":" + entity_->value();
   case PathSegmentSourceKind::SemanticGeneratedEdge:
     return "semantic_edge:" + semantic_edge_->node_id();
+  case PathSegmentSourceKind::FeatureEdge: {
+    const auto witness = std::visit(
+        [](const auto& source) -> std::string {
+          using T = std::decay_t<decltype(source)>;
+          if constexpr (std::is_same_v<T, ResultEdgeReference>)
+            return source.identity();
+          else if constexpr (std::is_same_v<T, ImportedTopologyReference>)
+            return source.source_node_id();
+          else if constexpr (std::is_same_v<T, SemanticCircularEdgeReference>)
+            return std::to_string(source.source_feature().value().size()) + ":" +
+                   source.source_feature().value() + ":" +
+                   std::to_string(source.source_profile().value().size()) + ":" +
+                   source.source_profile().value() + ":" + std::string(to_string(source.edge()));
+          else
+            return source.node_id();
+        },
+        feature_edge_->source());
+    const auto body = imported_source_body_ ? imported_source_body_->value() : std::string{};
+    return "feature_edge:" + std::string(to_string(feature_edge_->source_kind())) + ":" +
+           std::to_string(witness.size()) + ":" + witness + ":" + std::to_string(body.size()) +
+           ":" + body;
+  }
   }
   return {};
 }
@@ -129,6 +175,8 @@ std::string_view to_string(PathSegmentSourceKind value) noexcept {
     return "sketch_3d_curve";
   case PathSegmentSourceKind::SemanticGeneratedEdge:
     return "semantic_generated_edge";
+  case PathSegmentSourceKind::FeatureEdge:
+    return "feature_edge";
   }
   return "planar_sketch_curve";
 }
@@ -234,10 +282,15 @@ Result<PathCurve> PathCurve::create(PathCurveId id, std::string name,
           Error::validation(id.value(), "fixed up vector must be finite and non-zero"));
   }
   std::set<std::string> unique_sources;
-  for (const auto& segment : segments)
+  for (const auto& segment : segments) {
+    if (segment.source_kind() == PathSegmentSourceKind::FeatureEdge &&
+        execution_policy.kind() != PathGeometryPolicyKind::CurvePreserving)
+      return Result<PathCurve>::failure(Error::validation(
+          id.value(), "Feature-edge paths require explicit curve-preserving execution"));
     if (!unique_sources.insert(segment.stable_key()).second)
       return Result<PathCurve>::failure(
           Error::validation(id.value(), "path curve must not repeat a source segment"));
+  }
   return Result<PathCurve>::success(PathCurve(
       std::move(id), std::move(name), std::move(segments), closure, orientation_rule,
       fixed_up_vector, continuity_hint, connection_tolerance_mm, std::move(execution_policy)));

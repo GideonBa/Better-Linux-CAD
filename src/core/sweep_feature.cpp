@@ -22,16 +22,21 @@ std::string_view to_string(SweepProfileKind kind) noexcept {
 }
 
 SweepProfileReference::SweepProfileReference(
-    SweepProfileKind kind, std::variant<ProfileRegionReference, PathCurveId> source)
-    : kind_(kind), source_(std::move(source)) {}
+    SweepProfileKind kind, std::variant<ProfileRegionReference, PathCurveId> source,
+    SweepRegionPolicy policy)
+    : kind_(kind), source_(std::move(source)), region_policy_(policy) {}
 
 Result<SweepProfileReference>
-SweepProfileReference::create_closed_region(ProfileRegionReference profile) {
+SweepProfileReference::create_closed_region(ProfileRegionReference profile,
+                                            SweepRegionPolicy policy) {
+  if (policy != SweepRegionPolicy::OuterBoundary && policy != SweepRegionPolicy::MaterialRegion)
+    return Result<SweepProfileReference>::failure(
+        Error::validation(profile.profile().value(), "Unsupported Sweep region policy"));
   if (profile.role() != PartFeatureInputRole::SweepProfile)
     return Result<SweepProfileReference>::failure(Error::validation(
         profile.profile().value(), "closed sweep profile must use sweep_profile role"));
   return Result<SweepProfileReference>::success(
-      SweepProfileReference(SweepProfileKind::ClosedRegion, std::move(profile)));
+      SweepProfileReference(SweepProfileKind::ClosedRegion, std::move(profile), policy));
 }
 
 Result<SweepProfileReference> SweepProfileReference::create_open_path(PathCurveId path_curve) {
@@ -44,6 +49,9 @@ Result<SweepProfileReference> SweepProfileReference::create_open_path(PathCurveI
 
 SweepProfileKind SweepProfileReference::kind() const noexcept {
   return kind_;
+}
+SweepRegionPolicy SweepProfileReference::region_policy() const noexcept {
+  return region_policy_;
 }
 const std::variant<ProfileRegionReference, PathCurveId>&
 SweepProfileReference::source() const noexcept {

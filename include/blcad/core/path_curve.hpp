@@ -2,6 +2,7 @@
 
 #include "blcad/core/datum_plane.hpp"
 #include "blcad/core/id.hpp"
+#include "blcad/core/part_feature_input_reference.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/spatial.hpp"
 
@@ -17,7 +18,8 @@ enum class PathSegmentSourceKind {
   PlanarSketchCurve,
   ConstructionLine,
   Sketch3DCurve,
-  SemanticGeneratedEdge
+  SemanticGeneratedEdge,
+  FeatureEdge
 };
 enum class PlanarPathCurveKind {
   Line,
@@ -42,6 +44,9 @@ public:
                    bool reversed = false);
   [[nodiscard]] static Result<PathSegmentReference> create_semantic_edge(SemanticEdgeReference edge,
                                                                          bool reversed = false);
+  [[nodiscard]] static Result<PathSegmentReference>
+  create_feature_edge(EdgeReference edge, std::optional<BodyId> imported_source_body = std::nullopt,
+                      bool reversed = false);
 
   [[nodiscard]] PathSegmentSourceKind source_kind() const noexcept;
   [[nodiscard]] const std::optional<SketchId>& planar_sketch() const noexcept;
@@ -49,6 +54,8 @@ public:
   [[nodiscard]] const std::optional<SketchEntityId>& entity() const noexcept;
   [[nodiscard]] const std::optional<ConstructionLineId>& construction_line() const noexcept;
   [[nodiscard]] const std::optional<SemanticEdgeReference>& semantic_edge() const noexcept;
+  [[nodiscard]] const std::optional<EdgeReference>& feature_edge() const noexcept;
+  [[nodiscard]] const std::optional<BodyId>& imported_source_body() const noexcept;
   [[nodiscard]] const std::optional<PlanarPathCurveKind>& planar_curve_kind() const noexcept;
   [[nodiscard]] const std::optional<Sketch3DPathCurveKind>& sketch_3d_curve_kind() const noexcept;
   [[nodiscard]] bool reversed() const noexcept;
@@ -61,7 +68,9 @@ private:
                        std::optional<ConstructionLineId> construction_line,
                        std::optional<SemanticEdgeReference> semantic_edge,
                        std::optional<PlanarPathCurveKind> planar_curve_kind,
-                       std::optional<Sketch3DPathCurveKind> sketch_3d_curve_kind, bool reversed);
+                       std::optional<Sketch3DPathCurveKind> sketch_3d_curve_kind, bool reversed,
+                       std::optional<EdgeReference> feature_edge = std::nullopt,
+                       std::optional<BodyId> imported_source_body = std::nullopt);
 
   PathSegmentSourceKind source_kind_;
   std::optional<SketchId> planar_sketch_;
@@ -72,6 +81,8 @@ private:
   std::optional<PlanarPathCurveKind> planar_curve_kind_;
   std::optional<Sketch3DPathCurveKind> sketch_3d_curve_kind_;
   bool reversed_;
+  std::optional<EdgeReference> feature_edge_;
+  std::optional<BodyId> imported_source_body_;
 };
 
 [[nodiscard]] Result<std::size_t> validate_path_segment_source(const PartDocument&,
