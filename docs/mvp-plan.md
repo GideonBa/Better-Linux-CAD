@@ -949,3 +949,12 @@ that every Core-valid collection reopens without a separate JSON-only cap; whole
 conditions use one direct boundary decoder. Geometry construction budgets remain distinct from
 authored persistence. This completes the scoped intent slice only; complete G02 acceptance remains
 under final verification.
+
+
+The completed native-knot/rail slice passes **35 focused Geometry cases / 5,924 assertions**
+(`/tmp/blcad-169-feature16-geometry-focused.log`), including trimmed extrusion support knots,
+physical mm trim incidence, complete signed curvature tensors and all constrained feature oracles.
+All five targets build successfully. Runtime manifest: 1,165 inputs, SHA-256
+`afacf8112100b171917a514485bc5112dd906cfff62c7fbf917e99656e85f72d`.
+Final broad/native regressions and combined PR delivery remain in progress; no whole-block
+acceptance is inferred from this focused run.

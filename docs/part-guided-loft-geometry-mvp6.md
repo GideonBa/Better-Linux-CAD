@@ -97,8 +97,8 @@ Blocks 48–94 are implemented. Block 88 Surface feature Core intent and JSON is
 ## Native boundary-continuity verification
 
 The private Geometry verifier `surface_join_verification` supplies numerical evidence for constrained
-construction. It currently enables no new Loft execution; the constrained-intent gate remains in
-force while construction and complete G02 acceptance are implemented.
+construction. Its feature integration is under verification in Block 169; numbered G02 acceptance
+remains pending in `docs/mvp-plan.md`.
 
 It evaluates native located trimmed faces at native true-length boundary stations. Incidence uses
 actual 3D distance to the finite trim edges, in millimeters, followed by their native pcurves.
@@ -129,7 +129,8 @@ joins, nearly failing curvature, positional/normal tolerances, normal reversal a
 
 The bounded verification grids contain 33, 65 and 129 true-length stations. Every grid must meet
 all authored criteria; the change in measured maxima from 65 to 129 stations must be at most 5%
-of the corresponding budget. The report identifies the final 129-station witness. This is a
+of the corresponding budget. The report records the actual final station count: 129 uniform stations plus mandatory native
+knot crossings. This is a
 controlled numerical boundary check, not a global continuum or approximation error bound.
 Construction capability limits, complete section/rail adherence and candidate refinement remain
 separate obligations. No `GeomAbs_C2` flag or filling-builder success replaces these checks.
@@ -147,8 +148,20 @@ no display chords or altered source BReps enter construction. A Hermite solve in
 section stations and the rail-derived first/second endpoint derivative fields. Positive matching
 section weight functions support rational profiles, including exact circular arcs.
 
+Nearly identical converted knots may share a canonical value only within 64 machine-epsilon
+units and a conservative geometric budget. With knot displacement `delta`, minimum positive knot
+span `h`, degree `p`, centered control radius `r` and positive weight ratio `M`, corresponding-span
+de Boor interpolation bounds geometric displacement by `4*p*delta*r*(3*M-1)/h`. A snap exceeding
+5% of the authored linear tolerance rejects. Distinct knots within one curve never collapse;
+remaining ill-conditioned knot spans reject. Original input BReps remain unchanged, and actual
+section/rail adherence and differential checks still decide the constructed result.
+
 Current capability is deliberately bounded: the two rails must share endpoint derivative fields
-and compatible section parameters; their complete curves must agree with the constructed skin.
+and compatible section parameters. An exact shared-V-basis correction interpolates polynomial
+B-spline rails. A rational U partition with Greville coefficients retains the matching profile
+weight function and endpoint values; corrections vanish at authored sections and through second
+order at terminal stations. Interior V knots must retain C2 polynomial continuity; rational rail
+weight functions remain outside this capability.
 A section may reverse only when its first endpoint has no rail incidence; an ambiguous incidence
 never selects an arbitrary branch. Singular/ill-conditioned stations, incompatible weights,
 missing incidence, invalid topology and exhausted degree/knot/pole budgets reject explicitly.
@@ -159,8 +172,46 @@ interior native sections must meet the positional tolerance. G2 never falls back
 [Patch oracles](../tests/geometry/constrained_loft_patch_tests.cpp) independently check a sextic
 arch between planar G2 supports, exact cylindrical area/radius/principal curvature and rolled
 Airfoil sections with unequal source subdivision. Source BRep snapshots remain identical after
-successful and failed construction. This establishes a private construction primitive, not whole
-Loft execution: guide binding resolution, regularity/knot checks, patch assembly, Body operations
-and complete G02 feature/history/reopen acceptance remain pending. General varying support jets
-and incompatible rational weight functions remain unsupported until separately implemented and
+successful and failed construction. These private-kernel oracles are supplemented by the feature
+acceptance below. General varying support jets and incompatible rational weight functions remain
+unsupported until separately implemented and
 verified. Native editing is planned in Block 173.
+
+
+## Constrained feature integration — verification in progress
+
+Explicit constraints select the native patch builder; historical unconstrained Loft replay is
+unchanged. Historical global `LoftContinuity::G2` remains a diagnosed unsupported longitudinal
+request. Independently authored boundary G2 is checked against each selected neighboring face.
+The supported new network has 2–32 explicitly curve-preserving, ordered rails and 2–11 homogeneous
+sections. Sections may use a consistent reversal; mixed reversals reject as ambiguous. Closed
+sections form one cyclic traversal; open sections require endpoint rails without wrap. Rational
+section weight functions must match after exact common-basis refinement. Singular/pole sections,
+nonunit tangent scale and incompatible endpoint derivative fields reject explicitly.
+
+Anchors use native true length on original section entities, in their authored directions, or the
+canonical whole contour. Section rotation moves the physical anchor; subdivision does not rebind
+it. Every guide anchor must coincide in model units. Native rail subcurves retain authored traversal
+and terminal fractions. Missing or multiple rail stations never select the first match. For closed
+profiles, an optional center path must cross every finite planar section interior exactly once in
+order. It controls these stations; it neither becomes a skin constraint nor silently relocates an
+explicitly anchored section. Open-section center paths and nonzero open-section rotation remain
+outside the present construction capability.
+
+Patch roles use length-framed adjacent authored guide IDs; cap roles use logical terminal section
+identity. Scoped neighboring support conditions resolve exact current semantic/result/imported
+faces. The completed quilt must preserve every patch/cap origin, form one connected manifold
+quilt (a single face is valid for an open LoftSurface), pass native self-interference checks and retain all prescribed joins after sewing and solid
+orientation. Solid capping and positive-volume validation precede ordinary New/Join/Cut/Intersect
+Body publication. Boundary continuity describes the constructed Loft tool; a subsequent Boolean
+may trim it or reverse a subtractive material face.
+
+Differential sampling includes native boundary C2 intervals and intersections of trim pcurves
+with candidate/support spline knot lines. At knots, actual one-sided D1/D2 limits are evaluated on
+all admissible native spans; a narrow curvature spike between uniform stations is rejected.
+Each candidate polynomial knot cell also receives a bounded 9x9 regularity grid, with a maximum
+1,024 cells. These are stated numerical witnesses together with native topology/interference
+validation, not global continuum certificates. All constraints retain their authored mm/radian/
+inverse-mm budgets; failure publishes no candidate and no G1 fallback. Complete feature/history/
+exchange proof is recorded only when it passes in `docs/mvp-plan.md`. Advanced native controls and
+Surface-face picking remain planned in Block 173.

@@ -102,7 +102,12 @@ Constrained Loft intent is covered by `[loft-constraints]` in Core/Geometry, tog
 `[loft-feature]` and `[loft-section-compatibility]`. UI consumer regressions use
 `[interactive-loft],[interactive-surface],[block136-feature-edit]`; native checks use
 `[native-path-policy],[native-shell-spatial],[shell-mixed-path-loft],[native-feature-edit]`.
-Boundary construction/derivative verification remains the separate 169 gate.
+Constrained execution and independent G02 oracles use `[constrained-loft-feature]`, including
+`[constrained-loft-smooth]`, `[constrained-loft-edits]` and `[constrained-loft-open]`.
+Private kernel checks use `[constrained-loft-patch]`; `[surface-join-verification]` covers actual
+trim distance, one-sided native knot limits, oriented normal curvature and its complete tensor.
+The `[surface-join-knots]` and `[surface-join-spectrum]` subsets own narrow-spike and between-direction
+counterexamples. Native advanced authoring remains the separate Block 173 gate.
 
 ## Find and select focused tests
 

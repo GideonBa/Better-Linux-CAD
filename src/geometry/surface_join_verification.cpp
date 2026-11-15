@@ -6,9 +6,19 @@
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
+#include <Geom2dAPI_InterCurveCurve.hxx>
 #include <Geom2d_Curve.hxx>
+#include <Geom2d_Line.hxx>
+#include <GeomAPI_ProjectPointOnCurve.hxx>
+#include <Geom_BSplineCurve.hxx>
+#include <Geom_BSplineSurface.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom_Surface.hxx>
+#include <Geom_SurfaceOfLinearExtrusion.hxx>
+#include <Geom_TrimmedCurve.hxx>
+#include <IntRes2d_IntersectionPoint.hxx>
 #include <Standard_Failure.hxx>
+#include <TColStd_Array1OfReal.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
@@ -45,20 +55,81 @@ struct Jet {
 bool finite(const gp_Vec& v) {
   return std::isfinite(v.X()) && std::isfinite(v.Y()) && std::isfinite(v.Z());
 }
+std::vector<std::pair<int, int>> spans(const std::vector<double>& knots, double value,
+                                       double minimum, double maximum) {
+  if (knots.empty())
+    return {{0, 0}};
+  std::vector<std::pair<int, int>> result;
+  const double rounding =
+      64 * std::numeric_limits<double>::epsilon() * std::max(1.0, std::abs(value));
+  for (std::size_t i = 0; i + 1 < knots.size(); ++i)
+    if (value >= knots[i] - rounding && value <= knots[i + 1] + rounding && knots[i] < maximum &&
+        knots[i + 1] > minimum)
+      result.push_back({int(i) + 1, int(i) + 2});
+  if (result.empty())
+    throw std::runtime_error("Trim parameter is outside its native knot domain");
+  return result;
+}
 struct TrimProjection {
   TopoDS_Face face;
   Handle(Geom_Surface) surface;
   std::vector<TopoDS_Edge> uses;
   BRepExtrema_DistShapeShape distance;
+  Handle(Geom_BSplineSurface) spline;
+  Handle(Geom_SurfaceOfLinearExtrusion) extrusion;
+  Handle(Geom_BSplineCurve) basis;
+  std::vector<double> uknots, vknots;
+  double u_min, u_max, v_min, v_max;
+  void derivatives(double u, double v, int u0, int u1, int v0, int v1, gp_Pnt& p, gp_Vec& du,
+                   gp_Vec& dv, gp_Vec& duu, gp_Vec& dvv, gp_Vec& duv, bool second_order) const {
+    if (!spline.IsNull())
+      spline->LocalD2(u, v, u0, u1, v0, v1, p, du, dv, duu, dvv, duv);
+    else if (!basis.IsNull()) {
+      basis->LocalD2(u, u0, u1, p, du, duu);
+      dv = gp_Vec(extrusion->Direction());
+      p.Translate(dv.Multiplied(v));
+      dvv = gp_Vec(0, 0, 0);
+      duv = gp_Vec(0, 0, 0);
+    } else if (second_order)
+      surface->D2(u, v, p, du, dv, duu, dvv, duv);
+    else
+      surface->D1(u, v, p, du, dv);
+  }
   explicit TrimProjection(const TopoDS_Face& source, double tolerance) : face(source) {
     double u0, u1, v0, v1;
     BRepTools::UVBounds(face, u0, u1, v0, v1);
+    u_min = u0;
+    u_max = u1;
+    v_min = v0;
+    v_max = v1;
     if (face.Orientation() != TopAbs_FORWARD && face.Orientation() != TopAbs_REVERSED)
       throw std::runtime_error("Surface continuity requires an oriented manifold face");
     surface = BRep_Tool::Surface(face);
     if (surface.IsNull() || !std::isfinite(u0) || !std::isfinite(u1) || !std::isfinite(v0) ||
         !std::isfinite(v1))
       throw std::runtime_error("Surface continuity requires a finite native support domain");
+    auto carrier = surface;
+    if (const auto trimmed = Handle(Geom_RectangularTrimmedSurface)::DownCast(carrier);
+        !trimmed.IsNull())
+      carrier = trimmed->BasisSurface();
+    spline = Handle(Geom_BSplineSurface)::DownCast(carrier);
+    extrusion = Handle(Geom_SurfaceOfLinearExtrusion)::DownCast(carrier);
+    if (!extrusion.IsNull()) {
+      auto curve = extrusion->BasisCurve();
+      if (const auto trimmed = Handle(Geom_TrimmedCurve)::DownCast(curve); !trimmed.IsNull())
+        curve = trimmed->BasisCurve();
+      basis = Handle(Geom_BSplineCurve)::DownCast(curve);
+    }
+    if (!spline.IsNull()) {
+      for (int i = 1; i <= spline->NbUKnots(); ++i)
+        uknots.push_back(spline->UKnot(i));
+      for (int i = 1; i <= spline->NbVKnots(); ++i)
+        vknots.push_back(spline->VKnot(i));
+    } else if (!basis.IsNull())
+      for (int i = 1; i <= basis->NbKnots(); ++i)
+        uknots.push_back(basis->Knot(i));
+    if (uknots.size() > 512 || vknots.size() > 512)
+      throw std::runtime_error("Native continuity support exceeds its knot budget");
     BRep_Builder builder;
     TopoDS_Compound trim;
     builder.MakeCompound(trim);
@@ -105,35 +176,38 @@ std::vector<Jet> projected_jets(TrimProjection& trim, const gp_Pnt& point, doubl
                       surface->IsVPeriodic() ? surface->VPeriod() : 1.0))
         throw std::runtime_error("Ambiguous native projection onto the trimmed support");
     }
-    Jet jet{};
-    jet.u = u;
-    jet.v = v;
-    gp_Vec duu, dvv, duv;
-    if (second_order)
-      surface->D2(u, v, jet.point, jet.du, jet.dv, duu, dvv, duv);
-    else
-      surface->D1(u, v, jet.point, jet.du, jet.dv);
-    if (!std::isfinite(jet.point.X()) || !std::isfinite(jet.point.Y()) ||
-        !std::isfinite(jet.point.Z()) || !finite(jet.du) || !finite(jet.dv) ||
-        (second_order && (!finite(duu) || !finite(dvv) || !finite(duv))))
-      throw std::runtime_error("Nonfinite native surface derivatives");
-    jet.E = jet.du.SquareMagnitude();
-    jet.F = jet.du.Dot(jet.dv);
-    jet.G = jet.dv.SquareMagnitude();
-    jet.normal = jet.du.Crossed(jet.dv);
-    jet.determinant = jet.normal.SquareMagnitude();
-    if (!std::isfinite(jet.determinant) || jet.E <= 1e-24 || jet.G <= 1e-24 ||
-        jet.determinant <= 1e-20 * jet.E * jet.G)
-      throw std::runtime_error("Singular surface frame/pole cannot establish boundary continuity");
-    jet.normal.Normalize();
-    if ((face.Orientation() == TopAbs_REVERSED) != reverse)
-      jet.normal.Reverse();
-    jet.e = second_order ? duu.Dot(jet.normal) : 0.0;
-    jet.f = second_order ? duv.Dot(jet.normal) : 0.0;
-    jet.g = second_order ? dvv.Dot(jet.normal) : 0.0;
-    if (jet.point.Distance(boundary_point) > tolerance || jet.point.Distance(point) > tolerance)
-      throw std::runtime_error("Native trim pcurve exceeds the model-space incidence tolerance");
-    jets.push_back(std::move(jet));
+    for (const auto& [u0, u1] : spans(trim.uknots, u, trim.u_min, trim.u_max))
+      for (const auto& [v0, v1] : spans(trim.vknots, v, trim.v_min, trim.v_max)) {
+        Jet jet{};
+        jet.u = u;
+        jet.v = v;
+        gp_Vec duu, dvv, duv;
+        trim.derivatives(u, v, u0, u1, v0, v1, jet.point, jet.du, jet.dv, duu, dvv, duv,
+                         second_order);
+        if (!std::isfinite(jet.point.X()) || !std::isfinite(jet.point.Y()) ||
+            !std::isfinite(jet.point.Z()) || !finite(jet.du) || !finite(jet.dv) ||
+            (second_order && (!finite(duu) || !finite(dvv) || !finite(duv))))
+          throw std::runtime_error("Nonfinite native surface derivatives");
+        jet.E = jet.du.SquareMagnitude();
+        jet.F = jet.du.Dot(jet.dv);
+        jet.G = jet.dv.SquareMagnitude();
+        jet.normal = jet.du.Crossed(jet.dv);
+        jet.determinant = jet.normal.SquareMagnitude();
+        if (!std::isfinite(jet.determinant) || jet.E <= 1e-24 || jet.G <= 1e-24 ||
+            jet.determinant <= 1e-20 * jet.E * jet.G)
+          throw std::runtime_error(
+              "Singular surface frame/pole cannot establish boundary continuity");
+        jet.normal.Normalize();
+        if ((face.Orientation() == TopAbs_REVERSED) != reverse)
+          jet.normal.Reverse();
+        jet.e = second_order ? duu.Dot(jet.normal) : 0.0;
+        jet.f = second_order ? duv.Dot(jet.normal) : 0.0;
+        jet.g = second_order ? dvv.Dot(jet.normal) : 0.0;
+        if (jet.point.Distance(boundary_point) > tolerance || jet.point.Distance(point) > tolerance)
+          throw std::runtime_error(
+              "Native trim pcurve exceeds the model-space incidence tolerance");
+        jets.push_back(std::move(jet));
+      }
   };
   for (int i = 1; i <= trim.distance.NbSolution(); ++i) {
     const auto kind = trim.distance.SupportTypeShape2(i);
@@ -156,6 +230,42 @@ std::vector<Jet> projected_jets(TrimProjection& trim, const gp_Pnt& point, doubl
   if (jets.empty())
     throw std::runtime_error("Boundary is not incident to the unique finite trimmed support");
   return jets;
+}
+void knot_stations(std::vector<double>& parameters, const TopoDS_Edge& boundary,
+                   const TrimProjection& trim, double tolerance) {
+  double first, last;
+  const auto curve = BRep_Tool::Curve(boundary, first, last);
+  if (curve.IsNull())
+    throw std::runtime_error("Missing native boundary curve");
+  for (const auto& edge : trim.uses) {
+    double a, b;
+    const auto pcurve = BRep_Tool::CurveOnSurface(edge, trim.face, a, b);
+    if (pcurve.IsNull())
+      throw std::runtime_error("Missing native trim pcurve");
+    for (const bool u : {true, false}) {
+      const auto& knots = u ? trim.uknots : trim.vknots;
+      for (std::size_t k = 1; k + 1 < knots.size(); ++k) {
+        const Handle(Geom2d_Line) isoline = new Geom2d_Line(
+            gp_Pnt2d(u ? knots[k] : 0, u ? 0 : knots[k]), gp_Dir2d(u ? 0 : 1, u ? 1 : 0));
+        Geom2dAPI_InterCurveCurve intersection(pcurve, isoline, 1e-12);
+        if (!intersection.Intersector().IsDone())
+          throw std::runtime_error("Native trim/spline-knot intersection did not converge");
+        for (int i = 1; i <= intersection.NbPoints(); ++i) {
+          const double t = intersection.Intersector().Point(i).ParamOnFirst();
+          if (t < a || t > b)
+            continue;
+          const auto uv = intersection.Point(i);
+          const auto point = trim.surface->Value(uv.X(), uv.Y());
+          GeomAPI_ProjectPointOnCurve projection(point, curve, first, last);
+          for (int j = 1; j <= projection.NbPoints(); ++j)
+            if (projection.Distance(j) <= tolerance)
+              parameters.push_back(projection.Parameter(j));
+          if (parameters.size() > 4096)
+            throw std::runtime_error("Native continuity knot station budget exceeded");
+        }
+      }
+    }
+  }
 }
 gp_Vec transport(const gp_Vec& value, const gp_Vec& from, const gp_Vec& to) {
   const auto axis = from.Crossed(to);
@@ -201,19 +311,34 @@ Result<SurfaceJoinReport> verify_surface_join(FeatureId id, const TopoDS_Edge& b
     const bool g2 = continuity == LoftBoundaryContinuity::G2;
     TrimProjection candidate_trim(candidate, position_tolerance);
     TrimProjection support_trim(support, position_tolerance);
+    TColStd_Array1OfReal intervals(1, curve.NbIntervals(GeomAbs_C2) + 1);
+    curve.Intervals(intervals, GeomAbs_C2);
+    std::vector<double> mandatory;
+    for (int i = intervals.Lower(); i <= intervals.Upper(); ++i)
+      mandatory.push_back(intervals(i));
+    knot_stations(mandatory, boundary, candidate_trim, position_tolerance);
+    knot_stations(mandatory, boundary, support_trim, position_tolerance);
     SurfaceJoinReport previous, report;
     for (const int count : {33, 65, 129}) {
       report = {};
-      report.stations = std::size_t(count);
+      std::vector<double> parameters = mandatory;
       for (int i = 0; i < count; ++i) {
-        double parameter = i == count - 1 ? last : first;
-        if (i > 0 && i < count - 1) {
+        if (i == 0)
+          parameters.push_back(first);
+        else if (i == count - 1)
+          parameters.push_back(last);
+        else {
           GCPnts_AbscissaPoint station(integration_tolerance, curve,
                                        length * double(i) / double(count - 1), first);
           if (!station.IsDone())
             return fail("Native arc-length continuity station did not converge");
-          parameter = station.Parameter();
+          parameters.push_back(station.Parameter());
         }
+      }
+      std::sort(parameters.begin(), parameters.end());
+      parameters.erase(std::unique(parameters.begin(), parameters.end()), parameters.end());
+      report.stations = parameters.size();
+      for (const double parameter : parameters) {
         gp_Pnt point;
         gp_Vec tangent;
         curve.D1(parameter, point, tangent);
