@@ -66,3 +66,37 @@ native drag direction and numeric distance share one Geometry authority. Preview
 boundary membership, planarity and topology before exposing an applicable result. The frame is
 transient, follows reversed boundary orientation and source-parameter recompute, and adds no persisted
 intent. Focused proof: `[geometry][surface-trim-extend][block136-surface]`.
+
+
+## Curved boundary extension plan — 172
+
+The next Surface delivery implements the V13 options already frozen in
+[Surface intent](part-surface-feature-intent-mvp6.md). Historical records without options retain
+their Block-90 replay. This plan does not change numbered acceptance in `mvp-plan.md`.
+
+- Modern Trim has explicit KeepInside/RemoveInside. OnSurface retains finite planar contours on
+  coplanar targets. AlongDirection projects a finite closed planar contour through every forward
+  intersection on the selected curved faces/quilt; direction is an authored nonzero vector.
+  Multiple forward intersections are not silently reduced to the first. Disconnected selected
+  output regions reject and require separate explicit selections. Existing inner holes survive.
+- Exact native contour curves and Boolean intersections own the cut. Candidate construction uses
+  private topology and authored physical tolerance; ineffective, invalid, disconnected and
+  self-intersecting results reject. New logical trim roles include side and contour identity;
+  changing side can lose an existing captured support and requires explicit repair.
+- Natural Extend initially supports complete native isoparametric sides of rectangular analytic
+  plane/cylinder patches. One selected free side is extended per feature within a single- or
+  multi-face quilt. Distance is measured on the actual native isocurves; periodic overlap, partial
+  split sides, arbitrary trimmed boundaries and unsupported surfaces reject.
+- Tangent Extend uses the exact first-order continuation. A cylinder's axial generator gains a
+  planar G1 strip; axial continuation and planar patches retain their analytic continuation.
+  It verifies the oriented join and actual departure from the authored tangent extrapolation
+  against the explicit deviation budget. This mode does not claim G2 or approximation to natural
+  cylinder curvature. Native direction frames share the same boundary resolver as execution.
+- The derived free-edge/gap/non-manifold query supplies Stitch/Thicken diagnostics and later native
+  overlays. Physical whole-edge maxima, authored tolerance and actual shell closure remain the
+  authorities; no overlay or topology index is serialized and no larger gap is automatically healed.
+
+G04 will prove a trimmed multi-face cylindrical quilt across its seam, explicit opposite sides,
+curved boundary extension, preserved holes, parameter-driven contours, physical area/volume,
+Stitch/solid conversion and atomic downstream failure/repair. Advanced native authoring remains
+173, and combined S04/G04/X01 remains 174. General arbitrary patch extension/healing stays deferred.

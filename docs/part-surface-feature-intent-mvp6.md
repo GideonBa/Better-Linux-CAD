@@ -188,16 +188,36 @@ The shared derived `SurfaceBoundaryQuery` counts native edge uses (including per
 reports free/non-manifold boundaries and measures bidirectional whole-edge gap maxima using true
 curve-length stations and native knots. A nearby endpoint or minimum distance cannot label a
 larger complete-edge gap as within tolerance. These geometry/overlay products are never persisted.
-The full 171 consumer/import/exchange gate and 172 curved operations remain separate acceptance.
+The complete G03 consumer/import/exchange proof follows below; curved operations remain the separate 172 gate.
 
 
-Foundation proof: [native G03 and gap cases](../tests/geometry/surface_offset_geometry_tests.cpp)
-cover analytic planes/cylindrical quilts, both directions/symmetry, holes, all four Body modes,
-exact JSON reopening, input immutability, inward collapse and disconnected selections. The nonplanar
-`z=.02*x*y` case checks actual Solid normal sections and an independently integrated Gaussian-
-curvature tube-volume formula. Gap cases distinguish complete-edge maxima from nearby endpoints.
-Surface/G02 regression: **29 cases / 2,964 assertions**; existing Qt Surface/edit: **4 / 74**
-offscreen. All five build targets passed. Frozen runtime: **1,176 files**, SHA256
-`93174ac39e472a01d6d3fc7135f90f681ec4c10fd98a88d4b55810de676bbc97`.
-This verified foundation does not close the remaining 171 consumer/import/exchange acceptance or
-native advanced authoring in 173; numbered status remains in `mvp-plan.md`.
+### G03 consumers and exchange proof
+
+[Native G03/gap cases](../tests/geometry/surface_offset_geometry_tests.cpp) cover analytic planes,
+cylindrical quilts, directions/symmetry, inner holes, all Body modes, exact JSON reopening,
+immutable inputs, inward collapse and disconnected selections. The nonplanar `z=.02*x*y` case
+checks actual Solid normal sections and an independently integrated Gaussian-curvature tube-volume
+formula. Complete-edge gap cases distinguish maxima from nearby endpoints.
+
+[Consumer/import cases](../tests/geometry/surface_offset_consumer_tests.cpp) prove an associative
+skin-supported Sketch and Hole, a positive thickness edit, actual finishing, exact reopening and
+physical STEP readback (volume and material points). A placed imported cylinder exercises all four
+Body modes against analytic volumes, effective in-place predecessors, stable derived skin faces,
+supplier freshness and unchanged geometry caches after impossible edits. A separate imported
+multi-face cylindrical quilt has an opening crossing its native seam: both signed directions and
+symmetric construction retain the opening and match independently derived angular tube volumes
+and material-point witnesses. Supplier bytes remain unchanged.
+
+The nonlocal collision counterexample uses a near-mouth cubic with every local curvature radius
+larger than the offset. The small construction passes; the larger colliding skin/walls reject,
+proving that focal checks alone do not authorize success. Historical semantic source faces retain
+their authored frames; imported curved face roots derive from the exact owned catalog entry.
+
+Final full Geometry: **776 cases / 81,143 assertions**. Existing Qt Surface/edit: **4 / 74**
+offscreen. Relevant native Qt workflows: **2 / 255** at both **100% and 150%**, no skips; captures
+were inspected after CAD processes exited. This is the existing native workflow regression,
+not advanced authoring coverage, which remains 173. All five build targets passed; subsequent
+changes added Geometry tests only, with the GUI/app/exporter binary hashes verified unchanged.
+Frozen runtime: **1,178 files**, SHA256
+`8abc03217aefaf37be388530f916e37da977342921dc9a51e34dc0ddfa527c82`.
+Numbered acceptance stays in `mvp-plan.md`; detailed run chronology remains in Git/PR history.

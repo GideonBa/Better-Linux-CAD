@@ -719,6 +719,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/surface_trim_extend_pipeline_tests.cpp
       tests/geometry/measure_selection_tests.cpp
       tests/geometry/surface_offset_geometry_tests.cpp
+      tests/geometry/surface_offset_consumer_tests.cpp
       tests/geometry/surface_stitch_pipeline_tests.cpp
       tests/geometry/surface_close_shell_pipeline_tests.cpp
       tests/geometry/shell_feature_pipeline_tests.cpp
