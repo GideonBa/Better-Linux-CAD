@@ -804,25 +804,26 @@ inner profile wires remain 167; richer support/guide intent, G2 and Surface work
 ### Block 167 semantic edges and multi-wire Sweep — in progress
 
 Active draft: [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191), based on merged
-[PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190). Commits `0757969` / `f2120cf`
-contain 606 / 398 added lines. Every delivery commit must stay below the assigned 1,500-line cap.
+[PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190). Commits `0757969` / `f2120cf` / `9022d59`
+contain 606 / 398 / 487 added lines. Every delivery commit must stay below the assigned 1,500-line cap.
 
 | Slice | Contract and proof boundary |
 | --- | --- |
 | Core / necessary-only V11 | Verified: typed capabilities/reversal, imported Body ownership, legacy-preserving material-region interpretation and strict Part/Project subsets. [Core proofs](../tests/core/semantic_sweep_intent_tests.cpp), [format](file-format.md#semantic-path-edges-and-sweep-material-regions--part-v11). |
 | Semantic native edges | Verified: bounded native curves, canonical result direction before path reversal, exact circular phase and explicit normalized imported base scope. [Contract](part-path-curve-core-mvp6.md#semantic-native-curve-execution--167), [physical length/direction, real upstream split, reopen and source-byte rejection](../tests/geometry/semantic_sweep_intent_geometry_tests.cpp). Placed imported results use producer-anchored result witnesses; dedicated placed-path acceptance remains open. |
 | Material-region Sweep | Verified within the open-spine boundary. Exact native-wire containment rejects crossing/touching boundaries, exact inner pipes precede checked Body operations. [Contract](part-sweep-intent-mvp6.md#material-region-execution), [independent volumes/material sections for all four operations, multiple/rational holes, legacy filled replay and atomic rejection](../tests/geometry/material_region_sweep_tests.cpp). |
-| Closed spines / G01 | Pending: cyclic frame/guide/twist capability, independent hollow sections, seams, excessive size/self-intersection, ambiguous references, placed imports and mixed-source physical acceptance. Kernel validity alone is insufficient. |
+| Closed spines | Verified within the circular capability: [exact circular cyclic-frame contract](part-sweep-3d-geometry-mvp6.md#circular-closed-spine-capability--167), all three frames, integer roll, hollow/noncircular physical sections and seam drift. Conservative extent rejects spindle folds; near-circles, fractional roll and competing controls reject atomically. [Independent physical proofs](../tests/geometry/material_region_sweep_tests.cpp). |
+| G01 combined acceptance | Pending: ambiguous reference recovery, placed imports, reversed generated/imported sources with rational/spatial spans and a hollow profile, plus physical exchange/reopen. Native authoring completes in 173. |
 
 All five targets build. Full Core **768 / 34,565** remains valid for unchanged Core inputs.
-Current focused Geometry **71 / 12,410** and Qt **49 cases: 47 passed, two native-only skipped /
+Current focused Geometry **76 / 13,790** and Qt **49 cases: 47 passed, two native-only skipped /
 4,632 assertions** pass. This does not close the whole G01 gate or prove native authoring of the
 new selectors (173).
 
-Current runtime: **1,147 inputs**, SHA-256
-`a83a4a7a6c7c7d7e012fe4ceb14f62098be69a24482750604e5d9e58d2fb4e2e`.
+Current runtime: **1,149 inputs**, SHA-256
+`9efefd26041540d61b15cc06de409c4135d53dbdde9b7a0b2068dd83543740d6`.
 Native policy/Sweep/Loft regression passes **3 / 687** at both 100% and compact 150%, without skips; separate app startup shows a process-owned visible X11 window (timeout 124, probe exit 0).
-Proof logs: `/tmp/blcad-167-{geometry10-focused,qt10-focused,native100-10,native150-10}.log` and `/tmp/blcad-167-startup10-proof.log`.
+Proof logs: `/tmp/blcad-167-{geometry16-focused,qt16-focused,native100-16,native150-16}.log` and `/tmp/blcad-167-startup16-proof.log`.
 The assigned continuation remains through 174; preserve all 168–204 requirements.
 
 ## Later phases

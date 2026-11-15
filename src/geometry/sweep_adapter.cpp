@@ -1,4 +1,5 @@
 #include "blcad/geometry/sweep_adapter.hpp"
+#include "closed_sweep_validation.hpp"
 #include "derived_curve_internal.hpp"
 #include "native_twist_guide.hpp"
 
@@ -21,6 +22,7 @@
 #include <TColgp_Array1OfPnt.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopoDS.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Wire.hxx>
@@ -362,13 +364,16 @@ Result<GeometryShape> SweepAdapter::sweep_closed_profile(
         Error::validation("sweep", "feature id must not be empty"));
   if (!std::isfinite(twist_angle_deg))
     return Result<GeometryShape>::failure(sweep_error(feature_id, "Sweep twist must be finite"));
+  const double modeling_tolerance = modern_path_tolerance(path);
+  const bool closed =
+      modeling_tolerance > 0 && !path.empty() && same_point(path.front().start, path.back().end);
   auto profile_wire = make_wire(
       feature_id, profile, "sweep profile", true,
       [&](const ClosedProfileCurveSegment& segment) { return profile_edge(feature_id, segment); });
   if (profile_wire.has_error())
     return Result<GeometryShape>::failure(profile_wire.error());
   auto path_wire =
-      make_wire(feature_id, path, "sweep path", false, [&](const SweepPathSegment& segment) {
+      make_wire(feature_id, path, "sweep path", closed, [&](const SweepPathSegment& segment) {
         return path_edge(feature_id, segment, "path");
       });
   if (path_wire.has_error())
@@ -376,7 +381,30 @@ Result<GeometryShape> SweepAdapter::sweep_closed_profile(
   if (guide != nullptr && std::abs(twist_angle_deg) > kTolerance)
     return Result<GeometryShape>::failure(
         sweep_error(feature_id, "combined guide and twist are not supported"));
-  const double modeling_tolerance = modern_path_tolerance(path);
+  auto execution_path = path;
+  if (closed) {
+    auto supported = detail::validate_circular_closed_sweep(
+        feature_id, profile_wire.value(), path_wire.value(), orientation_rule, fixed_up_vector,
+        twist_angle_deg, guide != nullptr, modeling_tolerance);
+    if (!supported)
+      return Result<GeometryShape>::failure(supported.error());
+    profile_wire = Result<TopoDS_Wire>::success(supported.value().profile);
+    path_wire = Result<TopoDS_Wire>::success(supported.value().spine);
+    TopExp_Explorer edge(path_wire.value(), TopAbs_EDGE);
+    double first = 0, last = 0;
+    auto circle = BRep_Tool::Curve(TopoDS::Edge(edge.Current()), first, last);
+    auto native = std::make_shared<const DerivedCurve>(circle, true);
+    execution_path = {{SweepPathSegmentKind::DerivedNative,
+                       path.front().start,
+                       {},
+                       path.back().end,
+                       native,
+                       modeling_tolerance}};
+    if (std::abs(twist_angle_deg) > kTolerance)
+      return detail::sweep_circular_closed_twist(feature_id, profile, path_wire.value(),
+                                                 orientation_rule, fixed_up_vector, twist_angle_deg,
+                                                 modeling_tolerance);
+  }
   if (std::abs(twist_angle_deg) > kTolerance && modeling_tolerance == 0 &&
       std::any_of(path.begin(), path.end(), [](const auto& segment) {
         return segment.kind == SweepPathSegmentKind::DerivedEquation;
@@ -387,8 +415,8 @@ Result<GeometryShape> SweepAdapter::sweep_closed_profile(
   bool native_guide = false;
   if (guide == nullptr && std::abs(twist_angle_deg) > kTolerance) {
     if (modeling_tolerance > 0) {
-      auto checked = checked_twist_guide(feature_id, path, orientation_rule, fixed_up_vector,
-                                         twist_angle_deg, modeling_tolerance);
+      auto checked = checked_twist_guide(feature_id, execution_path, orientation_rule,
+                                         fixed_up_vector, twist_angle_deg, modeling_tolerance);
       if (!checked)
         return Result<GeometryShape>::failure(checked.error());
       generated = std::move(checked.value());
@@ -400,18 +428,19 @@ Result<GeometryShape> SweepAdapter::sweep_closed_profile(
   std::optional<TopoDS_Wire> guide_wire;
   if (guide != nullptr) {
     auto built =
-        make_wire(feature_id, *guide, "sweep guide", false, [&](const SweepPathSegment& segment) {
+        make_wire(feature_id, *guide, "sweep guide", closed, [&](const SweepPathSegment& segment) {
           return path_edge(feature_id, segment, "guide");
         });
     if (built.has_error())
       return Result<GeometryShape>::failure(built.error());
     guide_wire = built.value();
   }
-  auto shape = execute_sweep(feature_id, profile_wire.value(), path_wire.value(), path.front(),
-                             orientation_rule, fixed_up_vector, guide_wire, true,
-                             has_equation_curve(path) || has_equation_curve(profile) ||
-                                 (guide && has_equation_curve(*guide)),
-                             native_guide, modeling_tolerance);
+  auto shape =
+      execute_sweep(feature_id, profile_wire.value(), path_wire.value(), execution_path.front(),
+                    orientation_rule, fixed_up_vector, guide_wire, true,
+                    has_equation_curve(path) || has_equation_curve(profile) ||
+                        (guide && has_equation_curve(*guide)),
+                    native_guide, modeling_tolerance);
   if (shape.has_error())
     return Result<GeometryShape>::failure(shape.error());
   return Result<GeometryShape>::success(
@@ -429,6 +458,10 @@ SweepAdapter::sweep_open_profile(FeatureId feature_id, const std::vector<SweepPa
         Error::validation("sweep", "feature id must not be empty"));
   if (!std::isfinite(twist_angle_deg))
     return Result<GeometryShape>::failure(sweep_error(feature_id, "Sweep twist must be finite"));
+  if (modern_path_tolerance(path) > 0 && !path.empty() &&
+      same_point(path.front().start, path.back().end))
+    return Result<GeometryShape>::failure(sweep_error(
+        feature_id, "Closed-spine Surface Sweep requires a separately verified boundary contract"));
   auto profile_wire = make_wire(
       feature_id, profile, "surface profile", false,
       [&](const SweepPathSegment& segment) { return path_edge(feature_id, segment, "profile"); });

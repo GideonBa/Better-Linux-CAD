@@ -224,6 +224,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/semantic_edge_resolution.cpp
     src/geometry/semantic_path_segment.cpp
     src/geometry/sweep_material_region.cpp
+    src/geometry/closed_sweep_validation.cpp
     src/geometry/recompute_executor.cpp
     src/geometry/circular_pattern_adapter.cpp
     src/geometry/linear_pattern_adapter.cpp
