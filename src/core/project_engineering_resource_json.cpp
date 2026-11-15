@@ -20,8 +20,8 @@ Result<nlohmann::json> resource_part_to_project_json(const PartDocument& part,
     auto value = nlohmann::json::parse(serialized.value());
     if (value.at("version") == 7 || value.at("version") == 8 || value.at("version") == 9 ||
         value.at("version") == 10 || value.at("version") == 11 || value.at("version") == 12 ||
-        !part.engineering_resources().entries().empty() || !part.hole_features().empty() ||
-        !part.thread_features().empty()) {
+        value.at("version") == 13 || !part.engineering_resources().entries().empty() ||
+        !part.hole_features().empty() || !part.thread_features().empty()) {
       auto refs = nlohmann::json::array();
       for (const auto& entry : part.engineering_resources().entries()) {
         const auto& key = engineering_resource_key(entry);
@@ -45,7 +45,7 @@ Result<PartDocument> resource_part_from_project_json(const nlohmann::json& value
         (value.at("version") != 3 && value.at("version") != 4 && value.at("version") != 5 &&
          value.at("version") != 6 && value.at("version") != 7 && value.at("version") != 8 &&
          value.at("version") != 9 && value.at("version") != 10 && value.at("version") != 11 &&
-         value.at("version") != 12))
+         value.at("version") != 12 && value.at("version") != 13))
       return deserialize_part_document_from_json(value.dump());
     if (value.contains("engineering_resources") || !value.contains("engineering_resource_refs") ||
         !value.at("engineering_resource_refs").is_array())

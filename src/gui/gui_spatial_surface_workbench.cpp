@@ -80,7 +80,7 @@ Result<std::size_t> GuiSpatialSurfaceWorkbench::apply_loft(GuiDocumentSession& s
 }
 Result<GuiSpatialFeaturePreview> GuiSpatialSurfaceWorkbench::preview_surface(const GuiDocumentSession& session, SurfaceFeature feature) const {
   const auto id = surface_feature_id(feature); const auto kind = surface_feature_kind(feature);
-  const BodyKind output = kind == SurfaceFeatureKind::ClosedShellToSolid ? BodyKind::Solid : BodyKind::Surface;
+  const BodyKind output = surface_feature_result_kind(feature);
   return preview(session, std::move(feature), &PartDocument::add_surface_feature, id,
                  std::string(to_string(kind)) + " with ordered surface inputs", output);
 }

@@ -428,9 +428,7 @@ store_verified_feature_result(const PartDocument& document, const Feature& featu
   const FeatureId& feature_id = surface_feature_id(feature);
   const BodyId& result_body_id = surface_feature_result_body(feature);
   const Body* result_body = document.find_body(result_body_id);
-  const BodyKind expected_kind =
-      surface_feature_kind(feature) == SurfaceFeatureKind::ClosedShellToSolid ? BodyKind::Solid
-                                                                              : BodyKind::Surface;
+  const BodyKind expected_kind = surface_feature_result_kind(feature);
   if (result_body == nullptr || result_body->kind() != expected_kind)
     return Result<std::size_t>::failure(validation_error(
         result_body_id.value(), expected_kind == BodyKind::Solid
@@ -2539,6 +2537,10 @@ resolve_surface_trimming(const PartDocument& document, const TrimmingReference& 
                                                            const ShapeCache& cache,
                                                            const SurfaceAdapter& adapter,
                                                            const FeatureId& consumer) {
+  if (reference.source_kind() == SurfaceReferenceSourceKind::SelectedFaces)
+    return Result<GeometryShape>::failure(geometry_error(
+        consumer.value(),
+        "Selected Surface faces require verified native execution (Blocks 171–172)"));
   if (reference.source_kind() == SurfaceReferenceSourceKind::Body) {
     const BodyId& body = std::get<BodyId>(reference.source());
     const GeometryShape* shape = cache.find_body_shape(body);
@@ -3695,6 +3697,10 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "surface feature must exist in part document"));
   const SurfaceFeatureKind kind = surface_feature_kind(*feature);
+  if (surface_feature_requires_v13(*feature))
+    return Result<std::size_t>::failure(geometry_error(
+        feature_id.value(),
+        "Advanced Surface construction requires verified native execution (Blocks 171–172)"));
 
   ShapeCache working_cache = shape_cache;
   Result<GeometryShape> result = Result<GeometryShape>::failure(

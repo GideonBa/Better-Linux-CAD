@@ -82,11 +82,11 @@ execution are canonical in `docs/part-boundary-fill-surface-geometry-mvp6.md`,
 patch-network intent remain deferred beyond the first Part Construction MVP.
 
 
-## OffsetSurface and Thicken extension plan
+## OffsetSurface and Thicken intent — 170
 
-The 170–172 delivery extends the existing Surface family while retaining the six historical record
-shapes and their planar replay. Numbered status stays in `docs/mvp-plan.md`; this section is the
-implementation plan, not accepted execution evidence.
+The extension retains the six historical record shapes and their planar replay. Core intent,
+strict persistence and atomic updates are implemented; native construction is the separate 171–172
+gate. Numbered status stays in `docs/mvp-plan.md`.
 
 - Add separate OffsetSurface and Thicken kinds. Offset produces no material and always creates a
   Surface Body. Thicken closes offset skins and their free boundaries into a Solid, then reuses
@@ -117,3 +117,33 @@ implementation plan, not accepted execution evidence.
 Public selection, intent and query types should be completed together before the full rebuild.
 Geometry capability limits and approximation/error evidence must be documented before native
 advanced controls are enabled in 173. All deferred arbitrary-network/healing scope above is retained.
+
+### Core policy and evidence
+
+`SurfaceOffsetFeature` has distinct OffsetSurface/Thicken kinds and one typed parameter policy.
+Distance is **1e-6..1e6 mm**. Tolerance is **1e-9..1 mm**, at most **1% of distance**.
+Verified approximation requires an explicit maximum deviation between tolerance and 1% of distance;
+exact analytic intent rejects an inactive deviation budget. These limits apply on insertion,
+feature replacement, parameter changes and dependent formula reevaluation. Failed changes restore
+the complete Part, including graph, history, values and invalidation state.
+
+Selected-face references own a Body and **1..64** unique `SurfaceSourceFace` references. Result-face
+owners must agree; imported faces retain the exact immutable base Body/catalog ownership. Dependency
+inputs include the owner and every producer, not merely the first face. Body/quilt and historical
+semantic-planar references keep their original spelling. Offset always creates a new Surface Body;
+Thicken uses the existing New/Join/Cut/Intersect context and restores the predecessor producer when
+an unreferenced in-place feature is removed. Existing update commands preserve result identity.
+
+Advanced Trim/Extend options share the necessary V13 envelope: explicit keep/remove and projection
+policy for Trim; natural/tangent mode, tolerance and tangent-deviation budget for Extend. Their
+absence retains historical replay. Geometry rejects all new construction until verified execution
+is supplied; the Core contract does not claim kernel support or native authoring.
+
+Proof: [Core cases](../tests/core/surface_offset_intent_tests.cpp), tags
+`[surface-offset-intent],[surface-feature],[loft-constraints]`: **16 cases / 494 assertions**.
+Full Core: **782 / 34,928**. Existing Surface Geometry: **16 / 850**, including the separate
+`[surface-to-solid]` filter. Existing Qt Surface/edit regression: **4 / 74** offscreen.
+All five build targets completed after the public variant/layout change. Runtime manifest:
+**1,167 files**, SHA256 `e59f8fd7dca53347bf2b6a43bbbfab106d7001b29366e63bd40282d4913ffae2`.
+No native advanced-authoring claim is made here; that remains the 173 gate. Detailed run chronology
+stays in Git/PR history.

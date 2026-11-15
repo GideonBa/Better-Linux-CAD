@@ -1,6 +1,7 @@
 #include "blcad/core/surface_feature.hpp"
 
 #include <algorithm>
+#include <set>
 #include <type_traits>
 #include <unordered_set>
 #include <utility>
@@ -33,7 +34,11 @@ std::string_view to_string(BoundaryCurveSourceKind kind) noexcept {
   return kind == BoundaryCurveSourceKind::PathCurve ? "path_curve" : "semantic_edge";
 }
 std::string_view to_string(SurfaceReferenceSourceKind kind) noexcept {
-  return kind == SurfaceReferenceSourceKind::Body ? "body" : "semantic_face";
+  if (kind == SurfaceReferenceSourceKind::Body)
+    return "body";
+  if (kind == SurfaceReferenceSourceKind::SelectedFaces)
+    return "selected_faces";
+  return "semantic_face";
 }
 std::string_view to_string(TrimmingReferenceSourceKind kind) noexcept {
   return kind == TrimmingReferenceSourceKind::BoundaryCurve ? "boundary_curve" : "profile_region";
@@ -52,6 +57,10 @@ std::string_view to_string(SurfaceFeatureKind kind) noexcept {
     return "surface_stitch";
   case SurfaceFeatureKind::ClosedShellToSolid:
     return "closed_shell_to_solid";
+  case SurfaceFeatureKind::OffsetSurface:
+    return "offset_surface";
+  case SurfaceFeatureKind::Thicken:
+    return "thicken";
   }
   return "boundary_surface";
 }
@@ -95,25 +104,87 @@ Result<SurfaceReference> SurfaceReference::create_body(BodyId body) {
 Result<SurfaceReference> SurfaceReference::create_semantic_face(SemanticFaceReference face) {
   return Result<SurfaceReference>::success(SurfaceReference(std::move(face)));
 }
-SurfaceReference::SurfaceReference(std::variant<BodyId, SemanticFaceReference> source)
-    : source_(std::move(source)) {}
-SurfaceReferenceSourceKind SurfaceReference::source_kind() const noexcept {
-  return std::holds_alternative<BodyId>(source_) ? SurfaceReferenceSourceKind::Body
-                                                 : SurfaceReferenceSourceKind::SemanticFace;
+namespace {
+std::string framed(const std::string& value) {
+  return std::to_string(value.size()) + ":" + value;
 }
-const std::variant<BodyId, SemanticFaceReference>& SurfaceReference::source() const noexcept {
+std::string face_key(const FaceReference& face) {
+  return std::visit(
+      [](const auto& source) {
+        using T = std::decay_t<decltype(source)>;
+        if constexpr (std::is_same_v<T, ResultFaceReference>)
+          return "result/" + source.identity();
+        else if constexpr (std::is_same_v<T, ImportedTopologyReference>)
+          return "imported/" + framed(source.catalog().value()) + framed(source.entry().value());
+        else if constexpr (std::is_same_v<T, SemanticFaceReference>)
+          return "plane/" + framed(source.source_feature().value()) +
+                 framed(std::string(to_string(source.face())));
+        else
+          return "cylinder/" + framed(source.source_feature().value()) +
+                 framed(source.source_profile().value());
+      },
+      face.source());
+}
+} // namespace
+Result<SurfaceReference> SurfaceReference::create_faces(BodyId owner,
+                                                        std::vector<FaceReference> faces) {
+  if (owner.empty() || faces.empty() || faces.size() > 64)
+    return invalid<SurfaceReference>(
+        owner.value(), "Surface face selection requires an owner and one to sixty-four faces");
+  std::set<std::string> keys;
+  for (const auto& face : faces) {
+    if (face.role() != PartFeatureInputRole::SurfaceSourceFace ||
+        !keys.insert(face_key(face)).second)
+      return invalid<SurfaceReference>(owner.value(),
+                                       "Surface inputs require unique typed source faces");
+    if (const auto* result = std::get_if<ResultFaceReference>(&face.source());
+        result && result->body() != owner)
+      return invalid<SurfaceReference>(
+          owner.value(), "Selected result face must belong to its explicit Surface input owner");
+  }
+  return Result<SurfaceReference>::success(
+      SurfaceReference(SurfaceFaceSelection{std::move(owner), std::move(faces)}));
+}
+SurfaceReference::SurfaceReference(SurfaceReferenceSource source) : source_(std::move(source)) {}
+SurfaceReferenceSourceKind SurfaceReference::source_kind() const noexcept {
+  if (std::holds_alternative<BodyId>(source_))
+    return SurfaceReferenceSourceKind::Body;
+  return std::holds_alternative<SemanticFaceReference>(source_)
+             ? SurfaceReferenceSourceKind::SemanticFace
+             : SurfaceReferenceSourceKind::SelectedFaces;
+}
+const SurfaceReferenceSource& SurfaceReference::source() const noexcept {
   return source_;
 }
 std::string SurfaceReference::source_node_id() const {
-  return source_kind() == SurfaceReferenceSourceKind::Body
-             ? "body:" + std::get<BodyId>(source_).value()
-             : std::get<SemanticFaceReference>(source_).source_feature().value();
+  if (const auto* body = std::get_if<BodyId>(&source_))
+    return "body:" + body->value();
+  if (const auto* face = std::get_if<SemanticFaceReference>(&source_))
+    return face->source_feature().value();
+  return "body:" + std::get<SurfaceFaceSelection>(source_).body.value();
+}
+std::vector<std::string> SurfaceReference::source_nodes() const {
+  std::vector<std::string> nodes{source_node_id()};
+  if (const auto* selected = std::get_if<SurfaceFaceSelection>(&source_))
+    for (const auto& face : selected->faces)
+      nodes.push_back(face.source_node_id());
+  std::sort(nodes.begin(), nodes.end());
+  nodes.erase(std::unique(nodes.begin(), nodes.end()), nodes.end());
+  return nodes;
 }
 std::string SurfaceReference::stable_key() const {
-  return source_kind() == SurfaceReferenceSourceKind::Body
-             ? "body:" + std::get<BodyId>(source_).value()
-             : "face:" + std::get<SemanticFaceReference>(source_).source_feature().value() + ":" +
-                   std::string(to_string(std::get<SemanticFaceReference>(source_).face()));
+  if (const auto* body = std::get_if<BodyId>(&source_))
+    return "body:" + body->value();
+  if (const auto* face = std::get_if<SemanticFaceReference>(&source_))
+    return "face:" + face->source_feature().value() + ":" + std::string(to_string(face->face()));
+  const auto& selected = std::get<SurfaceFaceSelection>(source_);
+  std::set<std::string> keys;
+  for (const auto& face : selected.faces)
+    keys.insert(face_key(face));
+  std::string key = "faces/" + framed(selected.body.value());
+  for (const auto& value : keys)
+    key += framed(value);
+  return key;
 }
 
 Result<TrimmingReference>
@@ -317,6 +388,8 @@ SurfaceFeatureKind surface_feature_kind(const SurfaceFeature& feature) noexcept 
           return SurfaceFeatureKind::ExtendSurface;
         if constexpr (std::is_same_v<T, SurfaceStitchFeature>)
           return SurfaceFeatureKind::SurfaceStitch;
+        if constexpr (std::is_same_v<T, SurfaceOffsetFeature>)
+          return value.kind();
         return SurfaceFeatureKind::ClosedShellToSolid;
       },
       feature);
@@ -334,16 +407,33 @@ std::vector<std::string> surface_feature_input_nodes(const SurfaceFeature& featu
           for (const auto& boundary : value.boundaries())
             nodes.push_back(boundary.source_node_id());
         else if constexpr (std::is_same_v<T, TrimSurfaceFeature>) {
-          nodes = {value.target().source_node_id(), value.trimming().source_node_id()};
+          nodes = value.target().source_nodes();
+          nodes.push_back(value.trimming().source_node_id());
+          if (value.options())
+            nodes.push_back(value.options()->tolerance.value());
         } else if constexpr (std::is_same_v<T, ExtendSurfaceFeature>) {
-          nodes = {value.target().source_node_id(), value.boundary().source_node_id(),
-                   value.distance_parameter().value()};
+          nodes = value.target().source_nodes();
+          nodes.push_back(value.boundary().source_node_id());
+          nodes.push_back(value.distance_parameter().value());
+          if (value.options()) {
+            nodes.push_back(value.options()->tolerance.value());
+            if (value.options()->maximum_deviation)
+              nodes.push_back(value.options()->maximum_deviation->value());
+          }
         } else if constexpr (std::is_same_v<T, SurfaceStitchFeature>) {
-          for (const auto& surface : value.surfaces())
-            nodes.push_back(surface.source_node_id());
+          for (const auto& surface : value.surfaces()) {
+            const auto sources = surface.source_nodes();
+            nodes.insert(nodes.end(), sources.begin(), sources.end());
+          }
           nodes.push_back(value.tolerance_parameter().value());
+        } else if constexpr (std::is_same_v<T, SurfaceOffsetFeature>) {
+          nodes = value.target().source_nodes();
+          nodes.push_back(value.parameters().distance.value());
+          nodes.push_back(value.parameters().tolerance.value());
+          if (value.parameters().maximum_deviation)
+            nodes.push_back(value.parameters().maximum_deviation->value());
         } else
-          nodes.push_back(value.shell().source_node_id());
+          nodes = value.shell().source_nodes();
         return nodes;
       },
       feature);

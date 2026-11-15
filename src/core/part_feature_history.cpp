@@ -23,8 +23,10 @@ bool creates_body_identity(const FeatureBodyResultContext& context) {
   return !context.target_body() || context.effective_produced_body() != *context.target_body();
 }
 template <typename Record> bool creates_output(const Record& record) {
-  if constexpr (std::is_same_v<Record, ImportedBodyFeature> ||
-                std::is_same_v<Record, SurfaceFeature>)
+  if constexpr (std::is_same_v<Record, SurfaceFeature>) {
+    const auto* context = surface_feature_body_context(record);
+    return context ? creates_body_identity(*context) : true;
+  } else if constexpr (std::is_same_v<Record, ImportedBodyFeature>)
     return true;
   else if constexpr (std::is_same_v<Record, Feature>)
     return record.body_result_context() ? creates_body_identity(*record.body_result_context())
@@ -75,10 +77,36 @@ template <typename Record> ExecutionContract execution_contract(const Record& re
       contract.created.push_back(output.body);
     }
   } else if constexpr (std::is_same_v<Record, SurfaceFeature>) {
+    const auto* context = surface_feature_body_context(record);
+    const auto result_body = surface_feature_result_body(record);
+    const bool in_place = context && context->target_body() == std::optional(result_body);
     for (auto node : surface_feature_input_nodes(record))
-      add_input(contract, std::move(node));
-    contract.outputs.push_back(surface_feature_result_body(record));
-    contract.created = contract.outputs;
+      if (!in_place || node != "body:" + result_body.value())
+        add_input(contract, std::move(node));
+    if (context)
+      add_context(contract, *context);
+    else {
+      contract.outputs.push_back(result_body);
+      contract.created = contract.outputs;
+    }
+    const auto add_surface = [&](const SurfaceReference& source) {
+      if (const auto* body = std::get_if<BodyId>(&source.source()))
+        contract.body_inputs.push_back(*body);
+      if (const auto* selection = std::get_if<SurfaceFaceSelection>(&source.source()))
+        contract.body_inputs.push_back(selection->body);
+    };
+    std::visit(
+        [&](const auto& value) {
+          using T = std::decay_t<decltype(value)>;
+          if constexpr (requires { value.target(); })
+            add_surface(value.target());
+          else if constexpr (std::is_same_v<T, SurfaceStitchFeature>)
+            for (const auto& source : value.surfaces())
+              add_surface(source);
+          else if constexpr (std::is_same_v<T, ClosedShellToSolidFeature>)
+            add_surface(value.shell());
+        },
+        record);
   } else if constexpr (std::is_same_v<Record, BodyTransform>) {
     contract.body_inputs.push_back(record.body());
     contract.outputs.push_back(record.body());

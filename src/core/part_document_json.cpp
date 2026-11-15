@@ -42,6 +42,7 @@ constexpr int k_spatial_constraint_version = 9;
 constexpr int k_curve_policy_version = 10;
 constexpr int k_semantic_sweep_version = 11;
 constexpr int k_loft_constraint_version = 12;
+constexpr int k_surface_construction_version = 13;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -3440,7 +3441,13 @@ boundary_curve_reference_from_json(const json& value) {
              {"body", nullptr}, {"semantic_face", nullptr}};
   if (reference.source_kind() == SurfaceReferenceSourceKind::Body)
     value["body"] = std::get<BodyId>(reference.source()).value();
-  else {
+  else if (reference.source_kind() == SurfaceReferenceSourceKind::SelectedFaces) {
+    const auto& selected = std::get<SurfaceFaceSelection>(reference.source());
+    value["body"] = selected.body.value();
+    value["faces"] = json::array();
+    for (const auto& face : selected.faces)
+      value["faces"].push_back(face_reference_to_json(face));
+  } else {
     const auto& face = std::get<SemanticFaceReference>(reference.source());
     value["semantic_face"] = json{{"source_feature", face.source_feature().value()},
                                   {"face", std::string(to_string(face.face()))}};
@@ -3449,6 +3456,21 @@ boundary_curve_reference_from_json(const json& value) {
 }
 
 [[nodiscard]] Result<SurfaceReference> surface_reference_from_json(const json& value) {
+  if (value.is_object() && value.value("source_kind", std::string{}) == "selected_faces") {
+    if (!has_exact_fields(value, {"source_kind", "body", "semantic_face", "faces"}) ||
+        !value.at("body").is_string() || !value.at("semantic_face").is_null() ||
+        !value.at("faces").is_array())
+      return Result<SurfaceReference>::failure(json_error("Malformed selected Surface faces"));
+    std::vector<FaceReference> faces;
+    for (const auto& item : value.at("faces")) {
+      auto face = face_reference_from_json(item, PartFeatureInputRole::SurfaceSourceFace);
+      if (!face)
+        return Result<SurfaceReference>::failure(face.error());
+      faces.push_back(std::move(face.value()));
+    }
+    return SurfaceReference::create_faces(BodyId(value.at("body").get<std::string>()),
+                                          std::move(faces));
+  }
   if (!has_exact_fields(value, {"source_kind", "body", "semantic_face"}) ||
       !value.at("source_kind").is_string() ||
       (!value.at("body").is_null() && !value.at("body").is_string()) ||
@@ -3511,7 +3533,99 @@ boundary_curve_reference_from_json(const json& value) {
       json_error("surface trimming reference has inconsistent source fields"));
 }
 
+[[nodiscard]] json surface_offset_to_json(const SurfaceOffsetFeature& feature) {
+  const auto& p = feature.parameters();
+  json value{{"id", feature.id().value()},
+             {"name", feature.name()},
+             {"type", std::string(to_string(feature.kind()))},
+             {"target", surface_reference_to_json(feature.target())},
+             {"parameters",
+              {{"distance", p.distance.value()},
+               {"tolerance", p.tolerance.value()},
+               {"side", p.side == SurfaceOffsetSide::AlongNormal      ? "normal"
+                        : p.side == SurfaceOffsetSide::OppositeNormal ? "opposite"
+                                                                      : "symmetric"},
+               {"approximation", p.approximation == SurfaceOffsetApproximation::ExactAnalytic
+                                     ? "exact_analytic"
+                                     : "verified_approximation"},
+               {"maximum_deviation",
+                p.maximum_deviation ? json(p.maximum_deviation->value()) : json(nullptr)}}}};
+  value.update(pattern_body_context_to_json(feature.body_result_context()));
+  return value;
+}
+[[nodiscard]] Result<SurfaceFeature> surface_offset_from_json(const json& value) {
+  const auto fail = []() {
+    return Result<SurfaceFeature>::failure(json_error("Malformed OffsetSurface/Thicken intent"));
+  };
+  if (value.size() != 6U + value.contains("target_body") + value.contains("produced_body") ||
+      !value.at("id").is_string() || !value.at("name").is_string() ||
+      !value.at("type").is_string() || !value.at("operation_mode").is_string())
+    return fail();
+  const auto& p = value.at("parameters");
+  if (!has_exact_fields(p,
+                        {"distance", "tolerance", "side", "approximation", "maximum_deviation"}) ||
+      !p.at("distance").is_string() || !p.at("tolerance").is_string() ||
+      !p.at("side").is_string() || !p.at("approximation").is_string() ||
+      (!p.at("maximum_deviation").is_null() && !p.at("maximum_deviation").is_string()))
+    return fail();
+  const auto side = p.at("side").get<std::string>(),
+             approx = p.at("approximation").get<std::string>();
+  if ((side != "normal" && side != "opposite" && side != "symmetric") ||
+      (approx != "exact_analytic" && approx != "verified_approximation"))
+    return fail();
+  SurfaceOffsetParameters parameters{ParameterId(p.at("distance").get<std::string>()),
+                                     ParameterId(p.at("tolerance").get<std::string>()),
+                                     side == "normal"     ? SurfaceOffsetSide::AlongNormal
+                                     : side == "opposite" ? SurfaceOffsetSide::OppositeNormal
+                                                          : SurfaceOffsetSide::Symmetric,
+                                     approx == "exact_analytic"
+                                         ? SurfaceOffsetApproximation::ExactAnalytic
+                                         : SurfaceOffsetApproximation::VerifiedApproximation,
+                                     {}};
+  if (!p.at("maximum_deviation").is_null())
+    parameters.maximum_deviation = ParameterId(p.at("maximum_deviation").get<std::string>());
+  auto target = surface_reference_from_json(value.at("target"));
+  if (!target)
+    return Result<SurfaceFeature>::failure(target.error());
+  auto context = feature_body_result_context_from_json(value);
+  if (!context)
+    return Result<SurfaceFeature>::failure(context.error());
+  if (!context.value())
+    return fail();
+  const FeatureId id(value.at("id").get<std::string>());
+  const auto name = value.at("name").get<std::string>();
+  auto feature = value.at("type") == "offset_surface"
+                     ? SurfaceOffsetFeature::create_offset(id, name, std::move(target.value()),
+                                                           parameters, *context.value())
+                     : SurfaceOffsetFeature::create_thicken(id, name, std::move(target.value()),
+                                                            parameters, *context.value());
+  if (!feature)
+    return Result<SurfaceFeature>::failure(feature.error());
+  return Result<SurfaceFeature>::success(std::move(feature.value()));
+}
+[[nodiscard]] bool surface_record_uses_v13(const json& value) {
+  if (!value.is_object())
+    return false;
+  const auto type = value.value("type", std::string{});
+  if (type == "offset_surface" || type == "thicken" || value.contains("options"))
+    return true;
+  const auto selected = [](const json& ref) {
+    return ref.is_object() &&
+           (ref.contains("faces") || ref.value("source_kind", std::string{}) == "selected_faces");
+  };
+  for (const auto* key : {"target", "shell"})
+    if (value.contains(key) && selected(value.at(key)))
+      return true;
+  if (value.contains("surfaces") && value.at("surfaces").is_array())
+    for (const auto& ref : value.at("surfaces"))
+      if (selected(ref))
+        return true;
+  return false;
+}
+
 [[nodiscard]] json surface_feature_to_json(const SurfaceFeature& feature) {
+  if (const auto* offset = std::get_if<SurfaceOffsetFeature>(&feature))
+    return surface_offset_to_json(*offset);
   json value{{"id", surface_feature_id(feature).value()},
              {"name", surface_feature_name(feature)},
              {"type", std::string(to_string(surface_feature_kind(feature)))},
@@ -3536,15 +3650,45 @@ boundary_curve_reference_from_json(const json& value) {
       for (const auto& surface : typed.surfaces())
         value["surfaces"].push_back(surface_reference_to_json(surface));
       value["tolerance_parameter"] = typed.tolerance_parameter().value();
-    } else value["shell"] = surface_reference_to_json(typed.shell());
+    } else if constexpr (std::is_same_v<T, ClosedShellToSolidFeature>)
+      value["shell"] = surface_reference_to_json(typed.shell());
+    if constexpr (std::is_same_v<T, TrimSurfaceFeature>) {
+      if (typed.options()) {
+        const auto& options = *typed.options();
+        value["options"] = {
+            {"side", options.side == SurfaceTrimSide::KeepInside ? "keep" : "remove"},
+            {"projection", options.projection == SurfaceTrimProjection::OnSurface
+                               ? "on_surface"
+                               : "along_direction"},
+            {"direction", options.direction ? vector3_to_json(*options.direction) : json(nullptr)},
+            {"tolerance", options.tolerance.value()}};
+      }
+    } else if constexpr (std::is_same_v<T, ExtendSurfaceFeature>) {
+      if (typed.options()) {
+        const auto& options = *typed.options();
+        value["options"] = {
+            {"mode", options.mode == SurfaceExtendMode::Natural ? "natural" : "tangent"},
+            {"tolerance", options.tolerance.value()},
+            {"maximum_deviation",
+             options.maximum_deviation ? json(options.maximum_deviation->value()) : json(nullptr)}};
+      }
+    }
   }, feature);
   return value;
 }
 
 [[nodiscard]] Result<SurfaceFeature> surface_feature_from_json(const json& value) {
-  if (!has_exact_fields(value, {"id", "name", "type", "boundaries", "target", "trimming",
-                                "boundary", "distance_parameter", "surfaces",
-                                "tolerance_parameter", "shell", "result_body"}) ||
+  if (value.is_object() && (value.value("type", std::string{}) == "offset_surface" ||
+                            value.value("type", std::string{}) == "thicken"))
+    return surface_offset_from_json(value);
+  auto legacy = value;
+  legacy.erase("options");
+  if (value.contains("options") && (value.value("type", std::string{}) != "trim_surface" &&
+                                    value.value("type", std::string{}) != "extend_surface"))
+    return Result<SurfaceFeature>::failure(json_error("Surface options require Trim or Extend"));
+  if (!has_exact_fields(legacy, {"id", "name", "type", "boundaries", "target", "trimming",
+                                 "boundary", "distance_parameter", "surfaces",
+                                 "tolerance_parameter", "shell", "result_body"}) ||
       !value.at("id").is_string() || !value.at("name").is_string() ||
       !value.at("type").is_string() || !value.at("boundaries").is_array() ||
       !value.at("surfaces").is_array() || !value.at("result_body").is_string())
@@ -3613,6 +3757,31 @@ boundary_curve_reference_from_json(const json& value) {
     auto parsed = TrimSurfaceFeature::create(id, name, std::move(target.value()),
                                              std::move(trimming.value()), result);
     if (parsed.has_error()) return Result<SurfaceFeature>::failure(parsed.error());
+    if (value.contains("options")) {
+      const auto& o = value.at("options");
+      if (!has_exact_fields(o, {"side", "projection", "direction", "tolerance"}) ||
+          !o.at("side").is_string() || !o.at("projection").is_string() ||
+          !o.at("tolerance").is_string() ||
+          (!o.at("direction").is_null() && !has_exact_fields(o.at("direction"), {"x", "y", "z"})))
+        return Result<SurfaceFeature>::failure(
+            json_error("Malformed advanced Surface Trim options"));
+      const auto side = o.at("side").get<std::string>(),
+                 projection = o.at("projection").get<std::string>();
+      if ((side != "keep" && side != "remove") ||
+          (projection != "on_surface" && projection != "along_direction"))
+        return Result<SurfaceFeature>::failure(json_error("Unknown Surface Trim side/projection"));
+      SurfaceTrimOptions options{side == "keep" ? SurfaceTrimSide::KeepInside
+                                                : SurfaceTrimSide::RemoveInside,
+                                 projection == "on_surface" ? SurfaceTrimProjection::OnSurface
+                                                            : SurfaceTrimProjection::AlongDirection,
+                                 {},
+                                 ParameterId(o.at("tolerance").get<std::string>())};
+      if (!o.at("direction").is_null())
+        options.direction = vector3_from_json(o.at("direction"));
+      parsed = parsed.value().with_options(options);
+      if (!parsed)
+        return Result<SurfaceFeature>::failure(parsed.error());
+    }
     return Result<SurfaceFeature>::success(std::move(parsed.value()));
   }
   if (type == "extend_surface" && value.at("target").is_object() &&
@@ -3625,6 +3794,26 @@ boundary_curve_reference_from_json(const json& value) {
         id, name, std::move(target.value()), std::move(boundary.value()),
         ParameterId(value.at("distance_parameter").get<std::string>()), result);
     if (parsed.has_error()) return Result<SurfaceFeature>::failure(parsed.error());
+    if (value.contains("options")) {
+      const auto& o = value.at("options");
+      if (!has_exact_fields(o, {"mode", "tolerance", "maximum_deviation"}) ||
+          !o.at("mode").is_string() || !o.at("tolerance").is_string() ||
+          (!o.at("maximum_deviation").is_null() && !o.at("maximum_deviation").is_string()))
+        return Result<SurfaceFeature>::failure(
+            json_error("Malformed advanced Surface Extend options"));
+      const auto mode = o.at("mode").get<std::string>();
+      if (mode != "natural" && mode != "tangent")
+        return Result<SurfaceFeature>::failure(json_error("Unknown Surface extension mode"));
+      SurfaceExtendOptions options{mode == "natural" ? SurfaceExtendMode::Natural
+                                                     : SurfaceExtendMode::Tangent,
+                                   ParameterId(o.at("tolerance").get<std::string>()),
+                                   {}};
+      if (!o.at("maximum_deviation").is_null())
+        options.maximum_deviation = ParameterId(o.at("maximum_deviation").get<std::string>());
+      parsed = parsed.value().with_options(options);
+      if (!parsed)
+        return Result<SurfaceFeature>::failure(parsed.error());
+    }
     return Result<SurfaceFeature>::success(std::move(parsed.value()));
   }
   if (type == "surface_stitch" && value.at("tolerance_parameter").is_string()) {
@@ -4924,6 +5113,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   json root;
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
+  const bool surface_construction =
+      std::any_of(document.surface_features().begin(), document.surface_features().end(),
+                  surface_feature_requires_v13);
   const bool loft_constraints =
       std::any_of(document.loft_features().begin(), document.loft_features().end(),
                   [](const auto& feature) { return feature.constraints().has_value(); });
@@ -4958,8 +5150,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       std::any_of(document.circular_pattern_features().begin(),
                   document.circular_pattern_features().end(),
                   [](const auto& f) { return f.placements().has_value(); });
-  if (loft_constraints || semantic_sweep || curve_policy || spatial || equations ||
-      extended_patterns || !document.engineering_resources().entries().empty() ||
+  if (surface_construction || loft_constraints || semantic_sweep || curve_policy || spatial ||
+      equations || extended_patterns || !document.engineering_resources().entries().empty() ||
       !document.hole_features().empty() || !document.thread_features().empty()) {
     const bool manufacturing = std::any_of(
         document.hole_features().begin(), document.hole_features().end(), [](const auto& hole) {
@@ -4969,7 +5161,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
         !document.thread_features().empty() ||
         std::any_of(document.hole_features().begin(), document.hole_features().end(),
                     [](const auto& hole) { return hole.thread().has_value(); });
-    root["version"] = loft_constraints                   ? k_loft_constraint_version
+    root["version"] = surface_construction               ? k_surface_construction_version
+                      : loft_constraints                 ? k_loft_constraint_version
                       : semantic_sweep                   ? k_semantic_sweep_version
                       : curve_policy                     ? k_curve_policy_version
                       : spatial                          ? k_spatial_constraint_version
@@ -5373,8 +5566,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     latest_ancestor_position[node] = latest;
   }
-  if (loft_constraints || semantic_sweep || curve_policy || spatial || equations ||
-      extended_patterns || interleaved || !document.result_face_workplanes().empty() ||
+  if (surface_construction || loft_constraints || semantic_sweep || curve_policy || spatial ||
+      equations || extended_patterns || interleaved || !document.result_face_workplanes().empty() ||
       !document.hole_features().empty() || !document.thread_features().empty() ||
       document.authored_history_intent())
     root["feature_order"] = std::move(feature_order);
@@ -5414,15 +5607,24 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
          root.at("version") != k_spatial_constraint_version &&
          root.at("version") != k_curve_policy_version &&
          root.at("version") != k_semantic_sweep_version &&
-         root.at("version") != k_loft_constraint_version))
+         root.at("version") != k_loft_constraint_version &&
+         root.at("version") != k_surface_construction_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
     const auto version = root.at("version").get<int>();
-    const bool loft_envelope = version == k_loft_constraint_version;
+    const bool surface_envelope = version == k_surface_construction_version;
+    bool surface_intent = false;
+    if (root.contains("surface_features") && root.at("surface_features").is_array())
+      for (const auto& feature : root.at("surface_features"))
+        surface_intent |= surface_record_uses_v13(feature);
+    if (surface_envelope != surface_intent)
+      return Result<PartDocument>::failure(
+          json_error("Advanced Surface intent requires necessary Part version 13"));
+    const bool loft_envelope = version == k_loft_constraint_version || surface_envelope;
     bool loft_intent = false;
     if (root.contains("loft_features") && root.at("loft_features").is_array())
       for (const auto& feature : root.at("loft_features"))
         loft_intent = loft_intent || (feature.is_object() && feature.contains("constraints"));
-    if (loft_envelope != loft_intent)
+    if ((loft_intent && !loft_envelope) || (version == k_loft_constraint_version && !loft_intent))
       return Result<PartDocument>::failure(
           json_error("Authored Loft constraints require necessary Part version 12"));
     const bool semantic_sweep_envelope = version == k_semantic_sweep_version || loft_envelope;
