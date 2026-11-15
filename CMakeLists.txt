@@ -66,6 +66,7 @@ add_library(
   src/core/invalidation_state.cpp
   src/core/loft_feature.cpp
   src/core/surface_feature.cpp
+  src/core/surface_offset_feature.cpp
   src/core/mirror_feature.cpp
   src/core/part_pattern_feature.cpp
   src/core/hole_instance_reference.cpp
@@ -534,6 +535,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/invalidation_state_tests.cpp
     tests/core/loft_feature_tests.cpp
     tests/core/loft_constraint_intent_tests.cpp
+    tests/core/surface_offset_intent_tests.cpp
     tests/core/surface_feature_tests.cpp
     tests/core/mirror_feature_tests.cpp
     tests/core/part_document_json_tests.cpp

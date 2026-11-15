@@ -44,6 +44,7 @@ enum class PartFeatureInputRole {
   SpatialConstraint,
   PathSegment,
   LoftBoundarySupport,
+  SurfaceSourceFace,
 };
 
 enum class PartFeatureInputSourceKind {

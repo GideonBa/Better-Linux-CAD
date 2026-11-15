@@ -1752,3 +1752,31 @@ Loft `g2` retains its unsupported execution diagnostic. Constraint-free files re
 necessary old version. Both Project resource directions support V12, preserve pinned local subsets
 and reject foreign/unresolved resource ownership. The authored history version remains independent;
 V12 does not manufacture history/suppression intent.
+
+
+## Surface offset, thickness and advanced boundary intent — Part V13
+
+Part V13 is necessary exactly when a Surface record uses OffsetSurface/Thicken, selected faces or
+advanced Trim/Extend options. V1–V12 reject those reserved fields/kinds; V13 requires actual new
+intent. It inherits V12 capabilities without requiring a Loft constraint. Older Parts retain their
+lowest necessary version and byte spelling. Project resource stripping/hydration supports V13,
+including empty local subsets and revision pins; authored history version remains independent.
+
+Offset/Thicken records contain exactly `id`, `name`, `type` (`offset_surface`/`thicken`), `target`,
+`parameters`, `operation_mode`, plus the existing context's optional `target_body`/`produced_body`.
+Parameters contain `distance`, `tolerance`, `side` (`normal`/`opposite`/`symmetric`), `approximation`
+(`exact_analytic`/`verified_approximation`) and nullable `maximum_deviation`. Length fields are
+parameter IDs. Exact mode requires null deviation; verified mode requires an explicit bounded ID.
+
+Selected Surface references contain `source_kind:"selected_faces"`, `body`, `semantic_face:null`
+and a nonempty `faces` array using the existing typed Face codec and `surface_source_face` role.
+Historical Body/semantic references retain their three fields. No topology indices are stored.
+
+The historical Trim/Extend record gains `options` only when authored. Trim options contain exactly
+`side` (`keep`/`remove`), `projection` (`on_surface`/`along_direction`), nullable `direction` and
+`tolerance`. A direction is a finite nonzero XYZ vector required only for `along_direction`.
+Extend options contain `mode` (`natural`/`tangent`), `tolerance` and nullable `maximum_deviation`,
+which is required only for tangent mode. Null options, unknown fields, wrong variants/parameter
+types, inactive budgets, invalid ownership and unsupported versions fail strict loading.
+Derived measurements, free-edge/gap overlays, BReps and sampled offset skins are never serialized.
+[Intent and proof](part-surface-feature-intent-mvp6.md#core-policy-and-evidence).

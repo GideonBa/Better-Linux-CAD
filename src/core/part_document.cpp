@@ -12,7 +12,9 @@ namespace blcad {
 namespace {
 
 bool has_transactional_parameter_intent(const PartDocument& document) {
-  return std::any_of(document.loft_features().begin(), document.loft_features().end(),
+  return std::any_of(document.surface_features().begin(), document.surface_features().end(),
+                     [](const auto& feature) { return surface_feature_requires_v13(feature); }) ||
+         std::any_of(document.loft_features().begin(), document.loft_features().end(),
                      [](const auto& feature) { return feature.constraints().has_value(); }) ||
          std::any_of(document.sketches().begin(), document.sketches().end(),
                      [](const auto& sketch) { return !sketch.equation_curves().empty(); }) ||
@@ -50,6 +52,14 @@ Result<std::size_t> validate_parameter_intent(const PartDocument& document,
         ++count;
       }
     }
+    for (const auto& feature : document.surface_features())
+      if (surface_feature_requires_v13(feature) &&
+          std::find(affected.begin(), affected.end(), surface_feature_id(feature).value()) !=
+              affected.end()) {
+        auto valid = validate_surface_feature_parameters(document, feature);
+        if (!valid)
+          return valid;
+      }
     return Result<std::size_t>::success(count);
   };
   auto planar = validate(document.sketches());
@@ -2769,6 +2779,37 @@ Result<std::size_t> PartDocument::add_surface_feature(SurfaceFeature feature) {
       if (body == nullptr || body->kind() != BodyKind::Surface)
         return Result<std::size_t>::failure(
             Error::validation(id.value(), "surface reference must identify a Surface Body"));
+    } else if (surface.source_kind() == SurfaceReferenceSourceKind::SelectedFaces) {
+      const auto& selected = std::get<SurfaceFaceSelection>(surface.source());
+      if (!find_body(selected.body))
+        return Result<std::size_t>::failure(
+            Error::validation(id.value(), "Surface face selection owner Body must exist"));
+      for (const auto& face : selected.faces) {
+        auto valid = validate_part_feature_input_reference(*this, face);
+        if (!valid)
+          return valid;
+        if (const auto* result = std::get_if<ResultFaceReference>(&face.source())) {
+          if (result->body() != selected.body)
+            return Result<std::size_t>::failure(
+                Error::validation(id.value(), "Selected Surface face belongs to a different Body"));
+        } else if (const auto* imported = std::get_if<ImportedTopologyReference>(&face.source())) {
+          const auto* catalog = find_imported_topology_catalog(imported->catalog());
+          const auto* entry = catalog ? catalog->find(imported->entry()) : nullptr;
+          bool owned = false;
+          for (const auto& producer : imported_body_features())
+            if (producer.definition().catalog() == imported->catalog())
+              for (const auto& output : producer.definition().outputs())
+                owned |= entry && entry->parent_body &&
+                         output.imported_body == *entry->parent_body &&
+                         output.body == selected.body;
+          if (!owned)
+            return Result<std::size_t>::failure(Error::validation(
+                id.value(), "Imported Surface face requires its exact immutable base Body owner"));
+        } else if (!record_produces_body(*this, face.source_node_id(), selected.body))
+          return Result<std::size_t>::failure(Error::validation(
+              id.value(), "Selected semantic Surface face producer must own the selected Body"));
+      }
+      return Result<std::size_t>::success(1);
     } else {
       auto face = FaceReference::create_planar(
           PartFeatureInputRole::DraftFace,
@@ -2827,6 +2868,8 @@ Result<std::size_t> PartDocument::add_surface_feature(SurfaceFeature feature) {
           !tolerance->value().is_positive_length())
         valid = Result<std::size_t>::failure(Error::validation(
             id.value(), "surface stitch tolerance must be a positive Length parameter"));
+    } else if constexpr (std::is_same_v<T, SurfaceOffsetFeature>) {
+      valid = validate_surface(value.target());
     } else {
       valid = validate_surface(value.shell());
     }
@@ -2835,27 +2878,52 @@ Result<std::size_t> PartDocument::add_surface_feature(SurfaceFeature feature) {
 
   const BodyId result_id = surface_feature_result_body(feature);
   const Body* result_body = find_body(result_id);
-  const BodyKind expected_kind = surface_feature_kind(feature) ==
-                                         SurfaceFeatureKind::ClosedShellToSolid
-                                     ? BodyKind::Solid
-                                     : BodyKind::Surface;
+  valid = validate_surface_feature_parameters(*this, feature);
+  if (!valid)
+    return valid;
+  const BodyKind expected_kind = surface_feature_result_kind(feature);
   if (result_body == nullptr || result_body->kind() != expected_kind)
     return Result<std::size_t>::failure(Error::validation(
         id.value(), "surface feature result Body kind must match its feature kind"));
   const std::string result_node = body_dependency_node_id(result_id);
-  if (!dependency_sources_of(dependency_graph_, result_node).empty())
+  const auto* context = surface_feature_body_context(feature);
+  const bool in_place = context && context->target_body() == std::optional(result_id);
+  if (context && context->target_body()) {
+    const auto* target = find_body(*context->target_body());
+    if (!target || target->kind() != BodyKind::Solid)
+      return Result<std::size_t>::failure(
+          Error::validation(id.value(), "Thicken modification target must be a Solid Body"));
+  }
+  if (!in_place && !dependency_sources_of(dependency_graph_, result_node).empty())
     return Result<std::size_t>::failure(
-        Error::dependency(id.value(), "surface feature result Body already has a producer"));
+        Error::dependency(id.value(), "Surface feature result Body already has a producer"));
 
   auto graph = dependency_graph_;
   auto node = add_authored_graph_node(graph, id.value());
   if (node.has_error()) return Result<std::size_t>::failure(node.error());
   for (const auto& input : surface_feature_input_nodes(feature)) {
-    if (input == result_node)
+    if (input == result_node) {
+      if (in_place)
+        continue;
       return Result<std::size_t>::failure(
-          Error::dependency(id.value(), "surface feature result Body cannot be an input"));
+          Error::dependency(id.value(), "Surface feature result Body cannot be an input"));
+    }
     auto edge = add_dependency_if_missing(graph, input, id.value());
     if (edge.has_error()) return Result<std::size_t>::failure(edge.error());
+  }
+  if (in_place) {
+    const auto previous = dependency_sources_of(graph, result_node);
+    graph.remove_dependencies_of_dependent(result_node);
+    for (const auto& producer : previous) {
+      auto edge = add_dependency_if_missing(graph, producer, id.value());
+      if (!edge)
+        return Result<std::size_t>::failure(edge.error());
+    }
+  } else if (context && context->target_body()) {
+    auto edge = add_dependency_if_missing(graph, body_dependency_node_id(*context->target_body()),
+                                          id.value());
+    if (!edge)
+      return Result<std::size_t>::failure(edge.error());
   }
   auto result_edge = add_dependency_if_missing(graph, id.value(), result_node);
   if (result_edge.has_error()) return Result<std::size_t>::failure(result_edge.error());
@@ -2882,6 +2950,8 @@ Result<std::size_t> PartDocument::remove_surface_feature(FeatureId id) {
     return Result<std::size_t>::failure(
         Error::validation(id.empty() ? "surface_feature" : id.value(),
                           "surface feature must exist in part document"));
+  if (surface_feature_body_context(*found))
+    return remove_feature_record(&PartDocument::surface_features_, id);
   const std::string result_node = body_dependency_node_id(surface_feature_result_body(*found));
   if (!dependency_graph_.direct_dependents(result_node).empty())
     return Result<std::size_t>::failure(

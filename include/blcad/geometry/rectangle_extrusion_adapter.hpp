@@ -56,6 +56,10 @@ private:
   friend class RevolveAdapter;
   friend class SweepAdapter;
   friend class SurfaceAdapter;
+  friend class SurfaceOffsetAdapter;
+  friend class SurfaceBoundaryQuery;
+  friend class SurfaceSelectionGeometry;
+  friend class SurfaceTrimAdapter;
   friend class LoftAdapter;
   friend class FilletAdapter;
   friend class ChamferAdapter;
