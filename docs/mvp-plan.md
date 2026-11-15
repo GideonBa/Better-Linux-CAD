@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 168
 current_block: 169
-current_boundary: Block 168 intent verified; Block 169 constrained execution next
+current_boundary: Block 169 native differential verifier checked; constrained construction pending
 current_tag: "[parity-b169]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–168 accepted; Blocks 169–204 planned"
+  advanced_modeling_workflows: "Blocks 145–168 accepted; Block 169 in progress; Blocks 170–204 planned"
 ---
 
 # MVP Plan
@@ -35,9 +35,9 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 168
-current block        Block 169 (planned; verified G2 construction)
+current block        Block 169 (in progress; native continuity verification)
 current phase        Curves, paths and surfaces
-current boundary     Block 168 intent verified; constrained execution remains 169
+current boundary     Block 169 numerical verifier; constrained construction remains pending
 ```
 
 The assigned sequence continues through Block 174. PR #191 was merged normally by rebase;
@@ -76,7 +76,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 165 | Delivered in [PR #189](https://github.com/GideonBa/Better-Linux-CAD/pull/189): solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 consumers. |
 | 166 | Delivered in [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190): explicit compatible native paths, checked twist, mixed physical consumers and native upgrade/history. |
 | 167 | Delivered in [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191): strict compatible V11, native semantic edges, exact hollow sections, cyclic circular frames and independent G01/exchange proofs. |
-| 168–169 | 168 intent/persistence accepted on the active branch; 169 constrained execution and G02 acceptance remain planned. |
+| 168–169 | 168 intent/persistence accepted on the active branch; 169 constrained execution is in progress; G02 acceptance remains pending. |
 | 170–172 | Offset/Thicken intent and checked Geometry, curved Trim/Extend and derived gap diagnostics with G03–G04 acceptance. |
 | 173–174 | Native advanced curve/Surface workflows, integrated edits/history/reopen and physical STEP roundtrip acceptance. |
 
@@ -172,7 +172,7 @@ raw samples, benchmark limits and future performance scope remain in their exist
 ## Blocks 145–204 — Advanced modeling workflows
 
 Status authority: Blocks 145–168 are **Implemented and accepted**;
-Blocks 169–204 are **Planned; not started**.
+Block 169 is **In progress**; Blocks 170–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -185,7 +185,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
-| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166–168 accepted; 169–174 planned |
+| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166–168 accepted; 169 in progress; 170–174 planned |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
 | G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
@@ -906,3 +906,28 @@ sections remain outside the current section types; singular G2 requests cannot a
 label. No execution, G02 milestone or advanced authoring completion is claimed by 168. Continue on
 the same branch with 169, then deliver the combined PR normally before the 170–172 Surface branch.
 Preserve every 169–204 requirement, including native authoring in 173 and integration in 174.
+
+
+### Block 169 verified G2 Loft — in progress
+
+The first Geometry slice adds a private native boundary verifier. It compares actual located trimmed
+faces through positional incidence, oriented normals and signed normal curvature in tangent,
+transverse and diagonal directions, with native arc-length station refinement. Independent analytic
+fixtures distinguish C1-only and near-threshold curvature from exact smooth continuation, and cover
+rigid placement, reversed orientation, finite support and singular frames/poles.
+
+The signed curvature criterion uses the maximum absolute eigenvalue of the complete difference
+of second fundamental forms in aligned orthonormal tangent frames. Independent polynomial data
+proves why taking only the largest of three directional values could accept a failing join.
+
+All five targets build successfully. The current focused Geometry run passes **23 cases / 3,196
+assertions**, including seven analytic numerical-verifier cases and the existing Loft/refinement
+regressions. Runtime manifest: 1,154 inputs, SHA-256
+`215405719126071ce779efd79e75a5d8281d68b010fd3406187af33604d9dcb2`.
+Proof: `/tmp/blcad-169-verifier5-focused.log`,
+[contract](part-guided-loft-geometry-mvp6.md#native-boundary-continuity-verification) and
+[analytic oracles](../tests/geometry/surface_join_verification_tests.cpp).
+
+This verifier supplies no constrained Loft result; constrained construction, section/rail adherence,
+unequal/rolled airfoil combinations and complete G02 acceptance remain required before 169 advances.
+The existing execution gate stays in force. Advanced native authoring remains 173.

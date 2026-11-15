@@ -229,6 +229,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/circular_pattern_adapter.cpp
     src/geometry/linear_pattern_adapter.cpp
     src/geometry/loft_adapter.cpp
+    src/geometry/surface_join_verification.cpp
     src/geometry/loft_section_alignment.cpp
     src/geometry/loft_section_compatibility.cpp
     src/geometry/mirror_adapter.cpp
@@ -679,6 +680,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/left_workplane_pipeline_tests.cpp
       tests/geometry/linear_pattern_pipeline_tests.cpp
       tests/geometry/loft_feature_pipeline_tests.cpp
+      tests/geometry/surface_join_verification_tests.cpp
       tests/geometry/multi_section_loft_pipeline_tests.cpp
       tests/geometry/loft_section_compatibility_tests.cpp
       tests/geometry/mixed_path_loft_tests.cpp
