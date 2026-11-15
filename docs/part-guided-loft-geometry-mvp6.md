@@ -100,8 +100,11 @@ The private Geometry verifier `surface_join_verification` supplies numerical evi
 construction. It currently enables no new Loft execution; the constrained-intent gate remains in
 force while construction and complete G02 acceptance are implemented.
 
-It evaluates native located trimmed faces at native true-length boundary stations. A projection
-must lie on the actual finite face boundary. Distinct native projection branches are ambiguous;
+It evaluates native located trimmed faces at native true-length boundary stations. Incidence uses
+actual 3D distance to the finite trim edges, in millimeters, followed by their native pcurves.
+A millimeter tolerance is never applied directly to UV coordinates: anisotropic parameter scaling
+can otherwise accept a physically distant trim. Pcurve/surface/edge points must agree within the
+model tolerance. Distinct native projection branches are ambiguous;
 only equivalent periodic parameters may refer to the same branch. Missing incidence, unsupported
 orientation, nonfinite values, collapsed boundaries and singular differential frames/poles reject.
 The caller validates candidate topology before accepting a construction.
@@ -133,3 +136,31 @@ separate obligations. No `GeomAbs_C2` flag or filling-builder success replaces t
 
 Focused numerical proof: `[surface-join-verification]`; the `[surface-join-spectrum]` subset owns the
 complete-tensor counterexample. Whole-169 execution acceptance remains in `docs/mvp-plan.md`.
+
+
+## Native constrained patch construction
+
+The private `constrained_loft_patch` / `native_loft_tensor` builder constructs a bounded rational
+BSpline tensor patch from four explicitly ordered native boundaries and up to nine interior
+sections. Exact source curves are copied, converted and degree/knot refined into common bases;
+no display chords or altered source BReps enter construction. A Hermite solve interpolates all
+section stations and the rail-derived first/second endpoint derivative fields. Positive matching
+section weight functions support rational profiles, including exact circular arcs.
+
+Current capability is deliberately bounded: the two rails must share endpoint derivative fields
+and compatible section parameters; their complete curves must agree with the constructed skin.
+A section may reverse only when its first endpoint has no rail incidence; an ambiguous incidence
+never selects an arbitrary branch. Singular/ill-conditioned stations, incompatible weights,
+missing incidence, invalid topology and exhausted degree/knot/pole budgets reject explicitly.
+The same candidate's two orientations are tested against the authored support normals. Every
+specified G1/G2 join must pass the independent differential verifier; all four boundaries and
+interior native sections must meet the positional tolerance. G2 never falls back to G1.
+
+[Patch oracles](../tests/geometry/constrained_loft_patch_tests.cpp) independently check a sextic
+arch between planar G2 supports, exact cylindrical area/radius/principal curvature and rolled
+Airfoil sections with unequal source subdivision. Source BRep snapshots remain identical after
+successful and failed construction. This establishes a private construction primitive, not whole
+Loft execution: guide binding resolution, regularity/knot checks, patch assembly, Body operations
+and complete G02 feature/history/reopen acceptance remain pending. General varying support jets
+and incompatible rational weight functions remain unsupported until separately implemented and
+verified. Native editing is planned in Block 173.

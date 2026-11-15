@@ -1,12 +1,18 @@
 #include "surface_join_verification.hpp"
 #include <BRepAdaptor_Curve.hxx>
-#include <BRepClass_FaceClassifier.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepTools.hxx>
+#include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
-#include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <Geom2d_Curve.hxx>
 #include <Geom_Surface.hxx>
 #include <Standard_Failure.hxx>
+#include <TopExp.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopoDS.hxx>
+#include <TopoDS_Compound.hxx>
 #include <algorithm>
 #include <cmath>
 #include <gp_Pnt2d.hxx>
@@ -39,38 +45,63 @@ struct Jet {
 bool finite(const gp_Vec& v) {
   return std::isfinite(v.X()) && std::isfinite(v.Y()) && std::isfinite(v.Z());
 }
-std::vector<Jet> projected_jets(const TopoDS_Face& face, const gp_Pnt& point, double tolerance,
+struct TrimProjection {
+  TopoDS_Face face;
+  Handle(Geom_Surface) surface;
+  std::vector<TopoDS_Edge> uses;
+  BRepExtrema_DistShapeShape distance;
+  explicit TrimProjection(const TopoDS_Face& source, double tolerance) : face(source) {
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(face, u0, u1, v0, v1);
+    if (face.Orientation() != TopAbs_FORWARD && face.Orientation() != TopAbs_REVERSED)
+      throw std::runtime_error("Surface continuity requires an oriented manifold face");
+    surface = BRep_Tool::Surface(face);
+    if (surface.IsNull() || !std::isfinite(u0) || !std::isfinite(u1) || !std::isfinite(v0) ||
+        !std::isfinite(v1))
+      throw std::runtime_error("Surface continuity requires a finite native support domain");
+    BRep_Builder builder;
+    TopoDS_Compound trim;
+    builder.MakeCompound(trim);
+    // Retain edge uses: the two sides of a periodic seam have distinct pcurves.
+    for (TopExp_Explorer edge(face, TopAbs_EDGE); edge.More(); edge.Next()) {
+      uses.push_back(TopoDS::Edge(edge.Current()));
+      builder.Add(trim, edge.Current());
+    }
+    if (uses.empty())
+      throw std::runtime_error("Surface continuity requires a finite trim boundary");
+    distance.LoadS2(trim);
+    distance.SetDeflection(std::max(1e-12, tolerance * .05));
+  }
+};
+std::vector<Jet> projected_jets(TrimProjection& trim, const gp_Pnt& point, double tolerance,
                                 bool second_order, bool reverse) {
-  double u0, u1, v0, v1;
-  BRepTools::UVBounds(face, u0, u1, v0, v1);
-  if (face.Orientation() != TopAbs_FORWARD && face.Orientation() != TopAbs_REVERSED)
-    throw std::runtime_error("Surface continuity requires an oriented manifold face");
-  const auto surface = BRep_Tool::Surface(face);
-  if (surface.IsNull() || !std::isfinite(u0) || !std::isfinite(u1) || !std::isfinite(v0) ||
-      !std::isfinite(v1))
-    throw std::runtime_error("Surface continuity requires a finite native support domain");
-  GeomAPI_ProjectPointOnSurf projection(point, surface, u0, u1, v0, v1,
-                                        std::max(1e-12, tolerance * .05));
+  trim.distance.LoadS1(BRepBuilderAPI_MakeVertex(point).Vertex());
+  if (!trim.distance.Perform() || !trim.distance.IsDone() ||
+      !std::isfinite(trim.distance.Value()) || trim.distance.Value() > tolerance)
+    throw std::runtime_error("Boundary is not incident to the finite trim in model units");
+  const auto& face = trim.face;
+  const auto& surface = trim.surface;
   std::vector<Jet> jets;
-  for (int i = 1; i <= projection.NbPoints(); ++i) {
-    if (projection.Distance(i) > tolerance)
-      continue;
-    double u, v;
-    projection.Parameters(i, u, v);
-    BRepClass_FaceClassifier domain(face, gp_Pnt2d(u, v), tolerance);
-    // A boundary join must lie on the actual trim, not merely the infinite
-    // carrier.
-    if (domain.State() != TopAbs_ON)
-      continue;
+  const auto append = [&](const TopoDS_Edge& edge, double parameter, const gp_Pnt& boundary_point) {
+    double first, last;
+    const auto pcurve = BRep_Tool::CurveOnSurface(edge, face, first, last);
+    if (pcurve.IsNull() || parameter < first || parameter > last)
+      throw std::runtime_error("Missing or inconsistent native trim pcurve");
+    const auto uv = pcurve->Value(parameter);
+    const double u = uv.X(), v = uv.Y();
+    if (!std::isfinite(u) || !std::isfinite(v))
+      throw std::runtime_error("Nonfinite native trim parameter");
     if (!jets.empty()) {
-      const auto equivalent = [](double delta, bool periodic, double period) {
+      const auto equivalent = [](double a, double b, bool periodic, double period) {
         constexpr double rounding = 64 * std::numeric_limits<double>::epsilon();
-        return delta == 0.0 || (periodic && std::abs(delta) <= period * (1.0 + rounding) &&
-                                std::abs(std::remainder(delta, period)) <= rounding * period);
+        const double delta = a - b;
+        return std::abs(delta) <= rounding * std::max({1.0, std::abs(a), std::abs(b)}) ||
+               (periodic && std::abs(delta) <= period * (1.0 + rounding) &&
+                std::abs(std::remainder(delta, period)) <= rounding * period);
       };
-      if (!equivalent(u - jets.front().u, surface->IsUPeriodic(),
+      if (!equivalent(u, jets.front().u, surface->IsUPeriodic(),
                       surface->IsUPeriodic() ? surface->UPeriod() : 1.0) ||
-          !equivalent(v - jets.front().v, surface->IsVPeriodic(),
+          !equivalent(v, jets.front().v, surface->IsVPeriodic(),
                       surface->IsVPeriodic() ? surface->VPeriod() : 1.0))
         throw std::runtime_error("Ambiguous native projection onto the trimmed support");
     }
@@ -100,7 +131,27 @@ std::vector<Jet> projected_jets(const TopoDS_Face& face, const gp_Pnt& point, do
     jet.e = second_order ? duu.Dot(jet.normal) : 0.0;
     jet.f = second_order ? duv.Dot(jet.normal) : 0.0;
     jet.g = second_order ? dvv.Dot(jet.normal) : 0.0;
+    if (jet.point.Distance(boundary_point) > tolerance || jet.point.Distance(point) > tolerance)
+      throw std::runtime_error("Native trim pcurve exceeds the model-space incidence tolerance");
     jets.push_back(std::move(jet));
+  };
+  for (int i = 1; i <= trim.distance.NbSolution(); ++i) {
+    const auto kind = trim.distance.SupportTypeShape2(i);
+    const auto topology = trim.distance.SupportOnShape2(i);
+    for (const auto& edge : trim.uses) {
+      if (kind == BRepExtrema_IsOnEdge && edge.IsSame(topology)) {
+        double parameter;
+        trim.distance.ParOnEdgeS2(i, parameter);
+        append(edge, parameter, trim.distance.PointOnShape2(i));
+      } else if (kind == BRepExtrema_IsVertex) {
+        double first, last;
+        BRep_Tool::Range(edge, first, last);
+        if (TopExp::FirstVertex(edge).IsSame(topology))
+          append(edge, first, trim.distance.PointOnShape2(i));
+        if (TopExp::LastVertex(edge).IsSame(topology))
+          append(edge, last, trim.distance.PointOnShape2(i));
+      }
+    }
   }
   if (jets.empty())
     throw std::runtime_error("Boundary is not incident to the unique finite trimmed support");
@@ -148,6 +199,8 @@ Result<SurfaceJoinReport> verify_surface_join(FeatureId id, const TopoDS_Edge& b
     if (!std::isfinite(length) || length <= position_tolerance)
       return fail("Collapsed Loft boundary/pole cannot establish continuity");
     const bool g2 = continuity == LoftBoundaryContinuity::G2;
+    TrimProjection candidate_trim(candidate, position_tolerance);
+    TrimProjection support_trim(support, position_tolerance);
     SurfaceJoinReport previous, report;
     for (const int count : {33, 65, 129}) {
       report = {};
@@ -168,8 +221,8 @@ Result<SurfaceJoinReport> verify_surface_join(FeatureId id, const TopoDS_Edge& b
             !finite(tangent) || tangent.SquareMagnitude() <= 1e-24)
           return fail("Singular native boundary tangent");
         tangent.Normalize();
-        const auto a = projected_jets(candidate, point, position_tolerance, g2, false);
-        const auto b = projected_jets(support, point, position_tolerance, g2, reverse_support);
+        const auto a = projected_jets(candidate_trim, point, position_tolerance, g2, false);
+        const auto b = projected_jets(support_trim, point, position_tolerance, g2, reverse_support);
         // Every admissible projection must agree; selecting the first branch is
         // not proof.
         for (const auto& candidate_jet : a)

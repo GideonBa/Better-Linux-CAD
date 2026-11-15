@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 168
 current_block: 169
-current_boundary: Block 169 native differential verifier checked; constrained construction pending
+current_boundary: Block 169 native Hermite patch kernel verified; feature integration pending
 current_tag: "[parity-b169]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -37,7 +37,7 @@ Historical delivery details remain in the linked PRs and Git history.
 implemented through  Block 168
 current block        Block 169 (in progress; native continuity verification)
 current phase        Curves, paths and surfaces
-current boundary     Block 169 numerical verifier; constrained construction remains pending
+current boundary     Block 169 patch kernel; constrained feature integration remains pending
 ```
 
 The assigned sequence continues through Block 174. PR #191 was merged normally by rebase;
@@ -910,24 +910,23 @@ Preserve every 169–204 requirement, including native authoring in 173 and inte
 
 ### Block 169 verified G2 Loft — in progress
 
-The first Geometry slice adds a private native boundary verifier. It compares actual located trimmed
-faces through positional incidence, oriented normals and signed normal curvature in tangent,
-transverse and diagonal directions, with native arc-length station refinement. Independent analytic
-fixtures distinguish C1-only and near-threshold curvature from exact smooth continuation, and cover
-rigid placement, reversed orientation, finite support and singular frames/poles.
+Private Geometry now supplies both a native differential verifier and a constrained Hermite
+BSpline patch kernel. Four ordered exact boundaries, compatible rational section bases and bounded
+interior stations produce a candidate; actual native positional, oriented normal and complete
+signed-curvature-tensor checks decide acceptance. Native 3D trim distance avoids UV/model-unit
+confusion. Independent sextic, cylindrical and unequal/rolled Airfoil fixtures cover physical
+sections, curvature, radius/area and unchanged source BReps. Capability limits and remaining
+construction work are recorded in the [contract](part-guided-loft-geometry-mvp6.md#native-constrained-patch-construction).
 
-The signed curvature criterion uses the maximum absolute eigenvalue of the complete difference
-of second fundamental forms in aligned orthonormal tangent frames. Independent polynomial data
-proves why taking only the largest of three directional values could accept a failing join.
+All five targets build successfully. The focused Geometry run passes **26 cases / 4,109 assertions**,
+including eight analytic numerical-verifier cases, four native patch cases and existing
+Loft/refinement regressions. Runtime manifest: 1,159 inputs, SHA-256
+`b898de395bf2fce02a5a4f1033ba2bba447a3f15ee99f2e9c541344cecbb0943`.
+Proof: `/tmp/blcad-169-trim5-focused.log`,
+[analytic oracles](../tests/geometry/surface_join_verification_tests.cpp) and
+[patch oracles](../tests/geometry/constrained_loft_patch_tests.cpp).
 
-All five targets build successfully. The current focused Geometry run passes **23 cases / 3,196
-assertions**, including seven analytic numerical-verifier cases and the existing Loft/refinement
-regressions. Runtime manifest: 1,154 inputs, SHA-256
-`215405719126071ce779efd79e75a5d8281d68b010fd3406187af33604d9dcb2`.
-Proof: `/tmp/blcad-169-verifier5-focused.log`,
-[contract](part-guided-loft-geometry-mvp6.md#native-boundary-continuity-verification) and
-[analytic oracles](../tests/geometry/surface_join_verification_tests.cpp).
-
-This verifier supplies no constrained Loft result; constrained construction, section/rail adherence,
-unequal/rolled airfoil combinations and complete G02 acceptance remain required before 169 advances.
-The existing execution gate stays in force. Advanced native authoring remains 173.
+This private kernel supplies no constrained Loft feature result yet. Native knot/regularity
+checks, logical guide/support resolution, quilt/solid assembly, Body operations and complete G02
+history/reopen acceptance remain required before 169 advances. The feature execution gate stays
+in force. Advanced native authoring remains 173; Blocks 170–204 retain their full planned scope.
