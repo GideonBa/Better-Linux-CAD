@@ -323,7 +323,14 @@ and restored after success and failure; no background Geometry worker is introdu
 154 adds explicit analytic UV-boundary conversion before that same final BRep check. STEP's
 cylindrical/conical seam pcurves and zero-length cone-pole boundary can need completion when
 translated into OCCT's parametric topology. Only Cylinder/Cone face-unorientability and associated
-wire-closure statuses qualify; other transfer errors retain the original rejection. On a private
+wire-closure statuses qualify; other transfer errors retain the original rejection. Block 167
+extends exact UV conversion to complete regular Torus faces with one wire, two seam edges and
+one shared vertex over full U/V periods. The corresponding face wire-orientation status is
+eligible. Consequential solid-region statuses qualify only after analytic proof of one outward
+torus shell and strictly contained, mutually disjoint inward toroidal voids on the same axis.
+Partial/trimming boundaries, spindle tori and incompatible shell arrangements remain rejected.
+The converter preserves face orientation and every existing 3D curve/range, surface, vertex and
+tolerance, then requires the same final BRep validity. No general solid-orientation repair is enabled. On a private
 copy, the decoder orders seam pcurves, shifts them by full surface periods and completes the
 parametric pole edge. It checks that every existing 3D edge/curve/range, surface, vertex and
 tolerance remains unchanged and retained. A changed or still-invalid result is rejected.

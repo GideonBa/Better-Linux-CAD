@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 166
 current_block: 167
-current_boundary: Block 166 delivered; Block 167 Core intent verified, Geometry pending
+current_boundary: Block 167 history/exchange verified; native reference precision follow-up open
 current_tag: "[parity-b167]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -53,7 +53,7 @@ the complete issue, inspect the staged diff, run appropriate headless/native che
 contracts and evidence, commit and normally push, then merge its PR through main's rules. Fetch and
 verify the delivered tree before starting the next issue from main. Do not stack unfinished PRs.
 
-### Assigned continuation through Block 174 — updated 2026-11-14
+### Assigned continuation through Block 174 — updated 2026-11-15
 
 The current request assigns the complete sequence through 174. Execute each delivery serially;
 this assignment does not change acceptance status. Keep the detailed requirements in
@@ -805,7 +805,7 @@ inner profile wires remain 167; richer support/guide intent, G2 and Surface work
 
 Active draft: [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191), based on merged
 [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190). Commits `0757969` / `f2120cf` / `9022d59`
-contain 606 / 398 / 487 added lines. Every delivery commit must stay below the assigned 1,500-line cap.
+contain 606 / 398 / 487 added lines; `d5fefae` adds 525. Every delivery commit must stay below the assigned 1,500-line cap.
 
 | Slice | Contract and proof boundary |
 | --- | --- |
@@ -813,18 +813,24 @@ contain 606 / 398 / 487 added lines. Every delivery commit must stay below the a
 | Semantic native edges | Verified: bounded native curves, canonical result direction before path reversal, exact circular phase and explicit normalized imported base scope. [Contract](part-path-curve-core-mvp6.md#semantic-native-curve-execution--167), [physical length/direction, real upstream split, reopen and source-byte rejection](../tests/geometry/semantic_sweep_intent_geometry_tests.cpp). Placed imported results use producer-anchored result witnesses; dedicated placed-path acceptance remains open. |
 | Material-region Sweep | Verified within the open-spine boundary. Exact native-wire containment rejects crossing/touching boundaries, exact inner pipes precede checked Body operations. [Contract](part-sweep-intent-mvp6.md#material-region-execution), [independent volumes/material sections for all four operations, multiple/rational holes, legacy filled replay and atomic rejection](../tests/geometry/material_region_sweep_tests.cpp). |
 | Closed spines | Verified within the circular capability: [exact circular cyclic-frame contract](part-sweep-3d-geometry-mvp6.md#circular-closed-spine-capability--167), all three frames, integer roll, hollow/noncircular physical sections and seam drift. Conservative extent rejects spindle folds; near-circles, fractional roll and competing controls reject atomically. [Independent physical proofs](../tests/geometry/material_region_sweep_tests.cpp). |
-| G01 combined acceptance | Pending: ambiguous reference recovery, placed imports, reversed generated/imported sources with rational/spatial spans and a hollow profile, plus physical exchange/reopen. Native authoring completes in 173. |
+| G01 combined acceptance | Verified combined reversed generated/imported, rational/spatial and hollow sections, exact reopening, unique/ambiguous native recovery and physical placed STEP roundtrip. The new periodic conversion rejects a physically outside void shell. [Combined proofs](../tests/geometry/semantic_path_acceptance_tests.cpp). Native authoring completes in 173. |
+| Native reference precision | Open before delivery: the recovery tolerance must never complete a genuine native arc gap or flatten a near-axis circular plane. Independent physical probes reproduce both cases; add focused regressions and preserve native bounds/axes before closing 167. |
 
-All five targets build. Full Core **768 / 34,565** remains valid for unchanged Core inputs.
-Current focused Geometry **76 / 13,790** and Qt **49 cases: 47 passed, two native-only skipped /
-4,632 assertions** pass. This does not close the whole G01 gate or prove native authoring of the
-new selectors (173).
+All five targets build after the Core-state addition. Full Core **769 / 34,592**, full Geometry
+**741 / 77,555** and full offscreen Qt **937 cases: 863 passed, 74 native/optional skipped /
+102,931 assertions** pass. The Geometry-only negative-test addition leaves the Core, Qt, app and
+STEP exporter binaries byte-identical to their verified versions; all four hashes were checked.
+Native policy/Sweep/Loft passes **3 / 687** at both 100% and compact 150% without skips; all eight
+captures were inspected after CAD exit. Separate app startup proves a visible process-owned X11
+window (intentional timeout 124, probe exit 0). These native regressions do not establish authoring
+coverage for the new selectors (173).
 
-Current runtime: **1,149 inputs**, SHA-256
-`9efefd26041540d61b15cc06de409c4135d53dbdde9b7a0b2068dd83543740d6`.
-Native policy/Sweep/Loft regression passes **3 / 687** at both 100% and compact 150%, without skips; separate app startup shows a process-owned visible X11 window (timeout 124, probe exit 0).
-Proof logs: `/tmp/blcad-167-{geometry16-focused,qt16-focused,native100-16,native150-16}.log` and `/tmp/blcad-167-startup16-proof.log`.
-The assigned continuation remains through 174; preserve all 168–204 requirements.
+Current runtime: **1,150 inputs**, SHA-256
+`12a8944d01f54bc12455a415d12bdd0df1328f44280174a24aea6df1df45d5bb`.
+Proof logs: `/tmp/blcad-167-core19-full.log`, `/tmp/blcad-167-geometry22-full.log`,
+`/tmp/blcad-167-qt21-full.log`, `/tmp/blcad-167-native{100,150}-22.log`,
+`/tmp/blcad-167-startup22-proof.log`. The reference-precision follow-up remains a required open
+167 gate. Continue through 174 and preserve all 168–204 requirements.
 
 ## Later phases
 

@@ -233,3 +233,28 @@ TEST_CASE("Part V11 rejects downgraded noncanonical malformed and unnecessary Sw
   unnecessary["version"] = 11;
   CHECK_FALSE(deserialize_part_document_from_json(unnecessary.dump()));
 }
+TEST_CASE("V11 replays declared mixed native and imported order without creating authored history",
+          "[core][parity-b167][semantic-sweep-intent]") {
+  auto part = f::part();
+  const auto supplier = imported();
+  for (const auto& value : supplier.step_import_sources())
+    REQUIRE(part.add_step_import_source(value));
+  for (const auto& value : supplier.imported_topology_catalogs())
+    REQUIRE(part.add_imported_topology_catalog(value));
+  for (const auto& value : supplier.bodies())
+    REQUIRE(part.add_body(value));
+  for (const auto& value : supplier.imported_body_features())
+    REQUIRE(part.add_imported_body_feature(value));
+  REQUIRE(part.add_path_curve(
+      path("mixed.order", {f::checked(PathSegmentReference::create_feature_edge(generated()))})));
+  CHECK_FALSE(part.authored_history_intent());
+  const auto bytes = saved(part);
+  const auto encoded = json::parse(bytes);
+  REQUIRE(encoded.at("history_version") == 1);
+  CHECK_FALSE(encoded.contains("suppressed_features"));
+  const auto restored = f::checked(deserialize_part_document_from_json(bytes));
+  CHECK_FALSE(restored.authored_history_intent());
+  CHECK(json::parse(saved(restored)).at("feature_order") == encoded.at("feature_order"));
+  CHECK(saved(restored) == bytes);
+  project_roundtrip(part);
+}

@@ -12,6 +12,7 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepCheck_Result.hxx>
 #include <BRepGProp.hxx>
+#include <BRepTools.hxx>
 #include <BRepTools_ReShape.hxx>
 #include <BRep_Tool.hxx>
 #include <Bnd_Box.hxx>
@@ -72,6 +73,7 @@
 #include <locale>
 #include <map>
 #include <mutex>
+#include <numbers>
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
@@ -409,6 +411,91 @@ struct BodyDraft {
 // representations, on a private copy, before the unchanged solid validator.
 // This is not a general ShapeFix/Perform pass: missing 3D curves, displaced
 // vertices, gaps, self-intersections and tolerance changes remain errors.
+bool complete_regular_torus_face(const TopoDS_Shape& shape) {
+  if (shape.ShapeType() != TopAbs_FACE)
+    return false;
+  const auto face = TopoDS::Face(shape);
+  BRepAdaptor_Surface surface(face);
+  if (surface.GetType() != GeomAbs_Torus)
+    return false;
+  const auto torus = surface.Torus();
+  if (torus.MinorRadius() <= 1e-7 || torus.MajorRadius() <= torus.MinorRadius() + 1e-7)
+    return false;
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(face, u0, u1, v0, v1);
+  if (std::abs(u1 - u0 - 2 * std::numbers::pi) > 1e-9 ||
+      std::abs(v1 - v0 - 2 * std::numbers::pi) > 1e-9)
+    return false;
+  int wires = 0, uses = 0;
+  for (TopExp_Explorer w(face, TopAbs_WIRE); w.More(); w.Next())
+    ++wires;
+  for (TopExp_Explorer e(face, TopAbs_EDGE); e.More(); e.Next())
+    ++uses;
+  TopTools_IndexedMapOfShape edges, vertices;
+  TopExp::MapShapes(face, TopAbs_EDGE, edges);
+  TopExp::MapShapes(face, TopAbs_VERTEX, vertices);
+  if (wires != 1 || uses != 4 || edges.Extent() != 2 || vertices.Extent() != 1)
+    return false;
+  for (int i = 1; i <= edges.Extent(); ++i)
+    if (BRep_Tool::Degenerated(TopoDS::Edge(edges(i))) ||
+        !BRep_Tool::IsClosed(TopoDS::Edge(edges(i)), face))
+      return false;
+  return true;
+}
+
+// A full periodic torus has no physical trimming boundary. Prove its material arrangement from
+// the actual analytic surfaces before allowing the consequential solid-classification statuses.
+bool regular_torus_shells(const TopoDS_Shape& input) {
+  if (input.ShapeType() != TopAbs_SOLID || input.Orientation() != TopAbs_FORWARD)
+    return false;
+  TopTools_IndexedMapOfShape faces, shells;
+  TopExp::MapShapes(input, TopAbs_FACE, faces);
+  TopExp::MapShapes(input, TopAbs_SHELL, shells);
+  if (faces.IsEmpty() || faces.Extent() != shells.Extent())
+    return false;
+  for (int i = 1; i <= shells.Extent(); ++i) {
+    TopTools_IndexedMapOfShape members;
+    TopExp::MapShapes(shells(i), TopAbs_FACE, members);
+    if (members.Extent() != 1)
+      return false;
+  }
+  std::vector<gp_Torus> tori;
+  std::optional<std::size_t> outer;
+  for (int i = 1; i <= faces.Extent(); ++i) {
+    if (!complete_regular_torus_face(faces(i)))
+      return false;
+    if (faces(i).Orientation() == TopAbs_FORWARD) {
+      if (outer)
+        return false;
+      outer = tori.size();
+    } else if (faces(i).Orientation() != TopAbs_REVERSED)
+      return false;
+    tori.push_back(BRepAdaptor_Surface(TopoDS::Face(faces(i))).Torus());
+  }
+  if (!outer)
+    return false;
+  const auto& boundary = tori[*outer];
+  const gp_Vec axis(boundary.Axis().Direction());
+  std::vector<std::pair<Point2, double>> holes;
+  for (std::size_t i = 0; i < tori.size(); ++i) {
+    if (i == *outer)
+      continue;
+    const gp_Vec delta(boundary.Location(), tori[i].Location());
+    if (delta.Crossed(axis).Magnitude() > 1e-7 ||
+        gp_Vec(tori[i].Axis().Direction()).Crossed(axis).Magnitude() > 1e-10)
+      return false;
+    const Point2 center{tori[i].MajorRadius() - boundary.MajorRadius(), delta.Dot(axis)};
+    const double radius = tori[i].MinorRadius();
+    if (std::hypot(center.x, center.y) + radius + 1e-7 >= boundary.MinorRadius())
+      return false;
+    for (const auto& [other, r] : holes)
+      if (std::hypot(center.x - other.x, center.y - other.y) <= radius + r + 1e-7)
+        return false;
+    holes.emplace_back(center, radius);
+  }
+  return true;
+}
+
 TopoDS_Shape complete_analytic_uv_boundaries(const TopoDS_Shape& input) {
   if (input.IsNull())
     return {};
@@ -419,11 +506,15 @@ TopoDS_Shape complete_analytic_uv_boundaries(const TopoDS_Shape& input) {
     if (shape.ShapeType() != TopAbs_FACE)
       return false;
     const auto type = BRepAdaptor_Surface(TopoDS::Face(shape)).GetType();
-    return type == GeomAbs_Cylinder || type == GeomAbs_Cone;
+    return type == GeomAbs_Cylinder || type == GeomAbs_Cone || complete_regular_torus_face(shape);
   };
+  const bool torus_material = regular_torus_shells(input);
   const auto allowed = [&](const TopoDS_Shape& shape, const TopoDS_Shape& context,
                            BRepCheck_Status status) {
     return status == BRepCheck_NoError ||
+           (status == BRepCheck_BadOrientationOfSubshape && complete_regular_torus_face(shape)) ||
+           (torus_material && shape.IsSame(input) &&
+            (status == BRepCheck_EnclosedRegion || status == BRepCheck_SubshapeNotInShape)) ||
            (status == BRepCheck_UnorientableShape && analytic(shape)) ||
            (status == BRepCheck_NotClosed && shape.ShapeType() == TopAbs_WIRE &&
             !context.IsNull() && analytic(context));
@@ -521,7 +612,8 @@ TopoDS_Shape complete_analytic_uv_boundaries(const TopoDS_Shape& input) {
       return {};
     const auto face = TopoDS::Face(updated);
     TopLoc_Location location;
-    if (BRep_Tool::Surface(face, location) != f.surface || location != f.location ||
+    if ((complete_regular_torus_face(f.face) && face.Orientation() != f.face.Orientation()) ||
+        BRep_Tool::Surface(face, location) != f.surface || location != f.location ||
         BRep_Tool::Tolerance(face) != f.tolerance)
       return {};
   }

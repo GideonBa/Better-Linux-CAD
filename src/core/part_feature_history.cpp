@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <queue>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -203,6 +204,62 @@ template <typename Visitor> void PartDocument::visit_executable_families(Visitor
           PartFeatureFamily::BodyTransform);
 }
 
+namespace {
+Result<std::vector<PartFeatureHistoryEntry>>
+prefer_replayed_order(const DependencyGraph& graph,
+                      const std::vector<PartFeatureHistoryEntry>& entries,
+                      const std::vector<std::string>& preferred) {
+  std::unordered_map<std::string, std::size_t> indices;
+  std::vector<std::size_t> rank(entries.size()), indegree(entries.size());
+  std::vector<std::vector<std::size_t>> successors(entries.size());
+  for (std::size_t i = 0; i < entries.size(); ++i) {
+    indices.emplace(entries[i].node_id, i);
+    rank[i] = preferred.size() + i;
+  }
+  for (std::size_t i = 0; i < preferred.size(); ++i)
+    if (const auto found = indices.find(preferred[i]); found != indices.end())
+      rank[found->second] = i;
+  std::unordered_map<std::string, std::vector<std::string>> next;
+  for (const auto& [source, target] : graph.dependencies())
+    next[source].push_back(target);
+  // Collapse only metadata paths. Stop at the next executable, avoiding a quadratic transitive
+  // feature graph while retaining dependencies through Body aliases, Sketches and PathCurves.
+  for (std::size_t i = 0; i < entries.size(); ++i) {
+    auto pending = next[entries[i].node_id];
+    std::unordered_set<std::string> visited;
+    while (!pending.empty()) {
+      auto id = std::move(pending.back());
+      pending.pop_back();
+      if (!visited.insert(id).second)
+        continue;
+      if (const auto executable = indices.find(id); executable != indices.end()) {
+        successors[i].push_back(executable->second);
+        ++indegree[executable->second];
+      } else if (const auto metadata = next.find(id); metadata != next.end())
+        pending.insert(pending.end(), metadata->second.begin(), metadata->second.end());
+    }
+  }
+  using Ready = std::pair<std::size_t, std::size_t>;
+  std::priority_queue<Ready, std::vector<Ready>, std::greater<Ready>> ready;
+  for (std::size_t i = 0; i < entries.size(); ++i)
+    if (indegree[i] == 0)
+      ready.emplace(rank[i], i);
+  std::vector<PartFeatureHistoryEntry> ordered;
+  while (!ready.empty()) {
+    const auto index = ready.top().second;
+    ready.pop();
+    ordered.push_back(entries[index]);
+    for (const auto child : successors[index])
+      if (--indegree[child] == 0)
+        ready.emplace(rank[child], child);
+  }
+  if (ordered.size() != entries.size())
+    return Result<std::vector<PartFeatureHistoryEntry>>::failure(
+        Error::dependency("part.history", "Replayed executable dependencies contain a cycle"));
+  return Result<std::vector<PartFeatureHistoryEntry>>::success(std::move(ordered));
+}
+} // namespace
+
 Result<std::vector<PartFeatureHistoryEntry>> PartDocument::executable_history() const {
   using History = std::vector<PartFeatureHistoryEntry>;
   std::unordered_map<std::string, PartFeatureFamily> registered;
@@ -223,6 +280,8 @@ Result<std::vector<PartFeatureHistoryEntry>> PartDocument::executable_history() 
   if (!registered.empty())
     return Result<History>::failure(Error::dependency(
         "part.history", "An executable record is absent from the dependency graph."));
+  if (replayed_feature_order_ && !history_intent_)
+    return prefer_replayed_order(dependency_graph_, result, *replayed_feature_order_);
   if (history_intent_) {
     if (history_intent_->order.size() != result.size())
       return Result<History>::failure(
@@ -307,12 +366,18 @@ Result<std::size_t> PartDocument::sync_graph(DependencyGraph graph, Invalidation
 
 void PartDocument::append_history_executable(const std::string& id) {
   ++executable_generation_;
+  if (replayed_feature_order_ &&
+      std::find(replayed_feature_order_->begin(), replayed_feature_order_->end(), id) ==
+          replayed_feature_order_->end())
+    replayed_feature_order_->push_back(id);
   if (history_intent_ && std::find(history_intent_->order.begin(), history_intent_->order.end(),
                                    id) == history_intent_->order.end())
     history_intent_->order.push_back(id);
 }
 void PartDocument::erase_history_executable(const std::string& id) {
   ++executable_generation_;
+  if (replayed_feature_order_)
+    std::erase(*replayed_feature_order_, id);
   if (history_intent_) {
     std::erase(history_intent_->order, id);
     std::erase(history_intent_->suppressed, id);
@@ -677,6 +742,7 @@ Result<std::size_t> PartDocument::replay_feature_order(const std::vector<std::st
     return synced;
   for (const auto& restore : restore_collections)
     restore();
+  candidate.replayed_feature_order_ = order;
   *this = std::move(candidate);
   return Result<std::size_t>::success(order.size());
 }
