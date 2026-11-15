@@ -123,7 +123,9 @@ Modern Trim/Extend Core uses `[advanced-surface-intent]`; native Geometry uses `
 including `[curved-trim]`, `[curved-extend]` and `[curved-frame-import]`. Existing Qt Surface clients
 use `[block136-surface],[interactive-surface]`; `[native-shell-surface]` must execute with xcb at both
 scales to cover its offscreen-only skip. These foundation filters do not establish the complete
-combined G04/repair acceptance or advanced authoring in 173.
+advanced authoring in 173. `[curved-surface-combination]`, `[surface-gap-knots]` and Qt
+`[curved-surface-history]` own combined G04 physical exchange, narrow native-knot gap rejection
+and actual atomic session repair/Undo/Redo.
 
 ## Find and select focused tests
 

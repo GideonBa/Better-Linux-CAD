@@ -104,4 +104,51 @@ inline void extend(PartDocument& p, const std::string& id, SurfaceReference targ
       mode == SurfaceExtendMode::Tangent ? std::optional(ParameterId("deviation"))
                                          : std::nullopt}))));
 }
+inline void line_path(PartDocument& p, const std::string& id, Point2 point,
+                      const std::string& first, const std::string& last) {
+  auto sketch = checked(Sketch3D::create(Sketch3DId(id + ".sketch3d"), id));
+  for (const auto& [name, height] : {std::pair{"first", first}, {"last", last}})
+    (void)checked(sketch.add_point(checked(SketchPoint3D::create(
+        SketchEntityId(name), spatial_fixture::coordinate(point.x),
+        spatial_fixture::coordinate(point.y),
+        checked(SketchCoordinate3D::create_parameter(ParameterId(height)))))));
+  (void)checked(sketch.add_line(checked(SketchLine3D::create(
+      SketchEntityId("line"), SketchEntityId("first"), SketchEntityId("last")))));
+  (void)checked(p.add_sketch_3d(sketch));
+  const auto segment = checked(PathSegmentReference::create_sketch_3d(
+      sketch.id(), SketchEntityId("line"), Sketch3DPathCurveKind::Line));
+  (void)checked(p.add_path_curve(checked(PathCurve::create(
+      PathCurveId(id), id, {segment}, PathClosure::Open, PathOrientationRule::MinimumTwist, {}, {},
+      1e-7, checked(PathExecutionPolicy::curve_preserving(1e-7))))));
+}
+inline SurfaceReference body(const std::string& id) {
+  return checked(SurfaceReference::create_body(BodyId(id)));
+}
+inline PartDocument combination() {
+  auto p = part();
+  const double angle = std::acos(.8);
+  trim(p, "left", SurfaceTrimSide::KeepInside, quadrant({3}));
+  trim(p, "right", SurfaceTrimSide::KeepInside, quadrant({0}));
+  arc_path(p, "left.top", -angle, 0, "window.top");
+  arc_path(p, "right.top", 0, angle, "window.top");
+  extend(p, "left.extend", body("left.body"), "left.top");
+  extend(p, "right.extend", body("right.body"), "right.top");
+  line_path(p, "outer", {8, 6}, "window.bottom", "extension.top");
+  extend(p, "tangent", body("right.extend.body"), "outer", SurfaceExtendMode::Tangent);
+  (void)checked(
+      p.add_body(checked(Body::create(BodyId("quilt.body"), "Quilt", BodyKind::Surface))));
+  (void)checked(p.add_surface_feature(checked(SurfaceStitchFeature::create(
+      FeatureId("stitch"), "Quilt", {body("left.extend.body"), body("tangent.body")},
+      ParameterId("tolerance"), BodyId("quilt.body")))));
+  (void)checked(p.add_body(checked(Body::create(BodyId("thick.body"), "Thick", BodyKind::Solid))));
+  const SurfaceOffsetParameters parameters{ParameterId("wall"), ParameterId("tolerance"),
+                                           SurfaceOffsetSide::Symmetric,
+                                           SurfaceOffsetApproximation::ExactAnalytic, std::nullopt};
+  const auto context = checked(FeatureBodyResultContext::create(
+      FeatureBodyOperationMode::NewBody, std::nullopt, BodyId("thick.body")));
+  (void)checked(p.add_surface_feature(checked(SurfaceOffsetFeature::create_thicken(
+      FeatureId("thick"), "Thickness", body("quilt.body"), parameters, context))));
+  return p;
+}
+
 } // namespace blcad::test::curved_surface

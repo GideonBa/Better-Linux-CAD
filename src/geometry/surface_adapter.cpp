@@ -652,6 +652,8 @@ Result<GeometryShape> SurfaceAdapter::stitch_surfaces(FeatureId feature_id,
       builder.Add(compound, face);
     BRepBuilderAPI_Copy copy(compound, true, false);
     BRepBuilderAPI_Sewing sewing(tolerance_mm);
+    // Expose branching seams so they reject explicitly instead of choosing a pair.
+    sewing.SetNonManifoldMode(Standard_True);
     for (const auto& face : faces.value()) {
       auto owned = copy.ModifiedShape(face);
       owned.Orientation(face.Orientation());

@@ -25,6 +25,9 @@ struct SurfaceBoundaryReport {
 // Derived native geometry only. Edge positions in this report are transient overlay keys.
 class SurfaceBoundaryQuery {
 public:
+  // Each input is one transient native edge (or a one-edge wire).
+  [[nodiscard]] static Result<SurfaceGap> measure_gap(const GeometryShape&, const GeometryShape&,
+                                                      double tolerance_mm);
   [[nodiscard]] static Result<SurfaceBoundaryReport>
   inspect(const std::vector<GeometryShape>&, double tolerance_mm, double search_radius_mm);
 };
