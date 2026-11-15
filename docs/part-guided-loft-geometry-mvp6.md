@@ -93,3 +93,43 @@ native shape, invalid circular control geometry, and a constant-section Sweep co
 The first three cases failed against the old chord-based arc sampler before the correction.
 
 Blocks 48–94 are implemented. Block 88 Surface feature Core intent and JSON is implemented; Block 89 Boundary and Fill Surface Geometry is implemented; Block 90 Trim and Extend Surface Geometry is implemented; Block 91 Stitch/Knit/Sew shell Geometry is implemented; Block 92 Closed shell to solid conversion is implemented; Block 93 multi-body STEP export is implemented; Block 94 integrated Part Construction MVP acceptance is implemented; Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is next.
+
+## Native boundary-continuity verification
+
+The private Geometry verifier `surface_join_verification` supplies numerical evidence for constrained
+construction. It currently enables no new Loft execution; the constrained-intent gate remains in
+force while construction and complete G02 acceptance are implemented.
+
+It evaluates native located trimmed faces at native true-length boundary stations. A projection
+must lie on the actual finite face boundary. Distinct native projection branches are ambiguous;
+only equivalent periodic parameters may refer to the same branch. Missing incidence, unsupported
+orientation, nonfinite values, collapsed boundaries and singular differential frames/poles reject.
+The caller validates candidate topology before accepting a construction.
+
+Position error is measured in mm and oriented normal error in radians. Face orientation and the
+authored support-normal reversal determine the signed normal. For G2, native D2 derivatives define
+the first and signed second fundamental forms. Orthonormal tangent frames are identified by the
+minimal rotation between the candidate and support normals. Tangent, transverse and diagonal
+curvatures recover the complete symmetric difference tensor; its maximum absolute eigenvalue is
+the error in inverse mm. The criterion therefore bounds every unit direction in that tangent frame:
+
+```text
+m = (delta_xx + delta_yy) / 2
+error = abs(m) + hypot((delta_xx - delta_yy) / 2, delta_xy)
+```
+
+Checking the three sampled directions independently would miss some extrema between them. The
+[analytic tensor counterexample](../tests/geometry/surface_join_verification_tests.cpp) uses
+`z = q*x*x/2 + q*x*y - q*y*y/2`: each axial/diagonal discrepancy is at most `q`, but the actual
+extremum is `sqrt(2)*q`. Independent plane/cylinder and polynomial fixtures also separate G1-only
+joins, nearly failing curvature, positional/normal tolerances, normal reversal and rigid placement.
+
+The bounded verification grids contain 33, 65 and 129 true-length stations. Every grid must meet
+all authored criteria; the change in measured maxima from 65 to 129 stations must be at most 5%
+of the corresponding budget. The report identifies the final 129-station witness. This is a
+controlled numerical boundary check, not a global continuum or approximation error bound.
+Construction capability limits, complete section/rail adherence and candidate refinement remain
+separate obligations. No `GeomAbs_C2` flag or filling-builder success replaces these checks.
+
+Focused numerical proof: `[surface-join-verification]`; the `[surface-join-spectrum]` subset owns the
+complete-tensor counterexample. Whole-169 execution acceptance remains in `docs/mvp-plan.md`.
