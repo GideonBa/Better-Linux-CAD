@@ -1,4 +1,5 @@
 #include "surface_offset_verification.hpp"
+#include "native_parameter_breaks.hpp"
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepClass_FaceClassifier.hxx>
@@ -57,11 +58,11 @@ Domain domain(const TopoDS_Face& face) {
         "Verified offset requires native C2 patches; sharp knots are unsupported");
   if (const auto spline = Handle(Geom_BSplineSurface)::DownCast(basis)) {
     for (int i = 1; i <= spline->NbUKnots(); ++i)
-      if (spline->UKnot(i) > u0 && spline->UKnot(i) < u1)
-        result.u.push_back(spline->UKnot(i));
+      append_native_break(result.u, spline->UKnot(i), u0, u1, spline->IsUPeriodic(),
+                          spline->IsUPeriodic() ? spline->UPeriod() : 0);
     for (int i = 1; i <= spline->NbVKnots(); ++i)
-      if (spline->VKnot(i) > v0 && spline->VKnot(i) < v1)
-        result.v.push_back(spline->VKnot(i));
+      append_native_break(result.v, spline->VKnot(i), v0, v1, spline->IsVPeriodic(),
+                          spline->IsVPeriodic() ? spline->VPeriod() : 0);
   }
   Handle(Geom_Curve) generating;
   bool along_u = true;
@@ -78,12 +79,14 @@ Domain domain(const TopoDS_Face& face) {
       auto& knots = along_u ? result.u : result.v;
       const double low = along_u ? u0 : v0, high = along_u ? u1 : v1;
       for (int i = 1; i <= spline->NbKnots(); ++i)
-        if (spline->Knot(i) > low && spline->Knot(i) < high)
-          knots.push_back(spline->Knot(i));
+        append_native_break(knots, spline->Knot(i), low, high, spline->IsPeriodic(),
+                            spline->IsPeriodic() ? spline->Period() : 0);
     }
   }
   std::sort(result.u.begin(), result.u.end());
   std::sort(result.v.begin(), result.v.end());
+  result.u.erase(std::unique(result.u.begin(), result.u.end()), result.u.end());
+  result.v.erase(std::unique(result.v.begin(), result.v.end()), result.v.end());
   if ((result.u.size() - 1) * (result.v.size() - 1) > 128)
     throw std::runtime_error("Offset exceeds the native verification cell budget");
   return result;

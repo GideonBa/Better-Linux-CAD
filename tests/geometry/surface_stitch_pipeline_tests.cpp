@@ -62,9 +62,9 @@ std::string closed_rectangle(PartDocument& document, const std::string& tag,
   auto sketch = Sketch3D::create(sketch_id, tag);
   REQUIRE(sketch);
   for (std::size_t index = 0U; index < corners.size(); ++index) {
-    auto point = SketchPoint3D::create(
-        SketchEntityId(tag + ".p" + std::to_string(index)), coordinate(corners[index][0]),
-        coordinate(corners[index][1]), coordinate(corners[index][2]));
+    auto point = SketchPoint3D::create(SketchEntityId(tag + ".p" + std::to_string(index)),
+                                       coordinate(corners[index][0]), coordinate(corners[index][1]),
+                                       coordinate(corners[index][2]));
     REQUIRE(point);
     REQUIRE(sketch.value().add_point(point.value()));
   }
@@ -98,11 +98,11 @@ PartDocument stitch_document() {
   REQUIRE(document.add_parameter(length_parameter("stitch.tolerance", 0.001)));
 
   const std::string left = closed_rectangle(
-      document, "left", {{{{0.0, 0.0, 0.0}}, {{10.0, 0.0, 0.0}}, {{10.0, 10.0, 0.0}},
-                          {{0.0, 10.0, 0.0}}}});
+      document, "left",
+      {{{{0.0, 0.0, 0.0}}, {{10.0, 0.0, 0.0}}, {{10.0, 10.0, 0.0}}, {{0.0, 10.0, 0.0}}}});
   const std::string right = closed_rectangle(
-      document, "right", {{{{10.0, 0.0, 0.0}}, {{20.0, 0.0, 0.0}}, {{20.0, 10.0, 0.0}},
-                           {{10.0, 10.0, 0.0}}}});
+      document, "right",
+      {{{{10.0, 0.0, 0.0}}, {{20.0, 0.0, 0.0}}, {{20.0, 10.0, 0.0}}, {{10.0, 10.0, 0.0}}}});
 
   add_body(document, "body.left", BodyKind::Surface);
   add_body(document, "body.right", BodyKind::Surface);
@@ -117,10 +117,10 @@ PartDocument stitch_document() {
   REQUIRE(fill_right);
   REQUIRE(document.add_surface_feature(fill_right.value()));
 
-  auto stitch = SurfaceStitchFeature::create(
-      FeatureId("feature.stitch"), "Stitch",
-      {body_surface("body.left"), body_surface("body.right")}, ParameterId("stitch.tolerance"),
-      BodyId("body.shell"));
+  auto stitch =
+      SurfaceStitchFeature::create(FeatureId("feature.stitch"), "Stitch",
+                                   {body_surface("body.left"), body_surface("body.right")},
+                                   ParameterId("stitch.tolerance"), BodyId("body.shell"));
   REQUIRE(stitch);
   REQUIRE(document.add_surface_feature(stitch.value()));
   return document;
@@ -206,4 +206,27 @@ TEST_CASE("Block 91 stitch rejects a single surface and a non-positive tolerance
       SurfaceAdapter{}.stitch_surfaces(FeatureId("feature.stitch"), {left, right}, 0.0);
   REQUIRE_FALSE(bad_tolerance);
   CHECK(bad_tolerance.error().message().find("positive") != std::string::npos);
+}
+
+TEST_CASE("G04 Stitch enforces the complete seam gap and rejects a branching seam",
+          "[geometry][surface-stitch][curved-surface-combination][parity-b172]") {
+  const auto left = fill_face("left", 0, 10);
+  const auto right = fill_face("right", 10.0005, 20);
+  REQUIRE(SurfaceAdapter{}.stitch_surfaces(FeatureId("within"), {left, right}, .001));
+  const auto outside = SurfaceAdapter{}.stitch_surfaces(FeatureId("outside"), {left, right}, .0001);
+  REQUIRE_FALSE(outside);
+  CHECK(outside.error().message().find("tolerance") != std::string::npos);
+  const auto touching = fill_face("touching", 10, 20);
+  const std::vector<SweepPathSegment> loop = {
+      {SweepPathSegmentKind::Line, {10, 0, 0}, {}, {10, 10, 0}},
+      {SweepPathSegmentKind::Line, {10, 10, 0}, {}, {10, 10, 10}},
+      {SweepPathSegmentKind::Line, {10, 10, 10}, {}, {10, 0, 10}},
+      {SweepPathSegmentKind::Line, {10, 0, 10}, {}, {10, 0, 0}}};
+  const auto third = SurfaceAdapter{}.make_fill_surface(FeatureId("branch"), {loop});
+  REQUIRE(third);
+  const auto branched =
+      SurfaceAdapter{}.stitch_surfaces(FeatureId("invalid"), {left, touching, third.value()}, 1e-6);
+  REQUIRE_FALSE(branched);
+  CHECK(branched.error().message().find("non-manifold") != std::string::npos);
+  REQUIRE(SurfaceAdapter{}.stitch_surfaces(FeatureId("repaired"), {left, touching}, 1e-6));
 }

@@ -726,6 +726,8 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/surface_offset_geometry_tests.cpp
       tests/geometry/surface_offset_consumer_tests.cpp
       tests/geometry/curved_surface_geometry_tests.cpp
+      tests/geometry/curved_surface_combination_tests.cpp
+      tests/geometry/surface_gap_native_breaks_tests.cpp
       tests/geometry/surface_stitch_pipeline_tests.cpp
       tests/geometry/surface_close_shell_pipeline_tests.cpp
       tests/geometry/shell_feature_pipeline_tests.cpp
@@ -887,6 +889,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_interactive_path_sweep_loft_tests.cpp
       tests/gui/gui_interactive_surface_tests.cpp
       tests/gui/gui_feature_edit_tests.cpp
+      tests/gui/gui_curved_surface_history_tests.cpp
       tests/gui/gui_interactive_assembly_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )

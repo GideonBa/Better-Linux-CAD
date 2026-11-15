@@ -202,3 +202,37 @@ TEST_CASE("G04 read-only imported boundary frame uses the current verified Body 
   CHECK(brep(*c.find_body_shape(owner)) == before);
   CHECK(blcad::test::surface_offset::saved(p) == bytes);
 }
+
+TEST_CASE("G04 disconnected trim regions and partial or overlapping extensions reject explicitly",
+          "[geometry][curved-surface][curved-rejection][parity-b172]") {
+  auto p = f::part();
+  REQUIRE(p.update_construction_plane(f::checked(
+      ConstructionPlane::create_explicit(ConstructionPlaneId("window.plane"), "Window plane",
+                                         {-10, -20, 0}, {1, 0, 0}, {0, 0, 1}, {0, -1, 0}))));
+  f::trim(p, "ambiguous", SurfaceTrimSide::KeepInside, f::quadrant({0, 1, 2, 3}));
+  auto c = cache();
+  const auto rejected = GeometryRecomputeExecutor{}.execute_document(p, c);
+  REQUIRE_FALSE(rejected);
+  CHECK(c.body_shape_count() == 0);
+  auto source = f::part();
+  f::arc_path(source, "partial", 0, std::numbers::pi / 4, "source.height");
+  execute(source, c);
+  const auto target = f::checked(
+      SurfaceSelectionGeometry::resolve(source, c, f::quadrant({0}), FeatureId("frame"), 1e-6));
+  const auto before = brep(target);
+  const auto partial = f::checked(
+      GeometryRecomputeExecutor{}.resolve_path_segments(source, PathCurveId("partial"), c));
+  const auto incomplete =
+      SurfaceTrimAdapter{}.extend(FeatureId("partial"), target, partial, 3,
+                                  SurfaceExtendMode::Natural, 1e-6, std::nullopt, "partial");
+  REQUIRE_FALSE(incomplete);
+  CHECK(incomplete.error().message().find("boundary") != std::string::npos);
+  const std::vector<SweepPathSegment> generator = {
+      {SweepPathSegmentKind::Line, {0, 10, 0}, {}, {0, 10, 20}}};
+  const auto overlap =
+      SurfaceTrimAdapter{}.extend(FeatureId("overlap"), target, generator, 60,
+                                  SurfaceExtendMode::Natural, 1e-6, std::nullopt, "generator");
+  REQUIRE_FALSE(overlap);
+  CHECK(overlap.error().message().find("overlap") != std::string::npos);
+  CHECK(brep(target) == before);
+}

@@ -1,5 +1,6 @@
 #include "blcad/geometry/surface_boundary_query.hpp"
 #include "geometry_shape_internal.hpp"
+#include "native_parameter_breaks.hpp"
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
@@ -7,9 +8,12 @@
 #include <GCPnts_AbscissaPoint.hxx>
 #include <GeomAbs_CurveType.hxx>
 #include <Geom_BSplineCurve.hxx>
+#include <Geom_OffsetCurve.hxx>
+#include <Geom_TrimmedCurve.hxx>
 #include <Standard_Failure.hxx>
 #include <TopExp.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS_Edge.hxx>
 #include <algorithm>
 #include <cmath>
@@ -19,18 +23,34 @@ namespace {
 double directed_gap(const TopoDS_Edge& first, const TopoDS_Edge& second, double tolerance) {
   BRepAdaptor_Curve curve(first);
   const double start = curve.FirstParameter(), end = curve.LastParameter();
+  if (!std::isfinite(start) || !std::isfinite(end) || end <= start)
+    throw std::runtime_error("Surface gap requires finite native curve bounds");
   const double integration = std::max(1e-12, tolerance * .05);
   const double length = GCPnts_AbscissaPoint::Length(curve, start, end, integration);
+  if (!std::isfinite(start) || !std::isfinite(end) || !std::isfinite(length) || end <= start ||
+      length <= integration)
+    throw std::runtime_error("Surface gap requires bounded non-collapsed native curves");
   std::vector<double> knots = {start, end};
-  if (curve.GetType() == GeomAbs_BSplineCurve) {
-    const auto spline = curve.BSpline();
-    for (int i = 1; i <= spline->NbKnots(); ++i)
-      if (spline->Knot(i) > start && spline->Knot(i) < end)
-        knots.push_back(spline->Knot(i));
+  double native_first, native_last;
+  auto basis = BRep_Tool::Curve(first, native_first, native_last);
+  for (int depth = 0; depth < 16 && !basis.IsNull(); ++depth) {
+    if (const auto trimmed = Handle(Geom_TrimmedCurve)::DownCast(basis))
+      basis = trimmed->BasisCurve();
+    else if (const auto offset = Handle(Geom_OffsetCurve)::DownCast(basis))
+      basis = offset->BasisCurve();
+    else
+      break;
+    if (depth == 15)
+      throw std::runtime_error("Surface gap curve nesting exceeds the verification budget");
   }
+  if (const auto spline = Handle(Geom_BSplineCurve)::DownCast(basis))
+    for (int i = 1; i <= spline->NbKnots(); ++i)
+      detail::append_native_break(knots, spline->Knot(i), start, end, spline->IsPeriodic(),
+                                  spline->IsPeriodic() ? spline->Period() : 0);
   if (knots.size() > 258)
     throw std::runtime_error("Surface gap curve exceeds native knot budget");
   std::sort(knots.begin(), knots.end());
+  knots.erase(std::unique(knots.begin(), knots.end()), knots.end());
   double previous = -1, maximum = 0;
   for (const int divisions : {32, 64, 128}) {
     maximum = 0;
@@ -52,8 +72,8 @@ double directed_gap(const TopoDS_Edge& first, const TopoDS_Edge& second, double 
       measure(parameter);
     }
     for (std::size_t i = 1; i < knots.size(); ++i)
-      for (int j = 0; j <= 16; ++j)
-        measure(std::lerp(knots[i - 1], knots[i], j / 16.0));
+      for (int j = 0; j <= divisions / 2; ++j)
+        measure(std::lerp(knots[i - 1], knots[i], 2.0 * j / divisions));
     if (previous >= 0 && std::abs(maximum - previous) <= tolerance * .05)
       return maximum;
     previous = maximum;
@@ -61,6 +81,40 @@ double directed_gap(const TopoDS_Edge& first, const TopoDS_Edge& second, double 
   throw std::runtime_error("Surface gap maximum did not stabilize within its refinement budget");
 }
 } // namespace
+Result<SurfaceGap> SurfaceBoundaryQuery::measure_gap(const GeometryShape& first,
+                                                     const GeometryShape& second,
+                                                     double tolerance) {
+  const auto fail = [](std::string message) {
+    return Result<SurfaceGap>::failure(Error::geometry("surface.gap", std::move(message)));
+  };
+  if (first.empty() || second.empty() || !std::isfinite(tolerance) || tolerance < 1e-9 ||
+      tolerance > 1)
+    return fail("Surface gap requires two finite native edges and a bounded physical tolerance");
+  try {
+    std::vector<TopoDS_Edge> edges;
+    for (const auto* input : {&first, &second}) {
+      const auto& shape = input->impl_->shape;
+      if (shape.ShapeType() != TopAbs_EDGE && shape.ShapeType() != TopAbs_WIRE)
+        return fail("Surface gap inputs must be native edges or one-edge wires");
+      TopTools_IndexedMapOfShape mapped;
+      TopExp::MapShapes(shape, TopAbs_EDGE, mapped);
+      if (mapped.Extent() != 1)
+        return fail("Surface gap never chooses the first edge of a collection");
+      edges.push_back(TopoDS::Edge(mapped(1)));
+    }
+    BRepExtrema_DistShapeShape minimum(edges[0], edges[1]);
+    if (!minimum.IsDone() || !std::isfinite(minimum.Value()))
+      return fail("Surface gap minimum did not converge");
+    const double maximum = std::max(directed_gap(edges[0], edges[1], tolerance),
+                                    directed_gap(edges[1], edges[0], tolerance));
+    return Result<SurfaceGap>::success({0, 1, minimum.Value(), maximum, maximum <= tolerance});
+  } catch (const Standard_Failure& error) {
+    return fail(error.GetMessageString());
+  } catch (const std::exception& error) {
+    return fail(error.what());
+  }
+}
+
 Result<SurfaceBoundaryReport>
 SurfaceBoundaryQuery::inspect(const std::vector<GeometryShape>& shapes, double tolerance,
                               double search_radius) {

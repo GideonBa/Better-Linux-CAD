@@ -72,8 +72,7 @@ intent. Focused proof: `[geometry][surface-trim-extend][block136-surface]`.
 
 The V13 options frozen in [Surface intent](part-surface-feature-intent-mvp6.md) now have typed
 persistence and native construction. Historical records without options retain their Block-90
-replay. Numbered status remains in `mvp-plan.md`: complete G04 combination and atomic repair are
-still required before accepting 172.
+replay. Numbered acceptance and delivery status remain in `mvp-plan.md`.
 
 - Modern Trim has explicit KeepInside/RemoveInside. OnSurface retains finite planar contours on
   coplanar targets. AlongDirection projects a finite closed planar contour through every forward
@@ -97,10 +96,13 @@ still required before accepting 172.
   overlays. Physical whole-edge maxima, authored tolerance and actual shell closure remain the
   authorities; no overlay or topology index is serialized and no larger gap is automatically healed.
 
-The remaining complete G04 combination will prove a trimmed multi-face cylindrical quilt across its seam, explicit opposite sides,
-curved boundary extension, preserved holes, parameter-driven contours, physical area/volume,
-Stitch/solid conversion and atomic downstream failure/repair. Advanced native authoring remains
-173, and combined S04/G04/X01 remains 174. General arbitrary patch extension/healing stays deferred.
+The combined G04 fixture trims both cylindrical seam faces, naturally extends their curved rims,
+adds a verified tangent strip, Stitches the connected quilt and symmetrically Thickens it before
+adding a bore on its generated skin. Its independent volume is
+`(20 * acos(0.8) + extension) * (contour_height + extension) - pi * 0.2^2`.
+Material-point classification independently checks the cylindrical material, tangent strip and
+actual bore void. Advanced native authoring remains 173; combined S04/G04/X01 remains 174.
+General arbitrary patch extension/healing stays deferred.
 
 
 ### Native boundary and persistence foundation proof
@@ -137,5 +139,39 @@ Foundation checks: focused Core **8 / 415**; Surface Geometry regression **25 / 
 passed natively at **100% and 150%**, **1 / 593** each, with both captures reviewed after CAD exited.
 All five build targets passed. Runtime: **1,187 files**, SHA256
 `b410d00632de292edc49d2d888fba8e5b6fef72da6a8e4dc33569cd8eb1f5e11`.
-These focused proofs do not establish complete G04 or advanced native authoring; the remaining
-combination/repair gate stays open, and the new authoring controls remain 173.
+This foundation is supplemented by the combined proof below. Advanced authoring remains 173.
+
+
+### Combined G04 and repair proof
+
+[Combined geometry](../tests/geometry/curved_surface_combination_tests.cpp) measures the actual
+trimmed/extended quilt and bored Solid before and after a parameter-driven contour change, exact
+JSON reopening and STEP write/read. The analytic volume and independent material points must
+survive physical exchange. [Session history](../tests/gui/gui_curved_surface_history_tests.cpp)
+uses actual Undo/Redo, checks exact document bytes and independently measures each restored Solid.
+An incompatible original-source edit fails downstream boundary matching and preserves intent,
+last-valid Solid and history; its diagnostic refresh is allowed. A corrected extension subsequently
+recomputes the complete downstream model.
+
+[Negative geometry](../tests/geometry/curved_surface_geometry_tests.cpp) rejects disconnected
+projected regions, partial boundary matches and cylindrical periodic overlap without mutating
+source topology. [Stitch regressions](../tests/geometry/surface_stitch_pipeline_tests.cpp) prove
+a 0.0005 mm seam succeeds at 0.001 mm and fails at 0.0001 mm, rejects a three-face branching
+seam explicitly as non-manifold, and accepts the corrected two-face connection. Existing
+closed-shell-to-solid regressions retain positive volume and closure checks.
+
+The [native gap counterexample](../tests/geometry/surface_gap_native_breaks_tests.cpp) places a
+0.02 mm excursion inside narrowly spaced C2 spline knots underneath an offset wrapper. Both
+directed native-edge distances visit actual knot cells and refine them alongside physical
+arc-length stations; the nearby minimum cannot conceal the excessive maximum. Periodic native
+knots repeat through the actual shifted trim in both gap and offset verification. All query
+products remain transient and bounded; exceeding the budget rejects a required verification.
+
+Final combined acceptance: full Core **784 / 35,008**, full Geometry **784 / 81,269**;
+focused combined/negative Geometry **9 / 140** and actual session history **1 / 21**.
+Affected offscreen Qt regression: **11 passed / 1 native-only skip / 4,213 assertions**.
+The skipped existing Surface interaction passed natively at **100% and 150%**, **1 / 593**
+each, without skips; both final captures were reviewed after all CAD processes exited. These
+are existing interaction regressions; the advanced native controls remain the separate 173 gate.
+All five build targets passed. Frozen runtime: **1,191 files**, SHA256
+`b98ca2c42f7691ddaa773e57e35498966dd6e1061df667a1811a80cceb21331a`.
