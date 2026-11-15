@@ -3133,20 +3133,28 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
                       {"reversed", binding.reversed},
                       {"anchors", std::move(anchors)}});
   }
-  return {{"linear_tolerance", intent.linear_tolerance.value()},
-          {"angular_tolerance_rad", intent.angular_tolerance_rad},
-          {"curvature_tolerance_per_mm", intent.curvature_tolerance_per_mm},
-          {"start", boundary(intent.start)},
-          {"end", boundary(intent.end)},
-          {"guides", std::move(guides)}};
+  json result{{"linear_tolerance", intent.linear_tolerance.value()},
+              {"angular_tolerance_rad", intent.angular_tolerance_rad},
+              {"curvature_tolerance_per_mm", intent.curvature_tolerance_per_mm},
+              {"start", boundary(intent.start)},
+              {"end", boundary(intent.end)},
+              {"guides", std::move(guides)}};
+  if (!intent.patch_boundaries.empty()) {
+    result["patch_boundaries"] = json::array();
+    for (const auto& patch : intent.patch_boundaries)
+      result["patch_boundaries"].push_back({{"condition", boundary(patch.condition)},
+                                            {"from_guide", patch.from_guide.value()},
+                                            {"to_guide", patch.to_guide.value()}});
+  }
+  return result;
 }
 
 [[nodiscard]] Result<LoftConstraintIntent> loft_constraints_from_json(const json& value) {
   const auto fail = []() {
     return Result<LoftConstraintIntent>::failure(json_error("Malformed authored Loft constraints"));
   };
-  if (!value.is_object() || value.size() != 6U || !value.at("linear_tolerance").is_string() ||
-      !value.at("angular_tolerance_rad").is_number() ||
+  if (!value.is_object() || value.size() != 6U + (value.contains("patch_boundaries") ? 1U : 0U) ||
+      !value.at("linear_tolerance").is_string() || !value.at("angular_tolerance_rad").is_number() ||
       !value.at("curvature_tolerance_per_mm").is_number() || !value.at("guides").is_array())
     return fail();
   LoftConstraintIntent intent{ParameterId(value.at("linear_tolerance").get<std::string>()),
@@ -3205,6 +3213,27 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
                                 anchor.at("guide_fraction").get<double>()});
     }
     intent.guides.push_back(std::move(parsed));
+  }
+  if (value.contains("patch_boundaries")) {
+    const auto& patches = value.at("patch_boundaries");
+    if (!patches.is_array() || patches.empty() || patches.size() > 256)
+      return fail();
+    for (const auto& patch : patches) {
+      if (!patch.is_object() || patch.size() != 3U || !patch.at("from_guide").is_string() ||
+          !patch.at("to_guide").is_string() || patch.at("condition").is_null())
+        return fail();
+      // Reuse the same strict boundary codec, without recursively accepting patch records.
+      auto single = value;
+      single.erase("patch_boundaries");
+      single["start"] = patch.at("condition");
+      single["end"] = nullptr;
+      auto parsed = loft_constraints_from_json(single);
+      if (!parsed || !parsed.value().start)
+        return fail();
+      intent.patch_boundaries.push_back({*parsed.value().start,
+                                         PathCurveId(patch.at("from_guide").get<std::string>()),
+                                         PathCurveId(patch.at("to_guide").get<std::string>())});
+    }
   }
   return Result<LoftConstraintIntent>::success(std::move(intent));
 }

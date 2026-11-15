@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 168
 current_block: 169
-current_boundary: Block 169 native Hermite patch kernel verified; feature integration pending
+current_boundary: Block 169 feature integration under verification; G02 acceptance pending
 current_tag: "[parity-b169]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -37,7 +37,7 @@ Historical delivery details remain in the linked PRs and Git history.
 implemented through  Block 168
 current block        Block 169 (in progress; native continuity verification)
 current phase        Curves, paths and surfaces
-current boundary     Block 169 patch kernel; constrained feature integration remains pending
+current boundary     Block 169 feature integration under verification; G02 acceptance pending
 ```
 
 The assigned sequence continues through Block 174. PR #191 was merged normally by rebase;
@@ -930,3 +930,22 @@ This private kernel supplies no constrained Loft feature result yet. Native knot
 checks, logical guide/support resolution, quilt/solid assembly, Body operations and complete G02
 history/reopen acceptance remain required before 169 advances. The feature execution gate stays
 in force. Advanced native authoring remains 173; Blocks 170–204 retain their full planned scope.
+
+
+The next verification slice adds adjacent-guide patch supports, exact native B-spline rail
+corrections, original-entity anchor resolution, center-path section incidence, quilt/solid assembly
+and post-assembly continuity checks. Native curve/surface knot crossings and one-sided derivatives
+supplement true-length refinement; a narrow curvature spike is an explicit negative oracle.
+These source changes are **under verification**. Previous kernel proof above is not evidence for
+feature integration. Complete fresh/history/Body-operation/exchange and native regressions remain
+the acceptance boundary; no numbered status advances from compilation alone.
+
+
+The scoped-support Core slice passes **13 focused cases / 356 assertions** and the full Core suite
+(**778 cases / 34,748 assertions**). Proof: `/tmp/blcad-169-feature7-core.log` and
+`/tmp/blcad-169-feature8-core-full.log`; its 506 Core/header inputs remain unchanged across the
+subsequent Geometry-only corrections (subset SHA-256
+`042e38f05853d85e84505be2e5bbd6b3ef24670d2467994db243da48c8115b79`).
+Strict optional V12 patch records, overlap/adjacency, dependency protection and suppression are
+covered in [the Core tests](../tests/core/loft_constraint_intent_tests.cpp). This completes the
+scoped intent slice only; the complete G02 Geometry and native acceptance boundary remains open.

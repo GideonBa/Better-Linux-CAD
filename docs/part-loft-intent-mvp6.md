@@ -58,7 +58,16 @@ Blocks 48–94 are implemented. Block 85 Two-section Loft Geometry on arbitrary 
 join to a neighboring face. A boundary condition separately requests G1 or G2 to an explicit
 `FaceReference` carrying `LoftBoundarySupport`. Start/end bind the corresponding logical terminal
 section identity; reordering sections requires reauthoring those bindings. No implicit upgrade is
-performed. The Geometry execution gate currently diagnoses constrained execution as pending 169.
+performed. Geometry capability and acceptance remain owned by Block 169 and the
+[construction contract](part-guided-loft-geometry-mvp6.md#native-constrained-patch-construction).
+
+Optional `patch_boundaries` permits separate neighboring support faces for section spans between
+an adjacent ordered pair of authored guides. Closed sections include the final-to-first pair;
+open sections do not wrap. Each pair is unique per terminal section. Whole-boundary and patch
+conditions on the same terminal section overlap and are rejected. Guide order, source section
+identity and face references establish authority; transient compatibility edges do not. Every
+scoped support has the same graph, history, imported ownership and deletion protection as a whole
+start/end support.
 
 The identity is a length-framed source key: Sketch + Profile for closed sections, PathCurve for
 open sections. Alignment, rotation, flip, geometric parameter values and compatibility subdivisions

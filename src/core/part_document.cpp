@@ -2593,10 +2593,8 @@ Result<std::size_t> PartDocument::add_loft_feature(LoftFeature feature) {
       return Result<std::size_t>::failure(Error::validation(
           feature.id().value(), "Loft linear tolerance must be a Length from 1e-9 to 1 mm"));
     constraint_sources.push_back(intent.linear_tolerance.value());
-    for (const auto* condition : {&intent.start, &intent.end}) {
-      if (!*condition)
-        continue;
-      const auto& support = **condition;
+    for (const auto* condition : intent.boundary_conditions()) {
+      const auto& support = *condition;
       auto valid = validate_part_feature_input_reference(*this, support.support);
       if (!valid)
         return valid;

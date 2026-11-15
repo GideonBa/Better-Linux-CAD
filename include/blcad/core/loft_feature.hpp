@@ -41,6 +41,12 @@ struct LoftGuideBinding {
   std::vector<LoftGuideAnchor> anchors;
 };
 
+struct LoftPatchBoundaryCondition {
+  LoftBoundaryCondition condition;
+  PathCurveId from_guide;
+  PathCurveId to_guide;
+};
+
 struct LoftConstraintIntent {
   ParameterId linear_tolerance;
   double angular_tolerance_rad = 1e-5;
@@ -48,6 +54,17 @@ struct LoftConstraintIntent {
   std::optional<LoftBoundaryCondition> start;
   std::optional<LoftBoundaryCondition> end;
   std::vector<LoftGuideBinding> guides;
+  std::vector<LoftPatchBoundaryCondition> patch_boundaries{};
+  [[nodiscard]] std::vector<const LoftBoundaryCondition*> boundary_conditions() const {
+    std::vector<const LoftBoundaryCondition*> result;
+    if (start)
+      result.push_back(&*start);
+    if (end)
+      result.push_back(&*end);
+    for (const auto& patch : patch_boundaries)
+      result.push_back(&patch.condition);
+    return result;
+  }
 };
 
 [[nodiscard]] std::string_view to_string(LoftFeatureKind kind) noexcept;

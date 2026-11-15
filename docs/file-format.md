@@ -1736,7 +1736,12 @@ constraint record stores `linear_tolerance` (Length parameter ID), `angular_tole
 `section_identity`, typed Face-role `support`, nullable imported `source_body`, `continuity`
 (`g1`/`g2`), `reverse_normal` and `tangent_scale`. A guide stores `guide`, `reversed` and `anchors`;
 each anchor stores `section_identity`, nullable `boundary_entity`, `boundary_fraction` and
-`guide_fraction`. Unknown, missing, null-in-place-of-object or out-of-range values fail closed.
+`guide_fraction`. Optional nonempty `patch_boundaries` stores records with exactly `condition`,
+`from_guide` and `to_guide`; `condition` uses the same strict boundary codec. The ordered guide pair
+must be adjacent (including the final-to-first pair on a closed section), unique per terminal
+section and disjoint from whole-boundary start/end intent. Empty arrays are omitted canonically;
+legacy V12 records keep their existing six-field constraint shape. No patch topology is serialized.
+Unknown, missing, null-in-place-of-object or out-of-range values fail closed.
 
 V1–V11 reject the reserved new Loft field. V12 requires actual constraint intent and inherits V11
 native-path/material-region capabilities without requiring them to be present. Historical global
