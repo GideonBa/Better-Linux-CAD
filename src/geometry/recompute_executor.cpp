@@ -27,6 +27,7 @@
 #include "derived_curve_internal.hpp"
 #include "loft_section_alignment_internal.hpp"
 #include "native_path_curve.hpp"
+#include "semantic_path_segment.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -2155,10 +2156,14 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
       }
       resolved.insert(resolved.end(), spatial.begin(), spatial.end());
       continue;
-    } else if (reference.source_kind() == PathSegmentSourceKind::FeatureEdge) {
-      return Result<std::vector<SweepPathSegment>>::failure(
-          geometry_error(reference.source_node_id(),
-                         "Feature-edge paths require geometric capability validation"));
+    } else if (preserving &&
+               (reference.source_kind() == PathSegmentSourceKind::FeatureEdge ||
+                reference.source_kind() == PathSegmentSourceKind::SemanticGeneratedEdge)) {
+      auto native =
+          detail::resolve_semantic_path_segment(document, reference, shape_cache, import_context);
+      if (!native)
+        return Result<std::vector<SweepPathSegment>>::failure(native.error());
+      segment = std::move(native.value());
     } else {
       if (!allow_surface_boundary_sources)
         return Result<std::vector<SweepPathSegment>>::failure(
