@@ -39,6 +39,18 @@
 #include <vector>
 
 namespace blcad::geometry {
+std::optional<LoftVerificationReport> LoftAdapter::verification(const GeometryShape& shape) {
+  return shape.empty() ? std::nullopt : shape.impl_->loft_verification;
+}
+GeometryShape LoftAdapter::with_verification(const GeometryShape& shape,
+                                             LoftVerificationReport report) {
+  if (shape.empty())
+    return shape;
+  auto owned = std::make_shared<GeometryShape::Impl>(*shape.impl_);
+  owned->loft_verification = report;
+  return GeometryShape(std::move(owned));
+}
+
 namespace {
 
 constexpr double kTolerance = 1.0e-8;

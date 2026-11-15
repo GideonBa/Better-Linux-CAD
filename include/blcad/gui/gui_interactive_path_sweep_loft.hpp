@@ -483,6 +483,8 @@ public:
     kind_ = kind;
     result_body_ = std::move(result_body);
     sections_.clear();
+    constraints_.reset();
+    pending_parameters_.clear();
     path_curve_.reset();
     guide_curves_.clear();
     continuity_ = LoftContinuity::C0;
@@ -533,6 +535,15 @@ public:
   }
 
   void set_continuity(LoftContinuity continuity) noexcept { continuity_ = continuity; }
+  void set_constraints(std::optional<LoftConstraintIntent> value) {
+    constraints_ = std::move(value);
+  }
+  void set_pending_parameters(std::vector<Parameter> values) {
+    pending_parameters_ = std::move(values);
+  }
+  [[nodiscard]] const std::vector<ProfileSectionReference>& sections() const noexcept {
+    return sections_;
+  }
   void set_path_curve(std::optional<PathCurveId> path) { path_curve_ = std::move(path); }
   [[nodiscard]] Result<std::size_t> add_guide_curve(PathCurveId guide) {
     if (!active_) return fail("no loft command is active");
@@ -609,6 +620,8 @@ private:
       if (!added)
         return added;
     }
+    if (auto seeded = detail::provision_new_feature_parameters(part, pending_parameters_); !seeded)
+      return seeded;
     auto context = kind_ == LoftFeatureKind::LoftCut
                        ? FeatureBodyResultContext::create(FeatureBodyOperationMode::Cut,
                                                           result_body_, std::nullopt)
@@ -624,7 +637,10 @@ private:
     }
     Result<LoftFeature> feature = build_loft(context.value(), std::move(effective_sections));
     if (feature.has_error()) return Result<std::size_t>::failure(feature.error());
-    return part.add_loft_feature(std::move(feature.value()));
+    auto constrained = feature.value().with_constraints(constraints_);
+    if (!constrained)
+      return Result<std::size_t>::failure(constrained.error());
+    return part.add_loft_feature(std::move(constrained.value()));
   }
 
   [[nodiscard]] Result<LoftFeature>
@@ -659,6 +675,8 @@ private:
         Error::validation("gui.interactive_loft", std::move(message)));
   }
 
+  std::optional<LoftConstraintIntent> constraints_;
+  std::vector<Parameter> pending_parameters_;
   bool active_{false};
   FeatureId feature_{""};
   std::string name_;

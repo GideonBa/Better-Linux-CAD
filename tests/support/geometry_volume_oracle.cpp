@@ -1,4 +1,5 @@
 #include "geometry_volume_oracle.hpp"
+#include "constrained_loft_fixture.hpp"
 
 #include "blcad/geometry/occt_shape_view.hpp"
 
@@ -66,4 +67,10 @@ SolidPointLocation classify_solid_point(const geometry::GeometryShape& shape, Po
   }
 }
 
+} // namespace blcad::test
+
+namespace blcad::test {
+PartDocument constrained_airfoil_fixture() {
+  return constrained_loft::airfoil();
+}
 } // namespace blcad::test

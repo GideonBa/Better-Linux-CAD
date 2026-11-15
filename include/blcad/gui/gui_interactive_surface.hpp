@@ -23,7 +23,7 @@ namespace blcad::gui {
 
 // Block 128 interactive Surface authoring and closed-shell-to-solid conversion.
 //
-// One headless controller over the frozen Block-88..92 SurfaceFeature contracts:
+// One shared creation/edit controller over legacy and typed advanced Surface intent:
 // Boundary/Fill collect boundary-curve chains; Trim picks a target surface and a
 // trimming contour; Extend drags a boundary distance; Stitch collects surfaces
 // with a typed tolerance; ClosedShellToSolid converts a closed shell. Because
@@ -33,6 +33,7 @@ namespace blcad::gui {
 // transaction that seeds any driving parameter and adds the record.
 inline constexpr std::string_view kSurfaceToleranceValueId = "surface.stitch_tolerance";
 inline constexpr std::string_view kSurfaceExtendHandleId = "surface.extend";
+inline constexpr std::string_view kSurfaceOffsetHandleId = "surface.offset";
 
 class GuiInteractiveSurfaceController {
 public:
@@ -93,6 +94,122 @@ public:
     distance_ = distance->value().millimeters();
     pending_parameters_ = std::move(pending_parameters);
     return Result<std::size_t>::success(1);
+  }
+
+  [[nodiscard]] Result<std::size_t>
+  begin_offset(const GuiDocumentSession& session, FeatureId feature, std::string name,
+               SurfaceFeatureKind kind, SurfaceReference source, SurfaceOffsetParameters parameters,
+               FeatureBodyResultContext context, std::optional<Body> pending_body = {},
+               std::vector<Parameter> pending_parameters = {}) {
+    if (kind != SurfaceFeatureKind::OffsetSurface && kind != SurfaceFeatureKind::Thicken)
+      return fail("Choose Offset Surface or Thicken");
+    std::vector<std::pair<ParameterId, ParameterType>> expected = {
+        {parameters.distance, ParameterType::Length},
+        {parameters.tolerance, ParameterType::Length}};
+    if (parameters.maximum_deviation)
+      expected.push_back({*parameters.maximum_deviation, ParameterType::Length});
+    if (auto valid = detail::validate_new_feature_parameters(session, pending_parameters, expected);
+        !valid)
+      return valid;
+    const Parameter* distance = session.part_document()->find_parameter(parameters.distance);
+    for (const auto& value : pending_parameters)
+      if (value.id() == parameters.distance)
+        distance = &value;
+    if (!distance || distance->type() != ParameterType::Length)
+      return fail("Select a Length offset/thickness");
+    if (auto begun = begin_common(session, std::move(feature), std::move(name),
+                                  context.effective_produced_body(), std::move(pending_body));
+        !begun)
+      return begun;
+    kind_ = kind;
+    target_ = std::move(source);
+    offset_parameters_ = std::move(parameters);
+    offset_context_ = std::move(context);
+    pending_parameters_ = std::move(pending_parameters);
+    distance_parameter_ = offset_parameters_->distance;
+    distance_ = distance->value().millimeters();
+    return Result<std::size_t>::success(1);
+  }
+  // The same candidate authority serves creation and editing. Retain every
+  // authored field and binding until the user explicitly changes that input.
+  [[nodiscard]] Result<std::size_t> begin_edit(const GuiDocumentSession& session, FeatureId id) {
+    const auto* part = session.part_document();
+    const auto* record = part ? part->find_surface_feature(id) : nullptr;
+    if (!record)
+      return fail("Select an existing Surface feature");
+    if (auto begun = begin_common(session, id, surface_feature_name(*record),
+                                  surface_feature_result_body(*record), {});
+        !begun)
+      return begun;
+    kind_ = surface_feature_kind(*record);
+    editing_ = true;
+    std::visit(
+        [&](const auto& f) {
+          using T = std::decay_t<decltype(f)>;
+          if constexpr (std::is_same_v<T, BoundarySurfaceFeature> ||
+                        std::is_same_v<T, FillSurfaceFeature>)
+            boundaries_ = f.boundaries();
+          else if constexpr (std::is_same_v<T, TrimSurfaceFeature>) {
+            target_ = f.target();
+            trimming_ = f.trimming();
+            trim_options_ = f.options();
+          } else if constexpr (std::is_same_v<T, ExtendSurfaceFeature>) {
+            target_ = f.target();
+            extend_boundary_ = f.boundary();
+            distance_parameter_ = f.distance_parameter();
+            extend_options_ = f.options();
+          } else if constexpr (std::is_same_v<T, SurfaceStitchFeature>) {
+            surfaces_ = f.surfaces();
+            tolerance_parameter_ = f.tolerance_parameter();
+          } else if constexpr (std::is_same_v<T, ClosedShellToSolidFeature>)
+            target_ = f.shell();
+          else {
+            target_ = f.target();
+            offset_parameters_ = f.parameters();
+            offset_context_ = f.body_result_context();
+            distance_parameter_ = f.parameters().distance;
+          }
+        },
+        *record);
+    if (const auto* value = part->find_parameter(distance_parameter_))
+      distance_ = value->value().millimeters();
+    if (const auto* value = part->find_parameter(tolerance_parameter_))
+      tolerance_ = value->value().millimeters();
+    return Result<std::size_t>::success(1);
+  }
+  void set_trim_options(std::optional<SurfaceTrimOptions> value) {
+    trim_options_ = std::move(value);
+  }
+  void set_extend_options(std::optional<SurfaceExtendOptions> value) {
+    extend_options_ = std::move(value);
+  }
+  void set_offset_side(SurfaceOffsetSide side) {
+    if (offset_parameters_)
+      offset_parameters_->side = side;
+  }
+  void set_offset_intent(SurfaceOffsetParameters parameters, FeatureBodyResultContext context) {
+    offset_parameters_ = std::move(parameters);
+    offset_context_ = std::move(context);
+    distance_parameter_ = offset_parameters_->distance;
+    result_body_ = offset_context_->effective_produced_body();
+  }
+  void set_distance_binding(ParameterId id) {
+    distance_parameter_ = std::move(id);
+  }
+  void set_numeric_parameters(std::vector<std::pair<ParameterId, double>> values) {
+    numeric_parameters_ = std::move(values);
+  }
+  void set_pending_parameters(std::vector<Parameter> values) {
+    pending_parameters_ = std::move(values);
+  }
+  void set_pending_paths(std::vector<PathCurve> paths) {
+    pending_paths_ = std::move(paths);
+  }
+  void set_target(SurfaceReference value) {
+    target_ = std::move(value);
+  }
+  [[nodiscard]] bool editing() const noexcept {
+    return editing_;
   }
 
   [[nodiscard]] Result<std::size_t> begin_stitch(const GuiDocumentSession& session,
@@ -172,20 +289,35 @@ public:
     return Result<std::size_t>::success(surfaces_.size());
   }
 
-  void set_distance(double millimeters) noexcept { distance_ = millimeters; }
-  void set_tolerance(double millimeters) noexcept { tolerance_ = millimeters; }
+  void set_distance(double millimeters) noexcept {
+    distance_ = millimeters;
+    distance_changed_ = true;
+  }
+  void set_tolerance(double millimeters) noexcept {
+    tolerance_ = millimeters;
+    tolerance_changed_ = true;
+  }
   void set_manipulator_frame(GuiFeatureManipulatorFrame frame) noexcept { frame_ = frame; }
 
   [[nodiscard]] std::vector<GuiViewportManipulatorHandle> handles() const {
     std::vector<GuiViewportManipulatorHandle> handles;
-    if (!active_ || kind_ != SurfaceFeatureKind::ExtendSurface) return handles;
+    const bool offset =
+        kind_ == SurfaceFeatureKind::OffsetSurface || kind_ == SurfaceFeatureKind::Thicken;
+    if (!active_ || (kind_ != SurfaceFeatureKind::ExtendSurface && !offset))
+      return handles;
     GuiViewportManipulatorHandle handle;
-    handle.id = std::string(kSurfaceExtendHandleId);
+    handle.id = std::string(offset ? kSurfaceOffsetHandleId : kSurfaceExtendHandleId);
     handle.kind = GuiViewportManipulatorKind::Linear;
     handle.origin = frame_.origin;
     handle.axis = frame_.axis;
+    if (offset && offset_parameters_->side == SurfaceOffsetSide::OppositeNormal)
+      handle.axis = {-frame_.axis.x, -frame_.axis.y, -frame_.axis.z};
+    if (offset && offset_parameters_->side == SurfaceOffsetSide::Symmetric)
+      handle.model_units_per_value = .5;
     handle.reference_value = distance_;
-    handle.minimum_value = 0.0;
+    handle.minimum_value = offset ? 1e-6 : 0.0;
+    if (offset)
+      handle.maximum_value = 1e6;
     handles.push_back(std::move(handle));
     return handles;
   }
@@ -196,13 +328,15 @@ public:
     if (kind_ == SurfaceFeatureKind::SurfaceStitch &&
         candidate.handle_id == kSurfaceToleranceValueId &&
         candidate.value_kind == GuiViewportManipulatorValueKind::Distance) {
-      tolerance_ = candidate.scalar_value;
+      set_tolerance(candidate.scalar_value);
       return true;
     }
-    if (kind_ == SurfaceFeatureKind::ExtendSurface &&
-        candidate.handle_id == kSurfaceExtendHandleId &&
+    if (((kind_ == SurfaceFeatureKind::ExtendSurface &&
+          candidate.handle_id == kSurfaceExtendHandleId) ||
+         ((kind_ == SurfaceFeatureKind::OffsetSurface || kind_ == SurfaceFeatureKind::Thicken) &&
+          candidate.handle_id == kSurfaceOffsetHandleId)) &&
         candidate.value_kind == GuiViewportManipulatorValueKind::Distance) {
-      distance_ = candidate.scalar_value;
+      set_distance(candidate.scalar_value);
       return true;
     }
     return false;
@@ -233,7 +367,8 @@ public:
           auto feature = build_feature();
           if (feature.has_error())
             return Result<std::size_t>::failure(feature.error());
-          return part.add_surface_feature(std::move(feature.value()));
+          return editing_ ? part.update_surface_feature(std::move(feature.value()))
+                          : part.add_surface_feature(std::move(feature.value()));
         });
     if (committed.has_error()) return committed;
     active_ = false;
@@ -249,7 +384,14 @@ private:
       if (!added)
         return added;
     }
-    return detail::provision_new_feature_parameters(part, pending_parameters_);
+    if (auto parameters = detail::provision_new_feature_parameters(part, pending_parameters_);
+        !parameters)
+      return parameters;
+    for (const auto& path : pending_paths_) {
+      if (auto added = part.add_path_curve(path); !added)
+        return added;
+    }
+    return Result<std::size_t>::success(pending_parameters_.size() + pending_paths_.size());
   }
   [[nodiscard]] Result<PartDocument> candidate_document(const GuiDocumentSession& session) const {
     if (!active_ || !session.part_document())
@@ -268,7 +410,8 @@ private:
     auto feature = build_feature();
     if (!feature)
       return Result<PartDocument>::failure(feature.error());
-    auto added = candidate.add_surface_feature(std::move(feature.value()));
+    auto added = editing_ ? candidate.update_surface_feature(std::move(feature.value()))
+                          : candidate.add_surface_feature(std::move(feature.value()));
     if (!added)
       return Result<PartDocument>::failure(added.error());
     return Result<PartDocument>::success(std::move(candidate));
@@ -283,6 +426,17 @@ private:
       return valid;
     pending_body_ = std::move(pending_body);
     pending_parameters_.clear();
+    pending_paths_.clear();
+    numeric_parameters_.clear();
+    editing_ = false;
+    distance_changed_ = false;
+    tolerance_changed_ = false;
+    trim_options_.reset();
+    extend_options_.reset();
+    offset_parameters_.reset();
+    offset_context_.reset();
+    distance_parameter_ = ParameterId("");
+    tolerance_parameter_ = ParameterId("");
     feature_ = std::move(feature);
     name_ = std::move(name);
     result_body_ = std::move(result_body);
@@ -323,6 +477,11 @@ private:
       return (target_.has_value() && extend_boundary_.has_value())
                  ? Result<std::size_t>::success(1)
                  : fail("extend requires a target surface and a boundary");
+    case SurfaceFeatureKind::OffsetSurface:
+    case SurfaceFeatureKind::Thicken:
+      return target_ && offset_parameters_ && offset_context_
+                 ? Result<std::size_t>::success(1)
+                 : fail("Select owned Surface faces and an output mode");
     case SurfaceFeatureKind::ClosedShellToSolid:
       return target_.has_value() ? Result<std::size_t>::success(1)
                                  : fail("closed-shell-to-solid requires a shell");
@@ -331,21 +490,27 @@ private:
   }
 
   [[nodiscard]] Result<std::size_t> seed_parameters(PartDocument& part) const {
-    if (kind_ == SurfaceFeatureKind::ExtendSurface) {
-      auto quantity = Quantity::length_mm(distance_, distance_parameter_.value());
-      if (quantity.has_error()) return Result<std::size_t>::failure(quantity.error());
-      auto changed = part.set_parameter_value(distance_parameter_, quantity.value());
-      return changed.has_error() ? Result<std::size_t>::failure(changed.error())
-                                 : Result<std::size_t>::success(changed.value().size());
+    auto values = numeric_parameters_;
+    if (distance_changed_ &&
+        (kind_ == SurfaceFeatureKind::ExtendSurface || kind_ == SurfaceFeatureKind::OffsetSurface ||
+         kind_ == SurfaceFeatureKind::Thicken))
+      values.emplace_back(distance_parameter_, distance_);
+    if (tolerance_changed_ && kind_ == SurfaceFeatureKind::SurfaceStitch)
+      values.emplace_back(tolerance_parameter_, tolerance_);
+    std::size_t count = 0;
+    for (const auto& [id, value] : values) {
+      const auto* previous = part.find_parameter(id);
+      if (previous && previous->value().millimeters() == value)
+        continue;
+      auto quantity = Quantity::length_mm(value, id.value());
+      if (!quantity)
+        return Result<std::size_t>::failure(quantity.error());
+      auto updated = part.set_parameter_value(id, quantity.value());
+      if (!updated)
+        return Result<std::size_t>::failure(updated.error());
+      count += updated.value().size();
     }
-    if (kind_ == SurfaceFeatureKind::SurfaceStitch) {
-      auto quantity = Quantity::length_mm(tolerance_, tolerance_parameter_.value());
-      if (quantity.has_error()) return Result<std::size_t>::failure(quantity.error());
-      auto changed = part.set_parameter_value(tolerance_parameter_, quantity.value());
-      return changed.has_error() ? Result<std::size_t>::failure(changed.error())
-                                 : Result<std::size_t>::success(changed.value().size());
-    }
-    return Result<std::size_t>::success(0);
+    return Result<std::size_t>::success(count);
   }
 
   [[nodiscard]] Result<SurfaceFeature> build_feature() const {
@@ -364,18 +529,35 @@ private:
       auto feature =
           TrimSurfaceFeature::create(feature_, name_, *target_, *trimming_, result_body_);
       if (feature.has_error()) return Result<SurfaceFeature>::failure(feature.error());
-      return Result<SurfaceFeature>::success(std::move(feature.value()));
+      auto configured = feature.value().with_options(trim_options_);
+      if (!configured)
+        return Result<SurfaceFeature>::failure(configured.error());
+      return Result<SurfaceFeature>::success(std::move(configured.value()));
     }
     case SurfaceFeatureKind::ExtendSurface: {
       auto feature = ExtendSurfaceFeature::create(feature_, name_, *target_, *extend_boundary_,
                                                   distance_parameter_, result_body_);
       if (feature.has_error()) return Result<SurfaceFeature>::failure(feature.error());
-      return Result<SurfaceFeature>::success(std::move(feature.value()));
+      auto configured = feature.value().with_options(extend_options_);
+      if (!configured)
+        return Result<SurfaceFeature>::failure(configured.error());
+      return Result<SurfaceFeature>::success(std::move(configured.value()));
     }
     case SurfaceFeatureKind::SurfaceStitch: {
       auto feature = SurfaceStitchFeature::create(feature_, name_, surfaces_, tolerance_parameter_,
                                                   result_body_);
       if (feature.has_error()) return Result<SurfaceFeature>::failure(feature.error());
+      return Result<SurfaceFeature>::success(std::move(feature.value()));
+    }
+    case SurfaceFeatureKind::OffsetSurface:
+    case SurfaceFeatureKind::Thicken: {
+      auto feature = kind_ == SurfaceFeatureKind::Thicken
+                         ? SurfaceOffsetFeature::create_thicken(
+                               feature_, name_, *target_, *offset_parameters_, *offset_context_)
+                         : SurfaceOffsetFeature::create_offset(
+                               feature_, name_, *target_, *offset_parameters_, *offset_context_);
+      if (!feature)
+        return Result<SurfaceFeature>::failure(feature.error());
       return Result<SurfaceFeature>::success(std::move(feature.value()));
     }
     case SurfaceFeatureKind::ClosedShellToSolid: {
@@ -389,6 +571,8 @@ private:
   }
 
   [[nodiscard]] std::string_view apply_label() const noexcept {
+    if (editing_)
+      return "Edit Surface";
     return kind_ == SurfaceFeatureKind::ClosedShellToSolid ? "Convert Shell to Solid"
                                                            : "Apply Surface";
   }
@@ -402,6 +586,13 @@ private:
         Error::validation("gui.interactive_surface", std::move(message)));
   }
 
+  bool editing_ = false, distance_changed_ = false, tolerance_changed_ = false;
+  std::optional<SurfaceTrimOptions> trim_options_;
+  std::optional<SurfaceExtendOptions> extend_options_;
+  std::optional<SurfaceOffsetParameters> offset_parameters_;
+  std::optional<FeatureBodyResultContext> offset_context_;
+  std::vector<PathCurve> pending_paths_;
+  std::vector<std::pair<ParameterId, double>> numeric_parameters_;
   std::optional<Body> pending_body_;
   std::vector<Parameter> pending_parameters_;
   bool active_{false};

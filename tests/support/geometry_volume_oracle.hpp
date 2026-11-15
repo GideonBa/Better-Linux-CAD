@@ -3,7 +3,11 @@
 #include "blcad/core/spatial.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 
+namespace blcad {
+class PartDocument;
+}
 namespace blcad::test {
+[[nodiscard]] PartDocument constrained_airfoil_fixture();
 
 struct IntegratedSolidVolume {
   double volume_mm3;

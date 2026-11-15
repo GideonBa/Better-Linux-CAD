@@ -224,3 +224,25 @@ positive middle-section/guide edits and unchanged logical identities after secti
 The Core V12 codec also roundtrips a 257-condition intent collection: Geometry's construction
 limits are explicit diagnostics, never hidden persistence limits. See the acceptance table in
 `docs/mvp-plan.md` for exact build/runtime evidence and native regression scope.
+
+
+### Transient numerical feedback
+
+`LoftAdapter::verification` exposes native constrained-tool evidence: maximum curve/interior-section
+error, final post-sewing support position/normal error, G2 curvature error, separate G1/G2 join
+counts, station count and their authored physical tolerances. Curvature error covers requested G2
+joins only; zero requested joins proves no corresponding continuity claim. This bounded native
+sampling/refinement report is derived metadata, never persisted topology or a global continuum
+certificate.
+
+The report remains explicitly qualified **before Body operation** when the constructed tool passes
+through Join/Cut/Intersect. It does not claim uniform smoothness on a final Boolean result or across
+its caps. Metadata attachment clones the backing record and preserves source geometry/lineage.
+Both executor and direct constrained entry points diagnose unsupported global longitudinal G2
+separately from independently requested boundary G2.
+
+Shared candidate/consumer verification: Geometry **35 / 3,996**; affected offscreen Qt
+**14 passed / 1 native-only skip / 1,541 assertions**; all five targets passed. The native feature-edit
+case remains skipped in that offscreen filter; complete native advanced authoring is still pending.
+Frozen runtime: **1,195 files**, SHA256
+`29ef91b9fd8d726573d40f2e86bf2238b4a74714a9f7183e4506f2e2eaef8c68`.

@@ -2,6 +2,7 @@
 
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 
+#include "blcad/geometry/loft_verification.hpp"
 #include "blcad/geometry/surface_offset_adapter.hpp"
 #include "face_lineage.hpp"
 
@@ -21,6 +22,7 @@ struct GeometryShape::Impl {
   TopoDS_Shape shape;
   std::vector<detail::FaceLineage> face_lineage;
   std::optional<SurfaceDistanceReport> surface_distance;
+  std::optional<LoftVerificationReport> loft_verification;
 };
 
 } // namespace blcad::geometry
