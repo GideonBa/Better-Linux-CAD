@@ -29,23 +29,26 @@ Result<std::vector<FinishingSelectionTarget>> FinishingSelectionBuilder::build(
   const auto history = detail::validate_history_modeling_scope(document, cache, history_prefix);
   if (!history)
     return Result<std::vector<FinishingSelectionTarget>>::failure(history.error());
+  const bool path = role == PartFeatureInputRole::PathSegment;
+  const bool surface = path || role == PartFeatureInputRole::SurfaceSourceFace ||
+                       role == PartFeatureInputRole::LoftBoundarySupport;
   const bool edge =
-      role == PartFeatureInputRole::FilletEdge || role == PartFeatureInputRole::ChamferEdge;
-  if (!edge && role != PartFeatureInputRole::ShellRemovalFace &&
+      path || role == PartFeatureInputRole::FilletEdge || role == PartFeatureInputRole::ChamferEdge;
+  if (!surface && !edge && role != PartFeatureInputRole::ShellRemovalFace &&
       role != PartFeatureInputRole::DraftFace)
     return Result<std::vector<FinishingSelectionTarget>>::failure(
         Error::validation(body.value(), "unsupported finishing selection role"));
   const auto* result = cache.find_body_result(body);
   const auto* target_body = document.find_body(body);
-  if (!result || !target_body || target_body->kind() != BodyKind::Solid ||
+  if (!result || !target_body || (!surface && target_body->kind() != BodyKind::Solid) ||
       (visibility == FinishingSelectionVisibility::VisibleOnly &&
        target_body->visibility() != BodyVisibility::Visible) ||
       result->shape.empty())
     return Result<std::vector<FinishingSelectionTarget>>::failure(Error::validation(
         body.value(),
         visibility == FinishingSelectionVisibility::VisibleOnly
-            ? "finishing requires a visible, recomputed solid Body"
-            : "input selection requires a recomputed solid Body in its modeling scope"));
+            ? "selection requires a visible, recomputed compatible Body"
+            : "input selection requires a recomputed compatible Body in its modeling scope"));
   const auto& target = result->shape.impl_->shape;
   if (!document.imported_body_features().empty()) {
     auto observed = observe_imported_part_sources(document, import_context, cache.history_plan());
@@ -111,6 +114,10 @@ Result<std::vector<FinishingSelectionTarget>> FinishingSelectionBuilder::build(
                        {(xmin + xmax) / 2, (ymin + ymax) / 2, (zmin + zmax) / 2}});
   };
   for (const auto& base : document.imported_body_features()) {
+    // Imported Path bindings name the immutable base. Viewport paths on the
+    // current Body use a complete result-edge witness below, including placement.
+    if (path)
+      continue;
     if (!detail::validate_history_source(document, base.id().value(), &cache))
       continue;
     const auto& definition = base.definition();

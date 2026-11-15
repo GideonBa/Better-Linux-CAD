@@ -1013,3 +1013,8 @@ Implement and verify these coherent slices, each in commits below 1,500 added li
 Individual foundations do not accept the whole block. Complete 173 before the combined
 S04/G04/X01 milestone in 174, then continue through 184 under the expanded request. Preserve
 all later 185–204 planning and explicitly deferred capabilities.
+
+The [advanced input catalog foundation](gui-spatial-surface-workbench-mvp7.md#advanced-input-catalog-foundation)
+is verified: typed current-Body faces/native edges, curved Surface quilts, hidden scope and placed
+imported rims; focused Geometry **11 / 515** and all five targets passed. Native controls and
+complete workflow acceptance remain in progress.

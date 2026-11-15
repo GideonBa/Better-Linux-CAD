@@ -735,6 +735,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/right_workplane_pipeline_tests.cpp
       tests/geometry/semantic_reference_evaluator_tests.cpp
       tests/geometry/finishing_selection_tests.cpp
+      tests/geometry/advanced_surface_selection_tests.cpp
       tests/geometry/shape_cache_tests.cpp
       tests/geometry/equation_curve_geometry_tests.cpp
       tests/geometry/sketch_3d_geometry_adapter_tests.cpp

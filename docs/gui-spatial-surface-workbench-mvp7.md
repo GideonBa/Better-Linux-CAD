@@ -25,3 +25,23 @@ guide, path, section, topology, or output-Body references fail closed through no
 ./build/dev-gui/blcad_gui_tests "[gui][sweep-loft]"
 ./build/dev-gui/blcad_gui_tests "[gui][surface-workbench]"
 ```
+
+
+## Advanced input catalog foundation
+
+`FinishingSelectionBuilder` supplies compatible `SurfaceSourceFace`, `LoftBoundarySupport` and
+`PathSegment` inputs from the actual recomputed Solid or Surface Body. Existing finishing roles
+still require a Solid. Face identities retain authored contributors and explicit Body ownership;
+curved edges use complete, unique native result witnesses. Hidden input access is explicit and
+does not change persistent visibility. Stale or ambiguous sources reject normally.
+
+Viewport paths selected on a placed imported Body bind the current result witness. Existing
+imported-topology Path bindings retain their immutable-base meaning; the catalog does not relabel
+those references to make a transformed edge resolve. Input edits require a recomputed cache for
+the new source intent before subsequent read-only queries.
+
+[Focused selectors](../tests/geometry/advanced_surface_selection_tests.cpp) prove three-face
+curved/tangent quilts, typed support ownership, native boundary paths, explicit hidden scope and
+a placed imported cylindrical rim. Combined with existing finishing and semantic-path regressions:
+**11 cases / 515 assertions**, all passed; all five build targets passed. This is the catalog
+foundation only; complete native advanced authoring remains in progress in `mvp-plan.md`.
