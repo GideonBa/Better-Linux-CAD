@@ -1,9 +1,9 @@
 # Part Guided and Continuity-controlled Loft Geometry MVP-6
 
-Planned extension: [Blocks 168–169](inventor-parity-sequence.md) own richer binding intent
-and independently verified G2. The existing G2 rejection below remains correct until that
-execution is implemented and accepted; support-face and longitudinal continuity stay distinct.
-
+[Blocks 168–169](inventor-parity-sequence.md) add authored bindings and independently verified
+boundary G2 within the capability limits below. Historical global longitudinal G2 retains its
+diagnostic; support-face and longitudinal continuity stay distinct. Advanced native controls
+remain planned in Block 173.
 Status: implemented in Block 87.
 
 Block 87 executes the persistent primary-path, ordered-guide, and continuity intent introduced in
@@ -97,8 +97,8 @@ Blocks 48–94 are implemented. Block 88 Surface feature Core intent and JSON is
 ## Native boundary-continuity verification
 
 The private Geometry verifier `surface_join_verification` supplies numerical evidence for constrained
-construction. Its feature integration is under verification in Block 169; numbered G02 acceptance
-remains pending in `docs/mvp-plan.md`.
+construction. Feature integration and bounded G02 acceptance are
+recorded in `docs/mvp-plan.md`.
 
 It evaluates native located trimmed faces at native true-length boundary stations. Incidence uses
 actual 3D distance to the finite trim edges, in millimeters, followed by their native pcurves.
@@ -178,7 +178,7 @@ unsupported until separately implemented and
 verified. Native editing is planned in Block 173.
 
 
-## Constrained feature integration — verification in progress
+## Constrained feature integration
 
 Explicit constraints select the native patch builder; historical unconstrained Loft replay is
 unchanged. Historical global `LoftContinuity::G2` remains a diagnosed unsupported longitudinal
@@ -215,3 +215,12 @@ validation, not global continuum certificates. All constraints retain their auth
 inverse-mm budgets; failure publishes no candidate and no G1 fallback. Complete feature/history/
 exchange proof is recorded only when it passes in `docs/mvp-plan.md`. Advanced native controls and
 Surface-face picking remain planned in Block 173.
+
+
+Feature-level proof uses `[constrained-loft-feature]`: independent smoothstep volumes for all
+four Body operations, actual boundary derivatives and physical STEP sections/curvature, plus
+unequal rolled Airfoils, distinct patch supports, open single-face surfaces, repaired failures,
+positive middle-section/guide edits and unchanged logical identities after section reversal.
+The Core V12 codec also roundtrips a 257-condition intent collection: Geometry's construction
+limits are explicit diagnostics, never hidden persistence limits. See the acceptance table in
+`docs/mvp-plan.md` for exact build/runtime evidence and native regression scope.

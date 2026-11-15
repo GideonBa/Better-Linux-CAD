@@ -230,6 +230,8 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/linear_pattern_adapter.cpp
     src/geometry/loft_adapter.cpp
     src/geometry/surface_join_verification.cpp
+    src/geometry/constrained_loft_network.cpp
+    src/geometry/constrained_loft_feature.cpp
     src/geometry/constrained_loft_patch.cpp
     src/geometry/native_loft_tensor.cpp
     src/geometry/loft_section_alignment.cpp
@@ -683,6 +685,8 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/linear_pattern_pipeline_tests.cpp
       tests/geometry/loft_feature_pipeline_tests.cpp
       tests/geometry/surface_join_verification_tests.cpp
+      tests/geometry/constrained_loft_smooth_tests.cpp
+      tests/geometry/constrained_loft_feature_tests.cpp
       tests/geometry/constrained_loft_patch_tests.cpp
       tests/geometry/multi_section_loft_pipeline_tests.cpp
       tests/geometry/loft_section_compatibility_tests.cpp

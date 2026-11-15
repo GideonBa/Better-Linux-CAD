@@ -3508,10 +3508,6 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
   if (feature->sections().size() < 2U)
     return Result<std::size_t>::failure(
         geometry_error(feature_id.value(), "loft requires at least two ordered sections"));
-  if (feature->constraints())
-    return Result<std::size_t>::failure(geometry_error(
-        feature_id.value(),
-        "Constrained Loft execution requires verified boundary construction (Block 169)"));
   if (feature->continuity() == LoftContinuity::G2)
     return Result<std::size_t>::failure(
         geometry_error(feature_id.value(),
@@ -3550,7 +3546,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
   Result<GeometryShape> tool = Result<GeometryShape>::failure(
       geometry_error(feature_id.value(), "unsupported two-section loft"));
   const bool open = feature->sections().front().kind() == LoftSectionKind::OpenPath;
-  if (open) {
+  if (feature->constraints()) {
+    tool = loft_adapter_.loft_constrained(document, *feature, working_cache, import_context_);
+  } else if (open) {
     if (feature->kind() != LoftFeatureKind::LoftSurface)
       return Result<std::size_t>::failure(
           geometry_error(feature_id.value(), "open loft sections require LoftSurface"));

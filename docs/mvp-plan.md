@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 168
-current_block: 169
-current_boundary: Block 169 feature integration under verification; G02 acceptance pending
-current_tag: "[parity-b169]"
+implemented_through: Block 169
+current_block: 170
+current_boundary: Block 170 OffsetSurface/Thicken intent planned; 168–169 PR delivery pending
+current_tag: "[parity-b170]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–168 accepted; Block 169 in progress; Blocks 170–204 planned"
+  advanced_modeling_workflows: "Blocks 145–169 accepted; Blocks 170–204 planned"
 ---
 
 # MVP Plan
@@ -34,16 +34,16 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 168
-current block        Block 169 (in progress; native continuity verification)
+implemented through  Block 169
+current block        Block 170 (planned; OffsetSurface/Thicken intent)
 current phase        Curves, paths and surfaces
-current boundary     Block 169 feature integration under verification; G02 acceptance pending
+current boundary     Deliver 168–169 normally before starting the 170–172 Surface branch
 ```
 
-The assigned sequence continues through Block 174. PR #191 was merged normally by rebase;
-`feat/verified-loft-boundaries` starts from clean, upstream-equal main at `e765c42`.
-Block 168 is verified on that branch; delivery remains grouped with 169. Blocks 169–174 retain
-their complete planned acceptance.
+The assigned sequence continues through Block 174. Blocks 168–169 are accepted on
+`feat/verified-loft-boundaries`, based on clean upstream main after PR #191. Deliver their combined
+PR normally, then verify the merged tree and update main before starting 170–172. Blocks 170–174
+retain their complete planned acceptance, including native advanced authoring and integration.
 [The consolidated sequence](inventor-parity-sequence.md)
 contains dependencies and implementation criteria; [the test plan](inventor-parity-test-plan.md)
 contains individual and combined acceptance; [the UI contract](user-interface.md) owns the
@@ -76,7 +76,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 165 | Delivered in [PR #189](https://github.com/GideonBa/Better-Linux-CAD/pull/189): solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 consumers. |
 | 166 | Delivered in [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190): explicit compatible native paths, checked twist, mixed physical consumers and native upgrade/history. |
 | 167 | Delivered in [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191): strict compatible V11, native semantic edges, exact hollow sections, cyclic circular frames and independent G01/exchange proofs. |
-| 168–169 | 168 intent/persistence accepted on the active branch; 169 constrained execution is in progress; G02 acceptance remains pending. |
+| 168–169 | Accepted strict V12 intent and verified native G02 construction within documented limits; normal combined PR delivery pending. |
 | 170–172 | Offset/Thicken intent and checked Geometry, curved Trim/Extend and derived gap diagnostics with G03–G04 acceptance. |
 | 173–174 | Native advanced curve/Surface workflows, integrated edits/history/reopen and physical STEP roundtrip acceptance. |
 
@@ -171,8 +171,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–168 are **Implemented and accepted**;
-Block 169 is **In progress**; Blocks 170–204 are **Planned; not started**.
+Status authority: Blocks 145–169 are **Implemented and accepted**;
+Blocks 170–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -185,7 +185,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
-| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166–168 accepted; 169 in progress; 170–174 planned |
+| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166–169 accepted; 170–174 planned |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
 | G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
@@ -232,6 +232,7 @@ PR links preserve individual slice provenance without copying intermediate compl
 | 166 | Explicit compatible native paths, strict V10/Project ownership, checked arc-length twist, mixed physical consumers and native comparison/history | [Path construction](part-path-curve-core-mvp6.md#native-curve-construction), [twist](part-sweep-3d-geometry-mvp6.md#explicit-curve-preserving-twist), [native task](gui-interactive-path-sweep-loft-mvp9.md#explicit-path-execution-comparison); G01 within the 166 boundary | [190](https://github.com/GideonBa/Better-Linux-CAD/pull/190) |
 | 167 | Typed generated/imported native paths, strict necessary V11, exact material-region holes, bounded cyclic frames/roll, faithful native trims/axes and physical G01/STEP recovery | [Native source/precision](part-path-curve-core-mvp6.md#semantic-native-curve-execution--167), [material regions](part-sweep-intent-mvp6.md#material-region-execution), [cyclic capability](part-sweep-3d-geometry-mvp6.md#circular-closed-spine-capability--167), [physical proofs](../tests/geometry/semantic_path_acceptance_tests.cpp) | [191](https://github.com/GideonBa/Better-Linux-CAD/pull/191) |
 | 168 | Separate boundary G1/G2, stable logical guide anchors, strict necessary V12, typed support history, import ownership and atomic tolerance/formula edits | [Intent](part-loft-intent-mvp6.md#authored-boundary-and-guide-constraints), [Core proof](../tests/core/loft_constraint_intent_tests.cpp), [refinement proof](../tests/geometry/loft_section_compatibility_tests.cpp) | Active 168–169 branch; delivery pending |
+| 169 | Verified native Hermite Loft networks, exact source anchors, scoped support faces, one-sided knot derivatives, quilt/solid assembly, all Body operations and physical G02/STEP acceptance | [Construction/limits](part-guided-loft-geometry-mvp6.md#constrained-feature-integration), [feature oracles](../tests/geometry/constrained_loft_feature_tests.cpp), [smooth/STEP oracles](../tests/geometry/constrained_loft_smooth_tests.cpp) | Active 168–169 branch; delivery pending |
 
 The initial full parity plan was delivered in [PR #138](https://github.com/GideonBa/Better-Linux-CAD/pull/138).
 
@@ -901,60 +902,56 @@ The final compact Loft/mixed-section captures were inspected after all CAD proce
 The full Qt suite was not repeated for this backend intent change; the focused runs above are the
 current UI evidence. The earlier full Qt baseline remains recorded under 167.
 
-Geometry explicitly rejects the new constraints until 169 supplies verified construction. Point/pole
-sections remain outside the current section types; singular G2 requests cannot acquire a success
-label. No execution, G02 milestone or advanced authoring completion is claimed by 168. Continue on
-the same branch with 169, then deliver the combined PR normally before the 170–172 Surface branch.
-Preserve every 169–204 requirement, including native authoring in 173 and integration in 174.
+At the 168 boundary, Geometry gated the new constraints pending verified construction. Block 169
+below supplies that execution within explicit limits. Point/pole sections remain outside the
+current types; singular G2 requests cannot acquire a success label. Advanced authoring remains
+173, integrated acceptance remains 174, and all later 175–204 planning is retained.
 
 
-### Block 169 verified G2 Loft — in progress
+### Block 169 verified G2 Loft — accepted
 
-Private Geometry now supplies both a native differential verifier and a constrained Hermite
-BSpline patch kernel. Four ordered exact boundaries, compatible rational section bases and bounded
-interior stations produce a candidate; actual native positional, oriented normal and complete
-signed-curvature-tensor checks decide acceptance. Native 3D trim distance avoids UV/model-unit
-confusion. Independent sextic, cylindrical and unequal/rolled Airfoil fixtures cover physical
-sections, curvature, radius/area and unchanged source BReps. Capability limits and remaining
-construction work are recorded in the [contract](part-guided-loft-geometry-mvp6.md#native-constrained-patch-construction).
+Explicit V12 constraints execute native Hermite BSpline Loft networks with original-entity/true-length
+guide anchors, adjacent-guide support identities, center-path section incidence and immutable
+source BReps. Actual trimmed-face distance, oriented normals and complete signed curvature tensors
+verify every prescribed join, including native knot crossings and one-sided limits. Quilts and
+capped positive solids retain semantic origins; post-sewing/solid orientation is rechecked before
+ordinary New/Join/Cut/Intersect publication. Failed edits retain the last valid result.
 
-All five targets build successfully. The focused Geometry run passes **26 cases / 4,109 assertions**,
-including eight analytic numerical-verifier cases, four native patch cases and existing
-Loft/refinement regressions. Runtime manifest: 1,159 inputs, SHA-256
-`b898de395bf2fce02a5a4f1033ba2bba447a3f15ee99f2e9c541344cecbb0943`.
-Proof: `/tmp/blcad-169-trim5-focused.log`,
-[analytic oracles](../tests/geometry/surface_join_verification_tests.cpp) and
-[patch oracles](../tests/geometry/constrained_loft_patch_tests.cpp).
+G02 combines unequal 8/9/6-edge rolled Airfoil sections, two native rails, a center path and distinct
+neighboring supports. Independent sextic/cylinder/polynomial oracles separate G1-only and nearly
+failing G2, reversed normals, singular poles, anisotropic trim units, narrow knot spikes and tensor
+extrema. Positive middle-section/guide edits, consistent section reversal, exact reopen and
+physical STEP sections/curvature/volumes are covered by the
+[feature](../tests/geometry/constrained_loft_feature_tests.cpp),
+[smooth transition](../tests/geometry/constrained_loft_smooth_tests.cpp) and
+[differential](../tests/geometry/surface_join_verification_tests.cpp) proofs.
 
-This private kernel supplies no constrained Loft feature result yet. Native knot/regularity
-checks, logical guide/support resolution, quilt/solid assembly, Body operations and complete G02
-history/reopen acceptance remain required before 169 advances. The feature execution gate stays
-in force. Advanced native authoring remains 173; Blocks 170–204 retain their full planned scope.
+Capability limits remain explicit in the [contract](part-guided-loft-geometry-mvp6.md#constrained-feature-integration):
+2–32 polynomial C2 rails, 2–11 sections, matching positive section weight functions, compatible
+constant endpoint derivative fields and tangent scale 1. Unsupported rational rails, general
+varying support jets, mixed section reversals, singular frames and exhausted budgets reject.
+Historical global longitudinal `g2` remains unsupported; boundary G2 is distinct. These deferred
+capabilities remain planned work, and advanced native controls remain Block 173.
 
+| Verification | Result |
+| --- | --- |
+| All five dev-gui targets | Built successfully |
+| Full Core | 779 cases / 34,751 assertions; Core inputs unchanged after the final Geometry-only correction |
+| Focused Geometry | 35 cases / 5,924 assertions |
+| Full Geometry | 766 cases / 80,613 assertions, all passed |
+| Focused Qt Loft/Surface/editing | 16 cases: 15 passed, 1 native-only skip / 1,754 assertions |
+| Native path/spatial/Loft/editor, 100% and 150% | 4 cases / 749 assertions at each scale, no skips |
+| Separate native startup | Visible PID/window verified; intentional timeout 124, probe exit 0 |
 
-The next verification slice adds adjacent-guide patch supports, exact native B-spline rail
-corrections, original-entity anchor resolution, center-path section incidence, quilt/solid assembly
-and post-assembly continuity checks. Native curve/surface knot crossings and one-sided derivatives
-supplement true-length refinement; a narrow curvature spike is an explicit negative oracle.
-These source changes are **under verification**. Previous kernel proof above is not evidence for
-feature integration. Complete fresh/history/Body-operation/exchange and native regressions remain
-the acceptance boundary; no numbered status advances from compilation alone.
-
-
-The scoped-support Core slice passes the full Core suite: **779 cases / 34,751 assertions**
-(`/tmp/blcad-169-feature15-core-full.log`). Strict optional V12 patch records, overlap/adjacency,
-dependency protection and suppression are covered in
-[the Core tests](../tests/core/loft_constraint_intent_tests.cpp). A 257-condition fixture proves
-that every Core-valid collection reopens without a separate JSON-only cap; whole and scoped
-conditions use one direct boundary decoder. Geometry construction budgets remain distinct from
-authored persistence. This completes the scoped intent slice only; complete G02 acceptance remains
-under final verification.
-
-
-The completed native-knot/rail slice passes **35 focused Geometry cases / 5,924 assertions**
-(`/tmp/blcad-169-feature16-geometry-focused.log`), including trimmed extrusion support knots,
-physical mm trim incidence, complete signed curvature tensors and all constrained feature oracles.
-All five targets build successfully. Runtime manifest: 1,165 inputs, SHA-256
+Runtime manifest: 1,165 inputs, SHA-256
 `afacf8112100b171917a514485bc5112dd906cfff62c7fbf917e99656e85f72d`.
-Final broad/native regressions and combined PR delivery remain in progress; no whole-block
-acceptance is inferred from this focused run.
+Proof logs: `/tmp/blcad-169-feature15-core-full.log`,
+`/tmp/blcad-169-feature16-geometry-{focused,full}.log`,
+`/tmp/blcad-169-feature16-qt-focused.log`, `/tmp/blcad-169-native16-{100,150}.log` and
+`/tmp/blcad-169-feature16-startup-proof.log`. Final native Loft captures at both scales were reviewed
+after all CAD processes exited. Full Qt was not repeated for this backend change; the scoped
+current checks above and the earlier full-Qt baseline under 167 retain their stated limits.
+
+Delivery: accepted on the active combined 168–169 branch; commit/push and normal PR delivery remain
+required before the Surface branch. Continue through 174 without advancing any later block from
+these Loft checks alone. Preserve all unimplemented 170–204 acceptance and deferred capabilities.
