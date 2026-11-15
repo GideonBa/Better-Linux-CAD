@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 169
 current_block: 170
-current_boundary: Block 170 OffsetSurface/Thicken intent planned; 168–169 PR delivery pending
+current_boundary: Block 170 OffsetSurface/Thicken intent planned; 168–169 PR #192 delivery pending
 current_tag: "[parity-b170]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -42,7 +42,7 @@ current boundary     Deliver 168–169 normally before starting the 170–172 Su
 
 The assigned sequence continues through Block 174. Blocks 168–169 are accepted on
 `feat/verified-loft-boundaries`, based on clean upstream main after PR #191. Deliver their combined
-PR normally, then verify the merged tree and update main before starting 170–172. Blocks 170–174
+[PR #192](https://github.com/GideonBa/Better-Linux-CAD/pull/192) normally, then verify the merged tree and update main before starting 170–172. Blocks 170–174
 retain their complete planned acceptance, including native advanced authoring and integration.
 [The consolidated sequence](inventor-parity-sequence.md)
 contains dependencies and implementation criteria; [the test plan](inventor-parity-test-plan.md)
@@ -76,7 +76,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 165 | Delivered in [PR #189](https://github.com/GideonBa/Better-Linux-CAD/pull/189): solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 consumers. |
 | 166 | Delivered in [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190): explicit compatible native paths, checked twist, mixed physical consumers and native upgrade/history. |
 | 167 | Delivered in [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191): strict compatible V11, native semantic edges, exact hollow sections, cyclic circular frames and independent G01/exchange proofs. |
-| 168–169 | Accepted strict V12 intent and verified native G02 construction within documented limits; normal combined PR delivery pending. |
+| 168–169 | Accepted strict V12 intent and verified native G02 construction within documented limits; [PR #192](https://github.com/GideonBa/Better-Linux-CAD/pull/192) awaits normal rebase delivery. |
 | 170–172 | Offset/Thicken intent and checked Geometry, curved Trim/Extend and derived gap diagnostics with G03–G04 acceptance. |
 | 173–174 | Native advanced curve/Surface workflows, integrated edits/history/reopen and physical STEP roundtrip acceptance. |
 
@@ -231,8 +231,8 @@ PR links preserve individual slice provenance without copying intermediate compl
 | 165 | Solver-backed spatial curve/constraint authoring, scoped native targets/grips, explicit formula override and physical S03–S04 consumers | [Native task contract/proofs](gui-sketch3d-interaction-mvp8.md#solver-backed-task-foundation--165) | [189](https://github.com/GideonBa/Better-Linux-CAD/pull/189) |
 | 166 | Explicit compatible native paths, strict V10/Project ownership, checked arc-length twist, mixed physical consumers and native comparison/history | [Path construction](part-path-curve-core-mvp6.md#native-curve-construction), [twist](part-sweep-3d-geometry-mvp6.md#explicit-curve-preserving-twist), [native task](gui-interactive-path-sweep-loft-mvp9.md#explicit-path-execution-comparison); G01 within the 166 boundary | [190](https://github.com/GideonBa/Better-Linux-CAD/pull/190) |
 | 167 | Typed generated/imported native paths, strict necessary V11, exact material-region holes, bounded cyclic frames/roll, faithful native trims/axes and physical G01/STEP recovery | [Native source/precision](part-path-curve-core-mvp6.md#semantic-native-curve-execution--167), [material regions](part-sweep-intent-mvp6.md#material-region-execution), [cyclic capability](part-sweep-3d-geometry-mvp6.md#circular-closed-spine-capability--167), [physical proofs](../tests/geometry/semantic_path_acceptance_tests.cpp) | [191](https://github.com/GideonBa/Better-Linux-CAD/pull/191) |
-| 168 | Separate boundary G1/G2, stable logical guide anchors, strict necessary V12, typed support history, import ownership and atomic tolerance/formula edits | [Intent](part-loft-intent-mvp6.md#authored-boundary-and-guide-constraints), [Core proof](../tests/core/loft_constraint_intent_tests.cpp), [refinement proof](../tests/geometry/loft_section_compatibility_tests.cpp) | Active 168–169 branch; delivery pending |
-| 169 | Verified native Hermite Loft networks, exact source anchors, scoped support faces, one-sided knot derivatives, quilt/solid assembly, all Body operations and physical G02/STEP acceptance | [Construction/limits](part-guided-loft-geometry-mvp6.md#constrained-feature-integration), [feature oracles](../tests/geometry/constrained_loft_feature_tests.cpp), [smooth/STEP oracles](../tests/geometry/constrained_loft_smooth_tests.cpp) | Active 168–169 branch; delivery pending |
+| 168 | Separate boundary G1/G2, stable logical guide anchors, strict necessary V12, typed support history, import ownership and atomic tolerance/formula edits | [Intent](part-loft-intent-mvp6.md#authored-boundary-and-guide-constraints), [Core proof](../tests/core/loft_constraint_intent_tests.cpp), [refinement proof](../tests/geometry/loft_section_compatibility_tests.cpp) | [192](https://github.com/GideonBa/Better-Linux-CAD/pull/192); delivery pending |
+| 169 | Verified native Hermite Loft networks, exact source anchors, scoped support faces, one-sided knot derivatives, quilt/solid assembly, all Body operations and physical G02/STEP acceptance | [Construction/limits](part-guided-loft-geometry-mvp6.md#constrained-feature-integration), [feature oracles](../tests/geometry/constrained_loft_feature_tests.cpp), [smooth/STEP oracles](../tests/geometry/constrained_loft_smooth_tests.cpp) | [192](https://github.com/GideonBa/Better-Linux-CAD/pull/192); delivery pending |
 
 The initial full parity plan was delivered in [PR #138](https://github.com/GideonBa/Better-Linux-CAD/pull/138).
 
@@ -952,6 +952,6 @@ Proof logs: `/tmp/blcad-169-feature15-core-full.log`,
 after all CAD processes exited. Full Qt was not repeated for this backend change; the scoped
 current checks above and the earlier full-Qt baseline under 167 retain their stated limits.
 
-Delivery: accepted on the active combined 168–169 branch; commit/push and normal PR delivery remain
-required before the Surface branch. Continue through 174 without advancing any later block from
+Delivery: [PR #192](https://github.com/GideonBa/Better-Linux-CAD/pull/192) contains the committed and
+pushed 168–169 delivery; normal rebase merge remains required before the Surface branch. Continue through 174 without advancing any later block from
 these Loft checks alone. Preserve all unimplemented 170–204 acceptance and deferred capabilities.
