@@ -8,6 +8,7 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_Common.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
@@ -21,6 +22,7 @@
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_WireExplorer.hxx>
+#include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GProp_GProps.hxx>
@@ -32,6 +34,7 @@
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopoDS.hxx>
+#include <TopoDS_Compound.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
@@ -642,9 +645,18 @@ Result<GeometryShape> SurfaceAdapter::stitch_surfaces(FeatureId feature_id,
         surface_error(feature_id, "surface stitch requires at least two faces"));
 
   try {
-    BRepBuilderAPI_Sewing sewing(tolerance_mm);
+    BRep_Builder builder;
+    TopoDS_Compound compound;
+    builder.MakeCompound(compound);
     for (const auto& face : faces.value())
-      sewing.Add(face);
+      builder.Add(compound, face);
+    BRepBuilderAPI_Copy copy(compound, true, false);
+    BRepBuilderAPI_Sewing sewing(tolerance_mm);
+    for (const auto& face : faces.value()) {
+      auto owned = copy.ModifiedShape(face);
+      owned.Orientation(face.Orientation());
+      sewing.Add(owned);
+    }
     sewing.Perform();
     const TopoDS_Shape sewn = sewing.SewedShape();
     if (sewn.IsNull())
@@ -671,8 +683,16 @@ Result<GeometryShape> SurfaceAdapter::stitch_surfaces(FeatureId feature_id,
     auto checked = checked_shape(feature_id, shell);
     if (checked.has_error())
       return Result<GeometryShape>::failure(checked.error());
-    return Result<GeometryShape>::success(
-        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(checked.value()))));
+    auto backing = std::make_shared<GeometryShape::Impl>(std::move(checked.value()));
+    for (const auto& source : surfaces)
+      for (auto entry : source.impl_->face_lineage) {
+        entry.face = TopoDS::Face(copy.ModifiedShape(entry.face));
+        const auto image = sewing.ModifiedSubShape(entry.face);
+        if (!image.IsNull() && image.ShapeType() == TopAbs_FACE)
+          entry.face = TopoDS::Face(image);
+        detail::append_lineage(backing->face_lineage, entry, backing->shape);
+      }
+    return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
   } catch (const Standard_Failure& failure) {
     return Result<GeometryShape>::failure(surface_error(feature_id, failure_message(failure)));
   } catch (const std::exception& exception) {
@@ -744,8 +764,10 @@ Result<GeometryShape> SurfaceAdapter::close_shell_to_solid(FeatureId feature_id,
       return Result<GeometryShape>::failure(surface_error(
           feature_id, "closed-shell-to-solid produced a degenerate zero-volume solid"));
     TopoDS_Shape result = solid;
-    return Result<GeometryShape>::success(
-        GeometryShape(std::make_shared<GeometryShape::Impl>(std::move(result))));
+    auto backing = std::make_shared<GeometryShape::Impl>(std::move(result));
+    for (const auto& entry : shell.impl_->face_lineage)
+      detail::append_lineage(backing->face_lineage, entry, backing->shape);
+    return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
   } catch (const Standard_Failure& failure) {
     return Result<GeometryShape>::failure(surface_error(feature_id, failure_message(failure)));
   } catch (const std::exception& exception) {

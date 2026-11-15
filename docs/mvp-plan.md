@@ -81,6 +81,8 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 170–172 | Offset/Thicken intent and checked Geometry, curved Trim/Extend and derived gap diagnostics with G03–G04 acceptance. |
 | 173–174 | Native advanced curve/Surface workflows, integrated edits/history/reopen and physical STEP roundtrip acceptance. |
 
+The active 171 branch now has [checked native construction and focused G03/gap proof](part-surface-feature-intent-mvp6.md#checked-native-construction-foundation).
+Consumer/import/exchange acceptance remains open for 171; curved Trim/Extend remains 172.
 The remaining delivery checkpoints are the active 170–172 Surface branch,
 then 173 workflow and 174 integrated acceptance. Start each only after the preceding PR is merged
 and main is clean and current.

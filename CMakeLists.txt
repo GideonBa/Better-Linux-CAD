@@ -249,6 +249,10 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/pattern_placement_adapter.cpp
     src/geometry/sweep_adapter.cpp
     src/geometry/surface_adapter.cpp
+    src/geometry/surface_selection_geometry.cpp
+    src/geometry/surface_offset_adapter.cpp
+    src/geometry/surface_offset_verification.cpp
+    src/geometry/surface_boundary_query.cpp
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
     src/geometry/sketch_3d_geometry_adapter.cpp
@@ -714,6 +718,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/surface_boundary_fill_pipeline_tests.cpp
       tests/geometry/surface_trim_extend_pipeline_tests.cpp
       tests/geometry/measure_selection_tests.cpp
+      tests/geometry/surface_offset_geometry_tests.cpp
       tests/geometry/surface_stitch_pipeline_tests.cpp
       tests/geometry/surface_close_shell_pipeline_tests.cpp
       tests/geometry/shell_feature_pipeline_tests.cpp

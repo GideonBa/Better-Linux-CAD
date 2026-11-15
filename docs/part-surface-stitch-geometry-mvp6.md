@@ -61,3 +61,14 @@ a non-positive tolerance.
 Blocks 48–94 are implemented. Closed-shell-to-solid conversion is canonical in
 `docs/part-closed-shell-to-solid-geometry-mvp6.md`; `SurfaceStitchFeature` supplies its
 consistently oriented, sufficiently manifold shell input. Block 93 multi-body STEP export and deterministic body naming is implemented; Block 94 integrated Part Construction MVP acceptance is implemented; Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is the current next technical step.
+
+
+## Semantic quilt propagation
+
+Sewing uses private input copies and preserves each authored face-use orientation. Its native
+`ModifiedSubShape` history maps every source face origin into the resulting quilt; closed-shell
+conversion keeps those actual oriented face descendants. Surviving/split contributors remain
+recoverable/ambiguous through the existing semantic rules. Intrinsic Boundary/Fill patches and
+new offset skins therefore remain available to later Surface and planar Sketch consumers.
+The derived [boundary/gap query](part-surface-feature-intent-mvp6.md#checked-native-construction-foundation)
+adds physical diagnostics without changing the historical Stitch record or increasing its tolerance.

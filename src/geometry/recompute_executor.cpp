@@ -5,6 +5,8 @@
 #include "blcad/geometry/pattern_placement_adapter.hpp"
 #include "blcad/geometry/result_face_support.hpp"
 #include "blcad/geometry/spatial_constraint_geometry.hpp"
+#include "blcad/geometry/surface_offset_adapter.hpp"
+#include "blcad/geometry/surface_selection_geometry.hpp"
 #include "blcad/geometry/thread_adapter.hpp"
 #include "imported_body_placement.hpp"
 #include "material_geometry_source.hpp"
@@ -2532,25 +2534,10 @@ resolve_surface_trimming(const PartDocument& document, const TrimmingReference& 
       surface_path_from_closed_curves(curves.value()));
 }
 
-[[nodiscard]] Result<GeometryShape> resolve_surface_target(const PartDocument& document,
-                                                           const SurfaceReference& reference,
-                                                           const ShapeCache& cache,
-                                                           const SurfaceAdapter& adapter,
-                                                           const FeatureId& consumer) {
-  if (reference.source_kind() == SurfaceReferenceSourceKind::SelectedFaces)
-    return Result<GeometryShape>::failure(geometry_error(
-        consumer.value(),
-        "Selected Surface faces require verified native execution (Blocks 171–172)"));
-  if (reference.source_kind() == SurfaceReferenceSourceKind::Body) {
-    const BodyId& body = std::get<BodyId>(reference.source());
-    const GeometryShape* shape = cache.find_body_shape(body);
-    if (shape == nullptr)
-      return Result<GeometryShape>::failure(
-          geometry_error(body.value(), "surface target Body shape must exist in the shape cache"));
-    return Result<GeometryShape>::success(*shape);
-  }
-  return adapter.extract_semantic_face(consumer, document, cache,
-                                       std::get<SemanticFaceReference>(reference.source()));
+[[nodiscard]] Result<GeometryShape>
+resolve_surface_target(const PartDocument& document, const SurfaceReference& reference,
+                       const ShapeCache& cache, const SurfaceAdapter&, const FeatureId& consumer) {
+  return SurfaceSelectionGeometry::resolve(document, cache, reference, consumer, 1e-7);
 }
 
 // True when the sketch contains exactly one profile and it is of the kind
@@ -3697,15 +3684,63 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "surface feature must exist in part document"));
   const SurfaceFeatureKind kind = surface_feature_kind(*feature);
-  if (surface_feature_requires_v13(*feature))
+  if ((kind == SurfaceFeatureKind::TrimSurface &&
+       std::get<TrimSurfaceFeature>(*feature).options()) ||
+      (kind == SurfaceFeatureKind::ExtendSurface &&
+       std::get<ExtendSurfaceFeature>(*feature).options()))
     return Result<std::size_t>::failure(geometry_error(
-        feature_id.value(),
-        "Advanced Surface construction requires verified native execution (Blocks 171–172)"));
+        feature_id.value(), "Advanced curved Trim/Extend requires verified execution (Block 172)"));
 
   ShapeCache working_cache = shape_cache;
   Result<GeometryShape> result = Result<GeometryShape>::failure(
       geometry_error(feature_id.value(), "unsupported surface feature"));
-  if (kind == SurfaceFeatureKind::BoundarySurface || kind == SurfaceFeatureKind::FillSurface) {
+  if (const auto* offset = std::get_if<SurfaceOffsetFeature>(feature)) {
+    const auto& context = offset->body_result_context();
+    const auto& parameters = offset->parameters();
+    const double distance = document.find_parameter(parameters.distance)->value().millimeters();
+    const double tolerance = document.find_parameter(parameters.tolerance)->value().millimeters();
+    const auto deviation =
+        parameters.maximum_deviation
+            ? std::optional(
+                  document.find_parameter(*parameters.maximum_deviation)->value().millimeters())
+            : std::nullopt;
+    const GeometryShape* predecessor = nullptr;
+    if (context.operation_mode() != FeatureBodyOperationMode::NewBody) {
+      auto resolved = resolve_in_place_body_target(document, offset->id(), *context.target_body(),
+                                                   working_cache);
+      if (!resolved)
+        return Result<std::size_t>::failure(resolved.error());
+      predecessor = resolved.value();
+    }
+    const auto* selection = std::get_if<SurfaceFaceSelection>(&offset->target().source());
+    const bool use_predecessor =
+        selection && context.target_body() == std::optional(selection->body);
+    auto target = SurfaceSelectionGeometry::resolve(document, working_cache, offset->target(),
+                                                    feature_id, tolerance, import_context_,
+                                                    use_predecessor ? predecessor : nullptr);
+    if (!target)
+      return Result<std::size_t>::failure(target.error());
+    auto constructed = SurfaceOffsetAdapter{}.construct(feature_id, target.value(), kind, distance,
+                                                        parameters.side, tolerance,
+                                                        parameters.approximation, deviation);
+    if (!constructed)
+      return Result<std::size_t>::failure(constructed.error());
+    result = Result<GeometryShape>::success(constructed.value().shape);
+    if (predecessor) {
+      const auto operation = context.operation_mode() == FeatureBodyOperationMode::Join
+                                 ? BodyBooleanOperation::Add
+                             : context.operation_mode() == FeatureBodyOperationMode::Cut
+                                 ? BodyBooleanOperation::Subtract
+                                 : BodyBooleanOperation::Intersect;
+      auto combined = body_boolean_adapter_.combine(feature_id, operation, *predecessor,
+                                                    std::vector<GeometryShape>{result.value()});
+      if (!combined)
+        return Result<std::size_t>::failure(combined.error());
+      result = Result<GeometryShape>::success(SurfaceOffsetAdapter::with_verification(
+          combined.value(), constructed.value().verification));
+    }
+  } else if (kind == SurfaceFeatureKind::BoundarySurface ||
+             kind == SurfaceFeatureKind::FillSurface) {
     std::vector<BoundaryCurveReference> authored_boundaries;
     if (const auto* boundary = std::get_if<BoundarySurfaceFeature>(feature))
       authored_boundaries = boundary->boundaries();
@@ -3724,6 +3759,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     result = kind == SurfaceFeatureKind::BoundarySurface
                  ? surface_adapter_.make_boundary_surface(feature_id, boundaries)
                  : surface_adapter_.make_fill_surface(feature_id, boundaries);
+    if (result)
+      result = Result<GeometryShape>::success(
+          SurfaceSelectionGeometry::tag_single_patch(result.value(), feature_id, "surface/patch"));
   } else if (kind == SurfaceFeatureKind::TrimSurface) {
     const auto& trim = std::get<TrimSurfaceFeature>(*feature);
     auto target = resolve_surface_target(document, trim.target(), working_cache, surface_adapter_,
