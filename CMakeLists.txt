@@ -689,6 +689,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/native_path_consumer_tests.cpp
       tests/geometry/semantic_sweep_intent_geometry_tests.cpp
     tests/geometry/material_region_sweep_tests.cpp
+    tests/geometry/semantic_path_acceptance_tests.cpp
       tests/support/geometry_volume_oracle.cpp
       tests/geometry/part_construction_mvp_acceptance_tests.cpp
       tests/geometry/recompute_executor_tests.cpp

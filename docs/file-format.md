@@ -1721,3 +1721,13 @@ uppercase percent encoding of bytes outside ASCII letters/digits/underscore/hyph
 endpoints have no Pattern ID and zero coordinates. No resolved dimensions/coordinates are stored.
 Endpoint creation/loading validates syntax; current geometry resolution diagnoses removed/excluded
 occurrences without deleting relationships or redirecting them to another occurrence.
+
+### Declared implicit executable order
+
+A Part `feature_order` with `history_version: 1` retains the declared order as a stable preference
+among independent executable records. Loading metadata earlier does not reorder those features.
+Actual dependencies through Body aliases, Sketches and paths still take precedence after edits;
+new executables append to the preference and deletion removes their entries. This derived replay
+preference introduces no new JSON field and does not create authored suppression/history intent
+or silently promote the document to history version 2. Explicit authored history remains the
+existing strict order/suppression authority.

@@ -5793,6 +5793,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       restore(part.thread_features_, "thread_features");
       restore(part.draft_features_, "draft_features");
       restore(part.body_transforms_, "body_transforms");
+      part.replayed_feature_order_ = order;
       if (!retained) {
         auto valid = part.validate_reference_sources();
         if (!valid)

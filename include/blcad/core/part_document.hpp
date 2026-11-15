@@ -525,6 +525,8 @@ private:
   DependencyGraph dependency_graph_;
   InvalidationState invalidation_state_;
   std::optional<PartFeatureHistoryIntent> history_intent_;
+  // A declared legacy feature_order is a stable tie preference, not suppression/history intent.
+  std::optional<std::vector<std::string>> replayed_feature_order_;
   std::uint64_t executable_generation_ = 0;
 };
 

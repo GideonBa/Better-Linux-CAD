@@ -124,7 +124,7 @@ parent and imported output mapping. Both catalog/edge and Body dependencies prot
 Generated/result references omit that owner field. Spatial-constraint curve inputs retain their
 existing capability boundary; accepting an edge as a path does not enable it as a solver input.
 Part V11 persists this authored reference; native edge recovery and physical acceptance remain
-tracked in `mvp-plan.md`. Unsupported new Geometry requests fail explicitly during the intent slice.
+tracked in `mvp-plan.md`. Unsupported source/capability combinations reject atomically.
 
 ## Equation source contract
 
@@ -165,4 +165,6 @@ publication. A transformed imported result uses a producer-anchored result witne
 transforms never move an earlier base reference implicitly. Complete analytic circles use the
 source Sketch frame (semantic rims) or normalized descriptor axis with OCCT's canonical `gp_Ax2`
 X direction (imported circles) for phase. Open imported curves use the lexicographically smaller actual endpoint as their positive direction; the catalog's sorted recovery samples carry no traversal order. Closed non-circular imported curves remain explicitly unsupported.
-This execution slice does not yet enable closed-spine Sweep or material-region execution.
+Material-region execution and the bounded circular closed-spine capability are defined in the
+[Sweep contract](part-sweep-intent-mvp6.md#material-region-execution) and
+[cyclic-frame contract](part-sweep-3d-geometry-mvp6.md#circular-closed-spine-capability--167).
