@@ -132,13 +132,12 @@ Result<GeometryShape> SurfaceSelectionGeometry::resolve(const PartDocument& part
                   producers.push_back(base.id());
           if (producers.size() != 1)
             return fail("Imported Surface face has ambiguous base provenance");
-          const auto segment = [](const std::string& value) {
-            return std::to_string(value.size()) + ":" + value + "/";
-          };
-          const auto patch = tag_single_patch(
-              GeometryShape(std::make_shared<GeometryShape::Impl>(face)), producers.front(),
-              "surface/input/imported/" + segment(imported->catalog().value()) +
-                  segment(imported->entry().value()));
+          const auto role = make_imported_face_origin_role(*imported);
+          if (!role)
+            return Result<GeometryShape>::failure(role.error());
+          const auto patch =
+              tag_single_patch(GeometryShape(std::make_shared<GeometryShape::Impl>(face)),
+                               producers.front(), role.value());
           lineage.insert(lineage.end(), patch.impl_->face_lineage.begin(),
                          patch.impl_->face_lineage.end());
         }

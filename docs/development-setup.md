@@ -119,6 +119,12 @@ placed source/predecessor/freshness, nonlocal collision and actual holes crossin
 `[constrained-loft-feature]` for existing quilt/continuity consumers. Native advanced authoring
 remains the separate 173 gate.
 
+Modern Trim/Extend Core uses `[advanced-surface-intent]`; native Geometry uses `[curved-surface]`,
+including `[curved-trim]`, `[curved-extend]` and `[curved-frame-import]`. Existing Qt Surface clients
+use `[block136-surface],[interactive-surface]`; `[native-shell-surface]` must execute with xcb at both
+scales to cover its offscreen-only skip. These foundation filters do not establish the complete
+combined G04/repair acceptance or advanced authoring in 173.
+
 ## Find and select focused tests
 
 `tests/{core,geometry,gui}/` owns assertions/tags; `CMakeLists.txt` owns source registration and

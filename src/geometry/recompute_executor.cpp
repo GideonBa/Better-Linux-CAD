@@ -5,8 +5,10 @@
 #include "blcad/geometry/pattern_placement_adapter.hpp"
 #include "blcad/geometry/result_face_support.hpp"
 #include "blcad/geometry/spatial_constraint_geometry.hpp"
+#include "blcad/geometry/surface_boundary_query.hpp"
 #include "blcad/geometry/surface_offset_adapter.hpp"
 #include "blcad/geometry/surface_selection_geometry.hpp"
+#include "blcad/geometry/surface_trim_adapter.hpp"
 #include "blcad/geometry/thread_adapter.hpp"
 #include "imported_body_placement.hpp"
 #include "material_geometry_source.hpp"
@@ -2496,8 +2498,9 @@ resolve_loft_closed_section(const PartDocument& document, const ProfileSectionRe
   return Result<std::vector<ClosedProfileCurveSegment>>::success(std::move(curves));
 }
 
-[[nodiscard]] std::vector<SweepPathSegment>
-surface_path_from_closed_curves(const std::vector<ClosedProfileCurveSegment>& curves) {
+[[nodiscard]] Result<std::vector<SweepPathSegment>>
+surface_path_from_closed_curves(const std::vector<ClosedProfileCurveSegment>& curves,
+                                std::optional<double> native_tolerance) {
   std::vector<SweepPathSegment> result;
   for (const auto& curve : curves) {
     if (curve.kind == ClosedProfileCurveKind::Line) {
@@ -2507,19 +2510,31 @@ surface_path_from_closed_curves(const std::vector<ClosedProfileCurveSegment>& cu
     } else if (curve.kind == ClosedProfileCurveKind::DerivedEquation) {
       result.push_back(
           {SweepPathSegmentKind::DerivedEquation, curve.start, {}, curve.end, curve.derived_curve});
+    } else if (native_tolerance) {
+      auto native =
+          detail::native_rational_bezier({curve.start, curve.mid, curve.control2, curve.end},
+                                         curve.weights, "surface.trim.profile");
+      if (!native)
+        return Result<std::vector<SweepPathSegment>>::failure(native.error());
+      result.push_back(
+          {SweepPathSegmentKind::DerivedNative, curve.start, {}, curve.end, native.value()});
     } else {
       auto sampled = sampled_path({curve.start, curve.mid, curve.control2, curve.end},
                                   32U, {curve.weights.begin(), curve.weights.end()});
       result.insert(result.end(), sampled.begin(), sampled.end());
     }
   }
-  return result;
+  if (native_tolerance)
+    for (auto& segment : result)
+      segment.modeling_tolerance_mm = *native_tolerance;
+  return Result<std::vector<SweepPathSegment>>::success(std::move(result));
 }
 
 [[nodiscard]] Result<std::vector<SweepPathSegment>>
 resolve_surface_trimming(const PartDocument& document, const TrimmingReference& trimming,
                          const ShapeCache& cache, const WorkplaneResolver& resolver,
-                         StepImportTopologyContext* import_context = nullptr) {
+                         StepImportTopologyContext* import_context = nullptr,
+                         std::optional<double> native_tolerance = std::nullopt) {
   if (trimming.source_kind() == TrimmingReferenceSourceKind::BoundaryCurve)
     return resolve_surface_boundary(document, std::get<BoundaryCurveReference>(trimming.source()),
                                     cache, resolver, import_context);
@@ -2530,14 +2545,15 @@ resolve_surface_trimming(const PartDocument& document, const TrimmingReference& 
   auto curves = resolve_loft_closed_section(document, section.value(), cache, resolver);
   if (curves.has_error())
     return Result<std::vector<SweepPathSegment>>::failure(curves.error());
-  return Result<std::vector<SweepPathSegment>>::success(
-      surface_path_from_closed_curves(curves.value()));
+  return surface_path_from_closed_curves(curves.value(), native_tolerance);
 }
 
 [[nodiscard]] Result<GeometryShape>
 resolve_surface_target(const PartDocument& document, const SurfaceReference& reference,
-                       const ShapeCache& cache, const SurfaceAdapter&, const FeatureId& consumer) {
-  return SurfaceSelectionGeometry::resolve(document, cache, reference, consumer, 1e-7);
+                       const ShapeCache& cache, const FeatureId& consumer,
+                       StepImportTopologyContext* imports, double tolerance = 1e-7) {
+  return SurfaceSelectionGeometry::resolve(document, cache, reference, consumer, tolerance,
+                                           imports);
 }
 
 // True when the sketch contains exactly one profile and it is of the kind
@@ -3655,15 +3671,33 @@ Result<SurfaceExtensionFrame> GeometryRecomputeExecutor::surface_extension_frame
   const auto history = detail::validate_history_input(document, cache);
   if (!history)
     return Result<SurfaceExtensionFrame>::failure(history.error());
+  const auto sources =
+      observe_imported_part_sources(document, import_context_, cache.history_plan());
+  if (!sources)
+    return Result<SurfaceExtensionFrame>::failure(sources.error());
   const FeatureId preview_id("surface.extension.frame");
-  auto shape = resolve_surface_target(document, target, cache, surface_adapter_, preview_id);
+  // An authoring query has no consuming feature. Imported face resolution must
+  // use the current verified Body placement rather than a synthetic history ID.
+  const auto consumer =
+      target.source_kind() == SurfaceReferenceSourceKind::SelectedFaces ? FeatureId{} : preview_id;
+  auto shape = resolve_surface_target(document, target, cache, consumer, import_context_);
   if (!shape)
     return Result<SurfaceExtensionFrame>::failure(shape.error());
   auto segments =
       resolve_surface_boundary(document, boundary, cache, workplane_resolver_, import_context_);
   if (!segments)
     return Result<SurfaceExtensionFrame>::failure(segments.error());
-  return surface_adapter_.extension_frame(preview_id, shape.value(), segments.value());
+  const auto analytic =
+      SurfaceTrimAdapter{}.extension_frame(preview_id, shape.value(), segments.value(), 1e-7);
+  auto frame = analytic
+                   ? analytic
+                   : surface_adapter_.extension_frame(preview_id, shape.value(), segments.value());
+  if (!frame &&
+      (segments.value().size() != 1 || segments.value().front().kind != SweepPathSegmentKind::Line))
+    frame = analytic;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return Result<SurfaceExtensionFrame>::failure(fresh.error());
+  return frame;
 }
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
@@ -3684,13 +3718,6 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "surface feature must exist in part document"));
   const SurfaceFeatureKind kind = surface_feature_kind(*feature);
-  if ((kind == SurfaceFeatureKind::TrimSurface &&
-       std::get<TrimSurfaceFeature>(*feature).options()) ||
-      (kind == SurfaceFeatureKind::ExtendSurface &&
-       std::get<ExtendSurfaceFeature>(*feature).options()))
-    return Result<std::size_t>::failure(geometry_error(
-        feature_id.value(), "Advanced curved Trim/Extend requires verified execution (Block 172)"));
-
   ShapeCache working_cache = shape_cache;
   Result<GeometryShape> result = Result<GeometryShape>::failure(
       geometry_error(feature_id.value(), "unsupported surface feature"));
@@ -3764,57 +3791,96 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_surface_feature(
           SurfaceSelectionGeometry::tag_single_patch(result.value(), feature_id, "surface/patch"));
   } else if (kind == SurfaceFeatureKind::TrimSurface) {
     const auto& trim = std::get<TrimSurfaceFeature>(*feature);
-    auto target = resolve_surface_target(document, trim.target(), working_cache, surface_adapter_,
-                                         feature_id);
-    if (target.has_error())
+    const auto& options = trim.options();
+    const double tolerance =
+        options ? document.find_parameter(options->tolerance)->value().millimeters() : 1e-7;
+    auto target = resolve_surface_target(document, trim.target(), working_cache, feature_id,
+                                         import_context_, tolerance);
+    if (!target)
       return Result<std::size_t>::failure(target.error());
     auto trimming = resolve_surface_trimming(document, trim.trimming(), working_cache,
-                                             workplane_resolver_, import_context_);
-    if (trimming.has_error())
+                                             workplane_resolver_, import_context_,
+                                             options ? std::optional(tolerance) : std::nullopt);
+    if (!trimming)
       return Result<std::size_t>::failure(trimming.error());
-    result = surface_adapter_.trim_surface(feature_id, target.value(), trimming.value());
+    if (options) {
+      std::string identity;
+      if (const auto* profile = std::get_if<ProfileRegionReference>(&trim.trimming().source()))
+        identity = "profile/" + std::to_string(profile->sketch().value().size()) + ":" +
+                   profile->sketch().value() + "/" +
+                   std::to_string(profile->profile().value().size()) + ":" +
+                   profile->profile().value();
+      else
+        identity = std::get<BoundaryCurveReference>(trim.trimming().source()).stable_key();
+      result =
+          SurfaceTrimAdapter{}.trim(feature_id, target.value(), trimming.value(), options->side,
+                                    options->projection, options->direction, tolerance, identity);
+    } else
+      result = surface_adapter_.trim_surface(feature_id, target.value(), trimming.value());
   } else if (kind == SurfaceFeatureKind::ExtendSurface) {
     const auto& extend = std::get<ExtendSurfaceFeature>(*feature);
-    auto target = resolve_surface_target(document, extend.target(), working_cache, surface_adapter_,
-                                         feature_id);
-    if (target.has_error())
+    const auto& options = extend.options();
+    const double tolerance =
+        options ? document.find_parameter(options->tolerance)->value().millimeters() : 1e-7;
+    auto target = resolve_surface_target(document, extend.target(), working_cache, feature_id,
+                                         import_context_, tolerance);
+    if (!target)
       return Result<std::size_t>::failure(target.error());
     auto boundary = resolve_surface_boundary(document, extend.boundary(), working_cache,
                                              workplane_resolver_, import_context_);
-    if (boundary.has_error())
+    if (!boundary)
       return Result<std::size_t>::failure(boundary.error());
-    const Parameter* distance = document.find_parameter(extend.distance_parameter());
-    if (distance == nullptr || distance->type() != ParameterType::Length ||
+    const auto* distance = document.find_parameter(extend.distance_parameter());
+    if (!distance || distance->type() != ParameterType::Length ||
         !distance->value().is_positive_length())
       return Result<std::size_t>::failure(
           geometry_error(extend.distance_parameter().value(),
                          "surface extension distance must resolve to a positive Length parameter"));
-    result = surface_adapter_.extend_surface(feature_id, target.value(), boundary.value(),
-                                             distance->value().millimeters());
+    if (options) {
+      const auto deviation =
+          options->maximum_deviation
+              ? std::optional(
+                    document.find_parameter(*options->maximum_deviation)->value().millimeters())
+              : std::nullopt;
+      result = SurfaceTrimAdapter{}.extend(feature_id, target.value(), boundary.value(),
+                                           distance->value().millimeters(), options->mode,
+                                           tolerance, deviation, extend.boundary().stable_key());
+    } else
+      result = surface_adapter_.extend_surface(feature_id, target.value(), boundary.value(),
+                                               distance->value().millimeters());
   } else if (kind == SurfaceFeatureKind::SurfaceStitch) {
     const auto& stitch = std::get<SurfaceStitchFeature>(*feature);
-    std::vector<GeometryShape> resolved_surfaces;
-    resolved_surfaces.reserve(stitch.surfaces().size());
-    for (const auto& reference : stitch.surfaces()) {
-      auto resolved =
-          resolve_surface_target(document, reference, working_cache, surface_adapter_, feature_id);
-      if (resolved.has_error())
-        return Result<std::size_t>::failure(resolved.error());
-      resolved_surfaces.push_back(std::move(resolved.value()));
-    }
-    const Parameter* tolerance = document.find_parameter(stitch.tolerance_parameter());
-    if (tolerance == nullptr || tolerance->type() != ParameterType::Length ||
+    const auto* tolerance = document.find_parameter(stitch.tolerance_parameter());
+    if (!tolerance || tolerance->type() != ParameterType::Length ||
         !tolerance->value().is_positive_length())
       return Result<std::size_t>::failure(
           geometry_error(stitch.tolerance_parameter().value(),
                          "surface stitch tolerance must resolve to a positive Length parameter"));
-    result = surface_adapter_.stitch_surfaces(feature_id, resolved_surfaces,
-                                              tolerance->value().millimeters());
+    const double limit = tolerance->value().millimeters();
+    std::vector<GeometryShape> surfaces;
+    for (const auto& reference : stitch.surfaces()) {
+      auto resolved = resolve_surface_target(document, reference, working_cache, feature_id,
+                                             import_context_, limit);
+      if (!resolved)
+        return Result<std::size_t>::failure(resolved.error());
+      surfaces.push_back(std::move(resolved.value()));
+    }
+    const auto boundaries =
+        SurfaceBoundaryQuery::inspect(surfaces, limit, std::max(limit, 2 * limit));
+    if (boundaries && boundaries.value().non_manifold_edges)
+      return Result<std::size_t>::failure(
+          geometry_error(feature_id.value(), "Stitch input has non-manifold boundaries"));
+    result = surface_adapter_.stitch_surfaces(feature_id, surfaces, limit);
+    if (!result && boundaries)
+      return Result<std::size_t>::failure(geometry_error(
+          feature_id.value(), result.error().message() + "; inspect " +
+                                  std::to_string(boundaries.value().free_edges.size()) +
+                                  " free input boundaries at the authored tolerance"));
   } else {
     const auto& closed = std::get<ClosedShellToSolidFeature>(*feature);
-    auto shell = resolve_surface_target(document, closed.shell(), working_cache, surface_adapter_,
-                                        feature_id);
-    if (shell.has_error())
+    auto shell = resolve_surface_target(document, closed.shell(), working_cache, feature_id,
+                                        import_context_);
+    if (!shell)
       return Result<std::size_t>::failure(shell.error());
     result = surface_adapter_.close_shell_to_solid(feature_id, shell.value());
   }

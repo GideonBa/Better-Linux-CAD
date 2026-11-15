@@ -167,7 +167,7 @@ whose generated walls close the material region; symmetric distance is total ski
 Source regularity/curvature checks include native knot cells and their boundaries, with **17**
 subdivisions per cell and signed focal factors `1-offset*curvature`. Trimmed/offset surface wrappers
 and native extrusion/revolution generating-curve knots retain their actual differential geometry.
-The bounded capability is **64 faces / 128 native cells per face**; it is numerical verification,
+The bounded capability is **64 faces / 128 native cells per face / 256 free boundary edges**; it is numerical verification,
 not a continuum certificate. Shared quilt edges additionally require aligned oriented normals.
 
 Independent normal rays intersect the actual history-mapped trimmed skins using **9, 17, 33**

@@ -253,6 +253,10 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/surface_offset_adapter.cpp
     src/geometry/surface_offset_verification.cpp
     src/geometry/surface_boundary_query.cpp
+    src/geometry/surface_trim_adapter.cpp
+    src/geometry/surface_extend_geometry.cpp
+    src/geometry/surface_extension_selection.cpp
+    src/geometry/surface_extension_frame.cpp
     src/geometry/semantic_reference_evaluator.cpp
     src/geometry/shape_cache.cpp
     src/geometry/sketch_3d_geometry_adapter.cpp
@@ -540,6 +544,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/loft_feature_tests.cpp
     tests/core/loft_constraint_intent_tests.cpp
     tests/core/surface_offset_intent_tests.cpp
+    tests/core/advanced_surface_intent_tests.cpp
     tests/core/surface_feature_tests.cpp
     tests/core/mirror_feature_tests.cpp
     tests/core/part_document_json_tests.cpp
@@ -720,6 +725,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/measure_selection_tests.cpp
       tests/geometry/surface_offset_geometry_tests.cpp
       tests/geometry/surface_offset_consumer_tests.cpp
+      tests/geometry/curved_surface_geometry_tests.cpp
       tests/geometry/surface_stitch_pipeline_tests.cpp
       tests/geometry/surface_close_shell_pipeline_tests.cpp
       tests/geometry/shell_feature_pipeline_tests.cpp
