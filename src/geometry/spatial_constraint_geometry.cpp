@@ -238,6 +238,8 @@ struct State {
       shape = line(resolved.value().start, resolved.value().end);
       break;
     }
+    case PathSegmentSourceKind::FeatureEdge:
+      break;
     }
     return shape ? Result<CurveShape>::success({shape.value(), ref.reversed()})
                  : Result<CurveShape>::failure(shape.error());

@@ -540,6 +540,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/path_extrude_feature_tests.cpp
     tests/core/path_curve_tests.cpp
     tests/core/path_execution_policy_tests.cpp
+      tests/core/semantic_sweep_intent_tests.cpp
     tests/core/project_tests.cpp
     tests/core/projected_reference_invalidation_tests.cpp
     tests/core/projected_sketch_reference_json_tests.cpp
@@ -683,6 +684,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/path_execution_policy_tests.cpp
       tests/geometry/native_twist_geometry_tests.cpp
       tests/geometry/native_path_consumer_tests.cpp
+      tests/geometry/semantic_sweep_intent_geometry_tests.cpp
       tests/support/geometry_volume_oracle.cpp
       tests/geometry/part_construction_mvp_acceptance_tests.cpp
       tests/geometry/recompute_executor_tests.cpp

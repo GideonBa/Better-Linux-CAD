@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 166
 current_block: 167
-current_boundary: Block 166 accepted; Block 167 semantic-edge and multi-wire Sweep planned
+current_boundary: Block 166 delivered; Block 167 Core intent verified, Geometry pending
 current_tag: "[parity-b167]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–166 accepted; Blocks 167–204 planned"
+  advanced_modeling_workflows: "Blocks 145–166 accepted; Block 167 in progress; Blocks 168–204 planned"
 ---
 
 # MVP Plan
@@ -35,12 +35,12 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 166
-current block        Block 167 (planned; not started)
+current block        Block 167 (in progress)
 current phase        Curves, paths and surfaces
-current boundary     Block 166 accepted; semantic-edge and multi-wire Sweep next
+current boundary     Block 166 delivered; Core intent verified, semantic/multi-wire Geometry pending
 ```
 
-The assigned sequence continues through Block 174. Block 166 is accepted; Block 167 is next.
+The assigned sequence continues through Block 174. Block 166 is delivered; Block 167 is active.
 [The consolidated sequence](inventor-parity-sequence.md)
 contains dependencies and implementation criteria; [the test plan](inventor-parity-test-plan.md)
 contains individual and combined acceptance; [the UI contract](user-interface.md) owns the
@@ -71,8 +71,8 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 163 | Delivered in PR #187: spatial constraint ownership, strict V9 and actual legacy Geometry/session preservation. |
 | 164 | Delivered in PR #188: deterministic spatial solver, normalized native queries, physical rank/gauge and exact rejection with independent S03 oracles. |
 | 165 | Delivered in [PR #189](https://github.com/GideonBa/Better-Linux-CAD/pull/189): solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 consumers. |
-| 166 | Accepted in [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190): explicit compatible native paths, checked twist, mixed physical consumers and native upgrade/history. |
-| 167 | Next: semantic-edge inputs, multi-wire Sweep and closed-spine frames with G01 physical oracles. |
+| 166 | Delivered in [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190): explicit compatible native paths, checked twist, mixed physical consumers and native upgrade/history. |
+| 167 | Active: typed edge/material-region intent and compatible persistence, followed by semantic Geometry, multi-wire Sweep, closed-spine frames and independent G01 acceptance. |
 | 168–169 | Persistent Loft boundary/guide intent followed by independently verified G2 execution and G02 acceptance. |
 | 170–172 | Offset/Thicken intent and checked Geometry, curved Trim/Extend and derived gap diagnostics with G03–G04 acceptance. |
 | 173–174 | Native advanced curve/Surface workflows, integrated edits/history/reopen and physical STEP roundtrip acceptance. |
@@ -165,7 +165,7 @@ raw samples, benchmark limits and future performance scope remain in their exist
 ## Blocks 145–204 — Advanced modeling workflows
 
 Status authority: Blocks 145–166 are **Implemented and accepted**;
-Blocks 167–204 are **Planned; not started**.
+Block 167 is **In progress**; Blocks 168–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -178,7 +178,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
-| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166 accepted; 167–174 planned |
+| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166 accepted; 167 in progress; 168–174 planned |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
 | G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
@@ -800,6 +800,31 @@ and `/tmp/blcad-166-startup32-proof.log`. Runtime: **1,140 inputs**, SHA-256
 Delivery: [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190), with rebase preserving
 individual commits below 1,500 added lines. Closed-spine frame closure, semantic-edge inputs and
 inner profile wires remain 167; richer support/guide intent, G2 and Surface workflows remain 168–174.
+
+### Block 167 semantic edges and multi-wire Sweep — in progress
+
+Start from the verified clean Main delivery of [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190)
+on `feat/semantic-edge-multiwire-sweep`. The delivered tree matches the reviewed `9a139f0` tree;
+its six commits each contain 80–716 added lines. No previous delivery is left open.
+
+| Slice | Work and acceptance boundary |
+| --- | --- |
+| Core / necessary-only V11 | Verified: explicit edge capability, source roles/reversal, required imported Body ownership, legacy-preserving material-region interpretation and strict V11/Project subsets. [Core proofs](../tests/core/semantic_sweep_intent_tests.cpp), [format](file-format.md#semantic-path-edges-and-sweep-material-regions--part-v11). [Geometry boundary proofs](../tests/geometry/semantic_sweep_intent_geometry_tests.cpp) retain certified results on unsupported requests; physical execution remains pending. |
+| Geometry | Pending: actual bounded native edge recovery with unique semantic resolution, imported placement/source scope, consistently oriented inner wires and all Body operations. New Core intent currently receives explicit unsupported-Geometry diagnostics. |
+| Closed spines / G01 | Pending: define cyclic frame/guide/twist capability before enabling closure. Independent hollow sections, volume, seams, invalid profile size/intersection, split/ambiguous references, source edits and fresh/reopened results are required. Kernel validity alone is insufficient. |
+
+All five targets build after the public type additions. Full Core **768 / 34,565**, focused
+Geometry **50 / 20,916** and Qt **49 cases: 47 passed, two native-only skipped / 4,632 assertions**
+pass. Selected native policy/Sweep/Loft passes **3 / 687** at each of 100% and 150%, without skips;
+the compact policy captures at both scales were inspected. Separate app startup proves a visible
+process-owned X11 window (intentional timeout 124, probe exit 0). This is Core-slice regression,
+not native authoring or whole-G01 acceptance of the new features.
+
+Runtime: **1,142 inputs**, SHA-256
+`fad6c19ea975394368e4f3192b6f0b2284db3c5a9e67aff8e927504a71d91aba`.
+Proof logs: `/tmp/blcad-167-{core3-full,geometry2-focused,qt3-focused,native100-3,native150-3}.log`
+and `/tmp/blcad-167-startup3-proof.log`. No whole-167 acceptance or delivery is claimed; continue through 174 and preserve all 168–204
+requirements.
 
 ## Later phases
 

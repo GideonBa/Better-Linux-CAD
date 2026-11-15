@@ -115,6 +115,31 @@ does not inherit unrelated Project resources. Extracting a standalone Part write
 resource values again. Policy downgrade preserves these ownership and revision bindings and restores
 the necessary legacy member envelope. Mixed inline resources and Project references reject loading.
 
+## Semantic path edges and Sweep material regions — Part V11
+
+Version **11** is necessary only for a `feature_edge` PathCurve source or an explicitly selected
+Sweep material region. Historical records keep their prior necessary V1–V10 envelopes.
+A feature-edge segment has exactly `source`, `reversed`, `edge_reference` and `source_body`.
+The edge object reuses existing strict semantic linear/circular, producer-result witness or
+imported topology reference encoding. Its contextual role is `path_segment`; raw OCCT topology indices,
+STEP entity numbers and resolved curves are not persisted.
+
+`source_body` is null for generated/result references and a required nonempty Body ID for imported
+references. The catalog entry's parent Body must match that imported output. Missing/mismatched
+owners reject loading rather than choosing an occurrence implicitly. Typed edge paths require
+an explicit curve-preserving execution policy and retain its independent modeling tolerance.
+
+A closed Sweep profile may add exactly `region_policy: "material_region"` to request its selected
+outer loop and directly nested holes. Absence preserves historical outer-boundary replay; explicit
+legacy/null/unknown policies and policies on open-path profiles are noncanonical. Region policy is
+authored interpretation, while classified loops, orientation and resulting topology remain derived.
+
+V1–V10 reject the reserved new intent. V11 requires actual new intent and inherits the existing
+history/resource/spatial/equation contracts. Resource-aware Project V2 members store exact
+`engineering_resource_refs`, including empty member subsets, through the same V11 adapter.
+Core persistence is the first 167 slice; geometric capability and whole-block acceptance remain
+tracked only in `mvp-plan.md`.
+
 ## Planar Smooth/G2 constraint sidecar — 159
 
 The existing `blcad.sketch_constraints.mvp8` Part-session sidecar uses integer version **2** when

@@ -39,6 +39,9 @@ Result<SpatialConstraintTarget> SpatialConstraintTarget::curve(SketchEntityId en
 Result<SpatialConstraintTarget>
 SpatialConstraintTarget::external_curve(PathSegmentReference reference,
                                         SpatialCurveLocation location) {
+  if (reference.source_kind() == PathSegmentSourceKind::FeatureEdge)
+    return Result<SpatialConstraintTarget>::failure(
+        spatial_error("Feature-edge paths are not spatial-constraint curve inputs"));
   if (!location_valid(location))
     return Result<SpatialConstraintTarget>::failure(
         spatial_error("External curve target requires a supported location"));

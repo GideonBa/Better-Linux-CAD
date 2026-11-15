@@ -2155,6 +2155,10 @@ resolve_basic_sweep_path(const PartDocument& document, const PathCurve& path,
       }
       resolved.insert(resolved.end(), spatial.begin(), spatial.end());
       continue;
+    } else if (reference.source_kind() == PathSegmentSourceKind::FeatureEdge) {
+      return Result<std::vector<SweepPathSegment>>::failure(
+          geometry_error(reference.source_node_id(),
+                         "Feature-edge paths require geometric capability validation"));
     } else {
       if (!allow_surface_boundary_sources)
         return Result<std::vector<SweepPathSegment>>::failure(
@@ -3302,6 +3306,9 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
   if (feature == nullptr)
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "sweep feature must exist in part document"));
+  if (feature->profile().region_policy() == SweepRegionPolicy::MaterialRegion)
+    return Result<std::size_t>::failure(geometry_error(
+        feature_id.value(), "Material-region Sweep requires multi-wire geometry execution"));
 
   ShapeCache working_cache = shape_cache;
   const PathCurve* trajectory = document.find_path_curve(feature->path());

@@ -600,6 +600,31 @@ path_segment_endpoints(const PartDocument& document, const PathSegmentReference&
           segment.construction_line()->value(), "path ConstructionLine must exist"));
     start.identity = "construction_line:" + segment.construction_line()->value() + ":start";
     end.identity = "construction_line:" + segment.construction_line()->value() + ":end";
+  } else if (segment.source_kind() == PathSegmentSourceKind::FeatureEdge) {
+    auto valid = validate_part_feature_input_reference(document, *segment.feature_edge());
+    if (!valid)
+      return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(valid.error());
+    if (segment.imported_source_body() && !document.find_body(*segment.imported_source_body()))
+      return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(Error::validation(
+          segment.imported_source_body()->value(), "Imported path source Body must exist"));
+    if (segment.imported_source_body()) {
+      const auto& reference = std::get<ImportedTopologyReference>(segment.feature_edge()->source());
+      const auto* catalog = document.find_imported_topology_catalog(reference.catalog());
+      const auto* entry = catalog ? catalog->find(reference.entry()) : nullptr;
+      bool owned = false;
+      for (const auto& feature : document.imported_body_features())
+        if (feature.definition().catalog() == reference.catalog())
+          for (const auto& output : feature.definition().outputs())
+            owned = owned ||
+                    (entry && entry->parent_body && output.imported_body == *entry->parent_body &&
+                     output.body == *segment.imported_source_body());
+      if (!owned)
+        return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
+            Error::validation(segment.imported_source_body()->value(),
+                              "Imported path edge must belong to its explicit source Body"));
+    }
+    start.identity = segment.stable_key() + ":start";
+    end.identity = segment.stable_key() + ":end";
   } else {
     if (!has_additive_source_feature(document, segment.semantic_edge()->source_feature()))
       return Result<std::pair<PathEndpoint, PathEndpoint>>::failure(
@@ -2097,6 +2122,12 @@ Result<std::size_t> PartDocument::add_path_curve(PathCurve path_curve) {
         add_dependency_if_missing(graph, segment.source_node_id(), path_curve.id().value());
     if (dependency.has_error())
       return Result<std::size_t>::failure(dependency.error());
+    if (segment.imported_source_body()) {
+      auto owner = add_dependency_if_missing(
+          graph, body_dependency_node_id(*segment.imported_source_body()), path_curve.id().value());
+      if (!owner)
+        return Result<std::size_t>::failure(owner.error());
+    }
   }
   auto invalidation_state = invalidation_state_;
   auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);

@@ -13,6 +13,7 @@ namespace blcad {
 
 enum class SweepFeatureKind { Sweep, SweepCut, SweepSurface };
 enum class SweepProfileKind { ClosedRegion, OpenPath };
+enum class SweepRegionPolicy { OuterBoundary, MaterialRegion };
 
 [[nodiscard]] std::string_view to_string(SweepFeatureKind kind) noexcept;
 [[nodiscard]] std::string_view to_string(SweepProfileKind kind) noexcept;
@@ -20,18 +21,22 @@ enum class SweepProfileKind { ClosedRegion, OpenPath };
 class SweepProfileReference {
 public:
   [[nodiscard]] static Result<SweepProfileReference>
-  create_closed_region(ProfileRegionReference profile);
+  create_closed_region(ProfileRegionReference profile,
+                       SweepRegionPolicy policy = SweepRegionPolicy::OuterBoundary);
   [[nodiscard]] static Result<SweepProfileReference> create_open_path(PathCurveId path_curve);
 
   [[nodiscard]] SweepProfileKind kind() const noexcept;
+  [[nodiscard]] SweepRegionPolicy region_policy() const noexcept;
   [[nodiscard]] const std::variant<ProfileRegionReference, PathCurveId>& source() const noexcept;
   [[nodiscard]] std::string source_node_id() const;
 
 private:
   SweepProfileReference(SweepProfileKind kind,
-                        std::variant<ProfileRegionReference, PathCurveId> source);
+                        std::variant<ProfileRegionReference, PathCurveId> source,
+                        SweepRegionPolicy policy = SweepRegionPolicy::OuterBoundary);
   SweepProfileKind kind_;
   std::variant<ProfileRegionReference, PathCurveId> source_;
+  SweepRegionPolicy region_policy_;
 };
 
 class SweepFeature {
