@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 170
-current_block: 171
-current_boundary: Block 171 in progress; checked native offset and thickness construction
-current_tag: "[parity-b171]"
+implemented_through: Block 171
+current_block: 172
+current_boundary: Block 172 in progress; curved Trim/Extend and derived boundary diagnostics
+current_tag: "[parity-b172]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–170 accepted; Block 171 in progress; Blocks 172–204 planned"
+  advanced_modeling_workflows: "Blocks 145–171 accepted; Block 172 in progress; Blocks 173–204 planned"
 ---
 
 # MVP Plan
@@ -34,10 +34,10 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 170
-current block        Block 171 (in progress; checked Offset/Thicken Geometry)
+implemented through  Block 171
+current block        Block 172 (in progress; curved Trim/Extend and gap diagnostics)
 current phase        Curves, paths and surfaces
-current boundary     Implement and verify OffsetSurface/Thicken, then curved Trim/Extend
+current boundary     Verify curved Trim/Extend, gap diagnostics and atomic G04 repair
 ```
 
 The assigned sequence continues through Block 174. Blocks 168–169 were delivered by normal
@@ -78,11 +78,11 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 166 | Delivered in [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190): explicit compatible native paths, checked twist, mixed physical consumers and native upgrade/history. |
 | 167 | Delivered in [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191): strict compatible V11, native semantic edges, exact hollow sections, cyclic circular frames and independent G01/exchange proofs. |
 | 168–169 | Delivered by normal rebase in [PR #192](https://github.com/GideonBa/Better-Linux-CAD/pull/192): strict V12 intent and verified native G02 construction within documented limits. |
-| 170–172 | Offset/Thicken intent and checked Geometry, curved Trim/Extend and derived gap diagnostics with G03–G04 acceptance. |
+| 170–172 | 170–171 accepted: typed Offset/Thicken and independent G03 construction/consumer/import/exchange proof. Curved Trim/Extend and complete G04 remain in progress for 172. |
 | 173–174 | Native advanced curve/Surface workflows, integrated edits/history/reopen and physical STEP roundtrip acceptance. |
 
-The active 171 branch now has [checked native construction and focused G03/gap proof](part-surface-feature-intent-mvp6.md#checked-native-construction-foundation).
-Consumer/import/exchange acceptance remains open for 171; curved Trim/Extend remains 172.
+The active Surface branch has [complete checked G03 construction, consumers and exchange proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof).
+Curved Trim/Extend and complete G04 remain 172; its [bounded execution plan](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-extension-plan--172) is retained.
 The remaining delivery checkpoints are the active 170–172 Surface branch,
 then 173 workflow and 174 integrated acceptance. Start each only after the preceding PR is merged
 and main is clean and current.
@@ -174,8 +174,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–170 are **Implemented and accepted**;
-Block 171 is **In progress**; Blocks 172–204 are **Planned; not started**.
+Status authority: Blocks 145–171 are **Implemented and accepted**;
+Block 172 is **In progress**; Blocks 173–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -188,7 +188,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
-| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166–170 accepted; 171 in progress; 172–174 planned |
+| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166–171 accepted; 172 in progress; 173–174 planned |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
 | G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
@@ -236,7 +236,8 @@ PR links preserve individual slice provenance without copying intermediate compl
 | 167 | Typed generated/imported native paths, strict necessary V11, exact material-region holes, bounded cyclic frames/roll, faithful native trims/axes and physical G01/STEP recovery | [Native source/precision](part-path-curve-core-mvp6.md#semantic-native-curve-execution--167), [material regions](part-sweep-intent-mvp6.md#material-region-execution), [cyclic capability](part-sweep-3d-geometry-mvp6.md#circular-closed-spine-capability--167), [physical proofs](../tests/geometry/semantic_path_acceptance_tests.cpp) | [191](https://github.com/GideonBa/Better-Linux-CAD/pull/191) |
 | 168 | Separate boundary G1/G2, stable logical guide anchors, strict necessary V12, typed support history, import ownership and atomic tolerance/formula edits | [Intent](part-loft-intent-mvp6.md#authored-boundary-and-guide-constraints), [Core proof](../tests/core/loft_constraint_intent_tests.cpp), [refinement proof](../tests/geometry/loft_section_compatibility_tests.cpp) | [192](https://github.com/GideonBa/Better-Linux-CAD/pull/192) |
 | 169 | Verified native Hermite Loft networks, exact source anchors, scoped support faces, one-sided knot derivatives, quilt/solid assembly, all Body operations and physical G02/STEP acceptance | [Construction/limits](part-guided-loft-geometry-mvp6.md#constrained-feature-integration), [feature oracles](../tests/geometry/constrained_loft_feature_tests.cpp), [smooth/STEP oracles](../tests/geometry/constrained_loft_smooth_tests.cpp) | [192](https://github.com/GideonBa/Better-Linux-CAD/pull/192) |
-| 170 | Typed OffsetSurface/Thicken, explicit face/quilt ownership, necessary V13/Project persistence, bounded error policy and atomic parameter/feature/history updates | [Intent and Core proof](part-surface-feature-intent-mvp6.md#core-policy-and-evidence), [strict JSON](file-format.md#surface-offset-thickness-and-advanced-boundary-intent--part-v13) | Active Surface branch; delivery pending 171–172 |
+| 170 | Typed OffsetSurface/Thicken, explicit face/quilt ownership, necessary V13/Project persistence, bounded error policy and atomic parameter/feature/history updates | [Intent and Core proof](part-surface-feature-intent-mvp6.md#core-policy-and-evidence), [strict JSON](file-format.md#surface-offset-thickness-and-advanced-boundary-intent--part-v13) | Active Surface branch; delivery pending 172 |
+| 171 | Checked analytic/C2 offsets and thickness, signed/symmetric quilts with seam-crossing holes, source immutability, collision rejection, effective Body history and physical consumer/STEP proofs | [Native capability](part-surface-feature-intent-mvp6.md#checked-native-construction-foundation), [G03 proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof) | Active Surface branch; delivery pending 172 |
 
 The initial full parity plan was delivered in [PR #138](https://github.com/GideonBa/Better-Linux-CAD/pull/138).
 
@@ -958,19 +959,18 @@ current checks above and the earlier full-Qt baseline under 167 retain their sta
 
 Delivery: [PR #192](https://github.com/GideonBa/Better-Linux-CAD/pull/192) was merged normally by
 rebase. Clean upstream-equal main and the exact reviewed tree were verified before the Surface
-branch. Continue through 174; preserve all unimplemented 170–204 acceptance and deferred capabilities.
+branch. Continue through 174; preserve the remaining acceptance through 204 and deferred capabilities.
 
 ### Blocks 170–172 Surface continuation — in progress
 
-170 now defines typed OffsetSurface/Thicken selection, distance/side, approximation and Body/history
-contracts in the [Surface intent document](part-surface-feature-intent-mvp6.md#offsetsurface-and-thicken-extension-plan).
-171 must supply checked native construction and independent G03 thickness/volume/manifold oracles.
-172 must add explicit curved Trim/Extend modes, keep/remove identity and shared derived gap queries
-with G04 and atomic repair. Existing six Surface records and legacy planar behavior retain their
-replay contracts. New necessary V13 records must roundtrip through both Project resource adapters;
-Core validation and Geometry capability limits remain distinct. No block is accepted by this plan.
+170–171 are accepted within the linked [intent/native capability and G03 proof](part-surface-feature-intent-mvp6.md).
+Typed necessary V13/Project persistence, owned semantic selections, physical normal-distance and
+collision verification, all Body modes, curved seam-crossing holes, downstream Sketch/Hole/finishing,
+exact reopening and physical STEP readback are verified. Existing native regressions passed at
+100%/150%; advanced authoring remains 173.
 
-Implementation/checkpoints: batch related public API changes before rebuilding all five targets;
-keep runtime inputs frozen during builds/tests; split coherent reviewed commits below 1,500 added
-lines. Finish full G03/G04 and native regressions, then deliver this branch normally before 173.
-Native advanced controls remain 173 and the combined history/edit/reopen/STEP scenario remains 174.
+172 is in progress under the [curved Trim/Extend plan](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-extension-plan--172):
+explicit keep/remove/projection, bounded natural/tangent continuation, shared derived gap/free-edge
+queries, G04 and atomic repair. Historical six-kind records retain their original replay.
+Finish full G04 and native regressions, then deliver this branch normally before starting 173.
+The combined history/edit/reopen/STEP scenario remains 174. Preserve all later 175–204 planning.

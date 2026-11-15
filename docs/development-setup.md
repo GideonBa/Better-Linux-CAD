@@ -111,7 +111,10 @@ counterexamples. Native advanced authoring remains the separate Block 173 gate.
 
 Offset/thickness intent uses Core `[surface-offset-intent]`; native Geometry uses
 `[surface-offset-geometry]`, including `[surface-offset-history]`, `[surface-offset-holes]` and
-`[surface-offset-curved]`. `[surface-boundary-query]` proves whole-edge gap maxima. Combine with
+`[surface-offset-curved]`. `[surface-offset-consumer]`, `[surface-offset-import]`,
+`[surface-offset-collision]` and `[surface-offset-curved-hole]` cover generated skin consumers,
+placed source/predecessor/freshness, nonlocal collision and actual holes crossing native seams.
+`[surface-boundary-query]` proves whole-edge gap maxima. Combine with
 `[surface-boundary-fill],[surface-trim-extend],[surface-stitch],[surface-to-solid]` and
 `[constrained-loft-feature]` for existing quilt/continuity consumers. Native advanced authoring
 remains the separate 173 gate.

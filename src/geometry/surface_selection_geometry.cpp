@@ -69,6 +69,14 @@ Result<GeometryShape> SurfaceSelectionGeometry::resolve(const PartDocument& part
       auto face = SurfaceAdapter{}.extract_semantic_face(consumer, part, cache, semantic);
       if (!face)
         return face;
+      const auto* producer = cache.find_feature_shape(semantic.source_feature());
+      if (producer) {
+        auto backing = std::make_shared<GeometryShape::Impl>(*face.value().impl_);
+        for (const auto& entry : producer->impl_->face_lineage)
+          detail::append_lineage(backing->face_lineage, entry, backing->shape);
+        if (!backing->face_lineage.empty())
+          return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
+      }
       return Result<GeometryShape>::success(
           tag_single_patch(face.value(), semantic.source_feature(),
                            "surface/semantic/" + std::string(to_string(semantic.face()))));
@@ -109,9 +117,32 @@ Result<GeometryShape> SurfaceSelectionGeometry::resolve(const PartDocument& part
                       [&](const auto& old) { return old.IsSame(face); }))
         return fail("Distinct Surface references resolve to the same face");
       selected.push_back(face);
+      const auto before = lineage.size();
       for (const auto& entry : owned->impl_->face_lineage)
         if (entry.face.IsSame(face))
           lineage.push_back(entry);
+      if (lineage.size() == before) {
+        const auto* imported = std::get_if<ImportedTopologyReference>(&reference.source());
+        if (imported) {
+          std::vector<FeatureId> producers;
+          for (const auto& base : part.imported_body_features())
+            if (base.definition().catalog() == imported->catalog())
+              for (const auto& output : base.definition().outputs())
+                if (output.body == selection.body)
+                  producers.push_back(base.id());
+          if (producers.size() != 1)
+            return fail("Imported Surface face has ambiguous base provenance");
+          const auto segment = [](const std::string& value) {
+            return std::to_string(value.size()) + ":" + value + "/";
+          };
+          const auto patch = tag_single_patch(
+              GeometryShape(std::make_shared<GeometryShape::Impl>(face)), producers.front(),
+              "surface/input/imported/" + segment(imported->catalog().value()) +
+                  segment(imported->entry().value()));
+          lineage.insert(lineage.end(), patch.impl_->face_lineage.begin(),
+                         patch.impl_->face_lineage.end());
+        }
+      }
     }
     TopoDS_Shape shape;
     if (selected.size() == 1)
