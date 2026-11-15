@@ -162,9 +162,23 @@ Lost, split or ambiguous witnesses reject the entire candidate and retain the la
 Imported references select an explicit immutable imported-base output. The current normalized
 source descriptor must match uniquely on that output, and source bytes are checked again before
 publication. A transformed imported result uses a producer-anchored result witness; later Body
-transforms never move an earlier base reference implicitly. Complete analytic circles use the
-source Sketch frame (semantic rims) or normalized descriptor axis with OCCT's canonical `gp_Ax2`
-X direction (imported circles) for phase. Open imported curves use the lexicographically smaller actual endpoint as their positive direction; the catalog's sorted recovery samples carry no traversal order. Closed non-circular imported curves remain explicitly unsupported.
+transforms never move an earlier base reference implicitly. Complete analytic circles take phase
+and sense from the source Sketch frame (semantic rims) or normalized descriptor/OCCT `gp_Ax2`
+frame (imported circles), projected onto the actual native circle plane. Canonical direction
+rounding never replaces that native plane. Open imported curves use the lexicographically smaller actual endpoint as their positive direction; the catalog's sorted recovery samples carry no traversal order. Closed non-circular imported curves remain explicitly unsupported.
 Material-region execution and the bounded circular closed-spine capability are defined in the
 [Sweep contract](part-sweep-intent-mvp6.md#material-region-execution) and
 [cyclic-frame contract](part-sweep-3d-geometry-mvp6.md#circular-closed-spine-capability--167).
+
+### Native reference precision
+
+The fixed 1e-6-mm witness recovery tolerance only identifies and orients a recovered source; it is
+not a geometry-editing allowance. Keep actual native trims and axes even when the requested
+modeling tolerance is smaller. A topologically closed analytic edge can become a complete native
+circle only with its full 2π parameter span (within 1e-12 radians). Never complete an open arc
+because its endpoint gap falls within recovery tolerance. Authored closed-path connectivity is
+checked separately against the path's connection tolerance, with atomic cache retention on failure.
+
+[`native-reference-precision`](../tests/geometry/semantic_path_acceptance_tests.cpp) independently
+checks a real imported bounded arc gap and a large, nearly axis-aligned circular source plane at
+a requested 1e-9-mm construction tolerance. Both physical cases failed before the correction.

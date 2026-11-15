@@ -11,6 +11,7 @@
 #include <BRepPrimAPI_MakeCylinder.hxx>
 #include <BRepPrimAPI_MakeTorus.hxx>
 #include <BRep_Builder.hxx>
+#include <BRep_Tool.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
@@ -298,4 +299,107 @@ TEST_CASE("Periodic STEP conversion rejects a void shell outside the regular tor
       StepImportSourceId("invalid.torus"), "Invalid torus void", "supplier.step",
       f::checked(step_import_sha256(fixture.source_bytes())), StepImportMode::Reference));
   CHECK_FALSE(StepImportReader{}.read(source, fixture.root));
+}
+
+TEST_CASE("A bounded near-closed native edge must not become an exact circle",
+          "[geometry][parity-b167][semantic-sweep-acceptance][native-reference-precision]") {
+  using namespace imported_body_test;
+  Fixture fixture;
+  fixture.write(BRepPrimAPI_MakeCylinder(1, 5, 2 * std::numbers::pi - 5e-7).Shape());
+  auto part = fixture.editable();
+  auto shapes = cache();
+  StepImportTopologyContext context(fixture.root);
+  GeometryRecomputeExecutor executor(&context);
+  REQUIRE(executor.execute_document(part, shapes));
+  const auto producer = part.imported_body_features().front().id();
+  const auto* result = shapes.find_feature_shape(producer);
+  REQUIRE(result);
+  TopTools_IndexedMapOfShape edges;
+  TopExp::MapShapes(*topology(*result), TopAbs_EDGE, edges);
+  std::optional<ResultEdgeReference> witness;
+  for (int i = 1; i <= edges.Extent(); ++i) {
+    const auto edge = TopoDS::Edge(edges(i));
+    BRepAdaptor_Curve c(edge);
+    if (c.GetType() == GeomAbs_Circle && std::abs(c.Circle().Location().Z()) < 1e-7) {
+      REQUIRE_FALSE(BRep_Tool::IsClosed(edge));
+      REQUIRE(c.Value(c.FirstParameter()).Distance(c.Value(c.LastParameter())) > 1e-7);
+      witness = checked(make_result_edge_reference(producer, edge));
+    }
+  }
+  REQUIRE(witness);
+  const auto reference =
+      checked(EdgeReference::create_result(PartFeatureInputRole::PathSegment, *witness));
+  const auto accepted = part;
+  REQUIRE(part.add_path_curve(
+      checked(PathCurve::create(PathCurveId("near.closed"), "Near closed",
+                                {checked(PathSegmentReference::create_feature_edge(reference))},
+                                PathClosure::Closed, PathOrientationRule::MinimumTwist, {}, {},
+                                1e-8, checked(PathExecutionPolicy::curve_preserving(1e-9))))));
+  const auto intended = checked(serialize_part_document_to_json(part));
+  const auto run = executor.execute_document(part, shapes);
+  INFO((run ? "Incorrectly accepted a completed circle" : run.error().message()));
+  REQUIRE_FALSE(run);
+  CHECK(run.error().message().find("disconnected") != std::string::npos);
+  CHECK(shapes.validate_complete_geometry_result(accepted));
+  CHECK_FALSE(shapes.validate_complete_geometry_result(part));
+  CHECK(checked(serialize_part_document_to_json(part)) == intended);
+}
+
+TEST_CASE("Imported circular path preserves its actual plane below canonical axis rounding",
+          "[geometry][parity-b167][semantic-sweep-acceptance][native-reference-precision]") {
+  using namespace imported_body_test;
+  constexpr double radius = 100000.;
+  Fixture fixture;
+  fixture.write(
+      BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(5e-13, 0, 1)), radius, 5).Shape());
+  auto part = fixture.editable();
+  auto shapes = cache();
+  StepImportTopologyContext context(fixture.root);
+  GeometryRecomputeExecutor executor(&context);
+  REQUIRE(executor.execute_document(part, shapes));
+  const auto& base = part.imported_body_features().front();
+  const auto& output = base.definition().outputs().front();
+  const auto* original = shapes.find_imported_body_shape(base.id(), output.body);
+  REQUIRE(original);
+  TopTools_IndexedMapOfShape edges;
+  TopExp::MapShapes(*topology(*original), TopAbs_EDGE, edges);
+  std::optional<gp_Circ> circle;
+  for (int i = 1; i <= edges.Extent(); ++i) {
+    BRepAdaptor_Curve c(TopoDS::Edge(edges(i)));
+    if (c.GetType() == GeomAbs_Circle && std::abs(c.Circle().Location().Z()) < 1e-6)
+      circle = c.Circle();
+  }
+  REQUIRE(circle);
+  REQUIRE(std::abs(circle->Axis().Direction().X()) > 1e-13);
+  const auto& catalog = part.imported_topology_catalogs().front();
+  const auto entry =
+      std::find_if(catalog.entries().begin(), catalog.entries().end(), [](const auto& e) {
+        return e.descriptor.kind == ImportedTopologyKind::Edge &&
+               e.descriptor.geometry == ImportedGeometryClass::Circle &&
+               std::abs(e.descriptor.centroid.z) < 1e-6;
+      });
+  REQUIRE(entry != catalog.entries().end());
+  const auto reference = checked(
+      ImportedTopologyReference::create(catalog.id(), entry->id, ImportedTopologyCapability::Edge));
+  const auto edge =
+      checked(EdgeReference::create_imported(PartFeatureInputRole::PathSegment, reference));
+  REQUIRE(part.add_path_curve(checked(
+      PathCurve::create(PathCurveId("circle.path"), "Exact source plane",
+                        {checked(PathSegmentReference::create_feature_edge(edge, output.body))},
+                        PathClosure::Closed, PathOrientationRule::MinimumTwist, {}, {}, 1e-8,
+                        checked(PathExecutionPolicy::curve_preserving(1e-9))))));
+  REQUIRE(executor.execute_document(part, shapes));
+  const auto segments =
+      checked(executor.resolve_path_segments(part, PathCurveId("circle.path"), shapes));
+  const auto path = checked(SweepAdapter{}.path_shape(PathCurveId("circle.path"), segments, true));
+  TopExp_Explorer e(*topology(path), TopAbs_EDGE);
+  REQUIRE(e.More());
+  BRepAdaptor_Curve curve(TopoDS::Edge(e.Current()));
+  double error = 0;
+  const gp_Vec normal(circle->Axis().Direction());
+  for (int i = 0; i <= 64; ++i) {
+    const auto at = curve.Value(std::lerp(curve.FirstParameter(), curve.LastParameter(), i / 64.));
+    error = std::max(error, std::abs(gp_Vec(circle->Location(), at).Dot(normal)));
+  }
+  CHECK(error <= 1e-9);
 }

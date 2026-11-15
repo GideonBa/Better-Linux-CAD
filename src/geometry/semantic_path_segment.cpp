@@ -108,9 +108,9 @@ Result<SweepPathSegment> resolve_semantic_path_segment(const PartDocument& docum
     Handle(Geom_Curve) native = BRep_Tool::Curve(recovered.value(), first, last);
     if (native.IsNull() || !std::isfinite(first) || !std::isfinite(last) || last <= first)
       return failed(ref, "Path edge has no finite bounded native curve");
+    const bool closed_edge = BRep_Tool::IsClosed(recovered.value());
     Handle(Geom_Curve) curve = new Geom_TrimmedCurve(native, first, last);
-    if (imported_descriptor &&
-        distance(point(curve->Value(first)), point(curve->Value(last))) > tolerance) {
+    if (imported_descriptor && !closed_edge) {
       // Catalog samples are an unordered recovery set. Open imported edges use the
       // lexicographically smaller actual endpoint as their positive direction.
       samples = {point(curve->Value(first)), point(curve->Value(last))};
@@ -143,15 +143,15 @@ Result<SweepPathSegment> resolve_semantic_path_segment(const PartDocument& docum
       // Complete analytic circles have no endpoint orientation. Freeze the phase and positive
       // direction to the source sketch frame or the normalized imported analytic frame.
       BRepAdaptor_Curve adaptor(recovered.value());
-      if (adaptor.GetType() != GeomAbs_Circle ||
-          std::abs((last - first) - 2 * std::numbers::pi) > tolerance)
+      if (!closed_edge || adaptor.GetType() != GeomAbs_Circle ||
+          std::abs((last - first) - 2 * std::numbers::pi) > 1e-12)
         return failed(ref, "Path edge requires ordered samples or a complete analytic circle");
       const auto actual = adaptor.Circle();
-      gp_Dir axis, x;
+      gp_Dir desired_axis, desired_x;
       if (imported_descriptor) {
         const auto d = imported_descriptor->direction;
-        axis = gp_Dir(d.x, d.y, d.z);
-        x = gp_Ax2(actual.Location(), axis).XDirection();
+        desired_axis = gp_Dir(d.x, d.y, d.z);
+        desired_x = gp_Ax2(actual.Location(), desired_axis).XDirection();
       } else {
         const auto* circular = std::get_if<SemanticCircularEdgeReference>(&reference.source());
         if (!circular)
@@ -164,30 +164,39 @@ Result<SweepPathSegment> resolve_semantic_path_segment(const PartDocument& docum
         if (!frame)
           return Result<SweepPathSegment>::failure(frame.error());
         const auto n = frame.value().normal, a = frame.value().x_axis;
-        axis = gp_Dir(n.x, n.y, n.z);
-        x = gp_Dir(a.x, a.y, a.z);
+        desired_axis = gp_Dir(n.x, n.y, n.z);
+        desired_x = gp_Dir(a.x, a.y, a.z);
       }
-      curve = new Geom_Circle(gp_Ax2(actual.Location(), axis, x), actual.Radius());
+      // The normalized descriptor/Sketch frame defines phase and sense, never a replacement
+      // plane. Project its phase direction onto the actual recovered circle's native plane.
+      auto axis = actual.Axis().Direction();
+      if (axis.Dot(desired_axis) < 0)
+        axis.Reverse();
+      const gp_Vec requested(desired_x), normal(axis);
+      const auto x = requested - normal * requested.Dot(normal);
+      if (x.Magnitude() <= 1e-12)
+        return failed(ref, "Circular path phase is singular on its native plane");
+      curve = new Geom_Circle(gp_Ax2(actual.Location(), axis, gp_Dir(x)), actual.Radius());
     }
-    if (distance(point(curve->Value(curve->FirstParameter())),
-                 point(curve->Value(curve->LastParameter()))) <= tolerance &&
-        !curve->IsClosed()) {
+    if (closed_edge && !curve->IsClosed()) {
       BRepAdaptor_Curve adaptor(recovered.value());
-      if (adaptor.GetType() != GeomAbs_Circle ||
-          std::abs((last - first) - 2 * std::numbers::pi) > tolerance)
+      if (!closed_edge || adaptor.GetType() != GeomAbs_Circle ||
+          std::abs((last - first) - 2 * std::numbers::pi) > 1e-12)
         return failed(ref, "Closed path requires a complete analytic circle with a defined phase");
       const auto circle = adaptor.Circle();
       gp_Pnt p;
       gp_Vec tangent;
       curve->D1(curve->FirstParameter(), p, tangent);
       const gp_Vec radial(circle.Location(), p);
-      curve = new Geom_Circle(
-          gp_Ax2(circle.Location(), gp_Dir(radial.Crossed(tangent)), gp_Dir(radial)),
-          circle.Radius());
+      auto axis = circle.Axis().Direction();
+      if (gp_Vec(axis).Dot(radial.Crossed(tangent)) < 0)
+        axis.Reverse();
+      const auto x = radial - gp_Vec(axis) * radial.Dot(gp_Vec(axis));
+      curve = new Geom_Circle(gp_Ax2(circle.Location(), axis, gp_Dir(x)), circle.Radius());
     }
     const auto a = point(curve->Value(curve->FirstParameter()));
     const auto b = point(curve->Value(curve->LastParameter()));
-    const bool closed = distance(a, b) <= tolerance;
+    const bool closed = curve->IsClosed();
     auto derived = std::make_shared<DerivedCurve>(curve, closed);
     auto extent = derived_curve_length(derived, ref.source_node_id());
     if (!extent || extent.value() <= tolerance)
