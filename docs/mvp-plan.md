@@ -803,28 +803,27 @@ inner profile wires remain 167; richer support/guide intent, G2 and Surface work
 
 ### Block 167 semantic edges and multi-wire Sweep — in progress
 
-Start from the verified clean Main delivery of [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190)
-on `feat/semantic-edge-multiwire-sweep`. The delivered tree matches the reviewed `9a139f0` tree;
-its six commits each contain 80–716 added lines. No previous delivery is left open. The active draft is [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191); Core commit `0757969` adds 606 lines.
+Active draft: [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191), based on merged
+[PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190). Commits `0757969` / `f2120cf`
+contain 606 / 398 added lines. Every delivery commit must stay below the assigned 1,500-line cap.
 
-| Slice | Work and acceptance boundary |
+| Slice | Contract and proof boundary |
 | --- | --- |
-| Core / necessary-only V11 | Verified: explicit edge capability, source roles/reversal, required imported Body ownership, legacy-preserving material-region interpretation and strict V11/Project subsets. [Core proofs](../tests/core/semantic_sweep_intent_tests.cpp), [format](file-format.md#semantic-path-edges-and-sweep-material-regions--part-v11). [Geometry proofs](../tests/geometry/semantic_sweep_intent_geometry_tests.cpp) now cover native edge lengths/directions and atomic real-edge split rejection; material-region execution remains pending. |
-| Geometry | Active: actual bounded native edge recovery, unique semantic resolution, persistent witness direction and explicit imported base scope. Focused Geometry passes **67 / 12,181**, Qt **49 (47 passed, two native-only skipped) / 4,632** after all five targets built. Inner wires and all Body operations follow in a separate commit. Placed imported results use producer-anchored result witnesses. |
-| Closed spines / G01 | Pending: define cyclic frame/guide/twist capability before enabling closure. Independent hollow sections, volume, seams, invalid profile size/intersection, split/ambiguous references, source edits and fresh/reopened results are required. Kernel validity alone is insufficient. |
+| Core / necessary-only V11 | Verified: typed capabilities/reversal, imported Body ownership, legacy-preserving material-region interpretation and strict Part/Project subsets. [Core proofs](../tests/core/semantic_sweep_intent_tests.cpp), [format](file-format.md#semantic-path-edges-and-sweep-material-regions--part-v11). |
+| Semantic native edges | Verified: bounded native curves, canonical result direction before path reversal, exact circular phase and explicit normalized imported base scope. [Contract](part-path-curve-core-mvp6.md#semantic-native-curve-execution--167), [physical length/direction, real upstream split, reopen and source-byte rejection](../tests/geometry/semantic_sweep_intent_geometry_tests.cpp). Placed imported results use producer-anchored result witnesses; dedicated placed-path acceptance remains open. |
+| Material-region Sweep | Verified within the open-spine boundary. Exact native-wire containment rejects crossing/touching boundaries, exact inner pipes precede checked Body operations. [Contract](part-sweep-intent-mvp6.md#material-region-execution), [independent volumes/material sections for all four operations, multiple/rational holes, legacy filled replay and atomic rejection](../tests/geometry/material_region_sweep_tests.cpp). |
+| Closed spines / G01 | Pending: cyclic frame/guide/twist capability, independent hollow sections, seams, excessive size/self-intersection, ambiguous references, placed imports and mixed-source physical acceptance. Kernel validity alone is insufficient. |
 
-All five targets build after the public type additions. Full Core **768 / 34,565**, focused
-Geometry **50 / 20,916** and Qt **49 cases: 47 passed, two native-only skipped / 4,632 assertions**
-pass. Selected native policy/Sweep/Loft passes **3 / 687** at each of 100% and 150%, without skips;
-the compact policy captures at both scales were inspected. Separate app startup proves a visible
-process-owned X11 window (intentional timeout 124, probe exit 0). This is Core-slice regression,
-not native authoring or whole-G01 acceptance of the new features.
+All five targets build. Full Core **768 / 34,565** remains valid for unchanged Core inputs.
+Current focused Geometry **71 / 12,410** and Qt **49 cases: 47 passed, two native-only skipped /
+4,632 assertions** pass. This does not close the whole G01 gate or prove native authoring of the
+new selectors (173).
 
-Runtime: **1,142 inputs**, SHA-256
-`fad6c19ea975394368e4f3192b6f0b2284db3c5a9e67aff8e927504a71d91aba`.
-Proof logs: `/tmp/blcad-167-{core3-full,geometry2-focused,qt3-focused,native100-3,native150-3}.log`
-and `/tmp/blcad-167-startup3-proof.log`. Native-edge slice proof: `/tmp/blcad-167-{geometry6-focused,qt6-focused,native100-6,native150-6}.log` and `/tmp/blcad-167-startup6-proof.log`; native **3 / 687** at each scale, two policy captures inspected, visible app startup (intentional timeout 124, probe exit 0); runtime **1,144 inputs**, SHA-256 `b100d88e1858934d8ad705a0003a17366b9c45a65b6bd5dd1a2fb9f9a31392c6`. No whole-167 acceptance or delivery is claimed; continue through 174 and preserve all 168–204
-requirements.
+Current runtime: **1,147 inputs**, SHA-256
+`a83a4a7a6c7c7d7e012fe4ceb14f62098be69a24482750604e5d9e58d2fb4e2e`.
+Native policy/Sweep/Loft regression passes **3 / 687** at both 100% and compact 150%, without skips; separate app startup shows a process-owned visible X11 window (timeout 124, probe exit 0).
+Proof logs: `/tmp/blcad-167-{geometry10-focused,qt10-focused,native100-10,native150-10}.log` and `/tmp/blcad-167-startup10-proof.log`.
+The assigned continuation remains through 174; preserve all 168–204 requirements.
 
 ## Later phases
 

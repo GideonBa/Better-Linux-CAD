@@ -2,7 +2,7 @@
 
 Extension: [the explicit path policy](part-path-curve-core-mvp6.md#explicit-execution-policy--166)
 selects native curve construction. Historical documents retain the fixed-subdivision behavior
-below until an explicit, previewed upgrade. Semantic-edge/multi-wire paths remain planned in 167.
+below until an explicit, previewed upgrade. Semantic native sources and explicit material-region profiles extend this execution in 167; closed-spine acceptance remains separately tracked.
 
 Status: implemented in Block 82.
 
@@ -24,7 +24,7 @@ same resolved path. A helix resolves its axis, Length radius and pitch, Count tu
 handedness on every recompute. Invalid entities, parameters, axes, disconnected paths,
 self-intersection, and invalid OCCT output fail closed.
 
-Semantic generated-edge path execution is still deferred.
+Semantic generated-edge execution is available under the explicit curve-preserving policy; see the [native recovery contract](part-path-curve-core-mvp6.md#semantic-native-curve-execution--167).
 
 ## Path preview follow-up (Block 136)
 
