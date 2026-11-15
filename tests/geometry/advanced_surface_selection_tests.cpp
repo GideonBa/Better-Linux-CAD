@@ -34,6 +34,13 @@ TEST_CASE("Advanced Surface selectors expose typed owned faces and exact native 
       }
     }
   }
+  const auto selected_quilt = f::checked(
+      SurfaceSelectionGeometry::resolve(p, cache, f::body("quilt.body"), FeatureId{}, 1e-6));
+  const auto frame = f::checked(SurfaceSelectionGeometry::normal_frame(selected_quilt));
+  CHECK(frame.normal.x * frame.normal.x + frame.normal.y * frame.normal.y +
+            frame.normal.z * frame.normal.z ==
+        Catch::Approx(1));
+  CHECK(std::abs(frame.normal.z) < 1e-9);
   const auto edges = f::checked(
       FinishingSelectionBuilder::build(p, cache, owner, PartFeatureInputRole::PathSegment));
   REQUIRE(!edges.empty());

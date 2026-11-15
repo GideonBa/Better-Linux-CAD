@@ -3516,7 +3516,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
   if (feature->continuity() == LoftContinuity::G2)
     return Result<std::size_t>::failure(
         geometry_error(feature_id.value(),
-                       "G2 loft continuity is unsupported without a verified curvature guarantee"));
+                       "G2 loft continuity is unsupported for the global longitudinal request; "
+                       "choose verified boundary G2 and explicit support faces separately"));
 
   ShapeCache working_cache = shape_cache;
   std::vector<SweepPathSegment> center_path_segments;
@@ -3656,6 +3657,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
       return Result<std::size_t>::failure(combined.error());
     result = std::move(combined.value());
   }
+  if (const auto report = LoftAdapter::verification(tool.value()))
+    result = LoftAdapter::with_verification(result, *report);
   auto stored = store_loft_result(document, *feature, std::move(result), working_cache);
   if (stored.has_error())
     return stored;

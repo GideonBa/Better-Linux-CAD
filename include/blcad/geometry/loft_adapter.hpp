@@ -3,8 +3,10 @@
 #include "blcad/core/loft_feature.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/geometry/closed_profile_adapter.hpp"
+#include "blcad/geometry/loft_verification.hpp"
 #include "blcad/geometry/rectangle_extrusion_adapter.hpp"
 #include "blcad/geometry/sweep_adapter.hpp"
+#include <optional>
 
 #include <vector>
 
@@ -19,6 +21,9 @@ class StepImportTopologyContext;
 
 class LoftAdapter {
 public:
+  [[nodiscard]] static std::optional<LoftVerificationReport> verification(const GeometryShape&);
+  [[nodiscard]] static GeometryShape with_verification(const GeometryShape&,
+                                                       LoftVerificationReport);
   [[nodiscard]] Result<GeometryShape> loft_constrained(const PartDocument&, const LoftFeature&,
                                                        const ShapeCache&,
                                                        StepImportTopologyContext* = nullptr) const;

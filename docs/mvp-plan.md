@@ -1018,3 +1018,10 @@ The [advanced input catalog foundation](gui-spatial-surface-workbench-mvp7.md#ad
 is verified: typed current-Body faces/native edges, curved Surface quilts, hidden scope and placed
 imported rims; focused Geometry **11 / 515** and all five targets passed. Native controls and
 complete workflow acceptance remain in progress.
+
+The [shared advanced candidate foundation](gui-interactive-surface-mvp9.md#advanced-candidate-foundation)
+now covers typed Surface creation/editing, signed/symmetric handles, retained formulas, explicit
+Loft constraints and [native numerical feedback](part-guided-loft-geometry-mvp6.md#transient-numerical-feedback).
+Geometry **35 / 3,996** and affected Qt **14 passed / 1 native-only skip / 1,541 assertions** passed;
+all five targets passed. Native advanced widgets, selectors, overlays and full combined workflows
+remain required before accepting 173.

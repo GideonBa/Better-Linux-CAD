@@ -90,6 +90,9 @@ Result<GeometryShape> LoftAdapter::loft_constrained(const PartDocument& part,
         Error::geometry(feature.id().value(), std::move(message)));
   };
   try {
+    if (feature.continuity() == LoftContinuity::G2)
+      return fail("Global longitudinal G2 remains unsupported; choose independently verified "
+                  "boundary G2 explicitly");
     if (!feature.constraints())
       return fail("Verified Loft requires authored constraint intent");
     const auto& intent = *feature.constraints();
@@ -97,6 +100,10 @@ Result<GeometryShape> LoftAdapter::loft_constrained(const PartDocument& part,
     if (!parameter || parameter->type() != ParameterType::Length)
       return fail("Verified Loft requires a Length modeling tolerance");
     const double tolerance = parameter->value().millimeters();
+    LoftVerificationReport report;
+    report.linear_tolerance_mm = tolerance;
+    report.angular_tolerance_rad = intent.angular_tolerance_rad;
+    report.curvature_tolerance_per_mm = intent.curvature_tolerance_per_mm;
     for (const auto* support : intent.boundary_conditions())
       if (support->tangent_scale != 1.0)
         return fail("Verified native-rail Loft currently requires tangent scale 1; rail germs own "
@@ -138,6 +145,7 @@ Result<GeometryShape> LoftAdapter::loft_constrained(const PartDocument& part,
       if (!built)
         return fail(patch_role(feature, p) + ": " + built.error().message());
       const auto& patch = built.value();
+      report.curve_error_mm = std::max(report.curve_error_mm, patch.curve_error_mm);
       sewing.Add(patch.face);
       lineage.push_back({{feature.id(), patch_role(feature, p)}, patch.face, {}, {1, 0, 0}});
     }
@@ -206,13 +214,23 @@ Result<GeometryShape> LoftAdapter::loft_constrained(const PartDocument& part,
                                       });
       if (found == result.impl_->face_lineage.end())
         return fail("Verified Loft lost a boundary witness");
-      checked(detail::verify_surface_join(
+      const auto measured = checked(detail::verify_surface_join(
           feature.id(), witness.boundary.curve, found->face, *witness.boundary.support,
           witness.boundary.continuity, tolerance, intent.angular_tolerance_rad,
           intent.curvature_tolerance_per_mm, witness.boundary.reverse_normal));
+      report.position_error_mm = std::max(report.position_error_mm, measured.position_error_mm);
+      report.normal_error_rad = std::max(report.normal_error_rad, measured.normal_error_rad);
+      report.stations += measured.stations;
+      if (witness.boundary.continuity == LoftBoundaryContinuity::G2) {
+        ++report.g2_joins;
+        report.curvature_error_per_mm =
+            std::max(report.curvature_error_per_mm, measured.curvature_error_per_mm);
+      } else
+        ++report.g1_joins;
     }
     if (imports)
       checked(imports->validate_sources());
+    result.impl_->loft_verification = report;
     return Result<GeometryShape>::success(std::move(result));
   } catch (const Standard_Failure& e) {
     return fail(e.GetMessageString() ? e.GetMessageString() : "Verified Loft failed");

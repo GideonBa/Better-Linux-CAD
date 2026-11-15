@@ -250,6 +250,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/sweep_adapter.cpp
     src/geometry/surface_adapter.cpp
     src/geometry/surface_selection_geometry.cpp
+    src/geometry/surface_normal_frame.cpp
     src/geometry/surface_offset_adapter.cpp
     src/geometry/surface_offset_verification.cpp
     src/geometry/surface_boundary_query.cpp
@@ -891,6 +892,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_interactive_surface_tests.cpp
       tests/gui/gui_feature_edit_tests.cpp
       tests/gui/gui_curved_surface_history_tests.cpp
+      tests/gui/gui_advanced_surface_controller_tests.cpp
       tests/gui/gui_interactive_assembly_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )

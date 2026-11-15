@@ -380,3 +380,12 @@ Commands live in `docs/development-setup.md`. Local evidence logs use
 The source manifest is `source-freeze.json`. The intentionally failing `baseline-test.log` records
 the old distortion before the fix; completed final runs supersede development attempts. This
 follow-up does not change persistence versions or advance the numbered STEP import plan.
+
+
+### Explicit constrained candidate foundation
+
+`GuiInteractiveLoftController` accepts the existing typed `LoftConstraintIntent` and candidate
+tolerance parameters, preserving explicit ordered sections/rails and scoped support/anchor intent.
+The candidate uses actual constrained Geometry construction; unsupported global longitudinal G2
+retains a distinct diagnostic and never becomes boundary G2 implicitly. Advanced native controls
+remain in progress; see [shared candidate proof](gui-interactive-surface-mvp9.md#advanced-candidate-foundation).

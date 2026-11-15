@@ -3,8 +3,13 @@
 #include "blcad/geometry/shape_cache.hpp"
 namespace blcad::geometry {
 class StepImportTopologyContext;
+struct SurfaceNormalFrame {
+  Point3 origin;
+  Vector3 normal;
+};
 class SurfaceSelectionGeometry {
 public:
+  [[nodiscard]] static Result<SurfaceNormalFrame> normal_frame(const GeometryShape&);
   // owned_override is the real effective predecessor for an in-place operation.
   [[nodiscard]] static Result<GeometryShape> resolve(const PartDocument&, const ShapeCache&,
                                                      const SurfaceReference&, FeatureId consumer,

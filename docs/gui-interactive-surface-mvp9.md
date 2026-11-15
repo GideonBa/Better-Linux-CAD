@@ -112,3 +112,26 @@ restores a second drag with Escape and clicks the reachable Apply button. Geomet
 exact planar Fill and an outward frame
 that survives reversed boundary direction and source-parameter recompute. Existing headless Surface
 proof continues to cover tolerance-driven gap diagnostics and coordinator routing.
+
+
+## Advanced candidate foundation
+
+The headless Surface authority now accepts typed Offset/Thicken and modern Trim/Extend options
+from the existing V13 records. Creation and `begin_edit` share candidate construction, exact
+reference/parameter retention, preview validation and one atomic add/update transaction. Pending
+Length parameters and native edge PathCurves are provisioned only inside the candidate. Untouched
+computed values remain formula-bound; direct computed-value changes retain the existing explicit
+rejection rather than removing a formula implicitly.
+
+Offset/Thicken direction handles follow the actual source normal, reverse for OppositeNormal and
+use half the authored total distance for Symmetric display/drag scaling. The normal frame is a
+transient regular interior station near the quilt centroid; it never becomes a persisted face
+identity or changes per-face signed-side semantics. Modern Trim retains its explicit side and
+projection; Extend retains natural/tangent mode and deviation policy during editing.
+
+[Candidate tests](../tests/gui/gui_advanced_surface_controller_tests.cpp) check independent
+cylindrical thickness volumes, signed/symmetric handles, creation/editing, failed excessive
+thickness, formula preservation and exact session Undo/Redo. The same file checks independently
+sampled Airfoil sections through a GUI Loft candidate with explicit G2 supports and rejects global
+longitudinal G2 separately. Native widgets/selectors and their complete workflow gates remain in
+progress; this foundation does not enable new ribbon commands by itself.
