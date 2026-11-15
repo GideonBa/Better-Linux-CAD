@@ -14,31 +14,6 @@ using namespace blcad::geometry;
 namespace f = blcad::test::spatial_fixture;
 namespace sf = blcad::test::spatial_feature_fixture;
 
-TEST_CASE("Unimplemented material-region intent preserves the certified outer-boundary result",
-          "[geometry][parity-b167][semantic-sweep-intent]") {
-  auto part = sf::straight_sweep();
-  auto cache = f::checked(ShapeCache::create(ShapeCacheId("material.intent")));
-  REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
-  const auto accepted = part;
-  const auto old = *part.find_sweep_feature(FeatureId("driven.sweep"));
-  const auto region = std::get<ProfileRegionReference>(old.profile().source());
-  const auto profile = f::checked(
-      SweepProfileReference::create_closed_region(region, SweepRegionPolicy::MaterialRegion));
-  REQUIRE(part.update_sweep_feature(f::checked(SweepFeature::create_sweep(
-      old.id(), old.name(), profile, old.path(), old.body_result_context()))));
-  const auto source = f::checked(serialize_part_document_to_json(part));
-  const auto result = GeometryRecomputeExecutor{}.execute_document(part, cache);
-  REQUIRE_FALSE(result);
-  CHECK(result.error().message().find("multi-wire") != std::string::npos);
-  CHECK(f::checked(serialize_part_document_to_json(part)) == source);
-  CHECK(cache.validate_complete_geometry_result(accepted));
-  CHECK_FALSE(cache.validate_complete_geometry_result(part));
-  REQUIRE(cache.find_body_shape(BodyId("driven.body")));
-  CHECK(RectangleExtrusionAdapter{}
-            .summarize(*cache.find_body_shape(BodyId("driven.body")))
-            .volume_mm3 == Catch::Approx(6.4).margin(1e-6));
-}
-
 namespace {
 PathCurve edge_path(PathSegmentReference segment, PathClosure closure = PathClosure::Open) {
   return f::checked(PathCurve::create(PathCurveId("semantic.path"), "Semantic path", {segment},

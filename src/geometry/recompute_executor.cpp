@@ -28,6 +28,7 @@
 #include "loft_section_alignment_internal.hpp"
 #include "native_path_curve.hpp"
 #include "semantic_path_segment.hpp"
+#include "sweep_material_region.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -3311,9 +3312,6 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
   if (feature == nullptr)
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "sweep feature must exist in part document"));
-  if (feature->profile().region_policy() == SweepRegionPolicy::MaterialRegion)
-    return Result<std::size_t>::failure(geometry_error(
-        feature_id.value(), "Material-region Sweep requires multi-wire geometry execution"));
 
   ShapeCache working_cache = shape_cache;
   const PathCurve* trajectory = document.find_path_curve(feature->path());
@@ -3434,6 +3432,25 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_sweep(const PartDocument&
     }
     tool = sweep_adapter_.sweep_closed_profile(feature->id(), curves, path.value(), orientation,
                                                fixed_up, twist_angle_deg, guide);
+    if (tool && feature->profile().region_policy() == SweepRegionPolicy::MaterialRegion) {
+      auto holes = detail::resolve_sweep_material_holes(document, *sketch, profile_id);
+      if (!holes)
+        return Result<std::size_t>::failure(holes.error());
+      std::vector<GeometryShape> voids;
+      for (const auto& hole : holes.value()) {
+        auto inner = sweep_adapter_.sweep_closed_profile(
+            feature->id(), contained_hole_curves(workplane_resolver_, workplane.value(), hole),
+            path.value(), orientation, fixed_up, twist_angle_deg, guide);
+        if (!inner)
+          return Result<std::size_t>::failure(inner.error());
+        voids.push_back(std::move(inner.value()));
+      }
+      // Checked subtraction gives every inner boundary its material-outward orientation and
+      // preserves each exact wire. Never publish the filled outer pipe on any hole failure.
+      if (!voids.empty())
+        tool = body_boolean_adapter_.combine(feature->id(), BodyBooleanOperation::Subtract,
+                                             tool.value(), voids);
+    }
   }
   if (tool.has_error())
     return Result<std::size_t>::failure(tool.error());

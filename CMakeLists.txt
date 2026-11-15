@@ -223,6 +223,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/semantic_face_resolution.cpp
     src/geometry/semantic_edge_resolution.cpp
     src/geometry/semantic_path_segment.cpp
+    src/geometry/sweep_material_region.cpp
     src/geometry/recompute_executor.cpp
     src/geometry/circular_pattern_adapter.cpp
     src/geometry/linear_pattern_adapter.cpp
@@ -686,6 +687,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/native_twist_geometry_tests.cpp
       tests/geometry/native_path_consumer_tests.cpp
       tests/geometry/semantic_sweep_intent_geometry_tests.cpp
+    tests/geometry/material_region_sweep_tests.cpp
       tests/support/geometry_volume_oracle.cpp
       tests/geometry/part_construction_mvp_acceptance_tests.cpp
       tests/geometry/recompute_executor_tests.cpp

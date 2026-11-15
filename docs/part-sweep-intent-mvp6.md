@@ -79,3 +79,18 @@ and removal protection, Body-kind enforcement, strict roundtrip JSON, older-file
 and malformed-record rejection.
 
 Blocks 48–94 are implemented. Block 83 Path-following Extrude and Extruded Cut is implemented; Block 84 ProfileSectionReference and Loft Core intent plus JSON is implemented; Block 85 Two-section Loft Geometry on arbitrary planes is implemented; Block 86 Multi-section Loft is implemented; Block 87 Guided and continuity-controlled Loft is implemented; Block 88 Surface feature Core intent and JSON is implemented; Block 89 Boundary and Fill Surface Geometry is implemented; Block 90 Trim and Extend Surface Geometry is implemented; Block 91 Stitch/Knit/Sew shell Geometry is implemented; Block 92 Closed shell to solid conversion is implemented; Block 93 multi-body STEP export is implemented; Block 94 integrated Part Construction MVP acceptance is implemented; Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is next.
+
+### Material-region execution
+
+The explicit material-region policy resolves actual native profile wires in the Sketch plane.
+Exact wire distance and trimmed-face containment select directly nested holes. Touching or crossing
+boundaries reject the candidate, including contours the historical picking classifier would omit.
+Separate outer regions remain separate selections; deeper islands are not a second hole of this
+selected region. Rational/equation boundaries retain their native curves.
+
+Each exact inner contour follows the same path, orientation, twist and guide as the outer contour.
+Checked subtraction supplies material-outward inner boundaries before the existing New/Join/Cut/
+Intersect Body operation. Any classification, pipe or Boolean failure retains the accepted cache;
+there is no filled outer-only substitute. The default outer-boundary policy retains historical
+filled behavior, including when the Sketch contains nested contours. Closed-spine capability and
+whole-block acceptance remain separately tracked in `mvp-plan.md`.
