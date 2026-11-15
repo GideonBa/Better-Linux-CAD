@@ -396,3 +396,42 @@ TEST_CASE("Automatic Loft rejects malformed sections and bounded refinement over
   CHECK_FALSE(make_loft_sections_compatible(FeatureId("bad"), original));
   CHECK_FALSE(LoftAdapter{}.loft_closed_sections(FeatureId("bad"), original, true));
 }
+
+TEST_CASE("Explicit Loft anchors retain original identities through unequal spline refinement",
+          "[geometry][loft-constraints][parity-b168]") {
+  auto part = inputs();
+  add_loft(part);
+  REQUIRE(part.add_parameter(checked(Parameter::create_length(
+      ParameterId("loft.tolerance"), "Tolerance", checked(Quantity::length_mm(1e-5))))));
+  const auto rail = checked(PathCurve::create(
+      PathCurveId("rail"), "Rail",
+      {checked(PathSegmentReference::create_planar(SketchId("section.0"), SketchEntityId("upper.0"),
+                                                   PlanarPathCurveKind::Spline))},
+      PathClosure::Open, PathOrientationRule::MinimumTwist));
+  REQUIRE(part.add_path_curve(rail));
+  const auto original = *part.find_loft_feature(FeatureId("loft.unequal"));
+  const auto feature =
+      checked(LoftFeature::create_loft(original.id(), original.name(), original.sections(),
+                                       original.body_result_context(), {}, {rail.id()}));
+  LoftConstraintIntent intent{ParameterId("loft.tolerance"), 1e-5, 1e-5, {}, {},
+                              {{rail.id(), false, {}}}};
+  for (std::size_t i = 0; i < feature.sections().size(); ++i)
+    intent.guides[0].anchors.push_back(
+        {feature.sections()[i].identity(), SketchEntityId("upper.0"), .25, .5 * i});
+  REQUIRE(part.update_loft_feature(checked(feature.with_constraints(intent))));
+  const auto before = checked(serialize_part_document_to_json(part));
+  const auto compatible = checked(make_loft_sections_compatible(feature.id(), sections()));
+  REQUIRE(compatible.adjusted);
+  for (std::size_t i = 0; i < feature.sections().size(); ++i) {
+    const auto& anchor = part.find_loft_feature(feature.id())->constraints()->guides[0].anchors[i];
+    CHECK(anchor.section_identity == feature.sections()[i].identity());
+    REQUIRE(anchor.boundary_entity == SketchEntityId("upper.0"));
+    CHECK(part.find_sketch(SketchId("section." + std::to_string(i)))
+              ->find_spline_segment(*anchor.boundary_entity));
+    CHECK(distance(compatible.sections[i][compatible.source_vertices[i][0]].start,
+                   model(i, poles(i, true)[0])) < 1e-10);
+  }
+  CHECK(checked(serialize_part_document_to_json(part)) == before);
+  CHECK(checked(serialize_part_document_to_json(
+            checked(deserialize_part_document_from_json(before)))) == before);
+}

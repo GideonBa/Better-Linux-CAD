@@ -41,6 +41,7 @@ constexpr int k_equation_curve_version = 8;
 constexpr int k_spatial_constraint_version = 9;
 constexpr int k_curve_policy_version = 10;
 constexpr int k_semantic_sweep_version = 11;
+constexpr int k_loft_constraint_version = 12;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -3105,6 +3106,109 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
   return Result<SweepFeature>::failure(json_error("unsupported sweep feature type"));
 }
 
+[[nodiscard]] json loft_constraints_to_json(const LoftConstraintIntent& intent) {
+  const auto boundary = [](const std::optional<LoftBoundaryCondition>& condition) -> json {
+    if (!condition)
+      return nullptr;
+    return {{"section_identity", condition->section_identity},
+            {"support", face_reference_to_json(condition->support)},
+            {"source_body", condition->imported_source_body
+                                ? json(condition->imported_source_body->value())
+                                : json(nullptr)},
+            {"continuity", condition->continuity == LoftBoundaryContinuity::G1 ? "g1" : "g2"},
+            {"reverse_normal", condition->reverse_normal},
+            {"tangent_scale", condition->tangent_scale}};
+  };
+  json guides = json::array();
+  for (const auto& binding : intent.guides) {
+    json anchors = json::array();
+    for (const auto& anchor : binding.anchors)
+      anchors.push_back(
+          {{"section_identity", anchor.section_identity},
+           {"boundary_entity",
+            anchor.boundary_entity ? json(anchor.boundary_entity->value()) : json(nullptr)},
+           {"boundary_fraction", anchor.boundary_fraction},
+           {"guide_fraction", anchor.guide_fraction}});
+    guides.push_back({{"guide", binding.guide.value()},
+                      {"reversed", binding.reversed},
+                      {"anchors", std::move(anchors)}});
+  }
+  return {{"linear_tolerance", intent.linear_tolerance.value()},
+          {"angular_tolerance_rad", intent.angular_tolerance_rad},
+          {"curvature_tolerance_per_mm", intent.curvature_tolerance_per_mm},
+          {"start", boundary(intent.start)},
+          {"end", boundary(intent.end)},
+          {"guides", std::move(guides)}};
+}
+
+[[nodiscard]] Result<LoftConstraintIntent> loft_constraints_from_json(const json& value) {
+  const auto fail = []() {
+    return Result<LoftConstraintIntent>::failure(json_error("Malformed authored Loft constraints"));
+  };
+  if (!value.is_object() || value.size() != 6U || !value.at("linear_tolerance").is_string() ||
+      !value.at("angular_tolerance_rad").is_number() ||
+      !value.at("curvature_tolerance_per_mm").is_number() || !value.at("guides").is_array())
+    return fail();
+  LoftConstraintIntent intent{ParameterId(value.at("linear_tolerance").get<std::string>()),
+                              value.at("angular_tolerance_rad").get<double>(),
+                              value.at("curvature_tolerance_per_mm").get<double>(),
+                              {},
+                              {},
+                              {}};
+  for (const auto* key : {"start", "end"}) {
+    const auto& condition = value.at(key);
+    if (condition.is_null())
+      continue;
+    if (!condition.is_object() || condition.size() != 6U ||
+        !condition.at("section_identity").is_string() ||
+        (!condition.at("source_body").is_null() && !condition.at("source_body").is_string()) ||
+        !condition.at("continuity").is_string() || !condition.at("reverse_normal").is_boolean() ||
+        !condition.at("tangent_scale").is_number())
+      return fail();
+    auto support = face_reference_from_json(condition.at("support"),
+                                            PartFeatureInputRole::LoftBoundarySupport);
+    if (!support)
+      return Result<LoftConstraintIntent>::failure(support.error());
+    const auto continuity = condition.at("continuity").get<std::string>();
+    if (continuity != "g1" && continuity != "g2")
+      return fail();
+    std::optional<BodyId> body;
+    if (!condition.at("source_body").is_null())
+      body = BodyId(condition.at("source_body").get<std::string>());
+    LoftBoundaryCondition parsed{condition.at("section_identity").get<std::string>(),
+                                 std::move(support.value()),
+                                 std::move(body),
+                                 continuity == "g1" ? LoftBoundaryContinuity::G1
+                                                    : LoftBoundaryContinuity::G2,
+                                 condition.at("reverse_normal").get<bool>(),
+                                 condition.at("tangent_scale").get<double>()};
+    (std::string_view(key) == "start" ? intent.start : intent.end) = std::move(parsed);
+  }
+  for (const auto& binding : value.at("guides")) {
+    if (!binding.is_object() || binding.size() != 3U || !binding.at("guide").is_string() ||
+        !binding.at("reversed").is_boolean() || !binding.at("anchors").is_array())
+      return fail();
+    LoftGuideBinding parsed{PathCurveId(binding.at("guide").get<std::string>()),
+                            binding.at("reversed").get<bool>(),
+                            {}};
+    for (const auto& anchor : binding.at("anchors")) {
+      if (!anchor.is_object() || anchor.size() != 4U ||
+          !anchor.at("section_identity").is_string() ||
+          (!anchor.at("boundary_entity").is_null() && !anchor.at("boundary_entity").is_string()) ||
+          !anchor.at("boundary_fraction").is_number() || !anchor.at("guide_fraction").is_number())
+        return fail();
+      std::optional<SketchEntityId> entity;
+      if (!anchor.at("boundary_entity").is_null())
+        entity = SketchEntityId(anchor.at("boundary_entity").get<std::string>());
+      parsed.anchors.push_back({anchor.at("section_identity").get<std::string>(), std::move(entity),
+                                anchor.at("boundary_fraction").get<double>(),
+                                anchor.at("guide_fraction").get<double>()});
+    }
+    intent.guides.push_back(std::move(parsed));
+  }
+  return Result<LoftConstraintIntent>::success(std::move(intent));
+}
+
 [[nodiscard]] json loft_feature_to_json(const LoftFeature& feature) {
   json sections = json::array();
   for (const auto& section : feature.sections()) {
@@ -3147,12 +3251,15 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
     value["target_body"] = context.target_body()->value();
   if (context.produced_body().has_value())
     value["produced_body"] = context.produced_body()->value();
+  if (feature.constraints())
+    value["constraints"] = loft_constraints_to_json(*feature.constraints());
   return value;
 }
 
 [[nodiscard]] Result<LoftFeature> loft_feature_from_json(const json& value) {
-  const std::size_t expected_size =
-      8U + (value.contains("target_body") ? 1U : 0U) + (value.contains("produced_body") ? 1U : 0U);
+  const std::size_t expected_size = 8U + (value.contains("constraints") ? 1U : 0U) +
+                                    (value.contains("target_body") ? 1U : 0U) +
+                                    (value.contains("produced_body") ? 1U : 0U);
   if (!value.is_object() || value.size() != expected_size || !value.contains("id") ||
       !value.contains("name") || !value.contains("type") || !value.contains("sections") ||
       !value.contains("path_curve") || !value.contains("guide_curves") ||
@@ -3233,16 +3340,26 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
   const FeatureId id(value.at("id").get<std::string>());
   const std::string name = value.at("name").get<std::string>();
   const std::string type = value.at("type").get<std::string>();
+  const auto finish = [&](Result<LoftFeature> feature) -> Result<LoftFeature> {
+    if (!feature || !value.contains("constraints"))
+      return feature;
+    auto intent = loft_constraints_from_json(value.at("constraints"));
+    if (!intent)
+      return Result<LoftFeature>::failure(intent.error());
+    return feature.value().with_constraints(std::move(intent.value()));
+  };
   if (type == "loft")
-    return LoftFeature::create_loft(id, name, std::move(sections), std::move(*context.value()),
-                                    std::move(path), std::move(guides), continuity);
+    return finish(LoftFeature::create_loft(id, name, std::move(sections),
+                                           std::move(*context.value()), std::move(path),
+                                           std::move(guides), continuity));
   if (type == "loft_cut")
-    return LoftFeature::create_loft_cut(id, name, std::move(sections), std::move(*context.value()),
-                                        std::move(path), std::move(guides), continuity);
+    return finish(LoftFeature::create_loft_cut(id, name, std::move(sections),
+                                               std::move(*context.value()), std::move(path),
+                                               std::move(guides), continuity));
   if (type == "loft_surface")
-    return LoftFeature::create_loft_surface(id, name, std::move(sections),
-                                            std::move(*context.value()), std::move(path),
-                                            std::move(guides), continuity);
+    return finish(LoftFeature::create_loft_surface(id, name, std::move(sections),
+                                                   std::move(*context.value()), std::move(path),
+                                                   std::move(guides), continuity));
   return Result<LoftFeature>::failure(json_error("unsupported loft feature type"));
 }
 
@@ -4774,6 +4891,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   json root;
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
+  const bool loft_constraints =
+      std::any_of(document.loft_features().begin(), document.loft_features().end(),
+                  [](const auto& feature) { return feature.constraints().has_value(); });
   const bool semantic_sweep =
       std::any_of(document.path_curves().begin(), document.path_curves().end(),
                   [](const auto& path) {
@@ -4805,9 +4925,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       std::any_of(document.circular_pattern_features().begin(),
                   document.circular_pattern_features().end(),
                   [](const auto& f) { return f.placements().has_value(); });
-  if (semantic_sweep || curve_policy || spatial || equations || extended_patterns ||
-      !document.engineering_resources().entries().empty() || !document.hole_features().empty() ||
-      !document.thread_features().empty()) {
+  if (loft_constraints || semantic_sweep || curve_policy || spatial || equations ||
+      extended_patterns || !document.engineering_resources().entries().empty() ||
+      !document.hole_features().empty() || !document.thread_features().empty()) {
     const bool manufacturing = std::any_of(
         document.hole_features().begin(), document.hole_features().end(), [](const auto& hole) {
           return !std::holds_alternative<std::monostate>(hole.manufacturing());
@@ -4816,7 +4936,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
         !document.thread_features().empty() ||
         std::any_of(document.hole_features().begin(), document.hole_features().end(),
                     [](const auto& hole) { return hole.thread().has_value(); });
-    root["version"] = semantic_sweep                     ? k_semantic_sweep_version
+    root["version"] = loft_constraints                   ? k_loft_constraint_version
+                      : semantic_sweep                   ? k_semantic_sweep_version
                       : curve_policy                     ? k_curve_policy_version
                       : spatial                          ? k_spatial_constraint_version
                       : equations                        ? k_equation_curve_version
@@ -5219,9 +5340,10 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     latest_ancestor_position[node] = latest;
   }
-  if (semantic_sweep || curve_policy || spatial || equations || extended_patterns || interleaved ||
-      !document.result_face_workplanes().empty() || !document.hole_features().empty() ||
-      !document.thread_features().empty() || document.authored_history_intent())
+  if (loft_constraints || semantic_sweep || curve_policy || spatial || equations ||
+      extended_patterns || interleaved || !document.result_face_workplanes().empty() ||
+      !document.hole_features().empty() || !document.thread_features().empty() ||
+      document.authored_history_intent())
     root["feature_order"] = std::move(feature_order);
   if (document.authored_history_intent())
     root["suppressed_features"] = document.authored_history_intent()->suppressed;
@@ -5258,10 +5380,19 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
          root.at("version") != k_equation_curve_version &&
          root.at("version") != k_spatial_constraint_version &&
          root.at("version") != k_curve_policy_version &&
-         root.at("version") != k_semantic_sweep_version))
+         root.at("version") != k_semantic_sweep_version &&
+         root.at("version") != k_loft_constraint_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
     const auto version = root.at("version").get<int>();
-    const bool semantic_sweep_envelope = version == k_semantic_sweep_version;
+    const bool loft_envelope = version == k_loft_constraint_version;
+    bool loft_intent = false;
+    if (root.contains("loft_features") && root.at("loft_features").is_array())
+      for (const auto& feature : root.at("loft_features"))
+        loft_intent = loft_intent || (feature.is_object() && feature.contains("constraints"));
+    if (loft_envelope != loft_intent)
+      return Result<PartDocument>::failure(
+          json_error("Authored Loft constraints require necessary Part version 12"));
+    const bool semantic_sweep_envelope = version == k_semantic_sweep_version || loft_envelope;
     bool semantic_sweep_intent = false;
     if (root.contains("path_curves") && root.at("path_curves").is_array())
       for (const auto& path : root.at("path_curves"))
@@ -5276,7 +5407,8 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
         if (feature.is_object() && feature.contains("profile") &&
             feature.at("profile").is_object() && feature.at("profile").contains("region_policy"))
           semantic_sweep_intent = true;
-    if (semantic_sweep_envelope != semantic_sweep_intent)
+    if ((semantic_sweep_intent && !semantic_sweep_envelope) ||
+        (version == k_semantic_sweep_version && !semantic_sweep_intent))
       return Result<PartDocument>::failure(json_error(
           "Semantic-edge and material-region Sweep intent requires necessary Part version 11"));
     const bool curve_policy_envelope = version == k_curve_policy_version || semantic_sweep_envelope;

@@ -43,6 +43,7 @@ enum class PartFeatureInputRole {
   ThreadSupportFace,
   SpatialConstraint,
   PathSegment,
+  LoftBoundarySupport,
 };
 
 enum class PartFeatureInputSourceKind {

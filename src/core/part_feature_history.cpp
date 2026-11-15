@@ -120,6 +120,17 @@ template <typename Record> ExecutionContract execution_contract(const Record& re
       if (const auto* limit = std::get_if<HoleUpToBodyExtent>(&record.extent()))
         contract.body_inputs.push_back(limit->body);
     }
+    if constexpr (std::is_same_v<Record, LoftFeature>)
+      if (record.constraints())
+        for (const auto* condition : {&record.constraints()->start, &record.constraints()->end}) {
+          if (!*condition)
+            continue;
+          add_input(contract, (**condition).support.source_node_id());
+          if ((**condition).imported_source_body)
+            contract.body_inputs.push_back(*(**condition).imported_source_body);
+          if (const auto* face = std::get_if<ResultFaceReference>(&(**condition).support.source()))
+            contract.body_inputs.push_back(face->body());
+        }
     if constexpr (requires { record.body_result_context(); })
       add_context(contract, record.body_result_context());
     if constexpr (requires { record.target_body(); }) {

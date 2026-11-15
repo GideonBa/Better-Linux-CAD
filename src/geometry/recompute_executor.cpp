@@ -3508,6 +3508,10 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_loft(const PartDocument& 
   if (feature->sections().size() < 2U)
     return Result<std::size_t>::failure(
         geometry_error(feature_id.value(), "loft requires at least two ordered sections"));
+  if (feature->constraints())
+    return Result<std::size_t>::failure(geometry_error(
+        feature_id.value(),
+        "Constrained Loft execution requires verified boundary construction (Block 169)"));
   if (feature->continuity() == LoftContinuity::G2)
     return Result<std::size_t>::failure(
         geometry_error(feature_id.value(),

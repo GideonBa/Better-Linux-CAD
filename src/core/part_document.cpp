@@ -11,31 +11,33 @@
 namespace blcad {
 namespace {
 
-bool has_extended_sketch_intent(const PartDocument& document) {
-  return std::any_of(document.sketches().begin(), document.sketches().end(),
+bool has_transactional_parameter_intent(const PartDocument& document) {
+  return std::any_of(document.loft_features().begin(), document.loft_features().end(),
+                     [](const auto& feature) { return feature.constraints().has_value(); }) ||
+         std::any_of(document.sketches().begin(), document.sketches().end(),
                      [](const auto& sketch) { return !sketch.equation_curves().empty(); }) ||
          std::any_of(document.sketches_3d().begin(), document.sketches_3d().end(),
                      [](const auto& sketch) {
                        return !sketch.equation_curves().empty() || sketch.requires_spatial_schema();
                      });
 }
-// Preserve the existing fast path for historical Parts. Extended Sketch Parts
+// Preserve the existing fast path for historical Parts. Extended Sketch/Loft Parts
 // validate typed input changes transactionally, including dependent formulas/graph.
-struct SketchParameterRollback {
+struct ParameterIntentRollback {
   PartDocument& document;
   std::optional<PartDocument> before;
   bool accepted{false};
-  explicit SketchParameterRollback(PartDocument& value) : document(value) {
-    if (has_extended_sketch_intent(value))
+  explicit ParameterIntentRollback(PartDocument& value) : document(value) {
+    if (has_transactional_parameter_intent(value))
       before = value;
   }
-  ~SketchParameterRollback() {
+  ~ParameterIntentRollback() {
     if (before && !accepted)
       document = std::move(*before);
   }
 };
-Result<std::size_t> validate_sketch_parameter_intent(const PartDocument& document,
-                                                     const std::vector<std::string>& affected) {
+Result<std::size_t> validate_parameter_intent(const PartDocument& document,
+                                              const std::vector<std::string>& affected) {
   std::size_t count = 0;
   const auto validate = [&](const auto& sketches) -> Result<std::size_t> {
     for (const auto& sketch : sketches) {
@@ -61,6 +63,15 @@ Result<std::size_t> validate_sketch_parameter_intent(const PartDocument& documen
       auto valid = validate_spatial_constraints(document, sketch);
       if (!valid)
         return valid;
+    }
+  for (const auto& feature : document.loft_features())
+    if (feature.constraints() &&
+        std::find(affected.begin(), affected.end(), feature.id().value()) != affected.end()) {
+      const auto* tolerance = document.find_parameter(feature.constraints()->linear_tolerance);
+      if (!tolerance || tolerance->type() != ParameterType::Length ||
+          tolerance->value().millimeters() < 1e-9 || tolerance->value().millimeters() > 1.0)
+        return Result<std::size_t>::failure(Error::validation(
+            feature.id().value(), "Loft linear tolerance must remain a Length from 1e-9 to 1 mm"));
     }
   return Result<std::size_t>::success(count);
 }
@@ -240,8 +251,8 @@ validate_result_face_source(const PartDocument& document, const ResultFaceRefere
            dependents.end();
   };
   const auto* body = document.find_body(reference.body());
-  if (!body || body->kind() != BodyKind::Solid)
-    return fail("source Body must exist and be solid");
+  if (!body || (planar_only && body->kind() != BodyKind::Solid))
+    return fail(planar_only ? "source Body must exist and be solid" : "source Body must exist");
   const bool producer =
       record_produces_body(document, reference.producer().value(), reference.body());
   if (!producer && !may_retain(reference.producer().value()))
@@ -2573,6 +2584,76 @@ Result<std::size_t> PartDocument::add_loft_feature(LoftFeature feature) {
     if (valid.has_error())
       return valid;
   }
+  std::vector<std::string> constraint_sources;
+  if (feature.constraints()) {
+    const auto& intent = *feature.constraints();
+    const auto* tolerance = find_parameter(intent.linear_tolerance);
+    if (!tolerance || tolerance->type() != ParameterType::Length ||
+        tolerance->value().millimeters() < 1e-9 || tolerance->value().millimeters() > 1.0)
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "Loft linear tolerance must be a Length from 1e-9 to 1 mm"));
+    constraint_sources.push_back(intent.linear_tolerance.value());
+    for (const auto* condition : {&intent.start, &intent.end}) {
+      if (!*condition)
+        continue;
+      const auto& support = **condition;
+      auto valid = validate_part_feature_input_reference(*this, support.support);
+      if (!valid)
+        return valid;
+      constraint_sources.push_back(support.support.source_node_id());
+      if (const auto* face = std::get_if<ResultFaceReference>(&support.support.source())) {
+        const auto& context = feature.body_result_context();
+        const bool in_place_support = context.target_body() == std::optional(face->body()) &&
+                                      context.effective_produced_body() == face->body();
+        if (!in_place_support)
+          constraint_sources.push_back(body_dependency_node_id(face->body()));
+      }
+      if (support.imported_source_body) {
+        const auto& ref = std::get<ImportedTopologyReference>(support.support.source());
+        const auto* catalog = find_imported_topology_catalog(ref.catalog());
+        const auto* entry = catalog ? catalog->find(ref.entry()) : nullptr;
+        bool owned = false;
+        for (const auto& producer : imported_body_features())
+          if (producer.definition().catalog() == ref.catalog())
+            for (const auto& output : producer.definition().outputs())
+              owned = owned ||
+                      (entry && entry->parent_body && output.imported_body == *entry->parent_body &&
+                       output.body == *support.imported_source_body);
+        if (!owned || !find_body(*support.imported_source_body))
+          return Result<std::size_t>::failure(Error::validation(
+              feature.id().value(), "Imported Loft support must belong to its explicit base Body"));
+        const auto& context = feature.body_result_context();
+        const bool in_place_support =
+            context.target_body() == support.imported_source_body &&
+            context.effective_produced_body() == *support.imported_source_body;
+        if (!in_place_support)
+          constraint_sources.push_back(body_dependency_node_id(*support.imported_source_body));
+      }
+    }
+    for (const auto& binding : intent.guides)
+      for (std::size_t i = 0; i < binding.anchors.size(); ++i) {
+        const auto& anchor = binding.anchors[i];
+        if (!anchor.boundary_entity)
+          continue;
+        const auto& ref = std::get<ProfileRegionReference>(feature.sections()[i].source());
+        const auto* sketch = find_sketch(ref.sketch());
+        bool belongs = false;
+        const auto contains = [&](const auto& entities) {
+          return std::find(entities.begin(), entities.end(), *anchor.boundary_entity) !=
+                 entities.end();
+        };
+        if (const auto* profile = sketch->find_closed_profile(ref.profile()))
+          belongs = contains(profile->line_segments());
+        if (const auto* profile = sketch->find_arc_closed_profile(ref.profile()))
+          belongs = contains(profile->curve_segments());
+        if (const auto* profile = sketch->find_composite_closed_profile(ref.profile()))
+          belongs = contains(profile->outer_contour());
+        if (!belongs)
+          return Result<std::size_t>::failure(Error::validation(
+              feature.id().value(),
+              "Loft guide anchor must identify an original outer-boundary entity"));
+      }
+  }
   const auto& context = feature.body_result_context();
   if (context.target_body().has_value() && !has_body_id(*context.target_body()))
     return Result<std::size_t>::failure(
@@ -2618,6 +2699,11 @@ Result<std::size_t> PartDocument::add_loft_feature(LoftFeature feature) {
   for (const auto& guide : feature.guide_curves()) {
     auto dependency = add_dependency_if_missing(graph, guide.value(), feature.id().value());
     if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  for (const auto& source : constraint_sources) {
+    auto dependency = add_dependency_if_missing(graph, source, feature.id().value());
+    if (!dependency)
       return Result<std::size_t>::failure(dependency.error());
   }
   const std::string result_node = body_dependency_node_id(context.effective_produced_body());
@@ -4072,7 +4158,7 @@ Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId i
   auto updated = existing->with_value(value);
   if (updated.has_error())
     return Result<std::vector<std::string>>::failure(updated.error());
-  SketchParameterRollback rollback(*this);
+  ParameterIntentRollback rollback(*this);
   for (auto& parameter : parameters_)
     if (parameter.id() == id) {
       parameter = std::move(updated.value());
@@ -4085,7 +4171,7 @@ Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId i
   if (reevaluated.has_error())
     return Result<std::vector<std::string>>::failure(reevaluated.error());
   if (rollback.before) {
-    auto domains = validate_sketch_parameter_intent(*this, affected.value());
+    auto domains = validate_parameter_intent(*this, affected.value());
     if (!domains)
       return Result<std::vector<std::string>>::failure(domains.error());
   }
@@ -4132,7 +4218,7 @@ Result<std::vector<std::string>> PartDocument::set_parameter_formula(ParameterId
     return Result<std::vector<std::string>>::failure(Error::dependency(
         id.value(), "expression formula edit must not create a dependency cycle"));
 
-  SketchParameterRollback rollback(*this);
+  ParameterIntentRollback rollback(*this);
   auto invalidation_state = invalidation_state_;
   auto synced = sync_graph(std::move(graph), invalidation_state, dependency_graph_);
   if (synced.has_error())
@@ -4152,7 +4238,7 @@ Result<std::vector<std::string>> PartDocument::set_parameter_formula(ParameterId
   if (reevaluated.has_error())
     return Result<std::vector<std::string>>::failure(reevaluated.error());
   if (rollback.before) {
-    auto domains = validate_sketch_parameter_intent(*this, affected.value());
+    auto domains = validate_parameter_intent(*this, affected.value());
     if (!domains)
       return Result<std::vector<std::string>>::failure(domains.error());
   }
