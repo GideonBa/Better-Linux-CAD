@@ -3149,6 +3149,36 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
   return result;
 }
 
+[[nodiscard]] Result<std::optional<LoftBoundaryCondition>>
+loft_boundary_from_json(const json& condition) {
+  const auto fail = []() {
+    return Result<std::optional<LoftBoundaryCondition>>::failure(
+        json_error("Malformed authored Loft boundary condition"));
+  };
+  if (condition.is_null())
+    return Result<std::optional<LoftBoundaryCondition>>::success(std::nullopt);
+  if (!condition.is_object() || condition.size() != 6U ||
+      !condition.at("section_identity").is_string() ||
+      (!condition.at("source_body").is_null() && !condition.at("source_body").is_string()) ||
+      !condition.at("continuity").is_string() || !condition.at("reverse_normal").is_boolean() ||
+      !condition.at("tangent_scale").is_number())
+    return fail();
+  auto support =
+      face_reference_from_json(condition.at("support"), PartFeatureInputRole::LoftBoundarySupport);
+  if (!support)
+    return Result<std::optional<LoftBoundaryCondition>>::failure(support.error());
+  const auto continuity = condition.at("continuity").get<std::string>();
+  if (continuity != "g1" && continuity != "g2")
+    return fail();
+  std::optional<BodyId> body;
+  if (!condition.at("source_body").is_null())
+    body = BodyId(condition.at("source_body").get<std::string>());
+  return Result<std::optional<LoftBoundaryCondition>>::success(LoftBoundaryCondition{
+      condition.at("section_identity").get<std::string>(), std::move(support.value()),
+      std::move(body), continuity == "g1" ? LoftBoundaryContinuity::G1 : LoftBoundaryContinuity::G2,
+      condition.at("reverse_normal").get<bool>(), condition.at("tangent_scale").get<double>()});
+}
+
 [[nodiscard]] Result<LoftConstraintIntent> loft_constraints_from_json(const json& value) {
   const auto fail = []() {
     return Result<LoftConstraintIntent>::failure(json_error("Malformed authored Loft constraints"));
@@ -3164,33 +3194,10 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
                               {},
                               {}};
   for (const auto* key : {"start", "end"}) {
-    const auto& condition = value.at(key);
-    if (condition.is_null())
-      continue;
-    if (!condition.is_object() || condition.size() != 6U ||
-        !condition.at("section_identity").is_string() ||
-        (!condition.at("source_body").is_null() && !condition.at("source_body").is_string()) ||
-        !condition.at("continuity").is_string() || !condition.at("reverse_normal").is_boolean() ||
-        !condition.at("tangent_scale").is_number())
-      return fail();
-    auto support = face_reference_from_json(condition.at("support"),
-                                            PartFeatureInputRole::LoftBoundarySupport);
-    if (!support)
-      return Result<LoftConstraintIntent>::failure(support.error());
-    const auto continuity = condition.at("continuity").get<std::string>();
-    if (continuity != "g1" && continuity != "g2")
-      return fail();
-    std::optional<BodyId> body;
-    if (!condition.at("source_body").is_null())
-      body = BodyId(condition.at("source_body").get<std::string>());
-    LoftBoundaryCondition parsed{condition.at("section_identity").get<std::string>(),
-                                 std::move(support.value()),
-                                 std::move(body),
-                                 continuity == "g1" ? LoftBoundaryContinuity::G1
-                                                    : LoftBoundaryContinuity::G2,
-                                 condition.at("reverse_normal").get<bool>(),
-                                 condition.at("tangent_scale").get<double>()};
-    (std::string_view(key) == "start" ? intent.start : intent.end) = std::move(parsed);
+    auto parsed = loft_boundary_from_json(value.at(key));
+    if (!parsed)
+      return Result<LoftConstraintIntent>::failure(parsed.error());
+    (std::string_view(key) == "start" ? intent.start : intent.end) = std::move(parsed.value());
   }
   for (const auto& binding : value.at("guides")) {
     if (!binding.is_object() || binding.size() != 3U || !binding.at("guide").is_string() ||
@@ -3216,21 +3223,18 @@ using ParsedPartPattern = std::variant<LinearPatternFeature, CircularPatternFeat
   }
   if (value.contains("patch_boundaries")) {
     const auto& patches = value.at("patch_boundaries");
-    if (!patches.is_array() || patches.empty() || patches.size() > 256)
+    if (!patches.is_array() || patches.empty())
       return fail();
     for (const auto& patch : patches) {
       if (!patch.is_object() || patch.size() != 3U || !patch.at("from_guide").is_string() ||
           !patch.at("to_guide").is_string() || patch.at("condition").is_null())
         return fail();
-      // Reuse the same strict boundary codec, without recursively accepting patch records.
-      auto single = value;
-      single.erase("patch_boundaries");
-      single["start"] = patch.at("condition");
-      single["end"] = nullptr;
-      auto parsed = loft_constraints_from_json(single);
-      if (!parsed || !parsed.value().start)
+      auto parsed = loft_boundary_from_json(patch.at("condition"));
+      if (!parsed)
+        return Result<LoftConstraintIntent>::failure(parsed.error());
+      if (!parsed.value())
         return fail();
-      intent.patch_boundaries.push_back({*parsed.value().start,
+      intent.patch_boundaries.push_back({*parsed.value(),
                                          PathCurveId(patch.at("from_guide").get<std::string>()),
                                          PathCurveId(patch.at("to_guide").get<std::string>())});
     }

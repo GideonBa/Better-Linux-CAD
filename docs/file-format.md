@@ -1741,6 +1741,9 @@ each anchor stores `section_identity`, nullable `boundary_entity`, `boundary_fra
 must be adjacent (including the final-to-first pair on a closed section), unique per terminal
 section and disjoint from whole-boundary start/end intent. Empty arrays are omitted canonically;
 legacy V12 records keep their existing six-field constraint shape. No patch topology is serialized.
+The reader accepts every Core-valid patch collection without a separate JSON-only count limit.
+Whole and scoped conditions share one direct boundary decoder; construction budgets remain
+Geometry capability diagnostics and do not prevent reopening authored future intent.
 Unknown, missing, null-in-place-of-object or out-of-range values fail closed.
 
 V1–V11 reject the reserved new Loft field. V12 requires actual constraint intent and inherits V11
