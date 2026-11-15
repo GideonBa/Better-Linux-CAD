@@ -716,32 +716,33 @@ Result<GeometryShape> SurfaceAdapter::close_shell_to_solid(FeatureId feature_id,
     return Result<GeometryShape>::failure(surface_error(
         feature_id, "closed-shell-to-solid input must be a surface shell, not a solid"));
 
-  std::vector<TopoDS_Shell> shells;
-  for (TopExp_Explorer explorer(input, TopAbs_SHELL); explorer.More(); explorer.Next())
-    shells.push_back(TopoDS::Shell(explorer.Current()));
-  if (shells.size() != 1U)
-    return Result<GeometryShape>::failure(
-        surface_error(feature_id, "closed-shell-to-solid requires exactly one connected shell"));
-  TopoDS_Shell shell_topology = shells.front();
-
-  // A closed manifold shell shares every edge between exactly two faces: a free
-  // edge means the shell is open, more than two faces means it is non-manifold.
-  TopTools_IndexedDataMapOfShapeListOfShape edge_faces;
-  TopExp::MapShapesAndAncestors(shell_topology, TopAbs_EDGE, TopAbs_FACE, edge_faces);
-  for (Standard_Integer index = 1; index <= edge_faces.Extent(); ++index) {
-    const Standard_Integer count = edge_faces.FindFromIndex(index).Extent();
-    if (count < 2)
-      return Result<GeometryShape>::failure(surface_error(
-          feature_id, "closed-shell-to-solid requires a closed shell with no free edges"));
-    if (count > 2)
-      return Result<GeometryShape>::failure(
-          surface_error(feature_id, "closed-shell-to-solid rejects a non-manifold shell"));
-  }
-  if (!BRepCheck_Analyzer(shell_topology, true).IsValid())
-    return Result<GeometryShape>::failure(surface_error(
-        feature_id, "closed-shell-to-solid requires a consistently oriented valid shell"));
-
   try {
+    BRepBuilderAPI_Copy copy(input, true, false);
+    std::vector<TopoDS_Shell> shells;
+    for (TopExp_Explorer explorer(copy.Shape(), TopAbs_SHELL); explorer.More(); explorer.Next())
+      shells.push_back(TopoDS::Shell(explorer.Current()));
+    if (shells.size() != 1U)
+      return Result<GeometryShape>::failure(
+          surface_error(feature_id, "closed-shell-to-solid requires exactly one connected shell"));
+    TopoDS_Shell shell_topology = shells.front();
+
+    // A closed manifold shell shares every edge between exactly two faces: a free
+    // edge means the shell is open, more than two faces means it is non-manifold.
+    TopTools_IndexedDataMapOfShapeListOfShape edge_faces;
+    TopExp::MapShapesAndAncestors(shell_topology, TopAbs_EDGE, TopAbs_FACE, edge_faces);
+    for (Standard_Integer index = 1; index <= edge_faces.Extent(); ++index) {
+      const Standard_Integer count = edge_faces.FindFromIndex(index).Extent();
+      if (count < 2)
+        return Result<GeometryShape>::failure(surface_error(
+            feature_id, "closed-shell-to-solid requires a closed shell with no free edges"));
+      if (count > 2)
+        return Result<GeometryShape>::failure(
+            surface_error(feature_id, "closed-shell-to-solid rejects a non-manifold shell"));
+    }
+    if (!BRepCheck_Analyzer(shell_topology, true).IsValid())
+      return Result<GeometryShape>::failure(surface_error(
+          feature_id, "closed-shell-to-solid requires a consistently oriented valid shell"));
+
     shell_topology.Closed(Standard_True);
     BRepBuilderAPI_MakeSolid maker(shell_topology);
     if (!maker.IsDone())
@@ -765,8 +766,10 @@ Result<GeometryShape> SurfaceAdapter::close_shell_to_solid(FeatureId feature_id,
           feature_id, "closed-shell-to-solid produced a degenerate zero-volume solid"));
     TopoDS_Shape result = solid;
     auto backing = std::make_shared<GeometryShape::Impl>(std::move(result));
-    for (const auto& entry : shell.impl_->face_lineage)
+    for (auto entry : shell.impl_->face_lineage) {
+      entry.face = TopoDS::Face(copy.ModifiedShape(entry.face));
       detail::append_lineage(backing->face_lineage, entry, backing->shape);
+    }
     return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
   } catch (const Standard_Failure& failure) {
     return Result<GeometryShape>::failure(surface_error(feature_id, failure_message(failure)));

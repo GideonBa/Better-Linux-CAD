@@ -1,4 +1,5 @@
 #include "blcad/geometry/surface_offset_adapter.hpp"
+#include "blcad/geometry/surface_boundary_query.hpp"
 #include "geometry_shape_internal.hpp"
 #include "surface_offset_verification.hpp"
 #include <BRepAlgoAPI_Check.hxx>
@@ -96,6 +97,11 @@ SurfaceOffsetAdapter::construct(FeatureId id, const GeometryShape& source, Surfa
         (faces.Extent() > 1 && (shells.Extent() != 1 || original.ShapeType() != TopAbs_SHELL)))
       return fail("Offset/Thicken accepts one face or one connected quilt of at most 64 faces");
     checked(original, false);
+    const auto boundaries = SurfaceBoundaryQuery::inspect({source}, tolerance, tolerance);
+    if (!boundaries)
+      return fail(boundaries.error().message());
+    if (boundaries.value().non_manifold_edges)
+      return fail("Offset/Thicken source has non-manifold boundaries");
     const bool symmetric = side == SurfaceOffsetSide::Symmetric;
     const double first = symmetric ? -distance / 2 : 0;
     const double last = symmetric

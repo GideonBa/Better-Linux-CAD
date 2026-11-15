@@ -82,7 +82,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 173–174 | Native advanced curve/Surface workflows, integrated edits/history/reopen and physical STEP roundtrip acceptance. |
 
 The active Surface branch has [complete checked G03 construction, consumers and exchange proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof).
-Curved Trim/Extend and complete G04 remain 172; its [bounded execution plan](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-extension-plan--172) is retained.
+Curved Trim/Extend and complete G04 remain 172; its [bounded construction contract](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-construction--172) is retained.
 The remaining delivery checkpoints are the active 170–172 Surface branch,
 then 173 workflow and 174 integrated acceptance. Start each only after the preceding PR is merged
 and main is clean and current.
@@ -969,8 +969,11 @@ collision verification, all Body modes, curved seam-crossing holes, downstream S
 exact reopening and physical STEP readback are verified. Existing native regressions passed at
 100%/150%; advanced authoring remains 173.
 
-172 is in progress under the [curved Trim/Extend plan](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-extension-plan--172):
+172 is in progress under the [curved Trim/Extend contract](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-construction--172):
 explicit keep/remove/projection, bounded natural/tangent continuation, shared derived gap/free-edge
-queries, G04 and atomic repair. Historical six-kind records retain their original replay.
+queries, G04 and atomic repair. The [typed/native foundation](part-trim-extend-surface-geometry-mvp6.md#native-boundary-and-persistence-foundation-proof)
+now has strict V13/Project and physical curved-boundary proofs, shared direction frames and native
+legacy Surface regression. The complete combined G04/repair gate remains open. Historical six-kind
+records retain their original replay.
 Finish full G04 and native regressions, then deliver this branch normally before starting 173.
 The combined history/edit/reopen/STEP scenario remains 174. Preserve all later 175–204 planning.

@@ -68,11 +68,12 @@ transient, follows reversed boundary orientation and source-parameter recompute,
 intent. Focused proof: `[geometry][surface-trim-extend][block136-surface]`.
 
 
-## Curved boundary extension plan — 172
+## Curved boundary construction — 172
 
-The next Surface delivery implements the V13 options already frozen in
-[Surface intent](part-surface-feature-intent-mvp6.md). Historical records without options retain
-their Block-90 replay. This plan does not change numbered acceptance in `mvp-plan.md`.
+The V13 options frozen in [Surface intent](part-surface-feature-intent-mvp6.md) now have typed
+persistence and native construction. Historical records without options retain their Block-90
+replay. Numbered status remains in `mvp-plan.md`: complete G04 combination and atomic repair are
+still required before accepting 172.
 
 - Modern Trim has explicit KeepInside/RemoveInside. OnSurface retains finite planar contours on
   coplanar targets. AlongDirection projects a finite closed planar contour through every forward
@@ -96,7 +97,45 @@ their Block-90 replay. This plan does not change numbered acceptance in `mvp-pla
   overlays. Physical whole-edge maxima, authored tolerance and actual shell closure remain the
   authorities; no overlay or topology index is serialized and no larger gap is automatically healed.
 
-G04 will prove a trimmed multi-face cylindrical quilt across its seam, explicit opposite sides,
+The remaining complete G04 combination will prove a trimmed multi-face cylindrical quilt across its seam, explicit opposite sides,
 curved boundary extension, preserved holes, parameter-driven contours, physical area/volume,
 Stitch/solid conversion and atomic downstream failure/repair. Advanced native authoring remains
 173, and combined S04/G04/X01 remains 174. General arbitrary patch extension/healing stays deferred.
+
+
+### Native boundary and persistence foundation proof
+
+`SurfaceTrimAdapter` uses private topology throughout, validates its planar region tool and actual
+Boolean/quilt result, and never selects the first disconnected region. Native profile Beziers keep
+their exact curves in modern Trim; referenced PathCurves retain their explicitly authored execution
+policy. Trim supports **64 input faces / 256 contour segments**. All new side/contour/extension roles
+name authored inputs; imported roots use the canonical owned catalog-Face spelling.
+
+`surface_extension_selection` is the one shared boundary authority for construction and direction
+frames. It checks both complete native curves, face-use counts, native UV-side incidence and actual
+whole-side length. Natural distance is checked on native isocurves at 17 boundary stations. Tangent
+strips pass actual oriented G1 verification and physical extrapolation-error checks. A read-only
+imported-face frame uses the current verified Body placement, with source freshness checked before
+and after the query. Imported Path bindings still refer to the immutable base; a transformed Body
+boundary can instead use its actual producer's complete current result-edge witness. No placement
+or provenance is relabeled to make a reference resolve.
+
+Shared boundary queries now participate in Stitch/Thicken validation. Stitch retains legacy replay
+when an optional diagnostic exceeds its query budget, and augments failed sewing with actionable
+free-boundary context. Closed-shell conversion copies input topology before changing closed flags
+or orientation and maps copied semantic face descendants into the Solid.
+
+[Core option tests](../tests/core/advanced_surface_intent_tests.cpp) isolate necessary V13 from new
+selection types, cover both Project resource adapters, strict malformed/inactive intent and atomic
+numeric/formula rollback. [Native geometry tests](../tests/geometry/curved_surface_geometry_tests.cpp)
+check seam-crossing Keep/Remove against analytic cylindrical areas, preserved signed normals through
+actual thickness volumes, positive contour edits, exact reopening, forward-direction failure,
+measured natural/tangent endpoints, shared frames and transformed imported boundary references.
+
+Foundation checks: focused Core **8 / 415**; Surface Geometry regression **25 / 1,312**; offscreen Qt
+**10 passed / 1 native-only skip / 4,192 assertions**. The skipped Surface pick/drag/release case
+passed natively at **100% and 150%**, **1 / 593** each, with both captures reviewed after CAD exited.
+All five build targets passed. Runtime: **1,187 files**, SHA256
+`b410d00632de292edc49d2d888fba8e5b6fef72da6a8e4dc33569cd8eb1f5e11`.
+These focused proofs do not establish complete G04 or advanced native authoring; the remaining
+combination/repair gate stays open, and the new authoring controls remain 173.
