@@ -136,8 +136,8 @@ an unreferenced in-place feature is removed. Existing update commands preserve r
 
 Advanced Trim/Extend options share the necessary V13 envelope: explicit keep/remove and projection
 policy for Trim; natural/tangent mode, tolerance and tangent-deviation budget for Extend. Their
-absence retains historical replay. Geometry rejects all new construction until verified execution
-is supplied; the Core contract does not claim kernel support or native authoring.
+absence retains historical replay. Native construction follows the checked capability below; the Core contract alone does not
+claim kernel support or native authoring. Advanced Trim/Extend execution remains separate.
 
 Proof: [Core cases](../tests/core/surface_offset_intent_tests.cpp), tags
 `[surface-offset-intent],[surface-feature],[loft-constraints]`: **16 cases / 494 assertions**.
@@ -147,3 +147,57 @@ All five build targets completed after the public variant/layout change. Runtime
 **1,167 files**, SHA256 `e59f8fd7dca53347bf2b6a43bbbfab106d7001b29366e63bd40282d4913ffae2`.
 No native advanced-authoring claim is made here; that remains the 173 gate. Detailed run chronology
 stays in Git/PR history.
+
+### Checked native construction foundation
+
+`SurfaceSelectionGeometry` resolves explicitly owned faces against the actual cached quilt or
+in-place Body predecessor. Every captured contributor must recover exactly one descendant; split,
+lost, duplicate and disconnected selections reject. Sewing receives private copies with the
+original face-use orientations. Boundary/Fill's intrinsic single patch and authored extrusion/Loft
+origins survive selection, Stitch and closed-shell conversion. No traversal index becomes a role.
+
+`SurfaceOffsetAdapter` constructs material-free skins or a closed Thicken tool on a private deep
+copy. Exact analytic mode currently supports planes and cylinders. Verified approximation supports
+regular native C2 patches and consistently oriented smooth quilts within the stated budgets.
+Sharp joins, singular normals/poles, curvature collapse, non-manifold/disconnected selections,
+invalid topology, self-interference and nonpositive Solid volume reject without fallback healing.
+Thicken explicitly orients its one closed Solid before validation. Holes remain free boundaries
+whose generated walls close the material region; symmetric distance is total skin separation.
+
+Source regularity/curvature checks include native knot cells and their boundaries, with **17**
+subdivisions per cell and signed focal factors `1-offset*curvature`. Trimmed/offset surface wrappers
+and native extrusion/revolution generating-curve knots retain their actual differential geometry.
+The bounded capability is **64 faces / 128 native cells per face**; it is numerical verification,
+not a continuum certificate. Shared quilt edges additionally require aligned oriented normals.
+
+Independent normal rays intersect the actual history-mapped trimmed skins using **9, 17, 33**
+interior subdivisions per native cell. Refinement must stabilize the maximum error within 5% of the
+budget; each skin and the complete separation must meet the authored physical error in mm.
+The ray's root-search interval is separate from that error bound: OCCT OffsetSurface intersection
+can miss an existing root in a narrowly clipped interval. Multiple/missing roots still reject.
+No distance-to-the-whole-Solid shortcut can certify thickness.
+
+`SurfaceDistanceReport` records criterion (offset distance, wall thickness or symmetric skin
+separation), requested/measured min/max distance, maximum error, budget, station count and explicit
+approximation policy. It is transient and describes the verified construction **before** any Body
+Boolean. Join/Cut/Intersect retain that qualified tool report; they do not claim uniform thickness
+of the complete final Body. Skin origins name authored source roles and side. Arbitrary generated
+side walls receive no guessed semantic identity; existing complete edge witnesses support finishing.
+
+The shared derived `SurfaceBoundaryQuery` counts native edge uses (including periodic seams),
+reports free/non-manifold boundaries and measures bidirectional whole-edge gap maxima using true
+curve-length stations and native knots. A nearby endpoint or minimum distance cannot label a
+larger complete-edge gap as within tolerance. These geometry/overlay products are never persisted.
+The full 171 consumer/import/exchange gate and 172 curved operations remain separate acceptance.
+
+
+Foundation proof: [native G03 and gap cases](../tests/geometry/surface_offset_geometry_tests.cpp)
+cover analytic planes/cylindrical quilts, both directions/symmetry, holes, all four Body modes,
+exact JSON reopening, input immutability, inward collapse and disconnected selections. The nonplanar
+`z=.02*x*y` case checks actual Solid normal sections and an independently integrated Gaussian-
+curvature tube-volume formula. Gap cases distinguish complete-edge maxima from nearby endpoints.
+Surface/G02 regression: **29 cases / 2,964 assertions**; existing Qt Surface/edit: **4 / 74**
+offscreen. All five build targets passed. Frozen runtime: **1,176 files**, SHA256
+`93174ac39e472a01d6d3fc7135f90f681ec4c10fd98a88d4b55810de676bbc97`.
+This verified foundation does not close the remaining 171 consumer/import/exchange acceptance or
+native advanced authoring in 173; numbered status remains in `mvp-plan.md`.

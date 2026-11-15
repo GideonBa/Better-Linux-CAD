@@ -109,6 +109,13 @@ trim distance, one-sided native knot limits, oriented normal curvature and its c
 The `[surface-join-knots]` and `[surface-join-spectrum]` subsets own narrow-spike and between-direction
 counterexamples. Native advanced authoring remains the separate Block 173 gate.
 
+Offset/thickness intent uses Core `[surface-offset-intent]`; native Geometry uses
+`[surface-offset-geometry]`, including `[surface-offset-history]`, `[surface-offset-holes]` and
+`[surface-offset-curved]`. `[surface-boundary-query]` proves whole-edge gap maxima. Combine with
+`[surface-boundary-fill],[surface-trim-extend],[surface-stitch],[surface-to-solid]` and
+`[constrained-loft-feature]` for existing quilt/continuity consumers. Native advanced authoring
+remains the separate 173 gate.
+
 ## Find and select focused tests
 
 `tests/{core,geometry,gui}/` owns assertions/tags; `CMakeLists.txt` owns source registration and
