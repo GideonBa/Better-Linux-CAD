@@ -8,10 +8,21 @@
 
 #include <vector>
 
+namespace blcad {
+class PartDocument;
+}
+
 namespace blcad::geometry {
+
+class ShapeCache;
+class StepImportTopologyContext;
 
 class LoftAdapter {
 public:
+  [[nodiscard]] Result<GeometryShape> loft_constrained(const PartDocument&, const LoftFeature&,
+                                                       const ShapeCache&,
+                                                       StepImportTopologyContext* = nullptr) const;
+
   [[nodiscard]] Result<GeometryShape>
   loft_closed_sections(FeatureId feature_id,
                        const std::vector<std::vector<ClosedProfileCurveSegment>>& ordered_sections,

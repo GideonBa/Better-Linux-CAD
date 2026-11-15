@@ -400,6 +400,6 @@ TEST_CASE("Authored Loft constraints cannot silently execute the historical unco
   REQUIRE(document.update_loft_feature(constrained.value()));
   const auto failed = GeometryRecomputeExecutor{}.execute_document(document, shapes);
   REQUIRE_FALSE(failed);
-  CHECK(failed.error().message().find("verified boundary construction") != std::string::npos);
+  CHECK(failed.error().message().find("explicitly anchored native rails") != std::string::npos);
   CHECK(volume(shapes, "body.result") == before);
 }
