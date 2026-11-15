@@ -4,9 +4,9 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 166
-current_block: 167
-current_boundary: Block 167 history/exchange verified; native reference precision follow-up open
+implemented_through: Block 167
+current_block: 168
+current_boundary: Block 167 G01 verified; PR 191 delivery; Block 168 next
 current_tag: "[parity-b167]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–166 accepted; Block 167 in progress; Blocks 168–204 planned"
+  advanced_modeling_workflows: "Blocks 145–167 accepted; Blocks 168–204 planned"
 ---
 
 # MVP Plan
@@ -34,13 +34,14 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 166
-current block        Block 167 (in progress)
+implemented through  Block 167
+current block        Block 168 (planned; next after PR #191 delivery)
 current phase        Curves, paths and surfaces
-current boundary     Block 166 delivered; Core intent verified, semantic/multi-wire Geometry pending
+current boundary     Block 167 G01 verified; serial PR delivery before the next branch
 ```
 
-The assigned sequence continues through Block 174. Block 166 is delivered; Block 167 is active.
+The assigned sequence continues through Block 174. Block 167 is verified in PR #191; finish its
+normal rebase delivery before starting the 168–169 Loft branch from updated main.
 [The consolidated sequence](inventor-parity-sequence.md)
 contains dependencies and implementation criteria; [the test plan](inventor-parity-test-plan.md)
 contains individual and combined acceptance; [the UI contract](user-interface.md) owns the
@@ -72,7 +73,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 164 | Delivered in PR #188: deterministic spatial solver, normalized native queries, physical rank/gauge and exact rejection with independent S03 oracles. |
 | 165 | Delivered in [PR #189](https://github.com/GideonBa/Better-Linux-CAD/pull/189): solver-backed spatial curve/constraint interaction, explicit formula override and native S03–S04 consumers. |
 | 166 | Delivered in [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190): explicit compatible native paths, checked twist, mixed physical consumers and native upgrade/history. |
-| 167 | Active: typed edge/material-region intent and compatible persistence, followed by semantic Geometry, multi-wire Sweep, closed-spine frames and independent G01 acceptance. |
+| 167 | Verified in [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191): strict compatible V11, native semantic edges, exact hollow sections, cyclic circular frames and independent G01/exchange proofs. |
 | 168–169 | Persistent Loft boundary/guide intent followed by independently verified G2 execution and G02 acceptance. |
 | 170–172 | Offset/Thicken intent and checked Geometry, curved Trim/Extend and derived gap diagnostics with G03–G04 acceptance. |
 | 173–174 | Native advanced curve/Surface workflows, integrated edits/history/reopen and physical STEP roundtrip acceptance. |
@@ -165,7 +166,7 @@ raw samples, benchmark limits and future performance scope remain in their exist
 ## Blocks 145–204 — Advanced modeling workflows
 
 Status authority: Blocks 145–166 are **Implemented and accepted**;
-Block 167 is **In progress**; Blocks 168–204 are **Planned; not started**.
+Blocks 145–167 are **Implemented and accepted**; Blocks 168–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -178,7 +179,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
-| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166 accepted; 167 in progress; 168–174 planned |
+| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166–167 accepted; 168–174 planned |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
 | G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
@@ -223,6 +224,7 @@ PR links preserve individual slice provenance without copying intermediate compl
 | 164 | Bounded normalized spatial solve, native differential/projection queries, deterministic physical rank/redundancy, admissible rigid gauge/internal DOF and exact source rejection | [Solver contract/proofs](part-sketch-3d-core-mvp6.md#spatial-solver-boundary--164), [native capabilities](part-sketch-3d-geometry-mvp6.md#spatial-solver-queries--164); native authoring remains 165 | [188](https://github.com/GideonBa/Better-Linux-CAD/pull/188) |
 | 165 | Solver-backed spatial curve/constraint authoring, scoped native targets/grips, explicit formula override and physical S03–S04 consumers | [Native task contract/proofs](gui-sketch3d-interaction-mvp8.md#solver-backed-task-foundation--165) | [189](https://github.com/GideonBa/Better-Linux-CAD/pull/189) |
 | 166 | Explicit compatible native paths, strict V10/Project ownership, checked arc-length twist, mixed physical consumers and native comparison/history | [Path construction](part-path-curve-core-mvp6.md#native-curve-construction), [twist](part-sweep-3d-geometry-mvp6.md#explicit-curve-preserving-twist), [native task](gui-interactive-path-sweep-loft-mvp9.md#explicit-path-execution-comparison); G01 within the 166 boundary | [190](https://github.com/GideonBa/Better-Linux-CAD/pull/190) |
+| 167 | Typed generated/imported native paths, strict necessary V11, exact material-region holes, bounded cyclic frames/roll, faithful native trims/axes and physical G01/STEP recovery | [Native source/precision](part-path-curve-core-mvp6.md#semantic-native-curve-execution--167), [material regions](part-sweep-intent-mvp6.md#material-region-execution), [cyclic capability](part-sweep-3d-geometry-mvp6.md#circular-closed-spine-capability--167), [physical proofs](../tests/geometry/semantic_path_acceptance_tests.cpp) | [191](https://github.com/GideonBa/Better-Linux-CAD/pull/191) |
 
 The initial full parity plan was delivered in [PR #138](https://github.com/GideonBa/Better-Linux-CAD/pull/138).
 
@@ -801,36 +803,35 @@ Delivery: [PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190), with
 individual commits below 1,500 added lines. Closed-spine frame closure, semantic-edge inputs and
 inner profile wires remain 167; richer support/guide intent, G2 and Surface workflows remain 168–174.
 
-### Block 167 semantic edges and multi-wire Sweep — in progress
+### Block 167 semantic edges and multi-wire Sweep — accepted
 
-Active draft: [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191), based on merged
-[PR #190](https://github.com/GideonBa/Better-Linux-CAD/pull/190). Commits `0757969` / `f2120cf` / `9022d59`
-contain 606 / 398 / 487 added lines; `d5fefae` adds 525. Every delivery commit must stay below the assigned 1,500-line cap.
+Delivery: [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191), normal rebase required
+before starting the next branch. Six focused commits remain below 1,500 added lines each.
 
-| Slice | Contract and proof boundary |
+| Accepted boundary | Contract / independent proof |
 | --- | --- |
-| Core / necessary-only V11 | Verified: typed capabilities/reversal, imported Body ownership, legacy-preserving material-region interpretation and strict Part/Project subsets. [Core proofs](../tests/core/semantic_sweep_intent_tests.cpp), [format](file-format.md#semantic-path-edges-and-sweep-material-regions--part-v11). |
-| Semantic native edges | Verified: bounded native curves, canonical result direction before path reversal, exact circular phase and explicit normalized imported base scope. [Contract](part-path-curve-core-mvp6.md#semantic-native-curve-execution--167), [physical length/direction, real upstream split, reopen and source-byte rejection](../tests/geometry/semantic_sweep_intent_geometry_tests.cpp). Placed imported results use producer-anchored result witnesses; dedicated placed-path acceptance remains open. |
-| Material-region Sweep | Verified within the open-spine boundary. Exact native-wire containment rejects crossing/touching boundaries, exact inner pipes precede checked Body operations. [Contract](part-sweep-intent-mvp6.md#material-region-execution), [independent volumes/material sections for all four operations, multiple/rational holes, legacy filled replay and atomic rejection](../tests/geometry/material_region_sweep_tests.cpp). |
-| Closed spines | Verified within the circular capability: [exact circular cyclic-frame contract](part-sweep-3d-geometry-mvp6.md#circular-closed-spine-capability--167), all three frames, integer roll, hollow/noncircular physical sections and seam drift. Conservative extent rejects spindle folds; near-circles, fractional roll and competing controls reject atomically. [Independent physical proofs](../tests/geometry/material_region_sweep_tests.cpp). |
-| G01 combined acceptance | Verified combined reversed generated/imported, rational/spatial and hollow sections, exact reopening, unique/ambiguous native recovery and physical placed STEP roundtrip. The new periodic conversion rejects a physically outside void shell. [Combined proofs](../tests/geometry/semantic_path_acceptance_tests.cpp). Native authoring completes in 173. |
-| Native reference precision | Open before delivery: the recovery tolerance must never complete a genuine native arc gap or flatten a near-axis circular plane. Independent physical probes reproduce both cases; add focused regressions and preserve native bounds/axes before closing 167. |
+| Necessary-only V11 | Typed capabilities, imported Body ownership, reversal, compatible filled defaults, exact Part/Project subsets and implicit order without invented authored history. [Format](file-format.md#semantic-path-edges-and-sweep-material-regions--part-v11), [Core proofs](../tests/core/semantic_sweep_intent_tests.cpp). |
+| Native semantic sources | Unique bounded generated/imported curves, canonical direction, explicit base/placed source scope, real upstream split/ambiguity and atomic source loss. [Contract](part-path-curve-core-mvp6.md#semantic-native-curve-execution--167), [source proofs](../tests/geometry/semantic_sweep_intent_geometry_tests.cpp). |
+| Actual native precision | Recovery tolerance never completes an open arc or flattens a circular plane; actual native bounds/axes remain authoritative. [Contract](part-path-curve-core-mvp6.md#native-reference-precision), [two physical regressions](../tests/geometry/semantic_path_acceptance_tests.cpp). |
+| Material-region Sweep | Exact native-wire containment, crossing/touch rejection, correctly oriented inner boundaries and all four Body operations. [Contract](part-sweep-intent-mvp6.md#material-region-execution), [independent sections/volumes, rational/multiple holes and legacy replay](../tests/geometry/material_region_sweep_tests.cpp). |
+| Circular cyclic capability | One exact circle, all three cyclic frames, bounded section extent, signed integer roll, physical seam sections, spindle/near-circle rejection and no competing guides. [Contract](part-sweep-3d-geometry-mvp6.md#circular-closed-spine-capability--167). |
+| Combined G01 / exchange | Mixed reversed generated/rational/spatial/imported sources, exact reopen/order, placed imported rims, physical hollow STEP roundtrip and rejection of outside voids. [Combined proofs](../tests/geometry/semantic_path_acceptance_tests.cpp), [bounded periodic conversion](step-import-sequence-mvp10.md). |
 
-All five targets build after the Core-state addition. Full Core **769 / 34,592**, full Geometry
-**741 / 77,555** and full offscreen Qt **937 cases: 863 passed, 74 native/optional skipped /
-102,931 assertions** pass. The Geometry-only negative-test addition leaves the Core, Qt, app and
-STEP exporter binaries byte-identical to their verified versions; all four hashes were checked.
-Native policy/Sweep/Loft passes **3 / 687** at both 100% and compact 150% without skips; all eight
-captures were inspected after CAD exit. Separate app startup proves a visible process-owned X11
-window (intentional timeout 124, probe exit 0). These native regressions do not establish authoring
-coverage for the new selectors (173).
+Final Geometry **743 / 77,594**, focused Qt **49 cases: 47 passed, two native-only skipped / 4,632**,
+native policy/Sweep/Loft **3 / 687** at each of 100% and compact 150%, and separate visible app
+startup pass after all five targets build. The two final policy captures were inspected after CAD
+exit. All eight prior native regression captures were also inspected. Full Core **769 / 34,592**
+remains valid for unchanged Core inputs. The full Qt baseline **937 cases: 863 passed, 74
+native/optional skipped / 102,931** precedes the isolated final native-reference precision fix;
+it was not repeated after that fix. The focused Qt/native results above are on final inputs.
+Native authoring of the new selectors remains the explicit 173 gate.
 
-Current runtime: **1,150 inputs**, SHA-256
-`12a8944d01f54bc12455a415d12bdd0df1328f44280174a24aea6df1df45d5bb`.
-Proof logs: `/tmp/blcad-167-core19-full.log`, `/tmp/blcad-167-geometry22-full.log`,
-`/tmp/blcad-167-qt21-full.log`, `/tmp/blcad-167-native{100,150}-22.log`,
-`/tmp/blcad-167-startup22-proof.log`. The reference-precision follow-up remains a required open
-167 gate. Continue through 174 and preserve all 168–204 requirements.
+Final runtime: **1,150 inputs**, SHA-256
+`5e1e17ce15274244aa9c115dbd0712b5ae0fcb4e1ef5ab192175becce3395d9f`.
+Proof logs: `/tmp/blcad-167-core19-full.log`, `/tmp/blcad-167-geometry23-full.log`,
+`/tmp/blcad-167-qt21-full.log`, `/tmp/blcad-167-qt23-focused.log`,
+`/tmp/blcad-167-native{100,150}-23.log`, `/tmp/blcad-167-startup23-proof.log`.
+Continue directly through 174; preserve all 168–204 requirements.
 
 ## Later phases
 
