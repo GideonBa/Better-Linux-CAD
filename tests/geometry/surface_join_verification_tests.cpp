@@ -3,12 +3,15 @@
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <GC_MakeArcOfCircle.hxx>
+#include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_BezierCurve.hxx>
 #include <Geom_BezierSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Plane.hxx>
 #include <Geom_SphericalSurface.hxx>
+#include <Geom_SurfaceOfLinearExtrusion.hxx>
+#include <Geom_TrimmedCurve.hxx>
 #include <TColStd_Array1OfInteger.hxx>
 #include <TColStd_Array1OfReal.hxx>
 #include <TColgp_Array1OfPnt.hxx>
@@ -242,5 +245,66 @@ TEST_CASE("Trim incidence uses physical millimeters with strongly scaled native 
         REQUIRE_FALSE(result);
       }
     }
+  }
+}
+
+TEST_CASE("Native support knot crossings expose narrow curvature spikes between uniform stations",
+          "[geometry][surface-join-verification][surface-join-knots][parity-b169]") {
+  const std::array<double, 5> values{0, .30001, .30002, .30003, 1};
+  TColgp_Array2OfPnt poles(1, 3, 1, 5);
+  for (int u = 1; u <= 3; ++u)
+    for (int v = 1; v <= 5; ++v)
+      poles(u, v) = gp_Pnt(2.0 * (u - 1), 4 * values[v - 1], u == 3 && v == 3 ? .016 : 0);
+  TColStd_Array1OfReal uk(1, 2), vk(1, 5);
+  TColStd_Array1OfInteger um(1, 2), vm(1, 5);
+  uk(1) = 0;
+  uk(2) = 1;
+  um.Init(3);
+  for (int i = 1; i <= 5; ++i) {
+    vk(i) = values[i - 1];
+    vm(i) = i == 1 || i == 5 ? 2 : 1;
+  }
+  const Handle(Geom_Surface) surface = new Geom_BSplineSurface(poles, uk, vk, um, vm, 2, 1);
+  const auto candidate = patch(surface, 0, 1, 0, 1);
+  const Handle(Geom_Surface) plane = new Geom_Plane(gp_Ax3(gp::Origin(), gp::DZ(), gp::DX()));
+  const auto support = patch(plane, -4, 0, 0, 4);
+  const auto boundary = BRepBuilderAPI_MakeEdge(gp_Pnt(0, 0, 0), gp_Pnt(0, 4, 0)).Edge();
+  const auto tangent = verify(boundary, candidate, support, LoftBoundaryContinuity::G1);
+  REQUIRE(tangent);
+  CHECK(tangent.value().stations > 129);
+  // At v=.30002, z=.001*x*x, hence transverse curvature .002/mm.
+  // All 129 uniform boundary stations miss the entire nonzero interval.
+  const auto failed = verify(boundary, candidate, support, LoftBoundaryContinuity::G2);
+  REQUIRE_FALSE(failed);
+  CHECK(failed.error().message().find("curvature") != std::string::npos);
+}
+
+TEST_CASE("Extruded trimmed spline supports expose hidden native knot tangent spikes",
+          "[geometry][surface-join-verification][surface-join-knots][parity-b169]") {
+  const std::array<double, 5> values{0, .30001, .30002, .30003, 1};
+  TColgp_Array1OfPnt poles(1, 5);
+  TColStd_Array1OfReal knots(1, 5);
+  TColStd_Array1OfInteger mult(1, 5);
+  for (int i = 1; i <= 5; ++i) {
+    poles(i) = gp_Pnt(4 * values[i - 1], 0, i == 3 ? 1e-8 : 0);
+    knots(i) = values[i - 1];
+    mult(i) = i == 1 || i == 5 ? 2 : 1;
+  }
+  const Handle(Geom_Curve) spline = new Geom_BSplineCurve(poles, knots, mult, 1);
+  const Handle(Geom_Surface) plane = new Geom_Plane(gp_Ax3(gp::Origin(), gp::DZ(), gp::DX()));
+  const auto candidate = patch(plane, 0, 4, 0, 2);
+  const auto edge = BRepBuilderAPI_MakeEdge(gp_Pnt(0, 0, 0), gp_Pnt(4, 0, 0)).Edge();
+  for (const bool wrapped : {false, true}) {
+    Handle(Geom_Curve) basis = spline;
+    if (wrapped)
+      basis = new Geom_TrimmedCurve(spline, 0, 1);
+    const Handle(Geom_Surface) surface = new Geom_SurfaceOfLinearExtrusion(basis, gp::DY());
+    const auto support = patch(surface, 0, 1, -2, 0);
+    // The positional deviation is only 1e-8 mm, but a knot-side slope is
+    // 1e-8 / (4e-5)=.00025 rad, above the independent 1e-5 normal budget.
+    const auto failed = verify(edge, candidate, support, LoftBoundaryContinuity::G1);
+    INFO(wrapped);
+    REQUIRE_FALSE(failed);
+    CHECK(failed.error().message().find("normal") != std::string::npos);
   }
 }

@@ -6,6 +6,7 @@
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <BRep_Tool.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
+#include <Geom_BSplineSurface.hxx>
 #include <Standard_Failure.hxx>
 #include <TopExp.hxx>
 #include <algorithm>
@@ -81,7 +82,8 @@ build_constrained_loft_patch(FeatureId id, const std::vector<LoftPatchBoundary>&
             id, boundary.curve, *boundary.support, *boundary.support, LoftBoundaryContinuity::G1,
             linear_tolerance, angular_tolerance, curvature_tolerance);
         if (!incidence)
-          return fail(incidence.error().message());
+          return fail("Loft support at boundary " + std::to_string(i + 1) + ": " +
+                      incidence.error().message());
       }
     }
     const auto tensor = native_loft_tensor(
@@ -90,6 +92,29 @@ build_constrained_loft_patch(FeatureId id, const std::vector<LoftPatchBoundary>&
     if (!tensor)
       return fail(tensor.error().message());
     const auto candidate = tensor.value();
+    const auto native = Handle(Geom_BSplineSurface)::DownCast(BRep_Tool::Surface(candidate));
+    if (native.IsNull())
+      return fail("Verified Loft requires its native tensor surface");
+    if ((native->NbUKnots() - 1) * (native->NbVKnots() - 1) > 1024)
+      return fail("Verified Loft exceeds its native regularity cell budget");
+    // Inspect every polynomial knot cell, including one-sided limits, with a
+    // bounded 9x9 derivative grid. This is a stated numerical regularity witness.
+    for (int u = 1; u < native->NbUKnots(); ++u)
+      for (int v = 1; v < native->NbVKnots(); ++v)
+        for (int i = 0; i <= 8; ++i)
+          for (int j = 0; j <= 8; ++j) {
+            gp_Pnt p;
+            gp_Vec du, dv, duu, dvv, duv;
+            native->LocalD2(std::lerp(native->UKnot(u), native->UKnot(u + 1), i / 8.0),
+                            std::lerp(native->VKnot(v), native->VKnot(v + 1), j / 8.0), u, u + 1, v,
+                            v + 1, p, du, dv, duu, dvv, duv);
+            const double area = du.Crossed(dv).SquareMagnitude(),
+                         scale = du.SquareMagnitude() * dv.SquareMagnitude();
+            if (!std::isfinite(area) || !std::isfinite(scale) || scale <= 1e-24 ||
+                area <= 1e-20 * scale)
+              return fail("Constrained Loft has a singular native interior/knot frame");
+          }
+
     std::string orientation_errors;
     for (const bool reverse : {false, true}) {
       auto oriented = candidate;

@@ -15,6 +15,7 @@
 #include <TColgp_Array2OfPnt.hxx>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <stdexcept>
 #include <utility>
@@ -52,15 +53,53 @@ Handle(Geom_BSplineCurve) spline(const TopoDS_Edge& edge, bool reverse = false) 
   result->SetKnots(knots);
   return result;
 }
-void compatible(std::vector<Handle(Geom_BSplineCurve)>& curves) {
+void compatible(std::vector<Handle(Geom_BSplineCurve)>& curves, double tolerance) {
   int degree = 1;
   for (const auto& curve : curves)
     degree = std::max(degree, curve->Degree());
   std::map<double, int> union_knots;
   for (auto& curve : curves) {
     curve->IncreaseDegree(degree);
-    for (int i = 1; i <= curve->NbKnots(); ++i)
-      union_knots[curve->Knot(i)] = std::max(union_knots[curve->Knot(i)], curve->Multiplicity(i));
+    TColStd_Array1OfReal canonical(1, curve->NbKnots());
+    double delta = 0, minimum_span = 1;
+    for (int i = 1; i <= curve->NbKnots(); ++i) {
+      const double knot = curve->Knot(i);
+      const auto equivalent = [&](double value) {
+        return std::abs(value - knot) <= 64 * std::numeric_limits<double>::epsilon() *
+                                             std::max({1.0, std::abs(value), std::abs(knot)});
+      };
+      auto match = union_knots.lower_bound(knot);
+      if (match == union_knots.end() || !equivalent(match->first)) {
+        if (match != union_knots.begin() && equivalent(std::prev(match)->first))
+          --match;
+        else
+          match = union_knots.emplace(knot, 0).first;
+      }
+      canonical(i) = match->first;
+      match->second = std::max(match->second, curve->Multiplicity(i));
+      delta = std::max(delta, std::abs(canonical(i) - knot));
+      if (i > 1) {
+        minimum_span =
+            std::min({minimum_span, knot - curve->Knot(i - 1), canonical(i) - canonical(i - 1)});
+        if (canonical(i) <= canonical(i - 1))
+          throw std::runtime_error(
+              "Distinct knots cannot collapse during native basis normalization");
+      }
+    }
+    // With corresponding spans, each de Boor interpolation coefficient changes
+    // by at most 4*delta/minimum_span. Accumulate over degree levels in centered
+    // homogeneous coordinates, then divide by the positive minimum weight.
+    double radius = 0, minimum_weight = curve->Weight(1), maximum_weight = minimum_weight;
+    for (int i = 1; i <= curve->NbPoles(); ++i) {
+      radius = std::max(radius, curve->Pole(i).Distance(curve->Pole(1)));
+      minimum_weight = std::min(minimum_weight, curve->Weight(i));
+      maximum_weight = std::max(maximum_weight, curve->Weight(i));
+    }
+    const double error =
+        4 * degree * delta / minimum_span * radius * (3 * maximum_weight / minimum_weight - 1);
+    if (!std::isfinite(error) || error > .05 * tolerance)
+      throw std::runtime_error("Native knot normalization exceeds its geometric error budget");
+    curve->SetKnots(canonical);
   }
   if (union_knots.size() > 256)
     throw std::runtime_error("Native Loft common spline basis exceeds its knot budget");
@@ -187,7 +226,7 @@ Result<TopoDS_Face> native_loft_tensor(FeatureId id, const std::array<TopoDS_Edg
       stations.push_back(first_station);
       profiles.push_back(curve);
     }
-    compatible(profiles);
+    compatible(profiles, tolerance);
     gp_Pnt p;
     gp_Vec first_left, first_right, second_left, second_right;
     left->D2(0, p, first_left, second_left);
@@ -245,6 +284,42 @@ Result<TopoDS_Face> native_loft_tensor(FeatureId id, const std::array<TopoDS_Edg
     const Handle(Geom_BSplineSurface) surface =
         new Geom_BSplineSurface(poles, weights, u_knots, v_knots, u_mult, v_mult,
                                 profiles.front()->Degree(), degree_v, false, false);
+    // Exact rail correction in a shared V basis. The U blend is the rational
+    // partition with Greville coefficients, so it retains the common weight
+    // function and has endpoint values 0/1. Corrections vanish at every authored
+    // section and through second order at the two terminal stations.
+    if (left->IsRational() || right->IsRational())
+      return fail("Verified Loft rails currently require polynomial native B-splines");
+    std::vector<Handle(Geom_BSplineCurve)> rails{GeomConvert::CurveToBSplineCurve(surface->UIso(0)),
+                                                 GeomConvert::CurveToBSplineCurve(surface->UIso(1)),
+                                                 left, right};
+    compatible(rails, tolerance);
+    surface->IncreaseDegree(surface->UDegree(), rails.front()->Degree());
+    TColStd_Array1OfReal rail_knots(1, rails.front()->NbKnots());
+    TColStd_Array1OfInteger rail_mult(1, rail_knots.Length());
+    rails.front()->Knots(rail_knots);
+    rails.front()->Multiplicities(rail_mult);
+    surface->InsertVKnots(rail_knots, rail_mult, 0, false);
+    for (int k = 2; k < surface->NbVKnots(); ++k)
+      if (surface->VDegree() - surface->VMultiplicity(k) < 2)
+        return fail("Verified Loft currently requires C2 polynomial rail knot continuity");
+    if (surface->NbVPoles() != rails.front()->NbPoles())
+      return fail("Native Loft rail correction basis is inconsistent");
+    TColStd_Array1OfReal sequence(1, surface->NbUPoles() + surface->UDegree() + 1);
+    surface->UKnotSequence(sequence);
+    for (int i = 1; i <= surface->NbUPoles(); ++i) {
+      double blend = 0;
+      for (int k = 1; k <= surface->UDegree(); ++k)
+        blend += sequence(i + k);
+      blend /= surface->UDegree();
+      for (int j = 1; j <= surface->NbVPoles(); ++j) {
+        const auto delta_left = rails[2]->Pole(j).XYZ() - rails[0]->Pole(j).XYZ();
+        const auto delta_right = rails[3]->Pole(j).XYZ() - rails[1]->Pole(j).XYZ();
+        surface->SetPole(
+            i, j,
+            gp_Pnt(surface->Pole(i, j).XYZ() + delta_left * (1 - blend) + delta_right * blend));
+      }
+    }
     BRepBuilderAPI_MakeFace made(surface, 0, 1, 0, 1, tolerance * .01);
     if (!made.IsDone() || !BRepCheck_Analyzer(made.Face(), true).IsValid())
       return fail("Native Hermite Loft face is invalid");
