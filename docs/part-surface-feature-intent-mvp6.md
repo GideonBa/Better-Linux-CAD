@@ -80,3 +80,40 @@ execution are canonical in `docs/part-boundary-fill-surface-geometry-mvp6.md`,
 `docs/part-surface-stitch-geometry-mvp6.md`, and
 `docs/part-closed-shell-to-solid-geometry-mvp6.md`. Block 93 multi-body STEP export and deterministic body naming is implemented; Block 94 integrated Part Construction MVP acceptance is implemented; Block 95 Qt application shell, GUI document session, and command architecture is implemented; Block 96 document lifecycle, transactions, recompute, and diagnostics is implemented; Block 97 OCCT viewport, navigation, display, and semantic picking is implemented; Block 98 browser, property editor, and selection synchronization is the current next technical step. Network surfaces and arbitrary
 patch-network intent remain deferred beyond the first Part Construction MVP.
+
+
+## OffsetSurface and Thicken extension plan
+
+The 170–172 delivery extends the existing Surface family while retaining the six historical record
+shapes and their planar replay. Numbered status stays in `docs/mvp-plan.md`; this section is the
+implementation plan, not accepted execution evidence.
+
+- Add separate OffsetSurface and Thicken kinds. Offset produces no material and always creates a
+  Surface Body. Thicken closes offset skins and their free boundaries into a Solid, then reuses
+  New/Join/Cut/Intersect context, in-place identity, history and atomic feature updates. Existing
+  Shell removes faces from a solid; it is a distinct operation.
+- Extend Surface references with explicitly owned, unique typed face selections, including curved
+  result/imported faces, alongside existing quilt Bodies and semantic planar faces. Preserve all
+  producer/Body dependencies and import ownership; no native topology index becomes intent.
+- Persist positive Length distance and modeling tolerance, explicit normal/opposite/symmetric side,
+  and an exact-analytic or explicitly verified-approximation policy. Distance is total thickness;
+  symmetry uses half on each side. Symmetric Offset intentionally creates two material-free skins.
+  Approximation requires its own maximum-deviation Length budget; derived measurements stay transient.
+- Define bounded positive distance/tolerance and relative error limits before construction. Validate
+  parameter and dependent-formula edits transactionally. Geometry checks finite normal frames,
+  curvature/offset singularities, physical normal distances, collisions, closure and manifoldness;
+  kernel success or a display mesh cannot prove thickness. Invalid/inconclusive candidates reject.
+- A feature constructs one connected selected quilt. Disconnected or non-manifold selections need
+  an explicit diagnostic; additional regions can be authored separately. Preserve inner holes and
+  give derived offset skins stable face origins for downstream sketches, Hole and finishing.
+- Necessary Part V13 owns the new kinds, selected-face references and later advanced Trim/Extend
+  options. Older records retain their existing spelling/version. Both Project resource directions
+  must preserve strict records, local subsets and pins; no derived geometry is serialized.
+- G03 independently checks planes, cylinders, curved smooth quilts, holes, symmetry, all Body
+  operations, excessive inward offsets, concavity/collision and disconnected inputs. G04 follows
+  with explicit curved trim keep/remove, bounded natural/tangent extension and shared derived
+  free-edge/gap/non-manifold reports. Authored Stitch tolerance never conceals a larger gap.
+
+Public selection, intent and query types should be completed together before the full rebuild.
+Geometry capability limits and approximation/error evidence must be documented before native
+advanced controls are enabled in 173. All deferred arbitrary-network/healing scope above is retained.
