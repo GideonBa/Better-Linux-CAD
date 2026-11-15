@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <set>
+#include <tuple>
 #include <unordered_set>
 #include <utility>
 
@@ -111,14 +113,35 @@ LoftFeature::with_constraints(std::optional<LoftConstraintIntent> constraints) c
         intent.curvature_tolerance_per_mm <= 0.0 || intent.curvature_tolerance_per_mm > 1.0)
       return fail(
           "Loft verification requires a Length tolerance and bounded angular/curvature tolerances");
-    if (!intent.start && !intent.end && intent.guides.empty())
+    if (!intent.start && !intent.end && intent.guides.empty() && intent.patch_boundaries.empty())
       return fail("Loft constraints require authored support or guide bindings");
-    for (const bool first : {true, false}) {
-      const auto& condition = first ? intent.start : intent.end;
-      if (!condition)
-        continue;
-      if (condition->section_identity != (first ? sections_.front() : sections_.back()).identity())
-        return fail("Loft boundary support must bind the corresponding terminal section identity");
+    if (intent.start && intent.start->section_identity != sections_.front().identity())
+      return fail("Loft start support must bind the first section");
+    if (intent.end && intent.end->section_identity != sections_.back().identity())
+      return fail("Loft end support must bind the last section");
+    std::set<std::tuple<std::string, std::string, std::string>> patch_keys;
+    for (const auto& patch : intent.patch_boundaries) {
+      const bool first = patch.condition.section_identity == sections_.front().identity();
+      if ((!first && patch.condition.section_identity != sections_.back().identity()) ||
+          (first ? intent.start.has_value() : intent.end.has_value()))
+        return fail(
+            "Loft patch support must bind a terminal section without a whole-boundary overlap");
+      const auto from = std::find(guide_curves_.begin(), guide_curves_.end(), patch.from_guide);
+      if (guide_curves_.size() < 2 || from == guide_curves_.end() ||
+          patch.from_guide == patch.to_guide)
+        return fail("Loft patch support requires two distinct authored guides");
+      const auto next = std::next(from);
+      const bool closed = sections_.front().kind() == LoftSectionKind::ClosedRegion;
+      if ((next == guide_curves_.end() && (!closed || patch.to_guide != guide_curves_.front())) ||
+          (next != guide_curves_.end() && *next != patch.to_guide))
+        return fail("Loft patch support requires an adjacent ordered guide pair");
+      if (!patch_keys
+               .emplace(patch.condition.section_identity, patch.from_guide.value(),
+                        patch.to_guide.value())
+               .second)
+        return fail("Loft patch support must be unique for each terminal guide pair");
+    }
+    for (const auto* condition : intent.boundary_conditions()) {
       if (condition->support.role() != PartFeatureInputRole::LoftBoundarySupport ||
           (condition->continuity != LoftBoundaryContinuity::G1 &&
            condition->continuity != LoftBoundaryContinuity::G2) ||

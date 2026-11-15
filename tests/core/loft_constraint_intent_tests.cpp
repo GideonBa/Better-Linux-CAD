@@ -386,3 +386,74 @@ TEST_CASE("Loft guide anchors distinguish seam aliases from separate original ed
   CHECK_FALSE(
       feature.with_constraints(authored)); // Surplus logical section never indexes past sections.
 }
+
+TEST_CASE("Loft patch supports retain ordered guide-pair identity and strict optional V12 fields",
+          "[core][loft-constraints][parity-b169]") {
+  auto document = part();
+  const auto line = f::checked(PathSegmentReference::create_planar(
+      SketchId("reference.planar"), SketchEntityId("source.line"), PlanarPathCurveKind::Line));
+  for (const auto* id : {"left", "right"})
+    REQUIRE(document.add_path_curve(f::checked(PathCurve::create(
+        PathCurveId(id), id, {line}, PathClosure::Open, PathOrientationRule::MinimumTwist))));
+  const auto base = loft();
+  auto feature = f::checked(LoftFeature::create_loft_surface(
+      base.id(), base.name(), base.sections(), base.body_result_context(), {},
+      {PathCurveId("left"), PathCurveId("right")}));
+  auto authored = intent();
+  const auto support = *authored.start;
+  authored.start.reset();
+  for (int g = 0; g < 2; ++g)
+    authored.guides.push_back({PathCurveId(g ? "right" : "left"),
+                               false,
+                               {{feature.sections()[0].identity(), {}, g * .5, 0},
+                                {feature.sections()[1].identity(), {}, g * .5, 1}}});
+  authored.patch_boundaries.push_back({support, PathCurveId("left"), PathCurveId("right")});
+  REQUIRE(document.add_loft_feature(f::checked(feature.with_constraints(authored))));
+  const auto before = saved(document);
+  CHECK(saved(f::checked(deserialize_part_document_from_json(before))) == before);
+  CHECK(document.dependency_graph().has_dependency("base.feature", "loft"));
+  CHECK_FALSE(document.remove_feature(FeatureId("base.feature")));
+  for (int mutation = 0; mutation < 7; ++mutation) {
+    auto invalid = authored;
+    auto& patch = invalid.patch_boundaries[0];
+    if (mutation == 0)
+      invalid.start = support;
+    if (mutation == 1)
+      patch.to_guide = patch.from_guide;
+    if (mutation == 2)
+      patch.from_guide = PathCurveId("missing");
+    if (mutation == 3)
+      patch.condition.section_identity = "middle";
+    if (mutation == 4)
+      invalid.patch_boundaries.push_back(patch);
+    if (mutation == 5)
+      patch.condition.tangent_scale = 0;
+    if (mutation == 6)
+      patch.condition.imported_source_body = BodyId("base.body");
+    CHECK_FALSE(feature.with_constraints(invalid));
+  }
+  for (int mutation = 0; mutation < 4; ++mutation) {
+    auto invalid = json::parse(before);
+    auto& patches = invalid["loft_features"][0]["constraints"]["patch_boundaries"];
+    if (mutation == 0)
+      patches = json::array();
+    if (mutation == 1)
+      patches[0]["condition"] = nullptr;
+    if (mutation == 2)
+      patches[0]["sampled_patch"] = 1;
+    if (mutation == 3)
+      patches[0].erase("from_guide");
+    CHECK_FALSE(deserialize_part_document_from_json(invalid.dump()));
+  }
+  CHECK(saved(document) == before);
+  PartFeatureHistoryIntent history;
+  for (const auto& row : f::checked(document.executable_history()))
+    history.order.push_back(row.node_id);
+  history.suppressed = {"base.feature"};
+  REQUIRE(document.apply_history_intent(history));
+  const auto plan = f::checked(document.create_history_evaluation_plan());
+  const auto blocked = std::find_if(plan.entries.begin(), plan.entries.end(),
+                                    [](const auto& row) { return row.feature.node_id == "loft"; });
+  REQUIRE(blocked != plan.entries.end());
+  CHECK(blocked->state == PartHistoryExecutionState::Blocked);
+}

@@ -122,13 +122,11 @@ template <typename Record> ExecutionContract execution_contract(const Record& re
     }
     if constexpr (std::is_same_v<Record, LoftFeature>)
       if (record.constraints())
-        for (const auto* condition : {&record.constraints()->start, &record.constraints()->end}) {
-          if (!*condition)
-            continue;
-          add_input(contract, (**condition).support.source_node_id());
-          if ((**condition).imported_source_body)
-            contract.body_inputs.push_back(*(**condition).imported_source_body);
-          if (const auto* face = std::get_if<ResultFaceReference>(&(**condition).support.source()))
+        for (const auto* condition : record.constraints()->boundary_conditions()) {
+          add_input(contract, condition->support.source_node_id());
+          if (condition->imported_source_body)
+            contract.body_inputs.push_back(*condition->imported_source_body);
+          if (const auto* face = std::get_if<ResultFaceReference>(&condition->support.source()))
             contract.body_inputs.push_back(face->body());
         }
     if constexpr (requires { record.body_result_context(); })
