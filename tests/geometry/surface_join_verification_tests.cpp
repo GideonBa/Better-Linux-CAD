@@ -3,11 +3,14 @@
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <GC_MakeArcOfCircle.hxx>
+#include <Geom_BSplineSurface.hxx>
 #include <Geom_BezierCurve.hxx>
 #include <Geom_BezierSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Plane.hxx>
 #include <Geom_SphericalSurface.hxx>
+#include <TColStd_Array1OfInteger.hxx>
+#include <TColStd_Array1OfReal.hxx>
 #include <TColgp_Array1OfPnt.hxx>
 #include <TColgp_Array2OfPnt.hxx>
 #include <TopoDS.hxx>
@@ -209,4 +212,35 @@ TEST_CASE(
   const auto report = verify(edge, candidate, support, LoftBoundaryContinuity::G2, 1.2e-5);
   REQUIRE(report);
   CHECK(report.value().curvature_error_per_mm == Catch::Approx(std::sqrt(2) * q).margin(1e-10));
+}
+
+TEST_CASE("Trim incidence uses physical millimeters with strongly scaled native parameters",
+          "[geometry][surface-join-verification][parity-b169]") {
+  TColgp_Array2OfPnt poles(1, 2, 1, 2);
+  for (int u = 1; u <= 2; ++u)
+    for (int v = 1; v <= 2; ++v)
+      poles.SetValue(u, v, gp_Pnt(u - 2, v == 1 ? -2 : 2, 0));
+  TColStd_Array1OfInteger multiplicities(1, 2);
+  multiplicities.Init(2);
+  for (const double scale : {.001, 1000.0}) {
+    TColStd_Array1OfReal uknots(1, 2), vknots(1, 2);
+    uknots.SetValue(1, 0);
+    uknots.SetValue(2, scale);
+    vknots.SetValue(1, 0);
+    vknots.SetValue(2, 1);
+    const Handle(Geom_Surface) surface =
+        new Geom_BSplineSurface(poles, uknots, vknots, multiplicities, multiplicities, 1, 1);
+    const auto face = patch(surface, 0, scale, 0, 1);
+    for (const double gap : {0.0, 1e-8, 1e-5}) {
+      const auto edge = BRepBuilderAPI_MakeEdge(gp_Pnt(-gap, -1, 0), gp_Pnt(-gap, 1, 0)).Edge();
+      const auto result = verify(edge, face, face, LoftBoundaryContinuity::G2);
+      INFO("native U scale=" << scale << ", physical gap=" << gap);
+      if (gap <= 1e-7) {
+        REQUIRE(result);
+        CHECK(result.value().position_error_mm == Catch::Approx(gap).margin(1e-12));
+      } else {
+        REQUIRE_FALSE(result);
+      }
+    }
+  }
 }
