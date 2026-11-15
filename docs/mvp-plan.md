@@ -78,6 +78,10 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 170–172 | Offset/Thicken intent and checked Geometry, curved Trim/Extend and derived gap diagnostics with G03–G04 acceptance. |
 | 173–174 | Native advanced curve/Surface workflows, integrated edits/history/reopen and physical STEP roundtrip acceptance. |
 
+The next delivery checkpoints are the combined 168–169 Loft branch, the 170–172 Surface branch,
+then 173 workflow and 174 integrated acceptance. Start each only after the preceding PR is merged
+and main is clean and current.
+
 Each row retains its full numbered prerequisites and acceptance criteria; grouped rows do not
 authorize partial acceptance of any block. Preserve all planned scope after 174.
 
@@ -165,8 +169,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–166 are **Implemented and accepted**;
-Blocks 145–167 are **Implemented and accepted**; Blocks 168–204 are **Planned; not started**.
+Status authority: Blocks 145–167 are **Implemented and accepted**;
+Blocks 168–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -806,7 +810,7 @@ inner profile wires remain 167; richer support/guide intent, G2 and Surface work
 ### Block 167 semantic edges and multi-wire Sweep — accepted
 
 Delivery: [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191), normal rebase required
-before starting the next branch. Six focused commits remain below 1,500 added lines each.
+before starting the next branch. Six implementation commits remain below 1,500 added lines each; the largest adds 606 lines.
 
 | Accepted boundary | Contract / independent proof |
 | --- | --- |
