@@ -941,11 +941,11 @@ feature integration. Complete fresh/history/Body-operation/exchange and native r
 the acceptance boundary; no numbered status advances from compilation alone.
 
 
-The scoped-support Core slice passes **13 focused cases / 356 assertions** and the full Core suite
-(**778 cases / 34,748 assertions**). Proof: `/tmp/blcad-169-feature7-core.log` and
-`/tmp/blcad-169-feature8-core-full.log`; its 506 Core/header inputs remain unchanged across the
-subsequent Geometry-only corrections (subset SHA-256
-`042e38f05853d85e84505be2e5bbd6b3ef24670d2467994db243da48c8115b79`).
-Strict optional V12 patch records, overlap/adjacency, dependency protection and suppression are
-covered in [the Core tests](../tests/core/loft_constraint_intent_tests.cpp). This completes the
-scoped intent slice only; the complete G02 Geometry and native acceptance boundary remains open.
+The scoped-support Core slice passes the full Core suite: **779 cases / 34,751 assertions**
+(`/tmp/blcad-169-feature15-core-full.log`). Strict optional V12 patch records, overlap/adjacency,
+dependency protection and suppression are covered in
+[the Core tests](../tests/core/loft_constraint_intent_tests.cpp). A 257-condition fixture proves
+that every Core-valid collection reopens without a separate JSON-only cap; whole and scoped
+conditions use one direct boundary decoder. Geometry construction budgets remain distinct from
+authored persistence. This completes the scoped intent slice only; complete G02 acceptance remains
+under final verification.

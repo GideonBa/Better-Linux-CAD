@@ -457,3 +457,38 @@ TEST_CASE("Loft patch supports retain ordered guide-pair identity and strict opt
   REQUIRE(blocked != plan.entries.end());
   CHECK(blocked->state == PartHistoryExecutionState::Blocked);
 }
+
+TEST_CASE("Every Core-valid Loft patch collection retains a necessary V12 roundtrip",
+          "[core][loft-constraints][loft-patch-codec][parity-b169]") {
+  auto document = part();
+  const auto base = loft();
+  const auto line = f::checked(PathSegmentReference::create_planar(
+      SketchId("reference.planar"), SketchEntityId("source.line"), PlanarPathCurveKind::Line));
+  std::vector<PathCurveId> guides;
+  LoftConstraintIntent authored{ParameterId("loft.tolerance"), 1e-5, 1e-5, {}, {}, {}};
+  for (int i = 0; i < 129; ++i) {
+    const PathCurveId id("rail." + std::to_string(i));
+    guides.push_back(id);
+    (void)f::checked(document.add_path_curve(f::checked(PathCurve::create(
+        id, id.value(), {line}, PathClosure::Open, PathOrientationRule::MinimumTwist))));
+    authored.guides.push_back({id,
+                               false,
+                               {{base.sections().front().identity(), {}, i / 129.0, 0},
+                                {base.sections().back().identity(), {}, i / 129.0, 1}}});
+  }
+  for (int i = 0; i < 257; ++i) {
+    auto condition = *intent().start;
+    condition.section_identity =
+        (i < 129 ? base.sections().front() : base.sections().back()).identity();
+    authored.patch_boundaries.push_back({condition, guides[i % 129], guides[(i + 1) % 129]});
+  }
+  const auto feature = f::checked(LoftFeature::create_loft_surface(
+      base.id(), base.name(), base.sections(), base.body_result_context(), {}, guides));
+  REQUIRE(document.add_loft_feature(f::checked(feature.with_constraints(authored))));
+  const auto bytes = saved(document);
+  const auto restored = f::checked(deserialize_part_document_from_json(bytes));
+  CHECK(saved(restored) == bytes);
+  CHECK(restored.find_loft_feature(base.id())->constraints()->patch_boundaries.size() == 257);
+  // Construction's 32-rail capability is a Geometry diagnostic, not a second
+  // undocumented Core/persistence limit on authored future intent.
+}
