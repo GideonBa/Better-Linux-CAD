@@ -237,3 +237,14 @@ Repeated independent-value overrides allocate unique display names and retain pr
 All five targets passed; focused allocation/creation Qt **4 passed / 1 native skip / 185 assertions**
 checks preserved user values, distinct new bindings and exact Undo. Runtime **1,203 files**,
 `0e21237493cd354fe707519de7746a59750412aae3e34a1954f265211c226001`.
+
+## Dynamic property-row layout — 173
+
+Mode switches retain the owned controls and rebuild only their form layout. Wrapped fields and
+nested forms reserve their actual preferred row heights inside the scroll area. This prevents
+Curve/Contour, Path/Guide and direction controls from overlapping after task changes or when a
+scrollbar narrows the panel. Selection, focus and authored feature state remain with the controls.
+
+All five targets passed. The previously failing combined spatial/Surface context workflows now
+pass **2 / 1,354**, including exact history and physical STEP export; final Qt captures were
+reviewed. Complete native scale checks and full Qt regression remain the Block 173 final gate.

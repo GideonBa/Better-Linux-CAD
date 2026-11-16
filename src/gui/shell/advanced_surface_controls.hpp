@@ -3,6 +3,7 @@
 #include "blcad/core/surface_feature.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 #include "blcad/gui/gui_selection_model.hpp"
+#include "scroll_form_panel.hpp"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -44,7 +45,7 @@ struct AdvancedSurfaceControls {
   std::optional<GuiSelection> entry_viewport_selection;
   std::array<ParameterId, 3> override_ids{ParameterId(""), ParameterId(""), ParameterId("")};
   explicit AdvancedSurfaceControls(QWidget* parent) {
-    panel = new QWidget(parent);
+    panel = new ScrollFormPanel(parent);
     panel->setObjectName("blcad.surface.advanced");
     form = new QFormLayout(panel);
     form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
@@ -133,21 +134,24 @@ struct AdvancedSurfaceControls {
         kind == SurfaceFeatureKind::OffsetSurface || kind == SurfaceFeatureKind::Thicken;
     const bool trim = kind == SurfaceFeatureKind::TrimSurface,
                extend = kind == SurfaceFeatureKind::ExtendSurface;
-    form->setRowVisible(face_set, offset);
-    form->setRowVisible(face_set_panel, offset && face_set->isChecked());
-    form->setRowVisible(side, offset);
-    form->setRowVisible(trim_side, trim);
-    form->setRowVisible(projection, trim);
-    form->setRowVisible(direction_row, trim && projection->currentIndex() == 1);
-    form->setRowVisible(extension, extend);
-    form->setRowVisible(approximation, offset);
-    form->setRowVisible(tolerance, offset || trim || extend);
-    form->setRowVisible(deviation, (offset && approximation->currentIndex() == 1) ||
-                                       (extend && extension->currentIndex() == 1));
-    form->setRowVisible(operation, kind == SurfaceFeatureKind::Thicken);
-    form->setRowVisible(body,
-                        kind == SurfaceFeatureKind::Thicken && operation->currentIndex() != 0);
-    form->setRowVisible(override_formulas, editing.has_value() && (offset || trim || extend));
+    set_form_row_visible(*form, face_set, offset);
+    set_form_row_visible(*form, face_set_panel, offset && face_set->isChecked());
+    set_form_row_visible(*form, side, offset);
+    set_form_row_visible(*form, trim_side, trim);
+    set_form_row_visible(*form, projection, trim);
+    set_form_row_visible(*form, direction_row, trim && projection->currentIndex() == 1);
+    set_form_row_visible(*form, extension, extend);
+    set_form_row_visible(*form, approximation, offset);
+    set_form_row_visible(*form, tolerance, offset || trim || extend);
+    set_form_row_visible(*form, deviation,
+                         (offset && approximation->currentIndex() == 1) ||
+                             (extend && extension->currentIndex() == 1));
+    set_form_row_visible(*form, operation, kind == SurfaceFeatureKind::Thicken);
+    set_form_row_visible(*form, body,
+                         kind == SurfaceFeatureKind::Thicken && operation->currentIndex() != 0);
+    set_form_row_visible(*form, override_formulas,
+                         editing.has_value() && (offset || trim || extend));
+    form = rebuild_form_rows(form);
   }
   void reset(const PartDocument& part) {
     include_hidden->setChecked(false);
