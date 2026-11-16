@@ -159,8 +159,8 @@ at both 100% and compact 150%. The symmetric Stitch→Thicken flow verifies exac
 `1.23456789012345 mm` release, two-step Undo/Redo, Save/Open and independently integrated STEP
 material/volume. Both-scale captures were reviewed after all CAD processes exited. Frozen runtime:
 **1,199 files**, `cfec44bc42a7306d250c7c9732f7c34818245249a79f5fa1bb05d447db2a13e5`.
-Full advanced editing, hidden/multiple inputs and constrained Sweep/Loft authoring remain required
-for acceptance of Block 173.
+Historical editing and explicit hidden/multiple inputs are covered below. Constrained Sweep/Loft
+authoring remains required for acceptance of Block 173.
 
 ### Advanced Surface editing and historical input geometry
 
@@ -190,8 +190,40 @@ legacy Surface and generic editing **4 / 727** at both 100% and compact 150%. Ca
 records through unchanged Apply, exact shared formulas, explicit budget splits, historical source
 coordinates, independently integrated Cut/Thicken volumes, precise native drag/release and history.
 Runtime **1,201 files**, `457f06711982e1cf574aa7d00688ab22baee92eacbf459b1e8ee6f8b8f0991dc`.
-Explicit creation-time hidden/multiple-face selectors and constrained Sweep/Loft controls remain
-open Block 173 gates.
+Explicit creation-time hidden/multiple-face selectors are covered below. Constrained Sweep/Loft
+controls remain open Block 173 gates.
 Both-scale editing/creation captures were reviewed after CAD/build processes exited. The standalone
 native application initialized during an eight-second startup smoke and was deliberately stopped
 by the timeout; the existing X11 visual depth/stencil warning also appears in passing native tests.
+
+### Explicit hidden inputs and owned face sets
+
+The Surface panel exposes hidden Body inputs explicitly, without changing persisted or presentation
+visibility. Commands remain reachable when all compatible inputs are hidden. Reloading the catalog
+retains typed selections and ordered collection entries by reference identity, rather than old row
+numbers. Boolean targets must have geometry in the same input history. Historical editing starts
+with its available predecessors; source controls are disabled during an active handle drag.
+
+Offset/Thicken can consume an explicit set of one to 64 unique faces of one Body. Whole quilts and
+individual faces remain separate choices. Adding a duplicate or a face from another owner leaves
+the draft set intact. Editing reloads the complete set and bindings; switching off collection cannot
+silently retain a saved multi-face fallback. Native source picking stays active during preview.
+Readable Body/near-position labels and tooltips replace encoded reference keys in face choosers;
+these positions are display hints, never persisted identities. Numeric loads use shortest roundtrip
+text. Frames also evaluate staged existing parameter changes when a shared value drives the source.
+
+Proof: all five targets passed. Affected Qt **21 passed / 5 native skips / 15,682 assertions**;
+native Surface regression **5 / 779** at both 100% and compact 150%, with reviewed captures after
+all CAD/build processes exited. Two cylindrical faces selected by actual model clicks produce an
+Offset→Thicken solid with independently expected volume `154 acos(0.8) mm³`. A hidden cylinder
+face goes through projected Trim Keep/Remove (independent native face-distance probes), actual
+native arc picking, Natural/Tangent switching and precise Extend→Thicken. Its independent volume
+is `10 acos(0.8) × (4 + 1.23456789012345) mm³`. Both workflows check exact history, Save/Open,
+STEP reimport, integrated volume and material points. Additional cases reject duplicate/foreign
+faces, restore visibility/filter/scope on Cancel and verify a shared source driver moves the grip
+from z=5 to z=3 while its offset preview lies at z=6.
+
+Frozen runtime: **1,203 files**,
+`2e6fbcbee8f250fa3764e6e0b8e37b6f73f1f82110ae6173099a16f690423be3`.
+Sweep material-region/native path selectors and constrained Loft creation/editing remain required
+before accepting the complete Block 173 workflow.

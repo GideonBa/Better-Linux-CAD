@@ -42,6 +42,7 @@ bool ShellFeatureTools::advanced_surface() const noexcept {
 void ShellFeatureTools::build_advanced_surface_controls(QWidget* parent) {
   advanced_surface_ = std::make_unique<AdvancedSurfaceControls>(parent);
   auto& ui = *advanced_surface_;
+  build_surface_input_controls();
   surface_form_->addRow(ui.panel);
   for (auto* input : {ui.side, ui.trim_side, ui.projection, ui.extension, ui.approximation,
                       ui.operation, ui.body})
@@ -87,10 +88,10 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
     const int i = box->currentData().toInt();
     return i >= 0 && std::size_t(i) < surface_inputs_.size() ? &surface_inputs_[i] : nullptr;
   };
-  const auto* target = selected(surface_target_);
   const auto* source = selected(surface_source_);
-  if (!target || !target->surface)
-    return fail("Select an owned Surface face or quilt");
+  auto target = selected_surface_target();
+  if (!target)
+    return Result<std::size_t>::failure(target.error());
   bool numeric = false;
   const double tolerance = ui.tolerance->text().toDouble(&numeric);
   if (!numeric || !std::isfinite(tolerance) || tolerance < 1e-9 || tolerance > 1)
@@ -221,12 +222,12 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
       controller.set_offset_intent(parameters, context.value());
     else
       begun = controller.begin_offset(session_, surface_feature_, surface_name_, kind(command_),
-                                      *target->surface, parameters, context.value(), body, pending);
+                                      target.value(), parameters, context.value(), body, pending);
   } else if (command_ == Command::TrimSurface) {
     if (!source || !source->trimming)
       return fail("Select a closed trimming contour");
     if (!ui.editing)
-      begun = controller.begin_trim(session_, surface_feature_, surface_name_, *target->surface,
+      begun = controller.begin_trim(session_, surface_feature_, surface_name_, target.value(),
                                     *source->trimming, surface_result_, body);
     controller.set_trimming(*source->trimming);
     std::optional<Vector3> direction;
@@ -254,7 +255,7 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
       for (const auto& value : pending)
         if (value.id() == distance.value())
           driving.push_back(value);
-      begun = controller.begin_extend(session_, surface_feature_, surface_name_, *target->surface,
+      begun = controller.begin_extend(session_, surface_feature_, surface_name_, target.value(),
                                       *source->boundary, distance.value(), surface_result_, body,
                                       driving);
     }
@@ -265,7 +266,7 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
   }
   if (!begun)
     return begun;
-  controller.set_target(*target->surface);
+  controller.set_target(target.value());
   controller.set_pending_parameters(pending);
   controller.set_numeric_parameters(changes);
   if (source && source->pending_path)
@@ -275,6 +276,14 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
   // Direction and preview resolve the same native source. Pending edge paths
   // exist only in this disposable candidate and are committed with the feature.
   auto candidate = *part;
+  for (const auto& [id, value] : changes) {
+    auto quantity = Quantity::length_mm(value, id.value());
+    if (!quantity)
+      return Result<std::size_t>::failure(quantity.error());
+    auto updated = candidate.set_parameter_value(id, quantity.value());
+    if (!updated)
+      return Result<std::size_t>::failure(updated.error());
+  }
   for (const auto& path : source && source->pending_path
                               ? std::vector<PathCurve>{*source->pending_path}
                               : std::vector<PathCurve>{}) {
@@ -287,7 +296,7 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
         GuiFeatureManipulatorFrame result;
         const auto* cache = ui.input_cache ? &*ui.input_cache : session_.part_shape_cache();
         auto pending_cache = geometry::ShapeCache::create(ShapeCacheId("surface.pending.input"));
-        if (source && source->pending_path) {
+        if ((source && source->pending_path) || !changes.empty()) {
           if (!pending_cache)
             return Result<GuiFeatureManipulatorFrame>::failure(pending_cache.error());
           auto computed = ui.input_prefix
@@ -301,18 +310,18 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
         }
         if (command_ == Command::ExtendSurface) {
           auto value = geometry::GeometryRecomputeExecutor{context}.surface_extension_frame(
-              candidate, *target->surface, *source->boundary, *cache);
+              candidate, target.value(), *source->boundary, *cache);
           if (!value)
             return Result<GuiFeatureManipulatorFrame>::failure(value.error());
           result.origin = value.value().origin;
           result.axis = value.value().direction;
         } else if (offset) {
           const auto consumer =
-              target->surface->source_kind() == SurfaceReferenceSourceKind::SemanticFace
+              target.value().source_kind() == SurfaceReferenceSourceKind::SemanticFace
                   ? FeatureId("surface.direction.preview")
                   : FeatureId{};
           auto shape = geometry::SurfaceSelectionGeometry::resolve(
-              candidate, *cache, *target->surface, consumer, tolerance, context);
+              candidate, *cache, target.value(), consumer, tolerance, context);
           if (!shape)
             return Result<GuiFeatureManipulatorFrame>::failure(shape.error());
           auto value = geometry::SurfaceSelectionGeometry::normal_frame(shape.value());
@@ -376,11 +385,8 @@ void ShellFeatureTools::refresh_surface_diagnostics(const geometry::GeometryShap
         if (input.surface)
           append(*input.surface);
       }
-    else {
-      const int i = surface_target_->currentData().toInt();
-      if (i >= 0 && std::size_t(i) < surface_inputs_.size() && surface_inputs_[i].surface)
-        append(*surface_inputs_[i].surface);
-    }
+    else if (auto target = selected_surface_target(); target)
+      append(target.value());
   }
   std::vector<geometry::GeometryShape> edges;
   bool invalid = result == nullptr;

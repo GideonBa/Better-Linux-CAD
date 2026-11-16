@@ -1048,3 +1048,12 @@ all five targets passed, combined Qt **25 passed / 4 native skips / 16,791 asser
 creation/browser-edit/legacy regression **4 / 727** at 100% and compact 150%. Next complete the
 explicit hidden/multiple-face creation selectors and constrained Sweep/Loft controls. Block 173
 remains in progress; continue through the assigned Block 184.
+
+Explicit hidden Surface inputs and one-owner face sets are now verified in creation and editing.
+Native G04 includes model-clicked cylindrical face sets, Offset→Thicken and projected curved
+Trim Keep/Remove→native arc Extend→Thicken, with independent physical STEP checks and complete
+history/reopening. [Contract/evidence](gui-interactive-surface-mvp9.md#explicit-hidden-inputs-and-owned-face-sets):
+all five targets passed; Qt **21 passed / 5 native skips / 15,682 assertions**; native **5 / 779** at
+100% and compact 150%, reviewed captures. Shared source-driver frames use staged parameters.
+Next finish Sweep material-region/native path selectors and constrained Loft creation/editing;
+173 remains in progress, followed by the complete 174–184 assignment.
