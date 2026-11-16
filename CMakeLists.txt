@@ -545,6 +545,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/loft_feature_tests.cpp
     tests/core/loft_constraint_intent_tests.cpp
     tests/core/surface_offset_intent_tests.cpp
+    tests/core/surface_body_snapshot_tests.cpp
     tests/core/advanced_surface_intent_tests.cpp
     tests/core/surface_feature_tests.cpp
     tests/core/mirror_feature_tests.cpp

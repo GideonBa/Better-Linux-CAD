@@ -221,3 +221,22 @@ changes added Geometry tests only, with the GUI/app/exporter binary hashes verif
 Frozen runtime: **1,178 files**, SHA256
 `8abc03217aefaf37be388530f916e37da977342921dc9a51e34dc0ddfa527c82`.
 Numbered acceptance stays in `mvp-plan.md`; detailed run chronology remains in Git/PR history.
+
+
+### Historical Body-source snapshots
+
+A quilt extracted/trimmed from a Solid may subsequently Thicken with Join/Cut/Intersect back into
+that Solid. Earlier consumers bind to the actual producer before the later Body update; the final
+Body alias continues to serve subsequent consumers. This forms an ordinary history DAG, rather than
+a feedback edge from the final Solid into its own earlier quilt. Replacement retains the original
+feature slot: later consumers keep their dependency on the updated Body. True forward references
+and cycles still reject atomically. No reference identity, native geometry or persistence field is
+rewritten to simulate a matching source.
+
+[Core history regression](../tests/core/surface_body_snapshot_tests.cpp) covers all three modifying
+modes, exact JSON reopening, later-consumer retention, source-parameter invalidation and genuine
+forward-cycle rejection. [Native history regression](../tests/geometry/curved_surface_combination_tests.cpp)
+independently integrates the actual cylinder/strip material intersection, checks original producer
+geometry, edits the source contour, and compares incremental with reopened/fresh output. Full Core:
+**785 / 35,068**; new Geometry history: **1 / 54**; existing affected Surface regression:
+**17 / 871**. All five build targets passed.
