@@ -135,3 +135,28 @@ thickness, formula preservation and exact session Undo/Redo. The same file check
 sampled Airfoil sections through a GUI Loft candidate with explicit G2 supports and rejects global
 longitudinal G2 separately. Native widgets/selectors and their complete workflow gates remain in
 progress; this foundation does not enable new ribbon commands by itself.
+
+### Advanced Surface authoring controls
+
+Block 173 adds native Offset Surface/Thicken actions and typed creation controls shared with
+Trim/Extend: local-normal side, symmetric **total** separation, exact/verified construction,
+physical tolerance/deviation and all four Thicken Body operations. Trim exposes retained region
+and projection vector; Extend accepts complete native curved edges and natural/tangent continuation.
+Selected result edges provision curve-preserving Path inputs in the same transaction. Named Paths
+keep picking priority over coincident generated edges. Numeric handles use shortest roundtrip
+formatting, preserving the entered double through drag and release.
+
+Transient free-edge overlays remain unselectable and clear on cancellation. Feedback reports the
+actual normal-distance criterion and native station/error budget before the Body operation; it
+makes no global thickness claim about a Boolean result. Absence of complete seam pairs is stated
+explicitly, rather than reported as a zero measured gap. Invalid tolerance/deviation disables Apply;
+Cancel restores input selection, filters and semantic scope without changing the document.
+
+Creation proof: all five build targets passed; offscreen Surface regression **14 passed / 2 native
+skips / 15,397 assertions**. Native Surface, viewport and Sweep/Loft regression **11 / 959** passed
+at both 100% and compact 150%. The symmetric Stitch→Thicken flow verifies exact
+`1.23456789012345 mm` release, two-step Undo/Redo, Save/Open and independently integrated STEP
+material/volume. Both-scale captures were reviewed after all CAD processes exited. Frozen runtime:
+**1,199 files**, `cfec44bc42a7306d250c7c9732f7c34818245249a79f5fa1bb05d447db2a13e5`.
+Full advanced editing, hidden/multiple inputs and constrained Sweep/Loft authoring remain required
+for acceptance of Block 173.

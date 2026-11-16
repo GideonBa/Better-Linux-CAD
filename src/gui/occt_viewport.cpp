@@ -419,7 +419,10 @@ void apply_selection_priority(const geometry::ViewportSceneItem& item,
   // Coplanar datum planes and axes commonly cross a Sketch at the origin.
   // Prefer the bounded profile face there so an interior click selects the
   // feature input instead of an unrelated construction datum.
-  owner->SetPriority(sketch_profile_face(item) ? 9 : 0);
+  // Authored paths retain their identity when they overlap a result edge.
+  owner->SetPriority(sketch_profile_face(item)                        ? 9
+                     : item.kind == geometry::ViewportSceneKind::Path ? 6
+                                                                      : 0);
 }
 
 V3d_TypeOfOrientation occt_orientation(GuiStandardView view) {
@@ -512,6 +515,7 @@ struct OcctViewport::Impl {
   Aspect_Drawable native_drawable{0};
   std::vector<Presentation> presentations;
   std::vector<Presentation> feature_previews;
+  std::vector<Presentation> geometry_diagnostics;
   std::vector<Presentation> preview_selection_targets;
   bool feature_preview_focus{false};
   std::optional<SketchId> feature_preview_sketch;
@@ -657,6 +661,11 @@ Result<std::size_t> OcctViewport::set_scene(std::vector<geometry::ViewportSceneI
       impl_->context->Display(presentation.interactive, false);
       apply_selection_priority(presentation.item, presentation.interactive);
     }
+    for (const auto& diagnostic : impl_->geometry_diagnostics)
+      if (!diagnostic.interactive.IsNull()) {
+        impl_->context->Display(diagnostic.interactive, false);
+        impl_->context->Deactivate(diagnostic.interactive);
+      }
     for (const auto& preview : impl_->feature_previews)
       if (!preview.interactive.IsNull()) {
         impl_->context->Display(preview.interactive, false);
@@ -855,7 +864,47 @@ bool OcctViewport::feature_preview_replaces(std::string_view semantic_id) const 
   return false;
 }
 
+Result<std::size_t>
+OcctViewport::set_geometry_diagnostics(std::vector<geometry::GeometryShape> shapes, bool invalid) {
+  std::vector<Impl::Presentation> candidates;
+  std::size_t index = 0;
+  for (auto& shape : shapes) {
+    if (shape.empty())
+      return Result<std::size_t>::failure(viewport_error("Empty diagnostic geometry"));
+    Impl::Presentation item{{geometry::ViewportSceneKind::Edge,
+                             "diagnostic/surface/" + std::to_string(index++), std::move(shape)},
+                            {}};
+    if (!impl_->context.IsNull()) {
+      const auto* native = geometry::OcctShapeView::get(item.item.shape);
+      if (!native || native->IsNull())
+        return Result<std::size_t>::failure(
+            viewport_error("Diagnostic native geometry is unavailable"));
+      item.interactive = new AIS_Shape(*native);
+      item.interactive->SetColor(
+          Quantity_Color(invalid ? 1.0 : 1.0, invalid ? .2 : .65, .1, Quantity_TOC_RGB));
+      item.interactive->SetWidth(3);
+    }
+    candidates.push_back(std::move(item));
+  }
+  for (const auto& item : impl_->geometry_diagnostics)
+    if (!impl_->context.IsNull() && !item.interactive.IsNull())
+      impl_->context->Remove(item.interactive, false);
+  impl_->geometry_diagnostics = std::move(candidates);
+  for (const auto& item : impl_->geometry_diagnostics)
+    if (!impl_->context.IsNull() && !item.interactive.IsNull()) {
+      impl_->context->Display(item.interactive, false);
+      impl_->context->SetDisplayMode(item.interactive, 0, false);
+      impl_->context->Deactivate(item.interactive);
+    }
+  update();
+  return Result<std::size_t>::success(impl_->geometry_diagnostics.size());
+}
+std::size_t OcctViewport::geometry_diagnostic_count() const noexcept {
+  return impl_->geometry_diagnostics.size();
+}
+
 void OcctViewport::clear_feature_preview() {
+  (void)set_geometry_diagnostics({}, false);
   impl_->feature_preview_focus = false;
   impl_->feature_preview_sketch.reset();
   if (impl_->feature_previews.empty() && impl_->feature_preview_replaced_bodies.empty())
@@ -875,6 +924,7 @@ void OcctViewport::clear_scene() {
     render_update();
   }
   impl_->presentations.clear();
+  impl_->geometry_diagnostics.clear();
   impl_->preview_selection_targets.clear();
   impl_->preview_owner_to_index.clear();
   impl_->feature_previews.clear();

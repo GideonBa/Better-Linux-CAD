@@ -9,6 +9,7 @@
 
 #include <array>
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
 #include <utility>
@@ -37,6 +38,7 @@ class ShellRibbon;
 class ShellWindow;
 class ShellPropertyGroup;
 class ShellPropertySelector;
+struct AdvancedSurfaceControls;
 
 // GUI Shell Reset MVP-9R Blocks 135/136: explicit, shell-owned integration of
 // Extrude/Revolve, finishing and shell/draft controllers with the candidate-only
@@ -69,7 +71,9 @@ public:
     TrimSurface,
     ExtendSurface,
     SurfaceStitch,
-    ClosedShellToSolid
+    ClosedShellToSolid,
+    OffsetSurface,
+    Thicken
   };
 
   ShellFeatureTools(ShellWindow& window, GuiDocumentSession& session,
@@ -363,6 +367,10 @@ private:
   [[nodiscard]] bool finishing() const noexcept;
   [[nodiscard]] bool pattern() const noexcept;
   [[nodiscard]] bool surface() const noexcept;
+  [[nodiscard]] bool advanced_surface() const noexcept;
+  void build_advanced_surface_controls(QWidget*);
+  [[nodiscard]] Result<std::size_t> rebuild_advanced_surface_controller();
+  void refresh_surface_diagnostics(const geometry::GeometryShape*);
   [[nodiscard]] bool surface_scalar() const noexcept;
   void build_surface_controls(QWidget* panel);
   void refresh_surface_preview();
@@ -375,6 +383,8 @@ private:
     std::optional<BoundaryCurveReference> boundary;
     std::optional<SurfaceReference> surface;
     std::optional<TrimmingReference> trimming;
+    std::optional<PathCurve> pending_path = std::nullopt;
+    bool edge_input = false;
   };
   [[nodiscard]] std::vector<SurfaceInput>
   surface_inputs(std::vector<geometry::FinishingSelectionTarget>* targets = nullptr) const;
@@ -638,6 +648,7 @@ private:
   double spatial_twist_{0};
   std::optional<std::vector<std::string>> previous_semantic_scope_;
 
+  std::unique_ptr<AdvancedSurfaceControls> advanced_surface_;
   std::vector<SurfaceInput> surface_inputs_;
   std::vector<geometry::FinishingSelectionTarget> surface_targets_;
   std::vector<std::pair<Command, QAction*>> surface_actions_;

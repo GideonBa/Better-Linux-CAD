@@ -217,6 +217,9 @@ std::string_view ShellFeatureTools::command_id() const noexcept {
     return "surface.stitch";
   case Command::ClosedShellToSolid:
     return "surface.closed_shell_to_solid";
+  case Command::OffsetSurface:
+  case Command::Thicken:
+    return "surface.offset_thicken";
   case Command::None:
     return {};
   }

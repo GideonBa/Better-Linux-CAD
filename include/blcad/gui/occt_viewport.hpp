@@ -85,6 +85,9 @@ public:
                       std::vector<std::string> replaced_presentations = {});
   [[nodiscard]] std::size_t feature_preview_count() const noexcept;
   void clear_feature_preview();
+  [[nodiscard]] Result<std::size_t> set_geometry_diagnostics(std::vector<geometry::GeometryShape>,
+                                                             bool invalid);
+  [[nodiscard]] std::size_t geometry_diagnostic_count() const noexcept;
   // Disposable semantic faces/edges/vertices layered over a read-only preview.
   // Geometry supplies exact shapes; picking returns only BLCAD semantic ids.
   [[nodiscard]] Result<std::size_t>

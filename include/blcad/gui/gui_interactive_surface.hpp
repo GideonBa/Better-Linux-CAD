@@ -208,6 +208,13 @@ public:
   void set_target(SurfaceReference value) {
     target_ = std::move(value);
   }
+  void set_trimming(TrimmingReference value) {
+    trimming_ = std::move(value);
+  }
+  void set_boundary(BoundaryCurveReference value) {
+    extend_boundary_ = std::move(value);
+  }
+
   [[nodiscard]] bool editing() const noexcept {
     return editing_;
   }
