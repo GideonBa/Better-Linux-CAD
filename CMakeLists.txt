@@ -898,6 +898,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_feature_edit_tests.cpp
       tests/gui/gui_curved_surface_history_tests.cpp
       tests/gui/gui_advanced_surface_controller_tests.cpp
+      tests/gui/gui_advanced_curve_edit_controller_tests.cpp
       tests/gui/gui_advanced_surface_tools_tests.cpp
     tests/gui/gui_advanced_surface_edit_tests.cpp
     tests/gui/gui_advanced_surface_input_tests.cpp
