@@ -107,6 +107,14 @@ ShellFeatureTools::spatial_inputs_for(Command command) const {
     }
   }
   if (command == Command::PathCurve) {
+    if (const auto edges = native_spatial_edges(); edges)
+      for (const auto& edge : edges.value()) {
+        auto reference = PathSegmentReference::create_feature_edge(
+            std::get<EdgeReference>(edge.target.reference));
+        if (reference)
+          choices.push_back(
+              {edge.target.label, edge.target.semantic_id, reference.value(), {}, {}});
+      }
     for (const auto& line : part->construction_lines())
       if (line.kind() == ConstructionLineKind::ThroughTwoPoints) {
         auto reference = PathSegmentReference::create_construction_line(line.id());
@@ -213,6 +221,7 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   spatial_source_ = new QComboBox(spatial_controls_);
   spatial_source_->setObjectName("blcad.spatial.source");
   form->addRow(QStringLiteral("Profile / Element"), spatial_source_);
+  build_sweep_region_controls(*form);
   spatial_add_ = make_gui_button(QStringLiteral("Add to List"), spatial_controls_);
   spatial_add_->setObjectName("blcad.spatial.add");
   form->addRow(spatial_add_);
@@ -404,6 +413,9 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
                                     QString::fromStdString(existing.id().value()));
   spatial_policy_->setCurrentIndex(0);
   spatial_model_tolerance_->setText(QStringLiteral("0.0001"));
+  const QSignalBlocker region(sweep_region_policy_);
+  sweep_region_policy_->setCurrentIndex(0);
+  sweep_preserved_holes_->clear();
   const QSignalBlocker source(spatial_source_), mode(spatial_mode_), target(spatial_target_),
       path(spatial_path_), guide(spatial_guide_), order(spatial_order_), guides(spatial_guides_),
       closed(spatial_closed_), orientation(spatial_orientation_), continuity(spatial_continuity_),
@@ -487,8 +499,11 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
       (void)session_.task().cancel();
     return fail("Could not start spatial task");
   }
+  spatial_entry_selection_ = session_.selection();
+  spatial_entry_viewport_selection_ = viewport_.selected_semantic();
   previous_selection_mask_ = viewport_.selection_filter_mask();
   previous_semantic_scope_ = viewport_.selection_semantic_scope();
+  window_.refresh_feature_selection_scene();
   update_spatial_pick_scope();
   show_task_panel(title(command), QStringLiteral("deg"), 0);
   update_spatial_controls();
@@ -516,6 +531,12 @@ void ShellFeatureTools::update_spatial_controls() {
   form->setRowVisible(spatial_model_tolerance_->parentWidget(),
                       path && spatial_policy_->currentIndex() == 1);
   form->setRowVisible(spatial_source_, !policy_edit);
+  const int source_index = spatial_source_->currentData().toInt();
+  const bool region = sweep && source_index >= 0 &&
+                      std::size_t(source_index) < spatial_inputs_.size() &&
+                      spatial_inputs_[source_index].profile.has_value();
+  form->setRowVisible(sweep_region_policy_, region);
+  form->setRowVisible(sweep_preserved_holes_, region && sweep_region_policy_->currentIndex() == 1);
   form->setRowVisible(spatial_mode_, !path);
   form->setRowVisible(spatial_target_, !path && spatial_mode_->currentIndex() == 1);
   form->setRowVisible(spatial_pick_, !path);
@@ -571,9 +592,11 @@ void ShellFeatureTools::update_spatial_pick_scope() {
         scope.push_back("path/" + path.id().value() + "/segment/" + std::to_string(i));
     }
   }
-  viewport_.set_selection_filter_mask(
-      selection_kind_bit(GuiSelectionKind::SketchEntity) |
-      (command_ == Command::PathCurve ? selection_kind_bit(GuiSelectionKind::Datum) : 0));
+  viewport_.set_selection_filter_mask(selection_kind_bit(GuiSelectionKind::SketchEntity) |
+                                      (command_ == Command::PathCurve
+                                           ? selection_kind_bit(GuiSelectionKind::Datum) |
+                                                 selection_kind_bit(GuiSelectionKind::Edge)
+                                           : 0));
   viewport_.set_selection_semantic_scope(std::move(scope));
 }
 
@@ -669,14 +692,7 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
       pending = body.value();
     }
     if (command_ == Command::Sweep) {
-      const auto& source = spatial_inputs_.at(spatial_source_->currentData().toInt());
-      Result<SweepProfileReference> profile =
-          source.profile
-              ? SweepProfileReference::create_closed_region(
-                    ProfileRegionReference::create(source.profile->first, source.profile->second,
-                                                   PartFeatureInputRole::SweepProfile)
-                        .value())
-              : SweepProfileReference::create_open_path(*source.path);
+      auto profile = selected_sweep_profile();
       if (!profile)
         return Result<std::size_t>::failure(profile.error());
       std::optional<Parameter> twist;
@@ -803,9 +819,8 @@ bool ShellFeatureTools::accept_spatial_selection(const GuiSelection& selection) 
   if (command_ == Command::PathCurve || spatial_pick_->currentIndex() == 0) {
     for (std::size_t i = 0; i < spatial_inputs_.size(); ++i)
       if (matches(spatial_inputs_[i])) {
-        if (command_ == Command::Sweep)
-          spatial_source_->setCurrentIndex(i);
-        else
+        spatial_source_->setCurrentIndex(i);
+        if (command_ != Command::Sweep)
           (void)append_spatial_input(i);
         return true;
       }

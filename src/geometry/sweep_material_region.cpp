@@ -1,6 +1,7 @@
 #include "sweep_material_region.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/sweep_adapter.hpp"
+#include "blcad/geometry/sweep_region_query.hpp"
 #include "native_path_curve.hpp"
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepCheck_Analyzer.hxx>
@@ -223,3 +224,20 @@ Result<std::vector<ContainedProfileHole>> resolve_sweep_material_holes(const Par
   }
 }
 } // namespace blcad::geometry::detail
+
+namespace blcad::geometry {
+Result<std::vector<ProfileId>> inspect_sweep_material_holes(const PartDocument& part,
+                                                            SketchId sketch_id, ProfileId profile) {
+  const auto* sketch = part.find_sketch(sketch_id);
+  if (!sketch)
+    return Result<std::vector<ProfileId>>::failure(
+        Error::validation(sketch_id.value(), "Choose an existing Sketch region"));
+  auto holes = detail::resolve_sweep_material_holes(part, *sketch, profile);
+  if (!holes)
+    return Result<std::vector<ProfileId>>::failure(holes.error());
+  std::vector<ProfileId> result;
+  for (const auto& hole : holes.value())
+    result.push_back(hole.profile);
+  return Result<std::vector<ProfileId>>::success(std::move(result));
+}
+} // namespace blcad::geometry

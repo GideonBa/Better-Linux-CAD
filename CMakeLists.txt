@@ -387,6 +387,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_pattern_tools.cpp
     src/gui/shell/shell_body_tools.cpp
     src/gui/shell/shell_spatial_tools.cpp
+    src/gui/shell/shell_sweep_region_tools.cpp
     src/gui/shell/shell_surface_tools.cpp
       src/gui/shell/shell_advanced_surface_tools.cpp
       src/gui/shell/shell_surface_edit_tools.cpp
@@ -900,6 +901,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_advanced_surface_tools_tests.cpp
     tests/gui/gui_advanced_surface_edit_tests.cpp
     tests/gui/gui_advanced_surface_input_tests.cpp
+    tests/gui/gui_advanced_sweep_selector_tests.cpp
       tests/gui/gui_interactive_assembly_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )

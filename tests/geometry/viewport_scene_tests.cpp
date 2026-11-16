@@ -475,3 +475,27 @@ TEST_CASE("Viewport presents arbitrary nested line loops as distinct selectable 
     }
   }
 }
+
+TEST_CASE("Standalone viewport does not resurrect hidden owned Bodies through a legacy fallback",
+          "[geometry][viewport-scene][parity-b173]") {
+  namespace f = blcad::test::material_physical_fixture;
+  for (const bool sheet : {false, true}) {
+    auto part = sheet ? f::surface() : f::part();
+    std::vector<BodyId> ids;
+    for (const auto& body : part.bodies())
+      ids.push_back(body.id());
+    REQUIRE_FALSE(ids.empty());
+    for (const auto& id : ids)
+      REQUIRE(part.set_body_visibility(id, BodyVisibility::Hidden));
+    auto cache = f::checked(ShapeCache::create(ShapeCacheId("hidden.owned")));
+    REQUIRE(GeometryRecomputeExecutor{}.execute_document(part, cache));
+    if (!sheet)
+      REQUIRE(cache.has_final_shape());
+    REQUIRE(cache.find_body_shape(ids.front()));
+    const auto scene = f::checked(ViewportSceneBuilder{}.build_part(part, cache));
+    CHECK(std::none_of(scene.begin(), scene.end(), [](const auto& item) {
+      return item.kind == ViewportSceneKind::SolidBody ||
+             item.kind == ViewportSceneKind::SurfaceBody;
+    }));
+  }
+}

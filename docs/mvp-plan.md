@@ -1063,3 +1063,11 @@ implicit adoption of unrelated user values and duplicate names on repeated indep
 [Focused proof](gui-interactive-surface-mvp9.md#surface-parameter-namespace-reservation): all five
 targets and Qt **4 passed / 1 native skip / 185 assertions** passed. Continue the remaining 173
 Sweep/Loft controls before integrated 174 and the full 175–184 continuation.
+
+Sweep material-region and current native-edge Path selectors are verified, including exact holes,
+model-clicked arcs and Cancel restoration. Hidden owned Bodies no longer reappear through the
+legacy viewport fallback. [Contract and evidence](gui-spatial-surface-workbench-mvp7.md#native-material-region-and-current-edge-selectors--173):
+all five targets, Geometry **14 / 903**, Qt **12 passed / 5 native skips / 1,709 assertions**,
+native **5 / 363** at 100% and compact 150%, reviewed captures and physical STEP checks passed.
+Next complete shared Sweep/Loft editing and constrained Loft controls; 173 remains in progress
+and the assigned continuation remains through 184.
