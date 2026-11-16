@@ -1,6 +1,7 @@
 #include "advanced_surface_controls.hpp"
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "scroll_form_panel.hpp"
 
 #include "blcad/gui/occt_viewport.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
@@ -314,7 +315,7 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
 }
 
 void ShellFeatureTools::build_surface_controls(QWidget* panel) {
-  surface_controls_ = new QWidget(panel);
+  surface_controls_ = new ScrollFormPanel(panel);
   surface_controls_->setMinimumWidth(280);
   auto* column = new QVBoxLayout(surface_controls_);
   column->setContentsMargins(0, 0, 0, 0);
@@ -562,12 +563,14 @@ Result<std::size_t> ShellFeatureTools::begin_surface_task(Command command,
   previous_selection_mask_ = viewport_.selection_filter_mask();
   previous_semantic_scope_ = viewport_.selection_semantic_scope();
   auto* form = surface_form_;
-  form->setRowVisible(surface_target_, !curves);
-  form->setRowVisible(surface_source_, curves || command == Command::TrimSurface ||
-                                           command == Command::ExtendSurface);
+  set_form_row_visible(*form, surface_target_, !curves);
+  set_form_row_visible(*form, surface_source_,
+                       curves || command == Command::TrimSurface ||
+                           command == Command::ExtendSurface);
   for (QWidget* widget :
        std::array<QWidget*, 3>{surface_add_, surface_order_, surface_order_buttons_})
-    form->setRowVisible(widget, curves || stitch);
+    set_form_row_visible(*form, widget, curves || stitch);
+  surface_form_ = rebuild_form_rows(form);
   surface_hint_->setText(
       command == Command::BoundarySurface
           ? QStringLiteral("Connect two curves or close three to four connected boundary curves. "
