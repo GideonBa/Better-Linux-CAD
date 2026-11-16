@@ -7,6 +7,7 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeCone.hxx>
+#include <BRepPrimAPI_MakeTorus.hxx>
 #include <BRep_Builder.hxx>
 #include <Bnd_Box.hxx>
 #include <IFSelect_ReturnStatus.hxx>
@@ -679,4 +680,35 @@ TEST_CASE(
   CHECK(body.bounds_mm[0] == Approx(-4).margin(1e-7));
   CHECK(body.bounds_mm[3] == Approx(4).margin(1e-7));
   CHECK(body.bounds_mm[5] == Approx(5).margin(1e-7));
+}
+
+TEST_CASE("STEP toroidal Fillet strips retain physical volume and reject displaced seam vertices",
+          "[geometry][step-import-reader][toroidal-strip-exchange][parity-b174]") {
+  const bool invalid = GENERATE(false, true);
+  Fixture fixture;
+  fixture.part(BRepPrimAPI_MakeTorus(5, 1, 0, std::acos(-1.) / 2).Shape(), "Toroidal strip");
+  const auto path = fixture.write();
+  if (invalid) {
+    const auto bytes = fixture.bytes(path);
+    const auto changed = std::regex_replace(
+        bytes, std::regex(R"(CARTESIAN_POINT\('[^']*',\(\s*6\.0*,)"), "CARTESIAN_POINT('',(60.,");
+    REQUIRE(changed != bytes);
+    fixture.replace(path, changed);
+  }
+  const auto before = fixture.bytes(path);
+  const auto result = StepImportReader{}.read(fixture.source(path), fixture.root);
+  INFO((result ? "ok" : result.error().message()));
+  CHECK(fixture.bytes(path) == before);
+  if (invalid) {
+    REQUIRE_FALSE(result);
+    return;
+  }
+  REQUIRE(result);
+  REQUIRE(result.value().body_count() == 1);
+  const auto& body = result.value().products.front().bodies.front();
+  REQUIRE(OcctShapeView::get(body.shape));
+  CHECK(BRepCheck_Analyzer(*OcctShapeView::get(body.shape), true).IsValid());
+  const double pi = std::acos(-1.);
+  // Revolve the exact radial envelope: pi * integral_0^1 (5+sqrt(1-z*z))^2 dz.
+  CHECK(body.volume_mm3 == Approx(25 * pi + 5 * pi * pi / 2 + 2 * pi / 3).margin(1e-6));
 }
