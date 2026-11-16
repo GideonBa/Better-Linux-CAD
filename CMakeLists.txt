@@ -389,6 +389,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_spatial_tools.cpp
     src/gui/shell/shell_surface_tools.cpp
       src/gui/shell/shell_advanced_surface_tools.cpp
+      src/gui/shell/shell_surface_edit_tools.cpp
     src/gui/shell/shell_measure_tools.cpp
     src/gui/shell/shell_inspect_tools.cpp
     src/gui/shell/shell_reference_repair_tools.cpp
@@ -896,6 +897,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_curved_surface_history_tests.cpp
       tests/gui/gui_advanced_surface_controller_tests.cpp
       tests/gui/gui_advanced_surface_tools_tests.cpp
+    tests/gui/gui_advanced_surface_edit_tests.cpp
       tests/gui/gui_interactive_assembly_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )

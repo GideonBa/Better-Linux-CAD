@@ -15,6 +15,7 @@
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/gui_thread_recipe.hpp"
+#include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_property_controls.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
@@ -3436,6 +3437,22 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
     if (found == history.value().end() || std::size_t(found - history.value().begin()) >= *prefix)
       return Result<std::size_t>::failure(
           error("Move End of Part after this feature before editing it."));
+  }
+  if (const auto* surface = p.session.part_document()->find_surface_feature(id)) {
+    const bool modern = std::visit(
+        [](const auto& feature) {
+          using T = std::decay_t<decltype(feature)>;
+          if constexpr (std::is_same_v<T, SurfaceOffsetFeature>)
+            return true;
+          else if constexpr (std::is_same_v<T, TrimSurfaceFeature> ||
+                             std::is_same_v<T, ExtendSurfaceFeature>)
+            return feature.options().has_value();
+          else
+            return false;
+        },
+        *surface);
+    if (modern)
+      return p.window.feature_tools().begin_surface_edit(id);
   }
   auto begun = p.edit.begin(p.session, id);
   if (!begun)

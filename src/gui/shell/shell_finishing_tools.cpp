@@ -1,3 +1,4 @@
+#include "advanced_surface_controls.hpp"
 #include "blcad/geometry/result_face_support.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 
@@ -616,6 +617,15 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::finishing_selection_
                            : geometry::ViewportSceneKind::Face,
                        target.semantic_id, target.shape, SketchLineRole::Geometry,
                        finishing_body_->currentData().toString().toStdString()});
+  if (surface() && advanced_surface_->input_cache)
+    for (const auto& input : surface_inputs_)
+      if (input.surface && input.surface->source_kind() == SurfaceReferenceSourceKind::Body) {
+        const auto& owner = std::get<BodyId>(input.surface->source());
+        const auto* shape = advanced_surface_->input_cache->find_body_shape(owner);
+        if (shape)
+          items.push_back({geometry::ViewportSceneKind::SurfaceBody, input.semantic_id, *shape,
+                           SketchLineRole::Geometry, owner.value()});
+      }
   if (surface())
     for (const auto& target : surface_targets_) {
       // Surface inputs retain their typed producer reference; resolve its

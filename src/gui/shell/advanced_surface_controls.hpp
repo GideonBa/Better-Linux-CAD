@@ -1,6 +1,7 @@
 #pragma once
 #include "blcad/core/part_document.hpp"
 #include "blcad/core/surface_feature.hpp"
+#include "blcad/geometry/shape_cache.hpp"
 #include "blcad/gui/gui_selection_model.hpp"
 #include <QCheckBox>
 #include <QComboBox>
@@ -25,7 +26,10 @@ struct AdvancedSurfaceControls {
   QWidget* direction_row{};
   QCheckBox *boundaries{}, *override_formulas{};
   QLabel* feedback{};
+  bool highlighting_input = false;
   std::optional<FeatureId> editing;
+  std::optional<geometry::ShapeCache> input_cache;
+  std::optional<std::size_t> input_prefix;
   GuiSelectionModel entry_selection;
   std::optional<GuiSelection> entry_viewport_selection;
   std::array<ParameterId, 3> override_ids{ParameterId(""), ParameterId(""), ParameterId("")};
@@ -71,10 +75,10 @@ struct AdvancedSurfaceControls {
     form->addRow("Maximum Deviation (mm)", deviation);
     operation = combo("operation", "Result", {"New Body", "Join", "Cut", "Intersect"});
     body = combo("operation_target", "Target Solid", {});
-    override_formulas = new QCheckBox("Make changed formula values independent", panel);
+    override_formulas = new QCheckBox("Make changed shared values independent", panel);
     override_formulas->setObjectName("blcad.surface.override_formulas");
-    override_formulas->setToolTip(
-        "Creates a new parameter for this feature; keeps the shared formula unchanged.");
+    override_formulas->setToolTip("Creates a separate parameter for each changed field; keeps "
+                                  "shared values and formulas unchanged.");
     form->addRow(override_formulas);
     boundaries = new QCheckBox("Show free edges and gap diagnostics", panel);
     boundaries->setObjectName("blcad.surface.boundaries");
@@ -107,6 +111,9 @@ struct AdvancedSurfaceControls {
   }
   void reset(const PartDocument& part) {
     editing.reset();
+    input_cache.reset();
+    input_prefix.reset();
+    override_ids = {ParameterId(""), ParameterId(""), ParameterId("")};
     override_formulas->setChecked(false);
     side->setCurrentIndex(0);
     trim_side->setCurrentIndex(0);

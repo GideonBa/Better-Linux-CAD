@@ -1027,9 +1027,10 @@ ShellFeatureTools::accept_manipulator_candidate(const GuiViewportManipulatorCand
 
 Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   preview_valid_ = false;
-  if (command_ == Command::Extrude || command_ == Command::Revolve) {
-    auto configured = command_ == Command::Extrude ? configure_extrude_candidate()
-                                                   : configure_revolve_candidate();
+  if (command_ == Command::Extrude || command_ == Command::Revolve || advanced_surface()) {
+    auto configured = advanced_surface()             ? rebuild_advanced_surface_controller()
+                      : command_ == Command::Extrude ? configure_extrude_candidate()
+                                                     : configure_revolve_candidate();
     if (!configured) {
       viewport_.clear_feature_preview();
       if (surface())
@@ -1237,6 +1238,11 @@ Result<std::size_t> ShellFeatureTools::apply() {
     window_.refresh_feature_selection_scene();
   }
   surface_targets_.clear();
+  if (advanced_surface_) {
+    advanced_surface_->editing.reset();
+    advanced_surface_->input_cache.reset();
+    advanced_surface_->input_prefix.reset();
+  }
   preview_valid_ = false;
   drag_start_value_.reset();
   selected_profile_.reset();
@@ -1307,11 +1313,14 @@ void ShellFeatureTools::cancel() noexcept {
   hide_task_panel();
   synchronize_overlay();
   if (was_surface && advanced_surface_) {
-    session_.selection() = advanced_surface_->entry_selection;
     if (advanced_surface_->entry_viewport_selection)
       (void)viewport_.select_semantic(advanced_surface_->entry_viewport_selection->semantic_id);
     else
       viewport_.clear_selection();
+    session_.selection() = advanced_surface_->entry_selection;
+    advanced_surface_->editing.reset();
+    advanced_surface_->input_cache.reset();
+    advanced_surface_->input_prefix.reset();
   }
   window_.finish_context_task(false);
   window_.refresh();

@@ -5,6 +5,7 @@
 #include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/occt_viewport.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/shell/shell_reference_repair_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 #include <QAction>
 #include <QListWidget>
@@ -70,8 +71,9 @@ void ShellFeatureTools::build_advanced_surface_controls(QWidget* parent) {
   ui.form->addRow(repair);
   connect(repair, &QPushButton::clicked, this, [this] {
     cancel();
-    if (auto* action = window_.findChild<QAction*>("blcad.action.repair_references"))
-      action->trigger();
+    auto begun = window_.reference_repair_tools().begin();
+    if (!begun)
+      report(begun.error());
   });
 }
 Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
@@ -104,20 +106,29 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
   }
   std::vector<Parameter> pending;
   std::vector<std::pair<ParameterId, double>> changes;
+  std::vector<std::pair<ParameterId, double>> bindings;
   const auto length = [&](ParameterId original, double value, int slot) -> Result<ParameterId> {
     const auto* previous = part->find_parameter(original);
     ParameterId id = original;
-    if (previous && previous->is_expression() && previous->value().millimeters() != value) {
-      if (!ui.override_formulas->isChecked())
-        return Result<ParameterId>::failure(
-            Error::validation(original.value(), "Formula-bound value: enable the explicit "
-                                                "independent-value override before changing it"));
+    const bool changed = previous && previous->value().millimeters() != value;
+    if (changed && previous->is_expression() && !ui.override_formulas->isChecked())
+      return Result<ParameterId>::failure(
+          Error::validation(original.value(), "Formula-bound value: enable the explicit "
+                                              "independent-value override before changing it"));
+    if (changed && ui.override_formulas->isChecked()) {
       if (ui.override_ids[slot].empty())
         ui.override_ids[slot] = ParameterId(
             "surface.override." + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString());
       id = ui.override_ids[slot];
       previous = nullptr;
     }
+    const auto shared = std::find_if(bindings.begin(), bindings.end(),
+                                     [&](const auto& binding) { return binding.first == id; });
+    if (shared != bindings.end() && shared->second != value)
+      return Result<ParameterId>::failure(
+          Error::validation(id.value(), "Shared parameter fields need equal values; enable "
+                                        "independent changed values to split their bindings"));
+    bindings.emplace_back(id, value);
     if (!previous) {
       auto quantity = Quantity::length_mm(value, id.value());
       if (!quantity)
@@ -274,13 +285,16 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
   auto frame = query_with_step_import_context(
       session_, [&](auto* context) -> Result<GuiFeatureManipulatorFrame> {
         GuiFeatureManipulatorFrame result;
-        auto* cache = session_.part_shape_cache();
+        const auto* cache = ui.input_cache ? &*ui.input_cache : session_.part_shape_cache();
         auto pending_cache = geometry::ShapeCache::create(ShapeCacheId("surface.pending.input"));
         if (source && source->pending_path) {
           if (!pending_cache)
             return Result<GuiFeatureManipulatorFrame>::failure(pending_cache.error());
-          auto computed = geometry::GeometryRecomputeExecutor{context}.execute_document(
-              candidate, pending_cache.value());
+          auto computed = ui.input_prefix
+                              ? geometry::GeometryRecomputeExecutor{context}.execute_history_prefix(
+                                    candidate, *ui.input_prefix, pending_cache.value())
+                              : geometry::GeometryRecomputeExecutor{context}.execute_document(
+                                    candidate, pending_cache.value());
           if (!computed)
             return Result<GuiFeatureManipulatorFrame>::failure(computed.error());
           cache = &pending_cache.value();
@@ -298,7 +312,7 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
                   ? FeatureId("surface.direction.preview")
                   : FeatureId{};
           auto shape = geometry::SurfaceSelectionGeometry::resolve(
-              *part, *session_.part_shape_cache(), *target->surface, consumer, tolerance, context);
+              candidate, *cache, *target->surface, consumer, tolerance, context);
           if (!shape)
             return Result<GuiFeatureManipulatorFrame>::failure(shape.error());
           auto value = geometry::SurfaceSelectionGeometry::normal_frame(shape.value());
@@ -312,7 +326,8 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
   if (!frame)
     return Result<std::size_t>::failure(frame.error());
   controller.set_manipulator_frame(frame.value());
-  coordinator_.refresh_handles();
+  if (layer_.active_handle_id().empty())
+    coordinator_.refresh_handles();
   return begun;
 }
 void ShellFeatureTools::refresh_surface_diagnostics(const geometry::GeometryShape* result) {
@@ -349,8 +364,9 @@ void ShellFeatureTools::refresh_surface_diagnostics(const geometry::GeometryShap
                                 ? FeatureId("surface.diagnostics.preview")
                                 : FeatureId{};
       auto shape = geometry::SurfaceSelectionGeometry::resolve(
-          *session_.part_document(), *session_.part_shape_cache(), reference, consumer, tolerance,
-          context.value().get());
+          *session_.part_document(),
+          ui.input_cache ? *ui.input_cache : *session_.part_shape_cache(), reference, consumer,
+          tolerance, context.value().get());
       if (shape)
         sources.push_back(shape.value());
     };
