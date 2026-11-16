@@ -1077,3 +1077,10 @@ retains full Body operations, bindings, orientation and exact section/constraint
 targets and focused Qt **8 / 241** passed, including independent volumes and atomic invalid G2.
 Continue native shared panels and constrained Loft authoring before accepting 173 and proceeding
 through 174–184.
+
+[Native constrained Loft and shared curve panels](gui-spatial-surface-workbench-mvp7.md#native-constrained-loft-and-shared-curve-panels--173)
+now expose explicit anchors, scoped support G1/G2, measured feedback, hidden/historical sources and
+complete advanced Sweep/Loft editing. Native 100% and compact 150% each passed **8 / 701**, including
+physical STEP/profile checks. Reviewed field/feedback captures and Qt **23 passed / 6 native skips /
+3,612 assertions** complete this slice. Full Core **785 / 35,068** and Geometry **789 / 81,422** passed.
+Final full Qt regression remains before Block 173 acceptance; then continue through 174–184.

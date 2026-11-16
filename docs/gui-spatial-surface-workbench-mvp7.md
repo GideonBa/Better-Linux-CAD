@@ -81,3 +81,33 @@ All five targets and focused Qt **8 / 241** passed, including independent four-o
 volumes, exact no-op serialization and the verified four-boundary G2 airfoil Loft. Frozen runtime
 1,207 files: `7e10578b87e54fcc66a6c778b0c916f3cab26554decca2b753e6ad6e9cac44fe`.
 Native shared panels and constrained Loft authoring remain the next Block 173 gate.
+
+## Native constrained Loft and shared curve panels — 173
+
+The owned Loft task exposes ordered/reversible rails, explicit original-boundary entity anchors,
+true boundary/guide length fractions, whole start/end or adjacent-rail patch supports, G1/G2,
+normal reversal and authored tolerance units (mm, rad, 1/mm). Non-unit tangent scale and unsupported
+legacy longitudinal G2 fail explicitly. Missing/intermediate stations are never guessed.
+
+Support selectors use current owned faces and a matching pre-feature cache when editing. Hidden
+inputs require the visible scope option. Model clicks and chooser selection cross-highlight the
+same typed source. Repair opens the existing reference workflow. Unavailable saved sections/faces
+remain repairable inputs. Cancel restores selection/filter/scope and removes transient faces.
+
+Editing retains exact section alignment/rotation, all constraints, rail order/reversal, full Body
+context, orientation/up vector and numeric precision. Existing tolerance bindings remain read-only;
+choosing a new independent value retains shared formulas. Sweep offers an explicit independent
+twist override. Result ownership is shown during editing. Source controls are disabled during drags.
+Invalid constraint collection cancels the incomplete candidate, preventing Apply from publishing
+an unconstrained substitute. Editing previews replace the actual result Body presentation.
+
+Feedback reports measured native curve/position/normal errors, G1/G2 join counts, sampled/refined
+stations and G2 curvature error where verified, qualified before the Body operation.
+
+Native 100% and compact 150% each passed **8 / 701**, including actual model-clicked support selection,
+shared editing, exact history/reopening and physical STEP reimport. Independent Bernstein profile
+points and inside/outside material checks validate native and reimported geometry. Reviewed captures include anchor and support fields and numerical feedback.
+Focused Qt passed **23 / 3,612**, with six native-only skips. Full Core **785 / 35,068** and
+Geometry **789 / 81,422** passed; their binaries remain unchanged by the GUI refinements.
+Frozen runtime: 1,213 files, `8346c17e863d56591e9c0f95e812976d7d2c0cbaff3de870d98cd2d051909daa`.
+Final full Qt regression remains the whole-block acceptance gate.

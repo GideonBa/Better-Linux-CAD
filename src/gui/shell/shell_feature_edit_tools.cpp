@@ -3438,6 +3438,13 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
       return Result<std::size_t>::failure(
           error("Move End of Part after this feature before editing it."));
   }
+  const auto* advanced_loft = p.session.part_document()->find_loft_feature(id);
+  const auto* advanced_sweep = p.session.part_document()->find_sweep_feature(id);
+  if ((advanced_loft && advanced_loft->constraints()) ||
+      (advanced_sweep &&
+       (advanced_sweep->profile().region_policy() == SweepRegionPolicy::MaterialRegion ||
+        advanced_sweep->orientation_override())))
+    return p.window.feature_tools().begin_spatial_edit(id);
   if (const auto* surface = p.session.part_document()->find_surface_feature(id)) {
     const bool modern = std::visit(
         [](const auto& feature) {

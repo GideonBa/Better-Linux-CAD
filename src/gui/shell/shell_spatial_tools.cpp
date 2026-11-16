@@ -1,5 +1,9 @@
-#include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "advanced_loft_controls.hpp"
 #include "blcad/gui/gui_icons.hpp"
+#include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "scroll_form_panel.hpp"
+#include <QLocale>
+#include <QUuid>
 
 #include "blcad/gui/gui_modeling_workspace.hpp"
 #include "blcad/gui/occt_viewport.hpp"
@@ -18,6 +22,7 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QStandardItemModel>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -151,7 +156,7 @@ ShellFeatureTools::spatial_inputs_for(Command command) const {
 }
 
 void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
-  spatial_controls_ = new QWidget(panel);
+  spatial_controls_ = new ScrollFormPanel(panel);
   spatial_controls_->setMinimumWidth(280);
   auto* form = new QFormLayout(spatial_controls_);
   form->setRowWrapPolicy(QFormLayout::WrapLongRows);
@@ -294,16 +299,15 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   form->addRow(spatial_closed_);
   spatial_orientation_ = new QComboBox(spatial_controls_);
   spatial_orientation_->addItems({QStringLiteral("Profile Normal"), QStringLiteral("Minimum Twist"),
-                                  QStringLiteral("Fixed Up Vector")});
+                                  QStringLiteral("Fixed Up Vector"),
+                                  QStringLiteral("Inherit Path")});
   form->addRow(QStringLiteral("Orientation"), spatial_orientation_);
   for (std::size_t i = 0; i < spatial_up_.size(); ++i) {
-    auto* input = new QDoubleSpinBox(spatial_controls_);
-    input->setRange(-1e6, 1e6);
-    input->setDecimals(6);
-    input->setKeyboardTracking(false);
+    auto* input = new QLineEdit(spatial_controls_);
+    input->setObjectName(QString("blcad.spatial.up_%1").arg(i));
     spatial_up_[i] = input;
     form->addRow(QStringLiteral("Up %1").arg(QStringLiteral("XYZ").at(i)), input);
-    connect(input, &QDoubleSpinBox::valueChanged, this, [this] {
+    connect(input, &QLineEdit::textChanged, this, [this] {
       if (spatial())
         refresh_spatial_preview();
     });
@@ -311,9 +315,24 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   spatial_continuity_ = new QComboBox(spatial_controls_);
   spatial_continuity_->setObjectName("blcad.spatial.continuity");
   spatial_continuity_->addItems({QStringLiteral("C0"), QStringLiteral("G1"), QStringLiteral("G2")});
+  spatial_continuity_->setToolTip(
+      "Legacy longitudinal continuity. Global G1/G2 construction is unsupported; use explicit "
+      "boundary supports for verified G1/G2.");
   form->addRow(QStringLiteral("Continuity"), spatial_continuity_);
   sweep_twist_ = new QCheckBox(QStringLiteral("Enable Twist"), spatial_controls_);
   form->addRow(sweep_twist_);
+  sweep_independent_twist_ = new QCheckBox("Make twist independent", spatial_controls_);
+  sweep_independent_twist_->setObjectName("blcad.sweep.independent_twist");
+  form->addRow(sweep_independent_twist_);
+  connect(sweep_independent_twist_, &QCheckBox::toggled, this, [this] {
+    if (command_ == Command::Sweep)
+      refresh_spatial_preview();
+  });
+  spatial_edit_context_ = new QLabel(spatial_controls_);
+  spatial_edit_context_->setWordWrap(true);
+  spatial_edit_context_->setObjectName("blcad.spatial.edit_context");
+  form->addRow(spatial_edit_context_);
+  build_advanced_loft_controls(*form);
   panel->layout()->addWidget(spatial_controls_);
   spatial_controls_->hide();
   connect(spatial_add_, &QPushButton::clicked, this, [this] {
@@ -332,6 +351,8 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
         return;
     auto* item = new QListWidgetItem(spatial_guide_->currentText(), spatial_guides_);
     item->setData(Qt::UserRole, id);
+    item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+    item->setCheckState(Qt::Unchecked);
     refresh_spatial_preview();
   });
   connect(spatial_remove_guide_, &QPushButton::clicked, this, [this] {
@@ -357,6 +378,10 @@ void ShellFeatureTools::build_spatial_controls(QWidget* panel) {
   });
   connect(spatial_source_, &QComboBox::currentIndexChanged, this, [this] {
     if (command_ == Command::Sweep)
+      refresh_spatial_preview();
+  });
+  connect(spatial_guides_, &QListWidget::itemChanged, this, [this] {
+    if (command_ == Command::Loft)
       refresh_spatial_preview();
   });
   connect(spatial_order_, &QListWidget::itemChanged, this, [this] {
@@ -394,6 +419,17 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
     return fail("Spatial operation requires a part without an active command");
   if (command != Command::PathCurve && command != Command::Sweep && command != Command::Loft)
     return fail("Unknown spatial command");
+  spatial_editing_.reset();
+  spatial_input_cache_.reset();
+  spatial_input_prefix_.reset();
+  spatial_saved_sections_.clear();
+  advanced_loft_->reset(*part);
+  {
+    const QSignalBlocker block(sweep_independent_twist_);
+    sweep_independent_twist_->setChecked(false);
+  }
+  spatial_independent_twist_ = ParameterId(
+      "sweep.twist." + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString());
   spatial_inputs_ = spatial_inputs_for(command);
   const auto profiles = std::count_if(spatial_inputs_.begin(), spatial_inputs_.end(),
                                       [](const auto& input) { return input.profile.has_value(); });
@@ -470,12 +506,12 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
   spatial_mode_->setCurrentIndex(
       command != Command::PathCurve && profiles < (command == Command::Loft ? 2 : 1) ? 2 : 0);
   spatial_closed_->setChecked(false);
-  spatial_orientation_->setCurrentIndex(1);
+  spatial_orientation_->setCurrentIndex(command == Command::Sweep ? 3 : 1);
   spatial_continuity_->setCurrentIndex(0);
   spatial_auto_align_->setChecked(true);
   for (std::size_t i = 0; i < 3; ++i) {
     const QSignalBlocker block(spatial_up_[i]);
-    spatial_up_[i]->setValue(i == 1 ? 1 : 0);
+    spatial_up_[i]->setText(i == 1 ? "1" : "0");
   }
   sweep_twist_->setChecked(true);
   spatial_twist_ = 0;
@@ -484,7 +520,16 @@ Result<std::size_t> ShellFeatureTools::begin_spatial(Command command) {
       if (spatial_inputs_[i].profile == selected_profile_)
         spatial_source_->setCurrentIndex(i);
   }
+  if (command == Command::Loft)
+    spatial_pick_->addItem("Boundary Support Face");
   command_ = command;
+  if (command == Command::Loft) {
+    auto faces = refresh_loft_supports();
+    if (!faces) {
+      command_ = Command::None;
+      return faces;
+    }
+  }
   spatial_order_hint_->setText(
       command == Command::Loft
           ? QStringLiteral(
@@ -517,8 +562,8 @@ void ShellFeatureTools::update_spatial_controls() {
   const bool path = command_ == Command::PathCurve, sweep = command_ == Command::Sweep,
              loft = command_ == Command::Loft;
   const bool policy_edit = path && !spatial_policy_target_->currentData().toString().isEmpty();
-  form->setRowVisible(spatial_policy_target_, path);
-  form->setRowVisible(spatial_policy_, path);
+  set_form_row_visible(*form, spatial_policy_target_, path);
+  set_form_row_visible(*form, spatial_policy_, path);
   auto* tolerance_group = spatial_model_tolerance_->parentWidget();
   auto* tolerance_label =
       tolerance_group->findChild<QLabel*>(QStringLiteral("blcad.spatial.modeling_tolerance_label"));
@@ -528,52 +573,71 @@ void ShellFeatureTools::update_spatial_controls() {
                tolerance_label->heightForWidth(std::max(1, tolerance_group->width()))));
   tolerance_group->layout()->invalidate();
   tolerance_group->setMinimumHeight(tolerance_group->layout()->sizeHint().height());
-  form->setRowVisible(spatial_model_tolerance_->parentWidget(),
-                      path && spatial_policy_->currentIndex() == 1);
-  form->setRowVisible(spatial_source_, !policy_edit);
+  set_form_row_visible(*form, spatial_model_tolerance_->parentWidget(),
+                       path && spatial_policy_->currentIndex() == 1);
+  set_form_row_visible(*form, spatial_source_, !policy_edit);
   const int source_index = spatial_source_->currentData().toInt();
   const bool region = sweep && source_index >= 0 &&
                       std::size_t(source_index) < spatial_inputs_.size() &&
                       spatial_inputs_[source_index].profile.has_value();
-  form->setRowVisible(sweep_region_policy_, region);
-  form->setRowVisible(sweep_preserved_holes_, region && sweep_region_policy_->currentIndex() == 1);
-  form->setRowVisible(spatial_mode_, !path);
-  form->setRowVisible(spatial_target_, !path && spatial_mode_->currentIndex() == 1);
-  form->setRowVisible(spatial_pick_, !path);
+  set_form_row_visible(*form, sweep_region_policy_, region);
+  set_form_row_visible(*form, sweep_preserved_holes_,
+                       region && sweep_region_policy_->currentIndex() == 1);
+  set_form_row_visible(*form, spatial_mode_, !path);
+  spatial_mode_->setEnabled(!spatial_editing_);
+  spatial_target_->setEnabled(!spatial_editing_);
+  set_form_row_visible(*form, spatial_edit_context_, spatial_editing_.has_value());
+  set_form_row_visible(*form, sweep_independent_twist_,
+                       sweep && spatial_editing_ && sweep_twist_->isChecked());
+  set_form_row_visible(*form, advanced_loft_->panel, loft);
+
+  set_form_row_visible(*form, spatial_target_, !path && spatial_mode_->currentIndex() == 1);
+  set_form_row_visible(*form, spatial_pick_, !path);
   for (QWidget* widget :
        std::array<QWidget*, 3>{spatial_add_, spatial_order_, spatial_order_buttons_})
-    form->setRowVisible(widget, !sweep && !policy_edit);
-  form->setRowVisible(spatial_path_, !path);
-  form->setRowVisible(spatial_guide_, !path);
-  form->setRowVisible(spatial_add_guide_, loft);
-  form->setRowVisible(spatial_guides_, loft);
-  form->setRowVisible(spatial_remove_guide_, loft);
-  form->setRowVisible(spatial_closed_, path && !policy_edit);
-  form->setRowVisible(spatial_orientation_, path && !policy_edit);
+    set_form_row_visible(*form, widget, !sweep && !policy_edit);
+  set_form_row_visible(*form, spatial_path_, !path);
+  set_form_row_visible(*form, spatial_guide_, !path);
+  set_form_row_visible(*form, spatial_add_guide_, loft);
+  set_form_row_visible(*form, spatial_guides_, loft);
+  set_form_row_visible(*form, spatial_remove_guide_, loft);
+  set_form_row_visible(*form, spatial_closed_, path && !policy_edit);
+  set_form_row_visible(*form, spatial_orientation_, (path && !policy_edit) || sweep);
+  if (auto* model = qobject_cast<QStandardItemModel*>(spatial_orientation_->model()))
+    model->item(3)->setEnabled(sweep);
   for (auto* input : spatial_up_)
-    form->setRowVisible(input, path && !policy_edit && spatial_orientation_->currentIndex() == 2);
-  form->setRowVisible(spatial_continuity_, loft);
-  form->setRowVisible(spatial_auto_align_, loft);
+    set_form_row_visible(
+        *form, input, (path || sweep) && !policy_edit && spatial_orientation_->currentIndex() == 2);
+  set_form_row_visible(*form, spatial_continuity_, loft);
+  set_form_row_visible(*form, spatial_auto_align_, loft);
   bool closed_sections = true;
   for (int i = 0; i < spatial_order_->count(); ++i)
     closed_sections =
         closed_sections &&
         spatial_inputs_.at(spatial_order_->item(i)->data(Qt::UserRole).toInt()).profile.has_value();
-  spatial_auto_align_->setEnabled(loft && closed_sections && spatial_guides_->count() == 0);
-  form->setRowVisible(sweep_twist_, sweep);
+  spatial_auto_align_->setEnabled(loft && closed_sections && spatial_guides_->count() == 0 &&
+                                  !advanced_loft_->enabled->isChecked());
+  set_form_row_visible(*form, sweep_twist_, sweep);
   numeric_editor_->setVisible(spatial_scalar());
   value_label_->setVisible(spatial_scalar());
+  form = rebuild_form_rows(form);
   // QFormLayout can allocate less than its row widgets' minimum heights
   // inside a resizable scroll child. Keep its preferred row heights scrollable.
   form->invalidate();
-  const int height =
-      std::max(form->sizeHint().height(), form->heightForWidth(spatial_controls_->width()));
-  spatial_controls_->setMinimumHeight(height);
-  spatial_controls_->updateGeometry();
+  static_cast<ScrollFormPanel*>(spatial_controls_)->refresh_minimum_height();
 }
 
 void ShellFeatureTools::update_spatial_pick_scope() {
   std::vector<std::string> scope;
+  if (command_ == Command::Loft && spatial_pick_->currentIndex() == 3) {
+    for (const auto& face : advanced_loft_->faces)
+      if (face.available)
+        scope.push_back(face.target.semantic_id);
+    viewport_.set_selection_filter_mask(selection_kind_bit(GuiSelectionKind::Face));
+    viewport_.set_selection_semantic_scope(std::move(scope));
+    return;
+  }
+
   if (command_ == Command::PathCurve || spatial_pick_->currentIndex() == 0) {
     for (const auto& input : spatial_inputs_) {
       scope.push_back(input.semantic_id);
@@ -637,6 +701,15 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
   layer_.cancel();
   drag_start_value_.reset();
   coordinator_.cancel();
+  if (spatial_orientation_->currentIndex() == 2 &&
+      (command_ == Command::PathCurve || command_ == Command::Sweep))
+    for (const auto* input : spatial_up_) {
+      bool ok = false;
+      const double value = input->text().toDouble(&ok);
+      if (!ok || !std::isfinite(value))
+        return Result<std::size_t>::failure(
+            Error::validation("spatial.up", "Enter a finite up-vector component"));
+    }
   auto& sweep = coordinator_.path_sweep();
   if (command_ == Command::PathCurve) {
     const auto policy = [&]() -> Result<PathExecutionPolicy> {
@@ -668,8 +741,9 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
       return begun;
     sweep.set_execution_policy(policy.value());
     if (spatial_orientation_->currentIndex() == 2)
-      sweep.set_up_vector(
-          Vector3{spatial_up_[0]->value(), spatial_up_[1]->value(), spatial_up_[2]->value()});
+      sweep.set_up_vector(Vector3{spatial_up_[0]->text().toDouble(),
+                                  spatial_up_[1]->text().toDouble(),
+                                  spatial_up_[2]->text().toDouble()});
     for (int i = 0; i < spatial_order_->count(); ++i) {
       const auto* item = spatial_order_->item(i);
       auto added = sweep.add_segment(
@@ -684,7 +758,7 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
                               ? BodyId(spatial_target_->currentData().toString().toStdString())
                               : spatial_result_;
     std::optional<Body> pending;
-    if (mode != 1) {
+    if (mode != 1 && !spatial_editing_) {
       auto body =
           Body::create(result, spatial_name_, mode == 2 ? BodyKind::Surface : BodyKind::Solid);
       if (!body)
@@ -696,24 +770,49 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
       if (!profile)
         return Result<std::size_t>::failure(profile.error());
       std::optional<Parameter> twist;
-      if (sweep_twist_->isChecked()) {
-        auto parameter = Parameter::create_angle(spatial_twist_parameter_, spatial_name_ + " Twist",
-                                                 Quantity::angle_deg(spatial_twist_).value());
+      const ParameterId twist_id = spatial_editing_ && sweep_independent_twist_->isChecked()
+                                       ? spatial_independent_twist_
+                                       : spatial_twist_parameter_;
+      if (sweep_twist_->isChecked() && !session_.part_document()->find_parameter(twist_id)) {
+        auto parameter = Parameter::create_angle(
+            twist_id,
+            spatial_name_ +
+                (sweep_independent_twist_->isChecked() ? " Independent Twist" : " Twist"),
+            Quantity::angle_deg(spatial_twist_).value());
         if (!parameter)
           return Result<std::size_t>::failure(parameter.error());
         twist = parameter.value();
       }
-      auto begun = sweep.begin_sweep(
-          session_, spatial_feature_, spatial_name_, static_cast<SweepFeatureKind>(mode),
-          profile.value(), PathCurveId(spatial_path_->currentData().toString().toStdString()),
-          result, pending, twist);
+      auto begun = spatial_editing_
+                       ? sweep.begin_edit(session_, *spatial_editing_)
+                       : sweep.begin_sweep(
+                             session_, spatial_feature_, spatial_name_,
+                             static_cast<SweepFeatureKind>(mode), profile.value(),
+                             PathCurveId(spatial_path_->currentData().toString().toStdString()),
+                             result, pending, twist);
       if (!begun)
         return begun;
-      if (twist)
-        sweep.set_twist(spatial_twist_parameter_, spatial_twist_);
+      sweep.set_sweep_profile(profile.value());
+      sweep.set_sweep_path(PathCurveId(spatial_path_->currentData().toString().toStdString()));
+      const bool inherited = spatial_orientation_->currentIndex() == 3;
+      sweep.set_sweep_orientation(inherited ? std::nullopt
+                                            : std::optional(static_cast<PathOrientationRule>(
+                                                  spatial_orientation_->currentIndex())),
+                                  spatial_orientation_->currentIndex() == 2
+                                      ? std::optional(Vector3{spatial_up_[0]->text().toDouble(),
+                                                              spatial_up_[1]->text().toDouble(),
+                                                              spatial_up_[2]->text().toDouble()})
+                                      : std::nullopt);
+      sweep.set_pending_twist(twist);
+      if (sweep_twist_->isChecked())
+        sweep.set_twist(twist_id, spatial_twist_);
+      else
+        sweep.clear_twist();
       const auto guide = spatial_guide_->currentData().toString();
       if (!guide.isEmpty())
         sweep.set_guide(PathCurveId(guide.toStdString()));
+      else
+        sweep.clear_guide();
       GuiFeatureManipulatorFrame frame;
       auto segments = query_with_step_import_context(session_, [&](auto* context) {
         return geometry::GeometryRecomputeExecutor{context}.resolve_path_segments(
@@ -733,24 +832,23 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
       sweep.set_manipulator_frame(frame);
     } else {
       auto& loft = coordinator_.loft();
-      auto begun = loft.begin_loft(session_, spatial_feature_, spatial_name_,
-                                   static_cast<LoftFeatureKind>(mode), result, pending);
+      auto begun = spatial_editing_
+                       ? loft.begin_edit(session_, *spatial_editing_)
+                       : loft.begin_loft(session_, spatial_feature_, spatial_name_,
+                                         static_cast<LoftFeatureKind>(mode), result, pending);
       if (!begun)
         return begun;
       loft.set_auto_alignment(spatial_auto_align_->isChecked() && spatial_auto_align_->isEnabled());
-      for (int i = 0; i < spatial_order_->count(); ++i) {
-        const auto* item = spatial_order_->item(i);
-        const auto& source = spatial_inputs_.at(item->data(Qt::UserRole).toInt());
-        auto added = source.profile
-                         ? loft.add_closed_section(source.profile->first, source.profile->second,
-                                                   item->checkState() == Qt::Checked)
-                         : loft.add_open_section(*source.path, item->checkState() == Qt::Checked);
-        if (!added)
-          return added;
-      }
+      auto sections = selected_loft_sections();
+      if (!sections)
+        return Result<std::size_t>::failure(sections.error());
+      auto assigned = loft.set_sections(std::move(sections.value()));
+      if (!assigned)
+        return assigned;
       const auto path = spatial_path_->currentData().toString();
-      if (!path.isEmpty())
-        loft.set_path_curve(PathCurveId(path.toStdString()));
+      loft.set_path_curve(path.isEmpty() ? std::nullopt
+                                         : std::optional(PathCurveId(path.toStdString())));
+      loft.set_guide_curves({});
       for (int i = 0; i < spatial_guides_->count(); ++i) {
         auto added = loft.add_guide_curve(
             PathCurveId(spatial_guides_->item(i)->data(Qt::UserRole).toString().toStdString()));
@@ -758,6 +856,9 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
           return added;
       }
       loft.set_continuity(static_cast<LoftContinuity>(spatial_continuity_->currentIndex()));
+      auto constraints = configure_loft_constraints();
+      if (!constraints)
+        return constraints;
     }
   }
   coordinator_.refresh_handles();
@@ -770,6 +871,9 @@ void ShellFeatureTools::refresh_spatial_preview() {
     spatial_twist_ = coordinator_.path_sweep().twist();
   auto begun = rebuild_spatial_controller();
   if (!begun) {
+    coordinator_.cancel();
+    if (command_ == Command::Loft)
+      refresh_loft_feedback(nullptr);
     preview_valid_ = false;
     viewport_.clear_feature_preview();
     task_summary_->setText(QString::fromStdString(begun.error().message()));
@@ -816,6 +920,23 @@ bool ShellFeatureTools::accept_spatial_selection(const GuiSelection& selection) 
     }
     return false;
   };
+  if (command_ == Command::Loft && spatial_pick_->currentIndex() == 3) {
+    if (spatial_highlighting_)
+      return true;
+    int row = advanced_loft_->supports->currentRow();
+    if (row < 0 && advanced_loft_->supports->rowCount())
+      row = 0;
+    if (row < 0)
+      return false;
+    auto* box = qobject_cast<QComboBox*>(advanced_loft_->supports->cellWidget(row, 2));
+    for (std::size_t i = 0; i < advanced_loft_->faces.size(); ++i)
+      if (advanced_loft_->faces[i].available &&
+          advanced_loft_->faces[i].target.semantic_id == selection.semantic_id) {
+        box->setCurrentIndex(box->findData(int(i)));
+        return true;
+      }
+    return false;
+  }
   if (command_ == Command::PathCurve || spatial_pick_->currentIndex() == 0) {
     for (std::size_t i = 0; i < spatial_inputs_.size(); ++i)
       if (matches(spatial_inputs_[i])) {
