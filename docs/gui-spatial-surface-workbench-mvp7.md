@@ -111,3 +111,16 @@ Focused Qt passed **23 / 3,612**, with six native-only skips. Full Core **785 / 
 Geometry **789 / 81,422** passed; their binaries remain unchanged by the GUI refinements.
 Frozen runtime: 1,213 files, `8346c17e863d56591e9c0f95e812976d7d2c0cbaff3de870d98cd2d051909daa`.
 Final full Qt regression remains the whole-block acceptance gate.
+
+## Repeated curve edits and compact native checks — 173
+
+Repeated independent Sweep twist edits allocate unique parameter names while retaining the
+original binding, material-region policy, exact up vector and curve-preserving path policy.
+Focused Qt **1 / 52** verifies two overrides, independent physical volume and exact history.
+Loft tables expose full-width rows, normalized length-fraction tooltips and narrow continuity
+controls. The combined native harness uses the compact viewport at 150% and confirms the actual
+menu row under the desktop pointer instead of requiring one arbitrary horizontal pixel.
+
+All five targets passed. Combined spatial/Surface native contexts passed **2 / 1,364** at each
+scale; final Loft field/feedback captures passed **1 / 266** at 100% and compact 150% and were
+reviewed. The complete Qt run is the remaining Block 173 acceptance check.

@@ -18,8 +18,10 @@ std::string key(const PathCurveId& guide, const ProfileSectionReference& section
 }
 QComboBox* combo(QWidget* parent) {
   auto* box = new QComboBox(parent);
-  box->setMinimumWidth(110);
+  box->setMinimumWidth(80);
   box->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+  QObject::connect(box, &QComboBox::currentTextChanged, box,
+                   [box](const QString& text) { box->setToolTip(text); });
   return box;
 }
 Result<std::optional<LoftConstraintIntent>> fail(const char* message) {
@@ -61,7 +63,10 @@ AdvancedLoftControls::AdvancedLoftControls(QWidget* parent) {
   anchors = new QTableWidget(0, 5, panel);
   anchors->setObjectName("blcad.loft.anchors");
   anchors->setHorizontalHeaderLabels(
-      {"Guide", "Section", "Boundary Entity", "Boundary Length [0,1]", "Guide Length [0,1]"});
+      {"Guide", "Section", "Boundary Entity", "Boundary Fraction", "Guide Fraction"});
+  for (int column : {3, 4})
+    anchors->horizontalHeaderItem(column)->setToolTip(
+        "Normalized true curve length fraction in [0,1]");
   anchors->setMinimumHeight(180);
   anchors->setMaximumHeight(250);
   anchors->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
@@ -281,6 +286,7 @@ void AdvancedLoftControls::add_boundary(const LoftBoundaryCondition* condition,
     auto* b = combo(supports);
     supports->setCellWidget(r, c, b);
     if (c == 0) {
+      b->setMinimumContentsLength(12);
       b->addItems({"Whole Start", "Whole End", "Scoped Patch"});
       b->setCurrentIndex(patch ? 2 : scope);
     }
