@@ -2,6 +2,7 @@
 #include "blcad/gui/occt_viewport.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
+#include <QLocale>
 #include <QSignalBlocker>
 #include <type_traits>
 namespace blcad::gui {
@@ -29,6 +30,24 @@ Result<std::size_t> ShellFeatureTools::begin_surface_edit(FeatureId id) {
     return p ? p->value().millimeters() : 0;
   };
   const auto choose_target = [&](const SurfaceReference& reference) {
+    if (reference.source_kind() == SurfaceReferenceSourceKind::SelectedFaces) {
+      const auto& selection = std::get<SurfaceFaceSelection>(reference.source());
+      if (selection.faces.size() > 1) {
+        const QSignalBlocker block(ui.face_set);
+        ui.face_set->setChecked(true);
+        ui.face_owner = selection.body;
+        ui.face_refs = selection.faces;
+        for (const auto& face : selection.faces) {
+          auto single = SurfaceReference::create_faces(selection.body, {face});
+          std::string label = "Saved face (repair or replace)";
+          for (const auto& input : surface_inputs_)
+            if (single && input.surface &&
+                input.surface->stable_key() == single.value().stable_key())
+              label = input.label;
+          ui.selected_faces->addItem(QString::fromStdString(label));
+        }
+      }
+    }
     for (int row = 1; row < surface_target_->count(); ++row) {
       const auto& input = surface_inputs_[surface_target_->itemData(row).toInt()];
       if (input.surface && input.surface->stable_key() == reference.stable_key()) {
@@ -88,10 +107,11 @@ Result<std::size_t> ShellFeatureTools::begin_surface_edit(FeatureId id) {
             surface_value_ = number(parameters.distance);
             ui.side->setCurrentIndex(int(parameters.side));
             ui.approximation->setCurrentIndex(int(parameters.approximation));
-            ui.tolerance->setText(QString::number(number(parameters.tolerance), 'g', 17));
+            ui.tolerance->setText(
+                QString::number(number(parameters.tolerance), 'g', QLocale::FloatingPointShortest));
             if (parameters.maximum_deviation)
-              ui.deviation->setText(
-                  QString::number(number(*parameters.maximum_deviation), 'g', 17));
+              ui.deviation->setText(QString::number(number(*parameters.maximum_deviation), 'g',
+                                                    QLocale::FloatingPointShortest));
             const auto& context = feature.body_result_context();
             ui.operation->setCurrentIndex(int(context.operation_mode()));
             if (context.target_body())
@@ -104,13 +124,15 @@ Result<std::size_t> ShellFeatureTools::begin_surface_edit(FeatureId id) {
               const auto& options = *feature.options();
               ui.trim_side->setCurrentIndex(int(options.side));
               ui.projection->setCurrentIndex(int(options.projection));
-              ui.tolerance->setText(QString::number(number(options.tolerance), 'g', 17));
+              ui.tolerance->setText(
+                  QString::number(number(options.tolerance), 'g', QLocale::FloatingPointShortest));
               if (options.direction) {
                 const std::array<double, 3> xyz{options.direction->x, options.direction->y,
                                                 options.direction->z};
                 for (int i = 0; i < 3; ++i) {
                   const QSignalBlocker block(ui.direction[i]);
-                  ui.direction[i]->setText(QString::number(xyz[i], 'g', 17));
+                  ui.direction[i]->setText(
+                      QString::number(xyz[i], 'g', QLocale::FloatingPointShortest));
                 }
               }
             }
@@ -122,9 +144,11 @@ Result<std::size_t> ShellFeatureTools::begin_surface_edit(FeatureId id) {
             if (feature.options()) {
               const auto& options = *feature.options();
               ui.extension->setCurrentIndex(int(options.mode));
-              ui.tolerance->setText(QString::number(number(options.tolerance), 'g', 17));
+              ui.tolerance->setText(
+                  QString::number(number(options.tolerance), 'g', QLocale::FloatingPointShortest));
               if (options.maximum_deviation)
-                ui.deviation->setText(QString::number(number(*options.maximum_deviation), 'g', 17));
+                ui.deviation->setText(QString::number(number(*options.maximum_deviation), 'g',
+                                                      QLocale::FloatingPointShortest));
             }
           }
         },

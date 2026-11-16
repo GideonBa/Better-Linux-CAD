@@ -371,6 +371,10 @@ private:
   [[nodiscard]] bool advanced_surface() const noexcept;
   [[nodiscard]] Result<std::size_t> begin_surface_task(Command, std::optional<FeatureId>);
   void build_advanced_surface_controls(QWidget*);
+  void build_surface_input_controls();
+  void populate_surface_input_editors(Command);
+  [[nodiscard]] Result<std::size_t> append_surface_face();
+  [[nodiscard]] Result<SurfaceReference> selected_surface_target() const;
   [[nodiscard]] Result<std::size_t> rebuild_advanced_surface_controller();
   void refresh_surface_diagnostics(const geometry::GeometryShape*);
   [[nodiscard]] bool surface_scalar() const noexcept;

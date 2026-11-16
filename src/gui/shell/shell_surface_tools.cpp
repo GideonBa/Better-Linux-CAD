@@ -185,6 +185,9 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
   const bool historical =
       advanced_surface_ && advanced_surface_->editing && advanced_surface_->input_cache;
   const auto* cache = historical ? &*advanced_surface_->input_cache : session_.part_shape_cache();
+  const bool include_hidden =
+      advanced_surface_ && advanced_surface_->include_hidden->isChecked() &&
+      (surface() || advanced_surface_->editing.has_value() || advanced_surface_->preparing_inputs);
   const auto prefix =
       historical ? advanced_surface_->input_prefix : session_.history_prefix_count();
   if (!part || !cache)
@@ -216,12 +219,14 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
                            TrimmingReference::create_profile_region(profile.value()).value()});
     }
   for (const auto& body : part->bodies()) {
-    if ((!historical && body.visibility() != BodyVisibility::Visible) ||
-        !cache->find_body_shape(body.id()))
+    const bool hidden = body.visibility() == BodyVisibility::Hidden ||
+                        !session_.presentation_visible("body/" + body.id().value());
+    if ((!include_hidden && hidden) || !cache->find_body_shape(body.id()))
       continue;
+    const std::string selection_prefix = historical || hidden ? "surface-input/" : "";
     if (body.kind() == BodyKind::Surface) {
       choices.push_back({body.name(),
-                         "body/" + body.id().value(),
+                         selection_prefix + "body/" + body.id().value(),
                          {},
                          SurfaceReference::create_body(body.id()).value(),
                          {}});
@@ -231,8 +236,8 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
     for (auto role : {PartFeatureInputRole::PathSegment, PartFeatureInputRole::SurfaceSourceFace}) {
       auto resolved = geometry::FinishingSelectionBuilder::build(
           *part, *cache, body.id(), role, context, prefix,
-          historical ? geometry::FinishingSelectionVisibility::IncludeHiddenInputs
-                     : geometry::FinishingSelectionVisibility::VisibleOnly);
+          include_hidden ? geometry::FinishingSelectionVisibility::IncludeHiddenInputs
+                         : geometry::FinishingSelectionVisibility::VisibleOnly);
       if (!resolved)
         continue;
       for (const auto& target : resolved.value()) {
@@ -272,7 +277,7 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
           if (!boundary)
             continue;
           choices.push_back({target.label,
-                             target.semantic_id,
+                             selection_prefix + target.semantic_id,
                              boundary.value(),
                              {},
                              TrimmingReference::create_boundary_curve(boundary.value()).value(),
@@ -283,23 +288,28 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
               body.id(), {std::get<FaceReference>(target.reference)});
           if (!surface)
             continue;
-          choices.push_back({target.label, target.semantic_id, {}, surface.value(), {}, {}});
+          const auto& face = std::get<FaceReference>(target.reference);
+          const auto label = std::holds_alternative<ResultFaceReference>(face.source())
+                                 ? QString("%1 / Face near (%2, %3, %4) mm")
+                                       .arg(QString::fromStdString(body.name()))
+                                       .arg(target.anchor.x, 0, 'g', 5)
+                                       .arg(target.anchor.y, 0, 'g', 5)
+                                       .arg(target.anchor.z, 0, 'g', 5)
+                                       .toStdString()
+                                 : target.label;
+          choices.push_back(
+              {label, selection_prefix + target.semantic_id, {}, surface.value(), {}, {}});
         }
-        if (targets)
-          targets->push_back(target);
+        if (targets) {
+          auto presentation = target;
+          presentation.semantic_id = selection_prefix + target.semantic_id;
+          targets->push_back(std::move(presentation));
+        }
       }
     }
   }
   if (context && !context->validate_sources())
     return {};
-  if (historical) {
-    for (auto& choice : choices)
-      if (choice.surface || choice.edge_input)
-        choice.semantic_id = "surface-input/" + choice.semantic_id;
-    if (targets)
-      for (auto& target : *targets)
-        target.semantic_id = "surface-input/" + target.semantic_id;
-  }
   return choices;
 }
 
@@ -423,6 +433,10 @@ Result<std::size_t> ShellFeatureTools::begin_surface_task(Command command,
     return fail("Surface command requires a part without an active command");
   advanced_surface_->reset(*part);
   advanced_surface_->editing = editing;
+  {
+    const QSignalBlocker block(advanced_surface_->include_hidden);
+    advanced_surface_->include_hidden->setChecked(editing.has_value());
+  }
   if (editing) {
     auto history = part->executable_history();
     if (!history)
@@ -447,57 +461,55 @@ Result<std::size_t> ShellFeatureTools::begin_surface_task(Command command,
   }
   advanced_surface_->entry_selection = session_.selection();
   advanced_surface_->entry_viewport_selection = viewport_.selected_semantic();
-  surface_targets_.clear();
-  surface_inputs_ = surface_inputs(&surface_targets_);
   const QSignalBlocker source(surface_source_), target(surface_target_), pick(surface_pick_),
       order(surface_order_);
   surface_source_->clear();
   surface_target_->clear();
   surface_order_->clear();
   surface_pick_->clear();
-  surface_source_->addItem(QStringLiteral("Select"), -1);
-  surface_target_->addItem(QStringLiteral("Select"), -1);
-  for (std::size_t i = 0; i < surface_inputs_.size(); ++i) {
-    const auto& input = surface_inputs_[i];
-    if (input.surface && (command != Command::ClosedShellToSolid ||
-                          input.surface->source_kind() == SurfaceReferenceSourceKind::Body))
-      surface_target_->addItem(QString::fromStdString(input.label), static_cast<int>(i));
-    bool eligible =
-        command == Command::TrimSurface ? input.trimming.has_value() : input.boundary.has_value();
-    if (command == Command::TrimSurface && input.boundary &&
-        input.boundary->source_kind() == BoundaryCurveSourceKind::SemanticEdge)
-      eligible = false;
-    if (eligible && input.boundary &&
-        input.boundary->source_kind() == BoundaryCurveSourceKind::PathCurve) {
-      const auto id = std::get<PathCurveId>(input.boundary->source());
-      const auto* path = input.pending_path ? &*input.pending_path : part->find_path_curve(id);
-      if (command == Command::TrimSurface)
-        eligible = path && path->closure() == PathClosure::Closed;
-      if (command == Command::ExtendSurface && !input.pending_path) {
-        auto segments = query_with_step_import_context(session_, [&](auto* context) {
-          return geometry::GeometryRecomputeExecutor{context}.resolve_path_segments(
-              *part, id,
-              advanced_surface_->input_cache ? *advanced_surface_->input_cache
-                                             : *session_.part_shape_cache());
-        });
-        eligible = segments && segments.value().size() == 1 &&
-                   (segments.value().front().kind == geometry::SweepPathSegmentKind::Line ||
-                    segments.value().front().kind == geometry::SweepPathSegmentKind::CircularArc ||
-                    segments.value().front().kind == geometry::SweepPathSegmentKind::DerivedNative);
-      }
-    }
-    if (eligible)
-      surface_source_->addItem(QString::fromStdString(input.label), static_cast<int>(i));
-  }
+  populate_surface_input_editors(command);
   const bool curves = command == Command::BoundarySurface || command == Command::FillSurface;
   const bool stitch = command == Command::SurfaceStitch;
-  if (!editing &&
+  if (!editing && command != Command::OffsetSurface && command != Command::Thicken &&
       ((curves && surface_source_->count() < 2) || (!curves && surface_target_->count() < 2) ||
        ((command == Command::TrimSurface || command == Command::ExtendSurface) &&
         surface_source_->count() < 2) ||
        (stitch && surface_target_->count() < 3))) {
-    surface_targets_.clear();
-    return fail("First create suitable paths, surfaces, or a closed shell");
+    // Keep the hidden-input option reachable when all compatible sources are hidden.
+    const QSignalBlocker hidden_block(advanced_surface_->include_hidden);
+    const QScopedValueRollback preparing(advanced_surface_->preparing_inputs, true);
+    const bool previous = advanced_surface_->include_hidden->isChecked();
+    advanced_surface_->include_hidden->setChecked(true);
+    const auto available = surface_inputs();
+    advanced_surface_->include_hidden->setChecked(previous);
+    std::size_t target_count = 0;
+    bool source_available = false;
+    for (const auto& input : available) {
+      target_count +=
+          input.surface && (command != Command::ClosedShellToSolid ||
+                            input.surface->source_kind() == SurfaceReferenceSourceKind::Body);
+      if (command == Command::TrimSurface) {
+        if (input.trimming && !input.boundary)
+          source_available = true;
+        if (input.boundary && input.boundary->source_kind() == BoundaryCurveSourceKind::PathCurve) {
+          const auto* path =
+              input.pending_path
+                  ? &*input.pending_path
+                  : part->find_path_curve(std::get<PathCurveId>(input.boundary->source()));
+          source_available |= path && path->closure() == PathClosure::Closed;
+        }
+      } else
+        source_available |= input.boundary.has_value();
+    }
+    const bool suitable = curves   ? source_available
+                          : stitch ? target_count >= 2
+                          : command == Command::ClosedShellToSolid
+                              ? target_count > 0
+                              : target_count > 0 && source_available;
+    if (!suitable) {
+      surface_targets_.clear();
+      return fail("First create suitable paths, surfaces, or a closed shell");
+    }
   }
   surface_pick_->addItem(curves   ? QStringLiteral("Add Curve")
                          : stitch ? QStringLiteral("Add Surface")
@@ -716,6 +728,10 @@ void ShellFeatureTools::update_surface_pick_scope() {
       curves || surface_pick_->currentIndex() == 1 ? surface_source_ : surface_target_;
   for (int row = 1; row < combo->count(); ++row) {
     const auto& input = surface_inputs_.at(combo->itemData(row).toInt());
+    if (advanced_surface_->face_set->isChecked() && combo == surface_target_ &&
+        (!input.surface ||
+         input.surface->source_kind() != SurfaceReferenceSourceKind::SelectedFaces))
+      continue;
     scope.push_back(input.semantic_id);
     if (input.trimming &&
         input.trimming->source_kind() == TrimmingReferenceSourceKind::ProfileRegion) {
@@ -764,7 +780,9 @@ bool ShellFeatureTools::accept_surface_selection(const GuiSelection& selection) 
 
 void ShellFeatureTools::refresh_surface_enablement(bool idle_part) {
   // Use source contracts for enablement; geometric suitability is checked by preview.
-  bool curves = false, surfaces = false, shell = false;
+  bool curves = false, surfaces = false, shell = false, hidden_surfaces = false,
+       hidden_curves = false, hidden_shell = false;
+  std::size_t hidden_surface_count = 0;
   std::size_t surface_count = 0;
   auto import_context = make_step_import_context(session_);
   if (!import_context)
@@ -778,7 +796,9 @@ void ShellFeatureTools::refresh_surface_enablement(bool idle_part) {
     curves = !part->path_curves().empty();
     if (cache)
       for (const auto& body : part->bodies())
-        if (body.visibility() == BodyVisibility::Visible && cache->find_body_shape(body.id())) {
+        if (body.visibility() == BodyVisibility::Visible &&
+            session_.presentation_visible("body/" + body.id().value()) &&
+            cache->find_body_shape(body.id())) {
           shell |= body.kind() == BodyKind::Surface;
           if (body.kind() == BodyKind::Surface)
             ++surface_count;
@@ -793,6 +813,28 @@ void ShellFeatureTools::refresh_surface_enablement(bool idle_part) {
               import_context.value().get(), session_.history_prefix_count());
           curves |= edges && !edges.value().empty();
         }
+    if (cache)
+      for (const auto& body : part->bodies())
+        if ((body.visibility() == BodyVisibility::Hidden ||
+             !session_.presentation_visible("body/" + body.id().value())) &&
+            cache->find_body_shape(body.id())) {
+          auto faces = geometry::FinishingSelectionBuilder::build(
+              *part, *cache, body.id(), PartFeatureInputRole::SurfaceSourceFace,
+              import_context.value().get(), session_.history_prefix_count(),
+              geometry::FinishingSelectionVisibility::IncludeHiddenInputs);
+          hidden_surfaces |= body.kind() == BodyKind::Surface || (faces && !faces.value().empty());
+          hidden_shell |= body.kind() == BodyKind::Surface;
+          hidden_surface_count +=
+              (body.kind() == BodyKind::Surface ? 1 : 0) +
+              (faces ? faces.value().size() -
+                           (body.kind() == BodyKind::Surface && !faces.value().empty() ? 1 : 0)
+                     : 0);
+          auto edges = geometry::FinishingSelectionBuilder::build(
+              *part, *cache, body.id(), PartFeatureInputRole::PathSegment,
+              import_context.value().get(), session_.history_prefix_count(),
+              geometry::FinishingSelectionVisibility::IncludeHiddenInputs);
+          hidden_curves |= edges && !edges.value().empty();
+        }
     surfaces = surface_count > 0;
   }
   if (import_context && import_context.value() && !import_context.value()->validate_sources()) {
@@ -802,12 +844,14 @@ void ShellFeatureTools::refresh_surface_enablement(bool idle_part) {
   for (const auto& [command, action] : surface_actions_)
     action->setEnabled(
         idle_part &&
-        (command == Command::BoundarySurface || command == Command::FillSurface ? curves
-         : command == Command::ClosedShellToSolid                               ? shell
-         : command == Command::SurfaceStitch                                    ? surface_count >= 2
+        (command == Command::BoundarySurface || command == Command::FillSurface
+             ? curves || hidden_curves
+         : command == Command::ClosedShellToSolid ? shell || hidden_shell
+         : command == Command::SurfaceStitch      ? surface_count + hidden_surface_count >= 2
          : command == Command::OffsetSurface || command == Command::Thicken
-             ? surfaces
-             : surfaces && (curves || (command == Command::TrimSurface &&
-                                       !spatial_inputs_for(Command::Sweep).empty()))));
+             ? surfaces || hidden_surfaces
+             : (surfaces || hidden_surfaces) && (curves || hidden_curves ||
+                                                 (command == Command::TrimSurface &&
+                                                  !spatial_inputs_for(Command::Sweep).empty()))));
 }
 } // namespace blcad::gui

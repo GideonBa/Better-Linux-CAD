@@ -1500,6 +1500,8 @@ void ShellFeatureTools::synchronize_manipulator_editor(std::string_view handle) 
 
 void ShellFeatureTools::synchronize_overlay() {
   refresh_extrude_breadcrumbs();
+  if (surface())
+    surface_controls_->setEnabled(layer_.active_handle_id().empty());
   if (command_ == Command::Extrude)
     extrude_controls_->setEnabled(!editing_source_sketch_ && layer_.active_handle_id().empty());
   if (command_ == Command::Revolve)

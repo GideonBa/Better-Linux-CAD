@@ -10,7 +10,10 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
+#include <QPushButton>
 #include <QSignalBlocker>
+#include <QVBoxLayout>
 #include <QWidget>
 #include <array>
 #include <optional>
@@ -26,7 +29,14 @@ struct AdvancedSurfaceControls {
   QWidget* direction_row{};
   QCheckBox *boundaries{}, *override_formulas{};
   QLabel* feedback{};
+  QCheckBox *include_hidden{}, *face_set{};
+  QWidget* face_set_panel{};
+  QListWidget* selected_faces{};
+  QPushButton *face_add{}, *face_remove{};
+  std::optional<BodyId> face_owner;
+  std::vector<FaceReference> face_refs;
   bool highlighting_input = false;
+  bool preparing_inputs = false;
   std::optional<FeatureId> editing;
   std::optional<geometry::ShapeCache> input_cache;
   std::optional<std::size_t> input_prefix;
@@ -39,6 +49,34 @@ struct AdvancedSurfaceControls {
     form = new QFormLayout(panel);
     form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    include_hidden = new QCheckBox("Include hidden Body inputs", panel);
+    include_hidden->setObjectName("blcad.surface.include_hidden");
+    form->addRow(include_hidden);
+    face_set = new QCheckBox("Use an explicit face set", panel);
+    face_set->setObjectName("blcad.surface.face_set");
+    form->addRow(face_set);
+    face_set_panel = new QWidget(panel);
+    auto* face_column = new QVBoxLayout(face_set_panel);
+    face_column->setContentsMargins(0, 0, 0, 0);
+    auto* face_hint =
+        new QLabel("Choose individual faces above, then add them. All faces must share one Body.",
+                   face_set_panel);
+    face_hint->setWordWrap(true);
+    face_column->addWidget(face_hint);
+    selected_faces = new QListWidget(face_set_panel);
+    selected_faces->setObjectName("blcad.surface.selected_faces");
+    selected_faces->setMinimumHeight(90);
+    selected_faces->setMaximumHeight(140);
+    face_column->addWidget(selected_faces);
+    auto* face_buttons = new QHBoxLayout;
+    face_add = new QPushButton("Add Selected Face", face_set_panel);
+    face_add->setObjectName("blcad.surface.face_add");
+    face_remove = new QPushButton("Remove Face", face_set_panel);
+    face_remove->setObjectName("blcad.surface.face_remove");
+    face_buttons->addWidget(face_add);
+    face_buttons->addWidget(face_remove);
+    face_column->addLayout(face_buttons);
+    form->addRow(face_set_panel);
     const auto combo = [&](const char* id, const char* title, QStringList labels) {
       auto* value = new QComboBox(panel);
       value->setObjectName(QString("blcad.surface.") + id);
@@ -95,6 +133,8 @@ struct AdvancedSurfaceControls {
         kind == SurfaceFeatureKind::OffsetSurface || kind == SurfaceFeatureKind::Thicken;
     const bool trim = kind == SurfaceFeatureKind::TrimSurface,
                extend = kind == SurfaceFeatureKind::ExtendSurface;
+    form->setRowVisible(face_set, offset);
+    form->setRowVisible(face_set_panel, offset && face_set->isChecked());
     form->setRowVisible(side, offset);
     form->setRowVisible(trim_side, trim);
     form->setRowVisible(projection, trim);
@@ -110,6 +150,11 @@ struct AdvancedSurfaceControls {
     form->setRowVisible(override_formulas, editing.has_value() && (offset || trim || extend));
   }
   void reset(const PartDocument& part) {
+    include_hidden->setChecked(false);
+    face_set->setChecked(false);
+    face_owner.reset();
+    face_refs.clear();
+    selected_faces->clear();
     editing.reset();
     input_cache.reset();
     input_prefix.reset();

@@ -287,3 +287,45 @@ TEST_CASE("Shared tolerance and deviation bindings cannot silently overwrite dif
   REQUIRE(window.undo());
   CHECK(saved(window) == before);
 }
+TEST_CASE("Surface handles follow staged shared parameters that also drive the source",
+          "[gui][advanced-surface-edit][parity-b173]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Shared source driver"));
+  REQUIRE(window.session().commit_part_transaction("Inputs", [](PartDocument& p) {
+    p = blcad::test::spatial_fixture::part();
+    blcad::test::surface_offset::length(p, "tolerance", 1e-6);
+    f::checked(
+        p.add_body(f::checked(Body::create(BodyId("offset.body"), "Offset", BodyKind::Surface))));
+    return p.add_surface_feature(f::checked(SurfaceOffsetFeature::create_offset(
+        FeatureId("offset"), "Offset", blcad::test::surface_offset::plane(),
+        {ParameterId("depth"),
+         ParameterId("tolerance"),
+         SurfaceOffsetSide::AlongNormal,
+         SurfaceOffsetApproximation::ExactAnalytic,
+         {}},
+        f::checked(FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody, {},
+                                                    BodyId("offset.body"))))));
+  }));
+  window.refresh();
+  const auto before = saved(window);
+  begin(window, "offset");
+  auto& tools = window.feature_tools();
+  CHECK(tools.coordinator().surface().handles().front().origin.z == Catch::Approx(5).margin(1e-7));
+  REQUIRE(tools.set_numeric_text("3 mm"));
+  CHECK(tools.coordinator().surface().handles().front().origin.z == Catch::Approx(3).margin(1e-7));
+  CHECK(tools.manipulators().handles().front().origin.z == Catch::Approx(3).margin(1e-7));
+  const auto preview = f::checked(tools.coordinator().surface().preview_shape(window.session()));
+  CHECK(blcad::test::distance_to_faces(preview, {0, 0, 6}) < 1e-7);
+  CHECK(saved(window) == before);
+  REQUIRE(tools.apply());
+  CHECK(window.session()
+            .part_document()
+            ->find_parameter(ParameterId("depth"))
+            ->value()
+            .millimeters() == 3);
+  CHECK(blcad::test::integrated_solid_volume(
+            *window.session().part_shape_cache()->find_body_shape(BodyId("base.body")))
+            .volume_mm3 == Catch::Approx(144).margin(1e-6));
+  REQUIRE(window.undo());
+  CHECK(saved(window) == before);
+}
