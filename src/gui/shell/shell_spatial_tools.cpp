@@ -23,6 +23,7 @@
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QStandardItemModel>
+#include <QStatusBar>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -882,6 +883,7 @@ void ShellFeatureTools::refresh_spatial_preview() {
     preview_valid_ = false;
     viewport_.clear_feature_preview();
     task_summary_->setText(QString::fromStdString(begun.error().message()));
+    window_.statusBar()->showMessage(task_summary_->text());
     refresh_enablement();
     synchronize_overlay();
     return;

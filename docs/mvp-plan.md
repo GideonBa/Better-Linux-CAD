@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 173
-current_block: 174
-current_boundary: Block 174 in progress; connected curves and Surface acceptance
-current_tag: "[parity-b174]"
+implemented_through: Block 174
+current_block: 175
+current_boundary: Block 175 in progress; typed variable Fillet groups and radius laws
+current_tag: "[parity-b175]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–173 accepted; Block 174 in progress; Blocks 175–204 planned"
+  advanced_modeling_workflows: "Blocks 145–174 accepted; Block 175 in progress; Blocks 176–204 planned"
 ---
 
 # MVP Plan
@@ -34,10 +34,10 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 173
-current block        Block 174 (in progress)
-current phase        Curves, paths and surfaces
-current boundary     Connected curve/Surface model with independent physical acceptance
+implemented through  Block 174
+current block        Block 175 (in progress)
+current phase        Advanced finishing and sketch-driven features
+current boundary     Typed variable Fillet groups and radius laws
 ```
 
 The assigned sequence continues through Block 184. Blocks 168–169 were delivered by normal
@@ -81,7 +81,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 168–169 | Delivered by normal rebase in [PR #192](https://github.com/GideonBa/Better-Linux-CAD/pull/192): strict V12 intent and verified native G02 construction within documented limits. |
 | 170–172 | 170–172 accepted: typed/checked Offset/Thicken, curved Trim/Extend, native gap queries and complete G03/G04 history/consumer/exchange proof. Delivered by normal rebase in [PR #193](https://github.com/GideonBa/Better-Linux-CAD/pull/193). |
 | 173 | Accepted native advanced curve/Surface creation/editing, complete regression and 100%/150% physical workflows. |
-| 174 | In progress: connected integrated edits/history/reopen and independent physical STEP acceptance. |
+| 174 | Accepted connected curve/Surface model, exact sidecar history, independent native/STEP checks and both native scales. |
 | 175–176 | Typed variable-radius Fillet laws, ordered semantic chains and independently checked native radius progression. |
 | 177–179 | Typed face/full-round/setback intent, checked supported blends/corners and native shared finishing controls. |
 | 180–181 | Typed Rib/Web skeleton, side/draft/termination intent, checked connected thin volumes and semantic consumers. |
@@ -89,8 +89,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 
 The active Surface branch has [complete checked G03 construction, consumers and exchange proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof).
 Curved Trim/Extend and complete G04 are accepted in 172; the [bounded construction contract](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-construction--172) is retained.
-The active work is 174 integrated curve/Surface acceptance, followed by
-175–184 advanced finishing, Rib/Web and mapped Emboss/Engrave. The original sequence and scenario
+The active work is 175–184 advanced finishing, Rib/Web and mapped Emboss/Engrave. The original sequence and scenario
 oracles retain every prerequisite, supported-capability requirement and deferred extension.
 
 Each row retains its full numbered prerequisites and acceptance criteria; grouped rows do not
@@ -180,8 +179,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–173 are **Implemented and accepted**;
-Block 174 is **In progress**; Blocks 175–204 are **Planned; not started**.
+Status authority: Blocks 145–174 are **Implemented and accepted**;
+Block 175 is **In progress**; Blocks 176–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -194,8 +193,8 @@ negative cases, combination matrix, native proof and performance protocol live i
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
-| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166–173 accepted; 174 in progress |
-| E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
+| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Implemented and accepted |
+| E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | 175 in progress; 176–184 planned |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
 | G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
 | H | 199–204 | Motion/contact extensions, finite measurement, quality/thickness analysis, measured performance and final combined acceptance | Planned; not started |
@@ -1018,19 +1017,33 @@ The full Qt run and startup used frozen runtime inputs: **1,214 files**,
 Continue the combined S04/G04/X01 model in 174, then the complete 175–184 assignment. Keep all
 185–204 planning and deferred capabilities.
 
-### Block 174 connected curve and Surface acceptance — in progress
+### Block 174 connected curve and Surface acceptance — accepted
 
-The connected test model and independent oracles are prepared; they are not yet accepted.
-Combine the G2 airfoil, fixed 3D guide poles, equation duct, curved quilt, Offset/Thicken,
-Hole, Body Boolean, Pattern and rim Fillet. Exercise section/guide/anchor edits, impossible
-Offset/G2 requests, full Sketch sidecars and exact history/reopening. Compare native boundary
-derivatives, analytic component volumes and finishing contacts before and after STEP reimport.
+The [connected milestone contract and independent oracles](curves-surface-integrated-milestone-mvp10.md)
+combine a G2 airfoil/Smooth catalog, fixed 3D rails, equation duct, curved quilt, Offset/Thicken,
+Hole, common Body Boolean, Pattern and rim Fillet. Joint middle-section/guide/length-anchor edits
+and quilt-height changes propagate through the complete result. Invalid anchors, global G2 and
+an impossible inward Offset preserve committed geometry, complete Sketch sidecars and history.
+The actual Offset failure identity and valid initial editors prevent false negative witnesses;
+preview diagnostics stay visible outside the scrolled panel.
 
-The connected model exposed a partial toroidal Fillet seam conversion in STEP. Its
-[bounded decoder contract](step-import-sequence-mvp10.md) now retains all 3D/tolerance evidence
-and rejects displaced seam vertices independently of inflated transfer vertex tolerances.
-All five targets and reader regression **14 / 751** passed. Complete connected GUI/native
-history and physical STEP verification remain required; 174 is still in progress.
+All five targets passed. Geometry milestone **1 / 133**, combined curved model/Surface **4 / 234**,
+semantic Sweep/periodic STEP **6 / 193**, reader **14 / 751**, focused Qt **7 passed / 2 native skips /
+600 assertions**, and native **1 / 203** at 100% and compact 150% passed. Captures were reviewed;
+exact Undo/Redo, reopening and actual STEP reimport repeat independent position/normal/curvature,
+material, component-volume and Fillet-contact checks. The bounded toroidal STEP seam decoder
+retains 3D/tolerance evidence and rejects displaced vertices; its contract remains in
+`step-import-sequence-mvp10.md`.
+
+Runtime: **1,219 files**, `fc2855b392f94ebf6666548fabb1f9b90483783a1fc8534821760757a5cc684f`.
+Continue the complete 175–184 assignment; preserve all later 185–204 scope.
+
+### Block 175 variable Fillet intent — in progress
+
+Prepare ordered semantic groups, stable true-length stations, explicit interpolation/propagation,
+orientation and compatible constant-mode dispatch. Keep optional immutable advanced intent outside
+the legacy record definition where practical; integrate all radius dependencies, strict persistence,
+history and repair. Drafts and native law experiments are preparation, not block acceptance.
 
 ### Implementation route for the assigned continuation
 

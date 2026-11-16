@@ -721,6 +721,7 @@ if(BLCAD_BUILD_TESTS)
     tests/geometry/material_region_sweep_tests.cpp
     tests/geometry/semantic_path_acceptance_tests.cpp
       tests/support/geometry_volume_oracle.cpp
+      tests/support/curve_surface_milestone_oracle.cpp
       tests/geometry/part_construction_mvp_acceptance_tests.cpp
       tests/geometry/recompute_executor_tests.cpp
       tests/geometry/rectangle_extrusion_adapter_tests.cpp
@@ -736,6 +737,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/surface_offset_consumer_tests.cpp
       tests/geometry/curved_surface_geometry_tests.cpp
       tests/geometry/curved_surface_combination_tests.cpp
+      tests/geometry/curve_surface_milestone_tests.cpp
       tests/geometry/surface_gap_native_breaks_tests.cpp
       tests/geometry/surface_stitch_pipeline_tests.cpp
       tests/geometry/surface_close_shell_pipeline_tests.cpp
@@ -793,7 +795,9 @@ if(BLCAD_BUILD_TESTS)
   endif()
 
   if(BLCAD_BUILD_GUI)
-    add_library(blcad_geometry_test_support STATIC tests/support/geometry_volume_oracle.cpp)
+    add_library(blcad_geometry_test_support STATIC
+      tests/support/geometry_volume_oracle.cpp
+      tests/support/curve_surface_milestone_oracle.cpp)
     target_link_libraries(blcad_geometry_test_support PRIVATE BLCAD::geometry)
     target_include_directories(blcad_geometry_test_support SYSTEM PRIVATE ${OpenCASCADE_INCLUDE_DIR})
     add_executable(
@@ -902,6 +906,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_curved_surface_history_tests.cpp
       tests/gui/gui_advanced_surface_controller_tests.cpp
       tests/gui/gui_advanced_curve_edit_controller_tests.cpp
+      tests/gui/gui_curve_surface_milestone_tests.cpp
       tests/gui/gui_advanced_loft_panel_tests.cpp
       tests/gui/gui_advanced_sweep_edit_tests.cpp
       tests/gui/gui_advanced_surface_tools_tests.cpp

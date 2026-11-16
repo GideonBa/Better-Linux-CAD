@@ -1037,6 +1037,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
       if (surface())
         refresh_surface_diagnostics(nullptr);
       task_summary_->setText(QString::fromStdString(configured.error().message()));
+      window_.statusBar()->showMessage(task_summary_->text());
       refresh_enablement();
       synchronize_overlay();
       return Result<GuiPartFeaturePreview>::failure(configured.error());
@@ -1059,8 +1060,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     if (command_ == Command::Loft)
       refresh_loft_feedback(nullptr);
     task_summary_->setText(QString::fromStdString(preview.error().message()));
-    if (pattern())
-      window_.statusBar()->showMessage(task_summary_->text());
+    window_.statusBar()->showMessage(task_summary_->text());
     if (command_ == Command::Extrude)
       extrude_behavior_group_->set_diagnostic(QString::fromStdString(preview.error().message()));
     refresh_enablement();
@@ -1093,8 +1093,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     if (command_ == Command::Loft)
       refresh_loft_feedback(nullptr);
     task_summary_->setText(QString::fromStdString(shapes.error().message()));
-    if (pattern())
-      window_.statusBar()->showMessage(task_summary_->text());
+    window_.statusBar()->showMessage(task_summary_->text());
     refresh_enablement();
     synchronize_overlay();
     return Result<GuiPartFeaturePreview>::failure(shapes.error());
@@ -1135,8 +1134,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     if (command_ == Command::Loft)
       refresh_loft_feedback(nullptr);
     task_summary_->setText(QString::fromStdString(published.error().message()));
-    if (pattern())
-      window_.statusBar()->showMessage(task_summary_->text());
+    window_.statusBar()->showMessage(task_summary_->text());
     refresh_enablement();
     synchronize_overlay();
     return Result<GuiPartFeaturePreview>::failure(published.error());
