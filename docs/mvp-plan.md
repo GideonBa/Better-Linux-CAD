@@ -1084,3 +1084,25 @@ complete advanced Sweep/Loft editing. Native 100% and compact 150% each passed *
 physical STEP/profile checks. Reviewed field/feedback captures and Qt **23 passed / 6 native skips /
 3,612 assertions** complete this slice. Full Core **785 / 35,068** and Geometry **789 / 81,422** passed.
 Final full Qt regression remains before Block 173 acceptance; then continue through 174–184.
+
+### Implementation route for the assigned continuation
+
+- **174:** use one connected Part: G2 airfoil/adjacent supports and constrained 3D rails, an
+  equation path in the middle-section Sketch feeding Sweep, curved Trim/Extend→Stitch→Offset→
+  Thicken, a common Body Boolean, Pattern and a later Fillet. Change the middle section, rail
+  and explicit length anchor together; reject an inconsistent anchor and impossible Offset/G2
+  atomically. Verify analytic component volumes, boundary derivatives, material points and
+  finishing contacts before/after STEP, exact Undo and complete Sketch sidecars on reopening.
+- **175–179:** keep legacy constant Fillet bytes and geometry; introduce typed radius laws,
+  ordered semantic groups and true-length stations. Isolate optional advanced intent from the
+  legacy record header where practical. Check actual native contour expansion against declared
+  propagation. Face/full-round roles require a capability table, actual middle-face replacement
+  and independent contact/G2 evidence; unsupported combinations remain explicit failures.
+- **180–184:** register Rib/Web and Emboss/Engrave as normal history authorities with complete
+  graph, persistence and repair integration. Verify thin-volume connection/termination and
+  plane/cylinder/cone mapping, normal depth, holes, seam orientation and font reproducibility.
+  Finish shared native creation/editing and downstream Hole/Fillet checks at both scales.
+
+These are implementation notes, not block acceptance. The detailed 174–184 criteria in
+`inventor-parity-sequence.md` and `inventor-parity-test-plan.md` remain authoritative.
+Preserve the complete 185–204 sequence and all explicitly deferred capabilities.
