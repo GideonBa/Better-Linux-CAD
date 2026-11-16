@@ -617,6 +617,10 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::finishing_selection_
                            : geometry::ViewportSceneKind::Face,
                        target.semantic_id, target.shape, SketchLineRole::Geometry,
                        finishing_body_->currentData().toString().toStdString()});
+  if (command_ == Command::Loft) {
+    auto supports = loft_selection_items();
+    items.insert(items.end(), supports.begin(), supports.end());
+  }
   if (command_ == Command::PathCurve)
     if (const auto edges = native_spatial_edges(); edges)
       for (const auto& edge : edges.value())

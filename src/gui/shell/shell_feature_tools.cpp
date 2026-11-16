@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "advanced_loft_controls.hpp"
 #include "advanced_surface_controls.hpp"
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
@@ -1055,6 +1056,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     viewport_.clear_feature_preview();
     if (surface())
       refresh_surface_diagnostics(nullptr);
+    if (command_ == Command::Loft)
+      refresh_loft_feedback(nullptr);
     task_summary_->setText(QString::fromStdString(preview.error().message()));
     if (pattern())
       window_.statusBar()->showMessage(task_summary_->text());
@@ -1087,6 +1090,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     viewport_.clear_feature_preview();
     if (surface())
       refresh_surface_diagnostics(nullptr);
+    if (command_ == Command::Loft)
+      refresh_loft_feedback(nullptr);
     task_summary_->setText(QString::fromStdString(shapes.error().message()));
     if (pattern())
       window_.statusBar()->showMessage(task_summary_->text());
@@ -1108,6 +1113,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
     replacements.push_back("body/" + extrude_target_->currentData().toString().toStdString());
   else if (command_ == Command::Revolve && revolve_operation_->currentIndex() != 0)
     replacements.push_back("body/" + revolve_target_->currentData().toString().toStdString());
+  else if (spatial() && spatial_editing_)
+    replacements.push_back("body/" + spatial_result_.value());
   else if (spatial() && command_ != Command::PathCurve && spatial_mode_->currentIndex() == 1)
     replacements.push_back("body/" + spatial_target_->currentData().toString().toStdString());
   else if (finishing())
@@ -1117,12 +1124,16 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
       replacements.push_back("body/" + target->value());
   if (surface())
     refresh_surface_diagnostics(shapes.value().empty() ? nullptr : &shapes.value().front());
+  if (command_ == Command::Loft)
+    refresh_loft_feedback(shapes.value().empty() ? nullptr : &shapes.value().front());
   auto published =
       viewport_.set_feature_previews(std::move(shapes.value()), std::move(replacements));
   if (published.has_error()) {
     viewport_.clear_feature_preview();
     if (surface())
       refresh_surface_diagnostics(nullptr);
+    if (command_ == Command::Loft)
+      refresh_loft_feedback(nullptr);
     task_summary_->setText(QString::fromStdString(published.error().message()));
     if (pattern())
       window_.statusBar()->showMessage(task_summary_->text());
@@ -1213,6 +1224,7 @@ Result<std::size_t> ShellFeatureTools::apply() {
   const bool was_finishing = finishing();
   const bool was_pattern = pattern();
   const bool was_path = command_ == Command::PathCurve;
+  const bool was_spatial = spatial();
   const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
   const bool restore_scope = finishing() || pattern() || body_operation() || spatial() || surface();
@@ -1239,8 +1251,11 @@ Result<std::size_t> ShellFeatureTools::apply() {
     window_.refresh_feature_selection_scene();
   }
   surface_targets_.clear();
-  if (was_path)
+  if (was_path || was_spatial)
     window_.refresh_feature_selection_scene();
+  spatial_editing_.reset();
+  spatial_input_cache_.reset();
+  spatial_input_prefix_.reset();
   if (advanced_surface_) {
     advanced_surface_->editing.reset();
     advanced_surface_->input_cache.reset();
@@ -1310,7 +1325,7 @@ void ShellFeatureTools::cancel() noexcept {
     window_.refresh_feature_selection_scene();
   }
   surface_targets_.clear();
-  if (was_surface || was_path)
+  if (was_surface || was_path || was_spatial)
     window_.refresh_feature_selection_scene();
   preview_valid_ = false;
   if (was_extrude)
@@ -1327,6 +1342,9 @@ void ShellFeatureTools::cancel() noexcept {
     advanced_surface_->input_cache.reset();
     advanced_surface_->input_prefix.reset();
   }
+  spatial_editing_.reset();
+  spatial_input_cache_.reset();
+  spatial_input_prefix_.reset();
   if (was_spatial) {
     if (spatial_entry_viewport_selection_)
       (void)viewport_.select_semantic(spatial_entry_viewport_selection_->semantic_id);
@@ -1514,6 +1532,8 @@ void ShellFeatureTools::synchronize_overlay() {
   refresh_extrude_breadcrumbs();
   if (surface())
     surface_controls_->setEnabled(layer_.active_handle_id().empty());
+  if (spatial())
+    spatial_controls_->setEnabled(layer_.active_handle_id().empty());
   if (command_ == Command::Extrude)
     extrude_controls_->setEnabled(!editing_source_sketch_ && layer_.active_handle_id().empty());
   if (command_ == Command::Revolve)

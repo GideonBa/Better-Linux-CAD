@@ -387,6 +387,9 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_pattern_tools.cpp
     src/gui/shell/shell_body_tools.cpp
     src/gui/shell/shell_spatial_tools.cpp
+    src/gui/shell/advanced_loft_controls.cpp
+    src/gui/shell/shell_loft_constraint_tools.cpp
+    src/gui/shell/shell_spatial_edit_tools.cpp
     src/gui/shell/shell_sweep_region_tools.cpp
     src/gui/shell/shell_surface_tools.cpp
       src/gui/shell/shell_advanced_surface_tools.cpp
@@ -899,6 +902,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_curved_surface_history_tests.cpp
       tests/gui/gui_advanced_surface_controller_tests.cpp
       tests/gui/gui_advanced_curve_edit_controller_tests.cpp
+      tests/gui/gui_advanced_loft_panel_tests.cpp
       tests/gui/gui_advanced_surface_tools_tests.cpp
     tests/gui/gui_advanced_surface_edit_tests.cpp
     tests/gui/gui_advanced_surface_input_tests.cpp

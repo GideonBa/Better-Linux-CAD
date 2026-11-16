@@ -39,6 +39,7 @@ class ShellWindow;
 class ShellPropertyGroup;
 class ShellPropertySelector;
 struct AdvancedSurfaceControls;
+struct AdvancedLoftControls;
 
 // GUI Shell Reset MVP-9R Blocks 135/136: explicit, shell-owned integration of
 // Extrude/Revolve, finishing and shell/draft controllers with the candidate-only
@@ -209,6 +210,7 @@ public:
   [[nodiscard]] Result<GuiPartFeaturePreview> set_scale_center_text(std::size_t component,
                                                                     const QString& text);
   [[nodiscard]] Result<std::size_t> begin_spatial(Command command);
+  [[nodiscard]] Result<std::size_t> begin_spatial_edit(FeatureId);
   // Typed first input for an already started Sweep/Loft context task.
   [[nodiscard]] bool select_spatial_profile(SketchId sketch, ProfileId profile);
   [[nodiscard]] Result<std::size_t> begin_surface(Command command);
@@ -400,6 +402,13 @@ private:
   [[nodiscard]] bool spatial() const noexcept;
   [[nodiscard]] QString spatial_summary() const;
   void build_spatial_controls(QWidget* panel);
+  void build_advanced_loft_controls(QFormLayout&);
+  [[nodiscard]] Result<std::size_t> configure_loft_constraints();
+  [[nodiscard]] Result<std::vector<ProfileSectionReference>> selected_loft_sections() const;
+  [[nodiscard]] Result<std::size_t> refresh_loft_supports();
+  void refresh_loft_feedback(const geometry::GeometryShape*);
+  [[nodiscard]] std::vector<geometry::ViewportSceneItem> loft_selection_items() const;
+
   void build_sweep_region_controls(QFormLayout&);
   [[nodiscard]] Result<SweepProfileReference> selected_sweep_profile();
   struct SpatialNativeEdge {
@@ -628,6 +637,15 @@ private:
   double body_value_{0};
   bool body_reference_picking_{false};
 
+  std::unique_ptr<AdvancedLoftControls> advanced_loft_;
+  std::optional<FeatureId> spatial_editing_;
+  std::optional<geometry::ShapeCache> spatial_input_cache_;
+  std::optional<std::size_t> spatial_input_prefix_;
+  std::vector<ProfileSectionReference> spatial_saved_sections_;
+  bool spatial_highlighting_ = false;
+  QCheckBox* sweep_independent_twist_{};
+  ParameterId spatial_independent_twist_{""};
+  QLabel* spatial_edit_context_{};
   std::vector<SpatialInput> spatial_inputs_;
   GuiSelectionModel spatial_entry_selection_;
   std::optional<GuiSelection> spatial_entry_viewport_selection_;
@@ -651,7 +669,7 @@ private:
   QCheckBox* spatial_closed_{nullptr};
   QCheckBox* spatial_auto_align_{nullptr};
   QCheckBox* sweep_twist_{nullptr};
-  std::array<QDoubleSpinBox*, 3> spatial_up_{};
+  std::array<QLineEdit*, 3> spatial_up_{};
   QPushButton* spatial_add_{nullptr};
   QPushButton* spatial_add_guide_{nullptr};
   QWidget* spatial_order_buttons_{nullptr};
