@@ -247,4 +247,6 @@ scrollbar narrows the panel. Selection, focus and authored feature state remain 
 
 All five targets passed. The previously failing combined spatial/Surface context workflows now
 pass **2 / 1,354**, including exact history and physical STEP export; final Qt captures were
-reviewed. Complete native scale checks and full Qt regression remain the Block 173 final gate.
+reviewed. Final combined native contexts passed **2 / 1,364** at both 100% and compact 150%;
+complete Qt **885 passed / 81 skipped / 104,157 assertions** and standalone native startup
+passed on the frozen runtime recorded in `mvp-plan.md`. Block 173 is accepted.

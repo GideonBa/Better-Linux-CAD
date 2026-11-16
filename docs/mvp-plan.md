@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 172
-current_block: 173
-current_boundary: Block 173 in progress; typed native selectors and shared advanced authoring
-current_tag: "[parity-b173]"
+implemented_through: Block 173
+current_block: 174
+current_boundary: Block 174 in progress; connected curves and Surface acceptance
+current_tag: "[parity-b174]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–172 accepted; Block 173 in progress; Blocks 174–204 planned"
+  advanced_modeling_workflows: "Blocks 145–173 accepted; Block 174 in progress; Blocks 175–204 planned"
 ---
 
 # MVP Plan
@@ -34,10 +34,10 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 172
-current block        Block 173 (in progress)
+implemented through  Block 173
+current block        Block 174 (in progress)
 current phase        Curves, paths and surfaces
-current boundary     Compatible selectors and shared advanced curve/Surface authoring
+current boundary     Connected curve/Surface model with independent physical acceptance
 ```
 
 The assigned sequence continues through Block 184. Blocks 168–169 were delivered by normal
@@ -80,7 +80,8 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 167 | Delivered in [PR #191](https://github.com/GideonBa/Better-Linux-CAD/pull/191): strict compatible V11, native semantic edges, exact hollow sections, cyclic circular frames and independent G01/exchange proofs. |
 | 168–169 | Delivered by normal rebase in [PR #192](https://github.com/GideonBa/Better-Linux-CAD/pull/192): strict V12 intent and verified native G02 construction within documented limits. |
 | 170–172 | 170–172 accepted: typed/checked Offset/Thicken, curved Trim/Extend, native gap queries and complete G03/G04 history/consumer/exchange proof. Delivered by normal rebase in [PR #193](https://github.com/GideonBa/Better-Linux-CAD/pull/193). |
-| 173–174 | Native advanced curve/Surface workflows, integrated edits/history/reopen and physical STEP roundtrip acceptance. |
+| 173 | Accepted native advanced curve/Surface creation/editing, complete regression and 100%/150% physical workflows. |
+| 174 | In progress: connected integrated edits/history/reopen and independent physical STEP acceptance. |
 | 175–176 | Typed variable-radius Fillet laws, ordered semantic chains and independently checked native radius progression. |
 | 177–179 | Typed face/full-round/setback intent, checked supported blends/corners and native shared finishing controls. |
 | 180–181 | Typed Rib/Web skeleton, side/draft/termination intent, checked connected thin volumes and semantic consumers. |
@@ -88,7 +89,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 
 The active Surface branch has [complete checked G03 construction, consumers and exchange proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof).
 Curved Trim/Extend and complete G04 are accepted in 172; the [bounded construction contract](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-construction--172) is retained.
-The active work is 173 native workflow, followed by 174 integrated curve/Surface acceptance and
+The active work is 174 integrated curve/Surface acceptance, followed by
 175–184 advanced finishing, Rib/Web and mapped Emboss/Engrave. The original sequence and scenario
 oracles retain every prerequisite, supported-capability requirement and deferred extension.
 
@@ -179,8 +180,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–172 are **Implemented and accepted**;
-Block 173 is **In progress**; Blocks 174–204 are **Planned; not started**.
+Status authority: Blocks 145–173 are **Implemented and accepted**;
+Block 174 is **In progress**; Blocks 175–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -193,16 +194,16 @@ negative cases, combination matrix, native proof and performance protocol live i
 | A | 145–151 | Shared workflow/evidence, feature history/suppression/reorder, material resources and physical properties | Implemented and accepted |
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
-| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166–172 accepted; 173 in progress; 174 planned |
+| D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | 166–173 accepted; 174 in progress |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Planned; not started |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
 | G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
 | H | 199–204 | Motion/contact extensions, finite measurement, quality/thickness analysis, measured performance and final combined acceptance | Planned; not started |
 
 Advance individual completed blocks or named slices only after their full criteria and relevant
-native checks pass. A phase range remains incomplete while any constituent block is open. Serial
-PR/merge discipline applies to implementation and planning deliveries; no successor branch starts
-before the preceding PR is merged and main refreshed. Deferred drawings/BOMs, sheet metal,
+native checks pass. A phase range remains incomplete while any constituent block is open.
+The current delivery discipline above supersedes the withdrawn automatic push/PR agreement.
+Deferred drawings/BOMs, sheet metal,
 CAM/FEM, automatic fastener libraries and general physical dynamics are not assigned here.
 
 ### Accepted Blocks 145–156
@@ -990,100 +991,40 @@ Trim previews, free-edge/gap overlays, shared editing and native workflows remai
 The combined history/edit/reopen/STEP scenario remains 174. Preserve all later 175–204 planning.
 
 
-### Block 173 advanced native workflow — in progress
+### Block 173 advanced native workflow — accepted
 
-[PR #193](https://github.com/GideonBa/Better-Linux-CAD/pull/193) merged normally by rebase.
-Before this branch, main was clean and upstream-equal at
-`be71e4651716c241175e913a30aafea74a720850`; tree
-`8cef466f4dd9c295641cf9f74497edecc011c089` exactly matched the reviewed delivery.
+Advanced Surface and curve tools share typed creation/editing controls, historical input caches,
+explicit hidden/owned-face selectors, current native-edge Paths and material-region Sweep holes.
+Loft controls retain ordered rails/sections, explicit true-length anchors and scoped support G1/G2;
+unsupported global longitudinal G2 remains a distinct diagnosed request. Numerical feedback retains
+its bounded verification qualifications. Exact independent parameter overrides preserve shared formulas.
 
-Implement and verify these coherent slices, each in commits below 1,500 added lines:
+Contracts and focused proofs:
 
-- Compatible current-Body Surface/support-face and native-edge catalogs; explicit ownership,
-  ambiguity rejection, hidden-input scope and transformed imported references.
-- Shared advanced Surface creation/edit controls: Offset/Thicken result modes and signed/symmetric
-  direction, authored tolerance/deviation, Trim side/projection, natural/tangent Extend and measured
-  feedback. Keep source picking active during preview; show transient free boundaries/gaps.
-- Sweep material-region voids and ordered Loft sections/rails with explicit anchors and scoped
-  start/end/patch supports. Distinguish legacy global continuity from verified boundary G1/G2.
-- Native G01–G04/UI01 workflows at 100%/150%: exact release, invalid correction, mode/hidden-selector
-  changes, compact layout, source cross-highlighting, Cancel restoration, reference repair, exact
-  history/reopening and independently checked physical STEP exchange.
+- [Surface authoring, historical editing, hidden face sets and namespace reservation](gui-interactive-surface-mvp9.md#advanced-surface-authoring-controls).
+- [Current native paths/material regions and shared constrained Loft/Sweep editing](gui-spatial-surface-workbench-mvp7.md#native-material-region-and-current-edge-selectors--173).
+- [Dynamic wrapped property rows](gui-interactive-surface-mvp9.md#dynamic-property-row-layout--173)
+  and [repeated precise edits/compact controls](gui-spatial-surface-workbench-mvp7.md#repeated-curve-edits-and-compact-native-checks--173).
 
-Individual foundations do not accept the whole block. Complete 173 before the combined
-S04/G04/X01 milestone in 174, then continue through 184 under the expanded request. Preserve
-all later 185–204 planning and explicitly deferred capabilities.
+All five targets passed. Complete Core **785 / 35,068**, Geometry **789 / 81,422** and Qt
+**885 passed / 81 skipped / 104,157 assertions** passed. Native advanced widgets/workflows
+passed **8 / 701** at 100% and compact 150%; final combined spatial/Surface contexts passed
+**2 / 1,364** and final Loft controls **1 / 266** at each scale, with reviewed captures, exact
+history/reopening and physical STEP checks. The standalone native app remained running during
+its bounded eight-second startup smoke (timeout 124, no crash).
 
-The [advanced input catalog foundation](gui-spatial-surface-workbench-mvp7.md#advanced-input-catalog-foundation)
-is verified: typed current-Body faces/native edges, curved Surface quilts, hidden scope and placed
-imported rims; focused Geometry **11 / 515** and all five targets passed. Native controls and
-complete workflow acceptance remain in progress.
+The full Qt run and startup used frozen runtime inputs: **1,214 files**,
+`4cc6a9c23bdfe9a631f1fb66c2e1a30f580ce4e7f2f2ac52b5b88536a64f6608`.
+Continue the combined S04/G04/X01 model in 174, then the complete 175–184 assignment. Keep all
+185–204 planning and deferred capabilities.
 
-The [shared advanced candidate foundation](gui-interactive-surface-mvp9.md#advanced-candidate-foundation)
-now covers typed Surface creation/editing, signed/symmetric handles, retained formulas, explicit
-Loft constraints and [native numerical feedback](part-guided-loft-geometry-mvp6.md#transient-numerical-feedback).
-Geometry **35 / 3,996** and affected Qt **14 passed / 1 native-only skip / 1,541 assertions** passed;
-all five targets passed. Native advanced widgets, selectors, overlays and full combined workflows
-remain required before accepting 173.
+### Block 174 connected curve and Surface acceptance — in progress
 
-Historical derived quilts now support Join/Cut/Intersect back into their original Solid while
-keeping earlier producer snapshots and later consumer dependencies. [Contract/proof](part-surface-feature-intent-mvp6.md#historical-body-source-snapshots):
-full Core **785 / 35,068**, native Geometry history **1 / 54** and affected Surface regression
-**17 / 871** passed. Native Surface authoring remains in progress, including named-source picking
-and exact numeric drag/release verification.
-
-Advanced Surface **creation** is verified: typed Offset/Thicken/Trim/Extend options, all four
-Thicken Body modes, native curved-edge inputs, measured boundary feedback and exact numeric
-release. [Evidence and limits](gui-interactive-surface-mvp9.md#advanced-surface-authoring-controls):
-all five targets passed; offscreen **14 passed / 2 native skips / 15,397 assertions**; native
-Surface/viewport/spatial regression **11 / 959** at both 100% and compact 150%, with reviewed
-captures and physical STEP checks. Complete shared editing, hidden/multiple inputs and explicit
-Sweep/Loft authoring next; 173 remains in progress and the assigned target remains 184.
-
-Shared advanced Surface **editing** now loads complete typed records and uses the actual
-pre-feature history cache for sources and frames, including hidden predecessors. Formula/alias
-changes require explicit independent bindings; cross-highlighting preserves explicit list collection.
-[Contract and proof](gui-interactive-surface-mvp9.md#advanced-surface-editing-and-historical-input-geometry):
-all five targets passed, combined Qt **25 passed / 4 native skips / 16,791 assertions**, native
-creation/browser-edit/legacy regression **4 / 727** at 100% and compact 150%. Next complete the
-explicit hidden/multiple-face creation selectors and constrained Sweep/Loft controls. Block 173
-remains in progress; continue through the assigned Block 184.
-
-Explicit hidden Surface inputs and one-owner face sets are now verified in creation and editing.
-Native G04 includes model-clicked cylindrical face sets, Offset→Thicken and projected curved
-Trim Keep/Remove→native arc Extend→Thicken, with independent physical STEP checks and complete
-history/reopening. [Contract/evidence](gui-interactive-surface-mvp9.md#explicit-hidden-inputs-and-owned-face-sets):
-all five targets passed; Qt **21 passed / 5 native skips / 15,682 assertions**; native **5 / 779** at
-100% and compact 150%, reviewed captures. Shared source-driver frames use staged parameters.
-Next finish Sweep material-region/native path selectors and constrained Loft creation/editing;
-173 remains in progress, followed by the complete 174–184 assignment.
-
-Surface allocation additionally reserves complete generated parameter namespaces/names, preventing
-implicit adoption of unrelated user values and duplicate names on repeated independent overrides.
-[Focused proof](gui-interactive-surface-mvp9.md#surface-parameter-namespace-reservation): all five
-targets and Qt **4 passed / 1 native skip / 185 assertions** passed. Continue the remaining 173
-Sweep/Loft controls before integrated 174 and the full 175–184 continuation.
-
-Sweep material-region and current native-edge Path selectors are verified, including exact holes,
-model-clicked arcs and Cancel restoration. Hidden owned Bodies no longer reappear through the
-legacy viewport fallback. [Contract and evidence](gui-spatial-surface-workbench-mvp7.md#native-material-region-and-current-edge-selectors--173):
-all five targets, Geometry **14 / 903**, Qt **12 passed / 5 native skips / 1,709 assertions**,
-native **5 / 363** at 100% and compact 150%, reviewed captures and physical STEP checks passed.
-Next complete shared Sweep/Loft editing and constrained Loft controls; 173 remains in progress
-and the assigned continuation remains through 184.
-
-The [shared Sweep/Loft editing controller](gui-spatial-surface-workbench-mvp7.md#shared-sweep-and-loft-editing-controllers--173)
-retains full Body operations, bindings, orientation and exact section/constraint intent. All five
-targets and focused Qt **8 / 241** passed, including independent volumes and atomic invalid G2.
-Continue native shared panels and constrained Loft authoring before accepting 173 and proceeding
-through 174–184.
-
-[Native constrained Loft and shared curve panels](gui-spatial-surface-workbench-mvp7.md#native-constrained-loft-and-shared-curve-panels--173)
-now expose explicit anchors, scoped support G1/G2, measured feedback, hidden/historical sources and
-complete advanced Sweep/Loft editing. Native 100% and compact 150% each passed **8 / 701**, including
-physical STEP/profile checks. Reviewed field/feedback captures and Qt **23 passed / 6 native skips /
-3,612 assertions** complete this slice. Full Core **785 / 35,068** and Geometry **789 / 81,422** passed.
-Final full Qt regression remains before Block 173 acceptance; then continue through 174–184.
+The connected test model and independent oracles are prepared; they are not yet accepted.
+Combine the G2 airfoil, fixed 3D guide poles, equation duct, curved quilt, Offset/Thicken,
+Hole, Body Boolean, Pattern and rim Fillet. Exercise section/guide/anchor edits, impossible
+Offset/G2 requests, full Sketch sidecars and exact history/reopening. Compare native boundary
+derivatives, analytic component volumes and finishing contacts before and after STEP reimport.
 
 ### Implementation route for the assigned continuation
 

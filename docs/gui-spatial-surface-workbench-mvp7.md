@@ -110,7 +110,7 @@ points and inside/outside material checks validate native and reimported geometr
 Focused Qt passed **23 / 3,612**, with six native-only skips. Full Core **785 / 35,068** and
 Geometry **789 / 81,422** passed; their binaries remain unchanged by the GUI refinements.
 Frozen runtime: 1,213 files, `8346c17e863d56591e9c0f95e812976d7d2c0cbaff3de870d98cd2d051909daa`.
-Final full Qt regression remains the whole-block acceptance gate.
+The final complete Qt regression passed; the whole-block acceptance is recorded in `mvp-plan.md`.
 
 ## Repeated curve edits and compact native checks — 173
 
@@ -123,4 +123,7 @@ menu row under the desktop pointer instead of requiring one arbitrary horizontal
 
 All five targets passed. Combined spatial/Surface native contexts passed **2 / 1,364** at each
 scale; final Loft field/feedback captures passed **1 / 266** at 100% and compact 150% and were
-reviewed. The complete Qt run is the remaining Block 173 acceptance check.
+reviewed. Complete Qt **885 passed / 81 skipped / 104,157 assertions** passed on the
+unchanged 1,214-file runtime manifest recorded in `mvp-plan.md`. The separate native app startup
+smoke remained alive for eight seconds (timeout 124, no crash). Block 173 is accepted; 174
+continues the connected physical milestone.
