@@ -1057,3 +1057,9 @@ all five targets passed; Qt **21 passed / 5 native skips / 15,682 assertions**; 
 100% and compact 150%, reviewed captures. Shared source-driver frames use staged parameters.
 Next finish Sweep material-region/native path selectors and constrained Loft creation/editing;
 173 remains in progress, followed by the complete 174–184 assignment.
+
+Surface allocation additionally reserves complete generated parameter namespaces/names, preventing
+implicit adoption of unrelated user values and duplicate names on repeated independent overrides.
+[Focused proof](gui-interactive-surface-mvp9.md#surface-parameter-namespace-reservation): all five
+targets and Qt **4 passed / 1 native skip / 185 assertions** passed. Continue the remaining 173
+Sweep/Loft controls before integrated 174 and the full 175–184 continuation.

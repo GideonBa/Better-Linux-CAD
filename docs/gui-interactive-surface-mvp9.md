@@ -227,3 +227,13 @@ Frozen runtime: **1,203 files**,
 `2e6fbcbee8f250fa3764e6e0b8e37b6f73f1f82110ae6173099a16f690423be3`.
 Sweep material-region/native path selectors and constrained Loft creation/editing remain required
 before accepting the complete Block 173 workflow.
+
+### Surface parameter namespace reservation
+
+New Surface recipes reserve every generated parameter node (distance, tolerance and deviation),
+Body alias and display name before choosing their feature number. An unrelated user parameter
+cannot be adopted or overwritten because its identifier happens to match a generated suffix.
+Repeated independent-value overrides allocate unique display names and retain prior bindings.
+All five targets passed; focused allocation/creation Qt **4 passed / 1 native skip / 185 assertions**
+checks preserved user values, distinct new bindings and exact Undo. Runtime **1,203 files**,
+`0e21237493cd354fe707519de7746a59750412aae3e34a1954f265211c226001`.

@@ -134,14 +134,21 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_surface_controller() {
       auto quantity = Quantity::length_mm(value, id.value());
       if (!quantity)
         return Result<ParameterId>::failure(quantity.error());
-      auto parameter = Parameter::create_length(
-          id,
+      const auto base_name =
           surface_name_ +
-              (slot == 0   ? (command_ == Command::Thicken ? " Thickness" : " Distance")
-               : slot == 1 ? " Tolerance"
-                           : " Deviation") +
-              (id == original ? "" : " Independent"),
-          quantity.value());
+          (slot == 0   ? (command_ == Command::Thicken ? " Thickness" : " Distance")
+           : slot == 1 ? " Tolerance"
+                       : " Deviation") +
+          (id == original ? "" : " Independent");
+      auto name = base_name;
+      for (std::size_t suffix = 2;; ++suffix) {
+        const auto named = [&](const Parameter& parameter) { return parameter.name() == name; };
+        if (!std::any_of(part->parameters().begin(), part->parameters().end(), named) &&
+            !std::any_of(pending.begin(), pending.end(), named))
+          break;
+        name = base_name + " " + std::to_string(suffix);
+      }
+      auto parameter = Parameter::create_length(id, name, quantity.value());
       if (!parameter)
         return Result<ParameterId>::failure(parameter.error());
       pending.push_back(parameter.value());
