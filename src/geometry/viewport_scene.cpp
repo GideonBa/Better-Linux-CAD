@@ -400,8 +400,10 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
                          cached.body_id.value()});
     }
 
-    if (items.empty() && shape_cache.has_final_shape() && shape_cache.final_shape() != nullptr &&
-        !shape_cache.final_shape()->empty()) {
+    // Only legacy documents without owned Bodies use the terminal-feature fallback.
+    // An empty visible Body list must not resurrect explicitly hidden geometry.
+    if (items.empty() && document.bodies().empty() && shape_cache.has_final_shape() &&
+        shape_cache.final_shape() != nullptr && !shape_cache.final_shape()->empty()) {
       items.push_back({ViewportSceneKind::SolidBody,
                        "feature/" + shape_cache.final_feature_id().value(),
                        *shape_cache.final_shape()});

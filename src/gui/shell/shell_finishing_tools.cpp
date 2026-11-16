@@ -617,6 +617,11 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::finishing_selection_
                            : geometry::ViewportSceneKind::Face,
                        target.semantic_id, target.shape, SketchLineRole::Geometry,
                        finishing_body_->currentData().toString().toStdString()});
+  if (command_ == Command::PathCurve)
+    if (const auto edges = native_spatial_edges(); edges)
+      for (const auto& edge : edges.value())
+        items.push_back({geometry::ViewportSceneKind::Edge, edge.target.semantic_id,
+                         edge.target.shape, SketchLineRole::Geometry, edge.owner.value()});
   if (surface())
     for (const auto& input : surface_inputs_)
       if (input.surface && input.surface->source_kind() == SurfaceReferenceSourceKind::Body &&

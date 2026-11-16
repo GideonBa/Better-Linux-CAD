@@ -1212,6 +1212,7 @@ Result<std::size_t> ShellFeatureTools::apply() {
   window_.finish_context_task(true);
   const bool was_finishing = finishing();
   const bool was_pattern = pattern();
+  const bool was_path = command_ == Command::PathCurve;
   const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
   const bool restore_scope = finishing() || pattern() || body_operation() || spatial() || surface();
@@ -1238,6 +1239,8 @@ Result<std::size_t> ShellFeatureTools::apply() {
     window_.refresh_feature_selection_scene();
   }
   surface_targets_.clear();
+  if (was_path)
+    window_.refresh_feature_selection_scene();
   if (advanced_surface_) {
     advanced_surface_->editing.reset();
     advanced_surface_->input_cache.reset();
@@ -1274,7 +1277,9 @@ void ShellFeatureTools::cancel() noexcept {
     (void)session_.task().cancel();
   const bool was_finishing = finishing();
   const bool was_surface = surface();
+  const bool was_spatial = spatial();
   const bool was_pattern = pattern();
+  const bool was_path = command_ == Command::PathCurve;
   const bool was_extrude = command_ == Command::Extrude;
   const bool restore_selection = pattern() || body_operation() || spatial() || surface();
   const bool restore_scope = finishing() || pattern() || body_operation() || spatial() || surface();
@@ -1305,7 +1310,7 @@ void ShellFeatureTools::cancel() noexcept {
     window_.refresh_feature_selection_scene();
   }
   surface_targets_.clear();
-  if (was_surface)
+  if (was_surface || was_path)
     window_.refresh_feature_selection_scene();
   preview_valid_ = false;
   if (was_extrude)
@@ -1321,6 +1326,13 @@ void ShellFeatureTools::cancel() noexcept {
     advanced_surface_->editing.reset();
     advanced_surface_->input_cache.reset();
     advanced_surface_->input_prefix.reset();
+  }
+  if (was_spatial) {
+    if (spatial_entry_viewport_selection_)
+      (void)viewport_.select_semantic(spatial_entry_viewport_selection_->semantic_id);
+    else
+      viewport_.clear_selection();
+    session_.selection() = spatial_entry_selection_;
   }
   window_.finish_context_task(false);
   window_.refresh();

@@ -400,6 +400,13 @@ private:
   [[nodiscard]] bool spatial() const noexcept;
   [[nodiscard]] QString spatial_summary() const;
   void build_spatial_controls(QWidget* panel);
+  void build_sweep_region_controls(QFormLayout&);
+  [[nodiscard]] Result<SweepProfileReference> selected_sweep_profile();
+  struct SpatialNativeEdge {
+    geometry::FinishingSelectionTarget target;
+    BodyId owner;
+  };
+  [[nodiscard]] Result<std::vector<SpatialNativeEdge>> native_spatial_edges() const;
   void refresh_spatial_preview();
   [[nodiscard]] Result<std::size_t> rebuild_spatial_controller();
   void refresh_spatial_enablement(bool idle_part);
@@ -622,12 +629,16 @@ private:
   bool body_reference_picking_{false};
 
   std::vector<SpatialInput> spatial_inputs_;
+  GuiSelectionModel spatial_entry_selection_;
+  std::optional<GuiSelection> spatial_entry_viewport_selection_;
   std::vector<std::pair<Command, QAction*>> spatial_actions_;
   QWidget* spatial_controls_{nullptr};
   QComboBox* spatial_policy_target_{nullptr};
   QComboBox* spatial_policy_{nullptr};
   QLineEdit* spatial_model_tolerance_{nullptr};
   QComboBox* spatial_source_{nullptr};
+  QComboBox* sweep_region_policy_{nullptr};
+  QListWidget* sweep_preserved_holes_{nullptr};
   QListWidget* spatial_order_{nullptr};
   QComboBox* spatial_mode_{nullptr};
   QComboBox* spatial_target_{nullptr};

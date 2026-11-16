@@ -3,6 +3,7 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/sweep_region_query.hpp"
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <catch2/catch_approx.hpp>
@@ -366,4 +367,19 @@ TEST_CASE("Closed Sweep does not coalesce authored near-circles into an undeclar
   REQUIRE_FALSE(run);
   CHECK(run.error().message().find("same circle") != std::string::npos);
   CHECK(cache.validate_complete_geometry_result(accepted));
+}
+
+TEST_CASE("Sweep material inspection reports native holes and rejects touching contours",
+          "[geometry][material-region-sweep][parity-b173]") {
+  auto p = tube(FeatureBodyOperationMode::NewBody);
+  auto holes = inspect_sweep_material_holes(p, SketchId("sweep.profile"), ProfileId("outer"));
+  REQUIRE(holes);
+  REQUIRE(holes.value().size() == 1);
+  CHECK(holes.value().front() == ProfileId("inner"));
+  f::checked(
+      p.set_parameter_value(ParameterId("inner.diameter"), f::checked(Quantity::length_mm(4))));
+  auto touching = inspect_sweep_material_holes(p, SketchId("sweep.profile"), ProfileId("outer"));
+  REQUIRE_FALSE(touching);
+  CHECK(touching.error().message().find("touch or intersect") != std::string::npos);
+  CHECK_FALSE(inspect_sweep_material_holes(p, SketchId("missing"), ProfileId("outer")));
 }
