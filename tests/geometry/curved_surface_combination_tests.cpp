@@ -83,3 +83,53 @@ TEST_CASE("G04 seam trim, curved and tangent extension, Stitch and Thicken carry
   REQUIRE(shapes.size() == 1);
   physical(shapes.front(), expected(6));
 }
+
+TEST_CASE(
+    "Historical quilts modify their source Solid and survive contour edits and exact reopening",
+    "[geometry][surface-body-snapshot][curved-surface-combination][parity-b173]") {
+  for (const auto mode : {FeatureBodyOperationMode::Join, FeatureBodyOperationMode::Cut,
+                          FeatureBodyOperationMode::Intersect}) {
+    auto p = f::combination();
+    auto cache = blcad::test::surface_offset::cache();
+    execute(p, cache);
+    const auto source = *cache.find_feature_shape(FeatureId("source.feature"));
+    const auto modifier = f::checked(SurfaceOffsetFeature::create_thicken(
+        FeatureId("modify"), "Modify", f::body("quilt.body"),
+        {ParameterId("wall"),
+         ParameterId("tolerance"),
+         SurfaceOffsetSide::Symmetric,
+         SurfaceOffsetApproximation::ExactAnalytic,
+         {}},
+        f::checked(FeatureBodyResultContext::create(mode, BodyId("source.body"), {}))));
+    REQUIRE(p.add_surface_feature(modifier));
+    execute(p, cache);
+    const double outside = 20 * std::acos(.8) + 3;
+    const double inside =
+        9.75 * std::acos(.8) + .5 * (3 * std::sqrt(91.) + 100 * std::asin(.3)) - 28.5;
+    const auto expected = [&](double height) {
+      const double base = 2000 * std::numbers::pi;
+      return mode == FeatureBodyOperationMode::Join  ? base + (outside - inside) * height
+             : mode == FeatureBodyOperationMode::Cut ? base - inside * height
+                                                     : inside * height;
+    };
+    const auto check = [&](const ShapeCache& c, double height) {
+      CHECK(blcad::test::integrated_solid_volume(*c.find_body_shape(BodyId("source.body")))
+                .volume_mm3 == Catch::Approx(expected(height)).margin(5e-5));
+      CHECK(c.find_body_result(BodyId("source.body"))->source_feature_id == FeatureId("modify"));
+      CHECK(blcad::test::integrated_solid_volume(*c.find_feature_shape(FeatureId("source.feature")))
+                .volume_mm3 == Catch::Approx(2000 * std::numbers::pi).margin(1e-6));
+      CHECK(blcad::test::integrated_solid_volume(source).volume_mm3 ==
+            Catch::Approx(2000 * std::numbers::pi).margin(1e-6));
+    };
+    check(cache, 7);
+    REQUIRE(
+        p.set_parameter_value(ParameterId("window.height"), f::checked(Quantity::length_mm(6))));
+    execute(p, cache);
+    check(cache, 9);
+    auto reopened =
+        f::checked(deserialize_part_document_from_json(blcad::test::surface_offset::saved(p)));
+    auto fresh = blcad::test::surface_offset::cache();
+    execute(reopened, fresh);
+    check(fresh, 9);
+  }
+}

@@ -6,6 +6,7 @@
 #include <cmath>
 #include <string>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
 
 namespace blcad {
@@ -326,6 +327,46 @@ Result<std::size_t> add_dependency_if_missing(DependencyGraph& graph, std::strin
     return Result<std::size_t>::success(graph.dependency_count());
   }
   return graph.add_dependency(std::move(dependency), std::move(dependent));
+}
+
+// Body aliases denote the latest result. Earlier consumers retain the actual
+// producer snapshot they used before a later in-place Surface operation.
+Result<std::size_t> bind_historical_surface_consumers(DependencyGraph& graph,
+                                                      const std::string& body,
+                                                      const std::vector<std::string>& producers,
+                                                      const std::string& modifier,
+                                                      const std::vector<std::string>& order) {
+  if (producers.empty())
+    return Result<std::size_t>::success(0);
+  const auto stop = std::find(order.begin(), order.end(), modifier);
+  const std::unordered_set<std::string> earlier(order.begin(), stop);
+  for (const auto& consumer : graph.direct_dependents(body)) {
+    if (consumer == modifier)
+      continue;
+    bool historical = earlier.contains(consumer);
+    if (std::find(order.begin(), order.end(), consumer) == order.end()) {
+      const auto downstream = graph.transitive_dependents(consumer);
+      historical |= std::find(downstream.begin(), downstream.end(), modifier) != downstream.end() ||
+                    std::any_of(downstream.begin(), downstream.end(),
+                                [&](const auto& id) { return earlier.contains(id); });
+    }
+    if (!historical)
+      continue;
+    const auto inputs = dependency_sources_of(graph, consumer);
+    graph.remove_dependencies_of_dependent(consumer);
+    for (const auto& input : inputs)
+      if (input != body) {
+        auto added = add_dependency_if_missing(graph, input, consumer);
+        if (!added)
+          return added;
+      }
+    for (const auto& producer : producers) {
+      auto added = add_dependency_if_missing(graph, producer, consumer);
+      if (!added)
+        return added;
+    }
+  }
+  return Result<std::size_t>::success(1);
 }
 
 [[nodiscard]] std::string reference_generated_line_node_id(const Sketch& sketch,
@@ -2898,6 +2939,18 @@ Result<std::size_t> PartDocument::add_surface_feature(SurfaceFeature feature) {
     return Result<std::size_t>::failure(
         Error::dependency(id.value(), "Surface feature result Body already has a producer"));
 
+  std::vector<std::string> source_order;
+  if (history_intent_)
+    source_order = history_intent_->order;
+  else if (replayed_feature_order_)
+    source_order = *replayed_feature_order_;
+  else {
+    auto history = executable_history();
+    if (!history)
+      return Result<std::size_t>::failure(history.error());
+    for (const auto& row : history.value())
+      source_order.push_back(row.node_id);
+  }
   auto graph = dependency_graph_;
   auto node = add_authored_graph_node(graph, id.value());
   if (node.has_error()) return Result<std::size_t>::failure(node.error());
@@ -2913,6 +2966,10 @@ Result<std::size_t> PartDocument::add_surface_feature(SurfaceFeature feature) {
   }
   if (in_place) {
     const auto previous = dependency_sources_of(graph, result_node);
+    auto bound =
+        bind_historical_surface_consumers(graph, result_node, previous, id.value(), source_order);
+    if (!bound)
+      return bound;
     graph.remove_dependencies_of_dependent(result_node);
     for (const auto& producer : previous) {
       auto edge = add_dependency_if_missing(graph, producer, id.value());
@@ -4963,6 +5020,16 @@ PartDocument::update_feature_record(std::vector<FeatureT> PartDocument::*member,
   // result Body, retain the direct/released-producer validation paths.
   auto rebuild = [&](bool release_body) -> Result<PartDocument> {
     PartDocument candidate = *this;
+    if constexpr (std::is_same_v<FeatureT, SurfaceFeature>) {
+      if (!candidate.history_intent_ && !candidate.replayed_feature_order_) {
+        const auto history = executable_history();
+        if (!history)
+          return Result<PartDocument>::failure(history.error());
+        candidate.replayed_feature_order_ = std::vector<std::string>{};
+        for (const auto& row : history.value())
+          candidate.replayed_feature_order_->push_back(row.node_id);
+      }
+    }
     std::vector<FeatureT>& candidate_records = candidate.*member;
     candidate_records.erase(candidate_records.begin() + static_cast<std::ptrdiff_t>(index));
     auto removed = candidate.dependency_graph_.remove_node(node_id);

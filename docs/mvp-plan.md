@@ -1025,3 +1025,9 @@ Loft constraints and [native numerical feedback](part-guided-loft-geometry-mvp6.
 Geometry **35 / 3,996** and affected Qt **14 passed / 1 native-only skip / 1,541 assertions** passed;
 all five targets passed. Native advanced widgets, selectors, overlays and full combined workflows
 remain required before accepting 173.
+
+Historical derived quilts now support Join/Cut/Intersect back into their original Solid while
+keeping earlier producer snapshots and later consumer dependencies. [Contract/proof](part-surface-feature-intent-mvp6.md#historical-body-source-snapshots):
+full Core **785 / 35,068**, native Geometry history **1 / 54** and affected Surface regression
+**17 / 871** passed. Native Surface authoring remains in progress, including named-source picking
+and exact numeric drag/release verification.
