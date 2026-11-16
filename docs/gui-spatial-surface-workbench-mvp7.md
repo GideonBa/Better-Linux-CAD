@@ -67,3 +67,17 @@ integrated volume `30π`, an empty axial point, complete Undo/Redo, reopening an
 reimport. The selected current Body arc checks true path length `5π` after Apply.
 
 Shared Sweep/Loft editing and constrained Loft controls remain required for complete Block 173.
+
+## Shared Sweep and Loft editing controllers — 173
+
+Typed editing retains the complete Body result operation, Sweep profile region policy, path,
+orientation/up vector, guide and twist binding. Unchanged parameter values are not rewritten.
+An explicit independent twist binding preserves the original Angle parameter; Angle expression
+parameters remain outside the existing Core capability. Loft editing retains exact section
+alignment/rotation, ordered rails, constraints and global continuity, with automatic realignment
+opt-in during editing. Invalid geometry/global G2 remains an atomic failure.
+
+All five targets and focused Qt **8 / 241** passed, including independent four-operation Sweep
+volumes, exact no-op serialization and the verified four-boundary G2 airfoil Loft. Frozen runtime
+1,207 files: `7e10578b87e54fcc66a6c778b0c916f3cab26554decca2b753e6ad6e9cac44fe`.
+Native shared panels and constrained Loft authoring remain the next Block 173 gate.

@@ -124,6 +124,51 @@ public:
     return Result<std::size_t>::success(1);
   }
 
+  [[nodiscard]] Result<std::size_t> begin_edit(const GuiDocumentSession& session, FeatureId id) {
+    const auto* part = session.part_document();
+    const auto* source = part ? part->find_sweep_feature(id) : nullptr;
+    if (!source || part->is_reference_part())
+      return fail("Choose an editable Sweep feature");
+    const Parameter* twist =
+        source->twist_parameter() ? part->find_parameter(*source->twist_parameter()) : nullptr;
+    if (source->twist_parameter() && (!twist || twist->type() != ParameterType::Angle))
+      return fail("Sweep twist binding is unavailable");
+    auto begun =
+        begin_sweep(session, source->id(), source->name(), source->kind(), source->profile(),
+                    source->path(), source->body_result_context().effective_produced_body());
+    if (!begun)
+      return begun;
+    editing_ = true;
+    body_context_ = source->body_result_context();
+    sweep_orientation_ = source->orientation_override();
+    sweep_up_ = source->fixed_up_vector_override();
+    guide_path_ = source->guide_path();
+    twist_parameter_ = source->twist_parameter();
+    if (twist)
+      twist_deg_ = twist->value().degrees();
+    return begun;
+  }
+  [[nodiscard]] bool editing() const noexcept {
+    return editing_;
+  }
+  void set_sweep_profile(SweepProfileReference value) {
+    profile_ = std::move(value);
+  }
+  void set_sweep_path(PathCurveId value) {
+    sweep_path_ = std::move(value);
+  }
+  void set_sweep_orientation(std::optional<PathOrientationRule> rule, std::optional<Vector3> up) {
+    sweep_orientation_ = rule;
+    sweep_up_ = up;
+  }
+  void set_body_result_context(FeatureBodyResultContext value) {
+    result_body_ = value.effective_produced_body();
+    body_context_ = std::move(value);
+  }
+  void set_pending_twist(std::optional<Parameter> value) {
+    pending_twist_ = std::move(value);
+  }
+
   [[nodiscard]] bool active() const noexcept { return active_; }
   [[nodiscard]] GuiPathSweepMode mode() const noexcept { return mode_; }
   [[nodiscard]] std::size_t segment_count() const noexcept { return segments_.size(); }
@@ -345,6 +390,10 @@ private:
     sweep_kind_ = SweepFeatureKind::Sweep;
     pending_body_.reset();
     pending_twist_.reset();
+    editing_ = false;
+    body_context_.reset();
+    sweep_orientation_.reset();
+    sweep_up_.reset();
   }
 
   [[nodiscard]] Result<std::size_t> seed_parameters(PartDocument& part) const {
@@ -362,6 +411,9 @@ private:
       if (!added)
         return added;
     }
+    const auto* existing = part.find_parameter(*twist_parameter_);
+    if (existing && existing->value().degrees() == twist_deg_)
+      return Result<std::size_t>::success(0);
     auto quantity = Quantity::angle_deg(twist_deg_, twist_parameter_->value());
     if (quantity.has_error()) return Result<std::size_t>::failure(quantity.error());
     auto changed = part.set_parameter_value(*twist_parameter_, quantity.value());
@@ -385,7 +437,8 @@ private:
     }
     if (!profile_.has_value())
       return fail("sweep requires a profile");
-    auto context = sweep_kind_ == SweepFeatureKind::SweepCut
+    auto context = body_context_ ? Result<FeatureBodyResultContext>::success(*body_context_)
+                   : sweep_kind_ == SweepFeatureKind::SweepCut
                        ? FeatureBodyResultContext::create(FeatureBodyOperationMode::Cut,
                                                           result_body_, std::nullopt)
                        : FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody,
@@ -393,21 +446,23 @@ private:
     if (context.has_error()) return Result<std::size_t>::failure(context.error());
     Result<SweepFeature> feature = build_sweep(context.value());
     if (feature.has_error()) return Result<std::size_t>::failure(feature.error());
-    return part.add_sweep_feature(std::move(feature.value()));
+    return editing_ ? part.update_sweep_feature(std::move(feature.value()))
+                    : part.add_sweep_feature(std::move(feature.value()));
   }
 
   [[nodiscard]] Result<SweepFeature> build_sweep(const FeatureBodyResultContext& context) const {
     switch (sweep_kind_) {
     case SweepFeatureKind::Sweep:
       return SweepFeature::create_sweep(feature_, name_, *profile_, sweep_path_, context,
-                                        std::nullopt, std::nullopt, twist_parameter_, guide_path_);
+                                        sweep_orientation_, sweep_up_, twist_parameter_,
+                                        guide_path_);
     case SweepFeatureKind::SweepCut:
       return SweepFeature::create_sweep_cut(feature_, name_, *profile_, sweep_path_, context,
-                                            std::nullopt, std::nullopt, twist_parameter_,
+                                            sweep_orientation_, sweep_up_, twist_parameter_,
                                             guide_path_);
     case SweepFeatureKind::SweepSurface:
       return SweepFeature::create_sweep_surface(feature_, name_, *profile_, sweep_path_, context,
-                                                std::nullopt, std::nullopt, twist_parameter_,
+                                                sweep_orientation_, sweep_up_, twist_parameter_,
                                                 guide_path_);
     }
     return Result<SweepFeature>::failure(
@@ -434,6 +489,10 @@ private:
         Error::validation("gui.interactive_path_sweep", std::move(message)));
   }
 
+  bool editing_{false};
+  std::optional<FeatureBodyResultContext> body_context_;
+  std::optional<PathOrientationRule> sweep_orientation_;
+  std::optional<Vector3> sweep_up_;
   bool active_{false};
   GuiPathSweepMode mode_{GuiPathSweepMode::PathCurve};
   PathCurveId path_id_{""};
@@ -478,6 +537,8 @@ public:
     if (kind == LoftFeatureKind::LoftCut && pending_body)
       return fail("loft cut requires an existing target Body");
     pending_body_ = std::move(pending_body);
+    editing_ = false;
+    body_context_.reset();
     feature_ = std::move(feature);
     name_ = std::move(name);
     kind_ = kind;
@@ -491,6 +552,51 @@ public:
     auto_alignment_ = true;
     active_ = true;
     return Result<std::size_t>::success(1);
+  }
+
+  [[nodiscard]] Result<std::size_t> begin_edit(const GuiDocumentSession& session, FeatureId id) {
+    const auto* part = session.part_document();
+    const auto* source = part ? part->find_loft_feature(id) : nullptr;
+    if (!source || part->is_reference_part())
+      return fail("Choose an editable Loft feature");
+    auto begun = begin_loft(session, source->id(), source->name(), source->kind(),
+                            source->body_result_context().effective_produced_body());
+    if (!begun)
+      return begun;
+    editing_ = true;
+    body_context_ = source->body_result_context();
+    sections_ = source->sections();
+    constraints_ = source->constraints();
+    path_curve_ = source->path_curve();
+    guide_curves_ = source->guide_curves();
+    continuity_ = source->continuity();
+    auto_alignment_ =
+        false; // Keep authored correspondence unless alignment is explicitly requested.
+    return begun;
+  }
+  [[nodiscard]] bool editing() const noexcept {
+    return editing_;
+  }
+  [[nodiscard]] Result<std::size_t> set_sections(std::vector<ProfileSectionReference> values) {
+    if (!active_)
+      return fail("No Loft command is active");
+    const auto previous = sections_;
+    sections_.clear();
+    for (auto& section : values) {
+      auto added = add_section(std::move(section));
+      if (!added) {
+        sections_ = previous;
+        return added;
+      }
+    }
+    return Result<std::size_t>::success(sections_.size());
+  }
+  void set_body_result_context(FeatureBodyResultContext value) {
+    result_body_ = value.effective_produced_body();
+    body_context_ = std::move(value);
+  }
+  void set_guide_curves(std::vector<PathCurveId> values) {
+    guide_curves_ = std::move(values);
   }
 
   [[nodiscard]] bool active() const noexcept { return active_; }
@@ -622,7 +728,8 @@ private:
     }
     if (auto seeded = detail::provision_new_feature_parameters(part, pending_parameters_); !seeded)
       return seeded;
-    auto context = kind_ == LoftFeatureKind::LoftCut
+    auto context = body_context_ ? Result<FeatureBodyResultContext>::success(*body_context_)
+                   : kind_ == LoftFeatureKind::LoftCut
                        ? FeatureBodyResultContext::create(FeatureBodyOperationMode::Cut,
                                                           result_body_, std::nullopt)
                        : FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody,
@@ -640,7 +747,8 @@ private:
     auto constrained = feature.value().with_constraints(constraints_);
     if (!constrained)
       return Result<std::size_t>::failure(constrained.error());
-    return part.add_loft_feature(std::move(constrained.value()));
+    return editing_ ? part.update_loft_feature(std::move(constrained.value()))
+                    : part.add_loft_feature(std::move(constrained.value()));
   }
 
   [[nodiscard]] Result<LoftFeature>
@@ -677,6 +785,8 @@ private:
 
   std::optional<LoftConstraintIntent> constraints_;
   std::vector<Parameter> pending_parameters_;
+  bool editing_{false};
+  std::optional<FeatureBodyResultContext> body_context_;
   bool active_{false};
   FeatureId feature_{""};
   std::string name_;

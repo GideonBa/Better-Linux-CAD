@@ -1071,3 +1071,9 @@ all five targets, Geometry **14 / 903**, Qt **12 passed / 5 native skips / 1,709
 native **5 / 363** at 100% and compact 150%, reviewed captures and physical STEP checks passed.
 Next complete shared Sweep/Loft editing and constrained Loft controls; 173 remains in progress
 and the assigned continuation remains through 184.
+
+The [shared Sweep/Loft editing controller](gui-spatial-surface-workbench-mvp7.md#shared-sweep-and-loft-editing-controllers--173)
+retains full Body operations, bindings, orientation and exact section/constraint intent. All five
+targets and focused Qt **8 / 241** passed, including independent volumes and atomic invalid G2.
+Continue native shared panels and constrained Loft authoring before accepting 173 and proceeding
+through 174–184.
