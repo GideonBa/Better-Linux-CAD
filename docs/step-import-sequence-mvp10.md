@@ -328,7 +328,7 @@ extends exact UV conversion to complete regular Torus faces with one wire, two s
 one shared vertex over full U/V periods. The corresponding face wire-orientation status is
 eligible. Consequential solid-region statuses qualify only after analytic proof of one outward
 torus shell and strictly contained, mutually disjoint inward toroidal voids on the same axis.
-Partial/trimming boundaries, spindle tori and incompatible shell arrangements remain rejected.
+Other partial/trimming boundaries, spindle tori and incompatible shell arrangements remain rejected.
 The converter preserves face orientation and every existing 3D curve/range, surface, vertex and
 tolerance, then requires the same final BRep validity. No general solid-orientation repair is enabled. On a private
 copy, the decoder orders seam pcurves, shifts them by full surface periods and completes the
@@ -337,6 +337,17 @@ tolerance remains unchanged and retained. A changed or still-invalid result is r
 The optional full ShapeFix/Perform sequence, sewing, curve fitting, vertex merging and general
 supplier healing remain disabled and owned by the later explicit healing workflow. This conversion
 does not alter source bytes, nominal geometry, source freshness or catalog identity rules.
+
+Block 174 additionally decodes the single seam of a regular toroidal strip used by circular
+Fillets: full major-circle U period, a strict sub-period in V, one four-use wire, three circular
+edges and two vertices. Only the existing face-unorientability/wire-closure statuses qualify;
+there is no additional solid-orientation or material-region exception. Its 3D endpoints must
+meet the native curve/face accuracy independently of vertex tolerances that basic STEP transfer
+may enlarge. Face orientation and the same immutable 3D/tolerance evidence are retained through
+conversion. The reader rejects displaced seam vertices; it does not modify the source asset.
+All five targets and the reader regression **14 / 751** passed, including the independent
+radial-envelope volume and unchanged-byte rejection of a displaced seam vertex in
+`step_import_reader_tests.cpp`. The connected native milestone remains the separate 174 gate.
 
 Definitions retain XDE sharing only in transient maps. Canonical recursive geometry/topology
 signatures and sorted direct child-transform signatures determine runtime ordering. Names are

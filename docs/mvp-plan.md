@@ -1026,6 +1026,12 @@ Hole, Body Boolean, Pattern and rim Fillet. Exercise section/guide/anchor edits,
 Offset/G2 requests, full Sketch sidecars and exact history/reopening. Compare native boundary
 derivatives, analytic component volumes and finishing contacts before and after STEP reimport.
 
+The connected model exposed a partial toroidal Fillet seam conversion in STEP. Its
+[bounded decoder contract](step-import-sequence-mvp10.md) now retains all 3D/tolerance evidence
+and rejects displaced seam vertices independently of inflated transfer vertex tolerances.
+All five targets and reader regression **14 / 751** passed. Complete connected GUI/native
+history and physical STEP verification remain required; 174 is still in progress.
+
 ### Implementation route for the assigned continuation
 
 - **174:** use one connected Part: G2 airfoil/adjacent supports and constrained 3D rails, an
