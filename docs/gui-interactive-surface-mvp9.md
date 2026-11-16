@@ -45,7 +45,7 @@ the value at drag start, then a further Escape cancels the command. Stitch toler
 The task exposes existing PathCurves, visible recomputed Surface Bodies, materialized Sketch profiles
 for Trim, and supported unambiguous semantic box faces/linear edges on visible solid Bodies. The latter
 reuse stable finishing-selection resolution, including four-line drawn rectangle extrusions.
-Extend's path chooser admits only single linear segments; Trim admits closed paths and profiles.
+Extend's chooser admits complete supported native line/arc/derived edges; Trim admits closed paths and profiles.
 Selection masks and an explicit semantic whitelist restrict native picking to the active input role,
 then restore the previous viewport context on Apply/Cancel. The result is a new Body; source Bodies
 remain under the existing Surface feature contract.
@@ -90,11 +90,12 @@ Reproduction: `docs/development-setup.md`; current full/native evidence and rema
 The shell preserves the established contracts in `part-surface-feature-intent-mvp6.md`,
 `part-boundary-fill-surface-geometry-mvp6.md`, `part-trim-extend-surface-geometry-mvp6.md`,
 `part-surface-stitch-geometry-mvp6.md` and `part-closed-shell-to-solid-geometry-mvp6.md`.
-Extend currently requires one unambiguous face with a planar linear polygon boundary; it does not
-extend arbitrary curved surfaces. Missing, stale, ambiguous or incompatible references fail closed.
+Modern Extend supports bounded analytic planes/cylinders, complete free boundaries and explicit
+natural/tangent continuation under the [curved Surface contract](part-trim-extend-surface-geometry-mvp6.md).
+Missing, stale, ambiguous or incompatible references fail closed.
 Arbitrary OCCT topology indices are never persisted or guessed. Open raw Sketch chains first become
-PathCurves through **Pfad erstellen**. Color-coded free-edge/gap overlays are not implemented by this
-slice; the task displays the authoritative diagnostic and valid result geometry.
+PathCurves through **Pfad erstellen**. Advanced controls add transient free-edge/gap overlays and
+native measurements as described below; the original replacement-shell slice supplied text diagnostics.
 
 ## Focused proof
 
@@ -160,3 +161,37 @@ material/volume. Both-scale captures were reviewed after all CAD processes exite
 **1,199 files**, `cfec44bc42a7306d250c7c9732f7c34818245249a79f5fa1bb05d447db2a13e5`.
 Full advanced editing, hidden/multiple inputs and constrained Sweep/Loft authoring remain required
 for acceptance of Block 173.
+
+### Advanced Surface editing and historical input geometry
+
+Browser editing of Offset/Thicken and typed Trim/Extend routes to the same owned controls as
+creation. The editor loads complete typed source/contour references, side, projection vector,
+continuation, construction policy, budgets and Body result context. Full-precision numeric text
+preserves authored vector components and unchanged records, including formula bindings.
+
+A disposable cache evaluates the history **before** the edited feature. Face/edge catalogs and
+normal/extension frames use that cache with its matching history prefix. Historical input faces
+and quilts have separate transient selection identities; hidden predecessors can be selected
+without changing document visibility. The accepted model/cache stays unchanged until one checked
+update transaction recomputes the complete suffix. In particular, editing a Cut from the original
+box top measures its source at z=5 mm although the accepted top is already at z=3 mm.
+
+Changed computed values require the explicit independent-value option. It creates new bindings
+for changed fields and retains shared values/formulas. Fields sharing one parameter cannot submit
+different values silently: the UI requires equal values or explicit separate bindings. Inactive
+budgets remain excluded from the typed candidate. Chooser highlighting does not append Stitch/Fill
+list entries; only explicit collection actions do. Invalid field changes clear stale handles, and
+Cancel restores the entry selection, filters and scope. Repair References invokes the existing
+owned repair tool after cancelling the draft.
+
+Proof: all five targets passed. Combined advanced/legacy Surface and generic feature-edit Qt
+regression **25 passed / 4 native skips / 16,791 assertions**; native browser editing, creation,
+legacy Surface and generic editing **4 / 727** at both 100% and compact 150%. Cases retain exact
+records through unchanged Apply, exact shared formulas, explicit budget splits, historical source
+coordinates, independently integrated Cut/Thicken volumes, precise native drag/release and history.
+Runtime **1,201 files**, `457f06711982e1cf574aa7d00688ab22baee92eacbf459b1e8ee6f8b8f0991dc`.
+Explicit creation-time hidden/multiple-face selectors and constrained Sweep/Loft controls remain
+open Block 173 gates.
+Both-scale editing/creation captures were reviewed after CAD/build processes exited. The standalone
+native application initialized during an eight-second startup smoke and was deliberately stopped
+by the timeout; the existing X11 visual depth/stencil warning also appears in passing native tests.

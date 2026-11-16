@@ -14,6 +14,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QPushButton>
+#include <QScopedValueRollback>
 #include <QSignalBlocker>
 #include <QUuid>
 #include <QVBoxLayout>
@@ -181,7 +182,11 @@ std::vector<ShellFeatureTools::SurfaceInput>
 ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget>* targets) const {
   std::vector<SurfaceInput> choices;
   const auto* part = session_.part_document();
-  const auto* cache = session_.part_shape_cache();
+  const bool historical =
+      advanced_surface_ && advanced_surface_->editing && advanced_surface_->input_cache;
+  const auto* cache = historical ? &*advanced_surface_->input_cache : session_.part_shape_cache();
+  const auto prefix =
+      historical ? advanced_surface_->input_prefix : session_.history_prefix_count();
   if (!part || !cache)
     return choices;
   auto import_context = make_step_import_context(session_);
@@ -211,7 +216,8 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
                            TrimmingReference::create_profile_region(profile.value()).value()});
     }
   for (const auto& body : part->bodies()) {
-    if (body.visibility() != BodyVisibility::Visible || !cache->find_body_shape(body.id()))
+    if ((!historical && body.visibility() != BodyVisibility::Visible) ||
+        !cache->find_body_shape(body.id()))
       continue;
     if (body.kind() == BodyKind::Surface) {
       choices.push_back({body.name(),
@@ -224,7 +230,9 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
       continue;
     for (auto role : {PartFeatureInputRole::PathSegment, PartFeatureInputRole::SurfaceSourceFace}) {
       auto resolved = geometry::FinishingSelectionBuilder::build(
-          *part, *cache, body.id(), role, context, session_.history_prefix_count());
+          *part, *cache, body.id(), role, context, prefix,
+          historical ? geometry::FinishingSelectionVisibility::IncludeHiddenInputs
+                     : geometry::FinishingSelectionVisibility::VisibleOnly);
       if (!resolved)
         continue;
       for (const auto& target : resolved.value()) {
@@ -284,6 +292,14 @@ ShellFeatureTools::surface_inputs(std::vector<geometry::FinishingSelectionTarget
   }
   if (context && !context->validate_sources())
     return {};
+  if (historical) {
+    for (auto& choice : choices)
+      if (choice.surface || choice.edge_input)
+        choice.semantic_id = "surface-input/" + choice.semantic_id;
+    if (targets)
+      for (auto& target : *targets)
+        target.semantic_id = "surface-input/" + target.semantic_id;
+  }
   return choices;
 }
 
@@ -356,9 +372,24 @@ void ShellFeatureTools::build_surface_controls(QWidget* panel) {
   panel->layout()->addWidget(surface_controls_);
   surface_controls_->hide();
   for (auto* combo : {surface_source_, surface_target_})
-    connect(combo, &QComboBox::currentIndexChanged, this, [this] {
-      if (surface())
-        refresh_surface_preview();
+    connect(combo, &QComboBox::currentIndexChanged, this, [this, combo] {
+      if (!surface())
+        return;
+      const int index = combo->currentData().toInt();
+      if (index >= 0 && std::size_t(index) < surface_inputs_.size()) {
+        const bool curves =
+            command_ == Command::BoundarySurface || command_ == Command::FillSurface;
+        if (!curves && (command_ == Command::TrimSurface || command_ == Command::ExtendSurface))
+          surface_pick_->setCurrentIndex(combo == surface_source_ ? 1 : 0);
+        update_surface_pick_scope();
+        const auto& id = surface_inputs_[index].semantic_id;
+        if (!id.empty() &&
+            (!viewport_.selected_semantic() || viewport_.selected_semantic()->semantic_id != id)) {
+          const QScopedValueRollback guard(advanced_surface_->highlighting_input, true);
+          (void)viewport_.select_semantic(id);
+        }
+      }
+      refresh_surface_preview();
     });
   connect(surface_pick_, &QComboBox::currentIndexChanged, this, [this] {
     if (surface())
@@ -381,12 +412,39 @@ void ShellFeatureTools::build_surface_controls(QWidget* panel) {
 }
 
 Result<std::size_t> ShellFeatureTools::begin_surface(Command command) {
+  return begin_surface_task(command, {});
+}
+Result<std::size_t> ShellFeatureTools::begin_surface_task(Command command,
+                                                          std::optional<FeatureId> editing) {
   const auto* part = session_.part_document();
   if (active() || session_.task().active() || window_.active_sketch() || !part ||
       session_.workspace() != GuiWorkspace::Part || !session_.part_shape_cache() ||
       title(command).isEmpty())
     return fail("Surface command requires a part without an active command");
   advanced_surface_->reset(*part);
+  advanced_surface_->editing = editing;
+  if (editing) {
+    auto history = part->executable_history();
+    if (!history)
+      return Result<std::size_t>::failure(history.error());
+    const auto entry =
+        std::find_if(history.value().begin(), history.value().end(),
+                     [&](const auto& row) { return row.node_id == editing->value(); });
+    if (entry == history.value().end())
+      return fail("Surface input history is unavailable");
+    const auto prefix = std::size_t(entry - history.value().begin());
+    auto cache = geometry::ShapeCache::create(ShapeCacheId("surface.edit.inputs"));
+    if (!cache)
+      return Result<std::size_t>::failure(cache.error());
+    auto computed = query_with_step_import_context(session_, [&](auto* context) {
+      return geometry::GeometryRecomputeExecutor{context}.execute_history_prefix(*part, prefix,
+                                                                                 cache.value());
+    });
+    if (!computed)
+      return Result<std::size_t>::failure(computed.error());
+    advanced_surface_->input_cache = std::move(cache.value());
+    advanced_surface_->input_prefix = prefix;
+  }
   advanced_surface_->entry_selection = session_.selection();
   advanced_surface_->entry_viewport_selection = viewport_.selected_semantic();
   surface_targets_.clear();
@@ -418,7 +476,9 @@ Result<std::size_t> ShellFeatureTools::begin_surface(Command command) {
       if (command == Command::ExtendSurface && !input.pending_path) {
         auto segments = query_with_step_import_context(session_, [&](auto* context) {
           return geometry::GeometryRecomputeExecutor{context}.resolve_path_segments(
-              *part, id, *session_.part_shape_cache());
+              *part, id,
+              advanced_surface_->input_cache ? *advanced_surface_->input_cache
+                                             : *session_.part_shape_cache());
         });
         eligible = segments && segments.value().size() == 1 &&
                    (segments.value().front().kind == geometry::SweepPathSegmentKind::Line ||
@@ -431,10 +491,11 @@ Result<std::size_t> ShellFeatureTools::begin_surface(Command command) {
   }
   const bool curves = command == Command::BoundarySurface || command == Command::FillSurface;
   const bool stitch = command == Command::SurfaceStitch;
-  if ((curves && surface_source_->count() < 2) || (!curves && surface_target_->count() < 2) ||
-      ((command == Command::TrimSurface || command == Command::ExtendSurface) &&
-       surface_source_->count() < 2) ||
-      (stitch && surface_target_->count() < 3)) {
+  if (!editing &&
+      ((curves && surface_source_->count() < 2) || (!curves && surface_target_->count() < 2) ||
+       ((command == Command::TrimSurface || command == Command::ExtendSurface) &&
+        surface_source_->count() < 2) ||
+       (stitch && surface_target_->count() < 3))) {
     surface_targets_.clear();
     return fail("First create suitable paths, surfaces, or a closed shell");
   }
@@ -629,6 +690,12 @@ Result<std::size_t> ShellFeatureTools::rebuild_surface_controller() {
 void ShellFeatureTools::refresh_surface_preview() {
   if (!surface())
     return;
+  if (advanced_surface()) {
+    if (layer_.active_handle_id().empty())
+      coordinator_.cancel();
+    (void)preview_and_publish();
+    return;
+  }
   auto rebuilt = rebuild_surface_controller();
   if (!rebuilt) {
     preview_valid_ = false;
@@ -667,7 +734,7 @@ void ShellFeatureTools::update_surface_pick_scope() {
 }
 
 bool ShellFeatureTools::accept_surface_selection(const GuiSelection& selection) {
-  if (!surface() || !layer_.active_handle_id().empty())
+  if (!surface() || advanced_surface_->highlighting_input || !layer_.active_handle_id().empty())
     return false;
   const bool curves = command_ == Command::BoundarySurface || command_ == Command::FillSurface;
   auto* combo = curves || surface_pick_->currentIndex() == 1 ? surface_source_ : surface_target_;

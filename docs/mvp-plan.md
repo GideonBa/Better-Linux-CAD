@@ -1039,3 +1039,12 @@ all five targets passed; offscreen **14 passed / 2 native skips / 15,397 asserti
 Surface/viewport/spatial regression **11 / 959** at both 100% and compact 150%, with reviewed
 captures and physical STEP checks. Complete shared editing, hidden/multiple inputs and explicit
 Sweep/Loft authoring next; 173 remains in progress and the assigned target remains 184.
+
+Shared advanced Surface **editing** now loads complete typed records and uses the actual
+pre-feature history cache for sources and frames, including hidden predecessors. Formula/alias
+changes require explicit independent bindings; cross-highlighting preserves explicit list collection.
+[Contract and proof](gui-interactive-surface-mvp9.md#advanced-surface-editing-and-historical-input-geometry):
+all five targets passed, combined Qt **25 passed / 4 native skips / 16,791 assertions**, native
+creation/browser-edit/legacy regression **4 / 727** at 100% and compact 150%. Next complete the
+explicit hidden/multiple-face creation selectors and constrained Sweep/Loft controls. Block 173
+remains in progress; continue through the assigned Block 184.

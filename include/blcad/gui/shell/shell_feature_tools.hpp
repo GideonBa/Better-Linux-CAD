@@ -212,6 +212,7 @@ public:
   // Typed first input for an already started Sweep/Loft context task.
   [[nodiscard]] bool select_spatial_profile(SketchId sketch, ProfileId profile);
   [[nodiscard]] Result<std::size_t> begin_surface(Command command);
+  [[nodiscard]] Result<std::size_t> begin_surface_edit(FeatureId);
   [[nodiscard]] bool accept_surface_selection(const GuiSelection& selection);
   [[nodiscard]] Result<std::size_t> append_surface_input(int choice);
   [[nodiscard]] QComboBox& surface_source_editor() noexcept {
@@ -368,6 +369,7 @@ private:
   [[nodiscard]] bool pattern() const noexcept;
   [[nodiscard]] bool surface() const noexcept;
   [[nodiscard]] bool advanced_surface() const noexcept;
+  [[nodiscard]] Result<std::size_t> begin_surface_task(Command, std::optional<FeatureId>);
   void build_advanced_surface_controls(QWidget*);
   [[nodiscard]] Result<std::size_t> rebuild_advanced_surface_controller();
   void refresh_surface_diagnostics(const geometry::GeometryShape*);
