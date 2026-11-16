@@ -428,3 +428,32 @@ TEST_CASE("Native curved Trim keep-remove and native-arc Extend reach a checked 
   CHECK(solids == 1);
   CHECK(saved(w) == after);
 }
+TEST_CASE("Surface parameter allocation preserves existing user IDs and display names",
+          "[gui][advanced-surface-allocation][parity-b173]") {
+  const bool by_name = GENERATE(false, true);
+  ShellWindow w;
+  fixture(w);
+  const ParameterId reserved(by_name ? "reserved.user" : "parameter.surface.1.tolerance");
+  REQUIRE(w.session().commit_part_transaction("User parameter", [&](PartDocument& p) {
+    return p.add_parameter(f::checked(
+        Parameter::create_length(reserved, by_name ? "Thicken 1 Tolerance" : "User tolerance",
+                                 f::checked(Quantity::length_mm(.25)))));
+  }));
+  w.refresh();
+  const auto before = saved(w);
+  const auto count = w.session().part_document()->parameters().size();
+  REQUIRE(w.feature_tools().begin_surface(C::Thicken));
+  choose(w, "Quilt");
+  REQUIRE(control<QPushButton>(w, "blcad.feature.apply").isEnabled());
+  CHECK(saved(w) == before);
+  REQUIRE(w.feature_tools().apply());
+  const auto* part = w.session().part_document();
+  const auto& feature = std::get<SurfaceOffsetFeature>(part->surface_features().back());
+  CHECK(feature.id() == FeatureId("feature.surface.2"));
+  CHECK(feature.parameters().tolerance != reserved);
+  CHECK(part->find_parameter(feature.parameters().tolerance)->value().millimeters() == 1e-6);
+  CHECK(part->find_parameter(reserved)->value().millimeters() == .25);
+  CHECK(part->parameters().size() == count + 2);
+  REQUIRE(w.undo());
+  CHECK(saved(w) == before);
+}

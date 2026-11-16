@@ -523,12 +523,19 @@ Result<std::size_t> ShellFeatureTools::begin_surface_task(Command command,
     surface_result_ = BodyId("body.surface." + suffix);
     surface_parameter_ = ParameterId("parameter.surface." + suffix);
     surface_name_ = title(command).toStdString() + " " + suffix;
+    constexpr const char* kinds[]{" Size", " Distance", " Thickness", " Tolerance", " Deviation"};
     if (part->dependency_graph().has_node(surface_feature_.value()) ||
-        part->find_body(surface_result_) || part->find_parameter(surface_parameter_) ||
+        part->find_body(surface_result_) ||
+        part->dependency_graph().has_node("body:" + surface_result_.value()) ||
+        part->dependency_graph().has_node(surface_parameter_.value()) ||
+        part->dependency_graph().has_node(surface_parameter_.value() + ".tolerance") ||
+        part->dependency_graph().has_node(surface_parameter_.value() + ".deviation") ||
         std::any_of(part->bodies().begin(), part->bodies().end(),
                     [&](const auto& b) { return b.name() == surface_name_; }) ||
-        std::any_of(part->parameters().begin(), part->parameters().end(),
-                    [&](const auto& p) { return p.name() == surface_name_ + " Size"; }))
+        std::any_of(part->parameters().begin(), part->parameters().end(), [&](const auto& p) {
+          return std::any_of(std::begin(kinds), std::end(kinds),
+                             [&](const auto* kind) { return p.name() == surface_name_ + kind; });
+        }))
       continue;
     break;
   }

@@ -329,3 +329,40 @@ TEST_CASE("Surface handles follow staged shared parameters that also drive the s
   REQUIRE(window.undo());
   CHECK(saved(window) == before);
 }
+TEST_CASE("Repeated independent Surface values allocate unique names and preserve prior bindings",
+          "[gui][advanced-surface-allocation][parity-b173]") {
+  ShellWindow window;
+  REQUIRE(window.new_part("Independent Surface values"));
+  REQUIRE(window.session().commit_part_transaction("Inputs", [](PartDocument& p) {
+    p = f::combination();
+    return Result<std::size_t>::success(1);
+  }));
+  window.refresh();
+  const auto before = saved(window);
+  begin(window, "thick");
+  control<QCheckBox>(window, "blcad.surface.override_formulas").setChecked(true);
+  REQUIRE(window.feature_tools().set_numeric_text("1.1 mm"));
+  REQUIRE(window.feature_tools().apply());
+  const auto first =
+      std::get<SurfaceOffsetFeature>(
+          *window.session().part_document()->find_surface_feature(FeatureId("thick")))
+          .parameters()
+          .distance;
+  begin(window, "thick");
+  control<QCheckBox>(window, "blcad.surface.override_formulas").setChecked(true);
+  REQUIRE(window.feature_tools().set_numeric_text("1.2 mm"));
+  REQUIRE(window.feature_tools().apply());
+  const auto* part = window.session().part_document();
+  const auto second =
+      std::get<SurfaceOffsetFeature>(*part->find_surface_feature(FeatureId("thick")))
+          .parameters()
+          .distance;
+  CHECK(second != first);
+  CHECK(part->find_parameter(first)->value().millimeters() == 1.1);
+  CHECK(part->find_parameter(second)->value().millimeters() == 1.2);
+  CHECK(part->find_parameter(first)->name() != part->find_parameter(second)->name());
+  CHECK(part->find_parameter(ParameterId("wall"))->value().millimeters() == 1);
+  REQUIRE(window.undo());
+  REQUIRE(window.undo());
+  CHECK(saved(window) == before);
+}
