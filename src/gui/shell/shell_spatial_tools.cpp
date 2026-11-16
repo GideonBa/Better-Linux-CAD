@@ -774,11 +774,16 @@ Result<std::size_t> ShellFeatureTools::rebuild_spatial_controller() {
                                        ? spatial_independent_twist_
                                        : spatial_twist_parameter_;
       if (sweep_twist_->isChecked() && !session_.part_document()->find_parameter(twist_id)) {
-        auto parameter = Parameter::create_angle(
-            twist_id,
-            spatial_name_ +
-                (sweep_independent_twist_->isChecked() ? " Independent Twist" : " Twist"),
-            Quantity::angle_deg(spatial_twist_).value());
+        const auto root = spatial_name_ +
+                          (sweep_independent_twist_->isChecked() ? " Independent Twist" : " Twist");
+        auto name = root;
+        for (int suffix = 2; std::any_of(session_.part_document()->parameters().begin(),
+                                         session_.part_document()->parameters().end(),
+                                         [&](const auto& p) { return p.name() == name; });
+             ++suffix)
+          name = root + " " + std::to_string(suffix);
+        auto parameter =
+            Parameter::create_angle(twist_id, name, Quantity::angle_deg(spatial_twist_).value());
         if (!parameter)
           return Result<std::size_t>::failure(parameter.error());
         twist = parameter.value();

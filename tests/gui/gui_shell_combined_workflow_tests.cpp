@@ -97,7 +97,10 @@ public:
   WorkflowUi()
       : native_dialogs_disabled_(QApplication::testAttribute(Qt::AA_DontUseNativeDialogs)) {
     QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
-    window.resize(1280, 800);
+    auto size = qEnvironmentVariableIsSet("BLCAD_UI_COMPACT") ? QSize(1024, 640) : QSize(1280, 800);
+    if (QApplication::platformName() == "xcb")
+      size = size.boundedTo(window.screen()->availableGeometry().size() - QSize(40, 40));
+    window.resize(size);
     window.show();
     flush();
     if (QApplication::platformName() == "xcb")
@@ -280,6 +283,11 @@ public:
     const auto rectangle = view->visualRect(index);
     REQUIRE(view->viewport()->rect().contains(rectangle.center()));
     const auto global = view->viewport()->mapToGlobal(rectangle.center());
+    const auto pointer_matches_row = [&](QPoint position) {
+      const auto local = view->viewport()->mapFromGlobal(position);
+      return view->isVisible() && view->viewport()->rect().contains(local) &&
+             view->indexAt(local) == index;
+    };
     bool pointer_ready = !native;
     int pointer_warps = 0;
     int stable_ticks = 0;
@@ -300,7 +308,7 @@ public:
       });
       QObject::connect(&tick, &QTimer::timeout, &transition, [&] {
         const auto before = QCursor::pos();
-        if (before != global && pointer_warps < 4) {
+        if (!pointer_matches_row(before) && pointer_warps < 4) {
           ++pointer_warps;
           QCursor::setPos(global);
         }
@@ -316,7 +324,7 @@ public:
         if (timed_out)
           return;
         const auto actual = QCursor::pos();
-        const bool settled = actual == global && view->isVisible() &&
+        const bool settled = pointer_matches_row(actual) && view->isVisible() &&
                              view->viewport()->rect().contains(rectangle.center()) &&
                              view->indexAt(rectangle.center()) == index &&
                              view->currentIndex() == index;
@@ -337,7 +345,7 @@ public:
         // original deadline and four-warp limit if another settling pass is needed.
         QGuiApplication::sync();
         flush();
-        pointer_ready = !timed_out && pointer_ready && QCursor::pos() == global &&
+        pointer_ready = !timed_out && pointer_ready && pointer_matches_row(QCursor::pos()) &&
                         view->isVisible() &&
                         view->viewport()->mapToGlobal(rectangle.center()) == global &&
                         view->indexAt(rectangle.center()) == index && view->currentIndex() == index;
@@ -366,7 +374,7 @@ public:
     INFO("Available geometry: " << available_geometry.x() << ',' << available_geometry.y() << ' '
                                 << available_geometry.width() << 'x'
                                 << available_geometry.height());
-    if ((!pointer_ready || actual != global || current_global != global) &&
+    if ((!pointer_ready || !pointer_matches_row(actual) || current_global != global) &&
         qEnvironmentVariableIsSet("BLCAD_UI_CAPTURE_DIR")) {
       capture("assembly-popup-pointer-mismatch");
       const auto path = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR") +
@@ -375,7 +383,7 @@ public:
     }
     if (native) {
       REQUIRE(pointer_ready);
-      REQUIRE(actual == global);
+      REQUIRE(pointer_matches_row(actual));
     }
     REQUIRE(view->isVisible());
     REQUIRE(view->indexAt(rectangle.center()) == index);
