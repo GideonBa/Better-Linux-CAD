@@ -1031,3 +1031,11 @@ keeping earlier producer snapshots and later consumer dependencies. [Contract/pr
 full Core **785 / 35,068**, native Geometry history **1 / 54** and affected Surface regression
 **17 / 871** passed. Native Surface authoring remains in progress, including named-source picking
 and exact numeric drag/release verification.
+
+Advanced Surface **creation** is verified: typed Offset/Thicken/Trim/Extend options, all four
+Thicken Body modes, native curved-edge inputs, measured boundary feedback and exact numeric
+release. [Evidence and limits](gui-interactive-surface-mvp9.md#advanced-surface-authoring-controls):
+all five targets passed; offscreen **14 passed / 2 native skips / 15,397 assertions**; native
+Surface/viewport/spatial regression **11 / 959** at both 100% and compact 150%, with reviewed
+captures and physical STEP checks. Complete shared editing, hidden/multiple inputs and explicit
+Sweep/Loft authoring next; 173 remains in progress and the assigned target remains 184.

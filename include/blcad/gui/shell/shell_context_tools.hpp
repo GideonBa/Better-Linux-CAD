@@ -51,7 +51,7 @@ private:
   void place();
   ShellWindow& window_;
   QFrame* panel_{nullptr};
-  std::array<Entry, 26> commands_{};
+  std::array<Entry, 28> commands_{};
   QAction* cancel_{nullptr};
   QToolButton* cancel_button_{nullptr};
   QPoint anchor_{16, 16};

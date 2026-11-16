@@ -59,7 +59,9 @@ ShellContextTools::ShellContextTools(ShellWindow& window) : QObject(&window), wi
         std::tuple{FeatureCommand::TrimSurface, "surface_trim", "Trim"},
         std::tuple{FeatureCommand::ExtendSurface, "surface_extend", "Extend"},
         std::tuple{FeatureCommand::SurfaceStitch, "surface_stitch", "Stitch"},
-        std::tuple{FeatureCommand::ClosedShellToSolid, "surface_to_solid", "Solid"}}) {
+        std::tuple{FeatureCommand::ClosedShellToSolid, "surface_to_solid", "Solid"},
+        std::tuple{FeatureCommand::OffsetSurface, "surface_offset", "Offset Surface"},
+        std::tuple{FeatureCommand::Thicken, "surface_thicken", "Thicken"}}) {
     const auto [wrapper, button] = action(id, label);
     commands_.at(index++) = {kind, wrapper, button};
     connect(wrapper, &QAction::triggered, this, [this, kind] { begin(kind); });

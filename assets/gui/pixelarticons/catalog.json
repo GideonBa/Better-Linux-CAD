@@ -105,7 +105,9 @@
     "blcad.action.history_convert_hole": "circle",
     "blcad.action.semantic_thread": "circle",
     "blcad.action.undo": "undo",
-    "blcad.action.view_home": "home"
+    "blcad.action.view_home": "home",
+    "blcad.action.surface_offset": "copy",
+    "blcad.action.surface_thicken": "box"
   },
   "labels": {
     "3D Model": "box",

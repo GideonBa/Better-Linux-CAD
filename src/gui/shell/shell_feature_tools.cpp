@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "advanced_surface_controls.hpp"
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_property_controls.hpp"
@@ -23,6 +24,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QLocale>
 #include <QMetaObject>
 #include <QMouseEvent>
 #include <QPushButton>
@@ -130,7 +132,7 @@ std::size_t next_revolve_index(const PartDocument& part) {
 }
 
 QString number_text(double value) {
-  return QString::number(value, 'g', 12);
+  return QString::number(value, 'g', QLocale::FloatingPointShortest);
 }
 
 std::optional<double> parse_numeric(const QString& source, std::string_view expected_unit) {
@@ -258,7 +260,9 @@ ShellFeatureTools::ShellFeatureTools(ShellWindow& window, GuiDocumentSession& se
         std::tuple{Command::TrimSurface, "Trim Surface", "surface_trim"},
         std::tuple{Command::ExtendSurface, "Extend Surface", "surface_extend"},
         std::tuple{Command::SurfaceStitch, "Stitch Surfaces", "surface_stitch"},
-        std::tuple{Command::ClosedShellToSolid, "Shell to Solid", "surface_to_solid"}}) {
+        std::tuple{Command::ClosedShellToSolid, "Shell to Solid", "surface_to_solid"},
+        std::tuple{Command::OffsetSurface, "Offset Surface", "surface_offset"},
+        std::tuple{Command::Thicken, "Thicken", "surface_thicken"}}) {
     auto* action = new QAction(QString::fromUtf8(label), this);
     action->setObjectName(QStringLiteral("blcad.action.") + QString::fromUtf8(id));
     connect(action, &QAction::triggered, this, [this, command] {
@@ -917,8 +921,10 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_value(double value)
     if (!surface_scalar() || !coordinator_.surface().active())
       return Result<GuiPartFeaturePreview>::failure(
           Error::validation("surface", "Select valid surface inputs first"));
-    candidate.handle_id = std::string(
-        command_ == Command::ExtendSurface ? kSurfaceExtendHandleId : kSurfaceToleranceValueId);
+    candidate.handle_id =
+        std::string(command_ == Command::ExtendSurface   ? kSurfaceExtendHandleId
+                    : command_ == Command::SurfaceStitch ? kSurfaceToleranceValueId
+                                                         : kSurfaceOffsetHandleId);
     candidate.value_kind = GuiViewportManipulatorValueKind::Distance;
   } else if (spatial()) {
     if (!spatial_scalar())
@@ -1026,6 +1032,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
                                                    : configure_revolve_candidate();
     if (!configured) {
       viewport_.clear_feature_preview();
+      if (surface())
+        refresh_surface_diagnostics(nullptr);
       task_summary_->setText(QString::fromStdString(configured.error().message()));
       refresh_enablement();
       synchronize_overlay();
@@ -1044,6 +1052,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
           : coordinator_.preview();
   if (preview.has_error()) {
     viewport_.clear_feature_preview();
+    if (surface())
+      refresh_surface_diagnostics(nullptr);
     task_summary_->setText(QString::fromStdString(preview.error().message()));
     if (pattern())
       window_.statusBar()->showMessage(task_summary_->text());
@@ -1074,6 +1084,8 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   }
   if (!shapes) {
     viewport_.clear_feature_preview();
+    if (surface())
+      refresh_surface_diagnostics(nullptr);
     task_summary_->setText(QString::fromStdString(shapes.error().message()));
     if (pattern())
       window_.statusBar()->showMessage(task_summary_->text());
@@ -1102,10 +1114,14 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
   if (pattern() && session_.part_document())
     if (const auto target = coordinator_.pattern_mirror().hole_target(*session_.part_document()))
       replacements.push_back("body/" + target->value());
+  if (surface())
+    refresh_surface_diagnostics(shapes.value().empty() ? nullptr : &shapes.value().front());
   auto published =
       viewport_.set_feature_previews(std::move(shapes.value()), std::move(replacements));
   if (published.has_error()) {
     viewport_.clear_feature_preview();
+    if (surface())
+      refresh_surface_diagnostics(nullptr);
     task_summary_->setText(QString::fromStdString(published.error().message()));
     if (pattern())
       window_.statusBar()->showMessage(task_summary_->text());
@@ -1290,6 +1306,13 @@ void ShellFeatureTools::cancel() noexcept {
     restore_extrude_selection();
   hide_task_panel();
   synchronize_overlay();
+  if (was_surface && advanced_surface_) {
+    session_.selection() = advanced_surface_->entry_selection;
+    if (advanced_surface_->entry_viewport_selection)
+      (void)viewport_.select_semantic(advanced_surface_->entry_viewport_selection->semantic_id);
+    else
+      viewport_.clear_selection();
+  }
   window_.finish_context_task(false);
   window_.refresh();
   if (was_active)
@@ -1390,8 +1413,8 @@ double ShellFeatureTools::current_value() const noexcept {
     return coordinator_.path_sweep().active() ? coordinator_.path_sweep().twist() : spatial_twist_;
   if (surface_scalar())
     return coordinator_.surface().active()
-               ? (command_ == Command::ExtendSurface ? coordinator_.surface().distance()
-                                                     : coordinator_.surface().tolerance())
+               ? (command_ == Command::SurfaceStitch ? coordinator_.surface().tolerance()
+                                                     : coordinator_.surface().distance())
                : surface_value_;
   if (body_transform()) {
     if (!coordinator_.body_operation().active())
@@ -1560,8 +1583,10 @@ void ShellFeatureTools::show_task_panel(QString title, QString unit, double valu
   numeric_editor_->setVisible(command_ != Command::BodyMirror && command_ != Command::BodyBoolean &&
                               (!spatial() || spatial_scalar()) && (!surface() || surface_scalar()));
   task_dock_->setWindowTitle(std::move(title));
-  const QString label = command_ == Command::SurfaceStitch   ? QStringLiteral("Tolerance")
-                        : command_ == Command::ExtendSurface ? QStringLiteral("Distance")
+  const QString label = command_ == Command::SurfaceStitch ? QStringLiteral("Tolerance")
+                        : command_ == Command::ExtendSurface || command_ == Command::OffsetSurface
+                            ? QStringLiteral("Distance")
+                        : command_ == Command::Thicken       ? QStringLiteral("Total Thickness")
                         : command_ == Command::Sweep         ? QStringLiteral("Twist")
                         : command_ == Command::BodyTranslate ? QStringLiteral("X")
                         : command_ == Command::BodyScale     ? QStringLiteral("Factor")
