@@ -3,6 +3,7 @@
 
 #include "blcad/geometry/shape_cache.hpp"
 
+#include "face_fillet_adapter.hpp"
 #include "geometry_shape_internal.hpp"
 #include "semantic_edge_resolution.hpp"
 #include "variable_fillet_adapter.hpp"
@@ -33,15 +34,15 @@ Result<GeometryShape> FilletAdapter::apply(const PartDocument& document,
                                            const ShapeCache& shape_cache, double radius_mm,
                                            StepImportTopologyContext* import_context) const {
   if (feature.advanced_intent()) {
-    if (!std::holds_alternative<VariableFilletIntent>(feature.advanced_intent()->definition))
-      return Result<GeometryShape>::failure(fillet_error(
-          feature.id(), "Face/full-round Fillet construction requires the checked support engine"));
-
     if (target.empty())
       return Result<GeometryShape>::failure(
           fillet_error(feature.id(), "Variable Fillet target is empty"));
-    auto native = detail::variable_fillet(document, feature, target.impl_->shape, shape_cache,
-                                          import_context, target.impl_->face_lineage);
+    auto engine =
+        std::holds_alternative<VariableFilletIntent>(feature.advanced_intent()->definition)
+            ? detail::variable_fillet
+            : detail::face_fillet;
+    auto native = engine(document, feature, target.impl_->shape, shape_cache, import_context,
+                         target.impl_->face_lineage);
     if (!native)
       return Result<GeometryShape>::failure(native.error());
     auto backing = std::make_shared<GeometryShape::Impl>(std::move(native.value().shape));

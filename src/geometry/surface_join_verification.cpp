@@ -1,5 +1,6 @@
 #include "surface_join_verification.hpp"
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepAdaptor_Surface.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepTools.hxx>
@@ -80,6 +81,7 @@ struct TrimProjection {
   Handle(Geom_BSplineCurve) basis;
   std::vector<double> uknots, vknots;
   double u_min, u_max, v_min, v_max;
+  double u_period = 0, v_period = 0;
   void derivatives(double u, double v, int u0, int u1, int v0, int v1, gp_Pnt& p, gp_Vec& du,
                    gp_Vec& dv, gp_Vec& duu, gp_Vec& dvv, gp_Vec& duv, bool second_order) const {
     if (!spline.IsNull())
@@ -112,6 +114,10 @@ struct TrimProjection {
     if (const auto trimmed = Handle(Geom_RectangularTrimmedSurface)::DownCast(carrier);
         !trimmed.IsNull())
       carrier = trimmed->BasisSurface();
+    // Finite rectangular trims can hide the periodicity of their analytic carrier.
+    // The seam still identifies equivalent endpoint jets of that same carrier.
+    u_period = carrier->IsUPeriodic() ? carrier->UPeriod() : 0;
+    v_period = carrier->IsVPeriodic() ? carrier->VPeriod() : 0;
     spline = Handle(Geom_BSplineSurface)::DownCast(carrier);
     extrusion = Handle(Geom_SurfaceOfLinearExtrusion)::DownCast(carrier);
     if (!extrusion.IsNull()) {
@@ -151,7 +157,6 @@ std::vector<Jet> projected_jets(TrimProjection& trim, const gp_Pnt& point, doubl
       !std::isfinite(trim.distance.Value()) || trim.distance.Value() > tolerance)
     throw std::runtime_error("Boundary is not incident to the finite trim in model units");
   const auto& face = trim.face;
-  const auto& surface = trim.surface;
   std::vector<Jet> jets;
   const auto append = [&](const TopoDS_Edge& edge, double parameter, const gp_Pnt& boundary_point) {
     double first, last;
@@ -163,17 +168,21 @@ std::vector<Jet> projected_jets(TrimProjection& trim, const gp_Pnt& point, doubl
     if (!std::isfinite(u) || !std::isfinite(v))
       throw std::runtime_error("Nonfinite native trim parameter");
     if (!jets.empty()) {
-      const auto equivalent = [](double a, double b, bool periodic, double period) {
+      const BRepAdaptor_Surface adaptor(face);
+      const auto equivalent = [](double a, double b, double period, double resolution) {
         constexpr double rounding = 64 * std::numeric_limits<double>::epsilon();
         const double delta = a - b;
-        return std::abs(delta) <= rounding * std::max({1.0, std::abs(a), std::abs(b)}) ||
-               (periodic && std::abs(delta) <= period * (1.0 + rounding) &&
-                std::abs(std::remainder(delta, period)) <= rounding * period);
+        const double uncertainty =
+            std::max(rounding * std::max({1.0, std::abs(a), std::abs(b)}), resolution);
+        return std::abs(delta) <= uncertainty ||
+               (period > 0 && std::abs(delta) <= period + uncertainty &&
+                std::abs(std::remainder(delta, period)) <= uncertainty);
       };
-      if (!equivalent(u, jets.front().u, surface->IsUPeriodic(),
-                      surface->IsUPeriodic() ? surface->UPeriod() : 1.0) ||
-          !equivalent(v, jets.front().v, surface->IsVPeriodic(),
-                      surface->IsVPeriodic() ? surface->VPeriod() : 1.0))
+      // Native STEP trims can round a seam endpoint independently of the carrier period.
+      // Limit chart equivalence to 0.1% of the physical incidence budget; every jet is
+      // still evaluated and compared independently below, including curvature.
+      if (!equivalent(u, jets.front().u, trim.u_period, adaptor.UResolution(tolerance * .001)) ||
+          !equivalent(v, jets.front().v, trim.v_period, adaptor.VResolution(tolerance * .001)))
         throw std::runtime_error("Ambiguous native projection onto the trimmed support");
     }
     for (const auto& [u0, u1] : spans(trim.uknots, u, trim.u_min, trim.u_max))
