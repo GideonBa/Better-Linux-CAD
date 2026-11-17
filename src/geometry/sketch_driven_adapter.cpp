@@ -44,6 +44,8 @@ Result<GeometryShape> SketchDrivenAdapter::apply(const PartDocument& p,
                                                  StepImportTopologyContext* imports) const {
   try {
     require(!target.empty(), "Sketch-driven target Body is missing");
+    require(std::holds_alternative<RibWebIntent>(feature.definition().intent),
+            "Emboss/Engrave construction requires the checked mapping engine (Block 183)");
     const auto& r = std::get<RibWebIntent>(feature.definition().intent);
     const auto* sketch = p.find_sketch(r.source.sketch);
     require(sketch, "Rib source Sketch is missing");

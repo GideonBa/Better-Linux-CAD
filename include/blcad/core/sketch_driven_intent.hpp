@@ -1,4 +1,5 @@
 #pragma once
+#include "blcad/core/emboss_intent.hpp"
 #include "blcad/core/part_feature_input_reference.hpp"
 #include "blcad/core/sketch_driven_feature.hpp"
 #include <optional>
@@ -37,7 +38,7 @@ struct RibWebIntent {
   RibCrossingPolicy crossings{RibCrossingPolicy::Union};
 };
 struct SketchDrivenDefinition {
-  std::variant<RibWebIntent> intent;
+  std::variant<RibWebIntent, EmbossIntent> intent;
 };
 
 } // namespace blcad
