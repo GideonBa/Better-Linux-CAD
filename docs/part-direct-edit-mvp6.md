@@ -54,3 +54,44 @@ with `[direct-edit][parity-b185]`: all operation records, dimensions, frame/poli
 selections, exact reopen, strict dispatch, parameter rollback, history reorder/suppression, producer
 removal, result-face ancestry and authored Hole protection. Execution evidence is recorded after the
 frozen build/test gate; this source inventory alone is not an acceptance claim.
+
+## Checked native construction
+
+Geometry operates on a private deep copy of the predecessor. Planar Move translates the infinite
+selected support by the authored frame vector; a tangent-only displacement rejects as ineffective.
+Planar Rotate uses the explicit in-plane axis and pivot, with a nonzero angle below 90 degrees.
+Offset uses signed outward normal distance; Size changes the absolute cylinder radius or diameter.
+Adjacent supports extend/intersect to rebuild the trimmed domain. Delete-and-Heal must remove every
+selected face without kernel errors or warnings; partial healing rejects the entire candidate.
+
+Every result must have exactly one valid solid and finite positive material. Selected continuations
+must satisfy the requested analytic support uniquely. Every unselected face must retain its complete
+underlying support: planes/cylinders use analytic equality; other surfaces require identical native
+surface definitions. Sparse samples do not establish that invariant. Unexpected support deletion,
+creation, split or blend changes reject, preserving the previous certified cache and immutable base.
+
+Kernel provenance retains surviving/modified continuations. The offset algorithm's generated
+surfaces are accepted as continuations only after the complete support checks above. A selected
+continuation also owns `face/<selection-index>` under the Direct Edit FeatureId; that index belongs
+to the persisted authored selection order, never an OCCT traversal. Downstream selections use this
+result-face identity and diagnose missing/ambiguous descendants explicitly.
+
+## Backend foundation verification
+
+The initial frozen foundation passes full Core **824 cases / 35,931 assertions**, focused new Core
+**14 / 490**, focused Direct Edit/state/occurrence Geometry **10 / 374**, and affected history,
+import, structured exchange and cross-hierarchy regression **30 / 3,899**. Independent checks
+measure planar displacement, rotated support normals, bore radius/healed volume, original shape
+volume, exact reopening/suppression and certified-cache rollback. State and occurrence scenarios
+also physically reimport flat and structured STEP; no native Qt acceptance is inferred from these
+backend checks.
+
+Runtime manifest: **1,326 inputs**, SHA-256
+`aba39f3a3e9a5688217f8093c2f3a91f3bc2e156abf1d67f16f66dff2786c451`.
+Raw local evidence is `/tmp/blcad-through198-{core-full-01,core-focused-01,geometry-focused-02,geometry-regression-02}.log`
+and `/tmp/blcad-through198-runtime-02.json`. Focused sources are
+[Direct Edit Geometry](../tests/geometry/direct_edit_tests.cpp),
+[variant Geometry](../tests/geometry/model_state_tests.cpp) and
+[occurrence Geometry](../tests/geometry/assembly_occurrence_pose_tests.cpp).
+The complete 186–188 downstream/refresh/native gates remain pending; numbered status stays in the
+MVP plan.

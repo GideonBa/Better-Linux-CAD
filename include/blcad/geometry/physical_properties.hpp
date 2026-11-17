@@ -121,6 +121,7 @@ private:
   struct PartSnapshot {
     DocumentId document;
     PartPhysicalProperties properties;
+    ModelStateId selected_model_state{primary_model_state_id()};
   };
   ProjectPhysicalProperties(ProjectPhysicalPropertiesData data, std::string source,
                             std::vector<PartSnapshot> parts);

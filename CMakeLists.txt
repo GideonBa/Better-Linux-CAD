@@ -195,6 +195,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_numeric_solve_engine.cpp
     src/geometry/assembly_occt_rigid_transform.cpp
     src/geometry/assembly_part_shape_definitions.cpp
+    src/geometry/assembly_occurrence_solver.cpp
     src/geometry/assembly_posed_leaf_shapes.cpp
     src/geometry/assembly_revolute_joint_equation_builder.cpp
     src/geometry/assembly_revolute_joint_residual.cpp
@@ -248,6 +249,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/rib_skeleton.cpp
     src/geometry/rib_volume.cpp
     src/geometry/rib_lineage.cpp
+    src/geometry/direct_edit_adapter.cpp
     src/geometry/sketch_driven_adapter.cpp
     src/geometry/fillet_adapter.cpp
     src/geometry/geometry_measure.cpp
@@ -557,6 +559,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_cross_hierarchy_constraint_graph_tests.cpp
     tests/core/assembly_cross_hierarchy_constraint_tests.cpp
     tests/core/assembly_cross_hierarchy_joint_tests.cpp
+    tests/core/assembly_occurrence_pose_tests.cpp
     tests/core/assembly_document_tests.cpp
     tests/core/assembly_exchange_graph_tests.cpp
     tests/core/assembly_exchange_name_tests.cpp
@@ -757,6 +760,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/emboss_geometry_tests.cpp
       tests/geometry/rib_web_geometry_tests.cpp
       tests/geometry/fillet_guide_tests.cpp
+      tests/geometry/direct_edit_tests.cpp
       tests/geometry/face_fillet_tests.cpp
       tests/geometry/variable_fillet_tests.cpp
       tests/geometry/fillet_feature_pipeline_tests.cpp

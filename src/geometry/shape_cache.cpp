@@ -1,3 +1,4 @@
+#include "effective_part_source.hpp"
 #include "blcad/geometry/shape_cache.hpp"
 #include "part_history_evaluation.hpp"
 
@@ -429,7 +430,7 @@ ShapeCache::validate_complete_geometry_result(const PartDocument& document) cons
   if (!complete_geometry_source_)
     return Result<std::size_t>::failure(Error::dependency(
         document.id().value(), "Complete executor-owned geometry provenance is required"));
-  const auto source = serialize_part_document_to_json(document);
+  const auto source = detail::effective_part_source(document);
   if (!source)
     return Result<std::size_t>::failure(source.error());
   if (source.value() != complete_geometry_source_->source_json ||
@@ -452,7 +453,7 @@ Result<std::size_t> ShapeCache::match_history_source(const PartDocument& documen
           document.id().value(), "Feature history requires a matching evaluated cache."));
     return Result<std::size_t>::success(0);
   }
-  const auto source = serialize_part_document_to_json(document);
+  const auto source = detail::effective_part_source(document);
   if (!source)
     return Result<std::size_t>::failure(source.error());
   if (source.value() != history_result_->source_json ||

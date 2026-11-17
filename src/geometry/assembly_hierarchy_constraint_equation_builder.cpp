@@ -380,8 +380,9 @@ AssemblyHierarchyConstraintTargetResolver::resolve_geometric(
                          "local typed target must retain exactly one direct component transform"));
   }
 
-  const auto transforms = target_transform_chain(resolved.value().transforms_inner_to_outer.front(),
-                                                 occurrence.value().occurrence);
+  auto effective = project.effective_component_transform(target.occurrence_path(), target.component_instance());
+  if (!effective) return Result<AssemblyResolvedGeometricTarget>::failure(effective.error());
+  const auto transforms = target_transform_chain(effective.value(), occurrence.value().occurrence);
   AssemblyResolvedGeometricTarget hierarchy_target{
       AssemblyHierarchyGeometricTargetEndpointIdentity{
           target.occurrence_path(), target.component_instance(), target.semantic_reference()},

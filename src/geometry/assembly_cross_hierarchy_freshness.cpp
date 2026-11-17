@@ -14,9 +14,9 @@ namespace {
   return Error::validation(std::move(object_id), std::move(message));
 }
 
-[[nodiscard]] bool same_boundary_identity(
-    const AssemblyCrossHierarchyBoundaryInputSnapshot& lhs,
-    const AssemblyCrossHierarchyBoundaryInputSnapshot& rhs) noexcept {
+[[nodiscard]] bool
+same_boundary_identity(const AssemblyCrossHierarchyBoundaryInputSnapshot& lhs,
+                       const AssemblyCrossHierarchyBoundaryInputSnapshot& rhs) noexcept {
   return lhs.containing_assembly_document == rhs.containing_assembly_document &&
          lhs.subassembly_instance == rhs.subassembly_instance;
 }
@@ -35,22 +35,23 @@ namespace {
     AssemblyCrossHierarchyBoundaryInputSnapshot snapshot{
         containing->id(), occurrence, instance->referenced_assembly_document(),
         instance->suppression_state(), instance->transform()};
-    const auto existing = std::find_if(
-        snapshots.begin(), snapshots.end(), [&snapshot](const auto& candidate) {
+    const auto existing =
+        std::find_if(snapshots.begin(), snapshots.end(), [&snapshot](const auto& candidate) {
           return same_boundary_identity(candidate, snapshot);
         });
     if (existing == snapshots.end()) {
       snapshots.push_back(std::move(snapshot));
     } else if (*existing != snapshot) {
-      return Result<std::size_t>::failure(validation_error(
-          occurrence.value(), "cross-hierarchy endpoint boundary identity resolved inconsistently"));
+      return Result<std::size_t>::failure(
+          validation_error(occurrence.value(),
+                           "cross-hierarchy endpoint boundary identity resolved inconsistently"));
     }
 
     containing = project.find_assembly_document(instance->referenced_assembly_document());
     if (containing == nullptr) {
-      return Result<std::size_t>::failure(validation_error(
-          instance->referenced_assembly_document().value(),
-          "cross-hierarchy endpoint child assembly must exist"));
+      return Result<std::size_t>::failure(
+          validation_error(instance->referenced_assembly_document().value(),
+                           "cross-hierarchy endpoint child assembly must exist"));
     }
   }
   return Result<std::size_t>::success(endpoint.occurrence_path().size());
@@ -69,10 +70,14 @@ make_cross_hierarchy_authority_snapshots(
       return Result<std::vector<AssemblyCrossHierarchyTransformAuthoritySnapshot>>::failure(
           component.error());
     }
+    auto effective = cross_hierarchy_authority_transform(project, authority);
+    if (!effective)
+      return Result<std::vector<AssemblyCrossHierarchyTransformAuthoritySnapshot>>::failure(
+          effective.error());
     snapshots.push_back(AssemblyCrossHierarchyTransformAuthoritySnapshot{
         authority, component.value()->referenced_part_document(),
         component.value()->grounding_state(), component.value()->suppression_state(),
-        component.value()->transform()});
+        effective.value()});
   }
   return Result<std::vector<AssemblyCrossHierarchyTransformAuthoritySnapshot>>::success(
       std::move(snapshots));
@@ -125,9 +130,9 @@ validate_cross_hierarchy_authority_and_proposal_freshness(
   for (const auto& snapshot : authority_snapshots) {
     if (std::find(current_authorities.begin(), current_authorities.end(), snapshot.authority) !=
         current_authorities.end()) {
-      return Result<std::vector<ComponentTransformAuthority>>::failure(validation_error(
-          snapshot.authority.component_instance.value(),
-          result_label + " contains duplicate authority snapshots"));
+      return Result<std::vector<ComponentTransformAuthority>>::failure(
+          validation_error(snapshot.authority.component_instance.value(),
+                           result_label + " contains duplicate authority snapshots"));
     }
     current_authorities.push_back(snapshot.authority);
 
@@ -135,18 +140,21 @@ validate_cross_hierarchy_authority_and_proposal_freshness(
     if (component.has_error()) {
       return Result<std::vector<ComponentTransformAuthority>>::failure(component.error());
     }
+    auto effective = cross_hierarchy_authority_transform(project, snapshot.authority);
+    if (!effective)
+      return Result<std::vector<ComponentTransformAuthority>>::failure(effective.error());
     if (component.value()->referenced_part_document() != snapshot.referenced_part_document ||
         component.value()->grounding_state() != snapshot.grounding_state ||
         component.value()->suppression_state() != snapshot.suppression_state ||
-        component.value()->transform() != snapshot.source_transform) {
-      return Result<std::vector<ComponentTransformAuthority>>::failure(validation_error(
-          snapshot.authority.component_instance.value(),
-          result_label + " is stale because transform authority input changed"));
+        effective.value() != snapshot.source_transform) {
+      return Result<std::vector<ComponentTransformAuthority>>::failure(
+          validation_error(snapshot.authority.component_instance.value(),
+                           result_label + " is stale because transform authority input changed"));
     }
     if (snapshot.suppression_state != ComponentSuppressionState::Active) {
-      return Result<std::vector<ComponentTransformAuthority>>::failure(validation_error(
-          snapshot.authority.component_instance.value(),
-          result_label + " authority snapshot must be active"));
+      return Result<std::vector<ComponentTransformAuthority>>::failure(
+          validation_error(snapshot.authority.component_instance.value(),
+                           result_label + " authority snapshot must be active"));
     }
     if (snapshot.grounding_state == ComponentGroundingState::Grounded) {
       expected_fixed.push_back(snapshot.authority);
@@ -166,9 +174,9 @@ validate_cross_hierarchy_authority_and_proposal_freshness(
   for (const auto& proposal : proposed_transforms) {
     if (std::find(proposal_authorities.begin(), proposal_authorities.end(), proposal.authority) !=
         proposal_authorities.end()) {
-      return Result<std::vector<ComponentTransformAuthority>>::failure(validation_error(
-          proposal.authority.component_instance.value(),
-          result_label + " contains duplicate authority proposals"));
+      return Result<std::vector<ComponentTransformAuthority>>::failure(
+          validation_error(proposal.authority.component_instance.value(),
+                           result_label + " contains duplicate authority proposals"));
     }
     proposal_authorities.push_back(proposal.authority);
 
@@ -197,13 +205,12 @@ validate_cross_hierarchy_authority_and_proposal_freshness(
   }
 
   if (proposal_authorities != expected_free) {
-    return Result<std::vector<ComponentTransformAuthority>>::failure(validation_error(
-        std::string(application_object_id),
-        result_label + " proposals must exactly cover free authority snapshots"));
+    return Result<std::vector<ComponentTransformAuthority>>::failure(
+        validation_error(std::string(application_object_id),
+                         result_label + " proposals must exactly cover free authority snapshots"));
   }
 
-  return Result<std::vector<ComponentTransformAuthority>>::success(
-      std::move(current_authorities));
+  return Result<std::vector<ComponentTransformAuthority>>::success(std::move(current_authorities));
 }
 
 Result<std::size_t> validate_cross_hierarchy_boundary_freshness(
@@ -234,8 +241,8 @@ Result<std::size_t> apply_cross_hierarchy_authority_proposals(
           std::string(application_object_id),
           "cross-hierarchy proposal authority assembly document must remain in candidate project"));
     }
-    auto updated = assembly->set_component_instance_transform(
-        proposal.authority.component_instance, proposal.proposed_transform);
+    auto updated = set_cross_hierarchy_authority_transform(project, proposal.authority,
+                                                           proposal.proposed_transform);
     if (updated.has_error()) {
       return Result<std::size_t>::failure(updated.error());
     }

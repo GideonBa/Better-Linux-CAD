@@ -18,6 +18,7 @@ namespace blcad::geometry::detail {
 struct AssemblyPartShapeDefinition {
   DocumentId part_document;
   TopoDS_Shape shape;
+  ModelStateId selected_model_state{primary_model_state_id()};
 };
 
 struct AssemblyPartShapeDefinitionsBuild {
@@ -36,12 +37,16 @@ public:
   [[nodiscard]] Result<AssemblyPartShapeDefinitionsBuild>
   build(const Project& project, std::vector<DocumentId> referenced_part_documents) const;
 
+  [[nodiscard]] Result<AssemblyPartShapeDefinitionsBuild>
+  build_for_states(const Project&, std::vector<std::pair<DocumentId, ModelStateId>>) const;
+
 private:
   StepImportTopologyContext* import_context_{};
 };
 
 [[nodiscard]] const AssemblyPartShapeDefinition* find_assembly_part_shape_definition(
     const std::vector<AssemblyPartShapeDefinition>& definitions,
-    const DocumentId& part_document) noexcept;
+    const DocumentId& part_document,
+    ModelStateId state = primary_model_state_id()) noexcept;
 
 } // namespace blcad::geometry::detail

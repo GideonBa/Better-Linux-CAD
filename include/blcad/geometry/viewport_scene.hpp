@@ -69,6 +69,10 @@ public:
   build_project(const Project& project,
                 const std::function<const ShapeCache*(DocumentId)>& member_cache) const;
 
+  [[nodiscard]] Result<std::vector<ViewportSceneItem>>
+  build_project_for_states(const Project&,
+      const std::function<const ShapeCache*(DocumentId, ModelStateId)>&) const;
+
 private:
   StepImportTopologyContext* import_context_{};
 };

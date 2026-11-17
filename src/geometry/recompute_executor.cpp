@@ -1,3 +1,5 @@
+#include "effective_part_source.hpp"
+#include "blcad/geometry/direct_edit_adapter.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/sketch_contour.hpp"
@@ -468,6 +470,8 @@ store_verified_feature_result(const PartDocument& document, const Feature& featu
     return feature->body_result_context().effective_produced_body() == body;
   if (const LoftFeature* feature = document.find_loft_feature(FeatureId(std::string(producer))))
     return feature->body_result_context().effective_produced_body() == body;
+  if (const auto* feature = document.find_direct_edit_feature(FeatureId(std::string(producer))))
+    return feature->target_body() == body;
   if (const auto* feature = document.find_sketch_driven_feature(FeatureId(std::string(producer))))
     return feature->target_body() == body;
   if (const SurfaceFeature* feature =
@@ -4773,6 +4777,36 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
   return store_cut(std::move(shape.value()));
 }
 
+Result<std::size_t> GeometryRecomputeExecutor::execute_direct_edit(const PartDocument& document,
+                                                                     FeatureId id,
+                                                                     ShapeCache& cache) const {
+  const auto scope = detail::validate_history_input(document, cache, id.value());
+  if (!scope)
+    return Result<std::size_t>::failure(scope.error());
+  auto imported = validate_feature_imports(document, cache, id.value(), import_context_);
+  if (!imported)
+    return imported;
+  const auto* feature = document.find_direct_edit_feature(id);
+  if (!feature)
+    return Result<std::size_t>::failure(
+        validation_error(id.value(), "Direct Edit feature is missing"));
+  auto working = cache;
+  auto target = resolve_in_place_body_target(document, id, feature->target_body(), working);
+  if (!target)
+    return Result<std::size_t>::failure(target.error());
+  auto result =
+      DirectEditAdapter{}.apply(document, *feature, *target.value(), working, import_context_);
+  if (!result)
+    return Result<std::size_t>::failure(result.error());
+  auto stored = store_body_modifier_result(document, *feature, std::move(result.value()), working);
+  if (!stored)
+    return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
+  cache = std::move(working);
+  return stored;
+}
+
 Result<std::size_t> GeometryRecomputeExecutor::execute_sketch_driven(const PartDocument& document,
                                                                      FeatureId id,
                                                                      ShapeCache& cache) const {
@@ -5893,6 +5927,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(step.node_id));
     const SweepFeature* sweep = document.find_sweep_feature(FeatureId(step.node_id));
     const LoftFeature* loft = document.find_loft_feature(FeatureId(step.node_id));
+    const auto* direct_edit = document.find_direct_edit_feature(FeatureId(step.node_id));
     const auto* sketch_driven = document.find_sketch_driven_feature(FeatureId(step.node_id));
     const SurfaceFeature* surface = document.find_surface_feature(FeatureId(step.node_id));
     const LinearPatternFeature* linear_pattern =
@@ -5909,7 +5944,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(step.node_id));
     if (feature == nullptr && imported == nullptr && revolve == nullptr && sweep == nullptr &&
-        loft == nullptr && surface == nullptr && sketch_driven == nullptr &&
+        loft == nullptr && surface == nullptr && sketch_driven == nullptr && direct_edit == nullptr &&
         linear_pattern == nullptr && circular_pattern == nullptr && mirror == nullptr &&
         fillet == nullptr && chamfer == nullptr && shell == nullptr && draft == nullptr &&
         body_boolean == nullptr && body_transform == nullptr)
@@ -5920,6 +5955,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
                                     : revolve != nullptr          ? revolve->id()
                                     : sweep != nullptr            ? sweep->id()
                                     : loft != nullptr             ? loft->id()
+                                    : direct_edit != nullptr      ? direct_edit->id()
                                     : sketch_driven != nullptr    ? sketch_driven->id()
                                     : surface != nullptr          ? surface_feature_id(*surface)
                                     : linear_pattern != nullptr   ? linear_pattern->id()
@@ -5944,6 +5980,8 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
         : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
         : sweep != nullptr   ? execute_sweep(document, sweep->id(), execution_cache)
         : loft != nullptr    ? execute_loft(document, loft->id(), execution_cache)
+        : direct_edit != nullptr
+            ? execute_direct_edit(document, direct_edit->id(), execution_cache)
         : sketch_driven != nullptr
             ? execute_sketch_driven(document, sketch_driven->id(), execution_cache)
         : surface != nullptr
@@ -6059,6 +6097,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(executable_id));
     const SweepFeature* sweep = document.find_sweep_feature(FeatureId(executable_id));
     const LoftFeature* loft = document.find_loft_feature(FeatureId(executable_id));
+    const auto* direct_edit = document.find_direct_edit_feature(FeatureId(executable_id));
     const auto* sketch_driven = document.find_sketch_driven_feature(FeatureId(executable_id));
     const SurfaceFeature* surface = document.find_surface_feature(FeatureId(executable_id));
     const LinearPatternFeature* linear_pattern =
@@ -6075,7 +6114,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(executable_id));
     if (feature == nullptr && imported == nullptr && revolve == nullptr && sweep == nullptr &&
-        loft == nullptr && surface == nullptr && sketch_driven == nullptr &&
+        loft == nullptr && surface == nullptr && sketch_driven == nullptr && direct_edit == nullptr &&
         linear_pattern == nullptr && circular_pattern == nullptr && mirror == nullptr &&
         fillet == nullptr && chamfer == nullptr && shell == nullptr && draft == nullptr &&
         body_boolean == nullptr && body_transform == nullptr)
@@ -6086,7 +6125,8 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
                                  : revolve != nullptr          ? revolve->id()
                                  : sweep != nullptr            ? sweep->id()
                                  : loft != nullptr             ? loft->id()
-                                 : sketch_driven != nullptr    ? sketch_driven->id()
+                                 : direct_edit != nullptr      ? direct_edit->id()
+                                    : sketch_driven != nullptr    ? sketch_driven->id()
                                  : surface != nullptr          ? surface_feature_id(*surface)
                                  : linear_pattern != nullptr   ? linear_pattern->id()
                                  : circular_pattern != nullptr ? circular_pattern->id()
@@ -6110,6 +6150,8 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
         : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
         : sweep != nullptr   ? execute_sweep(document, sweep->id(), execution_cache)
         : loft != nullptr    ? execute_loft(document, loft->id(), execution_cache)
+        : direct_edit != nullptr
+            ? execute_direct_edit(document, direct_edit->id(), execution_cache)
         : sketch_driven != nullptr
             ? execute_sketch_driven(document, sketch_driven->id(), execution_cache)
         : surface != nullptr
@@ -6178,7 +6220,7 @@ void GeometryRecomputeExecutor::record_complete_geometry_source(const PartDocume
   }
   if (cache.body_shape_count() != available_count)
     return;
-  const auto source = serialize_part_document_to_json(document);
+  const auto source = detail::effective_part_source(document);
   if (source)
     cache.complete_geometry_source_ =
         ShapeCache::CompleteGeometrySource{source.value(), document.executable_generation()};
@@ -6190,8 +6232,8 @@ Result<GeometryRecomputeSummary> GeometryRecomputeExecutor::refresh_material_met
     // Immutable Reference Parts retain their own source/catalog/body result.
     // Unchanged definitions can accompany a Project catalogue edit without
     // receiving fabricated native feature/body provenance or new topology.
-    const auto old_source = serialize_part_document_to_json(before);
-    const auto new_source = serialize_part_document_to_json(after);
+    const auto old_source = detail::effective_part_source(before);
+    const auto new_source = detail::effective_part_source(after);
     if (!before.is_reference_part() || !after.is_reference_part() || !old_source || !new_source ||
         old_source.value() != new_source.value() ||
         before.executable_generation() != after.executable_generation())
@@ -6218,7 +6260,7 @@ Result<GeometryRecomputeSummary> GeometryRecomputeExecutor::refresh_material_met
   const auto provenance = cache.validate_complete_geometry_result(before);
   if (!provenance)
     return Result<GeometryRecomputeSummary>::failure(provenance.error());
-  const auto source = serialize_part_document_to_json(after);
+  const auto source = detail::effective_part_source(after);
   if (!source)
     return Result<GeometryRecomputeSummary>::failure(source.error());
   const auto old_inputs =
@@ -6260,7 +6302,7 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
       return Result<GeometryRecomputeSummary>::failure(
           Error::dependency(entry.feature.node_id, message));
     }
-  const auto source = serialize_part_document_to_json(document);
+  const auto source = detail::effective_part_source(document);
   if (!source)
     return Result<GeometryRecomputeSummary>::failure(source.error());
   auto created = ShapeCache::create(shape_cache.id());
@@ -6322,6 +6364,8 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
         return execute_circular_pattern(document, feature, working);
       case PartFeatureFamily::Mirror:
         return execute_mirror(document, feature, working);
+      case PartFeatureFamily::DirectEdit:
+        return execute_direct_edit(document, feature, working);
       case PartFeatureFamily::SketchDriven:
         return execute_sketch_driven(document, feature, working);
       case PartFeatureFamily::Fillet:
