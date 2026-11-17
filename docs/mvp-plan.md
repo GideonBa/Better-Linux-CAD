@@ -1109,7 +1109,11 @@ Native create/edit/drag, duplicate-role rejection, exact Undo/Redo and Save/Open
 at 100% and compact 150%; offscreen typed-panel regression **10 / 190**. Finishing selection on
 Stitch/Thicken ancestry and the coincident unrelated-Body negative pass **14 / 494**. Fixed
 Apply/Cancel and source-law arrows were visually reviewed. Explicit failed-Geometry reopening,
-scrolled compact controls and final combined regression remain open. Continue through 184;
+scrolled compact controls and final combined regression remain open. The subsequent owned-task
+regression adds actual failed reopening/repair, protected immutable entry state, feature renaming,
+shared-value synchronization and correct End-of-Part source guides. The broad native selection
+passes **37 / 2,681** at 100% and **37 / 2,701** at compact 150%, including existing History/edit
+commands. Full suites are running on frozen runtime inputs. Continue through 184;
 retain all planned scope after 184.
 
 ### Implementation route for the assigned continuation

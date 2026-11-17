@@ -534,7 +534,14 @@ model small. These captures verify the shared workflow; dedicated manufacturing 
 
 For Hole, use the familiar top-to-bottom order: positions → target/direction → bore/seat type →
 termination → thread → advanced checks. For Fillet, keep constant/variable/face/full-round as modes
-of the same feature tool; highlight edge stations and face roles directly. Direct Edit exposes its
+of the same feature tool; highlight edge stations and face roles directly. The owned
+[advanced finishing panel](gui-advanced-finishing-mvp9.md) restores the complete typed record on
+History editing, including unchanged literal fractions and shared bindings. Read-only source-law
+arrows cannot intercept station grips. Face roles, hold lines, derived full-round size and supported
+setbacks use the same task and fixed completion actions. Open for Repair first owns References;
+close that task before opening the Fillet editor from History. A successful repair validates the
+complete model and remains undoable. External document/model changes invalidate the local draft.
+Direct Edit exposes its
 Move/Rotate/Size/Delete choice beside the existing triad and provides matching numeric fields.
 In-context Assembly editing always shows the root and edited definition/occurrence in the breadcrumb.
 An Assembly Hole participant table makes every affected Part and recipe visible before Apply.

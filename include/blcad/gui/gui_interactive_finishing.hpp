@@ -328,12 +328,16 @@ public:
   [[nodiscard]] Result<std::size_t> apply(GuiDocumentSession& session) {
     auto checked = preview(session);
     if (checked.has_error()) return Result<std::size_t>::failure(checked.error());
-    auto committed = session.commit_part_transaction(
-        std::string(kind_ == GuiFinishingKind::Fillet ? "Apply Fillet" : "Apply Chamfer"),
-        [this](PartDocument& part) -> Result<std::size_t> {
-          if (auto seeded = seed_parameters(part); seeded.has_error()) return seeded;
-          return add_feature(part);
-        });
+    const GuiPartMutation mutation = [this](PartDocument& part) -> Result<std::size_t> {
+      if (auto seeded = seed_parameters(part); seeded.has_error())
+        return seeded;
+      return add_feature(part);
+    };
+    const auto label =
+        std::string(kind_ == GuiFinishingKind::Fillet ? "Apply Fillet" : "Apply Chamfer");
+    auto committed = draft_ && draft_->editing && session.reference_repair_mode()
+                         ? session.commit_part_repair_transaction(label, mutation)
+                         : session.commit_part_transaction(label, mutation);
     if (committed.has_error()) return committed;
     active_ = false;
     return committed;

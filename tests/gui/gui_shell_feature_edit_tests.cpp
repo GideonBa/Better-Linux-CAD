@@ -11,6 +11,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScrollArea>
@@ -278,6 +279,17 @@ TEST_CASE("Shell feature editor preloads and updates all thirteen persistent fea
   auto begun = tools.begin(id);
   INFO((begun.has_error() ? begun.error().message() : "ok"));
   REQUIRE(begun);
+  if (kind == GuiFeatureEditKind::Fillet) {
+    auto* title = w.findChild<QLineEdit*>("blcad.fillet.feature_name");
+    REQUIRE(title);
+    title->setText("Edited feature");
+    REQUIRE(QMetaObject::invokeMethod(title, "editingFinished", Qt::DirectConnection));
+    CHECK(snapshot(w) == before);
+    REQUIRE(w.feature_tools().apply());
+    CHECK(w.session().part_document()->fillet_features().front().name() == "Edited feature");
+    history(w, before);
+    return;
+  }
   REQUIRE(apply(w).isEnabled());
   CHECK(snapshot(w) == before);
   if (kind == GuiFeatureEditKind::BodyBoolean) {
@@ -392,34 +404,30 @@ TEST_CASE("Shell feature edit changes ordered sections and edge membership throu
     REQUIRE(sketch);
     CHECK(sketch->currentData().toString() == "upper");
   } else {
-    auto* add = w.findChild<QPushButton*>("blcad.feature_edit.add/edges");
-    REQUIRE(add);
-    add->click();
-    qApp->processEvents();
-    CHECK_FALSE(apply(w).isEnabled());
-    auto* edge = qobject_cast<QComboBox*>(tools.field("/edges/1/edge"));
-    REQUIRE(edge);
-    const int back =
-        edge->findData(QString::fromStdString(std::string(to_string(SemanticEdge::TopBack))));
-    REQUIRE(back >= 0);
-    edge->setCurrentIndex(back);
-    REQUIRE(apply(w).isEnabled());
-    auto* remove = w.findChild<QPushButton*>("blcad.feature_edit.Entfernen/edges/0");
-    REQUIRE(remove);
-    remove->click();
-    qApp->processEvents();
-    // An empty required list must still permit recovery inside the same edit.
-    remove = w.findChild<QPushButton*>("blcad.feature_edit.Entfernen/edges/0");
-    REQUIRE(remove);
-    remove->click();
-    qApp->processEvents();
-    CHECK_FALSE(apply(w).isEnabled());
-    add = w.findChild<QPushButton*>("blcad.feature_edit.add/edges");
-    REQUIRE(add);
-    REQUIRE(add->isEnabled());
-    add->click();
-    qApp->processEvents();
-    REQUIRE(apply(w).isEnabled());
+    auto& owned = w.feature_tools();
+    auto pick = [&](std::string_view role) {
+      const auto targets = owned.finishing_selection_items();
+      const auto found = std::find_if(targets.begin(), targets.end(), [&](const auto& target) {
+        return target.semantic_id.ends_with(role);
+      });
+      REQUIRE(found != targets.end());
+      REQUIRE(w.viewport().select_semantic(found->semantic_id));
+      qApp->processEvents();
+    };
+    pick("top_back");
+    CHECK(owned.finishing_target_editor().selectedItems().size() == 2);
+    pick("top_front");
+    pick("top_back");
+    CHECK(owned.finishing_target_editor().selectedItems().empty());
+    CHECK_FALSE(w.findChild<QPushButton*>("blcad.feature.apply")->isEnabled());
+    pick("top_back");
+    CHECK(snapshot(w) == before);
+    REQUIRE(owned.apply());
+    CHECK(std::get<SemanticEdgeReference>(
+              w.session().part_document()->fillet_features().front().edges().front().source())
+              .edge() == SemanticEdge::TopBack);
+    history(w, before);
+    return;
   }
   CHECK(snapshot(w) == before);
   REQUIRE(tools.apply());
@@ -463,6 +471,8 @@ TEST_CASE("Shell feature edit rejects stale documents and refuses conflicting ta
   CHECK_FALSE(tools.begin(FeatureId("missing")));
   REQUIRE(tools.begin(FeatureId("feature.fillet")));
   CHECK_FALSE(w.feature_tools().begin_extrude());
+  auto& owned = w.feature_tools();
+  REQUIRE(owned.active());
   const auto before = snapshot(w);
   REQUIRE(w.session().commit_part_transaction("External edit", [](PartDocument& part) {
     auto result = part.set_parameter_value(ParameterId("width"), Quantity::length_mm(21).value());
@@ -470,14 +480,17 @@ TEST_CASE("Shell feature edit rejects stale documents and refuses conflicting ta
   }));
   const auto external = snapshot(w);
   CHECK(before != external);
-  CHECK_FALSE(tools.apply());
+  CHECK_FALSE(owned.apply());
   w.refresh();
-  CHECK_FALSE(tools.active());
+  CHECK_FALSE(owned.active());
   CHECK(snapshot(w) == external);
   REQUIRE(tools.begin(FeatureId("feature.fillet")));
-  number(w, "/radius_parameter").setValue(1.2);
+  auto* radius = w.findChild<QLineEdit*>("blcad.fillet.size");
+  REQUIRE(radius);
+  radius->setText("1.2");
+  REQUIRE(QMetaObject::invokeMethod(radius, "editingFinished", Qt::DirectConnection));
   REQUIRE(w.undo());
-  CHECK_FALSE(tools.active());
+  CHECK_FALSE(owned.active());
   CHECK(snapshot(w) == before);
 }
 TEST_CASE("Native browser double click edits existing feature with drag numeric Escape and "

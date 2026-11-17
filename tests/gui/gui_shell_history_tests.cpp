@@ -712,9 +712,10 @@ TEST_CASE("History context commands preview cancel save apply undo and edit thro
   click(apply);
   CHECK(w.session().part_document()->authored_history_intent()->suppressed.empty());
   context(w, "fillet", w.history_tools().edit_action());
-  CHECK(w.feature_edit_tools().active());
+  CHECK(w.feature_tools().active());
+  CHECK(w.feature_tools().command() == ShellFeatureTools::Command::Fillet);
   CHECK_FALSE(w.history_tools().active());
-  w.feature_edit_tools().cancel();
+  w.feature_tools().cancel();
 }
 
 TEST_CASE("History dependency closure is explicit and unchecking it invalidates Apply again",
@@ -876,13 +877,13 @@ TEST_CASE("History restore failures keep a valid committed model until dimension
   REQUIRE(w.session().part_shape_cache()->validate_complete_history_result(
       *w.session().part_document()));
   context(w, "fillet", w.history_tools().edit_action());
-  REQUIRE(w.feature_edit_tools().active());
-  auto* radius = qobject_cast<QDoubleSpinBox*>(w.feature_edit_tools().field("/radius_parameter"));
-  REQUIRE(radius);
-  radius->setValue(1);
+  REQUIRE(w.feature_tools().active());
+  auto& radius = control<QLineEdit>(w, "blcad.fillet.size");
+  radius.setText("1");
+  REQUIRE(QMetaObject::invokeMethod(&radius, "editingFinished", Qt::DirectConnection));
   settle();
-  click(control<QPushButton>(w, "blcad.feature_edit.apply"));
-  CHECK_FALSE(w.feature_edit_tools().active());
+  click(control<QPushButton>(w, "blcad.feature.apply"));
+  CHECK_FALSE(w.feature_tools().active());
   CHECK((w.session().part_document()->authored_history_intent()->suppressed ==
          std::vector<std::string>{"fillet"}));
   context(w, "fillet", w.history_tools().restore_action());
