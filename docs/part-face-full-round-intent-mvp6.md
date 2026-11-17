@@ -37,10 +37,10 @@ The initial Core capability requires exactly three distinct explicit single-edge
 one constant radius parameter binding. All station IDs and group directions remain authored.
 The setback distance participates in normal parameter invalidation and transactional domain checks.
 
-The planned native capability for 178 is an orthogonal convex three-edge corner, with supported
+The native capability implemented in 178 is an orthogonal convex three-edge corner, with supported
 setback greater than its radius and sufficient remaining edge length. Actual support/corner
 feasibility, trimmed contact and resulting material belong to Geometry. The eventual capability
-table must distinguish checked native rolling corners, supported G1 setbacks and unsupported
+table distinguishes checked native rolling corners, analytic G1 setback relief networks and unsupported
 G2/support combinations; a generic cap does not establish contact continuity.
 
 ## Persistence and normal commands
@@ -58,9 +58,10 @@ reject. Part/Project reopening reconstructs the same typed mode. All modes use n
 add/update/remove and feature inventory. Face/path/size dependencies join the same atomic graph
 update, and failed replacement preserves the owned document and graph.
 
-The Geometry dispatcher recognizes these modes before legacy radius lookup. Until 178 supplies
-checked construction, face/full-round and setback requests fail explicitly; they cannot use a
-constant-radius fallback. Native create/edit/selection, handles and repair remain 179.
+The Geometry dispatcher recognizes these modes before legacy radius lookup. The supported
+constructions and their exact sizing/continuity meanings are defined by the
+[Geometry capability table](geometry-face-fillet-mvp8.md). Unsupported combinations fail explicitly.
+Native create/edit/selection, handles and repair remain 179.
 
 ## Verification status
 
@@ -73,5 +74,5 @@ suppression/removal and unchanged legacy contracts.
 The hold-line cycle regression constructs a derived curve from a downstream Fillet edge, then
 tries to consume it in that same Fillet. Replacing a feature now checks the complete restored
 DAG before publication, including documents without an authored construction sequence. Failure
-preserves both document and graph. Native support, actual middle replacement, differential
-continuity and shared interaction remain the separate 178/179 gates.
+preserves both document and graph. Native support, middle replacement and differential continuity are accepted in the linked 178
+contract. Shared interaction remains the separate 179 gate.

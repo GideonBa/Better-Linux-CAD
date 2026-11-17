@@ -120,8 +120,7 @@ Result<NativeFilletResult> variable_fillet(const PartDocument& document,
   try {
     const auto& intent = std::get<VariableFilletIntent>(feature.advanced_intent()->definition);
     if (intent.setback)
-      return Result<NativeFilletResult>::failure(error(
-          intent.setback->id, "Setback corner construction requires the checked corner engine"));
+      return setback_fillet(document, feature, target, cache, context, lineage);
     BRepBuilderAPI_Copy copy(target, true, false);
     if (!copy.IsDone())
       return Result<NativeFilletResult>::failure(

@@ -7,6 +7,7 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeCone.hxx>
+#include <BRepPrimAPI_MakeSphere.hxx>
 #include <BRepPrimAPI_MakeTorus.hxx>
 #include <BRep_Builder.hxx>
 #include <Bnd_Box.hxx>
@@ -711,4 +712,33 @@ TEST_CASE("STEP toroidal Fillet strips retain physical volume and reject displac
   const double pi = std::acos(-1.);
   // Revolve the exact radial envelope: pi * integral_0^1 (5+sqrt(1-z*z))^2 dz.
   CHECK(body.volume_mm3 == Approx(25 * pi + 5 * pi * pi / 2 + 2 * pi / 3).margin(1e-6));
+}
+
+TEST_CASE("STEP spherical pole patches preserve circular material and reject displaced vertices",
+          "[geometry][step-import-reader][spherical-pole-exchange][parity-b178]") {
+  const bool invalid = GENERATE(false, true);
+  Fixture fixture;
+  const double pi = std::acos(-1.);
+  fixture.part(BRepPrimAPI_MakeSphere(5, 0, pi / 2, pi / 2).Shape(), "Spherical octant");
+  const auto path = fixture.write();
+  if (invalid) {
+    const auto bytes = fixture.bytes(path);
+    const auto changed = std::regex_replace(
+        bytes, std::regex(R"(CARTESIAN_POINT\('[^']*',\(\s*5\.0*,)"), "CARTESIAN_POINT('',(50.,");
+    REQUIRE(changed != bytes);
+    fixture.replace(path, changed);
+  }
+  const auto bytes = fixture.bytes(path);
+  const auto result = StepImportReader{}.read(fixture.source(path), fixture.root);
+  INFO((result ? "ok" : result.error().message()));
+  CHECK(fixture.bytes(path) == bytes);
+  if (invalid) {
+    REQUIRE_FALSE(result);
+    return;
+  }
+  REQUIRE(result);
+  REQUIRE(result.value().body_count() == 1);
+  const auto& body = result.value().products.front().bodies.front();
+  CHECK(BRepCheck_Analyzer(*OcctShapeView::get(body.shape), true).IsValid());
+  CHECK(body.volume_mm3 == Approx(pi * 125 / 6).margin(1e-6));
 }

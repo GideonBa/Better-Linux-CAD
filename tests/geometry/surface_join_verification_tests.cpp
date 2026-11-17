@@ -129,6 +129,10 @@ TEST_CASE("Continuity verification rejects singular differential frames and "
                          gp_Pnt(0, 0, 5))
           .Value();
   const auto pole_edge = BRepBuilderAPI_MakeEdge(meridian).Edge();
+  REQUIRE(verify(pole_edge, patch(sphere, 0, .5, 0, std::numbers::pi / 2),
+                 patch(sphere, -.5, 0, 0, std::numbers::pi / 2), LoftBoundaryContinuity::G1));
+  REQUIRE(verify(pole_edge, patch(sphere, 0, .5, 0, std::numbers::pi / 2),
+                 patch(sphere, -.5, 0, 0, std::numbers::pi / 2), LoftBoundaryContinuity::G1));
   REQUIRE_FALSE(verify(pole_edge, patch(sphere, 0, .5, 0, std::numbers::pi / 2),
                        patch(sphere, -.5, 0, 0, std::numbers::pi / 2), LoftBoundaryContinuity::G2));
 }
