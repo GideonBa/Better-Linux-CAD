@@ -45,6 +45,8 @@ enum class PartFeatureInputRole {
   PathSegment,
   LoftBoundarySupport,
   SurfaceSourceFace,
+  FilletSupportFace,
+  FilletMiddleFace,
 };
 
 enum class PartFeatureInputSourceKind {

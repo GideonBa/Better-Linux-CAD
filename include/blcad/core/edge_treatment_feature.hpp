@@ -12,6 +12,8 @@ namespace blcad {
 
 struct AdvancedFilletIntent;
 struct VariableFilletIntent;
+struct FaceBlendIntent;
+struct FullRoundIntent;
 
 enum class ChamferMode { EqualDistance, TwoDistance, DistanceAngle };
 
@@ -26,6 +28,12 @@ public:
 
   [[nodiscard]] static Result<FilletFeature> create_variable(FeatureId, std::string name, BodyId,
                                                              VariableFilletIntent);
+  [[nodiscard]] static Result<FilletFeature> create_face_blend(FeatureId, std::string, BodyId,
+                                                               FaceBlendIntent);
+  [[nodiscard]] static Result<FilletFeature> create_full_round(FeatureId, std::string, BodyId,
+                                                               FullRoundIntent);
+  [[nodiscard]] std::vector<FaceReference> faces() const;
+  [[nodiscard]] std::vector<PathCurveId> hold_lines() const;
   [[nodiscard]] const AdvancedFilletIntent* advanced_intent() const noexcept;
   [[nodiscard]] std::vector<ParameterId> parameter_dependencies() const;
   [[nodiscard]] const FeatureId& id() const noexcept;

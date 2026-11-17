@@ -460,7 +460,8 @@ private:
   [[nodiscard]] Result<std::size_t>
   add_edge_treatment_dependencies(const FeatureId& id, const BodyId& target_body,
                                   const std::vector<EdgeReference>& edges,
-                                  const std::vector<ParameterId>& parameters);
+                                  const std::vector<ParameterId>& parameters,
+                                  const std::vector<std::string>& extra_sources = {});
   [[nodiscard]] Result<std::size_t> add_shell_dependencies(const ShellFeature& feature);
   [[nodiscard]] Result<std::size_t> add_hole_dependencies(const HoleFeature& feature);
   [[nodiscard]] Result<std::size_t> add_thread_dependencies(const ThreadFeature& feature);

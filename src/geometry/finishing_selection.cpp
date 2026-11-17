@@ -35,7 +35,8 @@ Result<std::vector<FinishingSelectionTarget>> FinishingSelectionBuilder::build(
   const bool edge =
       path || role == PartFeatureInputRole::FilletEdge || role == PartFeatureInputRole::ChamferEdge;
   if (!surface && !edge && role != PartFeatureInputRole::ShellRemovalFace &&
-      role != PartFeatureInputRole::DraftFace)
+      role != PartFeatureInputRole::DraftFace && role != PartFeatureInputRole::FilletSupportFace &&
+      role != PartFeatureInputRole::FilletMiddleFace)
     return Result<std::vector<FinishingSelectionTarget>>::failure(
         Error::validation(body.value(), "unsupported finishing selection role"));
   const auto* result = cache.find_body_result(body);

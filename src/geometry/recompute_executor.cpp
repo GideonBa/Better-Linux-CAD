@@ -4788,19 +4788,30 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument
     return Result<std::size_t>::failure(
         validation_error(feature_id.value(), "fillet feature must exist in part document"));
 
-  const Parameter* radius = document.find_parameter(feature->radius_parameter());
-  if (radius == nullptr || radius->type() != ParameterType::Length ||
-      radius->value().millimeters() <= k_tolerance)
-    return Result<std::size_t>::failure(validation_error(
-        feature->radius_parameter().value(), "fillet radius must be a positive length"));
+  double radius_mm = 0;
+  if (!feature->advanced_intent()) {
+    const auto* radius = document.find_parameter(feature->radius_parameter());
+    if (!radius || radius->type() != ParameterType::Length ||
+        radius->value().millimeters() <= k_tolerance)
+      return Result<std::size_t>::failure(validation_error(
+          feature->radius_parameter().value(), "fillet radius must be a positive length"));
+    radius_mm = radius->value().millimeters();
+  } else
+    for (const auto& id : feature->parameter_dependencies()) {
+      const auto* size = document.find_parameter(id);
+      if (!size || size->type() != ParameterType::Length ||
+          size->value().millimeters() <= k_tolerance)
+        return Result<std::size_t>::failure(validation_error(
+            id.value(), "Advanced Fillet sizes require positive resolved lengths"));
+    }
 
   ShapeCache working_cache = shape_cache;
   auto target =
       resolve_in_place_body_target(document, feature->id(), feature->target_body(), working_cache);
   if (target.has_error())
     return Result<std::size_t>::failure(target.error());
-  auto result = fillet_adapter_.apply(document, *feature, *target.value(), working_cache,
-                                      radius->value().millimeters(), import_context_);
+  auto result = fillet_adapter_.apply(document, *feature, *target.value(), working_cache, radius_mm,
+                                      import_context_);
   if (result.has_error())
     return Result<std::size_t>::failure(result.error());
   auto stored = store_fillet_result(document, *feature, std::move(result.value()), working_cache);

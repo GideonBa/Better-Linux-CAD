@@ -86,6 +86,28 @@ Result<std::size_t> validate_variable_fillet_intent(const VariableFilletIntent& 
         group.stations.back().normalized_length() != 1)
       return fail(group.id, "Radius law must cover the complete oriented contour from zero to one");
   }
+  if (intent.setback) {
+    const auto& corner = *intent.setback;
+    if (corner.id.empty() || corner.distance.empty() || intent.groups.size() != 3)
+      return fail(
+          corner.id,
+          "Setback corners require a stable ID, distance and exactly three explicit edge groups");
+    std::set<std::string> selected;
+    std::optional<ParameterId> radius;
+    for (const auto& id : corner.groups) {
+      const auto found = std::find_if(intent.groups.begin(), intent.groups.end(),
+                                      [&](const auto& group) { return group.id == id; });
+      if (!selected.insert(id).second || found == intent.groups.end() || found->edges.size() != 1 ||
+          found->propagation != FilletPropagation::Explicit)
+        return fail(corner.id, "Setback requires three distinct explicit single-edge groups");
+      for (const auto& station : found->stations) {
+        if (!radius)
+          radius = station.radius;
+        if (station.radius != *radius)
+          return fail(corner.id, "Supported setback groups must share one constant radius binding");
+      }
+    }
+  }
   return Result<std::size_t>::success(intent.groups.size());
 }
 FilletEdgeGroup reverse_fillet_group(FilletEdgeGroup group) {

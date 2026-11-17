@@ -1,4 +1,5 @@
 #include "blcad/geometry/fillet_adapter.hpp"
+#include "blcad/core/advanced_fillet_intent.hpp"
 
 #include "blcad/geometry/shape_cache.hpp"
 
@@ -32,6 +33,10 @@ Result<GeometryShape> FilletAdapter::apply(const PartDocument& document,
                                            const ShapeCache& shape_cache, double radius_mm,
                                            StepImportTopologyContext* import_context) const {
   if (feature.advanced_intent()) {
+    if (!std::holds_alternative<VariableFilletIntent>(feature.advanced_intent()->definition))
+      return Result<GeometryShape>::failure(fillet_error(
+          feature.id(), "Face/full-round Fillet construction requires the checked support engine"));
+
     if (target.empty())
       return Result<GeometryShape>::failure(
           fillet_error(feature.id(), "Variable Fillet target is empty"));
