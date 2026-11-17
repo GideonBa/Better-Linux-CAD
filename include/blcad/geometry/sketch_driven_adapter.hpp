@@ -8,5 +8,10 @@ class SketchDrivenAdapter {
 public:
   Result<GeometryShape> apply(const PartDocument&, const SketchDrivenFeature&, const GeometryShape&,
                               const ShapeCache&, StepImportTopologyContext* = nullptr) const;
+
+private:
+  Result<GeometryShape> apply_emboss(const PartDocument&, const SketchDrivenFeature&,
+                                     const GeometryShape&, const ShapeCache&,
+                                     StepImportTopologyContext*) const;
 };
 } // namespace blcad::geometry

@@ -10,7 +10,7 @@ feature-specific documents under `docs/`.
 - C++20
 - CMake 3.28 or newer
 - Ninja
-- OCCT/Open CASCADE for optional Geometry targets
+- OCCT/Open CASCADE and FreeType for optional Geometry targets
 - Qt 6 for the optional desktop, Interactive Sketcher, and Interactive Modeling
 - nlohmann-json
 - Catch2 3
@@ -30,7 +30,7 @@ sudo apt-get install -y build-essential cmake ninja-build pkg-config git clang-f
   libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev \
   libocct-data-exchange-dev libocct-visualization-dev libocct-ocaf-dev libocct-draw-dev \
   qt6-base-dev libeigen3-dev libtbb-dev nlohmann-json3-dev libfmt-dev libspdlog-dev catch2 libssl-dev \
-  doxygen graphviz
+  doxygen graphviz libfreetype6-dev
 ```
 
 ## Build and test presets

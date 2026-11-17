@@ -21,7 +21,8 @@ RibNative rib_tool(const RibSpine&, const RibWebIntent&, const FeatureId&, const
                    double, double, double, double, gp_Vec);
 RibNative join_rib(const RibNative&, const RibNative&, const FeatureId&,
                    bool reject_crossing = false);
-void scope_rib_fragments(RibNative&, const std::vector<FaceLineage>&, const FeatureId&);
+void scope_rib_fragments(RibNative&, const std::vector<FaceLineage>&, const FeatureId&,
+                         std::string_view prefix = "rib/fragment/");
 double rib_volume(const TopoDS_Shape&);
 void validate_rib_solid(const TopoDS_Shape&);
 } // namespace blcad::geometry::detail
