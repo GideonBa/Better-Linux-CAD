@@ -99,3 +99,10 @@ G1 spherical pole normals and the existing rejection of singular G2 charts have 
 Runtime: **1,244 files**, SHA-256
 `f590ef7bfea79674bd30ef001da27dc3eb979ded6fdeb13c0e86e3fbd462b79d`.
 Block 178 is accepted within the capability table. Native UI acceptance remains 179.
+
+Finishing selection enumerates surviving semantic supports from the selected producer ancestry,
+including Stitch/closed-shell and Thicken output Bodies. Each candidate must resolve uniquely on
+the actual current target and belong to its evaluated history scope. Sharing a Sketch, parameters
+or coincident geometry does not make an unrelated Body producer an ancestor. The Block-179
+selection regression passes **14 cases / 494 assertions**, including both consumers and a
+coincident unrelated-body negative (`build/verification/block179/selection-final.log`).
