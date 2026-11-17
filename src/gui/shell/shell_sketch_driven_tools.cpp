@@ -36,6 +36,7 @@ ShellSketchDrivenTools::ShellSketchDrivenTools(ShellWindow& window, ShellRibbon&
   window.addDockWidget(Qt::RightDockWidgetArea, p.dock);
   p.dock->hide();
   p.overlay = make_shell_manipulator_overlay(&window.viewport(), p.layer);
+  p.overlay->setObjectName("blcad.sketch_driven.manipulator_overlay");
   p.overlay->hide();
   for (const auto& [key, field] : p.ui->fields) {
     if (auto* line = qobject_cast<QLineEdit*>(field); line && key != "grip_numeric")
