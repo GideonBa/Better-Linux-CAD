@@ -19,6 +19,7 @@
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_property_controls.hpp"
 #include "blcad/gui/shell/shell_ribbon.hpp"
+#include "blcad/gui/shell/shell_sketch_driven_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 #include <QAbstractSpinBox>
 #include <QAction>
@@ -3424,6 +3425,9 @@ Result<std::size_t> ShellFeatureEditTools::begin_legacy_hole_conversion(FeatureI
 }
 Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   auto& p = *impl_;
+  if (!active() && !p.window.active_sketch() && !p.session.task().active() &&
+      p.session.part_document() && p.session.part_document()->find_sketch_driven_feature(id))
+    return p.window.sketch_driven_tools().begin_edit(id);
   if (!active() && !p.window.active_sketch() && !p.session.task().active() &&
       p.session.part_document() && p.session.part_document()->find_fillet_feature(id))
     return p.window.feature_tools().begin_fillet_edit(id);

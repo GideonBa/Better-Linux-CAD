@@ -31,7 +31,16 @@ The guide/controls foundation passes **2 Geometry cases / 80 assertions** and **
 normals, six planar support targets, retained inactive values and fixed completion controls.
 Logs: `build/verification/block184/guide-final.log`, `controls-final.log`.
 
-The native command owner, complete candidate/preview/publication workflow, source-Sketch return,
-qualified repair, actual grip interaction and combined F03/UI01 remain in progress. Native acceptance
-must cover 100% and compact 150%, complete history/Undo/Redo/Open/export and generated Hole/Fillet
-consumers before the main plan advances beyond 184.
+The native owner now provides Model actions and contextual selection, normal double-click editing,
+entry-revision guards, complete-history candidate preview and atomic publication. Source Sketch
+visits remain inside the parent workflow; Cancel restores its checkpoint. Qualified repair enters
+before the normal freshness guard and computes the real input prefix. Completion controls remain
+outside scrolling; the active grip has a numeric field with units.
+
+Initial owner verification passes offscreen **1 / 33**, native **1 / 31** and combined existing
+finishing/controls regression **15 / 356**, after all five targets build. The native test exercises
+an exact bound 1.2 mm thickness, preview-only edits, Escape, Undo/Redo and unchanged reopening of
+the editor. Logs: `build/verification/block184/owner-*`.
+
+Complete native text/wrapping, termination repair, source return, generated consumers and both-scale
+F03/UI01 acceptance remain in progress. The main plan retains 184 as the active block.

@@ -44,6 +44,7 @@ class ShellParameterTools;
 class ShellMaterialTools;
 class ShellPhysicalPropertiesTools;
 class ShellHoleTools;
+class ShellSketchDrivenTools;
 class ShellStepImportTools;
 
 // GUI Shell Reset MVP-9R Block 133: the single Qt shell window (replaces the
@@ -114,6 +115,9 @@ public:
 
   [[nodiscard]] ShellParameterTools& parameter_tools() noexcept {
     return *parameter_tools_;
+  }
+  [[nodiscard]] ShellSketchDrivenTools& sketch_driven_tools() noexcept {
+    return *sketch_driven_tools_;
   }
   [[nodiscard]] ShellHoleTools& hole_tools() noexcept {
     return *hole_tools_;
@@ -204,6 +208,7 @@ private:
   std::unique_ptr<ShellMaterialTools> material_tools_;
   std::unique_ptr<ShellPhysicalPropertiesTools> physical_properties_tools_;
   std::unique_ptr<ShellHoleTools> hole_tools_;
+  std::unique_ptr<ShellSketchDrivenTools> sketch_driven_tools_;
   std::unique_ptr<ShellStepImportTools> step_import_tools_;
 
   OcctViewport* viewport_{nullptr};

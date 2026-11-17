@@ -29,7 +29,7 @@ struct SketchDrivenControls {
   QScrollArea* scroll{};
   QComboBox *mode{}, *body{}, *sketch{}, *source_kind{}, *profile{}, *curve{}, *plane{}, *side{},
       *extent{}, *limit_body{}, *limit_face{}, *crossings{}, *mapping{}, *font{}, *face{};
-  QLineEdit *name{}, *text{}, *anchor_x{}, *anchor_y{}, *seam{};
+  QLineEdit *name{}, *text{}, *anchor_x{}, *anchor_y{}, *seam{}, *grip_numeric{};
   std::array<QLineEdit*, 3> direction{};
   Binding size, second, distance, draft, height, orientation;
   QCheckBox *draft_enabled{}, *orientation_enabled{};
@@ -176,6 +176,10 @@ struct SketchDrivenControls {
     rows->addStretch();
     scroll->setWidget(content);
     column->addWidget(scroll);
+    grip_numeric = line("grip_numeric");
+    grip_numeric->setPlaceholderText("Active grip: value with mm or deg");
+    grip_numeric->setEnabled(false);
+    column->addWidget(grip_numeric);
     breadcrumb = button("breadcrumb", "Finish Sketch → return to feature");
     breadcrumb->hide();
     column->addWidget(breadcrumb);
