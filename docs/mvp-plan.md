@@ -6,7 +6,7 @@ role: >-
   policies, ordering, and focused proofs.
 implemented_through: Block 184
 current_block: 185
-current_boundary: Block 185 planned; DirectEditFeature authority and topology lineage
+current_boundary: Block 185 in progress; continuation through 198 authorized
 current_tag: "[parity-b185]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
@@ -36,8 +36,8 @@ Historical delivery details remain in the linked PRs and Git history.
 
 ```text
 implemented through  Block 184
-current block        Block 185 (planned; not started)
-current phase        Direct editing of existing and imported geometry (planned)
+current block        Block 185 (in progress; not yet accepted)
+current phase        Direct editing of existing and imported geometry
 current boundary     DirectEditFeature authority and topology lineage
 ```
 
@@ -58,12 +58,28 @@ retain their order and full acceptance; the next implementation block remains 18
 
 ## Delivery discipline
 
-The implementation assignment through 184 is complete. Current work records the requested
-post-204 parameter-navigation plan; its 205–211 status remains planned. Keep focused professional
-commits with at most 1,500 added lines each, appropriate verification and synchronized documentation.
-The earlier AGENTS.md agreement was withdrawn on 2026-11-16; its automatic
-push/serial-PR workflow is no longer the current working instruction. Existing merged deliveries
-and their verified trees remain historical evidence.
+The current assignment continues through **Block 198**. Keep focused professional commits with
+at most 1,500 added lines each, appropriate verification and synchronized documentation. The
+current repository working agreement authorizes normal pushes and serial protected-branch PR
+delivery. The preceding delivery, [PR #194](https://github.com/GideonBa/Better-Linux-CAD/pull/194),
+is verified merged. Main was fast-forwarded to `8db9605e743418a6a54de1ff068bf2714a097d14`
+before starting `feat/direct-edit-authority`; its tree matches the preceding reviewed delivery.
+Blocks 199–211 retain their complete planned scope.
+
+### Assigned continuation through Block 198 — 2026-11-17
+
+| Delivery scope | Required completion boundary | Status |
+| --- | --- | --- |
+| 185–188 | Direct Edit authority, checked native execution, owned Qt authoring and integrated Advanced Part scenarios D01/D02/X01 | In progress at 185; no new block accepted |
+| 189–191 | Sparse model-state intent, immutable effective evaluation, isolated consumers and native variant/member workflows V01/V02 | Planned; prerequisite work under development |
+| 192–195 | Independent rooted flexible poses, common posed consumers and directed adaptive Project transactions A01/A02 | Planned; prerequisite work under development |
+| 196–198 | Coordinated Assembly Hole participants and execution, distinct representations and native Assembly lifecycle A03/A04/UI01 | Planned |
+
+Acceptance follows the existing sequence and test-plan oracles, including native Qt/OCCT at both
+scales for interaction changes. Implementation slices do not close a whole block. Each verified
+coherent change is reviewed, committed with its validation evidence, and pushed normally; PR merge
+must preserve the 1,500-addition commit boundaries. Frozen runtime manifests and focused proof
+belong to the affected contracts; Git and PR history retain execution chronology.
 
 ### Assigned continuation through Block 184 — updated 2026-11-17
 
@@ -101,7 +117,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 
 The active Surface branch has [complete checked G03 construction, consumers and exchange proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof).
 Curved Trim/Extend and complete G04 are accepted in 172; the [bounded construction contract](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-construction--172) is retained.
-Blocks 182–184 are accepted. The next planned boundary is 185; it has not started. The original
+Blocks 182–184 are accepted. The active boundary is 185; implementation is in progress and acceptance is pending. The original
 sequence and scenario oracles retain every prerequisite, supported-capability requirement and
 deferred extension.
 
