@@ -218,6 +218,10 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/dimension_driven_profile_resolver.cpp
     src/geometry/finishing_selection.cpp
     src/geometry/result_face_support.cpp
+    src/geometry/checked_fillet_builder.cpp
+    src/geometry/fillet_radius_law.cpp
+    src/geometry/fillet_spine_law.cpp
+    src/geometry/variable_fillet_adapter.cpp
     src/geometry/fillet_adapter.cpp
     src/geometry/geometry_measure.cpp
     src/geometry/measure_selection.cpp
@@ -704,6 +708,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/dimension_driven_profile_resolver_tests.cpp
       tests/geometry/front_workplane_pipeline_tests.cpp
       tests/geometry/guided_loft_pipeline_tests.cpp
+      tests/geometry/variable_fillet_tests.cpp
       tests/geometry/fillet_feature_pipeline_tests.cpp
       tests/geometry/left_workplane_pipeline_tests.cpp
       tests/geometry/linear_pattern_pipeline_tests.cpp

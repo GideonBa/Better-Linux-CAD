@@ -4,6 +4,7 @@
 
 #include "geometry_shape_internal.hpp"
 #include "semantic_edge_resolution.hpp"
+#include "variable_fillet_adapter.hpp"
 
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
@@ -30,9 +31,18 @@ Result<GeometryShape> FilletAdapter::apply(const PartDocument& document,
                                            const GeometryShape& target,
                                            const ShapeCache& shape_cache, double radius_mm,
                                            StepImportTopologyContext* import_context) const {
-  if (feature.advanced_intent())
-    return Result<GeometryShape>::failure(fillet_error(
-        feature.id(), "Variable-radius Fillet construction is unavailable in this build"));
+  if (feature.advanced_intent()) {
+    if (target.empty())
+      return Result<GeometryShape>::failure(
+          fillet_error(feature.id(), "Variable Fillet target is empty"));
+    auto native = detail::variable_fillet(document, feature, target.impl_->shape, shape_cache,
+                                          import_context, target.impl_->face_lineage);
+    if (!native)
+      return Result<GeometryShape>::failure(native.error());
+    auto backing = std::make_shared<GeometryShape::Impl>(std::move(native.value().shape));
+    backing->face_lineage = std::move(native.value().lineage);
+    return Result<GeometryShape>::success(GeometryShape(std::move(backing)));
+  }
   if (target.empty() || !std::isfinite(radius_mm) || radius_mm <= 0.0)
     return Result<GeometryShape>::failure(
         fillet_error(feature.id(), "fillet target and positive finite radius are required"));

@@ -53,9 +53,9 @@ objects reject unknown fields, malformed types, unsupported rules and duplicate 
 Project persistence delegates the same typed Part record. Legacy constant Fillet and all three
 Chamfer records keep their existing meaning and serialized form.
 
-The native adapter explicitly refuses advanced intent until 176 supplies checked construction;
-it cannot run the first radius as a constant approximation. Face/full-round roles and corner
-management remain the separate 177–179 continuation.
+The native adapter dispatches advanced intent through the [checked variable engine](geometry-variable-fillet-mvp8.md),
+including physical station mapping after OCCT guide approximation. It never substitutes the first
+radius for the complete law. Face/full-round roles and corner management remain 177–179.
 
 ## Verification status
 
