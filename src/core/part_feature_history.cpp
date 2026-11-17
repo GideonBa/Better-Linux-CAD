@@ -183,6 +183,9 @@ template <typename Record> ExecutionContract execution_contract(const Record& re
     if constexpr (requires { record.guide_curves(); })
       for (const auto& guide : record.guide_curves())
         add_input(contract, guide.value());
+    if constexpr (requires { record.hold_lines(); })
+      for (const auto& path : record.hold_lines())
+        add_input(contract, path.value());
     if constexpr (requires { record.sources(); })
       for (const auto& source : record.sources())
         add_input(contract, source.source_node_id());

@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 176
-current_block: 177
-current_boundary: Block 177 in progress; typed face/full-round and corner intent
-current_tag: "[parity-b177]"
+implemented_through: Block 177
+current_block: 178
+current_boundary: Block 178 in progress; checked face blends, full rounds and corners
+current_tag: "[parity-b178]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–176 accepted; Block 177 in progress; Blocks 178–204 planned"
+  advanced_modeling_workflows: "Blocks 145–177 accepted; Block 178 in progress; Blocks 179–204 planned"
 ---
 
 # MVP Plan
@@ -34,10 +34,10 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 176
-current block        Block 177 (in progress)
+implemented through  Block 177
+current block        Block 178 (in progress)
 current phase        Advanced finishing and sketch-driven features
-current boundary     Typed face/full-round and corner intent
+current boundary     Checked face blends, full rounds and corners
 ```
 
 The assigned sequence continues through Block 184. Blocks 168–169 were delivered by normal
@@ -83,7 +83,8 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 173 | Accepted native advanced curve/Surface creation/editing, complete regression and 100%/150% physical workflows. |
 | 174 | Accepted connected curve/Surface model, exact sidecar history, independent native/STEP checks and both native scales. |
 | 175–176 | Accepted typed variable-radius laws, ordered chains, physical station mapping and F01 Core/Geometry history/repair/STEP proof; native authoring remains 179. |
-| 177–179 | Typed face/full-round/setback intent, checked supported blends/corners and native shared finishing controls. |
+| 177 | Accepted typed face/full-round/setback intent and atomic Core ownership/history/persistence. |
+| 178–179 | Checked supported blends/corners and native shared finishing controls. |
 | 180–181 | Typed Rib/Web skeleton, side/draft/termination intent, checked connected thin volumes and semantic consumers. |
 | 182–184 | Typed planar/cylindrical/conical Emboss/Engrave, checked mapping and native Rib/Web/Emboss/Engrave workflows. |
 
@@ -1060,14 +1061,24 @@ or other CAD tests. No runtime inputs changed. Logs and manifest: `build/verific
 Runtime: **1,234 files**, `37d505e9d309a8d2bed72f6a88dbb66224c7d8a0deadf3a11f35e8cd02a86715`.
 Native shared-panel creation/editing remains the explicitly assigned Block 179 gate.
 
-### Block 177 face/full-round and corner intent — in progress
+### Block 177 face/full-round and corner intent — accepted
 
-Prepare typed ordered first/second/middle face roles, G1/G2 and hold-line constraints, explicit
-size meaning and checked setback policies in the existing immutable Fillet authority. Full-round
+The [typed face/full-round and corner contract](part-face-full-round-intent-mvp6.md) is implemented
+with verified Core integration: ordered first/second/middle roles, G1/G2, owned hold lines,
+explicit size meaning and stable setback policies in the existing immutable Fillet authority. Full-round
 derives its section from the selected supports and replaces the selected middle region. Keep
 all old constant/variable records compatible, normal graph/history/repair and unambiguous dispatch.
 Geometry and its supported-corner capability table remain 178; native shared finishing remains 179.
-Continue through 184 and retain every planned 185–204 capability.
+All five targets built. Focused Core **35 / 1,362**; complete Core **798 / 35,311**; focused
+Geometry **22 / 9,939**. The complete feature-replacement graph rejects a downstream hold-line
+cycle before publication. Logs and runtime manifest: `build/verification/block177/`.
+Runtime: **1239 files**, `b7ff9d34890b5262817d8c056e49192f2d7e54a40ec0d015fb9f17980f44b551`.
+
+### Block 178 checked finishing construction — in progress
+
+Implement actual supported face blends, full-round middle replacement and setback corners.
+Independent trimmed-contact and differential checks govern publication; native solver success
+alone is insufficient. Continue through 184 and retain every planned 185–204 capability.
 
 ### Implementation route for the assigned continuation
 

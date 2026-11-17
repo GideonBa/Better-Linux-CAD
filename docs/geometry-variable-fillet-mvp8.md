@@ -83,4 +83,4 @@ as part of the full Geometry suite.
 
 Logs and manifest: `build/verification/block176/`. The 1,234-file runtime manifest hash is
 `37d505e9d309a8d2bed72f6a88dbb66224c7d8a0deadf3a11f35e8cd02a86715`. Preparatory probes and
-failed/intermediate runs are not acceptance evidence. Native shared-panel interaction remains 179.
+failed/intermediate runs are not acceptance evidence. The documentation-consuming offscreen Qt coverage audit also passed **5 / 751**. Native shared-panel interaction remains 179.

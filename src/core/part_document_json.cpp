@@ -2,6 +2,7 @@
 #include "advanced_fillet_json.hpp"
 #include "engineering_resource_json.hpp"
 #include "equation_curve_json.hpp"
+#include "face_fillet_json.hpp"
 #include "imported_part_json.hpp"
 #include "imported_topology_json.hpp"
 #include "part_material_json.hpp"
@@ -1970,15 +1971,26 @@ feature_body_result_context_from_json(const json& feature_json) {
 }
 
 [[nodiscard]] json fillet_feature_to_json(const FilletFeature& feature) {
-  if (const auto* advanced = feature.advanced_intent())
-    return json{{"id", feature.id().value()},
-                {"name", feature.name()},
-                {"type", "fillet"},
-                {"target_body", feature.target_body().value()},
-                {"mode", "variable"},
-                {"groups", detail::variable_fillet_to_json(
-                               std::get<VariableFilletIntent>(advanced->definition),
-                               edge_treatment_edge_to_json)}};
+  if (const auto* advanced = feature.advanced_intent()) {
+    json value{{"id", feature.id().value()},
+               {"name", feature.name()},
+               {"type", "fillet"},
+               {"target_body", feature.target_body().value()}};
+    if (const auto* variable = std::get_if<VariableFilletIntent>(&advanced->definition)) {
+      value["mode"] = "variable";
+      value["groups"] = detail::variable_fillet_to_json(*variable, edge_treatment_edge_to_json);
+      if (variable->setback)
+        value["corner"] = detail::setback_to_json(*variable->setback);
+    } else if (const auto* face = std::get_if<FaceBlendIntent>(&advanced->definition)) {
+      value["mode"] = "face_blend";
+      value["definition"] = detail::face_blend_to_json(*face, face_reference_to_json);
+    } else {
+      value["mode"] = "full_round";
+      value["definition"] = detail::full_round_to_json(
+          std::get<FullRoundIntent>(advanced->definition), face_reference_to_json);
+    }
+    return value;
+  }
   json value{
       {"id", feature.id().value()}, {"name", feature.name()},
       {"type", "fillet"},           {"target_body", feature.target_body().value()},
@@ -2008,21 +2020,52 @@ using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
 [[nodiscard]] Result<ParsedEdgeTreatment> edge_treatment_from_json(const json& value) {
   if (value.is_object() && value.value("type", std::string{}) == "fillet" &&
       value.contains("mode")) {
-    if (value.size() != 6 || !value.at("id").is_string() || !value.at("name").is_string() ||
-        !value.at("target_body").is_string() || value.at("mode") != "variable" ||
-        !value.contains("groups"))
+    const auto fail = []() {
       return Result<ParsedEdgeTreatment>::failure(json_error("Malformed advanced Fillet record"));
-    auto intent = detail::variable_fillet_from_json(value.at("groups"), [](const json& edge) {
-      return edge_treatment_edge_from_json(edge, PartFeatureInputRole::FilletEdge);
-    });
-    if (!intent)
-      return Result<ParsedEdgeTreatment>::failure(intent.error());
-    auto feature = FilletFeature::create_variable(
-        FeatureId(value.at("id").get<std::string>()), value.at("name").get<std::string>(),
-        BodyId(value.at("target_body").get<std::string>()), std::move(intent.value()));
-    if (!feature)
-      return Result<ParsedEdgeTreatment>::failure(feature.error());
-    return Result<ParsedEdgeTreatment>::success(std::move(feature.value()));
+    };
+    if (!value.at("id").is_string() || !value.at("name").is_string() ||
+        !value.at("target_body").is_string() || !value.at("mode").is_string())
+      return fail();
+    const auto mode = value.at("mode").get<std::string>();
+    const auto finish = [](Result<FilletFeature> feature) {
+      if (!feature)
+        return Result<ParsedEdgeTreatment>::failure(feature.error());
+      return Result<ParsedEdgeTreatment>::success(std::move(feature.value()));
+    };
+    const FeatureId id(value.at("id").get<std::string>());
+    const auto name = value.at("name").get<std::string>();
+    const BodyId target(value.at("target_body").get<std::string>());
+    if (mode == "variable") {
+      if (value.size() != (value.contains("corner") ? 7 : 6) || !value.contains("groups"))
+        return fail();
+      auto intent = detail::variable_fillet_from_json(value.at("groups"), [](const json& edge) {
+        return edge_treatment_edge_from_json(edge, PartFeatureInputRole::FilletEdge);
+      });
+      if (!intent)
+        return Result<ParsedEdgeTreatment>::failure(intent.error());
+      if (value.contains("corner")) {
+        auto corner = detail::setback_from_json(value.at("corner"));
+        if (!corner)
+          return Result<ParsedEdgeTreatment>::failure(corner.error());
+        intent.value().setback = std::move(corner.value());
+      }
+      return finish(FilletFeature::create_variable(id, name, target, std::move(intent.value())));
+    }
+    if (value.size() != 6 || !value.contains("definition"))
+      return fail();
+    if (mode == "face_blend") {
+      auto intent = detail::face_blend_from_json(value.at("definition"), face_reference_from_json);
+      if (!intent)
+        return Result<ParsedEdgeTreatment>::failure(intent.error());
+      return finish(FilletFeature::create_face_blend(id, name, target, std::move(intent.value())));
+    }
+    if (mode == "full_round") {
+      auto intent = detail::full_round_from_json(value.at("definition"), face_reference_from_json);
+      if (!intent)
+        return Result<ParsedEdgeTreatment>::failure(intent.error());
+      return finish(FilletFeature::create_full_round(id, name, target, std::move(intent.value())));
+    }
+    return fail();
   }
   if (!value.is_object() || !value.contains("id") || !value.at("id").is_string() ||
       !value.contains("name") || !value.at("name").is_string() || !value.contains("type") ||

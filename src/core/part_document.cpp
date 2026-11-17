@@ -3310,10 +3310,9 @@ Result<std::size_t> PartDocument::add_mirror_feature(MirrorFeature feature) {
   return Result<std::size_t>::success(mirror_features_.size() - 1U);
 }
 
-Result<std::size_t>
-PartDocument::add_edge_treatment_dependencies(const FeatureId& id, const BodyId& target_body,
-                                              const std::vector<EdgeReference>& edges,
-                                              const std::vector<ParameterId>& parameters) {
+Result<std::size_t> PartDocument::add_edge_treatment_dependencies(
+    const FeatureId& id, const BodyId& target_body, const std::vector<EdgeReference>& edges,
+    const std::vector<ParameterId>& parameters, const std::vector<std::string>& extra_sources) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
   auto graph = dependency_graph_;
@@ -3330,6 +3329,11 @@ PartDocument::add_edge_treatment_dependencies(const FeatureId& id, const BodyId&
             id.value(), "imported result edge must target an output Body of its producing base"));
     auto dependency = add_dependency_if_missing(graph, edge.source_node_id(), id.value());
     if (dependency.has_error())
+      return Result<std::size_t>::failure(dependency.error());
+  }
+  for (const auto& source : extra_sources) {
+    auto dependency = add_dependency_if_missing(graph, source, id.value());
+    if (!dependency)
       return Result<std::size_t>::failure(dependency.error());
   }
   for (const auto& parameter : parameters) {
@@ -3400,6 +3404,47 @@ Result<std::size_t> PartDocument::add_fillet_feature(FilletFeature feature) {
             "Variable Fillet edge source must belong to the current target Body history"));
     }
   }
+  std::vector<std::string> extra_sources;
+  const auto target_node = body_dependency_node_id(feature.target_body());
+  const auto in_ancestry = [&](const std::string& source) {
+    const auto descendants = dependency_graph_.transitive_dependents(source);
+    return source == target_node ||
+           std::find(descendants.begin(), descendants.end(), target_node) != descendants.end();
+  };
+  for (const auto& face : feature.faces()) {
+    auto valid = validate_part_feature_input_reference(*this, face);
+    if (!valid)
+      return valid;
+    if (!in_ancestry(face.source_node_id()))
+      return Result<std::size_t>::failure(Error::validation(
+          face.source_node_id(), "Fillet support face must belong to the target Body history"));
+    if (const auto* result = std::get_if<ResultFaceReference>(&face.source()))
+      if (result->body() != feature.target_body())
+        return Result<std::size_t>::failure(Error::validation(
+            face.source_node_id(), "Fillet result face belongs to a different Body"));
+    if (const auto* imported = std::get_if<ImportedTopologyReference>(&face.source())) {
+      const auto* catalog = find_imported_topology_catalog(imported->catalog());
+      const auto* entry = catalog ? catalog->find(imported->entry()) : nullptr;
+      bool owned = false;
+      for (const auto& producer : imported_body_features())
+        if (producer.definition().catalog() == imported->catalog())
+          for (const auto& output : producer.definition().outputs())
+            owned |= entry && entry->parent_body == output.imported_body &&
+                     (output.body == feature.target_body() ||
+                      in_ancestry(body_dependency_node_id(output.body)));
+      if (!owned)
+        return Result<std::size_t>::failure(
+            Error::validation(imported->entry().value(),
+                              "Fillet imported face requires its exact Body or selected ancestry"));
+    }
+    extra_sources.push_back(face.source_node_id());
+  }
+  for (const auto& path : feature.hold_lines()) {
+    if (!find_path_curve(path))
+      return Result<std::size_t>::failure(
+          Error::validation(path.value(), "Fillet hold line must identify an owned PathCurve"));
+    extra_sources.push_back(path.value());
+  }
   for (const auto& edge : feature.edges()) {
     auto valid = validate_part_feature_input_reference(*this, edge);
     if (valid.has_error())
@@ -3408,8 +3453,9 @@ Result<std::size_t> PartDocument::add_fillet_feature(FilletFeature feature) {
   const auto parameters = detail::validate_fillet_parameters(*this, feature);
   if (!parameters)
     return parameters;
-  auto dependencies = add_edge_treatment_dependencies(
-      feature.id(), feature.target_body(), feature.edges(), feature.parameter_dependencies());
+  auto dependencies =
+      add_edge_treatment_dependencies(feature.id(), feature.target_body(), feature.edges(),
+                                      feature.parameter_dependencies(), extra_sources);
   if (dependencies.has_error())
     return dependencies;
   fillet_features_.push_back(std::move(feature));
@@ -5117,6 +5163,9 @@ PartDocument::update_feature_record(std::vector<FeatureT> PartDocument::*member,
             add_dependency_if_missing(candidate.dependency_graph_, producer, result_node);
         if (restored.has_error()) return Result<PartDocument>::failure(restored.error());
       }
+    if (candidate.dependency_graph_.has_cycle())
+      return Result<PartDocument>::failure(Error::dependency(
+          node_id, "Feature replacement must not depend on its own downstream inputs"));
     auto history_valid = candidate.validate_history_graph(candidate.dependency_graph_);
     if (!history_valid)
       return Result<PartDocument>::failure(history_valid.error());
