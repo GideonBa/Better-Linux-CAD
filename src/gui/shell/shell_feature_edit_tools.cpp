@@ -243,6 +243,8 @@ QString family(Kind kind) {
     return "Hole";
   case Kind::Thread:
     return "Thread";
+  case Kind::SketchDriven:
+    return "Sketch-driven Feature";
   }
   return {};
 }
@@ -266,6 +268,7 @@ auto with_record(const PartDocument& part, FeatureId id, Kind kind, Callback cal
     BLCAD_EDIT_RECORD(Chamfer, find_chamfer_feature, update_chamfer_feature)
     BLCAD_EDIT_RECORD(Shell, find_shell_feature, update_shell_feature)
     BLCAD_EDIT_RECORD(Draft, find_draft_feature, update_draft_feature)
+    BLCAD_EDIT_RECORD(SketchDriven, find_sketch_driven_feature, update_sketch_driven_feature)
     BLCAD_EDIT_RECORD(BodyBoolean, find_body_boolean_feature, update_body_boolean_feature)
   case Kind::Hole:
     return callback(*part.find_hole_feature(id), creating ? &PartDocument::add_hole_feature

@@ -50,6 +50,8 @@ struct ShellSketchDrivenTools::Impl {
   Result<ParameterId> parameter(PartDocument&, const detail::SketchDrivenControls::Binding&,
                                 const char*) const;
   void overlay_refresh();
+  Result<std::size_t> show_inputs(const geometry::GeometryShape* = nullptr);
   void apply_grip(const GuiViewportManipulatorCandidate&);
+  void restore_grip();
 };
 } // namespace blcad::gui

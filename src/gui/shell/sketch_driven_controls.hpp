@@ -11,6 +11,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSpinBox>
+#include <QStandardItemModel>
 #include <QTableWidget>
 #include <QVBoxLayout>
 #include <array>
@@ -37,7 +38,7 @@ struct SketchDrivenControls {
   QTableWidget* tokens{};
   QGroupBox *rib{}, *emboss{}, *curve_group{}, *text_group{}, *support_group{};
   QPushButton *preview{}, *apply{}, *cancel{}, *source_edit{}, *breadcrumb{}, *curve_add{},
-      *face_add{}, *token_add{};
+      *face_add{}, *token_add{}, *center_axis{};
   QLabel* status{};
   explicit SketchDrivenControls(QWidget* parent) : panel(new QWidget(parent)) {
     auto* column = new QVBoxLayout(panel);
@@ -127,6 +128,11 @@ struct SketchDrivenControls {
     seam->setText("0");
     mapped->addRow("Anchor X (mm)", anchor_x);
     mapped->addRow("Anchor Y (mm)", anchor_y);
+    anchor_y->setToolTip(
+        "Cylinder axis coordinate; cone meridian arclength in the resolved support frame.");
+    center_axis = button("center_axis", "Center along axis");
+    center_axis->setToolTip("Set the anchor to the first selected support along its axis.");
+    mapped->addRow(center_axis);
     mapped->addRow("Wrap seam (deg)", seam);
     orientation_enabled = new QCheckBox("Orientation", content);
     register_field("orientation_enabled", orientation_enabled);
@@ -294,6 +300,10 @@ struct SketchDrivenControls {
   }
   void render() {
     const bool is_rib = mode->currentIndex() < 2;
+    if (auto* choices = qobject_cast<QStandardItemModel*>(source_kind->model())) {
+      choices->item(0)->setEnabled(is_rib);
+      choices->item(2)->setEnabled(!is_rib);
+    }
     rib->setVisible(is_rib);
     emboss->setVisible(!is_rib);
     support_group->setVisible(!is_rib);
@@ -309,6 +319,7 @@ struct SketchDrivenControls {
     draft.parameter->setEnabled(draft_enabled->isChecked());
     draft.value->setEnabled(draft_enabled->isChecked());
     seam->setEnabled(mapping->currentIndex() != 0);
+    center_axis->setEnabled(mapping->currentIndex() != 0);
     orientation.parameter->setEnabled(orientation_enabled->isChecked());
     orientation.value->setEnabled(orientation_enabled->isChecked());
   }

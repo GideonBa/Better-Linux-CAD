@@ -76,6 +76,12 @@ ShellSketchDrivenTools::ShellSketchDrivenTools(ShellWindow& window, ShellRibbon&
     p.loading = false;
     p.edited();
   });
+  connect(p.ui->mapping, &QComboBox::currentIndexChanged, this, [this] {
+    auto& p = *impl_;
+    if (p.loading || !p.current())
+      return;
+    p.reload_targets();
+  });
   connect(p.ui->body, &QComboBox::currentIndexChanged, this, [this] {
     auto& p = *impl_;
     if (p.loading)
@@ -97,6 +103,22 @@ ShellSketchDrivenTools::ShellSketchDrivenTools(ShellWindow& window, ShellRibbon&
           [this] { impl_->edited(); });
   connect(p.ui->curve_add, &QPushButton::clicked, this, [this] { impl_->add_curve(); });
   connect(p.ui->face_add, &QPushButton::clicked, this, [this] { impl_->add_face(); });
+  connect(p.ui->center_axis, &QPushButton::clicked, this, [this] {
+    auto& p = *impl_;
+    if (!p.current())
+      return;
+    const auto key = (p.ui->supports->count() ? p.ui->supports->item(0)->data(Qt::UserRole)
+                                              : p.ui->face->currentData())
+                         .toString()
+                         .toStdString();
+    for (const auto& target : p.targets)
+      if (interactive_face_identity(std::get<FaceReference>(target.selection.reference)) == key &&
+          target.axial_center_mm) {
+        p.ui->anchor_y->setText(QString::number(*target.axial_center_mm, 'g', 17));
+        return;
+      }
+    p.fail(error("Select an analytic cylinder or cone support first."));
+  });
   connect(p.ui->token_add, &QPushButton::clicked, this, [this] { impl_->add_token(); });
   connect(p.ui->preview, &QPushButton::clicked, this, [this] { (void)preview(); });
   connect(p.ui->apply, &QPushButton::clicked, this, [this] { (void)apply(); });
@@ -129,7 +151,7 @@ void ShellSketchDrivenTools::Impl::edited() {
     return;
   valid = false;
   ui->apply->setEnabled(false);
-  window.viewport().clear_feature_preview();
+  (void)show_inputs();
   if (layer.active_handle_id().empty())
     (void)layer.set_handles({});
   ui->render();
@@ -247,10 +269,7 @@ Result<std::size_t> ShellSketchDrivenTools::Impl::start(std::optional<FeatureId>
   window.viewport().set_selection_semantic_scope(std::nullopt);
   for (const auto& selection : session.selection().entries())
     (void)owner.accept_selection(selection);
-  if (const auto* body =
-          input_cache->find_body_shape(BodyId(ui->body->currentData().toString().toStdString())))
-    (void)window.viewport().set_feature_preview(
-        *body, "body/" + ui->body->currentData().toString().toStdString());
+  (void)show_inputs();
   std::vector<geometry::ViewportSceneItem> picks;
   for (const auto& target : targets)
     picks.push_back(
@@ -336,7 +355,10 @@ Result<std::size_t> ShellSketchDrivenTools::apply() {
   }
   p.window.session() = std::move(staged);
   p.workflow = p.history_command = false;
+  auto* repeat = !p.editing ? p.actions[p.ui->mode->currentIndex()] : nullptr;
   cancel();
+  if (repeat)
+    p.window.remember_repeatable_command(*repeat);
   return committed;
 }
 void ShellSketchDrivenTools::cancel() {

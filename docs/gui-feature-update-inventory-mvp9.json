@@ -29,5 +29,27 @@
   "explicit_non_goals": [
     {"family": "body_transform", "type": "BodyTransform", "reason": "The persistent transform stack is ordered append-only intent (Block 126). Editing or removing an individual stack record is deliberately out of scope for the Block-129 feature-edit boundary; the stack is never collapsed and no reorder contract exists."},
     {"topic": "feature_reorder", "reason": "Feature order is dependency-derived (part-feature-body-dependency-mvp6.md). No Core reorder contract exists and Block 129 does not invent one."}
+  ],
+  "extensions": [
+    {
+      "family": "sketch_driven",
+      "modes": [
+        "Rib",
+        "Web",
+        "Emboss",
+        "Engrave"
+      ],
+      "type": "SketchDrivenFeature",
+      "add": "add_sketch_driven_feature",
+      "update": "update_sketch_driven_feature",
+      "remove": "remove_sketch_driven_feature",
+      "intent_blocks": [
+        180,
+        182
+      ],
+      "shell_owner": 184,
+      "contract": "docs/gui-sketch-driven-features-mvp9.md",
+      "coverage": "docs/gui-sketch-driven-coverage-mvp9.json"
+    }
   ]
 }

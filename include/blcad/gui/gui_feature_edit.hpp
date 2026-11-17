@@ -31,6 +31,7 @@ enum class GuiFeatureEditKind {
   BodyBoolean,
   Hole,
   Thread,
+  SketchDriven,
 };
 
 // Block 129 feature edit lifecycle. Double-clicking a feature begins an edit:
@@ -53,6 +54,8 @@ public:
     else if (part->find_revolve_feature(feature) != nullptr) kind_ = GuiFeatureEditKind::Revolve;
     else if (part->find_sweep_feature(feature) != nullptr) kind_ = GuiFeatureEditKind::Sweep;
     else if (part->find_loft_feature(feature) != nullptr) kind_ = GuiFeatureEditKind::Loft;
+    else if (part->find_sketch_driven_feature(feature) != nullptr)
+      kind_ = GuiFeatureEditKind::SketchDriven;
     else if (part->find_surface_feature(feature) != nullptr) kind_ = GuiFeatureEditKind::Surface;
     else if (part->find_linear_pattern_feature(feature) != nullptr)
       kind_ = GuiFeatureEditKind::LinearPattern;

@@ -1985,5 +1985,6 @@
         "proofs": []
       }
     ]
-  }
+  },
+  "extension_manifests": ["docs/gui-sketch-driven-coverage-mvp9.json"]
 }
