@@ -438,6 +438,16 @@ The detailed 3D sketch and surfacing block is in `docs/advanced-surfacing-and-3d
 
 The multi-body and path-feature target is in `docs/multi-body-transform-and-path-features-roadmap.md`.
 
+## Direct face editing
+
+`DirectEditFeature` is an ordinary executable Part history record after a native or imported solid
+Body. Move, Rotate, Offset, Size and Delete-and-Heal retain semantic face selections, expected
+capabilities, the exact target predecessor, typed parameter bindings, an explicit reference frame
+and conservative blend/heal policy. Whole-Body movement continues through `BodyTransform`.
+Reference Parts require explicit conversion; authored Hole/Thread faces direct users to their
+original parameter authority. [The Direct Edit contract](part-direct-edit-mvp6.md) owns current
+capabilities, persistence, failure and proof. Numbered acceptance remains in `mvp-plan.md`.
+
 ## FeatureReference
 
 A `FeatureReference` is a stable, semantic handle onto a geometric unit a feature produces ("top face of the base plate" rather than "Face 17"). Features expose the references they create so later features can bind to them. This is the mechanism that makes feature order robust against geometry changes.

@@ -1,9 +1,11 @@
 #include "blcad/core/assembly_document_json.hpp"
 
 #include "assembly_joint_json.hpp"
+#include "model_state_json.hpp"
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <exception>
 #include <optional>
 #include <string>
@@ -16,6 +18,7 @@ namespace {
 using json = nlohmann::json;
 constexpr std::string_view k_schema = "blcad.assembly_document.mvp4";
 constexpr int k_version = 1;
+constexpr int k_model_state_version = 2;
 
 [[nodiscard]] Error json_error(std::string message) {
   return Error::validation("assembly_document_json", std::move(message));
@@ -73,13 +76,16 @@ constexpr int k_version = 1;
 }
 
 [[nodiscard]] json component_instance_to_json(const ComponentInstance& instance) {
-  return json{{"id", instance.id().value()},
-              {"name", instance.name()},
-              {"referenced_part_document", instance.referenced_part_document().value()},
-              {"visibility", std::string(to_string(instance.visibility()))},
-              {"suppression_state", std::string(to_string(instance.suppression_state()))},
-              {"grounding_state", std::string(to_string(instance.grounding_state()))},
-              {"transform", transform_to_json(instance.transform())}};
+  json value{{"id", instance.id().value()},
+             {"name", instance.name()},
+             {"referenced_part_document", instance.referenced_part_document().value()},
+             {"visibility", std::string(to_string(instance.visibility()))},
+             {"suppression_state", std::string(to_string(instance.suppression_state()))},
+             {"grounding_state", std::string(to_string(instance.grounding_state()))},
+             {"transform", transform_to_json(instance.transform())}};
+  if (instance.selected_model_state() != primary_model_state_id())
+    value["selected_model_state"] = instance.selected_model_state().value();
+  return value;
 }
 
 [[nodiscard]] Result<ComponentInstance> component_instance_from_json(const json& instance_json) {
@@ -101,16 +107,20 @@ constexpr int k_version = 1;
       instance_json.at("name").get<std::string>(),
       DocumentId(instance_json.at("referenced_part_document").get<std::string>()),
       visibility.value(), suppression_state.value(), grounding_state.value(),
-      transform_from_json(instance_json.at("transform")));
+      transform_from_json(instance_json.at("transform")),
+      ModelStateId(instance_json.value("selected_model_state", std::string("primary"))));
 }
 
 [[nodiscard]] json subassembly_instance_to_json(const SubassemblyInstance& instance) {
-  return json{{"id", instance.id().value()},
-              {"name", instance.name()},
-              {"referenced_assembly_document", instance.referenced_assembly_document().value()},
-              {"visibility", std::string(to_string(instance.visibility()))},
-              {"suppression_state", std::string(to_string(instance.suppression_state()))},
-              {"transform", transform_to_json(instance.transform())}};
+  json value{{"id", instance.id().value()},
+             {"name", instance.name()},
+             {"referenced_assembly_document", instance.referenced_assembly_document().value()},
+             {"visibility", std::string(to_string(instance.visibility()))},
+             {"suppression_state", std::string(to_string(instance.suppression_state()))},
+             {"transform", transform_to_json(instance.transform())}};
+  if (instance.selected_model_state() != primary_model_state_id())
+    value["selected_model_state"] = instance.selected_model_state().value();
+  return value;
 }
 
 [[nodiscard]] Result<SubassemblyInstance>
@@ -128,7 +138,8 @@ subassembly_instance_from_json(const json& instance_json) {
       instance_json.at("name").get<std::string>(),
       DocumentId(instance_json.at("referenced_assembly_document").get<std::string>()),
       visibility.value(), suppression_state.value(),
-      transform_from_json(instance_json.at("transform")));
+      transform_from_json(instance_json.at("transform")),
+      ModelStateId(instance_json.value("selected_model_state", std::string("primary"))));
 }
 
 [[nodiscard]] Result<AssemblyConstraintType> constraint_type_from_json(const json& value) {
@@ -409,9 +420,27 @@ assembly_constraint_from_json(const json& constraint_json) {
 } // namespace
 
 Result<std::string> serialize_assembly_document_to_json(const AssemblyDocument& document) {
+  auto valid_states = validate_model_state_catalog(document.model_states());
+  if (!valid_states)
+    return Result<std::string>::failure(valid_states.error());
+  for (const auto& state : document.model_states()) {
+    auto effective = document.evaluate_model_state(state.id);
+    if (!effective)
+      return Result<std::string>::failure(effective.error());
+  }
   json root;
   root["schema"] = k_schema;
-  root["version"] = k_version;
+  const bool states =
+      !document.model_states().empty() ||
+      std::any_of(
+          document.component_instances().begin(), document.component_instances().end(),
+          [](const auto& c) { return c.selected_model_state() != primary_model_state_id(); }) ||
+      std::any_of(
+          document.subassembly_instances().begin(), document.subassembly_instances().end(),
+          [](const auto& c) { return c.selected_model_state() != primary_model_state_id(); });
+  root["version"] = states ? k_model_state_version : k_version;
+  if (!document.model_states().empty())
+    root["model_states"] = detail::model_states_to_json(document.model_states());
   root["document"] = json{{"id", document.id().value()}, {"name", document.name()}};
   root["parameters"] = json::array();
   for (const auto& parameter : document.parameters()) {
@@ -466,9 +495,24 @@ Result<AssemblyDocument> deserialize_assembly_document_from_json(std::string_vie
     if (root.at("schema").get<std::string>() != k_schema) {
       return Result<AssemblyDocument>::failure(json_error("unsupported assembly document schema"));
     }
-    if (root.at("version").get<int>() != k_version) {
+    if (!root.at("version").is_number_integer() ||
+        (root.at("version") != k_version && root.at("version") != k_model_state_version))
       return Result<AssemblyDocument>::failure(json_error("unsupported assembly document version"));
-    }
+    const bool state_envelope = root.at("version") == k_model_state_version;
+    bool state_intent = root.contains("model_states");
+    for (const auto* field : {"component_instances", "subassembly_instances"})
+      for (const auto& instance : root.value(field, json::array())) {
+        if (!instance.contains("selected_model_state"))
+          continue;
+        if (!instance.at("selected_model_state").is_string() ||
+            instance.at("selected_model_state") == "primary")
+          return Result<AssemblyDocument>::failure(
+              json_error("Explicit child model state must be a non-Primary identity"));
+        state_intent = true;
+      }
+    if (state_intent != state_envelope)
+      return Result<AssemblyDocument>::failure(
+          json_error("Model-state intent requires necessary Assembly version 2"));
 
     auto document =
         AssemblyDocument::create(DocumentId(root.at("document").at("id").get<std::string>()),
@@ -540,6 +584,17 @@ Result<AssemblyDocument> deserialize_assembly_document_from_json(std::string_vie
         return Result<AssemblyDocument>::failure(added.error());
     }
 
+    if (root.contains("model_states")) {
+      auto states = detail::model_states_from_json(root.at("model_states"));
+      if (!states)
+        return Result<AssemblyDocument>::failure(states.error());
+      if (states.value().empty())
+        return Result<AssemblyDocument>::failure(
+            json_error("Empty state catalogs must be omitted"));
+      auto applied = document.value().replace_model_states(std::move(states.value()));
+      if (!applied)
+        return Result<AssemblyDocument>::failure(applied.error());
+    }
     return document;
   } catch (const std::exception& content_error) {
     return Result<AssemblyDocument>::failure(

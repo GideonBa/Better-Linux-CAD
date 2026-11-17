@@ -38,6 +38,7 @@ add_library(
   src/core/assembly_constraint_graph.cpp
   src/core/assembly_cross_hierarchy_constraint_graph.cpp
   src/core/assembly_cross_hierarchy_motion_graph.cpp
+  src/core/assembly_occurrence_pose.cpp
   src/core/assembly_document.cpp
   src/core/assembly_document_json.cpp
   src/core/assembly_exchange_graph.cpp
@@ -60,6 +61,8 @@ add_library(
   src/core/emboss_intent.cpp
   src/core/emboss_validation.cpp
   src/core/emboss_json.cpp
+  src/core/direct_edit_feature.cpp
+  src/core/direct_edit_json.cpp
   src/core/sketch_driven_feature.cpp
   src/core/sketch_driven_validation.cpp
   src/core/sketch_driven_json.cpp
@@ -89,6 +92,8 @@ add_library(
   src/core/part_materials.cpp
   src/core/part_material_json.cpp
   src/core/part_feature_input_reference.cpp
+  src/core/model_state.cpp
+  src/core/model_state_json.cpp
   src/core/parameter.cpp
   src/core/parameter_expression.cpp
   src/core/curve_expression.cpp
@@ -536,6 +541,7 @@ if(BLCAD_BUILD_TESTS)
   add_executable(
     blcad_core_tests
     tests/core/part_feature_history_tests.cpp
+    tests/core/model_state_tests.cpp
     tests/core/part_history_intent_tests.cpp
     tests/core/part_history_evaluation_plan_tests.cpp
     tests/core/feature_update_command_tests.cpp
@@ -582,6 +588,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/draft_feature_tests.cpp
     tests/core/edge_treatment_feature_tests.cpp
     tests/core/emboss_intent_tests.cpp
+    tests/core/direct_edit_intent_tests.cpp
     tests/core/rib_web_intent_tests.cpp
     tests/core/variable_fillet_tests.cpp
     tests/core/face_fillet_tests.cpp

@@ -45,10 +45,12 @@ update_subassembly_instance(std::vector<SubassemblyInstance>& instances,
 
 } // namespace
 
-Result<SubassemblyInstance> SubassemblyInstance::create(
-    SubassemblyInstanceId id, std::string name, DocumentId referenced_assembly_document,
-    ComponentVisibility visibility, ComponentSuppressionState suppression_state,
-    RigidTransform transform) {
+Result<SubassemblyInstance> SubassemblyInstance::create(SubassemblyInstanceId id, std::string name,
+                                                        DocumentId referenced_assembly_document,
+                                                        ComponentVisibility visibility,
+                                                        ComponentSuppressionState suppression_state,
+                                                        RigidTransform transform,
+                                                        ModelStateId selected_state) {
   const auto object_id = id.empty() ? std::string("subassembly_instance") : id.value();
   if (id.empty()) {
     return Result<SubassemblyInstance>::failure(
@@ -62,50 +64,64 @@ Result<SubassemblyInstance> SubassemblyInstance::create(
     return Result<SubassemblyInstance>::failure(Error::validation(
         object_id, "subassembly instance referenced assembly document must not be empty"));
   }
+  if (selected_state.empty())
+    return Result<SubassemblyInstance>::failure(
+        Error::validation(object_id, "Selected model-state identity must not be empty"));
   if (!finite_transform(transform)) {
     return Result<SubassemblyInstance>::failure(
         Error::validation(object_id, "subassembly instance transform values must be finite"));
   }
 
-  return Result<SubassemblyInstance>::success(SubassemblyInstance(
-      std::move(id), std::move(name), std::move(referenced_assembly_document), visibility,
-      suppression_state, transform));
+  return Result<SubassemblyInstance>::success(
+      SubassemblyInstance(std::move(id), std::move(name), std::move(referenced_assembly_document),
+                          visibility, suppression_state, transform, std::move(selected_state)));
 }
 
-Result<SubassemblyInstance>
-SubassemblyInstance::with_transform(RigidTransform transform) const {
-  return create(id_, name_, referenced_assembly_document_, visibility_, suppression_state_, transform);
+Result<SubassemblyInstance> SubassemblyInstance::with_transform(RigidTransform transform) const {
+  return create(id_, name_, referenced_assembly_document_, visibility_, suppression_state_,
+                transform, selected_state_);
 }
 
 Result<SubassemblyInstance>
 SubassemblyInstance::with_visibility(ComponentVisibility visibility) const {
-  return create(id_, name_, referenced_assembly_document_, visibility, suppression_state_, transform_);
+  return create(id_, name_, referenced_assembly_document_, visibility, suppression_state_,
+                transform_, selected_state_);
 }
 
-Result<SubassemblyInstance> SubassemblyInstance::with_suppression_state(
-    ComponentSuppressionState suppression_state) const {
-  return create(id_, name_, referenced_assembly_document_, visibility_, suppression_state, transform_);
+Result<SubassemblyInstance>
+SubassemblyInstance::with_suppression_state(ComponentSuppressionState suppression_state) const {
+  return create(id_, name_, referenced_assembly_document_, visibility_, suppression_state,
+                transform_, selected_state_);
 }
 
 SubassemblyInstance::SubassemblyInstance(SubassemblyInstanceId id, std::string name,
                                          DocumentId referenced_assembly_document,
                                          ComponentVisibility visibility,
                                          ComponentSuppressionState suppression_state,
-                                         RigidTransform transform)
+                                         RigidTransform transform, ModelStateId selected_state)
     : id_(std::move(id)), name_(std::move(name)),
       referenced_assembly_document_(std::move(referenced_assembly_document)),
-      visibility_(visibility), suppression_state_(suppression_state), transform_(transform) {}
+      visibility_(visibility), suppression_state_(suppression_state), transform_(transform),
+      selected_state_(std::move(selected_state)) {}
 
-const SubassemblyInstanceId& SubassemblyInstance::id() const noexcept { return id_; }
-const std::string& SubassemblyInstance::name() const noexcept { return name_; }
+const SubassemblyInstanceId& SubassemblyInstance::id() const noexcept {
+  return id_;
+}
+const std::string& SubassemblyInstance::name() const noexcept {
+  return name_;
+}
 const DocumentId& SubassemblyInstance::referenced_assembly_document() const noexcept {
   return referenced_assembly_document_;
 }
-ComponentVisibility SubassemblyInstance::visibility() const noexcept { return visibility_; }
+ComponentVisibility SubassemblyInstance::visibility() const noexcept {
+  return visibility_;
+}
 ComponentSuppressionState SubassemblyInstance::suppression_state() const noexcept {
   return suppression_state_;
 }
-const RigidTransform& SubassemblyInstance::transform() const noexcept { return transform_; }
+const RigidTransform& SubassemblyInstance::transform() const noexcept {
+  return transform_;
+}
 
 Result<std::size_t> AssemblyDocument::add_subassembly_instance(SubassemblyInstance instance) {
   if (has_subassembly_instance_id(instance.id())) {

@@ -3,6 +3,7 @@
 #include "blcad/core/assembly_constraint.hpp"
 #include "blcad/core/assembly_document.hpp"
 #include "blcad/core/assembly_joint.hpp"
+#include "blcad/core/assembly_occurrence_pose.hpp"
 #include "blcad/core/part_document.hpp"
 #include "blcad/core/recompute_plan.hpp"
 #include "blcad/core/result.hpp"
@@ -76,6 +77,28 @@ public:
   [[nodiscard]] Result<std::size_t> validate_subassembly_instances() const;
   [[nodiscard]] Result<std::size_t> validate_assembly_hierarchy() const;
   [[nodiscard]] Result<std::size_t> validate_assembly_structure() const;
+
+  [[nodiscard]] const std::vector<AssemblyOccurrencePose>& occurrence_poses() const noexcept {
+    return occurrence_poses_;
+  }
+  [[nodiscard]] const AssemblyOccurrencePose*
+  find_occurrence_pose(const std::vector<SubassemblyInstanceId>& path) const noexcept;
+  [[nodiscard]] bool flexible_occurrence(const std::vector<SubassemblyInstanceId>& path) const noexcept;
+  [[nodiscard]] Result<std::size_t> set_occurrence_pose(AssemblyOccurrencePose pose);
+  [[nodiscard]] Result<std::size_t>
+  remove_occurrence_pose(const std::vector<SubassemblyInstanceId>& path);
+  [[nodiscard]] Result<std::size_t> validate_occurrence_poses() const;
+  [[nodiscard]] Result<RigidTransform>
+  effective_component_transform(const std::vector<SubassemblyInstanceId>& path,
+                                const ComponentInstanceId& component) const;
+  [[nodiscard]] Result<std::size_t>
+  set_occurrence_component_transform(const std::vector<SubassemblyInstanceId>& path,
+                                    ComponentInstanceId component, RigidTransform transform);
+
+  [[nodiscard]] Result<std::size_t>
+  set_occurrence_joint_coordinate(const std::vector<SubassemblyInstanceId>& path,
+                                  AssemblyJointId joint, AssemblyJointCoordinateRole role,
+                                  Quantity value);
 
   // Changes one root-assembly parameter, applies all root assembly bindings to
   // owned member parts, and returns per-part recompute plans for affected parts.
@@ -162,6 +185,7 @@ private:
   std::vector<AssemblyHierarchyConstraint> cross_hierarchy_constraints_;
   std::vector<AssemblyHierarchyJoint> cross_hierarchy_joints_;
   std::vector<PartDocument> part_documents_;
+  std::vector<AssemblyOccurrencePose> occurrence_poses_;
 };
 
 } // namespace blcad

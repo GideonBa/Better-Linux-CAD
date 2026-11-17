@@ -181,30 +181,26 @@ Result<AssemblyExchangeGraph> AssemblyExchangeGraph::build(const Project& projec
             AssemblyExchangeAssemblyOccurrenceIdentity{leaf.subassembly_path},
             leaf.component_instance},
         leaf.assembly_document,
-        AssemblyExchangePartProductDefinitionIdentity{leaf.referenced_part_document},
+        AssemblyExchangePartProductDefinitionIdentity{leaf.referenced_part_document, leaf.selected_model_state},
         leaf.transforms_inner_to_outer,
         component_occurrence_name(leaf.subassembly_path, leaf.component_instance)});
   }
   std::sort(component_occurrences.begin(), component_occurrences.end(), component_occurrence_less);
 
-  std::vector<DocumentId> part_documents;
-  for (const AssemblyExchangeComponentOccurrence& occurrence : component_occurrences) {
-    if (std::find(part_documents.begin(), part_documents.end(),
-                  occurrence.part_product.part_document) == part_documents.end()) {
-      part_documents.push_back(occurrence.part_product.part_document);
-    }
-  }
-  std::sort(part_documents.begin(), part_documents.end(),
-            [](const DocumentId& lhs, const DocumentId& rhs) {
-              return lhs.value() < rhs.value();
-            });
-
+  std::vector<AssemblyExchangePartProductDefinitionIdentity> definitions;
+  for (const auto& occurrence : component_occurrences)
+    if (std::find(definitions.begin(), definitions.end(), occurrence.part_product) == definitions.end())
+      definitions.push_back(occurrence.part_product);
+  std::sort(definitions.begin(), definitions.end(), [](const auto& a, const auto& b) {
+    return std::pair{a.part_document.value(), a.selected_model_state.value()} <
+           std::pair{b.part_document.value(), b.selected_model_state.value()};
+  });
   std::vector<AssemblyExchangePartProductDefinition> part_product_definitions;
-  part_product_definitions.reserve(part_documents.size());
-  for (const DocumentId& part_document : part_documents) {
-    part_product_definitions.push_back(AssemblyExchangePartProductDefinition{
-        AssemblyExchangePartProductDefinitionIdentity{part_document},
-        part_product_name(part_document)});
+  for (const auto& identity : definitions) {
+    auto name = part_product_name(identity.part_document);
+    if (identity.selected_model_state != primary_model_state_id())
+      name += ":model-state:" + encode_exchange_name_segment(identity.selected_model_state.value());
+    part_product_definitions.push_back({identity, std::move(name)});
   }
 
   return Result<AssemblyExchangeGraph>::success(

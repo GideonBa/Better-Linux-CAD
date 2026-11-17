@@ -36,6 +36,7 @@ struct AssemblyExchangeComponentOccurrenceIdentity {
 // reference one PartDocument map to this same derived exchange definition.
 struct AssemblyExchangePartProductDefinitionIdentity {
   DocumentId part_document;
+  ModelStateId selected_model_state{primary_model_state_id()};
 
   friend bool operator==(const AssemblyExchangePartProductDefinitionIdentity&,
                          const AssemblyExchangePartProductDefinitionIdentity&) = default;

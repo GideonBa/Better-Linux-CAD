@@ -149,7 +149,7 @@ Result<std::size_t> PartDocument::seal_reference_part(ImportedPartDefinition def
       !path_curves_.empty() || !features_.empty() || !revolve_features_.empty() ||
       !sweep_features_.empty() || !loft_features_.empty() || !surface_features_.empty() ||
       !linear_pattern_features_.empty() || !circular_pattern_features_.empty() ||
-      !mirror_features_.empty() || !sketch_driven_features_.empty() || !fillet_features_.empty() ||
+      !mirror_features_.empty() || !sketch_driven_features_.empty() || !direct_edit_features_.empty() || !model_states_.empty() || !fillet_features_.empty() ||
       !chamfer_features_.empty() || !shell_features_.empty() || !draft_features_.empty() ||
       !body_boolean_features_.empty() || !sketch_ownerships_.empty() || !body_transforms_.empty() ||
       !reference_statuses_.empty() || !reference_remaps_.empty() ||

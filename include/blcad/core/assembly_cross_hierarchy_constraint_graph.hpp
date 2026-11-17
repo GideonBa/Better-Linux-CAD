@@ -18,6 +18,7 @@ class Project;
 struct ComponentTransformAuthority {
   DocumentId assembly_document;
   ComponentInstanceId component_instance;
+  std::vector<SubassemblyInstanceId> occurrence_path{};
 
   friend bool operator==(const ComponentTransformAuthority&,
                          const ComponentTransformAuthority&) = default;
@@ -27,6 +28,7 @@ struct ComponentTransformAuthority {
 struct AssemblyLocalRelationshipIdentity {
   DocumentId assembly_document;
   AssemblyConstraintId constraint;
+  std::vector<SubassemblyInstanceId> occurrence_path{};
 
   friend bool operator==(const AssemblyLocalRelationshipIdentity&,
                          const AssemblyLocalRelationshipIdentity&) = default;

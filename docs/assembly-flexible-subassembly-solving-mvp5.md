@@ -1,12 +1,56 @@
 # Document-Scoped Flexible Subassembly Local Solving MVP-5
 
-Planned extension: [Blocks 192–193](inventor-parity-sequence.md) add occurrence-local pose
-authority and consumer integration. The document-local/shared-child contract below remains
-supported and is not reinterpreted as independent occurrence flexibility.
+[Blocks 192–193](inventor-parity-sequence.md) extend the authority with the independent
+occurrence API described below. The historical document-local/shared-child sections retain
+their existing behavior. Numbered acceptance and delivery status live in [the MVP plan](mvp-plan.md).
 
 Status: implemented.
 
 This document is canonical for document-scoped flexible-child solving. The implementation solves one shared child `AssemblyDocument` in its own local assembly space; it does not introduce occurrence-local internal pose overrides.
+
+## Independent rooted occurrence authority — 192–193
+
+`AssemblyOccurrencePose` persists an exact root-to-child `SubassemblyInstanceId` path,
+expected child `DocumentId`, explicit `Rigid`/`Flexible` policy, sparse component-local rigid
+transforms and role-addressed local joint coordinates. A missing record uses the historical
+shared definition pose. A rigid record cannot contain overrides. No composed world transform,
+solved residual or geometry cache is stored. Stable IDs survive label changes; changing a path
+or referenced child requires explicit repair/removal. Duplicate component/joint roles, nonfinite
+transforms, orphan records and moved grounded components reject before publication.
+
+`Project::effective_component_transform` is the common local-pose authority used by leaf
+resolution and hierarchy geometric targets. Viewport, physical properties, contact, measurement
+and flat/structured STEP consume those same rooted leaves/targets. Physical participation keeps
+hidden active components; suppression excludes them. Parent occurrence boundary transforms remain
+independent authored definition placement and compose in their existing inner-to-outer order.
+Nested flexible children use their own full rooted paths, so repeated parents do not alias them.
+
+`ComponentTransformAuthority`, local geometric relationships and local joint identities carry an
+optional rooted path. Empty retains shared definition authority; a flexible path identifies one
+independent component variable. Cross-hierarchy graphs and numeric solve/application read and write
+these identities through the same effective pose boundary. Local constraints/joints evaluate in a
+disposable child-root view with the selected occurrence's transforms and joint coordinates.
+Grounding, semantic source freshness, stale proposal rejection and atomic application are retained.
+
+`AssemblyOccurrenceSolver::solve/move/apply` exposes independent local solving and typed joint
+motion. Applying stores only the selected occurrence's transforms/coordinate values on a Project
+candidate. The complete canonical Project snapshot plus ordinary local solver/source checks guards
+application; an unrelated authored Project change conservatively invalidates a pending local
+occurrence result. Shared child JSON and other occurrence overrides remain unchanged. The earlier
+`AssemblyFlexibleSubassemblySolver` API continues to update the shared child definition explicitly.
+
+Project JSON selects necessary version 3 only while occurrence-pose records exist. Each record
+uses strict version 1 dispatch and exact fields; older envelopes cannot carry the extension. Removing
+all records restores the historical envelope when no other extension requires it. Joint values use
+explicit `mm`/`deg` units and typed role validation against the child joint's existing limits.
+
+Focused proof lives in [Core occurrence tests](../tests/core/assembly_occurrence_pose_tests.cpp)
+and [Geometry occurrence tests](../tests/geometry/assembly_occurrence_pose_tests.cpp), tagged
+`[occurrence-pose]`. The physical fixture drives one shared hollow-cylinder child to two independent
+prismatic extensions under rotated/translated parents. It checks immutable child JSON, exact reopen,
+stale rollback, actual material points, volume/centroid, contact, hidden physical participation,
+flat and structured STEP reimport, and separate cross-hierarchy numeric authorities. Native authoring,
+named positional representations and context controls remain the separate Block 198 gate.
 
 ## Scope
 

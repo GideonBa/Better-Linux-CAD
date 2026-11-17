@@ -18,6 +18,7 @@ struct ResolvedMotionEndpoint {
   const AssemblyDocument* assembly = nullptr;
   const ComponentInstance* component = nullptr;
   bool active = false;
+  std::vector<SubassemblyInstanceId> scope;
 };
 
 [[nodiscard]] bool authority_less(const ComponentTransformAuthority& lhs,
@@ -25,7 +26,12 @@ struct ResolvedMotionEndpoint {
   if (lhs.assembly_document.value() != rhs.assembly_document.value()) {
     return lhs.assembly_document.value() < rhs.assembly_document.value();
   }
-  return lhs.component_instance.value() < rhs.component_instance.value();
+  if (lhs.component_instance != rhs.component_instance)
+    return lhs.component_instance.value() < rhs.component_instance.value();
+  return std::lexicographical_compare(
+      lhs.occurrence_path.begin(), lhs.occurrence_path.end(), rhs.occurrence_path.begin(),
+      rhs.occurrence_path.end(),
+      [](const auto& a, const auto& b) { return a.value() < b.value(); });
 }
 
 [[nodiscard]] bool motion_relationship_less(const AssemblyMotionRelationshipIdentity& lhs,
@@ -39,14 +45,24 @@ struct ResolvedMotionEndpoint {
     if (lhs_local->assembly_document.value() != rhs_local.assembly_document.value()) {
       return lhs_local->assembly_document.value() < rhs_local.assembly_document.value();
     }
-    return lhs_local->constraint.value() < rhs_local.constraint.value();
+    if (lhs_local->constraint != rhs_local.constraint)
+      return lhs_local->constraint.value() < rhs_local.constraint.value();
+    return std::lexicographical_compare(
+        lhs_local->occurrence_path.begin(), lhs_local->occurrence_path.end(),
+        rhs_local.occurrence_path.begin(), rhs_local.occurrence_path.end(),
+        [](const auto& a, const auto& b) { return a.value() < b.value(); });
   }
   if (const auto* lhs_joint = std::get_if<AssemblyLocalJointIdentity>(&lhs)) {
     const auto& rhs_joint = std::get<AssemblyLocalJointIdentity>(rhs);
     if (lhs_joint->assembly_document.value() != rhs_joint.assembly_document.value()) {
       return lhs_joint->assembly_document.value() < rhs_joint.assembly_document.value();
     }
-    return lhs_joint->joint.value() < rhs_joint.joint.value();
+    if (lhs_joint->joint != rhs_joint.joint)
+      return lhs_joint->joint.value() < rhs_joint.joint.value();
+    return std::lexicographical_compare(
+        lhs_joint->occurrence_path.begin(), lhs_joint->occurrence_path.end(),
+        rhs_joint.occurrence_path.begin(), rhs_joint.occurrence_path.end(),
+        [](const auto& a, const auto& b) { return a.value() < b.value(); });
   }
   if (const auto* lhs_cross =
           std::get_if<AssemblyProjectCrossHierarchyRelationshipIdentity>(&lhs)) {
@@ -116,7 +132,10 @@ resolve_endpoint(const Project& project, const AssemblyHierarchyConstraintEndpoi
   }
   active = active && component->suppression_state() == ComponentSuppressionState::Active;
   return Result<ResolvedMotionEndpoint>::success(
-      ResolvedMotionEndpoint{assembly, component, active});
+      ResolvedMotionEndpoint{assembly, component, active,
+                             project.flexible_occurrence(endpoint.occurrence_path())
+                                 ? endpoint.occurrence_path()
+                                 : std::vector<SubassemblyInstanceId>{}});
 }
 
 void add_relationship(std::vector<AssemblyMotionRelationshipIdentity>& relationships,
@@ -147,9 +166,10 @@ void add_local_dependency(std::vector<AssemblyMotionRelationshipIdentity>& relat
                           std::vector<AssemblyMotionRelationshipAuthorityIncidence>& incidences,
                           const AssemblyMotionRelationshipIdentity& relationship,
                           const DocumentId& assembly_document, const ComponentInstance& component_a,
-                          const ComponentInstance& component_b) {
-  const ComponentTransformAuthority authority_a{assembly_document, component_a.id()};
-  const ComponentTransformAuthority authority_b{assembly_document, component_b.id()};
+                          const ComponentInstance& component_b,
+                          const std::vector<SubassemblyInstanceId>& scope) {
+  const ComponentTransformAuthority authority_a{assembly_document, component_a.id(), scope};
+  const ComponentTransformAuthority authority_b{assembly_document, component_b.id(), scope};
   add_relationship(relationships, relationship);
   add_authority(authorities, authority_a);
   add_authority(authorities, authority_b);
@@ -164,9 +184,9 @@ void add_cross_dependency(std::vector<AssemblyMotionRelationshipIdentity>& relat
                           const ResolvedMotionEndpoint& endpoint_a,
                           const ResolvedMotionEndpoint& endpoint_b) {
   const ComponentTransformAuthority authority_a{endpoint_a.assembly->id(),
-                                                endpoint_a.component->id()};
+                                                endpoint_a.component->id(), endpoint_a.scope};
   const ComponentTransformAuthority authority_b{endpoint_b.assembly->id(),
-                                                endpoint_b.component->id()};
+                                                endpoint_b.component->id(), endpoint_b.scope};
   add_relationship(relationships, relationship);
   add_authority(authorities, authority_a);
   add_authority(authorities, authority_b);
@@ -291,50 +311,53 @@ AssemblyCrossHierarchyMotionGraph::build(const Project& project) {
   std::vector<AssemblyCrossHierarchyJointEndpointAuthorityMapping> joint_endpoint_mappings;
 
   for (const AssemblyDocument* assembly : ordered_assembly_documents(project)) {
-    for (const AssemblyConstraint& constraint : assembly->constraints()) {
-      if (constraint.state() != AssemblyConstraintState::Active) {
-        continue;
+    for (const auto& scope : assembly_transform_scopes(project, assembly->id())) {
+      for (const AssemblyConstraint& constraint : assembly->constraints()) {
+        if (constraint.state() != AssemblyConstraintState::Active) {
+          continue;
+        }
+        if (!participates_in_current_assembly_constraint_graph(constraint.type())) {
+          continue;
+        }
+        const ComponentInstance* component_a =
+            assembly->find_component_instance(constraint.target_a().component_instance());
+        const ComponentInstance* component_b =
+            assembly->find_component_instance(constraint.target_b().component_instance());
+        if (component_a == nullptr || component_b == nullptr) {
+          return Result<AssemblyCrossHierarchyMotionGraph>::failure(
+              Error::validation(constraint.id().value(),
+                                "local geometric motion relationship components must resolve"));
+        }
+        if (component_a->suppression_state() != ComponentSuppressionState::Active ||
+            component_b->suppression_state() != ComponentSuppressionState::Active) {
+          continue;
+        }
+        add_local_dependency(
+            relationships, authorities, incidences,
+            AssemblyLocalRelationshipIdentity{assembly->id(), constraint.id(), scope},
+            assembly->id(), *component_a, *component_b, scope);
       }
-      if (!participates_in_current_assembly_constraint_graph(constraint.type())) {
-        continue;
-      }
-      const ComponentInstance* component_a =
-          assembly->find_component_instance(constraint.target_a().component_instance());
-      const ComponentInstance* component_b =
-          assembly->find_component_instance(constraint.target_b().component_instance());
-      if (component_a == nullptr || component_b == nullptr) {
-        return Result<AssemblyCrossHierarchyMotionGraph>::failure(
-            Error::validation(constraint.id().value(),
-                              "local geometric motion relationship components must resolve"));
-      }
-      if (component_a->suppression_state() != ComponentSuppressionState::Active ||
-          component_b->suppression_state() != ComponentSuppressionState::Active) {
-        continue;
-      }
-      add_local_dependency(relationships, authorities, incidences,
-                           AssemblyLocalRelationshipIdentity{assembly->id(), constraint.id()},
-                           assembly->id(), *component_a, *component_b);
-    }
 
-    for (const AssemblyJoint& joint : assembly->joints()) {
-      if (joint.state() != AssemblyJointState::Active) {
-        continue;
+      for (const AssemblyJoint& joint : assembly->joints()) {
+        if (joint.state() != AssemblyJointState::Active) {
+          continue;
+        }
+        const ComponentInstance* component_a =
+            assembly->find_component_instance(joint.target_a().component_instance());
+        const ComponentInstance* component_b =
+            assembly->find_component_instance(joint.target_b().component_instance());
+        if (component_a == nullptr || component_b == nullptr) {
+          return Result<AssemblyCrossHierarchyMotionGraph>::failure(
+              Error::validation(joint.id().value(), "local motion joint components must resolve"));
+        }
+        if (component_a->suppression_state() != ComponentSuppressionState::Active ||
+            component_b->suppression_state() != ComponentSuppressionState::Active) {
+          continue;
+        }
+        add_local_dependency(relationships, authorities, incidences,
+                             AssemblyLocalJointIdentity{assembly->id(), joint.id(), scope},
+                             assembly->id(), *component_a, *component_b, scope);
       }
-      const ComponentInstance* component_a =
-          assembly->find_component_instance(joint.target_a().component_instance());
-      const ComponentInstance* component_b =
-          assembly->find_component_instance(joint.target_b().component_instance());
-      if (component_a == nullptr || component_b == nullptr) {
-        return Result<AssemblyCrossHierarchyMotionGraph>::failure(
-            Error::validation(joint.id().value(), "local motion joint components must resolve"));
-      }
-      if (component_a->suppression_state() != ComponentSuppressionState::Active ||
-          component_b->suppression_state() != ComponentSuppressionState::Active) {
-        continue;
-      }
-      add_local_dependency(relationships, authorities, incidences,
-                           AssemblyLocalJointIdentity{assembly->id(), joint.id()}, assembly->id(),
-                           *component_a, *component_b);
     }
   }
 
@@ -382,10 +405,10 @@ AssemblyCrossHierarchyMotionGraph::build(const Project& project) {
     add_cross_dependency(relationships, authorities, incidences, relationship, target_a.value(),
                          target_b.value());
 
-    const ComponentTransformAuthority authority_a{target_a.value().assembly->id(),
-                                                  target_a.value().component->id()};
-    const ComponentTransformAuthority authority_b{target_b.value().assembly->id(),
-                                                  target_b.value().component->id()};
+    const ComponentTransformAuthority authority_a{
+        target_a.value().assembly->id(), target_a.value().component->id(), target_a.value().scope};
+    const ComponentTransformAuthority authority_b{
+        target_b.value().assembly->id(), target_b.value().component->id(), target_b.value().scope};
     joint_endpoint_mappings.push_back(AssemblyCrossHierarchyJointEndpointAuthorityMapping{
         joint.id(), AssemblyHierarchyJointEndpointRole::TargetA, joint.target_a(), authority_a});
     joint_endpoint_mappings.push_back(AssemblyCrossHierarchyJointEndpointAuthorityMapping{

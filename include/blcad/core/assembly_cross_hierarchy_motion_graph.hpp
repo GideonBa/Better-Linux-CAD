@@ -15,6 +15,7 @@ class Project;
 struct AssemblyLocalJointIdentity {
   DocumentId assembly_document;
   AssemblyJointId joint;
+  std::vector<SubassemblyInstanceId> occurrence_path{};
 
   friend bool operator==(const AssemblyLocalJointIdentity&, const AssemblyLocalJointIdentity&) =
       default;

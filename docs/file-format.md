@@ -7,7 +7,8 @@ specified in the 154 section. Thread integration uses Part V6 (155B); explicit P
 use Part V7 (156), equations use V8 (160), spatial constraint/scalar intent uses V9 (163), and explicit
 curve-preserving path policy uses V10 (166) below. Semantic paths/material regions use V11 (167),
 authored Loft constraints V12 (168), advanced Surface intent V13 (170/172), advanced Fillet V14
-(175/177), and Rib/Web/Emboss/Engrave share V15 (180/182). Planned evolution
+(175/177), Rib/Web/Emboss/Engrave share V15 (180/182), Direct Edit uses V16 (185),
+and sparse model states use V17 (189). Planned evolution
 in [Blocks 145–204](inventor-parity-sequence.md) additionally assigns new feature families,
 spatial solving/interaction, model states, occurrence poses and cross-document references.
 Their future intent is not implied by the current JSON fields. Each owning block must specify
@@ -1831,3 +1832,88 @@ mapping units, pinned font identity and source ownership.
 Unknown/incompatible fields, malformed variants and duplicate/foreign sources reject. Resolved font
 outlines, native topology, approximate chart phases, preview grips and GUI task state remain derived.
 Block 184 uses these existing records and adds no parallel UI save format.
+
+
+## Direct Edit intent — Part V16
+
+Direct Edit requires `direct_edit_features`, a nonempty array, and explicit `feature_order` when
+V16 is the highest required capability. Lower versions reject the reserved field, even if empty.
+V17 may carry Direct Edit alongside named model states. Removing the last direct edit restores the
+highest remaining necessary envelope. Project member serialization uses the same typed Part records.
+
+Each record has exactly `id`, `name`, `target_body`, `predecessor`, `operation_version:1`, `faces`,
+`operation`, `frame` and `policy`. A selected face has exactly `reference` (the existing semantic,
+result or imported codec with `surface_source_face` role) and `expected` (`planar`, `cylindrical`
+or `surface`). `predecessor` identifies the exact immediately preceding target Body producer.
+Frame stores `origin_mm`, `x_axis`, `y_axis`, each a three-number vector; axes must be orthonormal.
+The right-handed third axis is derived. Policy stores `tolerance_mm` in [1e-7,1e-3],
+`blends:"reject_affected"` and `healing:"extend_adjacent"`.
+
+The operation is one of the following exact records:
+
+- `{mode:"move",x,y,z,signs}`: three Length bindings and a three-number axis-sign vector; each sign
+  is -1, 0 or 1, with at least one nonzero. This retains the existing positive Length contract.
+- `{mode:"rotate",axis,angle}`: finite nonzero local axis and Angle binding; frame origin owns the
+  rotation pivot. The initial checked planar capability requires 0 < absolute angle < 90 degrees.
+- `{mode:"offset",distance,reverse}`: positive Length magnitude and explicit Boolean direction.
+- `{mode:"size",size,measurement}`: positive Length binding interpreted as `radius` or `diameter`.
+- `{mode:"delete_heal"}`: explicit adjacent-support healing without an implicit size binding.
+
+Unknown operation versions, fields, enums, malformed numeric/vector types, duplicate face identities,
+foreign target ownership, incompatible capabilities and missing predecessors reject loading.
+Suppression/history, parameter formulas and imported source/catalog authority retain their existing
+contracts. No STEP bytes, BRep, world-space sampled topology, healer result, triad or preview is saved.
+See [Direct Edit authority](part-direct-edit-mvp6.md).
+
+
+## Sparse model states and occurrence selections — Part V17 / Assembly V2
+
+Part version 17 is necessary only when `model_states` is a nonempty array; lower versions reject
+that reserved field and empty catalogs are omitted. The existing resource/history envelope and
+feature order remain authoritative. Primary has permanent id `primary` and is implicit, so legacy
+files retain their existing version and shape without a redundant Primary record.
+
+Each state record has exactly `version: 1`, `id`, `name`, and the arrays `parameters`, `features`,
+`materials`, `components`, `subassemblies`. Unknown fields, operation versions, duplicate ids/names
+or duplicate override targets reject. Part states require empty occurrence arrays; Assembly states
+require empty feature/material arrays. Parameter entries explicitly declare `kind: literal` with
+`parameter`, typed `unit` (`mm`, `deg`, `1`) and numeric `value`, or `kind: formula` with `parameter`
+and authored `formula`. Literal and formula categories cannot silently replace one another.
+Feature entries contain `executable` and boolean `suppressed`. Material entries contain nullable
+`body` and `material`: null Body selects the default, null material clears that assignment;
+non-null keys retain complete revision-pinned resource identity.
+
+Component entries contain `component`, nullable boolean `suppressed` and nullable `selected_state`;
+subassembly entries use `subassembly` instead. At least one operation must be present. A child
+selection is a stable state id, never a label, evaluated number or copied document. Assembly
+version 2 is necessary when a named catalog or non-Primary child selection exists. Its occurrence
+records add `selected_model_state` only for a non-Primary selection. Version 1 rejects these
+reserved additions; unnecessary version 2 and explicit Primary child fields reject.
+
+The embedded Part resource-reference adapter accepts supported Part versions through 17 and
+restores the exact ordered pinned subset from Project ownership before normal Part validation.
+No active state, evaluated override, effective result, geometry or state cache is serialized.
+[Parameter model](parameter-model.md#model-state-authority-and-effective-evaluation--189190) owns
+validation/evaluation semantics; `tests/core/model_state_tests.cpp` supplies focused JSON and
+Project roundtrip proof. Numbered acceptance remains in [the MVP plan](mvp-plan.md).
+
+## Occurrence-local internal pose extension — Blocks 192–193
+
+A Project with explicit occurrence-pose records uses `blcad.project.mvp4` **version 3**. Versions
+1/2 retain their canonical absent defaults and reject an `occurrence_poses` field. Version 3
+requires a nonempty `occurrence_poses` array plus the existing root engineering-resource catalog
+(which may be empty). Part and Assembly envelope versions remain selected by their own intent.
+Removing every pose permits the earlier necessary envelope again.
+
+Each pose has exactly `version: 1`, `path` (nonempty rooted Subassembly IDs), `assembly_document`
+(the expected child definition), `rigidity` (`rigid` or `flexible`), `components` and `joints`.
+Each component override has exactly `component`, three numeric `translation_mm` values and three
+numeric `rotation_deg` values. Joint overrides have exactly `joint`, typed `role`, `unit` (`mm` or
+`deg`) and numeric `value`. Rigidity, path/child identity, component grounding, joint role/limits,
+unique component/coordinate identities and finite values are validated. Unknown record versions,
+extra fields, booleans as coordinates, duplicate paths and orphan records fail closed.
+
+These are local transforms and sparse joint values, never composed world matrices. Missing pose
+records retain the shared child definition. The [occurrence contract](assembly-flexible-subassembly-solving-mvp5.md#independent-rooted-occurrence-authority--192193)
+owns authority, stale solve/application and physical-consumer behavior; focused Core/Geometry tests
+are linked there. Named positions and their precedence are assigned to Block 198.

@@ -30,6 +30,7 @@ enum class PartFeatureFamily {
   Hole,
   Thread,
   SketchDriven,
+  DirectEdit,
 };
 
 enum class PartFeatureState { Active, Suppressed };

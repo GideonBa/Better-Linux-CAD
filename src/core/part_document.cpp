@@ -15,7 +15,7 @@ namespace blcad {
 namespace {
 
 bool has_transactional_parameter_intent(const PartDocument& document) {
-  return !document.sketch_driven_features().empty() ||
+  return !document.direct_edit_features().empty() || !document.sketch_driven_features().empty() ||
          std::any_of(document.fillet_features().begin(), document.fillet_features().end(),
                      [](const auto& feature) { return feature.advanced_intent() != nullptr; }) ||
          std::any_of(document.surface_features().begin(), document.surface_features().end(),
@@ -46,6 +46,12 @@ struct ParameterIntentRollback {
 };
 Result<std::size_t> validate_parameter_intent(const PartDocument& document,
                                               const std::vector<std::string>& affected) {
+  for (const auto& feature : document.direct_edit_features())
+    if (std::find(affected.begin(), affected.end(), feature.id().value()) != affected.end()) {
+      auto valid = validate_direct_edit_parameters(document, feature);
+      if (!valid)
+        return valid;
+    }
   for (const auto& feature : document.sketch_driven_features())
     if (std::find(affected.begin(), affected.end(), feature.id().value()) != affected.end()) {
       auto valid = detail::validate_sketch_driven_parameters(document, feature);
@@ -142,6 +148,9 @@ template <typename FeatureT>
 [[nodiscard]] inline BodyId record_result_body(const MirrorFeature& f) {
   return f.body_result_context().effective_produced_body();
 }
+[[nodiscard]] inline BodyId record_result_body(const DirectEditFeature& f) {
+  return f.target_body();
+}
 [[nodiscard]] inline BodyId record_result_body(const SketchDrivenFeature& f) {
   return f.target_body();
 }
@@ -176,6 +185,7 @@ template <typename FeatureT>
   if (matches(part.features()) || matches(part.revolve_features()) ||
       matches(part.sweep_features()) || matches(part.loft_features()) ||
       matches(part.surface_features()) || matches(part.sketch_driven_features()) ||
+      matches(part.direct_edit_features()) ||
       matches(part.linear_pattern_features()) || matches(part.circular_pattern_features()) ||
       matches(part.mirror_features()) || matches(part.fillet_features()) ||
       matches(part.chamfer_features()) || matches(part.shell_features()) ||
@@ -313,6 +323,7 @@ validate_result_face_source(const PartDocument& document, const ResultFaceRefere
         document.find_sweep_feature(origin.feature) || document.find_loft_feature(origin.feature) ||
         document.find_surface_feature(origin.feature) ||
         document.find_sketch_driven_feature(origin.feature) ||
+        document.find_direct_edit_feature(origin.feature) ||
         document.find_linear_pattern_feature(origin.feature) ||
         document.find_circular_pattern_feature(origin.feature) ||
         document.find_mirror_feature(origin.feature) ||
@@ -1911,6 +1922,11 @@ Result<std::size_t> PartDocument::add_sketch_impl(Sketch sketch, const Sketch* r
 }
 
 Result<std::size_t> PartDocument::validate_reference_sources() const {
+  for (const auto& feature : direct_edit_features_) {
+    auto valid = validate_direct_edit_inputs(*this, feature);
+    if (!valid)
+      return valid;
+  }
   for (const auto& feature : sketch_driven_features_) {
     auto valid = detail::validate_sketch_driven_inputs(*this, feature);
     if (!valid)
@@ -3379,6 +3395,64 @@ Result<std::size_t> PartDocument::add_edge_treatment_dependencies(
   return Result<std::size_t>::success(1U);
 }
 
+Result<std::size_t> PartDocument::add_direct_edit_feature(DirectEditFeature feature) {
+  if (is_reference_part())
+    return Result<std::size_t>::failure(reference_part_edit_error());
+  if (has_any_feature_id(feature.id()))
+    return Result<std::size_t>::failure(
+        Error::validation(feature.id().value(), "Feature identity must be unique in the Part"));
+  if (!record_produces_body(*this, feature.predecessor().value(), feature.target_body()))
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "Direct Edit predecessor must produce the selected target Body"));
+  const auto previous = dependency_sources_of(dependency_graph_, body_dependency_node_id(feature.target_body()));
+  if (previous.size() != 1 || previous.front() != feature.predecessor().value())
+    return Result<std::size_t>::failure(Error::validation(
+        feature.id().value(), "Direct Edit predecessor must be the current target Body producer"));
+  auto valid = validate_direct_edit_inputs(*this, feature);
+  if (!valid)
+    return valid;
+  auto inputs = feature.input_nodes();
+  std::erase(inputs, body_dependency_node_id(feature.target_body()));
+  std::vector<std::string> order;
+  if (history_intent_)
+    order = history_intent_->order;
+  else {
+    auto history = executable_history();
+    if (!history)
+      return Result<std::size_t>::failure(history.error());
+    for (const auto& row : history.value())
+      order.push_back(row.node_id);
+  }
+  auto candidate = *this;
+  const auto alias = body_dependency_node_id(feature.target_body());
+  const auto producers = dependency_sources_of(candidate.dependency_graph_, alias);
+  auto bound = bind_historical_body_consumers(candidate.dependency_graph_, alias, producers,
+                                              feature.id().value(), order);
+  if (!bound)
+    return bound;
+  auto dependencies = candidate.add_edge_treatment_dependencies(
+      feature.id(), feature.target_body(), {}, feature.parameter_dependencies(), inputs);
+  if (!dependencies)
+    return dependencies;
+  candidate.direct_edit_features_.push_back(std::move(feature));
+  candidate.append_history_executable(candidate.direct_edit_features_.back().id().value());
+  const auto index = candidate.direct_edit_features_.size() - 1;
+  *this = std::move(candidate);
+  return Result<std::size_t>::success(index);
+}
+const std::vector<DirectEditFeature>& PartDocument::direct_edit_features() const noexcept {
+  return direct_edit_features_;
+}
+std::size_t PartDocument::direct_edit_feature_count() const noexcept {
+  return direct_edit_features_.size();
+}
+const DirectEditFeature* PartDocument::find_direct_edit_feature(FeatureId id) const noexcept {
+  for (const auto& feature : direct_edit_features_)
+    if (feature.id() == id)
+      return &feature;
+  return nullptr;
+}
+
 Result<std::size_t> PartDocument::add_sketch_driven_feature(SketchDrivenFeature feature) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
@@ -4165,6 +4239,10 @@ Result<std::size_t> PartDocument::remove_body(BodyId id) {
       return Result<std::size_t>::failure(
           Error::dependency(id.value(), "body with dependent model intent cannot be removed"));
   }
+  for (const auto& feature : direct_edit_features_)
+    if (feature.target_body() == id)
+      return Result<std::size_t>::failure(
+          Error::dependency(id.value(), "Body is used by Direct Edit"));
   for (const auto& feature : sketch_driven_features_)
     if (feature.target_body() == id)
       return Result<std::size_t>::failure(
@@ -5080,6 +5158,7 @@ bool PartDocument::has_any_feature_id(const FeatureId& id) const noexcept {
                      [&](const auto& feature) { return feature.id() == id; }) ||
          has_feature_id(id) || has_revolve_feature_id(id) || has_sweep_feature_id(id) ||
          has_loft_feature_id(id) || has_surface_feature_id(id) || find_sketch_driven_feature(id) ||
+         find_direct_edit_feature(id) ||
          has_linear_pattern_feature_id(id) || has_circular_pattern_feature_id(id) ||
          has_mirror_feature_id(id) || has_fillet_feature_id(id) || has_chamfer_feature_id(id) ||
          has_shell_feature_id(id) || has_hole_feature_id(id) || has_thread_feature_id(id) ||
@@ -5101,7 +5180,8 @@ bool PartDocument::has_authored_node_identity(std::string_view node) const {
       contains(sketches_3d_) || contains(path_curves_) || contains(imported_body_features_) ||
       contains(features_) || contains(revolve_features_) || contains(sweep_features_) ||
       contains(loft_features_) || contains(surface_features_) ||
-      contains(sketch_driven_features_) || contains(linear_pattern_features_) ||
+      contains(sketch_driven_features_) || contains(direct_edit_features_) ||
+      contains(linear_pattern_features_) ||
       contains(circular_pattern_features_) || contains(mirror_features_) ||
       contains(fillet_features_) || contains(chamfer_features_) || contains(shell_features_) ||
       contains(hole_features_) || contains(thread_features_) || contains(draft_features_) ||
@@ -5396,6 +5476,13 @@ Result<std::size_t> PartDocument::remove_mirror_feature(FeatureId id) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
   return remove_feature_record(&PartDocument::mirror_features_, id);
+}
+Result<std::size_t> PartDocument::update_direct_edit_feature(DirectEditFeature feature) {
+  return update_feature_record(&PartDocument::direct_edit_features_, std::move(feature),
+                               &PartDocument::add_direct_edit_feature);
+}
+Result<std::size_t> PartDocument::remove_direct_edit_feature(FeatureId id) {
+  return remove_feature_record(&PartDocument::direct_edit_features_, id);
 }
 Result<std::size_t> PartDocument::update_sketch_driven_feature(SketchDrivenFeature feature) {
   return update_feature_record(&PartDocument::sketch_driven_features_, std::move(feature),
