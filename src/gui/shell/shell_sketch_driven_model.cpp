@@ -100,7 +100,8 @@ void ShellSketchDrivenTools::Impl::reload_targets() {
       const auto key = interactive_face_identity(ref);
       face_references.insert_or_assign(key, ref);
       const auto label = q(body.name() + " / " + target.label);
-      if (body.id().value() == ui->body->currentData().toString().toStdString())
+      if (body.id().value() == ui->body->currentData().toString().toStdString() &&
+          target.mapping == static_cast<EmbossMapping>(ui->mapping->currentIndex()))
         ui->face->addItem(label, q(key));
       if (target.mapping == EmbossMapping::Planar)
         ui->limit_face->addItem(label, q(key));

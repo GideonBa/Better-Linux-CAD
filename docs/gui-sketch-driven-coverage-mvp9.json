@@ -1,0 +1,62 @@
+{
+  "schema": "blcad.gui-feature-extension.v1",
+  "family": "sketch_driven",
+  "owner": 184,
+  "numbered_status_authority": "docs/mvp-plan.md",
+  "contract": "docs/gui-sketch-driven-features-mvp9.md",
+  "modes": [
+    "Rib",
+    "Web",
+    "Emboss",
+    "Engrave"
+  ],
+  "core": {
+    "type": "SketchDrivenFeature",
+    "commands": [
+      "PartDocument::add_sketch_driven_feature",
+      "PartDocument::update_sketch_driven_feature",
+      "PartDocument::remove_sketch_driven_feature"
+    ]
+  },
+  "shell": {
+    "owner": "ShellSketchDrivenTools",
+    "entry_points": [
+      "Model actions",
+      "qualified contextual selection",
+      "browser double-click",
+      "History Edit"
+    ],
+    "controls": "src/gui/shell/sketch_driven_controls.hpp",
+    "proofs": [
+      {
+        "filter": "[sketch-driven-tools]",
+        "source": "tests/gui/gui_sketch_driven_tools_tests.cpp"
+      },
+      {
+        "filter": "[native-sketch-driven]",
+        "source": "tests/gui/gui_sketch_driven_tools_tests.cpp"
+      },
+      {
+        "filter": "[sketch-driven-controls]",
+        "source": "tests/gui/gui_sketch_driven_controls_tests.cpp"
+      },
+      {
+        "filter": "[sketch-driven-controls]",
+        "source": "tests/gui/gui_sketch_driven_controls_tests.cpp"
+      }
+    ],
+    "actions": [
+      "blcad.action.rib",
+      "blcad.action.web",
+      "blcad.action.emboss",
+      "blcad.action.engrave"
+    ]
+  },
+  "boundary": "Extends current coverage without changing historical Block 129/131/136 inventories. Acceptance evidence and limitations are in the contract.",
+  "geometry_proofs": [
+    {
+      "filter": "[sketch-driven-guides]",
+      "source": "tests/geometry/sketch_driven_guide_tests.cpp"
+    }
+  ]
+}

@@ -1128,3 +1128,23 @@ line or model edge through a point, and a plane parallel to another plane throug
 references are offered. Generated points also serve as inputs for two-point lines and three-point
 planes; downstream geometry follows later reference edits. Double-click these objects in the browser
 to edit their existing roles. Native reference picking and construction manipulators remain planned.
+
+## Rib, Web, Emboss and Engrave
+
+Choose the corresponding Model action or start from a selected source/support. The owned task
+selects a target Body and source Sketch, then ordered curves, a closed profile or feature-owned
+text. Rib/Web shows sides, thickness, local direction, draft and distance or actual face/Body
+termination. Emboss/Engrave shows compatible analytic supports, positive normal depth, chart,
+anchor and literal seam. Select all finite support patches that the mapped outline covers.
+**Center along axis** explicitly places the chart anchor along the first selected cylinder/cone.
+Text uses a pinned font, height binding and parameter-token table. The first selected analytic
+support chooses its chart; picking a planar face for Rib/Web chooses face termination. Ctrl+Enter
+applies the candidate; Repeat Command restarts a successfully created feature through its action.
+
+Numeric grips show mm or deg and honor formula bindings. Escape or lost mouse capture restores
+the draft value before the drag. The Sketch breadcrumb returns to the parent task; Apply publishes
+its source changes and feature together. Preview validates the complete downstream history while
+displaying the feature at its input position. Invalid candidates disable Apply and mark their
+source/support. Existing broken features retain explicit repair inputs. Completion actions stay
+outside the scrolling properties. See the [workflow contract](gui-sketch-driven-features-mvp9.md)
+for evidence and supported Geometry boundaries.

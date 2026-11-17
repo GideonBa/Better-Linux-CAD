@@ -69,8 +69,20 @@ SketchDrivenGuideQuery::faces(const PartDocument& p, const ShapeCache& c, BodyId
       label.precision(5);
       label << kind << " at (" << frame.value().origin.x << ", " << frame.value().origin.y << ", "
             << frame.value().origin.z << ")";
-      out.push_back(
-          {std::move(target), mapping, frame.value().origin, frame.value().normal, label.str()});
+      std::optional<double> center;
+      const auto at =
+          gp_Pnt(frame.value().origin.x, frame.value().origin.y, frame.value().origin.z);
+      if (surface.GetType() == GeomAbs_Cylinder) {
+        const auto axes = surface.Cylinder().Position();
+        center = gp_Vec(axes.Location(), at).Dot(gp_Vec(axes.Direction()));
+      }
+      if (surface.GetType() == GeomAbs_Cone) {
+        const auto cone = surface.Cone();
+        center = gp_Vec(cone.Location(), at).Dot(gp_Vec(cone.Axis().Direction())) /
+                 std::cos(cone.SemiAngle());
+      }
+      out.push_back({std::move(target), mapping, frame.value().origin, frame.value().normal,
+                     label.str(), center});
     }
     return Result<std::vector<SketchDrivenFaceTarget>>::success(std::move(out));
   } catch (const std::exception& e) {

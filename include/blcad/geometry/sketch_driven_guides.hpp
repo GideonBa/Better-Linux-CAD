@@ -8,6 +8,7 @@ struct SketchDrivenFaceTarget {
   Point3 anchor;
   Vector3 normal;
   std::string label;
+  std::optional<double> axial_center_mm{};
 };
 struct SketchDrivenGuide {
   std::string id, label;

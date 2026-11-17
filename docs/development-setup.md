@@ -98,6 +98,13 @@ Do not weaken the export assertions. If an incremental build crashes after a pub
 change, inspect Ninja's header-dependency records: stale objects with zero recorded dependencies
 have caused stack corruption here. Rebuild affected artifacts and rerun the relevant suites.
 
+Sketch-driven interaction uses GUI filter `[parity-b184]` (owned controls plus complete workflows)
+and native-only `[native-sketch-driven]`. Run the same filter with `QT_QPA_PLATFORM=xcb` at 100%
+and `QT_SCALE_FACTOR=1.5 BLCAD_UI_COMPACT=1 BLCAD_COMPACT_UI=1` for compact 150%. Set
+`BLCAD_UI_CAPTURE_DIR` to retain native property/viewport captures. The
+[workflow contract](gui-sketch-driven-features-mvp9.md) records exact acceptance evidence; the
+[extension inventory](gui-sketch-driven-coverage-mvp9.json) preserves historical coverage records.
+
 Constrained Loft intent is covered by `[loft-constraints]` in Core/Geometry, together with
 `[loft-feature]` and `[loft-section-compatibility]`. UI consumer regressions use
 `[interactive-loft],[interactive-surface],[block136-feature-edit]`; native checks use

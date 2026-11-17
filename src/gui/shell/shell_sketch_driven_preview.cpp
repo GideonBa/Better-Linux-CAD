@@ -12,6 +12,23 @@ Error error(const std::string& s) {
   return Error::validation("part.sketch_driven", s);
 }
 } // namespace
+Result<std::size_t>
+ShellSketchDrivenTools::Impl::show_inputs(const geometry::GeometryShape* result) {
+  if (!inputs || !input_cache)
+    return Result<std::size_t>::failure(error("Input prefix is unavailable"));
+  std::vector<geometry::GeometryShape> shapes;
+  std::vector<std::string> replaced;
+  const BodyId target(ui->body->currentData().toString().toStdString());
+  for (const auto& body : inputs->bodies())
+    if (body.visibility() == BodyVisibility::Visible) {
+      replaced.push_back("body/" + body.id().value());
+      if (body.id() == target && result)
+        shapes.push_back(*result);
+      else if (const auto* shape = input_cache->find_body_shape(body.id()))
+        shapes.push_back(*shape);
+    }
+  return window.viewport().set_feature_previews(std::move(shapes), std::move(replaced));
+}
 void ShellSketchDrivenTools::Impl::overlay_refresh() {
   auto mapping = GuiViewportManipulatorMapping::create(
       [this](GuiSketchScreenPoint p) { return window.viewport().screen_to_view_ray(p); },
@@ -25,8 +42,6 @@ void ShellSketchDrivenTools::Impl::overlay_refresh() {
 }
 void ShellSketchDrivenTools::Impl::guides(const PartDocument& candidate,
                                           const SketchDrivenFeature& record) {
-  if (!layer.active_handle_id().empty())
-    return;
   const auto history = candidate.executable_history();
   if (!history)
     return;
@@ -37,6 +52,9 @@ void ShellSketchDrivenTools::Impl::guides(const PartDocument& candidate,
   auto prepared = prepare_inputs(candidate, std::size_t(found - history.value().begin()));
   if (!prepared)
     return;
+  if (!layer.active_handle_id().empty())
+    return;
+  reload_targets();
   auto queried = query_with_step_import_context(window.session(), [&](auto* context) {
     return geometry::SketchDrivenGuideQuery::guides(*inputs, record, *input_cache, context, prefix);
   });
@@ -79,7 +97,7 @@ void ShellSketchDrivenTools::Impl::fail(const Error& e) {
   valid = false;
   ui->apply->setEnabled(false);
   ui->status->setText(QString::fromStdString(e.object_id() + ": " + e.message()));
-  window.viewport().clear_feature_preview();
+  (void)show_inputs();
   if (!layer.active_handle_id().empty())
     return;
   std::vector<GuiViewportManipulatorHandle> markers;
@@ -169,14 +187,13 @@ Result<std::size_t> ShellSketchDrivenTools::preview() {
     p.fail(computed.error());
     return Result<std::size_t>::failure(computed.error());
   }
-  const auto* shape = cache.value().find_body_shape(record->target_body());
+  const auto* shape = cache.value().find_feature_shape(record->id());
   if (!shape) {
-    auto e = error("Complete history has no target Body result.");
+    auto e = error("Complete history has no feature result.");
     p.fail(e);
     return Result<std::size_t>::failure(e);
   }
-  auto shown =
-      p.window.viewport().set_feature_preview(*shape, "body/" + record->target_body().value());
+  auto shown = p.show_inputs(shape);
   if (!shown) {
     p.fail(shown.error());
     return shown;
@@ -189,6 +206,23 @@ Result<std::size_t> ShellSketchDrivenTools::preview() {
           .arg(p.prefix));
   p.overlay_refresh();
   return Result<std::size_t>::success(1);
+}
+void ShellSketchDrivenTools::Impl::restore_grip() {
+  if (layer.active_handle_id().empty())
+    return;
+  layer.cancel();
+  if (drag_field) {
+    loading = true;
+    drag_field->setText(drag_start);
+    loading = false;
+  }
+  drag_field = nullptr;
+  ui->scroll->setEnabled(true);
+  ui->grip_numeric->setEnabled(false);
+  ui->grip_numeric->clear();
+  if (window.viewport().mouseGrabber() == &window.viewport())
+    window.viewport().release_interaction_mouse();
+  (void)owner.preview();
 }
 void ShellSketchDrivenTools::Impl::apply_grip(const GuiViewportManipulatorCandidate& candidate) {
   auto found = grip_fields.find(candidate.handle_id);
@@ -254,9 +288,15 @@ bool ShellSketchDrivenTools::accept_selection(const GuiSelection& selection) {
         const auto key =
             interactive_face_identity(std::get<FaceReference>(target.selection.reference));
         if (p.ui->mode->currentIndex() < 2) {
-          p.ui->extent->setCurrentIndex(1);
-          return select(p.ui->limit_face, key);
+          if (select(p.ui->limit_face, key)) {
+            p.ui->extent->setCurrentIndex(1);
+            return true;
+          }
+          p.fail(error("Rib/Web termination requires a planar support face."));
+          return true;
         }
+        if (p.ui->supports->count() == 0 && target.mapping)
+          p.ui->mapping->setCurrentIndex(int(*target.mapping));
         if (select(p.ui->face, key)) {
           p.add_face();
           return true;
@@ -271,19 +311,26 @@ bool ShellSketchDrivenTools::eventFilter(QObject* watched, QEvent* event) {
   auto& p = *impl_;
   if (!p.active || p.source_edit)
     return QObject::eventFilter(watched, event);
+  if (!p.layer.active_handle_id().empty() &&
+      (event->type() == QEvent::WindowDeactivate ||
+       (watched == &p.window.viewport() &&
+        (event->type() == QEvent::UngrabMouse || event->type() == QEvent::Resize ||
+         event->type() == QEvent::Wheel)))) {
+    p.restore_grip();
+    return QObject::eventFilter(watched, event);
+  }
+  if (event->type() == QEvent::KeyPress && p.layer.active_handle_id().empty()) {
+    const auto* key = static_cast<QKeyEvent*>(event);
+    if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) &&
+        key->modifiers() == Qt::ControlModifier) {
+      (void)apply();
+      return true;
+    }
+  }
   if (event->type() == QEvent::KeyPress &&
       static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
     if (!p.layer.active_handle_id().empty()) {
-      p.layer.cancel();
-      if (p.drag_field) {
-        p.loading = true;
-        p.drag_field->setText(p.drag_start);
-        p.loading = false;
-      }
-      p.ui->scroll->setEnabled(true);
-      p.ui->grip_numeric->setEnabled(false);
-      p.window.viewport().release_interaction_mouse();
-      (void)preview();
+      p.restore_grip();
     } else
       cancel();
     return true;
