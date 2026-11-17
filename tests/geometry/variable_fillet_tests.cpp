@@ -2,9 +2,11 @@
 #include "../../src/geometry/semantic_edge_resolution.hpp"
 #include "../../src/geometry/variable_fillet_adapter.hpp"
 #include "../support/geometry_volume_oracle.hpp"
+#include "../support/hole_feature_fixture.hpp"
 #include "../support/part_history_fixture.hpp"
 #include "blcad/core/advanced_fillet_intent.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "imported_body_test_fixture.hpp"
@@ -16,9 +18,11 @@
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
+#include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeCylinder.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepTools.hxx>
+#include <BRepTools_ReShape.hxx>
 #include <BRep_Tool.hxx>
 #include <GeomConvert.hxx>
 #include <Geom_BezierCurve.hxx>
@@ -357,6 +361,11 @@ TEST_CASE("Variable Fillet uses true Bezier length through explicit and expanded
     auto c = cache();
     auto law = intent(refs.front());
     if (split) {
+      const auto original_refs = curved_refs(curved_body(false));
+      auto split_lost = detail::variable_fillet(p, feature(intent(original_refs.front())), target,
+                                                c, nullptr, {});
+      REQUIRE_FALSE(split_lost);
+      CHECK(split_lost.error().message().find("changed") != std::string::npos);
       auto missing = detail::variable_fillet(p, feature(law), target, c, nullptr, {});
       REQUIRE_FALSE(missing);
       CHECK(missing.error().message().find("complete") != std::string::npos);
@@ -400,8 +409,20 @@ TEST_CASE(
   auto refs = curved_refs(*OcctShapeView::get(*c.find_body_shape(BodyId("body.1"))),
                           FeatureId("import.base"));
   REQUIRE(refs.size() == 1);
+  const auto& catalog = p.imported_topology_catalogs().front();
+  const auto entry =
+      std::find_if(catalog.entries().begin(), catalog.entries().end(), [](const auto& entry) {
+        return entry.descriptor.kind == ImportedTopologyKind::Edge &&
+               entry.descriptor.geometry == ImportedGeometryClass::Opaque &&
+               entry.descriptor.centroid.z > 7.9;
+      });
+  REQUIRE(entry != catalog.entries().end());
+  const auto imported_ref = f::checked(EdgeReference::create_imported(
+      PartFeatureInputRole::FilletEdge,
+      f::checked(ImportedTopologyReference::create(catalog.id(), entry->id,
+                                                   ImportedTopologyCapability::Edge))));
   auto record = f::checked(FilletFeature::create_variable(
-      FeatureId("variable"), "Imported variable", BodyId("body.1"), intent(refs.front())));
+      FeatureId("variable"), "Imported variable", BodyId("body.1"), intent(imported_ref)));
   f::accept(p.add_fillet_feature(record));
   auto built = executor.execute_document(p, c);
   INFO((built ? "ok" : built.error().message()));
@@ -422,4 +443,314 @@ TEST_CASE(
   REQUIRE(physical.products.size() == 1);
   REQUIRE(physical.products[0].bodies.size() == 1);
   curved_circles(*OcctShapeView::get(physical.products[0].bodies[0].shape));
+}
+
+TEST_CASE("Variable Fillet retains multi-solid Pattern results and rolls back excessive radii",
+          "[geometry][variable-fillet][parity-b176]") {
+  auto p = document();
+  f::accept(p.add_datum_axis(
+      f::checked(DatumAxis::create_explicit(DatumAxisId("pattern.x"), "X", {}, {1, 0, 0}))));
+  f::accept(p.add_parameter(f::checked(Parameter::create_length(
+      ParameterId("spacing"), "spacing", f::checked(Quantity::length_mm(40))))));
+  f::accept(p.add_parameter(f::checked(
+      Parameter::create_count(ParameterId("copies"), "copies", f::checked(Quantity::count(2))))));
+  f::accept(
+      p.add_body(f::checked(Body::create(BodyId("pattern.body"), "Pattern", BodyKind::Solid))));
+  const auto direction = f::checked(AxisReference::create_datum_axis(
+      PartFeatureInputRole::PatternAxis, DatumAxisId("pattern.x")));
+  const auto result = f::checked(FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody,
+                                                                  {}, BodyId("pattern.body")));
+  auto pattern = f::checked(LinearPatternFeature::create(
+      FeatureId("pattern"), "Pattern",
+      {f::checked(PatternSourceReference::body(BodyId("body.base")))}, direction,
+      ParameterId("copies"), LinearPatternExtentMode::Spacing, ParameterId("spacing"),
+      PatternDirectionSign::Positive, result));
+  f::accept(p.add_linear_pattern_feature(std::move(pattern)));
+  auto c = cache();
+  execute(p, c);
+  const auto* native = OcctShapeView::get(*c.find_body_shape(BodyId("pattern.body")));
+  TopoDS_Edge seed;
+  for (TopExp_Explorer it(*native, TopAbs_EDGE); it.More(); it.Next()) {
+    auto e = TopoDS::Edge(it.Current());
+    BRepAdaptor_Curve curve(e);
+    auto a = curve.Value(curve.FirstParameter()), b = curve.Value(curve.LastParameter());
+    if (std::abs(a.Y() - 5) < 1e-7 && std::abs(b.Y() - 5) < 1e-7 && a.Z() > 7.9 && b.Z() > 7.9 &&
+        std::max(a.X(), b.X()) < 11) {
+      seed = e;
+      break;
+    }
+  }
+  REQUIRE_FALSE(seed.IsNull());
+  auto ref = f::checked(EdgeReference::create_result(
+      PartFeatureInputRole::FilletEdge,
+      f::checked(make_result_edge_reference(FeatureId("pattern"), seed))));
+  auto record = f::checked(FilletFeature::create_variable(FeatureId("variable"), "Variable pattern",
+                                                          BodyId("pattern.body"), intent(ref)));
+  f::accept(p.add_fillet_feature(record));
+  execute(p, c);
+  auto last = *c.find_body_shape(BodyId("pattern.body"));
+  CHECK(RectangleExtrusionAdapter{}.summarize(last).solid_count == 2);
+  CHECK(blcad::test::integrated_solid_volume(*c.find_body_shape(BodyId("body.base"))).volume_mm3 ==
+        Catch::Approx(1600).margin(1e-6));
+  CHECK(blcad::test::integrated_solid_volume(last).volume_mm3 ==
+        Catch::Approx(3200 - (1 - std::numbers::pi / 4) * 140 / 3).margin(5e-5));
+  circles(
+      *OcctShapeView::get(last),
+      [](double f) { return std::pair{gp_Pnt(-10 + 20 * f, 5, 8), gp_Vec(0, -1, 0)}; },
+      [](double f) { return 1 + f; });
+  f::checked(p.set_parameter_value(ParameterId("r1"), f::checked(Quantity::length_mm(40))));
+  auto bad = GeometryRecomputeExecutor{}.execute_document(p, c);
+  REQUIRE_FALSE(bad);
+  CHECK(OcctShapeView::get(*c.find_body_shape(BodyId("pattern.body")))
+            ->IsSame(*OcctShapeView::get(last)));
+  f::checked(p.set_parameter_value(ParameterId("r1"), f::checked(Quantity::length_mm(2))));
+  f::checked(p.set_parameter_value(ParameterId("spacing"), f::checked(Quantity::length_mm(45))));
+  execute(p, c);
+  CHECK(RectangleExtrusionAdapter{}
+            .summarize(*c.find_body_shape(BodyId("pattern.body")))
+            .solid_count == 2);
+}
+TEST_CASE("Variable Fillet recovers an edited new Hole rim without changing radius stations",
+          "[geometry][variable-fillet][parity-b176]") {
+  auto p = document(.2, .4);
+  f::accept(p.add_parameter(f::checked(Parameter::create_length(
+      ParameterId("hole.diameter"), "hole_diameter", f::checked(Quantity::length_mm(4))))));
+  f::accept(
+      p.add_hole_feature(blcad::test::hole_fixture::hole("hole", ParameterId("hole.diameter"))));
+  auto c = cache();
+  execute(p, c);
+  auto select = [&]() {
+    auto targets = f::checked(FinishingSelectionBuilder::build(p, c, BodyId("body.base"),
+                                                               PartFeatureInputRole::FilletEdge));
+    for (const auto& target : targets) {
+      auto ref = std::get_if<EdgeReference>(&target.reference);
+      if (!ref)
+        continue;
+      auto edge = OcctShapeView::get(target.shape);
+      if (!edge || edge->ShapeType() != TopAbs_EDGE)
+        continue;
+      BRepAdaptor_Curve curve(TopoDS::Edge(*edge));
+      if (curve.GetType() == GeomAbs_Circle && curve.Value(curve.FirstParameter()).Z() > 7.9)
+        return *ref;
+    }
+    throw std::runtime_error("No top Hole rim");
+  };
+  auto law = intent(select());
+  law.groups[0].interpolation = FilletRadiusInterpolation::MonotoneCubic;
+  law.groups[0].stations.back().radius = ParameterId("r0");
+  law.groups[0].stations.insert(law.groups[0].stations.begin() + 1,
+                                {"middle", FilletStationLocation::Fraction, .5, ParameterId("r1")});
+  const auto verify_hole = [&](const GeometryShape& shape, double hole_radius) {
+    const auto& ref = std::get<ResultEdgeReference>(law.groups[0].edges[0].edge.source());
+    const auto seam = ref.samples().front();
+    const double phase = std::atan2(seam.y, seam.x);
+    const auto radius = [](double fraction) {
+      double t = 2 * fraction;
+      if (t > 1)
+        t = 2 - t;
+      return .2 + .2 * (3 * t * t - 2 * t * t * t);
+    };
+    for (double f : {.12, .24, .37, .51, .66, .79, .88}) {
+      const double theta = phase + 2 * std::numbers::pi * f, r = radius(f);
+      for (double angle : {0., .3, .7, 1.1, std::numbers::pi / 2}) {
+        const double rho = hole_radius + r * (1 - std::cos(angle));
+        CHECK(distance(*OcctShapeView::get(shape), {rho * std::cos(theta), rho * std::sin(theta),
+                                                    8 - r + r * std::sin(angle)}) < 2e-4);
+      }
+    }
+    double removed = 0;
+    const int count = 2000;
+    const double pi = std::numbers::pi;
+    for (int i = 0; i <= count; ++i) {
+      const double r = radius(double(i) / count);
+      removed += (i == 0 || i == count ? 1 : (i % 2 ? 4 : 2)) *
+                 (hole_radius * r * r * (1 - pi / 4) + r * r * r * (5. / 6 - pi / 4));
+    }
+    removed *= 2 * pi / count / 3;
+    CHECK(blcad::test::integrated_solid_volume(shape).volume_mm3 ==
+          Catch::Approx(1600 - 8 * pi * hole_radius * hole_radius - removed).margin(5e-5));
+  };
+  f::accept(p.add_fillet_feature(feature(law)));
+  execute(p, c);
+  verify_hole(*c.find_body_shape(BodyId("body.base")), 2);
+  auto last = *OcctShapeView::get(*c.find_body_shape(BodyId("body.base")));
+  f::checked(
+      p.set_parameter_value(ParameterId("hole.diameter"), f::checked(Quantity::length_mm(6))));
+  auto lost = GeometryRecomputeExecutor{}.execute_document(p, c);
+  REQUIRE_FALSE(lost);
+  CHECK(OcctShapeView::get(*c.find_body_shape(BodyId("body.base")))->IsSame(last));
+  // Repair resolves against the current pre-Fillet prefix, keeping all station identities/bindings.
+  auto prefix = f::checked(p.with_history_intent({{"base", "hole", "variable"}, {"variable"}}));
+  auto before = cache();
+  execute(prefix, before);
+  auto choices = f::checked(FinishingSelectionBuilder::build(prefix, before, BodyId("body.base"),
+                                                             PartFeatureInputRole::FilletEdge));
+  bool repaired = false;
+  for (const auto& target : choices) {
+    const auto* edge = OcctShapeView::get(target.shape);
+    if (!edge || edge->ShapeType() != TopAbs_EDGE)
+      continue;
+    BRepAdaptor_Curve curve(TopoDS::Edge(*edge));
+    if (curve.GetType() == GeomAbs_Circle && curve.Value(curve.FirstParameter()).Z() > 7.9) {
+      law.groups[0].edges[0].edge = std::get<EdgeReference>(target.reference);
+      repaired = true;
+      break;
+    }
+  }
+  REQUIRE(repaired);
+  f::accept(p.update_fillet_feature(feature(law)));
+  execute(p, c);
+  verify_hole(*c.find_body_shape(BodyId("body.base")), 3);
+  const auto& saved =
+      std::get<VariableFilletIntent>(
+          p.find_fillet_feature(FeatureId("variable"))->advanced_intent()->definition)
+          .groups[0];
+  CHECK(saved.stations[1].id == "middle");
+  CHECK(saved.stations[1].fraction == .5);
+  CHECK(saved.stations[1].radius == ParameterId("r1"));
+}
+
+TEST_CASE("Variable Fillet preserves radius side and units after Body scale and Mirror history",
+          "[geometry][variable-fillet][parity-b176]") {
+  auto p = document(.5, 1);
+  f::accept(p.add_body_transform(f::checked(BodyTransform::create_uniform_scale(
+      BodyTransformId("scale"), BodyId("body.base"), BodyTransformCoordinateSpace::World, {}, 2, {},
+      false, false))));
+  f::accept(
+      p.add_body(f::checked(Body::create(BodyId("mirrored.body"), "Mirrored", BodyKind::Solid))));
+  auto plane = f::checked(PlaneReference::create_datum_plane(PartFeatureInputRole::MirrorPlane,
+                                                             DatumPlaneId("datum.xy")));
+  auto body_context = f::checked(FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody,
+                                                                  {}, BodyId("mirrored.body")));
+  auto mirror = f::checked(MirrorFeature::create(
+      FeatureId("mirror"), "Mirror", {f::checked(MirrorSourceReference::body(BodyId("body.base")))},
+      plane, body_context));
+  f::accept(p.add_mirror_feature(std::move(mirror)));
+  auto c = cache();
+  execute(p, c);
+  auto* source = OcctShapeView::get(*c.find_body_shape(BodyId("mirrored.body")));
+  TopoDS_Edge seed;
+  for (TopExp_Explorer it(*source, TopAbs_EDGE); it.More(); it.Next()) {
+    auto e = TopoDS::Edge(it.Current());
+    BRepAdaptor_Curve curve(e);
+    auto a = curve.Value(curve.FirstParameter()), b = curve.Value(curve.LastParameter());
+    if (std::abs(a.Y() - 10) < 1e-7 && std::abs(b.Y() - 10) < 1e-7 && std::abs(a.Z() + 16) < 1e-7 &&
+        std::abs(b.Z() + 16) < 1e-7) {
+      seed = e;
+      break;
+    }
+  }
+  REQUIRE_FALSE(seed.IsNull());
+  auto ref = f::checked(EdgeReference::create_result(
+      PartFeatureInputRole::FilletEdge,
+      f::checked(make_result_edge_reference(FeatureId("mirror"), seed))));
+  f::accept(p.add_fillet_feature(f::checked(FilletFeature::create_variable(
+      FeatureId("variable"), "Mirrored variable", BodyId("mirrored.body"), intent(ref)))));
+  execute(p, c);
+  auto verify = [](const GeometryShape& shape) {
+    const auto* native = OcctShapeView::get(shape);
+    CHECK(BRepCheck_Analyzer(*native, true).IsValid());
+    for (double f : {.15, .35, .65, .85}) {
+      double r = .5 + .5 * f;
+      for (double a : {0., .3, .7, 1.1, std::numbers::pi / 2})
+        CHECK(distance(*native, {-20 + 40 * f, 10 - r * (1 - std::cos(a)),
+                                 -16 + r * (1 - std::sin(a))}) < 2e-4);
+    }
+  };
+  verify(*c.find_body_shape(BodyId("mirrored.body")));
+  auto opened = f::checked(
+      deserialize_part_document_from_json(f::checked(serialize_part_document_to_json(p))));
+  auto fresh = cache();
+  execute(opened, fresh);
+  verify(*fresh.find_body_shape(BodyId("mirrored.body")));
+}
+TEST_CASE("Variable tangent propagation rejects a shared-vertex branch before publishing geometry",
+          "[geometry][variable-fillet][parity-b175][parity-b176]") {
+  auto first = BRepPrimAPI_MakeBox(10, 10, 10).Shape();
+  TopoDS_Edge seed;
+  TopoDS_Vertex common;
+  for (TopExp_Explorer it(first, TopAbs_EDGE); it.More(); it.Next()) {
+    auto e = TopoDS::Edge(it.Current());
+    BRepAdaptor_Curve c(e);
+    auto a = c.Value(c.FirstParameter()), b = c.Value(c.LastParameter());
+    if (std::hypot(a.X(), a.Y()) < 1e-8 && std::hypot(b.X(), b.Y()) < 1e-8) {
+      seed = e;
+      for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More(); v.Next())
+        if (BRep_Tool::Pnt(TopoDS::Vertex(v.Current())).Z() > 9)
+          common = TopoDS::Vertex(v.Current());
+      break;
+    }
+  }
+  REQUIRE_FALSE(seed.IsNull());
+  REQUIRE_FALSE(common.IsNull());
+  auto attach = [&](TopoDS_Shape shape) {
+    Handle(BRepTools_ReShape) replace = new BRepTools_ReShape;
+    for (TopExp_Explorer it(shape, TopAbs_VERTEX); it.More(); it.Next())
+      if (BRep_Tool::Pnt(TopoDS::Vertex(it.Current())).Distance(gp_Pnt(0, 0, 10)) < 1e-8) {
+        replace->Replace(it.Current().Oriented(TopAbs_FORWARD), common.Oriented(TopAbs_FORWARD));
+        break;
+      }
+    auto joined = replace->Apply(shape);
+    BRep_Builder builder;
+    for (TopExp_Explorer it(joined, TopAbs_EDGE); it.More(); it.Next()) {
+      auto edge = TopoDS::Edge(it.Current());
+      BRepAdaptor_Curve curve(edge);
+      for (TopExp_Explorer v(edge, TopAbs_VERTEX); v.More(); v.Next())
+        if (v.Current().IsSame(common)) {
+          double parameter = curve.Value(curve.FirstParameter()).Distance(gp_Pnt(0, 0, 10)) < 1e-8
+                                 ? curve.FirstParameter()
+                                 : curve.LastParameter();
+          builder.UpdateVertex(common, parameter, edge, 1e-7);
+        }
+    }
+    return joined;
+  };
+  auto target = imported_body_test::compound(
+      {first, attach(BRepPrimAPI_MakeBox(gp_Pnt(0, 0, 10), 10, 10, 10).Shape()),
+       attach(BRepPrimAPI_MakeBox(gp_Pnt(-10, -10, 10), 10, 10, 10).Shape())});
+  REQUIRE(BRepCheck_Analyzer(target, true).IsValid());
+  auto p = document(.2, .3);
+  auto c = cache();
+  auto ref = f::checked(EdgeReference::create_result(
+      PartFeatureInputRole::FilletEdge,
+      f::checked(make_result_edge_reference(FeatureId("base"), seed))));
+  auto law = intent(ref);
+  law.groups[0].propagation = FilletPropagation::TangentChain;
+  auto rejected = detail::variable_fillet(p, feature(law), target, c, nullptr, {});
+  REQUIRE_FALSE(rejected);
+  CHECK(rejected.error().object_id() == "chain");
+  CHECK(rejected.error().message().find("branch") != std::string::npos);
+}
+
+TEST_CASE("Editing a Fillet station relocates measured physical radii and retains its identity",
+          "[geometry][variable-fillet][parity-b175][parity-b176]") {
+  auto p = document(2, 2.2);
+  auto law = intent(edge(SemanticEdge::TopFront));
+  law.groups[0].stations.back().radius = ParameterId("r0");
+  law.groups[0].stations.insert(
+      law.groups[0].stations.begin() + 1,
+      {"moving", FilletStationLocation::Fraction, .25, ParameterId("r1")});
+  f::accept(p.add_fillet_feature(feature(law)));
+  auto c = cache();
+  for (double station : {.25, .6}) {
+    law.groups[0].stations[1].fraction = station;
+    f::accept(p.update_fillet_feature(feature(law)));
+    execute(p, c);
+    circles(
+        *OcctShapeView::get(*c.find_body_shape(BodyId("body.base"))),
+        [](double f) { return std::pair{gp_Pnt(-10 + 20 * f, 5, 8), gp_Vec(0, -1, 0)}; },
+        [&](double f) { return 2 + .2 * (f <= station ? f / station : (1 - f) / (1 - station)); });
+    CHECK(std::get<VariableFilletIntent>(
+              p.find_fillet_feature(FeatureId("variable"))->advanced_intent()->definition)
+              .groups[0]
+              .stations[1]
+              .id == "moving");
+  }
+  auto opened = f::checked(
+      deserialize_part_document_from_json(f::checked(serialize_part_document_to_json(p))));
+  CHECK(std::get<VariableFilletIntent>(
+            opened.find_fillet_feature(FeatureId("variable"))->advanced_intent()->definition)
+            .groups[0]
+            .stations[1]
+            .fraction == .6);
 }

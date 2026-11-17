@@ -3374,6 +3374,25 @@ Result<std::size_t> PartDocument::add_fillet_feature(FilletFeature feature) {
           feature.id().value(), "Variable Fillet requires an owned Solid target"));
     const auto body_node = body_dependency_node_id(feature.target_body());
     for (const auto& edge : feature.edges()) {
+      if (const auto* imported = std::get_if<ImportedTopologyReference>(&edge.source())) {
+        const auto* catalog = find_imported_topology_catalog(imported->catalog());
+        const auto* entry = catalog ? catalog->find(imported->entry()) : nullptr;
+        bool owned = false;
+        for (const auto& producer : imported_body_features())
+          if (producer.definition().catalog() == imported->catalog())
+            for (const auto& output : producer.definition().outputs())
+              if (entry && entry->parent_body == output.imported_body) {
+                const auto descendants =
+                    dependency_graph_.transitive_dependents(body_dependency_node_id(output.body));
+                owned |= output.body == feature.target_body() ||
+                         std::find(descendants.begin(), descendants.end(), body_node) !=
+                             descendants.end();
+              }
+        if (!owned)
+          return Result<std::size_t>::failure(Error::validation(
+              imported->entry().value(), "Variable Fillet imported edge must belong to the target "
+                                         "Body or its selected source ancestry"));
+      }
       const auto descendants = dependency_graph_.transitive_dependents(edge.source_node_id());
       if (std::find(descendants.begin(), descendants.end(), body_node) == descendants.end())
         return Result<std::size_t>::failure(Error::validation(
