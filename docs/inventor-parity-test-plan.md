@@ -552,8 +552,9 @@ cover the relevant workflows; they do not establish every skipped offscreen case
 covers typed source/modes, strict necessary JSON/Project, normal graph/history, atomic edits and an
 earlier derived/placed Body termination. Focused **6 / 73**, full Core **804 / 35,384**. Geometry
 181 is now accepted: [checked construction, semantic consumers and STEP proof](geometry-rib-web-mvp8.md#verification),
-complete Geometry **836 / 91,510** and Core **805 / 35,388**. Emboss/Engrave 182–183 and combined
-native F03/UI01 in 184 remain open.
+complete Geometry **836 / 91,510** and Core **805 / 35,388**. The [182 intent gate](part-emboss-engrave-intent-mvp6.md)
+also passes focused Core **5 / 53**, full **810 / 35,441**, typed parameter-driven text, strict replay
+and literal chart identity. Geometry 183 and combined native F03/UI01 in 184 remain open.
 
 ### D01 Direct face edits and source preservation
 

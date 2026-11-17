@@ -1,5 +1,6 @@
 #include "sketch_driven_json.hpp"
 #include "blcad/core/sketch_driven_intent.hpp"
+#include "emboss_json.hpp"
 #include <stdexcept>
 namespace blcad::detail {
 namespace {
@@ -18,6 +19,8 @@ E choice(const json& value, std::initializer_list<std::pair<const char*, E>> ent
 }
 } // namespace
 json sketch_driven_to_json(const SketchDrivenFeature& feature, const SketchDrivenFaceWriter& face) {
+  if (std::holds_alternative<EmbossIntent>(feature.definition().intent))
+    return emboss_to_json(feature, face);
   const auto& r = std::get<RibWebIntent>(feature.definition().intent);
   json curves = json::array();
   for (const auto& curve : r.source.curves)
@@ -58,6 +61,9 @@ json sketch_driven_to_json(const SketchDrivenFeature& feature, const SketchDrive
 Result<SketchDrivenFeature> sketch_driven_from_json(const json& value,
                                                     const SketchDrivenFaceReader& face) {
   try {
+    if (value.is_object() && value.contains("mode") &&
+        (value.at("mode") == "emboss" || value.at("mode") == "engrave"))
+      return emboss_from_json(value, face);
     require(value.is_object() && value.size() == 13, "Malformed Rib/Web record");
     const auto id = FeatureId(value.at("id").get<std::string>());
     const auto name = value.at("name").get<std::string>();

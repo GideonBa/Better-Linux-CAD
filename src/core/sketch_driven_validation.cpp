@@ -1,9 +1,12 @@
 #include "sketch_driven_validation.hpp"
 #include "blcad/core/sketch_driven_intent.hpp"
+#include "emboss_validation.hpp"
 #include <cmath>
 namespace blcad::detail {
 Result<std::size_t> validate_sketch_driven_parameters(const PartDocument& p,
                                                       const SketchDrivenFeature& feature) {
+  if (const auto* e = std::get_if<EmbossIntent>(&feature.definition().intent))
+    return validate_emboss_parameters(p, *e, feature.id());
   const auto& r = std::get<RibWebIntent>(feature.definition().intent);
   std::vector<ParameterId> sizes{r.thickness};
   if (r.second_thickness)
@@ -34,7 +37,10 @@ Result<std::size_t> validate_sketch_driven_inputs(const PartDocument& p,
   };
   const auto* target = p.find_body(feature.target_body());
   if (!target || target->kind() != BodyKind::Solid)
-    return fail(feature.target_body().value(), "Rib/Web requires an owned Solid target Body");
+    return fail(feature.target_body().value(),
+                "Sketch-driven features require an owned Solid target Body");
+  if (const auto* e = std::get_if<EmbossIntent>(&feature.definition().intent))
+    return validate_emboss_inputs(p, *e, feature.target_body(), feature.id());
   const auto& r = std::get<RibWebIntent>(feature.definition().intent);
   const auto* sketch = p.find_sketch(r.source.sketch);
   if (!sketch)

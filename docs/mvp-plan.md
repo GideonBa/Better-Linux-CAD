@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 181
-current_block: 182
-current_boundary: Block 182 in progress; typed Emboss and Engrave intent
-current_tag: "[parity-b182]"
+implemented_through: Block 182
+current_block: 183
+current_boundary: Block 183 in progress; checked Emboss and Engrave Geometry
+current_tag: "[parity-b183]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–181 accepted; Block 182 in progress; Blocks 183–204 planned"
+  advanced_modeling_workflows: "Blocks 145–182 accepted; Block 183 in progress; Blocks 184–204 planned"
 ---
 
 # MVP Plan
@@ -34,10 +34,10 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 181
-current block        Block 182 (in progress)
+implemented through  Block 182
+current block        Block 183 (in progress)
 current phase        Advanced finishing and sketch-driven features
-current boundary     Typed Emboss and Engrave intent
+current boundary     Checked Emboss and Engrave Geometry
 ```
 
 The assigned sequence continues through Block 184. Blocks 168–169 were delivered by normal
@@ -88,7 +88,8 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 179 | Accepted shared native advanced finishing creation/editing, physical grips, qualified repair and full regression. |
 | 180 | Accepted typed Rib/Web intent, strict necessary V15, historical Body snapshots and atomic Core history/parameters. |
 | 181 | Accepted checked thin volumes, actual terminations, generated Shell/Hole/Fillet/full-round consumers and physical exchange; [proof](geometry-rib-web-mvp8.md#verification). |
-| 182–184 | Typed planar/cylindrical/conical Emboss/Engrave, checked mapping and native Rib/Web/Emboss/Engrave workflows. |
+| 182 | Accepted typed mapped Emboss/Engrave and pinned parameter-driven text; [intent proof](part-emboss-engrave-intent-mvp6.md#persistence-and-verification). |
+| 183–184 | Checked mapping and native Rib/Web/Emboss/Engrave workflows. |
 
 The active Surface branch has [complete checked G03 construction, consumers and exchange proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof).
 Curved Trim/Extend and complete G04 are accepted in 172; the [bounded construction contract](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-construction--172) is retained.
@@ -197,7 +198,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Implemented and accepted |
-| E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | 175 in progress; 176–184 planned |
+| E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | 175–182 accepted; 183 in progress; 184 planned |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
 | G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
 | H | 199–204 | Motion/contact extensions, finite measurement, quality/thickness analysis, measured performance and final combined acceptance | Planned; not started |
@@ -1130,17 +1131,29 @@ Core **804 / 35,384**, legacy guide Geometry **5 / 83** and focused finishing Qt
 1 native skip / 314 assertions** pass. Logs: `build/verification/block180/`. Frozen runtime:
 **1,263 files**, `aedf1c24cc5413545376844f865e13a33fef6c834d48fa2e0602ed5275b6d56f`.
 
-### Block 181 Rib and Web Geometry — in progress
+### Block 181 Rib and Web Geometry — accepted
 
-Build native checked thin volumes, mitered connected offsets and explicit crossing policies.
-Resolve actual finite face/first-Body termination, join connected material, preserve source and
-unrelated Bodies, and expose semantic faces to Hole/Fillet/full-round consumers. Independent
-straight/curved, side/draft, intersection, placed/imported support and history/STEP proof remain
-required. The [checked construction foundation](geometry-rib-web-mvp8.md) passes **8 / 78**;
-combined construction/finishing **37 / 9,788**, full Core **804 / 35,384** and focused Qt **13 passed /
-1 skipped / 314 assertions** pass after all five targets build. Semantic fragment witnesses retain
-old ambiguous provenance and expose qualified new faces. Consumer/import/STEP and full Geometry
-acceptance remain open. Continue through 184 and preserve all 185–204 planning.
+[Checked construction and consumer proof](geometry-rib-web-mvp8.md) covers thin connected volumes,
+actual finite terminations, controlled spline offsets, imported source preservation and generated
+Shell/Hole/Fillet/full-round supports. A whole branched cross cap rejects; one actual arm supports
+G1/G2 finishing after a Hole and thickness edit. Canonical reopen and physical two-Body STEP replay
+pass. Complete Core **805 / 35,388**, isolated Geometry **836 / 91,510**, focused Qt **13 passed /
+1 native skip / 314 assertions** and all five targets pass. Runtime **1,272 files**, SHA-256
+`eb460d08c4225d438c060c10902a199b8a2c8abc8e1b16f70ee43addfc3f813d`.
+
+### Block 182 Emboss and Engrave intent — accepted
+
+The [intent contract](part-emboss-engrave-intent-mvp6.md) covers profile/embedded SketchText sources,
+pinned fonts, typed chart/depth/orientation, raw seam/anchors, qualified target ownership and strict
+necessary V15. Full Core **810 / 35,441**, focused **5 / 53**, Rib/Web Geometry **16 / 202**,
+finishing Qt **13 passed / 1 skipped / 314 assertions** and all five build targets pass. Runtime
+**1,279 files**, SHA-256 `1d52862658bfa810127d135198669e7d9f691e445be3893e2d3a6c29edbae3bd`.
+
+### Block 183 Emboss and Engrave Geometry — in progress
+
+Construct bounded planar/cylindrical/conical material, preserve contour holes, prove normal depth,
+seams and finite support coverage, and reject invalid wrapping/erasing cuts atomically. Native
+interaction remains 184. Preserve the complete 185–204 planning.
 
 ### Implementation route for the assigned continuation
 
