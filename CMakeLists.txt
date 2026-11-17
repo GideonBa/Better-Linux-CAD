@@ -231,6 +231,10 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/fillet_guides.cpp
     src/geometry/face_fillet_adapter.cpp
     src/geometry/variable_fillet_adapter.cpp
+    src/geometry/rib_skeleton.cpp
+    src/geometry/rib_volume.cpp
+    src/geometry/rib_lineage.cpp
+    src/geometry/sketch_driven_adapter.cpp
     src/geometry/fillet_adapter.cpp
     src/geometry/geometry_measure.cpp
     src/geometry/measure_selection.cpp
@@ -722,6 +726,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/front_workplane_pipeline_tests.cpp
       tests/geometry/guided_loft_pipeline_tests.cpp
       tests/geometry/setback_fillet_tests.cpp
+      tests/geometry/rib_web_geometry_tests.cpp
       tests/geometry/fillet_guide_tests.cpp
       tests/geometry/face_fillet_tests.cpp
       tests/geometry/variable_fillet_tests.cpp

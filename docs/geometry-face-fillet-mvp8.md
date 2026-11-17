@@ -1,7 +1,7 @@
 # Checked face finishing — Block 178
 
 Construction is accepted within the capability table; `mvp-plan.md` owns numbered status. Typed inputs and persistence are
-specified in [the Core contract](part-face-full-round-intent-mvp6.md). Native controls remain 179.
+specified in [the Core contract](part-face-full-round-intent-mvp6.md). Native controls use the [shared finishing interaction](gui-advanced-finishing-mvp9.md).
 
 ## Construction and verification
 
@@ -98,7 +98,7 @@ G1 spherical pole normals and the existing rejection of singular G2 charts have 
 
 Runtime: **1,244 files**, SHA-256
 `f590ef7bfea79674bd30ef001da27dc3eb979ded6fdeb13c0e86e3fbd462b79d`.
-Block 178 is accepted within the capability table. Native UI acceptance remains 179.
+Block 178 is accepted within the capability table. Native UI proof is recorded in the [shared finishing contract](gui-advanced-finishing-mvp9.md#verification).
 
 Advanced face selection enumerates surviving semantic supports from the selected producer ancestry,
 including Stitch/closed-shell and Thicken output Bodies. Each candidate must resolve uniquely on
