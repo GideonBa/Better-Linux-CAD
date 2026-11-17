@@ -3,7 +3,7 @@
 Block 184 owns shared Rib/Web and Emboss/Engrave creation/editing in the current desktop shell.
 The [Rib Geometry](geometry-rib-web-mvp8.md), [mapped material Geometry](geometry-emboss-engrave-mvp8.md)
 and [typed intent](part-emboss-engrave-intent-mvp6.md) remain the model authorities. The [main plan](mvp-plan.md)
-retains 184 in progress until complete native F03/UI01 acceptance.
+records acceptance through 184; the evidence below closes its F03/UI01 gate.
 
 ## Owned controls and physical guides
 
@@ -57,7 +57,7 @@ The [current extension inventory](gui-sketch-driven-coverage-mvp9.json) links Co
 shell, normal edit entry points and registered proof filters. It extends the historical inventories
 without changing their accepted family counts.
 
-## Verification and remaining gate
+## Verification
 
 The Geometry guides pass **2 cases / 80 assertions**. The shared controls and combined native
 workflows use `[parity-b184]`: creation/editing through normal History Edit, exact numeric grips,
@@ -68,8 +68,29 @@ ordinary Fillet tool; a crossing Web feeds the ordinary Hole and G2 Full Round t
 the downstream result after an upstream thickness edit. An End-of-Part insertion validates its
 complete transformed suffix before publication. Formula values stay read-only until explicit rebind.
 
-The final native **100% and compact 150% runs each pass 11 cases / 466 assertions**, including
-whole-field visibility checks and reviewed captures. Complete Core passes **810 / 35,441**. All five
-targets build. Complete Geometry/offscreen GUI, separate app startup and final runtime identity remain
-the acceptance gate. Native evidence: `build/verification/block184/gui-native{100,150}-accepted.log`
-and `native{100,150}/`. The main plan retains 184 in progress until the remaining gates pass.
+Accepted on 2026-11-17 after all five targets build:
+
+| Check | Cases | Assertions |
+| --- | --- | --- |
+| Complete Core | 810 passed | 35,441 |
+| Isolated complete Geometry | 850 passed | 91,829 |
+| Complete offscreen GUI | 903 passed / 90 skipped | 104,772 |
+| Native xcb 100% | 11 passed | 466 |
+| Native xcb compact 150% | 11 passed | 466 |
+| Existing Extrude numeric HUD regression | 1 passed | 22 |
+
+Both native runs assert full input-field visibility and reachable completion controls; captures
+were inspected. The seven native-only Block-184 cases skipped offscreen execute at both scales.
+This evidence does not establish every legacy native-only case among the remaining skips.
+Separate xcb app startup remains healthy until its intentional 8-second timeout (exit 124).
+
+Final runtime: **1,300 files**, SHA-256
+`f99dbd52b6f2579f37893d32a9ceb80a8b897359cf311e873219c4e3b78c861d`. The runtime manifest was
+rechecked unchanged before delivery. Core, Geometry and STEP-export executable digests also retain their verified
+identity across the final GUI overlay correction. The owned overlay has its own widget identity;
+the existing Extrude numeric HUD and the complete GUI suite resolve their correct visible widgets.
+
+Evidence directory: `build/verification/block184/`. Final logs: `core-full-final.log`,
+`geometry-full-final.log`, `gui-full-final.log`, `gui-native100-owned-overlay.log`,
+`gui-native150-owned-overlay.log`, `overlay-regression.log`, `app-startup-final.log`.
+Captures: `native100/`, `native150/`. Identity: `runtime-final.json`, `binary-digests.json`.

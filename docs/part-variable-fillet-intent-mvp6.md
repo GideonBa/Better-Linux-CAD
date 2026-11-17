@@ -50,7 +50,8 @@ records. Lower versions cannot carry it and an unnecessary version-14 envelope i
 A variable record stores `id`, `name`, `type: fillet`, `target_body`, `mode: variable` and `groups`;
 it has no competing top-level constant `radius_parameter` or flat edge list. Group/member/station
 objects reject unknown fields, malformed types, unsupported rules and duplicate identities.
-Project persistence delegates the same typed Part record. Legacy constant Fillet and all three
+Project persistence delegates the same typed Part record. Parts that also contain sketch-driven
+features use V15 and preserve these records unchanged. Legacy constant Fillet and all three
 Chamfer records keep their existing meaning and serialized form.
 
 The native adapter dispatches advanced intent through the [checked variable engine](geometry-variable-fillet-mvp8.md),

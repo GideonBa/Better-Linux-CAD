@@ -54,8 +54,9 @@ independent history engine.
 Block 180 is accepted. All five targets build after the complete Part-registry ABI rebuild.
 Focused Core **6 / 73** and complete Core **804 / 35,384** pass. Legacy physical-guide Geometry
 **5 / 83** and shared finishing Qt **13 passed / 1 native skip / 314 assertions** pass. These
-regressions retain the prior finishing boundary; Rib/Web Geometry remains explicitly unavailable
-until 181. No new native authoring is claimed before 184.
+regressions retain the prior finishing boundary; the 180 proof does not claim Rib/Web Geometry
+or native authoring. See [checked Geometry](geometry-rib-web-mvp8.md) and the
+[owned native workflow](gui-sketch-driven-features-mvp9.md) for their subsequent gates.
 
 Core coverage `[rib-web]` / `[parity-b180]` proves raw literals, modes, ownership, normal graph/
 update/remove, parameter rollback, strict necessary JSON, suppression/reorder, Project roundtrip

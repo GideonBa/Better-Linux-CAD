@@ -5,7 +5,9 @@ Part version 3 and Project version 2 as specified in the owning 149B sections. S
 uses the Part-version-4 extension owned by 152B below; manufacturing variants use Part V5 as
 specified in the 154 section. Thread integration uses Part V6 (155B); explicit Pattern placements
 use Part V7 (156), equations use V8 (160), spatial constraint/scalar intent uses V9 (163), and explicit
-curve-preserving path policy uses V10 (166) below. Planned evolution
+curve-preserving path policy uses V10 (166) below. Semantic paths/material regions use V11 (167),
+authored Loft constraints V12 (168), advanced Surface intent V13 (170/172), advanced Fillet V14
+(175/177), and Rib/Web/Emboss/Engrave share V15 (180/182). Planned evolution
 in [Blocks 145–204](inventor-parity-sequence.md) additionally assigns new feature families,
 spatial solving/interaction, model states, occurrence poses and cross-document references.
 Their future intent is not implied by the current JSON fields. Each owning block must specify
@@ -1780,3 +1782,52 @@ which is required only for tangent mode. Null options, unknown fields, wrong var
 types, inactive budgets, invalid ownership and unsupported versions fail strict loading.
 Derived measurements, free-edge/gap overlays, BReps and sampled offset skins are never serialized.
 [Intent and proof](part-surface-feature-intent-mvp6.md#core-policy-and-evidence).
+
+## Advanced finishing intent — Part V14
+
+Advanced Fillet requires at least Part V14, including suppressed records. The writer uses V14
+when this is its highest required extension, or V15 when sketch-driven intent also exists. Lower
+versions reject advanced intent; an unnecessary V14 envelope rejects. Legacy constant Fillet and
+Chamfer fields retain their exact spelling. All variants use the normal Fillet array, graph,
+add/update/remove, history and Project Part adapters.
+
+Advanced records store `id`, `name`, `type:"fillet"`, `target_body` and explicit `mode`.
+`mode:"variable"` adds ordered `groups` with named members, stations, radius bindings and interpolation.
+An authored setback adds the known `corner` record. `mode:"face_blend"` or `"full_round"` instead
+stores `definition` with named face sets, continuity and hold lines; only the face blend carries its
+typed size binding. Unknown fields/modes, malformed roles, duplicate identities and incompatible
+size/continuity pairs reject. Exact nested shapes and policies are owned by
+[variable intent](part-variable-fillet-intent-mvp6.md) and
+[face/full-round intent](part-face-full-round-intent-mvp6.md#persistence-and-normal-commands).
+
+## Sketch-driven material intent — Part V15
+
+A necessary V15 Part contains a nonempty `sketch_driven_features` array and explicit `feature_order`.
+V1–V14 reject the reserved array, including an empty one. Removing the final sketch-driven record
+restores the earlier necessary envelope. V15 can contain V14 advanced Fillet and other earlier
+capabilities without requiring them. Both normal Part/Project resource directions replay this family
+through the same typed commands and preserve authored history, suppression and parameter ownership.
+
+Rib/Web records contain exactly `id`, `name`, `target_body`, `mode`, `source`, `plane`, `direction`,
+`side`, `thickness`, `second_thickness`, `draft`, `extent`, `crossings`. Mode is `rib` or `web`.
+Source contains `sketch`, nullable `profile` and ordered `curves`; exactly one profile or nonempty
+curve list is active. Plane is `perpendicular` or `parallel`; direction is three finite raw numbers
+in the Sketch frame. Side is `symmetric`, `first`, `second` or `asymmetric`; the second thickness is
+required only for asymmetric. Thickness and distance use Length bindings; nullable draft uses Angle.
+Extent is exactly `{mode:"distance",distance}`, `{mode:"face",face}` or `{mode:"body",body}`;
+face uses the existing `extrude_limit_face` codec. Crossings is `union` or `reject`.
+The [Rib/Web contract](part-rib-web-intent-mvp6.md#persistence) owns validation and historical limits.
+
+Emboss/Engrave records contain exactly `id`, `name`, `target_body`, `mode`, `source`, `supports`,
+`depth`, `mapping`, `anchor_mm`, `seam_degrees`, `orientation`. Mode is `emboss` or `engrave`.
+Profile source contains `kind:"profile"`, `sketch`, `profile`. Text source contains `kind:"text"`,
+the existing strict eight-field SketchText record and `font:{asset,sha256}`. Supports are ordered
+unique typed faces with `surface_source_face` role. Depth uses Length; nullable orientation uses
+Angle. Mapping is `planar`, `cylindrical` or `conical`; anchor contains two finite chart values in
+millimeters and the finite raw seam is in degrees (zero for planar). The
+[Emboss/Engrave contract](part-emboss-engrave-intent-mvp6.md#persistence-and-verification) owns exact
+mapping units, pinned font identity and source ownership.
+
+Unknown/incompatible fields, malformed variants and duplicate/foreign sources reject. Resolved font
+outlines, native topology, approximate chart phases, preview grips and GUI task state remain derived.
+Block 184 uses these existing records and adds no parallel UI save format.

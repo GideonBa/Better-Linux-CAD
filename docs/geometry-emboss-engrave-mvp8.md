@@ -76,5 +76,6 @@ Complete isolated Geometry: **848 / 91,749**. Core **810 / 35,441** and focused 
 All five targets build. A separate Core-only configure with FreeType discovery disabled succeeds.
 Final runtime **1,289 files**, SHA-256
 `9115edaf90a878def3d761e0b513cfd6a3dae46d35a636a8f944b6db6402ff14`.
-Final logs and manifest: `build/verification/block183/`. These checks close 183; combined native
-creation/editing, grips, reference repair and F03/UI01 remain 184.
+Final logs and manifest: `build/verification/block183/`. These checks close 183.
+[Native creation/editing, grips, repair and combined F03/UI01](gui-sketch-driven-features-mvp9.md)
+are owned by 184.

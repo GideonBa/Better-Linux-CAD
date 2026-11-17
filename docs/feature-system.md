@@ -15,10 +15,11 @@ Features are the parametric operations a part is built from. Each feature has in
 `PartDocument::executable_history()` returns a read-only, typed projection of existing executable
 records in dependency order for legacy Parts, or the explicit authored order described below.
 Each `PartFeatureHistoryEntry` carries the exact graph `node_id` and
-`PartFeatureFamily`; it owns no copied feature intent or second tree. Fifteen current typed families
+`PartFeatureFamily`; it owns no copied feature intent or second tree. The fifteen Block-146A families
 include imported Body bases, scalar/path Extrude, Revolve, Sweep, Loft, Surface variants, patterns,
 Mirror, Fillet, Chamfer, Shell, Draft, Body Boolean and BodyTransform. Non-executable resources,
-Sketches, PathCurves and Body aliases do not become feature rows.
+Sketches, PathCurves and Body aliases do not become feature rows. Later semantic Hole/Thread and
+SketchDriven families join the same visitor and typed projection; the original count is historical.
 
 One private typed-family visitor supplies query and replay registration. Existing `feature_order`
 loading replays on a disposable complete Part candidate through the current validated adders,
@@ -280,7 +281,11 @@ The finished OCCT geometry is only a cache derived from these rules. See `docs/s
 - Surface features: boundary surface, fill surface, network surface, trim/extend surface, stitch/knit surfaces, and closed-shell-to-solid conversion.
 - Edge features: fillets and chamfers (`docs/fillet-chamfer-features.md`).
 - Hole features (`docs/hole-wizard.md`).
-- Thread, emboss, engrave, rib, web, shell, and draft features as later sketch-driven or face-driven feature families.
+- Thread, Shell and Draft use their existing typed face-driven authorities.
+- Rib/Web and Emboss/Engrave share the immutable `SketchDrivenFeature` authority and normal Part
+  registry/history/CRUD. [Rib/Web](part-rib-web-intent-mvp6.md),
+  [Emboss/Engrave](part-emboss-engrave-intent-mvp6.md) and the
+  [owned native task](gui-sketch-driven-features-mvp9.md) define their supported behavior.
 - Pattern and mirror features (`docs/pattern-and-mirror-features.md`).
 - Shaft feature (`docs/shaft-wizard.md`).
 

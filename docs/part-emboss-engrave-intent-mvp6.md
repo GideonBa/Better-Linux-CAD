@@ -57,4 +57,4 @@ Runtime **1,279 files**, SHA-256
 `1d52862658bfa810127d135198669e7d9f691e445be3893e2d3a6c29edbae3bd`.
 Logs and manifest: `build/verification/block182/`. Block 183 owns the
 independent planar volume, cylindrical/conical coordinates, text counters and checked material proof;
-184 owns native creation/editing, grips and complete F03/UI01 acceptance.
+184 owns [native creation/editing, grips and combined F03/UI01](gui-sketch-driven-features-mvp9.md).

@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 183
-current_block: 184
-current_boundary: Block 184 in progress; native sketch-driven workflows
-current_tag: "[parity-b184]"
+implemented_through: Block 184
+current_block: 185
+current_boundary: Block 185 planned; DirectEditFeature authority and topology lineage
+current_tag: "[parity-b185]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–183 accepted; Block 184 in progress; Blocks 185–204 planned"
+  advanced_modeling_workflows: "Blocks 145–184 accepted; Blocks 185–204 planned"
 ---
 
 # MVP Plan
@@ -34,13 +34,13 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 183
-current block        Block 184 (in progress)
-current phase        Advanced finishing and sketch-driven features
-current boundary     Native Rib/Web/Emboss/Engrave workflows
+implemented through  Block 184
+current block        Block 185 (planned; not started)
+current phase        Direct editing of existing and imported geometry (planned)
+current boundary     DirectEditFeature authority and topology lineage
 ```
 
-The assigned sequence continues through Block 184. Blocks 168–169 were delivered by normal
+The assigned sequence through Block 184 is complete. Blocks 168–169 were delivered by normal
 rebase in [PR #192](https://github.com/GideonBa/Better-Linux-CAD/pull/192). Main was updated cleanly
 to `8e6304e7ca188ffa10435ed346ea40a6f8ab9592`; its tree exactly matches the reviewed delivery
 `75c7c15de99d61a7d0c25e17f9570642057caf5d`. The serial `feat/offset-thicken-surfaces` branch starts
@@ -90,12 +90,13 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 181 | Accepted checked thin volumes, actual terminations, generated Shell/Hole/Fillet/full-round consumers and physical exchange; [proof](geometry-rib-web-mvp8.md#verification). |
 | 182 | Accepted typed mapped Emboss/Engrave and pinned parameter-driven text; [intent proof](part-emboss-engrave-intent-mvp6.md#persistence-and-verification). |
 | 183 | Accepted checked planar/cylindrical/conical material, text counters, consumers, mass and physical exchange; [Geometry proof](geometry-emboss-engrave-mvp8.md#verification). |
-| 184 | Native Rib/Web/Emboss/Engrave workflows and complete F03/UI01. |
+| 184 | Accepted owned native Rib/Web/Emboss/Engrave workflows and combined F03/UI01 at both scales; [proof](gui-sketch-driven-features-mvp9.md#verification). |
 
 The active Surface branch has [complete checked G03 construction, consumers and exchange proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof).
 Curved Trim/Extend and complete G04 are accepted in 172; the [bounded construction contract](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-construction--172) is retained.
-The active work is 182–184 mapped Emboss/Engrave and native sketch-driven authoring. The original sequence and scenario
-oracles retain every prerequisite, supported-capability requirement and deferred extension.
+Blocks 182–184 are accepted. The next planned boundary is 185; it has not started. The original
+sequence and scenario oracles retain every prerequisite, supported-capability requirement and
+deferred extension.
 
 Each row retains its full numbered prerequisites and acceptance criteria; grouped rows do not
 authorize partial acceptance of any block. Preserve all planned scope after 184.
@@ -199,7 +200,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Implemented and accepted |
-| E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | 175–183 accepted; 184 in progress |
+| E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Implemented and accepted |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
 | G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
 | H | 199–204 | Motion/contact extensions, finite measurement, quality/thickness analysis, measured performance and final combined acceptance | Planned; not started |
@@ -1159,17 +1160,19 @@ Geometry **848 / 91,749**, Core **810 / 35,441**, focused Qt **13 passed / 1 nat
 and all five targets pass. Core-only configuration succeeds without FreeType discovery. Runtime
 **1,289 files**, SHA-256 `9115edaf90a878def3d761e0b513cfd6a3dae46d35a636a8f944b6db6402ff14`.
 
-### Block 184 Rib Web Emboss and Engrave interaction — in progress
+### Block 184 Rib Web Emboss and Engrave interaction — accepted
 
-Finish shared owned native creation/editing, contextual sources/supports, parameter bindings,
-physical grips and side/draft/termination/seam directions. Reuse source-Sketch breadcrumbs,
-qualified failure/repair, complete history, reopening and export. Prove combined F03/UI01 at
-100% and compact 150% before acceptance. The [guide/controls foundation](gui-sketch-driven-features-mvp9.md)
-passes Geometry **2 / 80**. The integrated owner passes native 100% and compact 150% **11 / 466 each**, including
-context selection, keyboard/repeat, source return, text/mass, seam/repair and generated
-Hole/Fillet/full-round consumers. Core **810 / 35,441** and all five targets pass.
-Complete Geometry/offscreen GUI, startup and runtime-identity acceptance remain open.
-Preserve all 185–204 planning.
+[Owned native workflows and proof](gui-sketch-driven-features-mvp9.md#verification) cover contextual
+sources/supports, typed bindings, physical grips, source-Sketch return, qualified repair, exact
+history/reopen/STEP, text/mass, literal cylindrical seam and generated Hole/Fillet/full-round
+consumers. Native 100% and compact 150% each pass **11 / 466**. Complete Core **810 / 35,441**,
+isolated Geometry **850 / 91,829**, offscreen GUI **903 passed / 90 skipped / 104,772 assertions**
+and all five targets pass. The seven native-only 184 cases execute at both scales; remaining legacy
+skips are not promoted by that focused proof. Separate xcb startup stays healthy until the intentional
+8-second timeout. Frozen runtime: **1,300 files**, SHA-256
+`f99dbd52b6f2579f37893d32a9ceb80a8b897359cf311e873219c4e3b78c861d`. Manifest and retained
+Core/Geometry/STEP executable identities are rechecked.
+The assignment through 184 is complete. Keep 185–204 planned and unstarted.
 
 ### Implementation route for the assigned continuation
 
