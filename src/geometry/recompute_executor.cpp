@@ -4,6 +4,7 @@
 #include "blcad/core/sketch_profile_roles.hpp"
 #include "blcad/geometry/pattern_placement_adapter.hpp"
 #include "blcad/geometry/result_face_support.hpp"
+#include "blcad/geometry/sketch_driven_adapter.hpp"
 #include "blcad/geometry/spatial_constraint_geometry.hpp"
 #include "blcad/geometry/surface_boundary_query.hpp"
 #include "blcad/geometry/surface_offset_adapter.hpp"
@@ -544,10 +545,10 @@ resolve_in_place_body_target(const PartDocument& document, const FeatureId& feat
   return Result<const GeometryShape*>::success(target);
 }
 
-[[nodiscard]] Result<std::size_t> store_fillet_result(const PartDocument& document,
-                                                      const FilletFeature& feature,
-                                                      GeometryShape shape,
-                                                      ShapeCache& shape_cache) {
+template <class Record>
+[[nodiscard]] Result<std::size_t>
+store_body_modifier_result(const PartDocument& document, const Record& feature, GeometryShape shape,
+                           ShapeCache& shape_cache) {
   const Body* body = document.find_body(feature.target_body());
   if (body == nullptr)
     return Result<std::size_t>::failure(
@@ -4773,17 +4774,33 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
 }
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_sketch_driven(const PartDocument& document,
-                                                                     FeatureId feature,
+                                                                     FeatureId id,
                                                                      ShapeCache& cache) const {
-  const auto scope = detail::validate_history_input(document, cache, feature.value());
+  const auto scope = detail::validate_history_input(document, cache, id.value());
   if (!scope)
     return Result<std::size_t>::failure(scope.error());
-  if (!document.find_sketch_driven_feature(feature))
+  auto imported = validate_feature_imports(document, cache, id.value(), import_context_);
+  if (!imported)
+    return imported;
+  const auto* feature = document.find_sketch_driven_feature(id);
+  if (!feature)
     return Result<std::size_t>::failure(
-        validation_error(feature.value(), "Sketch-driven feature is missing"));
-  return Result<std::size_t>::failure(geometry_error(
-      feature.value(),
-      "Rib/Web construction is not implemented in the Core-intent gate; Geometry is Block 181"));
+        validation_error(id.value(), "Sketch-driven feature is missing"));
+  auto working = cache;
+  auto target = resolve_in_place_body_target(document, id, feature->target_body(), working);
+  if (!target)
+    return Result<std::size_t>::failure(target.error());
+  auto result =
+      SketchDrivenAdapter{}.apply(document, *feature, *target.value(), working, import_context_);
+  if (!result)
+    return Result<std::size_t>::failure(result.error());
+  auto stored = store_body_modifier_result(document, *feature, std::move(result.value()), working);
+  if (!stored)
+    return stored;
+  if (auto fresh = validate_import_sources(); !fresh)
+    return fresh;
+  cache = std::move(working);
+  return stored;
 }
 
 Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument& document,
@@ -4830,7 +4847,8 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument
                                       import_context_);
   if (result.has_error())
     return Result<std::size_t>::failure(result.error());
-  auto stored = store_fillet_result(document, *feature, std::move(result.value()), working_cache);
+  auto stored =
+      store_body_modifier_result(document, *feature, std::move(result.value()), working_cache);
   if (stored.has_error())
     return stored;
   if (auto fresh = validate_import_sources(); !fresh)

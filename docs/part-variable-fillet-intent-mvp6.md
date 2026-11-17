@@ -55,7 +55,7 @@ Chamfer records keep their existing meaning and serialized form.
 
 The native adapter dispatches advanced intent through the [checked variable engine](geometry-variable-fillet-mvp8.md),
 including physical station mapping after OCCT guide approximation. It never substitutes the first
-radius for the complete law. Face/full-round roles and corner management remain 177–179.
+radius for the complete law. Face/full-round roles and corner management use the [typed finishing](part-face-full-round-intent-mvp6.md) and [shared interaction](gui-advanced-finishing-mvp9.md) contracts.
 
 ## Verification status
 
@@ -69,4 +69,4 @@ allows the selected source history, while another output of the same base cannot
 
 The [Geometry proof](geometry-variable-fillet-mvp8.md#verification) covers resolved expansion,
 branches, split/lost edges, physical station edits and normal Hole repair. Current logs/manifest
-are in `build/verification/block176/`. Native authoring remains 179; `mvp-plan.md` owns whole-block status.
+are in `build/verification/block176/`. Native authoring uses the [shared finishing contract](gui-advanced-finishing-mvp9.md); `mvp-plan.md` owns whole-block status.

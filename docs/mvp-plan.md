@@ -1136,7 +1136,11 @@ Build native checked thin volumes, mitered connected offsets and explicit crossi
 Resolve actual finite face/first-Body termination, join connected material, preserve source and
 unrelated Bodies, and expose semantic faces to Hole/Fillet/full-round consumers. Independent
 straight/curved, side/draft, intersection, placed/imported support and history/STEP proof remain
-required. Continue through 184 and preserve all 185–204 planning.
+required. The [checked construction foundation](geometry-rib-web-mvp8.md) passes **8 / 78**;
+combined construction/finishing **37 / 9,788**, full Core **804 / 35,384** and focused Qt **13 passed /
+1 skipped / 314 assertions** pass after all five targets build. Semantic fragment witnesses retain
+old ambiguous provenance and expose qualified new faces. Consumer/import/STEP and full Geometry
+acceptance remain open. Continue through 184 and preserve all 185–204 planning.
 
 ### Implementation route for the assigned continuation
 
