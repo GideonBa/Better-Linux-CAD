@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/gui/gui_fillet_draft.hpp"
 #include "blcad/gui/gui_interactive_extrude_revolve.hpp"
 #include "blcad/gui/gui_part_foundation_workbench.hpp"
 #include "blcad/gui/gui_pending_feature_inputs.hpp"
@@ -80,6 +81,35 @@ enum class GuiFinishingKind { Fillet, Chamfer };
 
 class GuiInteractiveFinishingController {
 public:
+  [[nodiscard]] Result<std::size_t> begin_draft(const GuiDocumentSession& session,
+                                                std::shared_ptr<GuiFilletDraft> draft) {
+    if (!session.part_document() || !draft)
+      return Result<std::size_t>::failure(
+          Error::validation("fillet", "An owned Fillet draft and Part are required"));
+    auto candidate = *session.part_document();
+    auto checked = draft->apply(candidate);
+    if (!checked)
+      return checked;
+    reset(draft->record.target_body(), draft->record.id(), draft->record.name());
+    kind_ = GuiFinishingKind::Fillet;
+    draft_ = std::move(draft);
+    const auto bindings = draft_->record.parameter_dependencies();
+    first_parameter_ = bindings.empty() ? ParameterId("") : bindings.front();
+    first_value_ =
+        first_parameter_.empty() ? 0 : draft_->value(*session.part_document(), first_parameter_);
+    return Result<std::size_t>::success(1);
+  }
+  [[nodiscard]] const GuiFilletDraft* typed_draft() const noexcept {
+    return draft_.get();
+  }
+  [[nodiscard]] double handle_value(std::string_view id) const noexcept {
+    if (draft_)
+      for (const auto& handle : draft_->handles)
+        if (handle.id == id)
+          return handle.reference_value;
+    return first_value_;
+  }
+
   [[nodiscard]] Result<std::size_t> begin_fillet(const GuiDocumentSession& session,
                                                  BodyId target_body, FeatureId feature,
                                                  std::string name, ParameterId radius_parameter,
@@ -180,7 +210,17 @@ public:
 
   // Typed numeric-HUD input for the primary (radius/first distance) and, for
   // two-parameter chamfers, the secondary (second distance / angle) value.
-  void set_first_value(double value) noexcept { first_value_ = value; }
+  void set_first_value(double value) noexcept {
+    first_value_ = value;
+    if (draft_ && !first_parameter_.empty()) {
+      draft_->values[first_parameter_.value()] = value;
+      for (auto& handle : draft_->handles) {
+        const auto found = draft_->handle_bindings.find(handle.id);
+        if (found != draft_->handle_bindings.end() && found->second == first_parameter_)
+          handle.reference_value = value;
+      }
+    }
+  }
   void set_second_value(double value) noexcept { second_value_ = value; }
 
   // Append one edge to the ordered chain, rejecting a duplicate stable id.
@@ -202,6 +242,8 @@ public:
   [[nodiscard]] std::vector<GuiViewportManipulatorHandle> handles() const {
     std::vector<GuiViewportManipulatorHandle> handles;
     if (!active_) return handles;
+    if (draft_)
+      return draft_->handles;
     if (kind_ == GuiFinishingKind::Fillet) {
       handles.push_back(linear_handle(kFilletRadiusHandleId, first_value_));
     } else {
@@ -221,6 +263,13 @@ public:
   }
 
   [[nodiscard]] bool apply_manipulator(const GuiViewportManipulatorCandidate& candidate) {
+    if (draft_) {
+      if (!draft_->move(candidate))
+        return false;
+      first_parameter_ = draft_->handle_bindings.at(candidate.handle_id);
+      first_value_ = candidate.scalar_value;
+      return true;
+    }
     const bool distance = candidate.value_kind == GuiViewportManipulatorValueKind::Distance;
     const bool angle = candidate.value_kind == GuiViewportManipulatorValueKind::Angle;
     if (candidate.handle_id == kFilletRadiusHandleId && distance) {
@@ -249,7 +298,8 @@ public:
       return preview_fail("no finishing command is active");
     const auto* part = session.part_document();
     if (part == nullptr) return preview_fail("preview requires an active Part document");
-    if (edges_.empty()) return preview_fail("finishing requires at least one picked edge");
+    if (edges_.empty() && !draft_)
+      return preview_fail("finishing requires at least one picked edge");
     PartDocument candidate = *part;
     if (auto seeded = seed_parameters(candidate); seeded.has_error())
       return Result<GuiPartFeaturePreview>::failure(seeded.error());
@@ -337,6 +387,7 @@ private:
     feature_ = std::move(feature);
     name_ = std::move(name);
     edges_.clear();
+    draft_.reset();
     pending_parameters_.clear();
     second_parameter_.reset();
     second_value_ = 0.0;
@@ -367,6 +418,8 @@ private:
   }
 
   [[nodiscard]] Result<std::size_t> seed_parameters(PartDocument& part) const {
+    if (draft_)
+      return Result<std::size_t>::success(0);
     auto provisioned = detail::provision_new_feature_parameters(part, pending_parameters_);
     if (!provisioned)
       return provisioned;
@@ -398,6 +451,8 @@ private:
   }
 
   [[nodiscard]] Result<std::size_t> add_feature(PartDocument& part) const {
+    if (draft_)
+      return draft_->apply(part);
     if (kind_ == GuiFinishingKind::Fillet) {
       auto feature = FilletFeature::create(feature_, name_, target_body_, edges_, first_parameter_);
       if (feature.has_error()) return Result<std::size_t>::failure(feature.error());
@@ -424,6 +479,8 @@ private:
   }
 
   [[nodiscard]] std::string summary() const {
+    if (draft_)
+      return draft_->editing ? "Edit Fillet" : "Fillet";
     if (kind_ == GuiFinishingKind::Fillet)
       return "fillet, " + std::to_string(edges_.size()) + " edges";
     return std::string("chamfer, ") + std::string(to_string(chamfer_mode_)) + ", " +
@@ -435,6 +492,7 @@ private:
         Error::validation("gui.interactive_finishing", std::move(message)));
   }
 
+  std::shared_ptr<GuiFilletDraft> draft_;
   bool active_{false};
   GuiFinishingKind kind_{GuiFinishingKind::Fillet};
   ChamferMode chamfer_mode_{ChamferMode::EqualDistance};
