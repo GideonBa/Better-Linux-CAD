@@ -107,8 +107,11 @@ std::vector<ParameterId> SketchDrivenFeature::parameter_dependencies() const {
 std::vector<std::string> SketchDrivenFeature::input_nodes() const {
   const auto& rib = std::get<RibWebIntent>(definition_->intent);
   std::vector<std::string> out{rib.source.sketch.value()};
-  if (const auto* face = std::get_if<RibFaceExtent>(&rib.extent))
+  if (const auto* face = std::get_if<RibFaceExtent>(&rib.extent)) {
     out.push_back(face->face.source_node_id());
+    if (const auto* captured = std::get_if<ResultFaceReference>(&face->face.source()))
+      out.push_back("body:" + captured->body().value());
+  }
   if (const auto* body = std::get_if<RibBodyExtent>(&rib.extent))
     out.push_back("body:" + body->body.value());
   return out;

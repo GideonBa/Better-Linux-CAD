@@ -242,3 +242,29 @@ TEST_CASE("Rib source ownership construction and termination failures are atomic
   CHECK(f::checked(serialize_project_to_json(
             f::checked(deserialize_project_from_json(serialized)))) == serialized);
 }
+TEST_CASE("Rib face termination requires the captured Body to remain available in history",
+          "[core][rib-web][parity-b181]") {
+  auto p = part();
+  f::rectangle(p, "limit.profile");
+  auto context = f::new_body(p, "limit");
+  auto base = f::checked(Feature::create_additive_extrude(
+      FeatureId("limit"), "Limit", SketchId("limit.profile"), ParameterId("depth")));
+  f::accept(p.add_feature(f::checked(base.with_body_result_context(context))));
+  const auto capture = f::checked(ResultFaceReference::create(
+      FeatureId("limit"), BodyId("body.limit"), {{FeatureId("limit"), "extrude/upper-cap"}}));
+  auto r = intent();
+  r.extent = RibFaceExtent{
+      f::checked(FaceReference::create_result(PartFeatureInputRole::ExtrudeLimitFace, capture))};
+  f::accept(p.add_body_boolean_feature(f::checked(BodyBooleanFeature::create(
+      FeatureId("consume"), BodyBooleanOperation::Add, BodyId("body.base"), {BodyId("body.limit")},
+      BodyBooleanResultMode::ModifyTarget, std::nullopt, false))));
+  REQUIRE(p.add_sketch_driven_feature(feature(r)));
+  auto plan = f::checked(p.create_history_evaluation_plan());
+  auto row = std::find_if(plan.entries.begin(), plan.entries.end(),
+                          [](const auto& value) { return value.feature.node_id == "rib"; });
+  REQUIRE(row != plan.entries.end());
+  CHECK(row->state == PartHistoryExecutionState::Blocked);
+  CHECK(std::any_of(row->issues.begin(), row->issues.end(), [](const auto& value) {
+    return value.code == PartHistoryInputIssueCode::ConsumedBody;
+  }));
+}

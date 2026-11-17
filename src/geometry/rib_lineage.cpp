@@ -89,6 +89,7 @@ void scope_rib_fragments(RibNative& result, const std::vector<FaceLineage>& witn
     auto entry = c.origins.front();
     entry.origin = {feature, "rib/fragment/" + scope};
     entry.selectable = true;
+    entry.preserve_partition = true;
     append_lineage(result.lineage, std::move(entry), result.shape);
   }
 }

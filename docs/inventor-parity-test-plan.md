@@ -551,7 +551,9 @@ cover the relevant workflows; they do not establish every skipped offscreen case
 **180 intent gate accepted — 2026-11-17.** [Rib/Web Core proof](part-rib-web-intent-mvp6.md#verification)
 covers typed source/modes, strict necessary JSON/Project, normal graph/history, atomic edits and an
 earlier derived/placed Body termination. Focused **6 / 73**, full Core **804 / 35,384**. Geometry
-181, Emboss/Engrave 182–183 and combined native F03/UI01 in 184 remain open.
+181 is now accepted: [checked construction, semantic consumers and STEP proof](geometry-rib-web-mvp8.md#verification),
+complete Geometry **836 / 91,510** and Core **805 / 35,388**. Emboss/Engrave 182–183 and combined
+native F03/UI01 in 184 remain open.
 
 ### D01 Direct face edits and source preservation
 

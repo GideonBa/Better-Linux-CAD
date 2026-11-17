@@ -35,6 +35,8 @@ struct FaceLineage {
   bool selectable = true;
   std::optional<Vector3> support_axis{};
   std::optional<CosmeticThread> cosmetic_thread{};
+  // Keep source-defined face regions available to later semantic consumers.
+  bool preserve_partition = false;
 };
 
 inline void append_lineage(std::vector<FaceLineage>& result, FaceLineage entry,

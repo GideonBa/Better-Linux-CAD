@@ -71,9 +71,11 @@ execute_algorithm(const FeatureId& feature_id, const TopoDS_Shape& left, const T
     return Result<TopoDS_Shape>::failure(
         boolean_error(feature_id, std::string(operation) + " operation did not complete"));
   }
-  // Collapse shared coplanar faces and tangent edges so downstream selection
-  // and finishing operate on the actual united boundary.
-  algorithm.SimplifyResult(true, true);
+  // Source-defined face regions remain physical supports for later features.
+  // Ordinary bodies retain their existing coplanar-face simplification policy.
+  const bool preserve = std::any_of(lineage.begin(), lineage.end(),
+                                    [](const auto& entry) { return entry.preserve_partition; });
+  algorithm.SimplifyResult(true, !preserve);
   TopoDS_Shape result = algorithm.Shape();
   if (result.IsNull()) {
     if constexpr (std::is_same_v<Algorithm, BRepAlgoAPI_Cut>)

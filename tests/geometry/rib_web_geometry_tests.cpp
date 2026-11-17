@@ -1,4 +1,4 @@
-#include "../support/part_history_fixture.hpp"
+#include "../support/rib_web_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/sketch_driven_intent.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
@@ -16,38 +16,9 @@ using namespace blcad;
 using namespace blcad::geometry;
 namespace f = blcad::test::history_fixture;
 namespace {
-PartDocument fixture(std::vector<LineSegment> lines = {}) {
-  auto p = f::native_base();
-  auto sketch =
-      f::checked(Sketch::create(SketchId("rib.sketch"), "Skeleton", DatumPlaneId("datum.xy")));
-  if (lines.empty())
-    lines.push_back(f::checked(LineSegment::create(SketchEntityId("line"), {-8, 0}, {8, 0})));
-  for (auto line : lines)
-    f::accept(sketch.add_entity(line));
-  f::accept(p.add_sketch(sketch));
-  for (const auto& [id, value] : {std::pair{"rib.t", 1.0}, {"rib.l", 12.0}, {"rib.second", 2.0}})
-    f::accept(p.add_parameter(f::checked(
-        Parameter::create_length(ParameterId(id), id, f::checked(Quantity::length_mm(value))))));
-  f::accept(p.add_parameter(f::checked(Parameter::create_angle(
-      ParameterId("rib.draft"), "Draft", f::checked(Quantity::angle_deg(5))))));
-  return p;
-}
-RibWebIntent intent() {
-  return {RibWebKind::Rib,
-          {SketchId("rib.sketch"), {SketchEntityId("line")}, std::nullopt},
-          RibExtrusionPlane::PerpendicularToSketch,
-          {0, 0, 1},
-          RibThicknessSide::Symmetric,
-          ParameterId("rib.t"),
-          std::nullopt,
-          std::nullopt,
-          RibDistanceExtent{ParameterId("rib.l")},
-          RibCrossingPolicy::Union};
-}
-void add(PartDocument& p, RibWebIntent r = intent()) {
-  f::accept(p.add_sketch_driven_feature(f::checked(SketchDrivenFeature::create_rib_web(
-      FeatureId("rib"), "Rib", BodyId("body.base"), std::move(r)))));
-}
+using blcad::test::rib_fixture::add;
+using blcad::test::rib_fixture::fixture;
+using blcad::test::rib_fixture::intent;
 ShapeCache cache() {
   return f::checked(ShapeCache::create(ShapeCacheId("rib.test")));
 }
@@ -277,4 +248,81 @@ TEST_CASE("Rib terminates at an actual earlier placed Body derived from its targ
   REQUIRE(p.set_parameter_value(ParameterId("rib.t"), f::checked(Quantity::length_mm(2))));
   execute(p, c);
   CHECK(volume(c) == Catch::Approx(1856).margin(1e-5));
+}
+TEST_CASE("Rib spline ribbons match independent source arclength integration",
+          "[geometry][rib-web][parity-b181]") {
+  auto p = fixture();
+  auto sketch = f::checked(Sketch::create(SketchId("spline"), "Spline", DatumPlaneId("datum.xy")));
+  f::accept(sketch.add_entity(f::checked(SplineSegment::create_cubic_bezier(
+      SketchEntityId("curve"), {-6, 0}, {-2, 1}, {2, -1}, {6, 0}))));
+  f::accept(p.add_sketch(sketch));
+  auto r = intent();
+  r.source = {sketch.id(), {SketchEntityId("curve")}, std::nullopt};
+  add(p, r);
+  auto c = cache();
+  execute(p, c);
+  const auto speed = [](double t) {
+    const double dy = 3 - 18 * t + 18 * t * t;
+    return std::sqrt(144 + dy * dy);
+  };
+  const int n = 20000;
+  double sum = speed(0) + speed(1);
+  for (int i = 1; i < n; ++i)
+    sum += (i % 2 ? 4 : 2) * speed(double(i) / n);
+  const double length = sum / (3 * n);
+  CHECK(volume(c) == Catch::Approx(1600 + 4 * length).margin(2e-4));
+}
+TEST_CASE("Closed circular Rib profiles retain their analytic annular band under draft",
+          "[geometry][rib-web][parity-b181]") {
+  auto p = fixture();
+  f::accept(p.add_parameter(f::checked(Parameter::create_length(
+      ParameterId("band.d"), "Band diameter", f::checked(Quantity::length_mm(6))))));
+  auto sketch =
+      f::checked(Sketch::create(SketchId("circle"), "Circle band", DatumPlaneId("datum.xy")));
+  f::accept(sketch.add_profile(
+      f::checked(CircleProfile::create(ProfileId("circle"), ParameterId("band.d")))));
+  f::accept(p.add_sketch(sketch));
+  auto r = intent();
+  r.source = {sketch.id(), {}, ProfileId("circle")};
+  double integral = 4;
+  SECTION("Constant thickness") {}
+  SECTION("Drafted thickness") {
+    r.draft = ParameterId("rib.draft");
+    integral += 80 * std::tan(5 * std::numbers::pi / 180);
+  }
+  add(p, r);
+  auto c = cache();
+  execute(p, c);
+  CHECK(volume(c) == Catch::Approx(1600 + 6 * std::numbers::pi * integral).margin(2e-4));
+}
+TEST_CASE("Rib rejects numerical collapse negative draft collapse and self-crossing chains",
+          "[geometry][rib-web][parity-b181]") {
+  auto p = fixture();
+  auto r = intent();
+  SECTION("Numerical thickness") {
+    REQUIRE(p.set_parameter_value(ParameterId("rib.t"), f::checked(Quantity::length_mm(1e-7))));
+  }
+  SECTION("Draft collapse") {
+    REQUIRE(p.set_parameter_value(ParameterId("rib.draft"), f::checked(Quantity::angle_deg(-5))));
+    r.draft = ParameterId("rib.draft");
+  }
+  SECTION("Self crossing") {
+    auto sketch =
+        f::checked(Sketch::create(SketchId("crossed"), "Self crossed", DatumPlaneId("datum.xy")));
+    const std::vector<Point2> points{{-4, -2}, {4, 2}, {-4, 2}, {4, -2}};
+    std::vector<SketchEntityId> ids;
+    for (int i = 0; i < 3; ++i) {
+      ids.emplace_back(std::to_string(i));
+      f::accept(
+          sketch.add_entity(f::checked(LineSegment::create(ids.back(), points[i], points[i + 1]))));
+    }
+    f::accept(p.add_sketch(sketch));
+    r.source = {sketch.id(), ids, std::nullopt};
+  }
+  auto c = cache();
+  execute(p, c);
+  const auto before = bytes(*c.find_body_shape(BodyId("body.base")));
+  add(p, r);
+  CHECK_FALSE(GeometryRecomputeExecutor{}.execute_document(p, c));
+  CHECK(bytes(*c.find_body_shape(BodyId("body.base"))) == before);
 }

@@ -1,14 +1,14 @@
 # Checked Rib and Web Geometry
 
 The [typed intent](part-rib-web-intent-mvp6.md) owns persistence and dependencies. `mvp-plan.md`
-owns numbered acceptance. Construction is implemented; the complete Block-181 consumer/exchange
-matrix remains in progress. Native authoring belongs to 184.
+owns numbered acceptance. Block 181 is accepted, including ordinary semantic consumers and physical exchange.
+Native authoring belongs to 184.
 
 ## Construction and capability boundary
 
 | Input / mode | Construction policy |
 | --- | --- |
-| Perpendicular straight, arc, rational cubic or equation skeleton | Native curves in the resolved Sketch frame; signed offsets of the complete connected planar wire. |
+| Perpendicular straight, arc, rational cubic or equation skeleton | Native curves in the resolved Sketch frame; signed offsets of the complete connected planar wire. Single smooth spline offsets use a bounded native approximation of the exact normal-offset law. |
 | Connected open chains | Miter joins, explicit first/second sides and end connectors; ambiguous endpoint branches reject. |
 | Closed profile skeleton | Outer offset minus the inner band; preserve the actual enclosed material. A collapsed inner offset does not become a filled disk. |
 | Parallel extrusion | Straight planar curtains, with thickness along the Sketch normal; collapsed/tangent or nonplanar curtains reject. |
@@ -29,7 +29,9 @@ self-interference checks reject collapsed, branched or crossing offset regions.
 
 The native offset carrier retains its source wire and distinguishes open versus closed results.
 Physical side selection is checked against the authored curve's tangent and Sketch normal.
-Connected wire edges retain their builder-produced source correspondence for generation history.
+Connected wire and ribbon edges retain their builder-produced source correspondence for generation history.
+Spline offsets require planar approximation error ≤1e−8 mm and independently checked spatial
+curve-on-surface error ≤1e−7 mm; invalid bands reject before extrusion.
 These choices preserve actual miters and provenance; independent square-ended edge boxes would
 change corner material.
 
@@ -54,20 +56,25 @@ Unresolved repeated signatures remain ambiguous.
 
 The same normal executor stores feature and Body results for Rib and Web. History prefixes,
 parameter edits, suppression/reorder, downstream recompute and strict Part/Project replay use the
-ordinary authority. Hole/Fillet/full-round and physical exchange acceptance remain under verification.
+ordinary authority. Captured termination faces also depend on their owned Body availability.
+
+Rib-defined face partitions survive subsequent Boolean consumers. This retains the physical arm
+regions needed for full-round finishing after a Hole; ordinary models keep their existing coplanar
+simplification. A selected unbranched cross-Web arm supports G1 and G2 full rounds. Selecting the
+whole branched cap rejects atomically rather than inventing a four-way blend.
 
 ## Verification
 
-Initial construction matrix: **8 cases / 78 assertions**, including independent visible material
-increments: straight 64 mm³, asymmetric 192, parallel 152, quarter-circle `8π`, cross Web 92,
-open miter 48 and closed rectangular band 120. Draft integrates the actual linear thickness law.
-An earlier Thicken-derived/placed limit gives 128 mm³ and retains its own 200 mm³ Body; a thickness
-edit and explicit owned Sketch placement replay correctly. Source BRep bytes and rejected candidates
-remain unchanged. Logs: `build/verification/block181/geometry-closed-final.log`.
+The final construction/consumer matrix passes **16 cases / 202 assertions**, including straight,
+asymmetric, parallel, arc, inflected spline, open miter and closed rectangular/circular bands,
+draft and minimum-thickness rejection. Independent arclength integration checks the spline volume.
+Cross-Web → generated-face Hole → G1/G2 full round retains analytic material after a thickness
+edit, exact canonical reopen and physical two-Body STEP replay. Ordinary edge Fillet and Shell
+consume generated supports. Imported immutable bases, stale digest rejection and unrelated Body
+bytes remain intact. Partial first Body termination rejects; explicit farther-face repair succeeds.
 
-Construction/finishing regression passes **37 / 9,788**; complete Core **804 / 35,384** and focused
-Qt **13 passed / 1 skipped / 314 assertions** pass. All five targets build. Frozen foundation
-runtime: **1,270 files**, SHA-256
-`0f628424e62630f25ad3be3ef086d08b50661cbb4cc07a4e72b762d1ef7be56d`.
-The complete consumer/import/exchange matrix and final full Geometry gate remain pending;
-`mvp-plan.md` retains Block 181 in progress.
+Complete Core: **805 / 35,388**. Complete isolated Geometry: **836 / 91,510**. Finishing/construction
+regression: **37 / 9,736**. Focused Qt: **13 passed / 1 skipped / 314 assertions**. All five targets
+build. Logs and canonical runtime manifest: `build/verification/block181/`. Frozen runtime:
+**1,272 files**, SHA-256 `eb460d08c4225d438c060c10902a199b8a2c8abc8e1b16f70ee43addfc3f813d`.
+These checks close 181; complete native authoring and integrated F03/UI01 remain 184.
