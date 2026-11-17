@@ -52,7 +52,8 @@ continuity and hold lines; only face blends carry the typed size. Variable group
 existing strict seven-field group objects. A setback adds the optional known top-level `corner`
 record; its group identities and distance binding are never flattened into a BRep.
 
-The V14 envelope remains necessary while any advanced Fillet exists, including suppression.
+The minimum V14 capability remains necessary while any advanced Fillet exists, including
+suppression; a Part with sketch-driven features uses the higher necessary V15 envelope.
 Unknown fields, malformed roles, invalid size/continuity pairs and ambiguous repeated references
 reject. Part/Project reopening reconstructs the same typed mode. All modes use normal Fillet
 add/update/remove and feature inventory. Face/path/size dependencies join the same atomic graph

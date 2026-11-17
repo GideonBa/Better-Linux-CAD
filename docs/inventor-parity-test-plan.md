@@ -556,8 +556,19 @@ complete Geometry **836 / 91,510** and Core **805 / 35,388**. The [182 intent ga
 also passes focused Core **5 / 53**, full **810 / 35,441**, typed parameter-driven text, strict replay
 and literal chart identity. [Geometry 183](geometry-emboss-engrave-mvp8.md#verification) is accepted:
 focused **12 / 239**, isolated complete **848 / 91,749**, independent text area/mass and mapped
-STEP coordinates, inner loops, consumer edits and atomic failures. Combined native F03/UI01 in
-184 remains open.
+STEP coordinates, inner loops, consumer edits and atomic failures.
+
+**184 native F03/UI01 gate accepted — 2026-11-17.** The
+[owned workflow and acceptance proof](gui-sketch-driven-features-mvp9.md#verification) passes native
+100% and compact 150% **11 / 466 each**: contextual supports, typed grips/keyboard/repeat,
+source-Sketch Apply/Cancel, parameter-driven text and mass, literal seam, invalid mapping and
+qualified termination repair. Crossing Web → ordinary Hole → G2 Full Round retains independent
+material after an upstream thickness edit, exact Undo/Redo, reopen and STEP. Generated Rib edges
+also feed the normal Fillet tool. Complete Core **810 / 35,441**, isolated Geometry **850 / 91,829**,
+offscreen GUI **903 passed / 90 skipped / 104,772 assertions**, all five targets and separate native
+startup pass. Seven current native-only skips are covered at both scales; the focused native proof
+does not establish all legacy skipped cases. Direct-edit reuse and the later combination matrix
+remain planned below.
 
 ### D01 Direct face edits and source preservation
 

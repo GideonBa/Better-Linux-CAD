@@ -77,4 +77,5 @@ Complete Core: **805 / 35,388**. Complete isolated Geometry: **836 / 91,510**. F
 regression: **37 / 9,736**. Focused Qt: **13 passed / 1 skipped / 314 assertions**. All five targets
 build. Logs and canonical runtime manifest: `build/verification/block181/`. Frozen runtime:
 **1,272 files**, SHA-256 `eb460d08c4225d438c060c10902a199b8a2c8abc8e1b16f70ee43addfc3f813d`.
-These checks close 181; complete native authoring and integrated F03/UI01 remain 184.
+These checks close 181. [Native authoring and integrated F03/UI01](gui-sketch-driven-features-mvp9.md)
+are owned by 184.
