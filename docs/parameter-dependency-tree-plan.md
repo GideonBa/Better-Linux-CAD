@@ -68,8 +68,12 @@ Angle literals exist; general Angle formulas are not implemented. Curve-local ex
 separate documented grammar and stable parameter references; their parser/AST remains its owner.
 The existing parameter manager edits a fresh Part only and lists direct consumer IDs. The current
 Project parameter updater addresses the root Assembly's explicit bindings. Neither is already a
-cross-document expression browser/editor. Global project parameters, automatic parameter renaming
-and arbitrary new formula functions are outside this extension unless a preceding block owns them.
+cross-document expression browser/editor. The current native Project owns embedded definitions
+by value; native external Part loading is not supplied by the existing STEP asset registry.
+Audit 194–195 first, then extend their native reference authority where needed. Reuse existing
+portable-path, verified-read and atomic-publication services without treating a native Part as STEP.
+Global project parameters, automatic parameter renaming and arbitrary new formula functions are
+outside this extension unless a preceding block owns them.
 
 ## Identity, document scope and repeated assemblies
 
@@ -142,6 +146,77 @@ The read-only view may inspect structurally valid intent when geometry is unavai
 values carry their actual stale/unresolved status and editing still requires a valid candidate.
 Reference-mode Parts remain readable and immutable. Geometry-only STEP imports with no authored
 parameters show an empty table/status; a measured diameter is not fabricated into a model parameter.
+
+## Standalone source resolution and file relocation
+
+A standalone Part5 must retain its own explicit Part3 source reference/catalog entry alongside its
+formula, so it can resolve dependencies without opening their common Assembly or a Part3 editor.
+Its evaluation context loads the dependency closure through the same expression/reference engine;
+a hidden temporary Assembly or a second evaluator is not an authored model requirement.
+An embedded Project definition remains owned by that Project; moving a separately exported Part3
+file does not convert the embedded definition into an external live reference.
+
+Separate three concerns in the native reference contract frozen in 206:
+
+- **Identity:** the reference authority's asset namespace plus expected DocumentId and ParameterId,
+  with any explicit state/driver qualifier. An ID records which document is intended, not its location.
+- **Locator:** a canonical location relative to a declared project/source root, or an explicitly
+  configured library root. Never rely on the current working directory or an open editor tab.
+  Reuse existing path/root constraints; locating outside a root requires an explicit supported root
+  mapping/import action, not an unchecked absolute path or parent-traversal bypass.
+- **Revision:** accepted source revision/fingerprint and evaluation policy. Reuse verified reads and
+  freshness checks. A digest proves observed bytes; it is not a replacement for document identity.
+
+A project/reference catalog maps registered source identity to location. A source lookup checks the
+recorded locator and explicitly registered current locations in its declared roots. The catalog is
+not an omniscient file database: an operating-system move while BLCAD is closed can leave it stale.
+Offer a bounded **Search project for source** action and **Locate source / Relink** file picker.
+Search only configured roots for explicitly referenced documents, never the entire disk or parent
+assemblies. Metadata/identity lookup must not evaluate every unrelated model or execute file content.
+
+| User filesystem change | Planned behavior |
+| --- | --- |
+| Move the entire project directory, retaining its internal layout | Resolve project-relative locators from the new root; preserve all source/parameter identities. Library sources retain their separate declared root mappings. |
+| Move/rename Part3 inside the project | Use an already registered new location when available; otherwise bounded project search or Locate Source finds candidates. A uniquely verified candidate with the expected identity and accepted revision may restore the locator without rewriting the formula. |
+| Move Part3 outside all configured roots | Show Missing Source and retain authored references. The user locates it and explicitly maps a supported new root/location; no disk-wide guessing. |
+| Find a different file also named Part3 | Reject relocation if expected document/parameter identity does not match. Replacing the source is a separate deliberate operation with compatibility/cycle/geometry validation. |
+| Find several copies with the same IDs | Show ambiguity and candidate locations; require an explicit choice. OS copies can retain IDs and even identical bytes, so IDs/hash/name alone cannot establish which copy was intended. |
+| Find the right document with changed content | Separate source refresh from locator repair. Review/validate the changed revision through the ordinary update policy; relocation must not silently accept new values. |
+
+Inspection/search and automatic candidate discovery are read-only. A unique same-revision match
+can be inspected as a validated runtime candidate and shown as **Source moved — locator repair pending**.
+Explicit Relink publishes that location through the existing transaction/publication path; ordinary
+Save persists committed intent and never adopts a discovered locator or revision implicitly.
+Do not mutate a read-only consumer, dirty a document merely by opening it or rewrite formulas during
+search. A Part5 opened alone can save its own verified reference repair without its Assembly.
+
+Relink preview checks expected document/parameter IDs, unit/type, state/context, fingerprint and
+cycles, then validates the complete affected candidate. Apply updates the canonical reference
+catalog/locator and known affected bindings as one scoped transaction. A rejected/stale preview
+preserves all committed intent, source bytes, results and history. External/read-only libraries are
+never modified just to repair a consuming document's locator.
+Verify the source's required dependency closure too. Moving Part3 must not reinterpret its own
+relative links against an unrelated directory; missing nested Parts/assets retain their diagnostics
+until their owning reference policy resolves them. File organization must preserve those roots or
+repair their locators explicitly, not silently rebase an immutable source's internal references.
+
+Discovery/repair does not move, delete or rewrite source files. Undo of Relink restores reference
+metadata; it cannot undo an OS file move. If a later in-app file-organization command is included,
+it must reuse 195's multi-file publication/recovery rules, define its filesystem undo boundary and
+update registered locators explicitly; it is not implied by adding this picker.
+
+For Save As, relocation and copying, preserve the distinction between the same document at a new
+location and an independent Part definition. An explicit independent-copy operation must assign
+new definition identity through the document-copy authority audited in 205. A raw filesystem copy
+has no such signal and remains a potentially
+ambiguous candidate. Never silently rewrite IDs inside a discovered source to make it fit.
+
+Pending/missing sources remain inspectable with authored IDs and explicit stale/unresolved status;
+retain the last committed result as historical evidence where available, without a fresh-value claim.
+Successful same-revision relocation keeps formula text, qualified parameter identities and values
+unchanged. Recheck source evidence before repair Preview/Apply and publication of its accepted
+locator, including file replacement during read. Ordinary Save may retain unresolved authored
+references under existing save rules, but cannot mark stale results fresh or accept changed bytes.
 
 ## Usage query and highlighting
 
@@ -246,9 +321,12 @@ mutation. No new writer is needed for this read-only projection.
 **Prerequisite:** 205 and delivered 194–195. Extend the existing resolver, reference intent and
 Project transaction/recompute commands for the missing cross-document/Assembly formula cases.
 Freeze exact grammar, stable reference fields, single-driver rules, necessary versions, migration,
-external-source policy and diagnostics before the first writer change. Preserve local formula bytes.
+external-source policy and diagnostics before the first writer change. Include standalone native
+source references, root-relative locators and relocation versus refresh/copy semantics from the
+section above. Preserve local formula bytes.
 **Proof:** PN02; local/cross-document chains, collisions, units, cycles, conflicting bindings,
 shared-definition contexts, immutable sources, strict Part/Assembly/Project roundtrip and rollback.
+Source moves/copies must preserve or deliberately repair the exact expected identities.
 
 ### Block 207 Typed reverse usage and impact query
 
@@ -271,15 +349,18 @@ multiple tables, text entry E, context restoration, task conflicts and 100%/comp
 
 **Prerequisites:** 206,208. Share parameter draft commands with the current manager. Add editable
 literal/formula cells, a qualified source picker and complete Project Preview/Apply/Cancel.
-Display binding/read-only ownership and shared-definition impact. Retain source selection and
-folds through correctable errors without publishing a partial value or child result.
+Display binding/read-only ownership and shared-definition impact. Add bounded source search,
+Locate Source and verified Relink through the normal repair/transaction owner. Retain source
+selection and folds through correctable errors without publishing a partial value or child result.
 **Proof:** PN05; 20 mm → 80 mm formula, source change 25 mm → 100 mm, independent physical geometry,
 failed downstream consumer, one-step Undo/Redo, Save/Open and unchanged read-only resources.
+Include standalone Part5 with closed Part3, locator repair, ambiguous copies and changed-source rejection.
 
 ### Block 210 State integration, freshness and large-tree behavior
 
 **Prerequisites:** 209 and delivered 189–198/203. Key snapshots/indexes by model/reference revision,
-root, model state and explicit driving context. Invalidate on formula/binding/state/source changes;
+root, model state and explicit driving context. Track source relocation, root mappings and observed
+revision separately. Invalidate on formula/binding/state/source changes;
 ignore stale asynchronous jobs. Preserve independent per-occurrence expansion and user filters.
 Virtualize large trees/tables; expand children on demand, cache reverse queries and avoid creating
 widgets/BRep scenes for hidden rows. Highlighting queries do not trigger recompute.

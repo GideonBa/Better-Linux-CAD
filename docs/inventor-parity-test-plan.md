@@ -793,6 +793,17 @@ formula can use Part5.Dia so selecting Part5 demonstrates exact source identity 
 | PN06 / 210 — states and workload | Change source/binding/state/root/reference revisions; late jobs cannot publish into the new view. Shared definition values and explicit state/driver context remain distinct from occurrence poses. Use deterministic 10/100/1,000-occurrence fixtures with equal/repeated names, deep folds and many parameters. Record cold/warm query/expand/highlight time, memory, cancellation and budgets before tuning; no OCCT recompute on inspection. |
 | PN07 / 211 — continuous acceptance | In one native workflow open Assembly1, fold Assembly2, inspect Part2/Part5, reveal exact formula hits, edit/Preview/Apply, Undo/Redo, return to CAD, Save/Open and open standalone Assembly2. Verify root-only scope, exact definitions/shared occurrences, unresolved external-source diagnostics and independent physical results. Complete relevant/full regressions, 100%/150% captures, startup, inventories and runtime identity. |
 
+PN02/PN05/PN06 also require real filesystem relocation fixtures: Part5 alone references closed
+Part3; move the complete project folder, rename/move only Part3 inside its root, and move it outside
+configured roots. Verify exact identities/formulas/values for same-revision repair, bounded search,
+missing-source status, duplicate-ID/byte-identical copies, wrong-document selection, stale discovery
+and changed-content refresh as separate operations. Inspect/search must not dirty or rewrite any
+file. Preview/Apply/Save recheck source evidence, and failed Relink preserves every consumer.
+One metadata Undo does not claim to reverse an OS move. Test standalone repair/reopen without its
+Assembly, read-only consumers/libraries and unchanged embedded definitions when an exported copy moves.
+Include Part3's own relative dependencies: relocation must preserve their resolution or report
+missing nested assets. Ordinary Save retains committed locators/revisions until explicit repair.
+
 A skip is not evidence. Controller/query tests alone do not close PN04/PN07. Collapsing/filtering
 must not remove real dependency edges or skip a hidden consumer during evaluation. Navigation is
 read-only until the explicit edit workflow; no global project-parameter scope or invented STEP
