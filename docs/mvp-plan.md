@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 182
-current_block: 183
-current_boundary: Block 183 in progress; checked Emboss and Engrave Geometry
-current_tag: "[parity-b183]"
+implemented_through: Block 183
+current_block: 184
+current_boundary: Block 184 in progress; native sketch-driven workflows
+current_tag: "[parity-b184]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–182 accepted; Block 183 in progress; Blocks 184–204 planned"
+  advanced_modeling_workflows: "Blocks 145–183 accepted; Block 184 in progress; Blocks 185–204 planned"
 ---
 
 # MVP Plan
@@ -34,10 +34,10 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 182
-current block        Block 183 (in progress)
+implemented through  Block 183
+current block        Block 184 (in progress)
 current phase        Advanced finishing and sketch-driven features
-current boundary     Checked Emboss and Engrave Geometry
+current boundary     Native Rib/Web/Emboss/Engrave workflows
 ```
 
 The assigned sequence continues through Block 184. Blocks 168–169 were delivered by normal
@@ -89,7 +89,8 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 180 | Accepted typed Rib/Web intent, strict necessary V15, historical Body snapshots and atomic Core history/parameters. |
 | 181 | Accepted checked thin volumes, actual terminations, generated Shell/Hole/Fillet/full-round consumers and physical exchange; [proof](geometry-rib-web-mvp8.md#verification). |
 | 182 | Accepted typed mapped Emboss/Engrave and pinned parameter-driven text; [intent proof](part-emboss-engrave-intent-mvp6.md#persistence-and-verification). |
-| 183–184 | Checked mapping and native Rib/Web/Emboss/Engrave workflows. |
+| 183 | Accepted checked planar/cylindrical/conical material, text counters, consumers, mass and physical exchange; [Geometry proof](geometry-emboss-engrave-mvp8.md#verification). |
+| 184 | Native Rib/Web/Emboss/Engrave workflows and complete F03/UI01. |
 
 The active Surface branch has [complete checked G03 construction, consumers and exchange proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof).
 Curved Trim/Extend and complete G04 are accepted in 172; the [bounded construction contract](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-construction--172) is retained.
@@ -198,7 +199,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | B | 152–158 | Semantic holes, extents/seats, cosmetic/modeled threads, placement patterns, Wizard UI and everyday acceptance | Implemented and accepted |
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Implemented and accepted |
-| E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | 175–182 accepted; 183 in progress; 184 planned |
+| E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | 175–183 accepted; 184 in progress |
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
 | G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
 | H | 199–204 | Motion/contact extensions, finite measurement, quality/thickness analysis, measured performance and final combined acceptance | Planned; not started |
@@ -1149,14 +1150,21 @@ necessary V15. Full Core **810 / 35,441**, focused **5 / 53**, Rib/Web Geometry 
 finishing Qt **13 passed / 1 skipped / 314 assertions** and all five build targets pass. Runtime
 **1,279 files**, SHA-256 `1d52862658bfa810127d135198669e7d9f691e445be3893e2d3a6c29edbae3bd`.
 
-### Block 183 Emboss and Engrave Geometry — in progress
+### Block 183 Emboss and Engrave Geometry — accepted
 
-Construct bounded planar/cylindrical/conical material, preserve contour holes, prove normal depth,
-seams and finite support coverage, and reject invalid wrapping/erasing cuts atomically.
-The [native construction foundation](geometry-emboss-engrave-mvp8.md) passes **5 / 148**, including
-independent cylinder/cone volumes and physical seam/normal points before/after STEP. Text/counter,
-combined consumer and complete regression gates remain open. Native interaction remains 184.
-Preserve the complete 185–204 planning.
+[Checked mapping and material proof](geometry-emboss-engrave-mvp8.md) covers analytic normal depth,
+finite support coverage, nested profile/text holes and dots, pinned font resolution, seam-crossing
+physical STEP replay, upstream Shell/Fillet edits and mass. Focused **12 / 239**, isolated full
+Geometry **848 / 91,749**, Core **810 / 35,441**, focused Qt **13 passed / 1 native skip / 314**
+and all five targets pass. Core-only configuration succeeds without FreeType discovery. Runtime
+**1,289 files**, SHA-256 `9115edaf90a878def3d761e0b513cfd6a3dae46d35a636a8f944b6db6402ff14`.
+
+### Block 184 Rib Web Emboss and Engrave interaction — in progress
+
+Finish shared owned native creation/editing, contextual sources/supports, parameter bindings,
+physical grips and side/draft/termination/seam directions. Reuse source-Sketch breadcrumbs,
+qualified failure/repair, complete history, reopening and export. Prove combined F03/UI01 at
+100% and compact 150% before acceptance. Preserve all 185–204 planning.
 
 ### Implementation route for the assigned continuation
 
