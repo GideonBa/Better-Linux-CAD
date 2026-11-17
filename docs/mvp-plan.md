@@ -1100,8 +1100,10 @@ runtime **1,244 files**, `f590ef7bfea79674bd30ef001da27dc3eb979ded6fdeb13c0e86e3
 Extend the existing owned Fillet panel/controller with typed constant/variable/face/full-round
 creation and editing, ordered stations/groups, actual radius grips, propagation/corner controls,
 role selection and repair. Preserve untouched literals and bindings, validate full downstream
-history and prove native workflows at 100%/150% compact scales. Continue through 184; retain all
-planned scope after 184.
+history and prove native workflows at 100%/150% compact scales. The [typed controller foundation](gui-advanced-finishing-mvp9.md)
+preserves no-op stations, stages shared/independent values and uses normal atomic Undo/Redo;
+all five targets built and **10 GUI cases / 191 assertions** pass. The owned panel, actual guides,
+repair and native scale gates remain open. Continue through 184; retain all planned scope after 184.
 
 ### Implementation route for the assigned continuation
 
