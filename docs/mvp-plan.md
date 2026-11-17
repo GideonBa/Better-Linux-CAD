@@ -1045,9 +1045,21 @@ Stable station IDs, original fraction literals and the separate orientation basi
 double reversal. All radius bindings participate in normal dependencies and transactional formula
 updates; foreign producers fail before publication. Legacy constant records retain six fields.
 On 2026-11-17 all five targets built; focused Core passed **28 / 1,244**, full Core **791 / 35,193**.
-The advanced native dispatch currently rejects explicitly. Tangent expansion, branches, actual
-true-length laws and split/lost-edge proof remain the joint 175/176 Geometry gate; this foundation
-does not accept either complete block. Continue through 184 and retain all 185–204 scope.
+The [native engine](geometry-variable-fillet-mvp8.md) now verifies true-length laws and explicit/expanded
+tangent chains. Branch ambiguity, the complete repair/history matrix and remaining F01 combinations
+keep the joint 175/176 gate open. Continue through 184 and retain all 185–204 scope.
+
+### Block 176 variable-radius Fillet Geometry — in progress
+
+The [checked engine and physical station contract](geometry-variable-fillet-mvp8.md) are implemented.
+On 2026-11-17 all five targets built; variable/constant Fillet and Chamfer regressions passed
+**17 cases / 7,476 assertions**. Independent normal-section circles cover increasing/decreasing
+and multistation laws, periodic rims and a nonuniform cubic B-spline trace, including explicit/expanded
+tangent spans and exact reversal. Projection to original true length corrects OCCT's elementary-guide
+parameterization; imported history/Open and physical STEP replay retain the same measured sections.
+Candidates use deep copies, and source BRep bytes remain unchanged. Branch/Pattern, mirrored/scaled
+inputs and new Hole edit/repair combinations remain required before whole-block acceptance. Continue
+through 184 and retain all 185–204 scope.
 
 ### Implementation route for the assigned continuation
 
