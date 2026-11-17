@@ -1,4 +1,5 @@
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "advanced_fillet_controls.hpp"
 #include "advanced_loft_controls.hpp"
 #include "advanced_surface_controls.hpp"
 #include "blcad/gui/gui_icons.hpp"
@@ -960,7 +961,9 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::set_numeric_value(double value)
     if (handles.empty())
       return Result<GuiPartFeaturePreview>::failure(
           Error::validation("finishing", "select valid inputs and elements first"));
-    candidate.handle_id = handles.front().id;
+    candidate.handle_id = typed_finishing() && !layer_.active_handle_id().empty()
+                              ? layer_.active_handle_id()
+                              : handles.front().id;
     candidate.value_kind = angular_value() ? GuiViewportManipulatorValueKind::Angle
                                            : GuiViewportManipulatorValueKind::Distance;
   }
@@ -1047,7 +1050,7 @@ Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
       pattern() && pattern_sources_->selectedItems().empty()
           ? Result<GuiPartFeaturePreview>::failure(
                 Error::validation("pattern", "Select at least one source."))
-      : finishing() && finishing_targets_list_->selectedItems().empty()
+      : finishing() && !typed_finishing() && finishing_targets_list_->selectedItems().empty()
           ? Result<GuiPartFeaturePreview>::failure(Error::validation(
                 "gui.shell.finishing", command_ == Command::Fillet || command_ == Command::Chamfer
                                            ? "Select at least one edge."
@@ -1251,6 +1254,12 @@ Result<std::size_t> ShellFeatureTools::apply() {
   surface_targets_.clear();
   if (was_path || was_spatial)
     window_.refresh_feature_selection_scene();
+  if (advanced_fillet_) {
+    advanced_fillet_->editing = false;
+    advanced_fillet_->input_document.reset();
+    advanced_fillet_->input_cache.reset();
+    advanced_fillet_->input_prefix.reset();
+  }
   spatial_editing_.reset();
   spatial_input_cache_.reset();
   spatial_input_prefix_.reset();
@@ -1289,6 +1298,7 @@ void ShellFeatureTools::cancel() noexcept {
   if (command_ != Command::None && session_.task().active())
     (void)session_.task().cancel();
   const bool was_finishing = finishing();
+  const bool was_fillet = command_ == Command::Fillet;
   const bool was_surface = surface();
   const bool was_spatial = spatial();
   const bool was_pattern = pattern();
@@ -1330,6 +1340,17 @@ void ShellFeatureTools::cancel() noexcept {
     restore_extrude_selection();
   hide_task_panel();
   synchronize_overlay();
+  if (was_fillet && advanced_fillet_) {
+    if (advanced_fillet_->entry_viewport_selection)
+      (void)viewport_.select_semantic(advanced_fillet_->entry_viewport_selection->semantic_id);
+    else
+      viewport_.clear_selection();
+    session_.selection() = advanced_fillet_->entry_selection;
+    advanced_fillet_->editing = false;
+    advanced_fillet_->input_document.reset();
+    advanced_fillet_->input_cache.reset();
+    advanced_fillet_->input_prefix.reset();
+  }
   if (was_surface && advanced_surface_) {
     if (advanced_surface_->entry_viewport_selection)
       (void)viewport_.select_semantic(advanced_surface_->entry_viewport_selection->semantic_id);
@@ -1470,6 +1491,8 @@ double ShellFeatureTools::current_value() const noexcept {
 }
 
 double ShellFeatureTools::value_for_handle(std::string_view handle) const noexcept {
+  if (typed_finishing())
+    return coordinator_.finishing().handle_value(handle);
   if (command_ == Command::Extrude && handle == kExtrudeTaperHandleId)
     return coordinator_.extrude().taper().value_or(0);
   if (command_ == Command::Extrude && handle == kExtrudeThinHandleId)
@@ -1519,6 +1542,8 @@ void ShellFeatureTools::synchronize_numeric_editor(double value) {
 }
 
 void ShellFeatureTools::synchronize_manipulator_editor(std::string_view handle) {
+  if (typed_finishing())
+    advanced_fillet_->sync_values();
   synchronize_numeric_editor(current_value());
   if (command_ == Command::Extrude && handle == kExtrudeThinHandleId) {
     const QSignalBlocker blocker(extrude_thickness_);
@@ -1528,6 +1553,8 @@ void ShellFeatureTools::synchronize_manipulator_editor(std::string_view handle) 
 
 void ShellFeatureTools::synchronize_overlay() {
   refresh_extrude_breadcrumbs();
+  if (typed_finishing())
+    finishing_controls_->setEnabled(layer_.active_handle_id().empty());
   if (surface())
     surface_controls_->setEnabled(layer_.active_handle_id().empty());
   if (spatial())
@@ -1536,7 +1563,8 @@ void ShellFeatureTools::synchronize_overlay() {
     extrude_controls_->setEnabled(!editing_source_sketch_ && layer_.active_handle_id().empty());
   if (command_ == Command::Revolve)
     revolve_controls_->setEnabled(layer_.active_handle_id().empty());
-  const bool visible = active() && !editing_source_sketch_ && preview_valid_ &&
+  const bool visible = active() && !editing_source_sketch_ &&
+                       (preview_valid_ || (typed_finishing() && advanced_fillet_->failure)) &&
                        !layer_.handles().empty() && !pattern_reference_picking_ &&
                        !body_reference_picking_ && !extrude_reference_picking_ &&
                        !extrude_profile_picking_;
@@ -1620,9 +1648,11 @@ void ShellFeatureTools::show_task_panel(QString title, QString unit, double valu
   spatial_controls_->setVisible(spatial());
   surface_controls_->setVisible(surface());
   value_label_->setVisible(command_ != Command::BodyMirror && command_ != Command::BodyBoolean &&
-                           (!spatial() || spatial_scalar()) && (!surface() || surface_scalar()));
+                           (!spatial() || spatial_scalar()) && (!surface() || surface_scalar()) &&
+                           !typed_finishing());
   numeric_editor_->setVisible(command_ != Command::BodyMirror && command_ != Command::BodyBoolean &&
-                              (!spatial() || spatial_scalar()) && (!surface() || surface_scalar()));
+                              (!spatial() || spatial_scalar()) &&
+                              (!surface() || surface_scalar()) && !typed_finishing());
   task_dock_->setWindowTitle(std::move(title));
   const QString label = command_ == Command::SurfaceStitch ? QStringLiteral("Tolerance")
                         : command_ == Command::ExtendSurface || command_ == Command::OffsetSurface
@@ -1712,6 +1742,8 @@ bool ShellFeatureTools::eventFilter(QObject* watched, QEvent* event) {
           auto accepted = accept_manipulator_candidate(*candidate);
           if (accepted.has_error())
             report(accepted.error());
+          else if (typed_finishing())
+            refresh_finishing_preview();
         } else {
           restore_drag_start_value();
         }

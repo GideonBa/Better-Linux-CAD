@@ -3438,6 +3438,8 @@ Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
       return Result<std::size_t>::failure(
           error("Move End of Part after this feature before editing it."));
   }
+  if (p.session.part_document()->find_fillet_feature(id))
+    return p.window.feature_tools().begin_fillet_edit(id);
   const auto* advanced_loft = p.session.part_document()->find_loft_feature(id);
   const auto* advanced_sweep = p.session.part_document()->find_sweep_feature(id);
   if ((advanced_loft && advanced_loft->constraints()) ||

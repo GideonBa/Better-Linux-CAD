@@ -38,6 +38,7 @@ class ShellRibbon;
 class ShellWindow;
 class ShellPropertyGroup;
 class ShellPropertySelector;
+struct AdvancedFilletControls;
 struct AdvancedSurfaceControls;
 struct AdvancedLoftControls;
 
@@ -168,7 +169,9 @@ public:
   [[nodiscard]] bool accept_extrude_selection(const GuiSelection& selection);
   [[nodiscard]] std::vector<geometry::ViewportSceneItem> extrude_selection_items() const;
   [[nodiscard]] Result<std::size_t> begin_revolve(std::optional<DatumAxisId> axis = std::nullopt);
-  [[nodiscard]] Result<std::size_t> begin_finishing(Command command);
+  [[nodiscard]] Result<std::size_t> begin_finishing(Command command,
+                                                    std::optional<FeatureId> editing = {});
+  [[nodiscard]] Result<std::size_t> begin_fillet_edit(FeatureId);
   [[nodiscard]] Result<std::size_t> begin_pattern(Command command);
   [[nodiscard]] Result<std::size_t> begin_body_operation(Command command);
   [[nodiscard]] bool accept_body_selection(const GuiSelection& selection);
@@ -454,7 +457,10 @@ private:
   [[nodiscard]] bool angular_value() const noexcept;
   [[nodiscard]] QString finishing_summary() const;
   void build_finishing_controls(QWidget* panel, QFormLayout& form);
-  void reload_finishing_targets();
+  void reload_finishing_targets(bool preview = true);
+  void show_fillet_failure(const Error&);
+  [[nodiscard]] bool typed_finishing() const noexcept;
+  [[nodiscard]] Result<std::size_t> rebuild_advanced_fillet_controller();
   [[nodiscard]] Result<std::size_t> rebuild_finishing_controller();
   void refresh_finishing_preview();
   [[nodiscard]] Result<std::pair<SketchId, ProfileId>> profile_from_selection() const;
@@ -683,6 +689,7 @@ private:
   double spatial_twist_{0};
   std::optional<std::vector<std::string>> previous_semantic_scope_;
 
+  std::unique_ptr<AdvancedFilletControls> advanced_fillet_;
   std::unique_ptr<AdvancedSurfaceControls> advanced_surface_;
   std::vector<SurfaceInput> surface_inputs_;
   std::vector<geometry::FinishingSelectionTarget> surface_targets_;
