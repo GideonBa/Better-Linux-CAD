@@ -25,14 +25,14 @@ namespace blcad::gui {
 struct AdvancedFilletControls {
   QWidget* panel;
   QComboBox *mode, *group, *interpolation, *propagation, *continuity, *size_binding;
-  QLineEdit *group_name, *size_value, *setback_value;
+  QLineEdit *feature_name, *group_name, *size_value, *setback_value;
   QListWidget* members;
   QTableWidget* stations;
   QCheckBox *corner, *independent;
   QLabel *capability, *derived, *size_label;
   std::array<QComboBox*, 2> hold;
   QWidget *group_buttons, *station_buttons, *size_row, *corner_row, *law_row, *contact_row;
-  const PartDocument* document{};
+  std::shared_ptr<const PartDocument> document;
   FeatureId id{""};
   BodyId body{""};
   std::string name;
@@ -42,7 +42,7 @@ struct AdvancedFilletControls {
   GuiSelectionModel entry_selection;
   std::optional<GuiSelection> entry_viewport_selection;
   bool editing = false, updating = false, failure = false;
-  std::size_t sequence = 0;
+  std::size_t sequence = 0, revision = 0;
   std::vector<EdgeReference> constant_edges;
   std::vector<FilletEdgeGroup> groups;
   FilletFaceSet first{"first", "First side", {}}, second{"second", "Second side", {}},
@@ -77,6 +77,15 @@ struct AdvancedFilletControls {
       column->addWidget(p);
       return p;
     };
+    feature_name = new QLineEdit(panel);
+    feature_name->setObjectName("blcad.fillet.feature_name");
+    row("Feature Name", feature_name);
+    QObject::connect(feature_name, &QLineEdit::editingFinished, panel, [this] {
+      if (!updating && feature_name->text().toStdString() != name) {
+        name = feature_name->text().toStdString();
+        changed();
+      }
+    });
     group = combo("group", {});
     row("Input Group / Role", group);
     group_name = new QLineEdit(panel);
@@ -129,8 +138,13 @@ struct AdvancedFilletControls {
              {"Remove Input", [this] { remove_member(); }}});
     stations = new QTableWidget(0, 4, panel);
     stations->setObjectName("blcad.fillet.stations");
-    stations->setHorizontalHeaderLabels({"Station", "Fraction", "Binding", "Radius (mm)"});
-    stations->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    stations->setHorizontalHeaderLabels({"Station", "Fraction", "Binding", "R (mm)"});
+    auto* header = stations->horizontalHeader();
+    header->setSectionResizeMode(QHeaderView::Fixed);
+    header->setSectionResizeMode(2, QHeaderView::Stretch);
+    stations->setColumnWidth(0, 96);
+    stations->setColumnWidth(1, 70);
+    stations->setColumnWidth(3, 84);
     stations->verticalHeader()->hide();
     stations->setMinimumHeight(132);
     column->addWidget(stations);
@@ -290,6 +304,11 @@ struct AdvancedFilletControls {
         changed();
     });
   }
+  bool current(const GuiDocumentSession& session) const {
+    const auto* owned = session.part_document();
+    return owned && document && owned->id() == document->id() &&
+           revision == session.model_revision();
+  }
   static QString number(double v) {
     return QString::number(v, 'g', 17);
   }
@@ -389,6 +408,7 @@ struct AdvancedFilletControls {
       index = box->count() - 1;
     }
     box->setCurrentIndex(index);
+    box->setToolTip(box->currentText());
   }
   void add_group() {
     auto start = new_radius(1), end = new_radius(2);
@@ -402,9 +422,10 @@ struct AdvancedFilletControls {
   }
   void reset(const PartDocument& source, FeatureId feature, std::string title, BodyId target) {
     QScopedValueRollback<bool> guard(updating, true);
-    document = &source;
+    document = std::make_shared<const PartDocument>(source);
     id = feature;
     name = std::move(title);
+    feature_name->setText(QString::fromStdString(name));
     body = target;
     editing = false;
     input_document.reset();
@@ -570,7 +591,13 @@ struct AdvancedFilletControls {
     for (int row = 0; row < int(g->stations.size()); ++row) {
       const auto saved = g->stations[row];
       auto* location = new QComboBox(stations);
-      location->addItems({"At Length", "Start", "End"});
+      const auto compact_combo = [](QComboBox* box) {
+        box->setMinimumWidth(0);
+        box->setStyleSheet("QComboBox { padding: 2px 18px 2px 3px; } "
+                           "QComboBox::drop-down { width: 14px; }");
+      };
+      compact_combo(location);
+      location->addItems({"Fraction", "Start", "End"});
       location->setCurrentIndex(saved.location == FilletStationLocation::Start ? 1
                                 : saved.location == FilletStationLocation::End ? 2
                                                                                : 0);
@@ -579,6 +606,7 @@ struct AdvancedFilletControls {
       fraction->setEnabled(saved.location == FilletStationLocation::Fraction);
       stations->setCellWidget(row, 1, fraction);
       auto* binding = new QComboBox(stations);
+      compact_combo(binding);
       fill_bindings(binding, saved.radius);
       stations->setCellWidget(row, 2, binding);
       auto* radius = new QLineEdit(number(value(saved.radius)), stations);
@@ -621,6 +649,7 @@ struct AdvancedFilletControls {
                          if (updating)
                            return;
                          if (auto* s = station()) {
+                           binding->setToolTip(binding->currentText());
                            s->radius = ParameterId(binding->currentData().toString().toStdString());
                            radius->setText(number(value(s->radius)));
                            changed();

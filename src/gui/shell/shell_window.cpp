@@ -1895,7 +1895,12 @@ void ShellWindow::refresh_viewport_scene() {
     return;
   }
   if (session_.reference_repair_mode()) {
-    viewport_->clear_scene();
+    if (feature_tools_ && feature_tools_->command() == ShellFeatureTools::Command::Fillet) {
+      // Only the owned repair task's freshly evaluated input prefix is shown.
+      // The failed complete model remains unavailable until normal publication succeeds.
+      (void)viewport_->set_scene(feature_tools_->finishing_selection_items());
+    } else
+      viewport_->clear_scene();
     return;
   }
   const auto imported = [](const PartDocument& part) {

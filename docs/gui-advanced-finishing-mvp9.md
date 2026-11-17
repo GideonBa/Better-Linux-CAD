@@ -83,3 +83,30 @@ actual Stitch/Thicken ancestors and a coincident unrelated Body negative. Captur
 Apply/Cancel and the physical source-direction guide; scrolled station/role captures and failed
 reopening are the remaining native checks. Logs: `panel-focused.log`, `selection-final.log`,
 `native100.log`, `native150.log` in the same Block-179 verification directory.
+
+## Failed Geometry, history scope and model changes
+
+Open for Repair initially owns the ordinary References task. Close that task, then double-click
+an owned Fillet in History. Its source prefix must recompute successfully; only that qualified
+input geometry is shown while the complete model remains failed. Correct the typed inputs or
+values and Apply through the existing repair transaction. Publication requires the complete
+result to recompute. Cancel preserves the failed record; Undo/Redo retain the failed/repaired
+states and reopening the repaired file uses the normal strict reader.
+
+The panel holds an immutable copy of its entry document and checks both document identity and
+model revision. External model changes invalidate the task before another preview or Apply.
+Creation at End of Part prepares the normal history insertion before deriving source guides;
+later Body placement cannot move grips ahead of the marker. Existing History context commands,
+feature renaming and suppressed-Fillet value correction use this same owned panel.
+
+The broad native regression passes **37 cases / 2,681 assertions** at 100%, including legacy
+History/feature-editor commands, normal grip interaction, failed reopening and exact stations at
+an earlier End-of-Part prefix. Offscreen focused regression passes **26 cases / 1,813 assertions**
+with **2 native skips**. The same native selection passes **37 / 2,701** in compact 150% mode
+(`QT_SCALE_FACTOR=1.5`, repository `BLCAD_UI_COMPACT=1`; the advanced-panel fixture also uses
+`BLCAD_COMPACT_UI=1`). Full-suite gates remain open; this is no block acceptance claim.
+
+An additional large-window 150% run passed 35 of 37 cases; two existing History size-preservation
+cases observed desktop resizing from 1232×651 to 1280×674. The complete compact repeat passes
+without changing those assertions. The native evidence qualifies the stated screen/scale setup;
+it does not claim every desktop/window-manager geometry.

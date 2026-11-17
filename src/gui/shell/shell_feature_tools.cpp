@@ -1030,6 +1030,11 @@ ShellFeatureTools::accept_manipulator_candidate(const GuiViewportManipulatorCand
 }
 
 Result<GuiPartFeaturePreview> ShellFeatureTools::preview_and_publish() {
+  if (typed_finishing() && !advanced_fillet_->current(session_)) {
+    cancel();
+    return Result<GuiPartFeaturePreview>::failure(
+        Error::validation("fillet", "The model changed. Reopen the Fillet editor."));
+  }
   preview_valid_ = false;
   if (command_ == Command::Extrude || command_ == Command::Revolve || advanced_surface()) {
     auto configured = advanced_surface()             ? rebuild_advanced_surface_controller()
@@ -1577,6 +1582,10 @@ void ShellFeatureTools::synchronize_overlay() {
 }
 
 void ShellFeatureTools::refresh_presentation() {
+  if (typed_finishing() && !advanced_fillet_->current(session_)) {
+    cancel();
+    return;
+  }
   // Reporting a failed candidate advances the presentation revision. Scene
   // rebuilding then clears OCCT selection, but the active local reference role
   // still owns its highlight, including invalid limits.

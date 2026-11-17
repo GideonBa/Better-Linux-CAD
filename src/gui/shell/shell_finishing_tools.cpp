@@ -371,7 +371,7 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command,
   };
   if (active() || session_.task().active() || window_.active_sketch() ||
       session_.document_kind() != GuiDocumentKind::Part ||
-      session_.workspace() != GuiWorkspace::Part || !session_.part_shape_cache())
+      session_.workspace() != GuiWorkspace::Part || (!session_.part_shape_cache() && !editing))
     return fail("Finishing requires a part without an active command");
   if (command != Command::Fillet && command != Command::Chamfer && command != Command::Shell &&
       command != Command::Draft)
@@ -500,6 +500,7 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command,
     if (!saved)
       advanced_fillet_->reset(part, finishing_feature_, finishing_name_,
                               BodyId(finishing_body_->currentData().toString().toStdString()));
+    advanced_fillet_->revision = session_.model_revision();
     advanced_fillet_->entry_selection = session_.selection();
     advanced_fillet_->entry_viewport_selection = viewport_.selected_semantic();
   }
@@ -539,7 +540,7 @@ void ShellFeatureTools::reload_finishing_targets(bool preview) {
   {
     const QSignalBlocker block(finishing_targets_list_);
     finishing_targets_list_->clear();
-    if (part && cache) {
+    if (part && (cache || (command_ == Command::Fillet && advanced_fillet_->input_cache))) {
       auto targets = finishing_targets(
           session_, BodyId(finishing_body_->currentData().toString().toStdString()),
           command_ == Command::Fillet ? advanced_fillet_->role() : selection_role(command_),
@@ -721,6 +722,7 @@ void ShellFeatureTools::refresh_finishing_preview() {
   synchronize_numeric_editor(current_value());
   auto preview = preview_and_publish();
   if (typed_finishing()) {
+    advanced_fillet_->sync_values();
     if (preview)
       advanced_fillet_->capability->setText(finishing_summary());
     else
@@ -779,6 +781,13 @@ std::vector<geometry::ViewportSceneItem> ShellFeatureTools::finishing_selection_
                            : geometry::ViewportSceneKind::Face,
                        target.semantic_id, target.shape, SketchLineRole::Geometry,
                        finishing_body_->currentData().toString().toStdString()});
+  if (command_ == Command::Fillet && advanced_fillet_->editing &&
+      session_.reference_repair_mode() && advanced_fillet_->input_cache) {
+    const auto& body = advanced_fillet_->body;
+    if (const auto* source = advanced_fillet_->input_cache->find_body_shape(body))
+      items.push_back({geometry::ViewportSceneKind::SolidBody, "body/" + body.value(), *source,
+                       SketchLineRole::Geometry, body.value()});
+  }
   if (command_ == Command::Loft) {
     auto supports = loft_selection_items();
     items.insert(items.end(), supports.begin(), supports.end());

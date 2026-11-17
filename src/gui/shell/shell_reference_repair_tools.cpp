@@ -387,6 +387,12 @@ ShellReferenceRepairTools::ShellReferenceRepairTools(ShellWindow& window, ShellR
   ui.dock->setObjectName("blcad.shell.reference_repair_task");
   auto* panel = new QWidget(ui.dock);
   auto* layout = new QVBoxLayout(panel);
+  auto* fillet_hint = new QLabel(
+      "To correct Fillet geometry, close this task and double-click the Fillet in History.", panel);
+  fillet_hint->setObjectName("blcad.reference_repair.fillet_hint");
+  fillet_hint->setWordWrap(true);
+  fillet_hint->hide();
+  layout->addWidget(fillet_hint);
   auto* hint = new QLabel(
       QStringLiteral("Repair points, lines, and face workplanes together. "
                      "Stage changes and check the entire list. Apply commits the repair."),
@@ -504,6 +510,9 @@ Result<std::size_t> ShellReferenceRepairTools::begin() {
   }
   ui.inspect();
   ui.select_reference();
+  ui.dock->findChild<QLabel*>("blcad.reference_repair.fillet_hint")
+      ->setVisible(session.reference_repair_mode() &&
+                   !session.part_document()->fillet_features().empty());
   ui.dock->show();
   ui.dock->raise();
   ui.window.refresh();

@@ -87,6 +87,9 @@ void ShellFeatureTools::show_fillet_failure(const Error& error) {
 }
 Result<std::size_t> ShellFeatureTools::rebuild_advanced_fillet_controller() {
   auto& controls = *advanced_fillet_;
+  if (!controls.current(session_))
+    return Result<std::size_t>::failure(
+        Error::validation("fillet", "The model changed. Reopen the Fillet editor."));
   controls.body = BodyId(finishing_body_->currentData().toString().toStdString());
   auto state = controls.build();
   if (!state)
@@ -95,6 +98,11 @@ Result<std::size_t> ShellFeatureTools::rebuild_advanced_fillet_controller() {
   auto staged = state.value()->apply(candidate);
   if (!staged)
     return staged;
+  if (!controls.editing && session_.history_prefix_count()) {
+    auto scoped = session_.prepare_part_history_candidate(candidate);
+    if (!scoped)
+      return scoped;
+  }
   const auto history = candidate.executable_history();
   if (!history)
     return Result<std::size_t>::failure(history.error());

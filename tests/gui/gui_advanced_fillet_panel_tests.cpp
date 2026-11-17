@@ -2,6 +2,7 @@
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
+#include "blcad/gui/shell/shell_reference_repair_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 #include <QApplication>
 #include <QComboBox>
@@ -12,6 +13,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
+#include <QScrollArea>
 #include <QTableWidget>
 #include <QTemporaryDir>
 #include <catch2/catch_approx.hpp>
@@ -23,10 +25,10 @@ namespace {
 std::string saved(ShellWindow& w) {
   return f::checked(serialize_part_document_to_json(*w.session().part_document()));
 }
-void open(ShellWindow& w, QTemporaryDir& directory) {
+void open(ShellWindow& w, QTemporaryDir& directory, PartDocument part = f::native_base()) {
   QFile file(directory.filePath("input.blcad.json"));
   REQUIRE(file.open(QIODevice::WriteOnly));
-  const auto data = f::checked(serialize_part_document_to_json(f::native_base()));
+  const auto data = f::checked(serialize_part_document_to_json(part));
   REQUIRE(file.write(QByteArray::fromStdString(data)) == qint64(data.size()));
   file.close();
   REQUIRE(w.open_path(file.fileName()));
@@ -55,6 +57,18 @@ void capture(ShellWindow& w, QString name) {
   REQUIRE(QDir().mkpath(path));
   qApp->processEvents();
   CHECK(w.grab().save(QDir(path).filePath(name + ".png")));
+}
+void reveal(QWidget& widget) {
+  auto* parent = widget.parentWidget();
+  while (parent && !qobject_cast<QScrollArea*>(parent))
+    parent = parent->parentWidget();
+  REQUIRE(parent);
+  auto* scroll = qobject_cast<QScrollArea*>(parent);
+  scroll->ensureWidgetVisible(&widget, 0, 0);
+  qApp->processEvents();
+  CHECK(widget.isVisible());
+  const QRect shown(widget.mapTo(scroll->viewport(), QPoint()), widget.size());
+  CHECK(scroll->viewport()->rect().contains(shown.center()));
 }
 void mouse(ShellWindow& w, QEvent::Type type, GuiSketchScreenPoint point,
            Qt::MouseButtons buttons) {
@@ -99,6 +113,7 @@ TEST_CASE("Owned advanced Fillet panel creates edits reverses and reopens statio
   REQUIRE(QMetaObject::invokeMethod(&end, "editingFinished", Qt::DirectConnection));
   REQUIRE(window.viewport().feature_preview_active());
   CHECK(saved(window) == before);
+  reveal(stations);
   capture(window, "variable-stations");
   REQUIRE(tools.apply());
   const auto created = saved(window);
@@ -159,6 +174,7 @@ TEST_CASE("Owned face and full-round roles reject duplicates and keep derived si
   }
   control<QComboBox>(window, "blcad.fillet.continuity").setCurrentIndex(1);
   REQUIRE(window.viewport().feature_preview_active());
+  reveal(group);
   capture(window, full ? "full-round-roles" : "face-blend-roles");
   if (full) {
     CHECK(control<QLabel>(window, "blcad.fillet.derived_size").text().contains("5"));
@@ -224,4 +240,100 @@ TEST_CASE(
             ->find_parameter(group.stations.back().radius)
             ->value()
             .millimeters() == Catch::Approx(2));
+}
+
+TEST_CASE("Owned Fillet repairs failed Geometry from its exact input prefix and retains undo",
+          "[gui][advanced-fillet-panel][parity-b179]") {
+  auto p = f::native_base();
+  REQUIRE(p.set_parameter_value(ParameterId("radius"), f::checked(Quantity::length_mm(40))));
+  VariableFilletIntent intent{{{"group",
+                                "Outer",
+                                {{f::edge(PartFeatureInputRole::FilletEdge), false}},
+                                FilletPropagation::Explicit,
+                                FilletRadiusInterpolation::Linear,
+                                {{"start", FilletStationLocation::Start, 0, ParameterId("radius")},
+                                 {"end", FilletStationLocation::End, 1, ParameterId("radius")}}}}};
+  REQUIRE(p.add_fillet_feature(f::checked(FilletFeature::create_variable(
+      FeatureId("repair"), "Repair Fillet", BodyId("body.base"), intent))));
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  QFile file(directory.filePath("failed.blcad.json"));
+  REQUIRE(file.open(QIODevice::WriteOnly));
+  REQUIRE(file.write(QByteArray::fromStdString(f::checked(serialize_part_document_to_json(p)))) >
+          0);
+  file.close();
+  ShellWindow window;
+  REQUIRE(window.open_path(file.fileName(), GuiDocumentOpenMode::ReferenceRepair));
+  window.resize(1050, 850);
+  window.show();
+  qApp->processEvents();
+  REQUIRE(window.session().reference_repair_mode());
+  const auto before = saved(window);
+  REQUIRE(window.reference_repair_tools().active());
+  window.reference_repair_tools().cancel();
+  auto begun = window.feature_edit_tools().begin(FeatureId("repair"));
+  INFO((begun ? "ok" : begun.error().object_id() + ": " + begun.error().message()));
+  REQUIRE(begun);
+  auto& tools = window.feature_tools();
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK_FALSE(tools.apply());
+  CHECK_FALSE(tools.finishing_selection_items().empty());
+  tools.cancel();
+  CHECK(saved(window) == before);
+  CHECK(window.session().reference_repair_mode());
+  REQUIRE(window.feature_edit_tools().begin(FeatureId("repair")));
+  auto& stations = control<QTableWidget>(window, "blcad.fillet.stations");
+  auto* radius = qobject_cast<QLineEdit*>(stations.cellWidget(0, 3));
+  REQUIRE(radius);
+  radius->setText("1.25");
+  REQUIRE(QMetaObject::invokeMethod(radius, "editingFinished", Qt::DirectConnection));
+  REQUIRE(window.viewport().feature_preview_active());
+  auto* linked = qobject_cast<QLineEdit*>(stations.cellWidget(1, 3));
+  REQUIRE(linked);
+  CHECK(linked->text().toDouble() == 1.25);
+  window.viewport().fit_feature_preview();
+  reveal(stations);
+  capture(window, "repair-stations");
+  REQUIRE(tools.apply());
+  CHECK_FALSE(window.session().reference_repair_mode());
+  const auto repaired = saved(window);
+  CHECK(repaired != before);
+  REQUIRE(window.undo());
+  CHECK(saved(window) == before);
+  CHECK(window.session().reference_repair_mode());
+  REQUIRE(window.redo());
+  CHECK(saved(window) == repaired);
+  CHECK_FALSE(window.session().reference_repair_mode());
+  REQUIRE(window.save_to(directory.filePath("repaired.blcad.json")));
+  GuiDocumentSession opened;
+  REQUIRE(opened.open_file(directory.filePath("repaired.blcad.json").toStdString()));
+  CHECK(f::checked(serialize_part_document_to_json(*opened.part_document())) == repaired);
+}
+
+TEST_CASE("Advanced station guides use End of Part before later Body placement",
+          "[gui][advanced-fillet-panel][parity-b179]") {
+  auto p = f::native_base();
+  REQUIRE(p.add_body_transform(f::checked(BodyTransform::create_translate(
+      BodyTransformId("later"), BodyId("body.base"), BodyTransformCoordinateSpace::World,
+      std::nullopt, {100, 0, 0}, false, false))));
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ShellWindow window;
+  open(window, directory, p);
+  const auto before = saved(window);
+  REQUIRE(window.session().begin_part_history_context(1));
+  window.refresh();
+  auto& tools = window.feature_tools();
+  REQUIRE(tools.begin_finishing(ShellFeatureTools::Command::Fillet));
+  control<QComboBox>(window, "blcad.finishing.mode").setCurrentIndex(1);
+  pick(window, "top_front");
+  REQUIRE(window.viewport().feature_preview_active());
+  REQUIRE(tools.manipulators().handles().size() == 3);
+  for (const auto& handle : tools.manipulators().handles())
+    CHECK(std::abs(handle.origin.x) <= 10.000001);
+  CHECK(saved(window) == before);
+  tools.cancel();
+  window.session().cancel_part_workflow();
+  window.refresh();
+  CHECK(saved(window) == before);
 }
