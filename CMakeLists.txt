@@ -225,6 +225,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/fillet_radius_law.cpp
     src/geometry/fillet_spine_law.cpp
     src/geometry/setback_fillet_adapter.cpp
+    src/geometry/fillet_guides.cpp
     src/geometry/face_fillet_adapter.cpp
     src/geometry/variable_fillet_adapter.cpp
     src/geometry/fillet_adapter.cpp
@@ -716,6 +717,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/front_workplane_pipeline_tests.cpp
       tests/geometry/guided_loft_pipeline_tests.cpp
       tests/geometry/setback_fillet_tests.cpp
+      tests/geometry/fillet_guide_tests.cpp
       tests/geometry/face_fillet_tests.cpp
       tests/geometry/variable_fillet_tests.cpp
       tests/geometry/fillet_feature_pipeline_tests.cpp
