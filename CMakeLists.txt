@@ -397,6 +397,7 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_feature_workflow.cpp
     src/gui/shell/shell_property_controls.cpp
     src/gui/shell/shell_revolve_tools.cpp
+    src/gui/shell/shell_advanced_fillet_tools.cpp
     src/gui/shell/shell_finishing_tools.cpp
     src/gui/shell/shell_pattern_tools.cpp
     src/gui/shell/shell_body_tools.cpp
@@ -917,6 +918,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_interactive_sketcher_acceptance_tests.cpp
       tests/gui/gui_spatial_surface_workbench_tests.cpp
       tests/gui/gui_interactive_modeling_mvp9_acceptance_tests.cpp
+      tests/gui/gui_advanced_fillet_panel_tests.cpp
       tests/gui/gui_advanced_fillet_controls_tests.cpp
       tests/gui/gui_advanced_fillet_draft_tests.cpp
       tests/gui/gui_interactive_finishing_tests.cpp

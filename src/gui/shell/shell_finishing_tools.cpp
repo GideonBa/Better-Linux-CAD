@@ -1,3 +1,4 @@
+#include "advanced_fillet_controls.hpp"
 #include "advanced_surface_controls.hpp"
 #include "blcad/geometry/result_face_support.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
@@ -23,12 +24,19 @@
 namespace blcad::gui {
 namespace {
 Result<std::vector<geometry::FinishingSelectionTarget>>
-finishing_targets(const GuiDocumentSession& session, const BodyId& body,
-                  PartFeatureInputRole role) {
+finishing_targets(const GuiDocumentSession& session, const BodyId& body, PartFeatureInputRole role,
+                  const AdvancedFilletControls* advanced = nullptr) {
+  const auto* document =
+      advanced && advanced->input_document ? &*advanced->input_document : session.part_document();
+  const auto* cache =
+      advanced && advanced->input_cache ? &*advanced->input_cache : session.part_shape_cache();
+  const auto prefix =
+      advanced && advanced->input_cache ? advanced->input_prefix : session.history_prefix_count();
   return query_with_step_import_context(session, [&](auto* context) {
-    return geometry::FinishingSelectionBuilder::build(*session.part_document(),
-                                                      *session.part_shape_cache(), body, role,
-                                                      context, session.history_prefix_count());
+    return geometry::FinishingSelectionBuilder::build(
+        *document, *cache, body, role, context, prefix,
+        advanced && advanced->editing ? geometry::FinishingSelectionVisibility::IncludeHiddenInputs
+                                      : geometry::FinishingSelectionVisibility::VisibleOnly);
   });
 }
 PartFeatureInputRole selection_role(ShellFeatureTools::Command command) {
@@ -271,19 +279,64 @@ void ShellFeatureTools::build_finishing_controls(QWidget* panel, QFormLayout&) {
   for (QWidget* input : std::array<QWidget*, 5>{
            finishing_body_, finishing_mode_, secondary_numeric_editor_, draft_axis_, draft_plane_})
     input->setMinimumHeight(input->minimumSizeHint().height());
+  advanced_fillet_ = std::make_unique<AdvancedFilletControls>(
+      finishing_controls_, finishing_mode_,
+      [this] {
+        if (command_ == Command::Fillet)
+          refresh_finishing_preview();
+      },
+      [this] {
+        if (command_ == Command::Fillet)
+          reload_finishing_targets();
+      });
+  column->addWidget(advanced_fillet_->panel);
+  advanced_fillet_->panel->hide();
   panel->layout()->addWidget(finishing_controls_);
   finishing_controls_->hide();
   connect(finishing_body_, &QComboBox::currentIndexChanged, this, [this] {
-    if (finishing())
+    if (finishing()) {
+      if (command_ == Command::Fillet) {
+        advanced_fillet_->body = BodyId(finishing_body_->currentData().toString().toStdString());
+        advanced_fillet_->clear_inputs();
+      }
       reload_finishing_targets();
+    }
   });
   connect(finishing_targets_list_, &QListWidget::itemSelectionChanged, this, [this] {
-    if (finishing())
+    if (finishing()) {
+      if (command_ == Command::Fillet) {
+        std::vector<std::string> selected;
+        for (int i = 0; i < finishing_targets_list_->count(); ++i)
+          if (finishing_targets_list_->item(i)->isSelected())
+            selected.push_back(finishing_targets_[i].semantic_id);
+        auto captured = advanced_fillet_->capture(finishing_targets_, selected);
+        if (!captured) {
+          task_summary_->setText(QString::fromStdString(captured.error().message()));
+          reload_finishing_targets(false);
+          return;
+        }
+      }
       refresh_finishing_preview();
+    }
   });
   connect(finishing_mode_, &QComboBox::currentIndexChanged, this, [this] {
     if (!finishing())
       return;
+    if (command_ == Command::Fillet) {
+      advanced_fillet_->remember_values();
+      if (!advanced_fillet_->editing && finishing_mode_->currentIndex() == 0) {
+        advanced_fillet_->input_document.reset();
+        advanced_fillet_->input_cache.reset();
+        advanced_fillet_->input_prefix.reset();
+      }
+      advanced_fillet_->configure();
+      advanced_fillet_->panel->setVisible(typed_finishing());
+      value_label_->setVisible(!typed_finishing());
+      numeric_editor_->setVisible(!typed_finishing());
+      preserve_finishing_row_heights(*finishing_controls_, *finishing_controls_->layout());
+      reload_finishing_targets();
+      return;
+    }
     const bool second = command_ == Command::Chamfer && finishing_mode_->currentIndex() > 0;
     secondary_numeric_editor_->parentWidget()->setVisible(second);
     if (second) {
@@ -310,7 +363,8 @@ void ShellFeatureTools::build_finishing_controls(QWidget* panel, QFormLayout&) {
     });
 }
 
-Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
+Result<std::size_t> ShellFeatureTools::begin_finishing(Command command,
+                                                       std::optional<FeatureId> editing) {
   const auto fail = [](std::string message) {
     return Result<std::size_t>::failure(
         Error::validation("gui.shell.finishing", std::move(message)));
@@ -323,12 +377,53 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
       command != Command::Draft)
     return fail("Unknown finishing function");
   const auto& part = *session_.part_document();
+  std::optional<FilletFeature> saved;
+  if (editing) {
+    const auto* record = part.find_fillet_feature(*editing);
+    if (command != Command::Fillet || !record)
+      return fail("Select an existing Fillet to edit");
+    saved = *record;
+  }
+  if (command == Command::Fillet) {
+    const QSignalBlocker mode(finishing_mode_);
+    finishing_mode_->clear();
+    finishing_mode_->addItems({"Constant Radius", "Variable Radius", "Face Blend", "Full Round"});
+    if (saved) {
+      advanced_fillet_->load(part, *saved);
+      auto history = part.executable_history();
+      if (!history)
+        return Result<std::size_t>::failure(history.error());
+      const auto found =
+          std::find_if(history.value().begin(), history.value().end(),
+                       [&](const auto& row) { return row.node_id == saved->id().value(); });
+      if (found == history.value().end())
+        return fail("Fillet input history is unavailable");
+      const auto prefix = std::size_t(found - history.value().begin());
+      if (session_.history_prefix_count() && prefix >= *session_.history_prefix_count())
+        return fail("Move End of Part after this Fillet before editing it");
+      auto cache = geometry::ShapeCache::create(ShapeCacheId("fillet.edit.inputs"));
+      if (!cache)
+        return Result<std::size_t>::failure(cache.error());
+      auto computed = query_with_step_import_context(session_, [&](auto* context) {
+        return geometry::GeometryRecomputeExecutor(context).execute_history_prefix(part, prefix,
+                                                                                   cache.value());
+      });
+      if (!computed)
+        return Result<std::size_t>::failure(computed.error());
+      advanced_fillet_->input_cache = std::move(cache.value());
+      advanced_fillet_->input_prefix = prefix;
+    } else
+      advanced_fillet_->reset(part, FeatureId("fillet.draft"), "Fillet", BodyId(""));
+  }
   {
     const QSignalBlocker body_block(finishing_body_), mode_block(finishing_mode_),
         axis_block(draft_axis_), plane_block(draft_plane_);
     finishing_body_->clear();
     for (const auto& body : part.bodies()) {
-      auto targets = finishing_targets(session_, body.id(), selection_role(command));
+      auto targets = finishing_targets(
+          session_, body.id(),
+          command == Command::Fillet ? advanced_fillet_->role() : selection_role(command),
+          command == Command::Fillet ? advanced_fillet_.get() : nullptr);
       if (targets && !targets.value().empty())
         finishing_body_->addItem(QString::fromStdString(body.name()),
                                  QString::fromStdString(body.id().value()));
@@ -343,7 +438,15 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
       if (index >= 0)
         finishing_body_->setCurrentIndex(index);
     }
-    finishing_mode_->clear();
+    if (saved) {
+      const int index =
+          finishing_body_->findData(QString::fromStdString(saved->target_body().value()));
+      if (index < 0)
+        return fail("Fillet target has no evaluated input geometry");
+      finishing_body_->setCurrentIndex(index);
+    }
+    if (command != Command::Fillet)
+      finishing_mode_->clear();
     if (command == Command::Chamfer)
       finishing_mode_->addItems({QStringLiteral("Equal Distances"), QStringLiteral("Two Distances"),
                                  QStringLiteral("Distance and Angle")});
@@ -363,29 +466,44 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
       draft_axis_->setCurrentIndex(z);
   }
   const auto title = command_title(command);
-  for (std::size_t i = 1;; ++i) {
-    const std::string base = "finishing." + std::to_string(i);
-    const FeatureId id("feature." + base);
-    const bool feature_taken =
-        part.find_feature(id) || part.find_revolve_feature(id) || part.find_fillet_feature(id) ||
-        part.find_chamfer_feature(id) || part.find_shell_feature(id) ||
-        part.find_draft_feature(id) || part.find_sweep_feature(id) || part.find_loft_feature(id) ||
-        part.find_surface_feature(id) || part.find_linear_pattern_feature(id) ||
-        part.find_circular_pattern_feature(id) || part.find_mirror_feature(id) ||
-        part.find_body_boolean_feature(id);
-    const std::string name = title.toStdString() + " " + std::to_string(i);
-    if (feature_taken || part.find_parameter(ParameterId("parameter." + base + ".first")) ||
-        part.find_parameter(ParameterId("parameter." + base + ".second")) ||
-        std::any_of(part.parameters().begin(), part.parameters().end(), [&](const auto& p) {
-          return p.name() == name + " Size" || p.name() == name + " Second Size";
-        }))
-      continue;
-    finishing_feature_ = id;
-    finishing_name_ = name;
-    finishing_parameter_ = ParameterId("parameter." + base + ".first");
-    finishing_second_parameter_ = ParameterId("parameter." + base + ".second");
-    break;
+  if (saved) {
+    finishing_feature_ = saved->id();
+    finishing_name_ = saved->name();
+    const auto parameters = saved->parameter_dependencies();
+    finishing_parameter_ = parameters.empty() ? ParameterId("") : parameters.front();
+    finishing_second_parameter_ = ParameterId("");
+  } else
+    for (std::size_t i = 1;; ++i) {
+      const std::string base = "finishing." + std::to_string(i);
+      const FeatureId id("feature." + base);
+      const bool feature_taken =
+          part.find_feature(id) || part.find_revolve_feature(id) || part.find_fillet_feature(id) ||
+          part.find_chamfer_feature(id) || part.find_shell_feature(id) ||
+          part.find_draft_feature(id) || part.find_sweep_feature(id) ||
+          part.find_loft_feature(id) || part.find_surface_feature(id) ||
+          part.find_linear_pattern_feature(id) || part.find_circular_pattern_feature(id) ||
+          part.find_mirror_feature(id) || part.find_body_boolean_feature(id);
+      const std::string name = title.toStdString() + " " + std::to_string(i);
+      if (feature_taken || part.find_parameter(ParameterId("parameter." + base + ".first")) ||
+          part.find_parameter(ParameterId("parameter." + base + ".second")) ||
+          std::any_of(part.parameters().begin(), part.parameters().end(), [&](const auto& p) {
+            return p.name() == name + " Size" || p.name() == name + " Second Size";
+          }))
+        continue;
+      finishing_feature_ = id;
+      finishing_name_ = name;
+      finishing_parameter_ = ParameterId("parameter." + base + ".first");
+      finishing_second_parameter_ = ParameterId("parameter." + base + ".second");
+      break;
+    }
+  if (command == Command::Fillet) {
+    if (!saved)
+      advanced_fillet_->reset(part, finishing_feature_, finishing_name_,
+                              BodyId(finishing_body_->currentData().toString().toStdString()));
+    advanced_fillet_->entry_selection = session_.selection();
+    advanced_fillet_->entry_viewport_selection = viewport_.selected_semantic();
   }
+  finishing_body_->setEnabled(!saved.has_value());
   previous_selection_mask_ = viewport_.selection_filter_mask();
   previous_semantic_scope_ = viewport_.selection_semantic_scope();
   command_ = command;
@@ -399,10 +517,12 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
   finishing_first_value_ = command == Command::Draft ? 5 : 1;
   finishing_second_value_ = 1;
   secondary_numeric_editor_->setText(QStringLiteral("1"));
-  show_task_panel(title, angular_value() ? QStringLiteral("deg") : QStringLiteral("mm"),
+  show_task_panel(saved ? QString("Edit %1").arg(QString::fromStdString(saved->name())) : title,
+                  angular_value() ? QStringLiteral("deg") : QStringLiteral("mm"),
                   finishing_first_value_);
-  finishing_mode_->parentWidget()->setVisible(command == Command::Chamfer ||
-                                              command == Command::Shell);
+  finishing_mode_->parentWidget()->setVisible(
+      command == Command::Fillet || command == Command::Chamfer || command == Command::Shell);
+  advanced_fillet_->panel->setVisible(typed_finishing());
   secondary_numeric_editor_->parentWidget()->hide();
   draft_axis_->parentWidget()->setVisible(command == Command::Draft);
   draft_plane_->parentWidget()->setVisible(command == Command::Draft);
@@ -412,7 +532,7 @@ Result<std::size_t> ShellFeatureTools::begin_finishing(Command command) {
   return Result<std::size_t>::success(1);
 }
 
-void ShellFeatureTools::reload_finishing_targets() {
+void ShellFeatureTools::reload_finishing_targets(bool preview) {
   const auto* part = session_.part_document();
   const auto* cache = session_.part_shape_cache();
   finishing_targets_.clear();
@@ -422,22 +542,47 @@ void ShellFeatureTools::reload_finishing_targets() {
     if (part && cache) {
       auto targets = finishing_targets(
           session_, BodyId(finishing_body_->currentData().toString().toStdString()),
-          selection_role(command_));
+          command_ == Command::Fillet ? advanced_fillet_->role() : selection_role(command_),
+          command_ == Command::Fillet ? advanced_fillet_.get() : nullptr);
       if (targets)
         finishing_targets_ = std::move(targets.value());
     }
-    for (const auto& target : finishing_targets_)
+    const auto keys = command_ == Command::Fillet ? advanced_fillet_->selected_keys()
+                                                  : std::vector<std::string>{};
+    if (command_ == Command::Fillet)
+      advanced_fillet_->labels.clear();
+    for (const auto& target : finishing_targets_) {
       finishing_targets_list_->addItem(target_label(target.label));
+      if (command_ == Command::Fillet) {
+        const auto key = std::visit(
+            [](const auto& r) {
+              using T = std::decay_t<decltype(r)>;
+              if constexpr (std::is_same_v<T, EdgeReference>)
+                return interactive_edge_identity(r);
+              else
+                return interactive_face_identity(r);
+            },
+            target.reference);
+        advanced_fillet_->labels[key] = target_label(target.label);
+        if (std::find(keys.begin(), keys.end(), key) != keys.end())
+          finishing_targets_list_->item(finishing_targets_list_->count() - 1)->setSelected(true);
+      }
+    }
+    if (command_ == Command::Fillet)
+      advanced_fillet_->render_members();
   }
-  viewport_.set_selection_filter_mask(selection_kind_bit(
-      command_ == Command::Fillet || command_ == Command::Chamfer ? GuiSelectionKind::Edge
-                                                                  : GuiSelectionKind::Face));
+  viewport_.set_selection_filter_mask(
+      selection_kind_bit((command_ == Command::Fillet && finishing_mode_->currentIndex() < 2) ||
+                                 command_ == Command::Chamfer
+                             ? GuiSelectionKind::Edge
+                             : GuiSelectionKind::Face));
   std::vector<std::string> scope;
   for (const auto& target : finishing_targets_)
     scope.push_back(target.semantic_id);
   viewport_.set_selection_semantic_scope(std::move(scope));
   window_.refresh_feature_selection_scene();
-  refresh_finishing_preview();
+  if (preview)
+    refresh_finishing_preview();
 }
 
 Result<std::size_t> ShellFeatureTools::rebuild_finishing_controller() {
@@ -446,6 +591,8 @@ Result<std::size_t> ShellFeatureTools::rebuild_finishing_controller() {
   layer_.cancel();
   drag_start_value_.reset();
   coordinator_.cancel();
+  if (typed_finishing())
+    return rebuild_advanced_fillet_controller();
   const BodyId body(finishing_body_->currentData().toString().toStdString());
   const bool angular = angular_value();
   auto quantity = angular ? Quantity::angle_deg(finishing_first_value_)
@@ -543,6 +690,9 @@ Result<std::size_t> ShellFeatureTools::rebuild_finishing_controller() {
 }
 
 QString ShellFeatureTools::finishing_summary() const {
+  if (typed_finishing())
+    return QString("%1: typed inputs and contacts verified. Preview valid.")
+        .arg(finishing_mode_->currentText());
   const auto count = finishing_targets_list_->selectedItems().size();
   const bool edges = command_ == Command::Fillet || command_ == Command::Chamfer;
   return QStringLiteral("%1 %2 selected. Preview valid.")
@@ -552,19 +702,31 @@ QString ShellFeatureTools::finishing_summary() const {
 }
 
 void ShellFeatureTools::refresh_finishing_preview() {
-  if (coordinator_.active())
+  if (typed_finishing())
+    advanced_fillet_->failure = false;
+  const auto* draft = coordinator_.finishing().typed_draft();
+  if (coordinator_.active() && (!draft || !draft->record.parameter_dependencies().empty()))
     finishing_first_value_ = current_value();
   auto begun = rebuild_finishing_controller();
   if (!begun) {
     preview_valid_ = false;
     viewport_.clear_feature_preview();
     task_summary_->setText(QString::fromStdString(begun.error().message()));
+    if (typed_finishing())
+      show_fillet_failure(begun.error());
     refresh_enablement();
     synchronize_overlay();
     return;
   }
   synchronize_numeric_editor(current_value());
-  (void)preview_and_publish();
+  auto preview = preview_and_publish();
+  if (typed_finishing()) {
+    if (preview)
+      advanced_fillet_->capability->setText(finishing_summary());
+    else
+      show_fillet_failure(preview.error());
+  }
+  synchronize_overlay();
 }
 
 bool ShellFeatureTools::accept_finishing_selection(const GuiSelection& selection) {

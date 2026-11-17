@@ -1103,7 +1103,14 @@ role selection and repair. Preserve untouched literals and bindings, validate fu
 history and prove native workflows at 100%/150% compact scales. The [typed controller and physical-guide foundation](gui-advanced-finishing-mvp9.md)
 preserves no-op stations, stages shared/independent values and uses normal atomic Undo/Redo.
 All five targets built; **10 GUI cases / 191 assertions** and **17 guide/variable Geometry cases /
-9,424 assertions** pass. The owned panel, repair and native scale gates remain open. Continue through 184; retain all planned scope after 184.
+9,424 assertions** pass. The owned panel now connects all four typed modes, ordered roles/stations, physical station grips,
+G1/G2 meaning, hold lines and explicit setback controls to the normal candidate transaction.
+Native create/edit/drag, duplicate-role rejection, exact Undo/Redo and Save/Open pass **11 / 221**
+at 100% and compact 150%; offscreen typed-panel regression **10 / 190**. Finishing selection on
+Stitch/Thicken ancestry and the coincident unrelated-Body negative pass **14 / 494**. Fixed
+Apply/Cancel and source-law arrows were visually reviewed. Explicit failed-Geometry reopening,
+scrolled compact controls and final combined regression remain open. Continue through 184;
+retain all planned scope after 184.
 
 ### Implementation route for the assigned continuation
 
