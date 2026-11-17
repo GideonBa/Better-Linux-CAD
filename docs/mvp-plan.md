@@ -1164,7 +1164,9 @@ and all five targets pass. Core-only configuration succeeds without FreeType dis
 Finish shared owned native creation/editing, contextual sources/supports, parameter bindings,
 physical grips and side/draft/termination/seam directions. Reuse source-Sketch breadcrumbs,
 qualified failure/repair, complete history, reopening and export. Prove combined F03/UI01 at
-100% and compact 150% before acceptance. Preserve all 185–204 planning.
+100% and compact 150% before acceptance. The [guide/controls foundation](gui-sketch-driven-features-mvp9.md)
+passes Geometry **2 / 80** and Qt **1 / 9**; native workflow acceptance remains open.
+Preserve all 185–204 planning.
 
 ### Implementation route for the assigned continuation
 

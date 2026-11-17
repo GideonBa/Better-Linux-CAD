@@ -235,6 +235,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/fillet_guides.cpp
     src/geometry/face_fillet_adapter.cpp
     src/geometry/variable_fillet_adapter.cpp
+    src/geometry/sketch_driven_guides.cpp
     src/geometry/emboss_outline.cpp
     src/geometry/emboss_mapping.cpp
     src/geometry/emboss_native.cpp
@@ -742,6 +743,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/setback_fillet_tests.cpp
       tests/geometry/rib_web_consumers_tests.cpp
       tests/geometry/emboss_text_tests.cpp
+      tests/geometry/sketch_driven_guide_tests.cpp
       tests/geometry/emboss_geometry_tests.cpp
       tests/geometry/rib_web_geometry_tests.cpp
       tests/geometry/fillet_guide_tests.cpp
@@ -948,6 +950,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_spatial_surface_workbench_tests.cpp
       tests/gui/gui_interactive_modeling_mvp9_acceptance_tests.cpp
       tests/gui/gui_advanced_fillet_panel_tests.cpp
+      tests/gui/gui_sketch_driven_controls_tests.cpp
       tests/gui/gui_advanced_fillet_controls_tests.cpp
       tests/gui/gui_advanced_fillet_draft_tests.cpp
       tests/gui/gui_interactive_finishing_tests.cpp
