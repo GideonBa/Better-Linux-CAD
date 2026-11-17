@@ -400,13 +400,30 @@ std::optional<std::vector<std::string>> transaction_geometry_roots(const PartDoc
   const auto next = Json::parse(after_json, nullptr, false);
   if (!previous.is_object() || !next.is_object())
     return std::nullopt;
-  const std::unordered_set<std::string> records{
-      "parameters",         "datum_planes",        "datum_axes",         "construction_points",
-      "construction_lines", "construction_planes", "derived_workplanes", "result_face_workplanes",
-      "sketches",           "sketches_3d",         "path_curves",        "features",
-      "revolve_features",   "sweep_features",      "loft_features",      "surface_features",
-      "part_patterns",      "mirror_features",     "edge_treatments",    "shell_features",
-      "draft_features",     "body_booleans",       "body_transforms"};
+  const std::unordered_set<std::string> records{"parameters",
+                                                "datum_planes",
+                                                "datum_axes",
+                                                "construction_points",
+                                                "construction_lines",
+                                                "construction_planes",
+                                                "derived_workplanes",
+                                                "result_face_workplanes",
+                                                "sketches",
+                                                "sketches_3d",
+                                                "path_curves",
+                                                "features",
+                                                "revolve_features",
+                                                "sweep_features",
+                                                "loft_features",
+                                                "surface_features",
+                                                "sketch_driven_features",
+                                                "part_patterns",
+                                                "mirror_features",
+                                                "edge_treatments",
+                                                "shell_features",
+                                                "draft_features",
+                                                "body_booleans",
+                                                "body_transforms"};
   std::unordered_set<std::string> keys;
   for (const auto& [key, value] : previous.items())
     keys.insert(key);

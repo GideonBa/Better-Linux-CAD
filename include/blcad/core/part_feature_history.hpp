@@ -29,6 +29,7 @@ enum class PartFeatureFamily {
   BodyTransform,
   Hole,
   Thread,
+  SketchDriven,
 };
 
 enum class PartFeatureState { Active, Suppressed };

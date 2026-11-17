@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 179
-current_block: 180
-current_boundary: Block 180 in progress; Rib and Web intent
-current_tag: "[parity-b180]"
+implemented_through: Block 180
+current_block: 181
+current_boundary: Block 181 in progress; checked Rib and Web Geometry
+current_tag: "[parity-b181]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–179 accepted; Block 180 in progress; Blocks 181–204 planned"
+  advanced_modeling_workflows: "Blocks 145–180 accepted; Block 181 in progress; Blocks 182–204 planned"
 ---
 
 # MVP Plan
@@ -34,10 +34,10 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 179
-current block        Block 180 (in progress)
+implemented through  Block 180
+current block        Block 181 (in progress)
 current phase        Advanced finishing and sketch-driven features
-current boundary     Rib and Web intent
+current boundary     Checked Rib and Web Geometry
 ```
 
 The assigned sequence continues through Block 184. Blocks 168–169 were delivered by normal
@@ -86,12 +86,13 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 177 | Accepted typed face/full-round/setback intent and atomic Core ownership/history/persistence. |
 | 178 | Accepted checked face/full-round construction and analytic G1 setback relief, native differential/material/history/STEP proof. |
 | 179 | Accepted shared native advanced finishing creation/editing, physical grips, qualified repair and full regression. |
-| 180–181 | Typed Rib/Web skeleton, side/draft/termination intent, checked connected thin volumes and semantic consumers. |
+| 180 | Accepted typed Rib/Web intent, strict necessary V15, historical Body snapshots and atomic Core history/parameters. |
+| 181 | Checked connected thin volumes, actual terminations and semantic consumers. |
 | 182–184 | Typed planar/cylindrical/conical Emboss/Engrave, checked mapping and native Rib/Web/Emboss/Engrave workflows. |
 
 The active Surface branch has [complete checked G03 construction, consumers and exchange proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof).
 Curved Trim/Extend and complete G04 are accepted in 172; the [bounded construction contract](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-construction--172) is retained.
-The active work is 177–184 face/full-round finishing, Rib/Web and mapped Emboss/Engrave. The original sequence and scenario
+The active work is 181–184 Rib/Web Geometry and mapped Emboss/Engrave. The original sequence and scenario
 oracles retain every prerequisite, supported-capability requirement and deferred extension.
 
 Each row retains its full numbered prerequisites and acceptance criteria; grouped rows do not
@@ -1114,13 +1115,28 @@ corrections. Runtime manifest: **1,255 files**, SHA-256
 Logs/captures: `build/verification/block179/`. Existing edge/Shell/Draft/Path selection retains its
 canonical result witnesses; advanced face ancestry uses one scoped query.
 
-### Block 180 Rib and Web intent — in progress
+### Block 180 Rib and Web intent — accepted
 
-Register one immutable sketch-driven family with owned skeleton/profile, target Body,
-parallel/perpendicular direction, thickness/side, draft, termination and crossing policy. Preserve
-normal history, atomic parameter edits, necessary strict persistence and earlier Body input
-snapshots. Core/JSON proof precedes checked Geometry in 181 and native authoring in 184.
-Continue through 184; preserve every planned requirement and deferred extension after 184.
+The [Rib/Web intent contract](part-rib-web-intent-mvp6.md) defines one immutable normal feature
+family, owned Sketch curves/profiles, local direction, side/thickness, draft, actual termination
+references and crossing policy. Normal history, graph inventory, update/remove/suppression,
+parameter rollback and strict necessary Part V15/Project replay are integrated. Legacy documents
+omit the new array and retain their earlier schema. Earlier Body consumers retain their original
+producer snapshot, allowing a placed limit Body derived from the later Rib target without a false
+cycle. Geometry dispatch diagnoses unimplemented construction explicitly until 181.
+
+All five targets build after the complete dependency rebuild. Focused Core **6 / 73**, complete
+Core **804 / 35,384**, legacy guide Geometry **5 / 83** and focused finishing Qt **13 passed /
+1 native skip / 314 assertions** pass. Logs: `build/verification/block180/`. Frozen runtime:
+**1,263 files**, `aedf1c24cc5413545376844f865e13a33fef6c834d48fa2e0602ed5275b6d56f`.
+
+### Block 181 Rib and Web Geometry — in progress
+
+Build native checked thin volumes, mitered connected offsets and explicit crossing policies.
+Resolve actual finite face/first-Body termination, join connected material, preserve source and
+unrelated Bodies, and expose semantic faces to Hole/Fillet/full-round consumers. Independent
+straight/curved, side/draft, intersection, placed/imported support and history/STEP proof remain
+required. Continue through 184 and preserve all 185–204 planning.
 
 ### Implementation route for the assigned continuation
 

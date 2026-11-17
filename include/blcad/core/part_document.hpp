@@ -30,6 +30,7 @@
 #include "blcad/core/shell_feature.hpp"
 #include "blcad/core/sketch.hpp"
 #include "blcad/core/sketch_3d.hpp"
+#include "blcad/core/sketch_driven_feature.hpp"
 #include "blcad/core/sketch_ownership.hpp"
 #include "blcad/core/step_import_source.hpp"
 #include "blcad/core/surface_feature.hpp"
@@ -136,6 +137,12 @@ public:
   [[nodiscard]] Result<std::size_t> add_sweep_feature(SweepFeature feature);
   [[nodiscard]] Result<std::size_t> add_loft_feature(LoftFeature feature);
   [[nodiscard]] Result<std::size_t> add_surface_feature(SurfaceFeature feature);
+  [[nodiscard]] Result<std::size_t> add_sketch_driven_feature(SketchDrivenFeature feature);
+  [[nodiscard]] Result<std::size_t> update_sketch_driven_feature(SketchDrivenFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_sketch_driven_feature(FeatureId id);
+  [[nodiscard]] const SketchDrivenFeature* find_sketch_driven_feature(FeatureId id) const noexcept;
+  [[nodiscard]] const std::vector<SketchDrivenFeature>& sketch_driven_features() const noexcept;
+  [[nodiscard]] std::size_t sketch_driven_feature_count() const noexcept;
   [[nodiscard]] Result<std::size_t> remove_surface_feature(FeatureId id);
   [[nodiscard]] Result<std::size_t> add_linear_pattern_feature(LinearPatternFeature feature);
   [[nodiscard]] Result<std::size_t> add_circular_pattern_feature(CircularPatternFeature feature);
@@ -507,6 +514,7 @@ private:
   std::vector<SweepFeature> sweep_features_;
   std::vector<LoftFeature> loft_features_;
   std::vector<SurfaceFeature> surface_features_;
+  std::vector<SketchDrivenFeature> sketch_driven_features_;
   std::vector<LinearPatternFeature> linear_pattern_features_;
   std::vector<CircularPatternFeature> circular_pattern_features_;
   std::vector<MirrorFeature> mirror_features_;
