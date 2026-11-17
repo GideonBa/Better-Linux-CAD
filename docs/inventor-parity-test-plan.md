@@ -554,7 +554,10 @@ earlier derived/placed Body termination. Focused **6 / 73**, full Core **804 / 3
 181 is now accepted: [checked construction, semantic consumers and STEP proof](geometry-rib-web-mvp8.md#verification),
 complete Geometry **836 / 91,510** and Core **805 / 35,388**. The [182 intent gate](part-emboss-engrave-intent-mvp6.md)
 also passes focused Core **5 / 53**, full **810 / 35,441**, typed parameter-driven text, strict replay
-and literal chart identity. Geometry 183 and combined native F03/UI01 in 184 remain open.
+and literal chart identity. [Geometry 183](geometry-emboss-engrave-mvp8.md#verification) is accepted:
+focused **12 / 239**, isolated complete **848 / 91,749**, independent text area/mass and mapped
+STEP coordinates, inner loops, consumer edits and atomic failures. Combined native F03/UI01 in
+184 remains open.
 
 ### D01 Direct face edits and source preservation
 

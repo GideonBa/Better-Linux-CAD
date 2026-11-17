@@ -741,6 +741,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/guided_loft_pipeline_tests.cpp
       tests/geometry/setback_fillet_tests.cpp
       tests/geometry/rib_web_consumers_tests.cpp
+      tests/geometry/emboss_text_tests.cpp
       tests/geometry/emboss_geometry_tests.cpp
       tests/geometry/rib_web_geometry_tests.cpp
       tests/geometry/fillet_guide_tests.cpp
@@ -822,6 +823,9 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/workplane_resolver_recovery_tests.cpp
     )
 
+    set_source_files_properties(tests/geometry/emboss_text_tests.cpp PROPERTIES
+      INCLUDE_DIRECTORIES "${FREETYPE_INCLUDE_DIRS}"
+      COMPILE_DEFINITIONS "BLCAD_TEST_OUTLINE_FONT=\"${CMAKE_CURRENT_SOURCE_DIR}/assets/gui/fonts/Barlow-Regular.ttf\"")
     target_link_libraries(blcad_geometry_tests PRIVATE BLCAD::geometry Catch2::Catch2WithMain)
     target_include_directories(blcad_geometry_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/geometry)
     target_include_directories(blcad_geometry_tests SYSTEM PRIVATE ${OpenCASCADE_INCLUDE_DIR})

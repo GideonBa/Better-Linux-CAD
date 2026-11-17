@@ -1,8 +1,8 @@
 # Checked Emboss and Engrave Geometry
 
 [Typed intent](part-emboss-engrave-intent-mvp6.md) owns persistence and units. The [main plan](mvp-plan.md)
-owns numbered status. The construction foundation is implemented; text/counter, combined consumer
-and complete regression proof remain open for 183. Native authoring belongs to 184.
+owns numbered status. Block 183 is accepted with text, combined consumer and complete Geometry regression proof.
+Native authoring belongs to 184.
 
 ## Bounded native construction
 
@@ -63,5 +63,18 @@ All five targets build. Core **810 / 35,441**, Rib/Web regression **16 / 202** a
 **13 passed / 1 native skip / 314** pass. Foundation runtime **1,287 files**, SHA-256
 `2ea725df6b4ccca9afd077769e25b739369684328669c7fee6b916a7ef635d68`.
 
-Whole-block acceptance remains open for text counters/dots, changed bound text/height, combined
-thickness/finishing/material consumers, failure variants and final complete Geometry regression.
+The complete matrix passes **12 cases / 239 assertions**. An independent Green-integral oracle
+uses font outline polynomials without OCCT curves, nesting or solids; it verifies O/B counters,
+the separate i dot, literal and parameter-driven text, changed height, physical mass and STEP.
+Composite profile holes retain analytic area. Complete-circumference wrapping, the conical apex,
+actual finite support holes, missing/corrupt pinned font bytes and erasing recesses reject atomically.
+Emboss/Engrave after Shell or Fillet retains independently known material increments after upstream
+size changes and canonical reopening.
+
+Complete isolated Geometry: **848 / 91,749**. Core **810 / 35,441** and focused Qt **13 passed /
+1 native skip / 314** retain the foundation result; subsequent changes affect only Geometry tests.
+All five targets build. A separate Core-only configure with FreeType discovery disabled succeeds.
+Final runtime **1,289 files**, SHA-256
+`9115edaf90a878def3d761e0b513cfd6a3dae46d35a636a8f944b6db6402ff14`.
+Final logs and manifest: `build/verification/block183/`. These checks close 183; combined native
+creation/editing, grips, reference repair and F03/UI01 remain 184.

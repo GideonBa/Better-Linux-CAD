@@ -259,3 +259,119 @@ TEST_CASE("Invalid finite support wraps and erasing recesses preserve the last c
   CHECK_FALSE(GeometryRecomputeExecutor{}.execute_document(p, c));
   CHECK(bytes(*c.find_body_shape(BodyId("body.base"))) == before);
 }
+TEST_CASE("Wrapped sources reject complete circumference and a conical apex atomically",
+          "[geometry][emboss-failure][parity-b183]") {
+  imported_body_test::Fixture files;
+  bool cone = false;
+  SECTION("Complete circumference") {}
+  SECTION("Cone apex") {
+    cone = true;
+  }
+  files.write(cone ? BRepPrimAPI_MakeCone(0, 10, 20).Shape()
+                   : BRepPrimAPI_MakeCylinder(10, 20).Shape());
+  auto p = files.editable();
+  source(p, cone ? 4 : 70, 3, cone ? Point2{} : Point2{0, 10});
+  StepImportTopologyContext context(files.root);
+  auto c = cache();
+  execute(p, c, &context);
+  auto e = intent(
+      support(p, c, BodyId("body.1"), cone ? GeomAbs_Cone : GeomAbs_Cylinder, false, &context),
+      cone ? EmbossMapping::Conical : EmbossMapping::Cylindrical);
+  if (cone)
+    e.anchor_mm.y = .1;
+  const auto before = bytes(*c.find_body_shape(BodyId("body.1")));
+  add(p, BodyId("body.1"), e);
+  CHECK_FALSE(GeometryRecomputeExecutor(&context).execute_document(p, c));
+  CHECK(bytes(*c.find_body_shape(BodyId("body.1"))) == before);
+}
+TEST_CASE("Composite Emboss retains inner profile material voids with analytic area",
+          "[geometry][emboss-geometry][parity-b183]") {
+  auto p = f::native_base();
+  source(p, 8, 4);
+  auto sketch =
+      f::checked(Sketch::create(SketchId("label.sketch"), "Ring", DatumPlaneId("datum.xy")));
+  const auto contour = [&](const char* name, double w, double h) {
+    std::vector<SketchEntityId> ids;
+    std::vector<Point2> points{{-w / 2, -h / 2}, {w / 2, -h / 2}, {w / 2, h / 2}, {-w / 2, h / 2}};
+    for (int i = 0; i < 4; ++i) {
+      SketchEntityId id(std::string(name) + std::to_string(i));
+      f::accept(
+          sketch.add_entity(f::checked(LineSegment::create(id, points[i], points[(i + 1) % 4]))));
+      ids.push_back(id);
+    }
+    return ids;
+  };
+  const auto outer = contour("outer", 8, 4), inner = contour("inner", 2, 2);
+  f::accept(sketch.add_profile(
+      f::checked(CompositeClosedProfile::create(ProfileId("label.profile"), outer, {inner}))));
+  f::accept(p.update_sketch(sketch));
+  auto c = cache();
+  execute(p, c);
+  add(p, BodyId("body.base"), intent(support(p, c, BodyId("body.base"), GeomAbs_Plane)));
+  execute(p, c);
+  CHECK(volume(c, BodyId("body.base")) == Catch::Approx(1614).margin(1e-5));
+  CHECK_FALSE(material(*c.find_body_shape(BodyId("body.base")), {0, 0, 8.25}));
+  CHECK(material(*c.find_body_shape(BodyId("body.base")), {2, 0, 8.25}));
+}
+TEST_CASE("Finite target support holes remain uncovered instead of accepting the infinite plane",
+          "[geometry][emboss-failure][parity-b183]") {
+  auto p = f::native_base();
+  source(p);
+  parameter(p, "bore.d", 2);
+  auto plane = f::checked(PlaneReference::create_datum_plane(PartFeatureInputRole::HoleSupportPlane,
+                                                             DatumPlaneId("datum.xy")));
+  f::accept(p.add_hole_feature(f::checked(
+      HoleFeature::create(FeatureId("bore"), "Bore", HoleKind::Plain, BodyId("body.base"), plane,
+                          {{HolePlacementId("center"), Point2{0, 0}}}, ParameterId("bore.d"),
+                          HoleThroughAllExtent{}, HoleDirection::SupportNormal, HoleFlatTip{}))));
+  auto c = cache();
+  execute(p, c);
+  const auto before = bytes(*c.find_body_shape(BodyId("body.base")));
+  add(p, BodyId("body.base"), intent(support(p, c, BodyId("body.base"), GeomAbs_Plane)));
+  CHECK_FALSE(GeometryRecomputeExecutor{}.execute_document(p, c));
+  CHECK(bytes(*c.find_body_shape(BodyId("body.base"))) == before);
+}
+TEST_CASE("Emboss and Engrave remain physical modifiers after Shell or Fillet and parameter edits",
+          "[geometry][emboss-consumers][parity-b183]") {
+  auto p = f::native_base();
+  source(p);
+  parameter(p, "skin", .4);
+  bool shell = false;
+  SECTION("Shell skin") {
+    shell = true;
+    auto face = f::checked(FaceReference::create_planar(
+        PartFeatureInputRole::ShellRemovalFace,
+        f::checked(SemanticFaceReference::create(FeatureId("base"), SemanticFace::Front))));
+    f::accept(p.add_shell_feature(
+        f::checked(ShellFeature::create(FeatureId("upstream"), "Shell", BodyId("body.base"), {face},
+                                        ParameterId("skin"), ShellDirection::Inward))));
+  }
+  SECTION("Fillet") {
+    auto edge = f::checked(EdgeReference::create_linear(
+        PartFeatureInputRole::FilletEdge,
+        f::checked(SemanticEdgeReference::create(FeatureId("base"), SemanticEdge::TopBack))));
+    f::accept(p.add_fillet_feature(f::checked(FilletFeature::create(
+        FeatureId("upstream"), "Fillet", BodyId("body.base"), {edge}, ParameterId("skin")))));
+  }
+  auto c = cache();
+  execute(p, c);
+  const auto original = *c.find_feature_shape(FeatureId("upstream"));
+  const auto original_bytes = bytes(original);
+  const double before = volume(c, BodyId("body.base"));
+  auto e = intent(support(p, c, BodyId("body.base"), GeomAbs_Plane));
+  if (shell) {
+    e.operation = EmbossOperation::Recess;
+    REQUIRE(p.set_parameter_value(ParameterId("label.d"), f::checked(Quantity::length_mm(.2))));
+  }
+  add(p, BodyId("body.base"), e);
+  execute(p, c);
+  const double delta = shell ? -2.4 : 6;
+  CHECK(volume(c, BodyId("body.base")) == Catch::Approx(before + delta).margin(2e-4));
+  CHECK(bytes(original) == original_bytes);
+  REQUIRE(p.set_parameter_value(ParameterId("skin"), f::checked(Quantity::length_mm(.6))));
+  execute(p, c);
+  const double changed =
+      blcad::test::integrated_solid_volume(*c.find_feature_shape(FeatureId("upstream"))).volume_mm3;
+  CHECK(volume(c, BodyId("body.base")) == Catch::Approx(changed + delta).margin(3e-4));
+  replay(p, c, BodyId("body.base"));
+}
