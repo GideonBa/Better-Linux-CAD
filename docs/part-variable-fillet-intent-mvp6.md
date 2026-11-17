@@ -59,11 +59,14 @@ radius for the complete law. Face/full-round roles and corner management remain 
 
 ## Verification status
 
-Core foundation verified on 2026-11-17: all five development targets built successfully; the
-focused variable-Fillet/edge-treatment/history-intent run passed **28 cases / 1,244 assertions**
-and the full Core suite passed **791 cases / 35,193 assertions**. Coverage includes tiny literal
-fractions and exact double reversal, malformed/needless/downgraded envelopes, all radius
-dependencies, failed formula/value rollback of the complete document and graph, ownership/repair,
-suppression/removal, Part/Project roundtrip and legacy six-field constant compatibility. Logs
-are in `build/verification/block175/`. Resolved tangent expansion, branches and split/lost edges
-remain part of the joint 175/176 Geometry gate; whole-block status is owned by `mvp-plan.md`.
+Accepted Core/Geometry gate on 2026-11-17: all five development targets built; the focused
+variable-Fillet/edge-treatment/history-intent run passed **29 cases / 1,249 assertions** and the
+full Core suite passed **792 / 35,198**. Coverage includes tiny literal fractions, exact double
+reversal, strict envelopes, all radius dependencies, formula/value rollback of the complete
+document and graph, foreign producers, exact imported parent-Body ownership, repair, suppression,
+removal, Part/Project roundtrip and legacy six-field constant compatibility. Imported ancestry
+allows the selected source history, while another output of the same base cannot lend its edge.
+
+The [Geometry proof](geometry-variable-fillet-mvp8.md#verification) covers resolved expansion,
+branches, split/lost edges, physical station edits and normal Hole repair. Current logs/manifest
+are in `build/verification/block176/`. Native authoring remains 179; `mvp-plan.md` owns whole-block status.

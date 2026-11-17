@@ -64,13 +64,23 @@ uses an exact B-spline representation of its Bernstein polynomial, including spl
 
 ## Verification
 
-Native foundation verified on 2026-11-17: all five development targets built, and the focused
-variable/constant-Fillet/Chamfer run passed **17 cases / 7,476 assertions**. Executable cases in `tests/geometry/variable_fillet_tests.cpp` cover
-increasing/decreasing straight-edge sections, nonmonotone multiple stations, exact group reversal,
-interpolation bounds/derivatives/intervals, unresolved station and excessive-radius rollback,
-periodic rim closure, nonuniform cubic length, explicit/expanded chains, imported construction,
-normal history/Save/Open and independent circles after physical STEP export/reimport.
+Accepted Core/Geometry gate on 2026-11-17: all five development targets built; variable Geometry
+passed **12 cases / 9,341 assertions**, and complete Geometry passed **803 / 90,933** in an isolated
+run. Complete Core passed **792 / 35,198**. Runtime inputs stayed frozen throughout both full suites.
 
-The remaining F01 matrix includes branch ambiguity, Pattern, mirrored/scaled inputs, new Hole edits and explicit
-reference repair. Native shared-panel interaction remains Block 179. Logs and preparatory probes
-remain in `build/verification/block176/`; experiments are not acceptance evidence.
+`tests/geometry/variable_fillet_tests.cpp` independently checks normal-section circles within
+`2e-4 mm`, increasing/decreasing and multiple-station laws, periodic seams and nonuniform cubic
+length, explicit/expanded chains, double reversal, actual station relocation, shared-vertex branch
+rejection and split/lost-edge failure. Typed imported references replay through normal history,
+Save/Open and physical STEP export/reimport. Scaled/Mirrored Bodies preserve radius units/side.
+
+Pattern preserves both components and unrelated Body material, with analytic removed volume.
+A new Hole changes diameter from 4 to 6 mm; the stale rim fails atomically, explicit repair retains
+all station identities/bindings, and independent rim circles plus integrated removed volume agree
+before and after repair. Excessive radii preserve the last published result; original source BRep
+bytes remain unchanged. Legacy Fillet/Chamfer, STEP reader and connected Surface regressions pass
+as part of the full Geometry suite.
+
+Logs and manifest: `build/verification/block176/`. The 1,234-file runtime manifest hash is
+`37d505e9d309a8d2bed72f6a88dbb66224c7d8a0deadf3a11f35e8cd02a86715`. Preparatory probes and
+failed/intermediate runs are not acceptance evidence. Native shared-panel interaction remains 179.

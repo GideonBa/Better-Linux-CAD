@@ -516,6 +516,13 @@ Material-only BRep reuse remains 150; visible resource management remains 151.
 - Oracle: independent normal-section radius checks, solid validity and semantic endpoint mapping.
   Reject discontinuous chains, branch ambiguity, negative/excessive radii and stale picked edges.
 
+**175/176 gate accepted — 2026-11-17.** [Typed intent](part-variable-fillet-intent-mvp6.md#verification-status)
+and [independent native proof](geometry-variable-fillet-mvp8.md#verification) cover the complete
+Core/Geometry F01 matrix, including typed import ownership, branches, split/lost edges, moved
+stations, Pattern, scaled/Mirrored Bodies, new Hole edit/repair and physical STEP. Complete Core
+**792 / 35,198**, complete Geometry **803 / 90,933** on frozen runtime inputs. Native shared-panel
+creation, station drags and compact/scaled interaction retain their Block-179 gate.
+
 ### F02 Face full rounds and corner behavior
 
 - **First gate:** 177/178; native completion 179.

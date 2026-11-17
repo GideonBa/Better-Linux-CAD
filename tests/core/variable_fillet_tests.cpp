@@ -276,3 +276,50 @@ TEST_CASE("Variable radius value and formula failures roll back the complete par
   CHECK(saved(part) == before);
   CHECK(part.dependency_graph().dependencies() == graph);
 }
+
+TEST_CASE("Variable Fillet distinguishes exact Body ownership within a multi-output import",
+          "[core][variable-fillet][parity-b175]") {
+  const auto original = f::imported();
+  const auto source = original.step_import_sources().front();
+  const auto body = original.imported_topology_catalogs().front().entries().front().descriptor;
+  ImportedTopologyDescriptor edge;
+  edge.kind = ImportedTopologyKind::Edge;
+  edge.geometry = ImportedGeometryClass::Line;
+  edge.bounds_mm = {0, 0, 0, 10, 0, 0};
+  edge.centroid = {5, 0, 0};
+  edge.direction = {1, 0, 0};
+  edge.measure = 10;
+  edge.geometry_key = std::string(64, 'd');
+  const auto catalog = f::checked(ImportedTopologyCatalog::create(
+      ImportedTopologyCatalogId("catalog"), source.id(), source.sha256_digest(),
+      std::string(64, '2'),
+      {{ImportedTopologyId("first"), {}, body},
+       {ImportedTopologyId("second"), {}, body},
+       {ImportedTopologyId("edge"), ImportedTopologyId("first"), edge}}));
+  const auto definition = f::checked(ImportedPartDefinition::create(
+      source.id(), catalog.id(),
+      {{ImportedTopologyId("first"), BodyId("body.first"), BodyKind::Solid},
+       {ImportedTopologyId("second"), BodyId("body.second"), BodyKind::Solid}}));
+  auto part = f::checked(PartDocument::create_editable_import(
+      DocumentId("owned"), "Owned", source, catalog,
+      f::checked(ImportedBodyFeature::create(FeatureId("imported"), "Imported", definition))));
+  f::accept(part.add_parameter(f::checked(Parameter::create_length(
+      ParameterId("radius"), "radius", f::checked(Quantity::length_mm(1))))));
+  auto law = intent();
+  for (auto& station : law.groups[0].stations)
+    station.radius = ParameterId("radius");
+  law.groups[0].edges[0].edge = f::checked(EdgeReference::create_imported(
+      PartFeatureInputRole::FilletEdge,
+      f::checked(ImportedTopologyReference::create(catalog.id(), ImportedTopologyId("edge"),
+                                                   ImportedTopologyCapability::Edge))));
+  const auto before = saved(part);
+  const auto graph = part.dependency_graph().dependencies();
+  auto wrong = f::checked(FilletFeature::create_variable(FeatureId("variable"), "Wrong Body",
+                                                         BodyId("body.second"), law));
+  CHECK_FALSE(part.add_fillet_feature(wrong));
+  CHECK(saved(part) == before);
+  CHECK(part.dependency_graph().dependencies() == graph);
+  REQUIRE(part.add_fillet_feature(f::checked(
+      FilletFeature::create_variable(FeatureId("variable"), "Owned", BodyId("body.first"), law))));
+  CHECK(saved(f::checked(deserialize_part_document_from_json(saved(part)))) == saved(part));
+}

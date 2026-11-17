@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 174
-current_block: 175
-current_boundary: Block 175 in progress; typed variable Fillet groups and radius laws
-current_tag: "[parity-b175]"
+implemented_through: Block 176
+current_block: 177
+current_boundary: Block 177 in progress; typed face/full-round and corner intent
+current_tag: "[parity-b177]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–174 accepted; Block 175 in progress; Blocks 176–204 planned"
+  advanced_modeling_workflows: "Blocks 145–176 accepted; Block 177 in progress; Blocks 178–204 planned"
 ---
 
 # MVP Plan
@@ -34,10 +34,10 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 174
-current block        Block 175 (in progress)
+implemented through  Block 176
+current block        Block 177 (in progress)
 current phase        Advanced finishing and sketch-driven features
-current boundary     Typed variable Fillet groups and radius laws
+current boundary     Typed face/full-round and corner intent
 ```
 
 The assigned sequence continues through Block 184. Blocks 168–169 were delivered by normal
@@ -58,7 +58,7 @@ documentation. The earlier AGENTS.md agreement was withdrawn on 2026-11-16; its 
 push/serial-PR workflow is no longer the current working instruction. Existing merged deliveries
 and their verified trees remain historical evidence.
 
-### Assigned continuation through Block 184 — updated 2026-11-16
+### Assigned continuation through Block 184 — updated 2026-11-17
 
 The current request extends the complete sequence through 184. Keep each commit below 1,500 added lines;
 this assignment does not change acceptance status. Keep the detailed requirements in
@@ -82,14 +82,14 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 170–172 | 170–172 accepted: typed/checked Offset/Thicken, curved Trim/Extend, native gap queries and complete G03/G04 history/consumer/exchange proof. Delivered by normal rebase in [PR #193](https://github.com/GideonBa/Better-Linux-CAD/pull/193). |
 | 173 | Accepted native advanced curve/Surface creation/editing, complete regression and 100%/150% physical workflows. |
 | 174 | Accepted connected curve/Surface model, exact sidecar history, independent native/STEP checks and both native scales. |
-| 175–176 | Typed variable-radius Fillet laws, ordered semantic chains and independently checked native radius progression. |
+| 175–176 | Accepted typed variable-radius laws, ordered chains, physical station mapping and F01 Core/Geometry history/repair/STEP proof; native authoring remains 179. |
 | 177–179 | Typed face/full-round/setback intent, checked supported blends/corners and native shared finishing controls. |
 | 180–181 | Typed Rib/Web skeleton, side/draft/termination intent, checked connected thin volumes and semantic consumers. |
 | 182–184 | Typed planar/cylindrical/conical Emboss/Engrave, checked mapping and native Rib/Web/Emboss/Engrave workflows. |
 
 The active Surface branch has [complete checked G03 construction, consumers and exchange proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof).
 Curved Trim/Extend and complete G04 are accepted in 172; the [bounded construction contract](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-construction--172) is retained.
-The active work is 175–184 advanced finishing, Rib/Web and mapped Emboss/Engrave. The original sequence and scenario
+The active work is 177–184 face/full-round finishing, Rib/Web and mapped Emboss/Engrave. The original sequence and scenario
 oracles retain every prerequisite, supported-capability requirement and deferred extension.
 
 Each row retains its full numbered prerequisites and acceptance criteria; grouped rows do not
@@ -1038,28 +1038,36 @@ retains 3D/tolerance evidence and rejects displaced vertices; its contract remai
 Runtime: **1,219 files**, `fc2855b392f94ebf6666548fabb1f9b90483783a1fc8534821760757a5cc684f`.
 Continue the complete 175–184 assignment; preserve all later 185–204 scope.
 
-### Block 175 variable Fillet intent — in progress
+### Blocks 175–176 variable Fillet intent and Geometry — accepted
 
-Core foundation implemented: [typed groups, immutable laws and strict version-14 persistence](part-variable-fillet-intent-mvp6.md).
-Stable station IDs, original fraction literals and the separate orientation basis survive exact
-double reversal. All radius bindings participate in normal dependencies and transactional formula
-updates; foreign producers fail before publication. Legacy constant records retain six fields.
-On 2026-11-17 all five targets built; focused Core passed **28 / 1,244**, full Core **791 / 35,193**.
-The [native engine](geometry-variable-fillet-mvp8.md) now verifies true-length laws and explicit/expanded
-tangent chains. Branch ambiguity, the complete repair/history matrix and remaining F01 combinations
-keep the joint 175/176 gate open. Continue through 184 and retain all 185–204 scope.
+Accepted on 2026-11-17 with [immutable typed intent and strict compatible V14 persistence](part-variable-fillet-intent-mvp6.md)
+and [checked native construction with physical station mapping](geometry-variable-fillet-mvp8.md).
+Stable group/station IDs, literal fractions and all parameter bindings survive reversal, editing,
+suppression, repair and Part/Project reopening. Imported references check their exact parent Body
+or selected ancestry, including rejection of another output from the same imported base. Legacy
+constant Fillet records/geometry and all Chamfer modes retain their meanings.
 
-### Block 176 variable-radius Fillet Geometry — in progress
+Independent native sections cover increasing/decreasing and multistation laws, periodic rims,
+a nonuniform cubic trace, explicit/expanded tangent chains and moved stations. Valid shared-vertex
+branches, stale/split edges, unresolved spacing and excessive radii reject before publication.
+Pattern, scaled/Mirrored history and an edited new Hole exercise normal recovery and atomic cache
+preservation. Analytic removed volumes, retained unrelated material and physical STEP reimport
+support the radius/side claims; source BRep bytes remain unchanged.
 
-The [checked engine and physical station contract](geometry-variable-fillet-mvp8.md) are implemented.
-On 2026-11-17 all five targets built; variable/constant Fillet and Chamfer regressions passed
-**17 cases / 7,476 assertions**. Independent normal-section circles cover increasing/decreasing
-and multistation laws, periodic rims and a nonuniform cubic B-spline trace, including explicit/expanded
-tangent spans and exact reversal. Projection to original true length corrects OCCT's elementary-guide
-parameterization; imported history/Open and physical STEP replay retain the same measured sections.
-Candidates use deep copies, and source BRep bytes remain unchanged. Branch/Pattern, mirrored/scaled
-inputs and new Hole edit/repair combinations remain required before whole-block acceptance. Continue
-through 184 and retain all 185–204 scope.
+All five targets built. Focused Core **29 cases / 1,249 assertions**; complete Core **792 / 35,198**.
+Variable Geometry **12 / 9,341**; complete Geometry **803 / 90,933**, run without concurrent builds
+or other CAD tests. No runtime inputs changed. Logs and manifest: `build/verification/block176/`.
+Runtime: **1,234 files**, `37d505e9d309a8d2bed72f6a88dbb66224c7d8a0deadf3a11f35e8cd02a86715`.
+Native shared-panel creation/editing remains the explicitly assigned Block 179 gate.
+
+### Block 177 face/full-round and corner intent — in progress
+
+Prepare typed ordered first/second/middle face roles, G1/G2 and hold-line constraints, explicit
+size meaning and checked setback policies in the existing immutable Fillet authority. Full-round
+derives its section from the selected supports and replaces the selected middle region. Keep
+all old constant/variable records compatible, normal graph/history/repair and unambiguous dispatch.
+Geometry and its supported-corner capability table remain 178; native shared finishing remains 179.
+Continue through 184 and retain every planned 185–204 capability.
 
 ### Implementation route for the assigned continuation
 
