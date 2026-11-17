@@ -13,12 +13,21 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepGProp.hxx>
+#include <BRepLib.hxx>
+#include <BRepLib_CheckCurveOnSurface.hxx>
 #include <BRepOffsetAPI_MakeOffset.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <BRep_Tool.hxx>
 #include <GProp_GProps.hxx>
+#include <Geom2dConvert_ApproxCurve.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <Geom2d_OffsetCurve.hxx>
+#include <Geom2d_TrimmedCurve.hxx>
+#include <GeomAPI.hxx>
+#include <Geom_Plane.hxx>
+#include <Geom_TrimmedCurve.hxx>
 #include <TopExp.hxx>
 #include <TopoDS.hxx>
 #include <algorithm>
@@ -60,6 +69,32 @@ Boundary offset(const RibSpine& s, const ResolvedWorkplane& f, double distance,
   const gp_Pln plane(gp_Ax3(gp_Pnt(f.origin.x, f.origin.y, f.origin.z), n,
                             gp_Dir(f.x_axis.x, f.x_axis.y, f.x_axis.z)));
   BRepAdaptor_Curve curve(s.edges.front().first);
+  if (s.edges.size() == 1 &&
+      (curve.GetType() == GeomAbs_BezierCurve || curve.GetType() == GeomAbs_BSplineCurve)) {
+    double begin, end;
+    auto native = BRep_Tool::Curve(s.edges.front().first, begin, end);
+    if (auto trim = Handle(Geom_TrimmedCurve)::DownCast(native); !trim.IsNull())
+      native = trim->BasisCurve();
+    Handle(Geom2d_Curve) local = new Geom2d_TrimmedCurve(GeomAPI::To2d(native, plane), begin, end);
+    if (s.edges.front().first.Orientation() == TopAbs_REVERSED)
+      local->Reverse();
+    Handle(Geom2d_Curve) exact = new Geom2d_OffsetCurve(local, -distance);
+    Geom2dConvert_ApproxCurve approximation(exact, 1e-9, GeomAbs_C2, 256, 8);
+    require(approximation.IsDone() && approximation.MaxError() <= 1e-8,
+            "Rib spline offset exceeds its planar approximation tolerance");
+    Handle(Geom2d_Curve) law = approximation.Curve();
+    Handle(Geom_Surface) carrier = new Geom_Plane(plane);
+    auto edge =
+        BRepBuilderAPI_MakeEdge(law, carrier, law->FirstParameter(), law->LastParameter()).Edge();
+    require(BRepLib::BuildCurve3d(edge, 1e-8),
+            "Rib spline offset cannot resolve its spatial curve");
+    BRepLib_CheckCurveOnSurface check(edge, BRepBuilderAPI_MakeFace(carrier, 1e-7).Face());
+    check.Perform();
+    require(check.IsDone() && check.MaxDistance() <= 1e-7,
+            "Rib spline offset exceeds its spatial approximation tolerance");
+    return {BRepBuilderAPI_MakeWire(edge).Wire(), {{edge, s.edges.front().second + "/" + side}}};
+  }
+
   gp_Pnt p;
   gp_Vec tangent;
   curve.D1((curve.FirstParameter() + curve.LastParameter()) * .5, p, tangent);
@@ -120,19 +155,33 @@ Boundary ribbon(const RibSpine& s, const RibWebIntent& r, const ResolvedWorkplan
                    : translated(s, gp_Vec(f.normal.x, f.normal.y, f.normal.z) * b, "second");
   require(!s.closed, "Closed Rib bands are built from independent outer and inner wires");
   BRepBuilderAPI_MakeWire loop;
-  loop.Add(left.wire);
-  const auto end = BRepBuilderAPI_MakeEdge(last(left.wire), last(right.wire)).Edge();
-  loop.Add(end);
-  auto reverse = right.wire;
-  reverse.Reverse();
-  loop.Add(reverse);
-  const auto start = BRepBuilderAPI_MakeEdge(first(right.wire), first(left.wire)).Edge();
-  loop.Add(start);
-  require(loop.IsDone(), "Rib ribbon could not close");
-  Boundary result{loop.Wire(), left.edges};
-  result.edges.insert(result.edges.end(), right.edges.begin(), right.edges.end());
-  result.edges.emplace_back(start, s.edges.front().second + "/start");
-  result.edges.emplace_back(end, s.edges.back().second + "/end");
+  Boundary result;
+  const auto add = [&](const TopoDS_Edge& edge, const std::vector<std::string>& roles) {
+    loop.Add(edge);
+    require(loop.IsDone(), "Rib ribbon cannot connect its boundary");
+    for (const auto& role : roles)
+      result.edges.emplace_back(loop.Edge(), role);
+  };
+  const auto append = [&](const Boundary& source, bool reverse) {
+    auto wire = source.wire;
+    if (reverse)
+      wire.Reverse();
+    for (BRepTools_WireExplorer it(wire); it.More(); it.Next()) {
+      std::vector<std::string> roles;
+      for (const auto& [edge, role] : source.edges)
+        if (edge.IsSame(it.Current()) && std::find(roles.begin(), roles.end(), role) == roles.end())
+          roles.push_back(role);
+      require(!roles.empty(), "Rib boundary lost its authored curve correspondence");
+      add(it.Current(), roles);
+    }
+  };
+  append(left, false);
+  add(BRepBuilderAPI_MakeEdge(last(left.wire), last(right.wire)).Edge(),
+      {s.edges.back().second + "/end"});
+  append(right, true);
+  add(BRepBuilderAPI_MakeEdge(first(right.wire), first(left.wire)).Edge(),
+      {s.edges.front().second + "/start"});
+  result.wire = loop.Wire();
   return result;
 }
 double area(TopoDS_Wire w) {
@@ -166,7 +215,9 @@ void append_faces(RibNative& out, const TopoDS_Shape& shape, const FeatureId& id
       if (std::abs(n.Dot(gp_Dir(x.x, x.y, x.z))) > .99)
         x = f.y_axis;
     }
-    append_lineage(out.lineage, {{id, role}, face, f.origin, x}, out.shape);
+    FaceLineage entry{{id, role}, face, f.origin, x};
+    entry.preserve_partition = true;
+    append_lineage(out.lineage, std::move(entry), out.shape);
   }
 }
 } // namespace
@@ -206,8 +257,14 @@ RibNative rib_tool(const RibSpine& s, const RibWebIntent& r, const FeatureId& id
   const auto make_solid = [&](Boundary base, Boundary top) -> RibNative {
     RibNative out;
     if (draft == 0) {
-      BRepBuilderAPI_MakeFace face(base.wire, true);
-      require(face.IsDone(), "Rib ribbon is not planar or self-intersects");
+      const gp_Pln plane(gp_Ax3(gp_Pnt(f.origin.x, f.origin.y, f.origin.z),
+                                gp_Dir(f.normal.x, f.normal.y, f.normal.z),
+                                gp_Dir(f.x_axis.x, f.x_axis.y, f.x_axis.z)));
+      BRepBuilderAPI_MakeFace face = r.plane == RibExtrusionPlane::PerpendicularToSketch
+                                         ? BRepBuilderAPI_MakeFace(plane, base.wire, true)
+                                         : BRepBuilderAPI_MakeFace(base.wire, true);
+      require(face.IsDone() && BRepCheck_Analyzer(face.Face(), true).IsValid(),
+              "Rib band is not a valid planar region");
       BRepPrimAPI_MakePrism prism(face.Face(), extrusion, true);
       require(prism.IsDone(), "Rib extrusion failed");
       out.shape = prism.Shape();

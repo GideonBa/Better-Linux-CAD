@@ -1,6 +1,7 @@
 #include "blcad/geometry/equation_curve_geometry.hpp"
 #include "derived_curve_internal.hpp"
 #include "rib_native.hpp"
+#include <BOPAlgo_ArgumentAnalyzer.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepCheck_Analyzer.hxx>
@@ -152,6 +153,11 @@ std::vector<RibSpine> rib_spines(const PartDocument& p, const RibWebIntent& r,
         connected.emplace_back(wire.Edge(), member.second);
       }
       require(wire.IsDone(), "Rib skeleton is not connected");
+      BOPAlgo_ArgumentAnalyzer check;
+      check.SetShape1(wire.Wire());
+      check.SelfInterMode() = true;
+      check.Perform();
+      require(!check.HasFaulty(), "Rib skeleton self-intersects");
       const auto [a, unused] = ends(chain.front().first);
       const auto [unused2, b] = ends(chain.back().first);
       result.push_back({wire.Wire(), std::move(connected), a.Distance(b) < 1e-7});

@@ -726,6 +726,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/front_workplane_pipeline_tests.cpp
       tests/geometry/guided_loft_pipeline_tests.cpp
       tests/geometry/setback_fillet_tests.cpp
+      tests/geometry/rib_web_consumers_tests.cpp
       tests/geometry/rib_web_geometry_tests.cpp
       tests/geometry/fillet_guide_tests.cpp
       tests/geometry/face_fillet_tests.cpp

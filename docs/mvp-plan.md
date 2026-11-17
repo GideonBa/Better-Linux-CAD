@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 180
-current_block: 181
-current_boundary: Block 181 in progress; checked Rib and Web Geometry
-current_tag: "[parity-b181]"
+implemented_through: Block 181
+current_block: 182
+current_boundary: Block 182 in progress; typed Emboss and Engrave intent
+current_tag: "[parity-b182]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–180 accepted; Block 181 in progress; Blocks 182–204 planned"
+  advanced_modeling_workflows: "Blocks 145–181 accepted; Block 182 in progress; Blocks 183–204 planned"
 ---
 
 # MVP Plan
@@ -34,10 +34,10 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 180
-current block        Block 181 (in progress)
+implemented through  Block 181
+current block        Block 182 (in progress)
 current phase        Advanced finishing and sketch-driven features
-current boundary     Checked Rib and Web Geometry
+current boundary     Typed Emboss and Engrave intent
 ```
 
 The assigned sequence continues through Block 184. Blocks 168–169 were delivered by normal
@@ -87,12 +87,12 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 178 | Accepted checked face/full-round construction and analytic G1 setback relief, native differential/material/history/STEP proof. |
 | 179 | Accepted shared native advanced finishing creation/editing, physical grips, qualified repair and full regression. |
 | 180 | Accepted typed Rib/Web intent, strict necessary V15, historical Body snapshots and atomic Core history/parameters. |
-| 181 | Checked connected thin volumes, actual terminations and semantic consumers. |
+| 181 | Accepted checked thin volumes, actual terminations, generated Shell/Hole/Fillet/full-round consumers and physical exchange; [proof](geometry-rib-web-mvp8.md#verification). |
 | 182–184 | Typed planar/cylindrical/conical Emboss/Engrave, checked mapping and native Rib/Web/Emboss/Engrave workflows. |
 
 The active Surface branch has [complete checked G03 construction, consumers and exchange proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof).
 Curved Trim/Extend and complete G04 are accepted in 172; the [bounded construction contract](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-construction--172) is retained.
-The active work is 181–184 Rib/Web Geometry and mapped Emboss/Engrave. The original sequence and scenario
+The active work is 182–184 mapped Emboss/Engrave and native sketch-driven authoring. The original sequence and scenario
 oracles retain every prerequisite, supported-capability requirement and deferred extension.
 
 Each row retains its full numbered prerequisites and acceptance criteria; grouped rows do not
