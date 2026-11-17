@@ -20,6 +20,8 @@
 #include <algorithm>
 #include <memory>
 #include <optional>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace blcad::geometry {
 Result<std::vector<FinishingSelectionTarget>> FinishingSelectionBuilder::build(
@@ -162,15 +164,33 @@ Result<std::vector<FinishingSelectionTarget>> FinishingSelectionBuilder::build(
       }
     }
   }
+  const bool ancestry_faces = role == PartFeatureInputRole::FilletSupportFace ||
+                              role == PartFeatureInputRole::FilletMiddleFace;
+  std::optional<std::unordered_set<std::string>> ancestors;
+  const auto ancestor = [&](const FeatureId& id) {
+    if (!ancestors) {
+      std::unordered_map<std::string, std::vector<std::string>> parents;
+      for (const auto& [parent, child] : document.dependency_graph().dependencies())
+        parents[child].push_back(parent);
+      ancestors.emplace();
+      std::vector<std::string> pending{result->source_feature_id.value()};
+      while (!pending.empty()) {
+        auto node = std::move(pending.back());
+        pending.pop_back();
+        if (!ancestors->insert(node).second)
+          continue;
+        if (const auto found = parents.find(node); found != parents.end())
+          pending.insert(pending.end(), found->second.begin(), found->second.end());
+      }
+    }
+    return ancestors->contains(id.value());
+  };
   for (const auto& source : document.features()) {
-    if (!source.body_result_context() ||
-        !detail::validate_history_source(document, source.id().value(), &cache))
+    if (!source.body_result_context())
       continue;
     if (source.body_result_context()->effective_produced_body() != body) {
-      const auto descendants =
-          document.dependency_graph().transitive_dependents(source.id().value());
-      if (std::find(descendants.begin(), descendants.end(), result->source_feature_id.value()) ==
-          descendants.end())
+      if (!ancestry_faces || !ancestor(source.id()) ||
+          !detail::validate_history_source(document, source.id().value(), &cache))
         continue;
     }
     if (edge) {

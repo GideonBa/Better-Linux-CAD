@@ -374,6 +374,12 @@ TEST_CASE("Full-round consumes a stitched closed shell and preserves its origina
   const auto picks = f::checked(FinishingSelectionBuilder::build(
       p, c, BodyId("solid"), PartFeatureInputRole::FilletSupportFace));
   CHECK(picks.size() == 6);
+  const auto edges = f::checked(
+      FinishingSelectionBuilder::build(p, c, BodyId("solid"), PartFeatureInputRole::FilletEdge));
+  REQUIRE_FALSE(edges.empty());
+  for (const auto& edge : edges)
+    CHECK_FALSE(std::holds_alternative<SemanticEdgeReference>(
+        std::get<EdgeReference>(edge.reference).source()));
   for (const auto& pick : picks) {
     const auto& reference = std::get<FaceReference>(pick.reference);
     REQUIRE(std::holds_alternative<SemanticFaceReference>(reference.source()));

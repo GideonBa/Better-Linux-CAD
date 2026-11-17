@@ -100,9 +100,17 @@ Runtime: **1,244 files**, SHA-256
 `f590ef7bfea79674bd30ef001da27dc3eb979ded6fdeb13c0e86e3fbd462b79d`.
 Block 178 is accepted within the capability table. Native UI acceptance remains 179.
 
-Finishing selection enumerates surviving semantic supports from the selected producer ancestry,
+Advanced face selection enumerates surviving semantic supports from the selected producer ancestry,
 including Stitch/closed-shell and Thicken output Bodies. Each candidate must resolve uniquely on
 the actual current target and belong to its evaluated history scope. Sharing a Sketch, parameters
 or coincident geometry does not make an unrelated Body producer an ancestor. The Block-179
 selection regression passes **14 cases / 494 assertions**, including both consumers and a
 coincident unrelated-body negative (`build/verification/block179/selection-final.log`).
+
+Only Fillet support/middle roles expand native producer ancestry. Existing edge, Shell, Draft and
+Path queries retain their canonical current-result witnesses and original native-owner filter.
+The face query builds one lazy ancestor set; it never repeatedly resolves ancestral primitive
+edges across every patterned instance. The focused Geometry selection/face matrix passes
+**14 / 507**; the existing 20/40-blade GUI rotor workflow passes **1 / 696** in **55.90 seconds**
+without concurrent CAD or compiler activity. Complete Core **798 / 35,311** and isolated complete
+Geometry **820 / 91,308** pass (`build/verification/block179/`).
