@@ -1040,10 +1040,14 @@ Continue the complete 175–184 assignment; preserve all later 185–204 scope.
 
 ### Block 175 variable Fillet intent — in progress
 
-Prepare ordered semantic groups, stable true-length stations, explicit interpolation/propagation,
-orientation and compatible constant-mode dispatch. Keep optional immutable advanced intent outside
-the legacy record definition where practical; integrate all radius dependencies, strict persistence,
-history and repair. Drafts and native law experiments are preparation, not block acceptance.
+Core foundation implemented: [typed groups, immutable laws and strict version-14 persistence](part-variable-fillet-intent-mvp6.md).
+Stable station IDs, original fraction literals and the separate orientation basis survive exact
+double reversal. All radius bindings participate in normal dependencies and transactional formula
+updates; foreign producers fail before publication. Legacy constant records retain six fields.
+On 2026-11-17 all five targets built; focused Core passed **28 / 1,244**, full Core **791 / 35,193**.
+The advanced native dispatch currently rejects explicitly. Tangent expansion, branches, actual
+true-length laws and split/lost-edge proof remain the joint 175/176 Geometry gate; this foundation
+does not accept either complete block. Continue through 184 and retain all 185–204 scope.
 
 ### Implementation route for the assigned continuation
 

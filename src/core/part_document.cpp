@@ -1,4 +1,5 @@
 #include "blcad/core/part_document.hpp"
+#include "fillet_parameter_validation.hpp"
 
 #include "blcad/core/parameter_expression.hpp"
 
@@ -13,7 +14,9 @@ namespace blcad {
 namespace {
 
 bool has_transactional_parameter_intent(const PartDocument& document) {
-  return std::any_of(document.surface_features().begin(), document.surface_features().end(),
+  return std::any_of(document.fillet_features().begin(), document.fillet_features().end(),
+                     [](const auto& feature) { return feature.advanced_intent() != nullptr; }) ||
+         std::any_of(document.surface_features().begin(), document.surface_features().end(),
                      [](const auto& feature) { return surface_feature_requires_v13(feature); }) ||
          std::any_of(document.loft_features().begin(), document.loft_features().end(),
                      [](const auto& feature) { return feature.constraints().has_value(); }) ||
@@ -41,6 +44,13 @@ struct ParameterIntentRollback {
 };
 Result<std::size_t> validate_parameter_intent(const PartDocument& document,
                                               const std::vector<std::string>& affected) {
+  for (const auto& feature : document.fillet_features())
+    if (feature.advanced_intent() &&
+        std::find(affected.begin(), affected.end(), feature.id().value()) != affected.end()) {
+      auto valid = detail::validate_fillet_parameters(document, feature);
+      if (!valid)
+        return valid;
+    }
   std::size_t count = 0;
   const auto validate = [&](const auto& sketches) -> Result<std::size_t> {
     for (const auto& sketch : sketches) {
@@ -3358,17 +3368,29 @@ Result<std::size_t> PartDocument::add_fillet_feature(FilletFeature feature) {
   if (!has_body_id(feature.target_body()))
     return Result<std::size_t>::failure(
         Error::validation(feature.id().value(), "fillet target body must exist in part document"));
+  if (feature.advanced_intent()) {
+    if (find_body(feature.target_body())->kind() != BodyKind::Solid)
+      return Result<std::size_t>::failure(Error::validation(
+          feature.id().value(), "Variable Fillet requires an owned Solid target"));
+    const auto body_node = body_dependency_node_id(feature.target_body());
+    for (const auto& edge : feature.edges()) {
+      const auto descendants = dependency_graph_.transitive_dependents(edge.source_node_id());
+      if (std::find(descendants.begin(), descendants.end(), body_node) == descendants.end())
+        return Result<std::size_t>::failure(Error::validation(
+            edge.source_node_id(),
+            "Variable Fillet edge source must belong to the current target Body history"));
+    }
+  }
   for (const auto& edge : feature.edges()) {
     auto valid = validate_part_feature_input_reference(*this, edge);
     if (valid.has_error())
       return Result<std::size_t>::failure(valid.error());
   }
-  const Parameter* radius = find_parameter(feature.radius_parameter());
-  if (radius == nullptr || radius->type() != ParameterType::Length)
-    return Result<std::size_t>::failure(Error::validation(
-        feature.id().value(), "fillet radius must reference an existing length parameter"));
+  const auto parameters = detail::validate_fillet_parameters(*this, feature);
+  if (!parameters)
+    return parameters;
   auto dependencies = add_edge_treatment_dependencies(
-      feature.id(), feature.target_body(), feature.edges(), {feature.radius_parameter()});
+      feature.id(), feature.target_body(), feature.edges(), feature.parameter_dependencies());
   if (dependencies.has_error())
     return dependencies;
   fillet_features_.push_back(std::move(feature));

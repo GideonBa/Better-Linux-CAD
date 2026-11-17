@@ -1,4 +1,5 @@
 #include "blcad/core/part_document_json.hpp"
+#include "advanced_fillet_json.hpp"
 #include "engineering_resource_json.hpp"
 #include "equation_curve_json.hpp"
 #include "imported_part_json.hpp"
@@ -43,6 +44,7 @@ constexpr int k_curve_policy_version = 10;
 constexpr int k_semantic_sweep_version = 11;
 constexpr int k_loft_constraint_version = 12;
 constexpr int k_surface_construction_version = 13;
+constexpr int k_advanced_fillet_version = 14;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -1968,6 +1970,15 @@ feature_body_result_context_from_json(const json& feature_json) {
 }
 
 [[nodiscard]] json fillet_feature_to_json(const FilletFeature& feature) {
+  if (const auto* advanced = feature.advanced_intent())
+    return json{{"id", feature.id().value()},
+                {"name", feature.name()},
+                {"type", "fillet"},
+                {"target_body", feature.target_body().value()},
+                {"mode", "variable"},
+                {"groups", detail::variable_fillet_to_json(
+                               std::get<VariableFilletIntent>(advanced->definition),
+                               edge_treatment_edge_to_json)}};
   json value{
       {"id", feature.id().value()}, {"name", feature.name()},
       {"type", "fillet"},           {"target_body", feature.target_body().value()},
@@ -1995,6 +2006,24 @@ feature_body_result_context_from_json(const json& feature_json) {
 using ParsedEdgeTreatment = std::variant<FilletFeature, ChamferFeature>;
 
 [[nodiscard]] Result<ParsedEdgeTreatment> edge_treatment_from_json(const json& value) {
+  if (value.is_object() && value.value("type", std::string{}) == "fillet" &&
+      value.contains("mode")) {
+    if (value.size() != 6 || !value.at("id").is_string() || !value.at("name").is_string() ||
+        !value.at("target_body").is_string() || value.at("mode") != "variable" ||
+        !value.contains("groups"))
+      return Result<ParsedEdgeTreatment>::failure(json_error("Malformed advanced Fillet record"));
+    auto intent = detail::variable_fillet_from_json(value.at("groups"), [](const json& edge) {
+      return edge_treatment_edge_from_json(edge, PartFeatureInputRole::FilletEdge);
+    });
+    if (!intent)
+      return Result<ParsedEdgeTreatment>::failure(intent.error());
+    auto feature = FilletFeature::create_variable(
+        FeatureId(value.at("id").get<std::string>()), value.at("name").get<std::string>(),
+        BodyId(value.at("target_body").get<std::string>()), std::move(intent.value()));
+    if (!feature)
+      return Result<ParsedEdgeTreatment>::failure(feature.error());
+    return Result<ParsedEdgeTreatment>::success(std::move(feature.value()));
+  }
   if (!value.is_object() || !value.contains("id") || !value.at("id").is_string() ||
       !value.contains("name") || !value.at("name").is_string() || !value.contains("type") ||
       !value.at("type").is_string() || !value.contains("target_body") ||
@@ -5113,6 +5142,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   json root;
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
+  const bool advanced_fillet =
+      std::any_of(document.fillet_features().begin(), document.fillet_features().end(),
+                  [](const auto& feature) { return feature.advanced_intent() != nullptr; });
   const bool surface_construction =
       std::any_of(document.surface_features().begin(), document.surface_features().end(),
                   surface_feature_requires_v13);
@@ -5150,9 +5182,10 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       std::any_of(document.circular_pattern_features().begin(),
                   document.circular_pattern_features().end(),
                   [](const auto& f) { return f.placements().has_value(); });
-  if (surface_construction || loft_constraints || semantic_sweep || curve_policy || spatial ||
-      equations || extended_patterns || !document.engineering_resources().entries().empty() ||
-      !document.hole_features().empty() || !document.thread_features().empty()) {
+  if (advanced_fillet || surface_construction || loft_constraints || semantic_sweep ||
+      curve_policy || spatial || equations || extended_patterns ||
+      !document.engineering_resources().entries().empty() || !document.hole_features().empty() ||
+      !document.thread_features().empty()) {
     const bool manufacturing = std::any_of(
         document.hole_features().begin(), document.hole_features().end(), [](const auto& hole) {
           return !std::holds_alternative<std::monostate>(hole.manufacturing());
@@ -5161,7 +5194,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
         !document.thread_features().empty() ||
         std::any_of(document.hole_features().begin(), document.hole_features().end(),
                     [](const auto& hole) { return hole.thread().has_value(); });
-    root["version"] = surface_construction               ? k_surface_construction_version
+    root["version"] = advanced_fillet                    ? k_advanced_fillet_version
+                      : surface_construction             ? k_surface_construction_version
                       : loft_constraints                 ? k_loft_constraint_version
                       : semantic_sweep                   ? k_semantic_sweep_version
                       : curve_policy                     ? k_curve_policy_version
@@ -5566,10 +5600,10 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     latest_ancestor_position[node] = latest;
   }
-  if (surface_construction || loft_constraints || semantic_sweep || curve_policy || spatial ||
-      equations || extended_patterns || interleaved || !document.result_face_workplanes().empty() ||
-      !document.hole_features().empty() || !document.thread_features().empty() ||
-      document.authored_history_intent())
+  if (advanced_fillet || surface_construction || loft_constraints || semantic_sweep ||
+      curve_policy || spatial || equations || extended_patterns || interleaved ||
+      !document.result_face_workplanes().empty() || !document.hole_features().empty() ||
+      !document.thread_features().empty() || document.authored_history_intent())
     root["feature_order"] = std::move(feature_order);
   if (document.authored_history_intent())
     root["suppressed_features"] = document.authored_history_intent()->suppressed;
@@ -5608,15 +5642,28 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
          root.at("version") != k_curve_policy_version &&
          root.at("version") != k_semantic_sweep_version &&
          root.at("version") != k_loft_constraint_version &&
-         root.at("version") != k_surface_construction_version))
+         root.at("version") != k_surface_construction_version &&
+         root.at("version") != k_advanced_fillet_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
     const auto version = root.at("version").get<int>();
-    const bool surface_envelope = version == k_surface_construction_version;
+    const bool advanced_fillet_envelope = version == k_advanced_fillet_version;
+    bool advanced_fillet_intent = false;
+    if (root.contains("edge_treatments") && root.at("edge_treatments").is_array())
+      for (const auto& feature : root.at("edge_treatments"))
+        advanced_fillet_intent |= feature.is_object() &&
+                                  feature.value("type", std::string{}) == "fillet" &&
+                                  feature.contains("mode");
+    if (advanced_fillet_envelope != advanced_fillet_intent)
+      return Result<PartDocument>::failure(
+          json_error("Advanced Fillet requires necessary Part version 14"));
+    const bool surface_envelope =
+        version == k_surface_construction_version || advanced_fillet_envelope;
     bool surface_intent = false;
     if (root.contains("surface_features") && root.at("surface_features").is_array())
       for (const auto& feature : root.at("surface_features"))
         surface_intent |= surface_record_uses_v13(feature);
-    if (surface_envelope != surface_intent)
+    if ((surface_intent && !surface_envelope) ||
+        (version == k_surface_construction_version && !surface_intent))
       return Result<PartDocument>::failure(
           json_error("Advanced Surface intent requires necessary Part version 13"));
     const bool loft_envelope = version == k_loft_constraint_version || surface_envelope;

@@ -30,6 +30,9 @@ Result<GeometryShape> FilletAdapter::apply(const PartDocument& document,
                                            const GeometryShape& target,
                                            const ShapeCache& shape_cache, double radius_mm,
                                            StepImportTopologyContext* import_context) const {
+  if (feature.advanced_intent())
+    return Result<GeometryShape>::failure(fillet_error(
+        feature.id(), "Variable-radius Fillet construction is unavailable in this build"));
   if (target.empty() || !std::isfinite(radius_mm) || radius_mm <= 0.0)
     return Result<GeometryShape>::failure(
         fillet_error(feature.id(), "fillet target and positive finite radius are required"));
