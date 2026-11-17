@@ -70,10 +70,15 @@ Blocks 199–211 retain their complete planned scope.
 
 | Delivery scope | Required completion boundary | Status |
 | --- | --- | --- |
-| 185–188 | Direct Edit authority, checked native execution, owned Qt authoring and integrated Advanced Part scenarios D01/D02/X01 | In progress at 185; no new block accepted |
-| 189–191 | Sparse model-state intent, immutable effective evaluation, isolated consumers and native variant/member workflows V01/V02 | Planned; prerequisite work under development |
-| 192–195 | Independent rooted flexible poses, common posed consumers and directed adaptive Project transactions A01/A02 | Planned; prerequisite work under development |
+| 185–188 | Direct Edit authority, checked native execution, owned Qt authoring and integrated Advanced Part scenarios D01/D02/X01 | Core/backend foundation verified; native and integrated gates pending |
+| 189–191 | Sparse model-state intent, immutable effective evaluation, isolated consumers and native variant/member workflows V01/V02 | Core/effective Geometry foundation verified; native workflows pending |
+| 192–195 | Independent rooted flexible poses, common posed consumers and directed adaptive Project transactions A01/A02 | Independent pose foundation verified; extended state/solver and adaptive gates pending |
 | 196–198 | Coordinated Assembly Hole participants and execution, distinct representations and native Assembly lifecycle A03/A04/UI01 | Planned |
+
+The initial foundation has [checked Core/backend evidence](part-direct-edit-mvp6.md#backend-foundation-verification)
+and independent [variant](../tests/geometry/model_state_tests.cpp) /
+[occurrence](../tests/geometry/assembly_occurrence_pose_tests.cpp) physical scenarios. This slice
+advances no entire numbered block; remaining native/integrated requirements are unchanged.
 
 Acceptance follows the existing sequence and test-plan oracles, including native Qt/OCCT at both
 scales for interaction changes. Implementation slices do not close a whole block. Each verified

@@ -760,6 +760,8 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/emboss_geometry_tests.cpp
       tests/geometry/rib_web_geometry_tests.cpp
       tests/geometry/fillet_guide_tests.cpp
+      tests/geometry/assembly_occurrence_pose_tests.cpp
+      tests/geometry/model_state_tests.cpp
       tests/geometry/direct_edit_tests.cpp
       tests/geometry/face_fillet_tests.cpp
       tests/geometry/variable_fillet_tests.cpp
