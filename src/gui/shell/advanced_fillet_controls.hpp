@@ -829,7 +829,19 @@ struct AdvancedFilletControls {
     if (live)
       for (const auto& [key, v] : live->values)
         values[key] = v;
+    live.reset();
     const int m = current_mode();
+    if (m == 1 && corner->isChecked()) {
+      if (groups.size() != 3)
+        return Result<std::shared_ptr<GuiFilletDraft>>::failure(
+            Error::validation(id.value(), "Setback requires exactly three edge groups"));
+      if (!policy) {
+        const auto distance = new_radius(3);
+        policy = FilletSetbackCorner{
+            new_id("corner"), {groups[0].id, groups[1].id, groups[2].id}, distance};
+        setback_value->setText(number(value(distance)));
+      }
+    }
     const auto contact =
         continuity->currentIndex() == 1 ? FilletContinuity::Curvature : FilletContinuity::Tangent;
     Result<FilletFeature> record = [&]() {

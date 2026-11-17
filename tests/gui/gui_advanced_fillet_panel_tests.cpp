@@ -5,6 +5,7 @@
 #include "blcad/gui/shell/shell_reference_repair_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDir>
 #include <QFile>
@@ -13,6 +14,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QTableWidget>
 #include <QTemporaryDir>
@@ -64,6 +66,9 @@ void reveal(QWidget& widget) {
     parent = parent->parentWidget();
   REQUIRE(parent);
   auto* scroll = qobject_cast<QScrollArea*>(parent);
+  // Mode changes post layout/resize events; scroll against the settled content bounds.
+  QApplication::sendPostedEvents(nullptr, QEvent::LayoutRequest);
+  qApp->processEvents();
   scroll->ensureWidgetVisible(&widget, 0, 0);
   qApp->processEvents();
   CHECK(widget.isVisible());
@@ -336,4 +341,75 @@ TEST_CASE("Advanced station guides use End of Part before later Body placement",
   window.session().cancel_part_workflow();
   window.refresh();
   CHECK(saved(window) == before);
+}
+
+TEST_CASE("Owned setback controls require three groups and publish only their active bindings",
+          "[gui][advanced-fillet-panel][parity-b179]") {
+  auto p = f::native_base();
+  for (const auto* id : {"width", "height", "depth"})
+    REQUIRE(p.set_parameter_value(ParameterId(id), f::checked(Quantity::length_mm(30))));
+  REQUIRE(p.set_parameter_value(ParameterId("radius"), f::checked(Quantity::length_mm(2))));
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  ShellWindow window;
+  open(window, directory, p);
+  auto& tools = window.feature_tools();
+  const auto before = saved(window);
+  const auto parameter_count = window.session().part_document()->parameters().size();
+  REQUIRE(tools.begin_finishing(ShellFeatureTools::Command::Fillet));
+  control<QComboBox>(window, "blcad.finishing.mode").setCurrentIndex(1);
+  auto& corner = control<QCheckBox>(window, "blcad.fillet.setback");
+  const std::array<const char*, 3> edges{"top_front", "top_left", "front_left"};
+  for (int group = 0; group < 3; ++group) {
+    if (group) {
+      auto* panel = control<QListWidget>(window, "blcad.fillet.members").parentWidget();
+      auto buttons = panel->findChildren<QPushButton*>();
+      const auto add = std::find_if(buttons.begin(), buttons.end(),
+                                    [](auto* button) { return button->text() == "Add Group"; });
+      REQUIRE(add != buttons.end());
+      (*add)->click();
+    }
+    pick(window, edges[group]);
+    if (group == 0) {
+      corner.setChecked(true);
+      CHECK_FALSE(window.viewport().feature_preview_active());
+      CHECK_FALSE(tools.apply());
+      CHECK(saved(window) == before);
+    }
+    auto& stations = control<QTableWidget>(window, "blcad.fillet.stations");
+    for (int row = 0; row < 2; ++row) {
+      auto* binding = qobject_cast<QComboBox*>(stations.cellWidget(row, 2));
+      REQUIRE(binding);
+      const int radius = binding->findData("radius");
+      REQUIRE(radius >= 0);
+      binding->setCurrentIndex(radius);
+    }
+  }
+  auto& size = control<QLineEdit>(window, "blcad.fillet.setback_size");
+  size.setText("1000");
+  REQUIRE(QMetaObject::invokeMethod(&size, "editingFinished", Qt::DirectConnection));
+  CHECK_FALSE(window.viewport().feature_preview_active());
+  CHECK_FALSE(tools.apply());
+  CHECK(std::count_if(
+            tools.manipulators().handles().begin(), tools.manipulators().handles().end(),
+            [](const auto& handle) { return handle.id.starts_with("fillet.failure/"); }) == 6);
+  CHECK(saved(window) == before);
+  size.setText("6");
+  REQUIRE(QMetaObject::invokeMethod(&size, "editingFinished", Qt::DirectConnection));
+  REQUIRE(window.viewport().feature_preview_active());
+  reveal(size);
+  capture(window, "setback-corner");
+  REQUIRE(tools.apply());
+  const auto& part = *window.session().part_document();
+  const auto& intent =
+      std::get<VariableFilletIntent>(part.fillet_features().front().advanced_intent()->definition);
+  REQUIRE(intent.setback);
+  CHECK(intent.groups.size() == 3);
+  CHECK(part.find_parameter(intent.setback->distance)->value().millimeters() == 6);
+  CHECK(part.parameters().size() == parameter_count + 1);
+  const auto after = saved(window);
+  REQUIRE(window.undo());
+  CHECK(saved(window) == before);
+  REQUIRE(window.redo());
+  CHECK(saved(window) == after);
 }

@@ -691,9 +691,14 @@ Result<std::size_t> ShellFeatureTools::rebuild_finishing_controller() {
 }
 
 QString ShellFeatureTools::finishing_summary() const {
-  if (typed_finishing())
-    return QString("%1: typed inputs and contacts verified. Preview valid.")
-        .arg(finishing_mode_->currentText());
+  if (typed_finishing()) {
+    const auto& intent = session_.part_document()->authored_history_intent();
+    if (intent && std::find(intent->suppressed.begin(), intent->suppressed.end(),
+                            finishing_feature_.value()) != intent->suppressed.end())
+      return QString("%1: Changes staged; feature remains suppressed.")
+          .arg(finishing_mode_->currentText());
+    return QString("%1: Preview valid.").arg(finishing_mode_->currentText());
+  }
   const auto count = finishing_targets_list_->selectedItems().size();
   const bool edges = command_ == Command::Fillet || command_ == Command::Chamfer;
   return QStringLiteral("%1 %2 selected. Preview valid.")

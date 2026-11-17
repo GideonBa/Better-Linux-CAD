@@ -73,6 +73,11 @@ TEST_CASE("Owned Fillet controls preserve exact untouched stations and stable gr
   candidate = p;
   REQUIRE(draft->apply(candidate));
   CHECK(saved(candidate) == before);
+  controls.corner->setChecked(true);
+  auto missing_groups = controls.build();
+  REQUIRE_FALSE(missing_groups);
+  CHECK_FALSE(controls.live);
+  CHECK(missing_groups.error().message().find("three edge groups") != std::string::npos);
 }
 TEST_CASE("Fillet mode controls retain face roles and exclude inactive scalar bindings",
           "[gui][advanced-fillet-controls][parity-b179]") {

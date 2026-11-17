@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 178
-current_block: 179
-current_boundary: Block 179 in progress; shared advanced finishing interaction
-current_tag: "[parity-b179]"
+implemented_through: Block 179
+current_block: 180
+current_boundary: Block 180 in progress; Rib and Web intent
+current_tag: "[parity-b180]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–178 accepted; Block 179 in progress; Blocks 180–204 planned"
+  advanced_modeling_workflows: "Blocks 145–179 accepted; Block 180 in progress; Blocks 181–204 planned"
 ---
 
 # MVP Plan
@@ -34,10 +34,10 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 178
-current block        Block 179 (in progress)
+implemented through  Block 179
+current block        Block 180 (in progress)
 current phase        Advanced finishing and sketch-driven features
-current boundary     Shared advanced finishing interaction
+current boundary     Rib and Web intent
 ```
 
 The assigned sequence continues through Block 184. Blocks 168–169 were delivered by normal
@@ -85,7 +85,7 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 175–176 | Accepted typed variable-radius laws, ordered chains, physical station mapping and F01 Core/Geometry history/repair/STEP proof; native authoring remains 179. |
 | 177 | Accepted typed face/full-round/setback intent and atomic Core ownership/history/persistence. |
 | 178 | Accepted checked face/full-round construction and analytic G1 setback relief, native differential/material/history/STEP proof. |
-| 179 | Shared native advanced finishing creation, editing, grips and recovery. |
+| 179 | Accepted shared native advanced finishing creation/editing, physical grips, qualified repair and full regression. |
 | 180–181 | Typed Rib/Web skeleton, side/draft/termination intent, checked connected thin volumes and semantic consumers. |
 | 182–184 | Typed planar/cylindrical/conical Emboss/Engrave, checked mapping and native Rib/Web/Emboss/Engrave workflows. |
 
@@ -1095,26 +1095,32 @@ All five targets built. Focused finishing/contact/exchange **48 / 10,434**; comp
 Qt documentation audit **5 / 751**. Logs/manifest: `build/verification/block178/`; unchanged
 runtime **1,244 files**, `f590ef7bfea79674bd30ef001da27dc3eb979ded6fdeb13c0e86e3fbd462b79d`.
 
-### Block 179 shared advanced finishing interaction — in progress
+### Block 179 shared advanced finishing interaction — accepted
 
-Extend the existing owned Fillet panel/controller with typed constant/variable/face/full-round
-creation and editing, ordered stations/groups, actual radius grips, propagation/corner controls,
-role selection and repair. Preserve untouched literals and bindings, validate full downstream
-history and prove native workflows at 100%/150% compact scales. The [typed controller and physical-guide foundation](gui-advanced-finishing-mvp9.md)
-preserves no-op stations, stages shared/independent values and uses normal atomic Undo/Redo.
-All five targets built; **10 GUI cases / 191 assertions** and **17 guide/variable Geometry cases /
-9,424 assertions** pass. The owned panel now connects all four typed modes, ordered roles/stations, physical station grips,
-G1/G2 meaning, hold lines and explicit setback controls to the normal candidate transaction.
-Native create/edit/drag, duplicate-role rejection, exact Undo/Redo and Save/Open pass **11 / 221**
-at 100% and compact 150%; offscreen typed-panel regression **10 / 190**. Finishing selection on
-Stitch/Thicken ancestry and the coincident unrelated-Body negative pass **14 / 494**. Fixed
-Apply/Cancel and source-law arrows were visually reviewed. Explicit failed-Geometry reopening,
-scrolled compact controls and final combined regression remain open. The subsequent owned-task
-regression adds actual failed reopening/repair, protected immutable entry state, feature renaming,
-shared-value synchronization and correct End-of-Part source guides. The broad native selection
-passes **37 / 2,681** at 100% and **37 / 2,701** at compact 150%, including existing History/edit
-commands. Full suites are running on frozen runtime inputs. Continue through 184;
-retain all planned scope after 184.
+The [shared finishing contract and proof](gui-advanced-finishing-mvp9.md) cover all four owned
+Fillet modes, exact station/group intent, linked/independent bindings, physical source guides,
+face roles, G1/G2 meaning, hold lines and checked Setback controls. Normal transactions preserve
+complete downstream history, Cancel/Escape, Undo/Redo and Save/Open. Qualified input-history
+reopening repairs failed Geometry; stale model drafts reject. Failures identify their actual
+station/group/role or complete corner. Suppressed features retain suppression.
+
+All five targets build. Complete Core **798 / 35,311**, isolated complete Geometry **820 / 91,308**
+and full offscreen GUI **899 passed / 83 skipped / 104,660 assertions** (982 cases) pass. Native
+finishing/history/edit regression passes **38 / 2,745** at 100% and **38 / 2,765** at compact 150%;
+the final affected 100% subset passes **14 / 349**. Reviewed captures show scrolled controls and
+fixed completion actions. Core/Geometry binary digests remain identical through final UI-only
+corrections. Runtime manifest: **1,255 files**, SHA-256
+`ece7fcb2929f3e76bb2dea6ce844a339a4eb02405a3e034bf802b454eab9ded0`.
+Logs/captures: `build/verification/block179/`. Existing edge/Shell/Draft/Path selection retains its
+canonical result witnesses; advanced face ancestry uses one scoped query.
+
+### Block 180 Rib and Web intent — in progress
+
+Register one immutable sketch-driven family with owned skeleton/profile, target Body,
+parallel/perpendicular direction, thickness/side, draft, termination and crossing policy. Preserve
+normal history, atomic parameter edits, necessary strict persistence and earlier Body input
+snapshots. Core/JSON proof precedes checked Geometry in 181 and native authoring in 184.
+Continue through 184; preserve every planned requirement and deferred extension after 184.
 
 ### Implementation route for the assigned continuation
 
