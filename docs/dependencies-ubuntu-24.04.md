@@ -64,3 +64,6 @@ sudo apt-get install ./downloads/apt/*.deb
 ```
 
 If `apt` requests additional packages, use the normal repository command from the installation section instead.
+
+Material text outlines in optional Geometry use `libfreetype6-dev` with the pinned bundled font assets.
+Core-only builds retain no FreeType dependency.

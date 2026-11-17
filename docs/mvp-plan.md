@@ -1152,8 +1152,11 @@ finishing Qt **13 passed / 1 skipped / 314 assertions** and all five build targe
 ### Block 183 Emboss and Engrave Geometry — in progress
 
 Construct bounded planar/cylindrical/conical material, preserve contour holes, prove normal depth,
-seams and finite support coverage, and reject invalid wrapping/erasing cuts atomically. Native
-interaction remains 184. Preserve the complete 185–204 planning.
+seams and finite support coverage, and reject invalid wrapping/erasing cuts atomically.
+The [native construction foundation](geometry-emboss-engrave-mvp8.md) passes **5 / 148**, including
+independent cylinder/cone volumes and physical seam/normal points before/after STEP. Text/counter,
+combined consumer and complete regression gates remain open. Native interaction remains 184.
+Preserve the complete 185–204 planning.
 
 ### Implementation route for the assigned continuation
 

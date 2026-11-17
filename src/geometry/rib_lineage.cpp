@@ -9,7 +9,7 @@
 #include <set>
 namespace blcad::geometry::detail {
 void scope_rib_fragments(RibNative& result, const std::vector<FaceLineage>& witnesses,
-                         const FeatureId& feature) {
+                         const FeatureId& feature, std::string_view prefix) {
   struct Candidate {
     TopoDS_Face face;
     std::vector<FaceLineage> origins;
@@ -87,7 +87,7 @@ void scope_rib_fragments(RibNative& result, const std::vector<FaceLineage>& witn
     for (const auto& key : contacts)
       scope += segment(key);
     auto entry = c.origins.front();
-    entry.origin = {feature, "rib/fragment/" + scope};
+    entry.origin = {feature, std::string(prefix) + scope};
     entry.selectable = true;
     entry.preserve_partition = true;
     append_lineage(result.lineage, std::move(entry), result.shape);

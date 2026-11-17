@@ -24,6 +24,7 @@ endif()
 
 if(BLCAD_BUILD_GEOMETRY)
   find_package(OpenCASCADE CONFIG REQUIRED)
+  find_package(Freetype REQUIRED)
   find_package(OCCT CONFIG QUIET)
 endif()
 
@@ -234,6 +235,10 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/fillet_guides.cpp
     src/geometry/face_fillet_adapter.cpp
     src/geometry/variable_fillet_adapter.cpp
+    src/geometry/emboss_outline.cpp
+    src/geometry/emboss_mapping.cpp
+    src/geometry/emboss_native.cpp
+    src/geometry/emboss_adapter.cpp
     src/geometry/rib_skeleton.cpp
     src/geometry/rib_volume.cpp
     src/geometry/rib_lineage.cpp
@@ -317,6 +322,11 @@ if(BLCAD_BUILD_GEOMETRY)
   target_include_directories(blcad_geometry SYSTEM PRIVATE ${OpenCASCADE_INCLUDE_DIR})
 
   target_compile_features(blcad_geometry PUBLIC cxx_std_20)
+  target_compile_definitions(blcad_geometry PRIVATE
+    BLCAD_OUTLINE_FONT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/gui/fonts"
+    BLCAD_OUTLINE_FONT_INSTALL_DIR="${CMAKE_INSTALL_PREFIX}/share/blcad/fonts")
+  target_link_libraries(blcad_geometry PRIVATE Freetype::Freetype)
+  install(DIRECTORY assets/gui/fonts/ DESTINATION share/blcad/fonts)
 
   target_link_libraries(
     blcad_geometry
@@ -731,6 +741,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/guided_loft_pipeline_tests.cpp
       tests/geometry/setback_fillet_tests.cpp
       tests/geometry/rib_web_consumers_tests.cpp
+      tests/geometry/emboss_geometry_tests.cpp
       tests/geometry/rib_web_geometry_tests.cpp
       tests/geometry/fillet_guide_tests.cpp
       tests/geometry/face_fillet_tests.cpp
