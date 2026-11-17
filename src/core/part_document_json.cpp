@@ -6,6 +6,7 @@
 #include "imported_part_json.hpp"
 #include "imported_topology_json.hpp"
 #include "part_material_json.hpp"
+#include "sketch_driven_json.hpp"
 #include "step_import_json.hpp"
 #include "thread_json.hpp"
 
@@ -46,6 +47,7 @@ constexpr int k_semantic_sweep_version = 11;
 constexpr int k_loft_constraint_version = 12;
 constexpr int k_surface_construction_version = 13;
 constexpr int k_advanced_fillet_version = 14;
+constexpr int k_sketch_driven_version = 15;
 
 [[nodiscard]] bool has_exact_fields(const json& value,
                                     std::initializer_list<std::string_view> fields);
@@ -5185,6 +5187,7 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   json root;
   root["schema"] = k_schema;
   root["version"] = document.authored_history_intent() ? k_history_version : k_version;
+  const bool sketch_driven = !document.sketch_driven_features().empty();
   const bool advanced_fillet =
       std::any_of(document.fillet_features().begin(), document.fillet_features().end(),
                   [](const auto& feature) { return feature.advanced_intent() != nullptr; });
@@ -5225,8 +5228,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
       std::any_of(document.circular_pattern_features().begin(),
                   document.circular_pattern_features().end(),
                   [](const auto& f) { return f.placements().has_value(); });
-  if (advanced_fillet || surface_construction || loft_constraints || semantic_sweep ||
-      curve_policy || spatial || equations || extended_patterns ||
+  if (sketch_driven || advanced_fillet || surface_construction || loft_constraints ||
+      semantic_sweep || curve_policy || spatial || equations || extended_patterns ||
       !document.engineering_resources().entries().empty() || !document.hole_features().empty() ||
       !document.thread_features().empty()) {
     const bool manufacturing = std::any_of(
@@ -5237,7 +5240,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
         !document.thread_features().empty() ||
         std::any_of(document.hole_features().begin(), document.hole_features().end(),
                     [](const auto& hole) { return hole.thread().has_value(); });
-    root["version"] = advanced_fillet                    ? k_advanced_fillet_version
+    root["version"] = sketch_driven                      ? k_sketch_driven_version
+                      : advanced_fillet                  ? k_advanced_fillet_version
                       : surface_construction             ? k_surface_construction_version
                       : loft_constraints                 ? k_loft_constraint_version
                       : semantic_sweep                   ? k_semantic_sweep_version
@@ -5513,6 +5517,12 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   root["loft_features"] = json::array();
   for (const auto& feature : document.loft_features())
     root["loft_features"].push_back(loft_feature_to_json(feature));
+  if (sketch_driven) {
+    root["sketch_driven_features"] = json::array();
+    for (const auto& feature : document.sketch_driven_features())
+      root["sketch_driven_features"].push_back(
+          detail::sketch_driven_to_json(feature, face_reference_to_json));
+  }
   root["surface_features"] = json::array();
   for (const auto& feature : document.surface_features())
     root["surface_features"].push_back(surface_feature_to_json(feature));
@@ -5624,8 +5634,9 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
   std::unordered_map<std::string, std::size_t> historical_positions;
   for (const auto* family :
        {"imported_body_features", "features", "revolve_features", "sweep_features", "loft_features",
-        "surface_features", "body_booleans", "part_patterns", "mirror_features", "edge_treatments",
-        "shell_features", "hole_features", "thread_features", "draft_features", "body_transforms"})
+        "surface_features", "sketch_driven_features", "body_booleans", "part_patterns",
+        "mirror_features", "edge_treatments", "shell_features", "hole_features", "thread_features",
+        "draft_features", "body_transforms"})
     for (const auto& feature : root.value(family, json::array()))
       historical_positions.emplace(feature.at("id").get<std::string>(),
                                    historical_positions.size() + 1U);
@@ -5643,8 +5654,8 @@ Result<std::string> serialize_part_document_to_json(const PartDocument& document
     }
     latest_ancestor_position[node] = latest;
   }
-  if (advanced_fillet || surface_construction || loft_constraints || semantic_sweep ||
-      curve_policy || spatial || equations || extended_patterns || interleaved ||
+  if (sketch_driven || advanced_fillet || surface_construction || loft_constraints ||
+      semantic_sweep || curve_policy || spatial || equations || extended_patterns || interleaved ||
       !document.result_face_workplanes().empty() || !document.hole_features().empty() ||
       !document.thread_features().empty() || document.authored_history_intent())
     root["feature_order"] = std::move(feature_order);
@@ -5686,17 +5697,30 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
          root.at("version") != k_semantic_sweep_version &&
          root.at("version") != k_loft_constraint_version &&
          root.at("version") != k_surface_construction_version &&
-         root.at("version") != k_advanced_fillet_version))
+         root.at("version") != k_advanced_fillet_version &&
+         root.at("version") != k_sketch_driven_version))
       return Result<PartDocument>::failure(json_error("unsupported part document json version"));
     const auto version = root.at("version").get<int>();
-    const bool advanced_fillet_envelope = version == k_advanced_fillet_version;
+    const bool sketch_driven_envelope = version == k_sketch_driven_version;
+    if (sketch_driven_envelope) {
+      if (!root.contains("sketch_driven_features") ||
+          !root.at("sketch_driven_features").is_array() ||
+          root.at("sketch_driven_features").empty() || !root.contains("feature_order") ||
+          !root.at("feature_order").is_array())
+        return Result<PartDocument>::failure(json_error("Part V15 requires sketch-driven intent"));
+    } else if (root.contains("sketch_driven_features"))
+      return Result<PartDocument>::failure(
+          json_error("Sketch-driven intent requires necessary Part V15"));
+    const bool advanced_fillet_envelope =
+        version == k_advanced_fillet_version || sketch_driven_envelope;
     bool advanced_fillet_intent = false;
     if (root.contains("edge_treatments") && root.at("edge_treatments").is_array())
       for (const auto& feature : root.at("edge_treatments"))
         advanced_fillet_intent |= feature.is_object() &&
                                   feature.value("type", std::string{}) == "fillet" &&
                                   feature.contains("mode");
-    if (advanced_fillet_envelope != advanced_fillet_intent)
+    if ((advanced_fillet_intent && !advanced_fillet_envelope) ||
+        (version == k_advanced_fillet_version && !advanced_fillet_intent))
       return Result<PartDocument>::failure(
           json_error("Advanced Fillet requires necessary Part version 14"));
     const bool surface_envelope =
@@ -5920,6 +5944,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
                                 "sweep_features",
                                 "loft_features",
                                 "surface_features",
+                                "sketch_driven_features",
                                 "part_patterns",
                                 "mirror_features",
                                 "edge_treatments",
@@ -5969,6 +5994,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
                                                       "sweep_features",
                                                       "loft_features",
                                                       "surface_features",
+                                                      "sketch_driven_features",
                                                       "body_booleans",
                                                       "part_patterns",
                                                       "mirror_features",
@@ -5995,6 +6021,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
           return Result<PartDocument>::failure(json_error(key + " must be an array"));
         prelude[key] = json::array();
       }
+      prelude.erase("sketch_driven_features");
       prelude.erase("hole_features");
       prelude.erase("thread_features");
       auto document = deserialize_part_document_from_json(prelude.dump(), mode);
@@ -6105,6 +6132,13 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       enqueue(
           "loft_features", loft_feature_from_json,
           [](auto& doc, const auto& value) { return doc.add_loft_feature(value); }, true);
+      enqueue(
+          "sketch_driven_features",
+          [&](const auto& record) {
+            return detail::sketch_driven_from_json(record, face_reference_from_json);
+          },
+          [](auto& doc, const auto& feature) { return doc.add_sketch_driven_feature(feature); },
+          true);
       enqueue(
           "surface_features", surface_feature_from_json,
           [](auto& doc, const auto& value) { return doc.add_surface_feature(value); }, true);
@@ -6239,6 +6273,7 @@ Result<PartDocument> deserialize_part_document_from_json(std::string_view conten
       restore(part.sweep_features_, "sweep_features");
       restore(part.loft_features_, "loft_features");
       restore(part.surface_features_, "surface_features");
+      restore(part.sketch_driven_features_, "sketch_driven_features");
       restore(part.body_boolean_features_, "body_booleans");
       restore(part.linear_pattern_features_, "part_patterns");
       restore(part.circular_pattern_features_, "part_patterns");

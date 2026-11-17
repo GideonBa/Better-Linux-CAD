@@ -548,6 +548,11 @@ cover the relevant workflows; they do not establish every skipped offscreen case
   mass tracks material change. Invalid joins/wraps preserve previous results and support identities.
 - Reuse the resulting model for suppression/reorder, reference repair and direct-edit scenario D02.
 
+**180 intent gate accepted — 2026-11-17.** [Rib/Web Core proof](part-rib-web-intent-mvp6.md#verification)
+covers typed source/modes, strict necessary JSON/Project, normal graph/history, atomic edits and an
+earlier derived/placed Body termination. Focused **6 / 73**, full Core **804 / 35,384**. Geometry
+181, Emboss/Engrave 182–183 and combined native F03/UI01 in 184 remain open.
+
 ### D01 Direct face edits and source preservation
 
 - **First gate:** 185/186; native completion 187.

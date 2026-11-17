@@ -467,6 +467,8 @@ store_verified_feature_result(const PartDocument& document, const Feature& featu
     return feature->body_result_context().effective_produced_body() == body;
   if (const LoftFeature* feature = document.find_loft_feature(FeatureId(std::string(producer))))
     return feature->body_result_context().effective_produced_body() == body;
+  if (const auto* feature = document.find_sketch_driven_feature(FeatureId(std::string(producer))))
+    return feature->target_body() == body;
   if (const SurfaceFeature* feature =
           document.find_surface_feature(FeatureId(std::string(producer))))
     return surface_feature_result_body(*feature) == body;
@@ -4770,6 +4772,20 @@ Result<std::size_t> GeometryRecomputeExecutor::execute_subtractive_extrude(
   return store_cut(std::move(shape.value()));
 }
 
+Result<std::size_t> GeometryRecomputeExecutor::execute_sketch_driven(const PartDocument& document,
+                                                                     FeatureId feature,
+                                                                     ShapeCache& cache) const {
+  const auto scope = detail::validate_history_input(document, cache, feature.value());
+  if (!scope)
+    return Result<std::size_t>::failure(scope.error());
+  if (!document.find_sketch_driven_feature(feature))
+    return Result<std::size_t>::failure(
+        validation_error(feature.value(), "Sketch-driven feature is missing"));
+  return Result<std::size_t>::failure(geometry_error(
+      feature.value(),
+      "Rib/Web construction is not implemented in the Core-intent gate; Geometry is Block 181"));
+}
+
 Result<std::size_t> GeometryRecomputeExecutor::execute_fillet(const PartDocument& document,
                                                               FeatureId feature_id,
                                                               ShapeCache& shape_cache) const {
@@ -5859,6 +5875,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(step.node_id));
     const SweepFeature* sweep = document.find_sweep_feature(FeatureId(step.node_id));
     const LoftFeature* loft = document.find_loft_feature(FeatureId(step.node_id));
+    const auto* sketch_driven = document.find_sketch_driven_feature(FeatureId(step.node_id));
     const SurfaceFeature* surface = document.find_surface_feature(FeatureId(step.node_id));
     const LinearPatternFeature* linear_pattern =
         document.find_linear_pattern_feature(FeatureId(step.node_id));
@@ -5874,10 +5891,10 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(step.node_id));
     if (feature == nullptr && imported == nullptr && revolve == nullptr && sweep == nullptr &&
-        loft == nullptr && surface == nullptr && linear_pattern == nullptr &&
-        circular_pattern == nullptr && mirror == nullptr && fillet == nullptr &&
-        chamfer == nullptr && shell == nullptr && draft == nullptr && body_boolean == nullptr &&
-        body_transform == nullptr)
+        loft == nullptr && surface == nullptr && sketch_driven == nullptr &&
+        linear_pattern == nullptr && circular_pattern == nullptr && mirror == nullptr &&
+        fillet == nullptr && chamfer == nullptr && shell == nullptr && draft == nullptr &&
+        body_boolean == nullptr && body_transform == nullptr)
       continue;
 
     const FeatureId executable_id = feature != nullptr            ? feature->id()
@@ -5885,6 +5902,7 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
                                     : revolve != nullptr          ? revolve->id()
                                     : sweep != nullptr            ? sweep->id()
                                     : loft != nullptr             ? loft->id()
+                                    : sketch_driven != nullptr    ? sketch_driven->id()
                                     : surface != nullptr          ? surface_feature_id(*surface)
                                     : linear_pattern != nullptr   ? linear_pattern->id()
                                     : circular_pattern != nullptr ? circular_pattern->id()
@@ -5908,6 +5926,8 @@ GeometryRecomputeExecutor::execute_plan(const PartDocument& document, const Reco
         : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
         : sweep != nullptr   ? execute_sweep(document, sweep->id(), execution_cache)
         : loft != nullptr    ? execute_loft(document, loft->id(), execution_cache)
+        : sketch_driven != nullptr
+            ? execute_sketch_driven(document, sketch_driven->id(), execution_cache)
         : surface != nullptr
             ? execute_surface_feature(document, surface_feature_id(*surface), execution_cache)
         : linear_pattern != nullptr
@@ -6021,6 +6041,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     const RevolveFeature* revolve = document.find_revolve_feature(FeatureId(executable_id));
     const SweepFeature* sweep = document.find_sweep_feature(FeatureId(executable_id));
     const LoftFeature* loft = document.find_loft_feature(FeatureId(executable_id));
+    const auto* sketch_driven = document.find_sketch_driven_feature(FeatureId(executable_id));
     const SurfaceFeature* surface = document.find_surface_feature(FeatureId(executable_id));
     const LinearPatternFeature* linear_pattern =
         document.find_linear_pattern_feature(FeatureId(executable_id));
@@ -6036,10 +6057,10 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
     const BodyTransform* body_transform =
         document.find_body_transform(BodyTransformId(executable_id));
     if (feature == nullptr && imported == nullptr && revolve == nullptr && sweep == nullptr &&
-        loft == nullptr && surface == nullptr && linear_pattern == nullptr &&
-        circular_pattern == nullptr && mirror == nullptr && fillet == nullptr &&
-        chamfer == nullptr && shell == nullptr && draft == nullptr && body_boolean == nullptr &&
-        body_transform == nullptr)
+        loft == nullptr && surface == nullptr && sketch_driven == nullptr &&
+        linear_pattern == nullptr && circular_pattern == nullptr && mirror == nullptr &&
+        fillet == nullptr && chamfer == nullptr && shell == nullptr && draft == nullptr &&
+        body_boolean == nullptr && body_transform == nullptr)
       continue;
 
     const FeatureId feature_id = feature != nullptr            ? feature->id()
@@ -6047,6 +6068,7 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
                                  : revolve != nullptr          ? revolve->id()
                                  : sweep != nullptr            ? sweep->id()
                                  : loft != nullptr             ? loft->id()
+                                 : sketch_driven != nullptr    ? sketch_driven->id()
                                  : surface != nullptr          ? surface_feature_id(*surface)
                                  : linear_pattern != nullptr   ? linear_pattern->id()
                                  : circular_pattern != nullptr ? circular_pattern->id()
@@ -6070,6 +6092,8 @@ GeometryRecomputeExecutor::execute_document(const PartDocument& document,
         : revolve != nullptr ? execute_revolve(document, revolve->id(), execution_cache)
         : sweep != nullptr   ? execute_sweep(document, sweep->id(), execution_cache)
         : loft != nullptr    ? execute_loft(document, loft->id(), execution_cache)
+        : sketch_driven != nullptr
+            ? execute_sketch_driven(document, sketch_driven->id(), execution_cache)
         : surface != nullptr
             ? execute_surface_feature(document, surface_feature_id(*surface), execution_cache)
         : linear_pattern != nullptr
@@ -6280,6 +6304,8 @@ GeometryRecomputeExecutor::execute_history(const PartDocument& document,
         return execute_circular_pattern(document, feature, working);
       case PartFeatureFamily::Mirror:
         return execute_mirror(document, feature, working);
+      case PartFeatureFamily::SketchDriven:
+        return execute_sketch_driven(document, feature, working);
       case PartFeatureFamily::Fillet:
         return execute_fillet(document, feature, working);
       case PartFeatureFamily::Chamfer:

@@ -62,6 +62,7 @@ private:
   friend class SurfaceTrimAdapter;
   friend class LoftAdapter;
   friend class FilletAdapter;
+  friend class SketchDrivenAdapter;
   friend class ChamferAdapter;
   friend class ShellAdapter;
   friend class DraftAdapter;

@@ -761,7 +761,8 @@ Result<std::size_t> validate_part_feature_input_reference(const PartDocument& do
           }
           if (document.find_feature(id) || document.find_revolve_feature(id) ||
               document.find_sweep_feature(id) || document.find_loft_feature(id) ||
-              document.find_surface_feature(id) || document.find_linear_pattern_feature(id) ||
+              document.find_surface_feature(id) || document.find_sketch_driven_feature(id) ||
+              document.find_linear_pattern_feature(id) ||
               document.find_circular_pattern_feature(id) || document.find_mirror_feature(id) ||
               document.find_fillet_feature(id) || document.find_chamfer_feature(id) ||
               document.find_shell_feature(id) || document.find_hole_feature(id) ||

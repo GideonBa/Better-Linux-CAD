@@ -457,6 +457,7 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
   append_part_nodes(features, part, part.sweep_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.loft_features(), GuiBrowserNodeKind::Feature);
   append_surface_nodes(features, part);
+  append_part_nodes(features, part, part.sketch_driven_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.linear_pattern_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.circular_pattern_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.mirror_features(), GuiBrowserNodeKind::Feature);

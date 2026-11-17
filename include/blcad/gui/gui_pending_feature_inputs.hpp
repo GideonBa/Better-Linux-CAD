@@ -78,6 +78,7 @@ recompute_preview_geometry_with_context(const GuiDocumentSession& session,
     collect(part.circular_pattern_features());
     collect(part.mirror_features());
     collect(part.fillet_features());
+    collect(part.sketch_driven_features());
     collect(part.chamfer_features());
     collect(part.shell_features());
     collect(part.draft_features());

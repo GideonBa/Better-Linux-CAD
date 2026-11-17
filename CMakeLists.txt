@@ -56,6 +56,9 @@ add_library(
   src/core/datum_plane.cpp
   src/core/draft_feature.cpp
   src/core/edge_treatment_feature.cpp
+  src/core/sketch_driven_feature.cpp
+  src/core/sketch_driven_validation.cpp
+  src/core/sketch_driven_json.cpp
   src/core/advanced_fillet_intent.cpp
   src/core/advanced_fillet_json.cpp
   src/core/variable_fillet_feature.cpp
@@ -557,6 +560,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/derived_workplane_tests.cpp
     tests/core/draft_feature_tests.cpp
     tests/core/edge_treatment_feature_tests.cpp
+    tests/core/rib_web_intent_tests.cpp
     tests/core/variable_fillet_tests.cpp
     tests/core/face_fillet_tests.cpp
     tests/core/error_result_tests.cpp
