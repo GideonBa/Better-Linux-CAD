@@ -25,7 +25,12 @@ protected:
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
     for (const auto& presentation : layer_.presentations()) {
-      const QColor color = presentation.active ? QColor(0, 122, 204) : QColor(245, 170, 35);
+      const QColor color =
+          !presentation.interactive
+              ? (presentation.handle_id.starts_with("fillet.failure/") ? QColor(225, 65, 55)
+                                                                       : QColor(70, 150, 220))
+          : presentation.active ? QColor(0, 122, 204)
+                                : QColor(245, 170, 35);
       QPen pen(color);
       pen.setWidthF(presentation.active ? 3.0 : 2.0);
       painter.setPen(pen);
@@ -39,7 +44,8 @@ protected:
       } else {
         painter.drawLine(anchor, endpoint);
         draw_arrow_head(painter, anchor, endpoint);
-        painter.drawEllipse(endpoint, 4.5, 4.5);
+        if (presentation.interactive)
+          painter.drawEllipse(endpoint, 4.5, 4.5);
       }
       painter.setFont(appearance::numeric_font());
       painter.setPen(QColor::fromRgb(appearance::text));

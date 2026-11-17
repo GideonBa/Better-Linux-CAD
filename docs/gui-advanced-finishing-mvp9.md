@@ -40,18 +40,33 @@ unqualified prefix rejects. Returned data is transient canvas geometry and never
 persistent topology identity. Independent imported cubic/periodic oracles exercise actual native
 curves and physical length rather than production parameterization.
 
-## Remaining native integration
+## Owned panel and editing
 
-Connect the typed candidate to the existing owned property panel: constant/variable/face/full-round
-modes, ordered groups and members, dirty-cell-only station editing, binding/value controls,
-propagation/interpolation, role-specific face sets, hold lines and the supported analytic setback
-policy. Show actual source-length station anchors, original-basis direction, derived full-round
-size and actionable capability/failure feedback. Preserve unavailable inputs for explicit repair.
+Model → Fillet offers Constant Radius, Variable Radius, Face Blend and Full Round in the same
+owned panel. Variable groups retain authored order, member direction, interpolation and propagation.
+The station table edits endpoint/fraction roles and explicit parameter bindings. Full precision
+formatting and dirty-only writes preserve untouched raw literals. Reversal changes the chain basis
+through the existing Core operation. Only the active group's grips appear on the model; the
+read-only Law Direction arrow shows the original station basis and cannot intercept radius drags.
 
-Existing-feature editing must use its evaluated input-history prefix, then validate the complete
-downstream model. Native acceptance requires real station drags, face roles, repeated picks,
-Cancel/Escape and selection restoration, upstream changes, repair, complete Save/Open/history/STEP
-and compact property panels at both 100% and 150%. These gates remain open.
+Face roles have separate ordered selections. Repeated picks remove a member; assigning a face or
+edge already used by another role/group rejects without changing that intent. The panel explains
+G1 radius versus G2 contact-setback meaning, derived full-round size and the orthogonal three-edge
+setback capability. Hold-line choices bind owned paths. Switching modes filters staged parameters
+and values to the active record's dependencies. Common fields retain their identities; new groups,
+stations and bindings get fresh IDs. Inactive fields never become owned dependencies.
+
+Editing restores the complete owned record and evaluates its input-history prefix. Its target
+Body remains fixed while editing. Candidate publication recomputes the complete downstream
+history. Cancel/Escape discard the candidate and restore the entry selection and filter/scope.
+Dragging stages the exact station binding; linked values synchronize, controls are disabled during
+the drag, and release refreshes physical anchors from the updated source prefix. Finishing selection
+also resolves actual surviving semantic faces from selected Stitch/Thicken ancestry; coincident
+unrelated Body producers cannot supply those references.
+
+The connected panel passed its first native create/edit/drag/role matrix at both scales;
+explicit reopening into failed-Geometry repair and scrolled compact controls remain under verification. The implementation route continues
+through Block 184; none of this advances later blocks.
 
 ## Verification status
 
@@ -61,3 +76,10 @@ Geometry regression: **17 / 9,424** (`guides-final.log`). Five guide cases cover
 stations, original basis, explicit edit scope, a nonuniform imported split cubic with independent
 Bernstein/Simpson length, periodic seams, stale sources and derived full-round size. Native panel
 acceptance remains open; continue through 184 and retain 185–204 scope.
+
+The first owned-panel matrix passes **10 offscreen cases / 190 assertions** and **11 native cases /
+221 assertions** at 100% and compact 150%. Selection/face Geometry passes **14 / 494**, including
+actual Stitch/Thicken ancestors and a coincident unrelated Body negative. Captures confirm fixed
+Apply/Cancel and the physical source-direction guide; scrolled station/role captures and failed
+reopening are the remaining native checks. Logs: `panel-focused.log`, `selection-final.log`,
+`native100.log`, `native150.log` in the same Block-179 verification directory.
