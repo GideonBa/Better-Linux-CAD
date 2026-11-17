@@ -164,8 +164,15 @@ Result<std::vector<FinishingSelectionTarget>> FinishingSelectionBuilder::build(
   }
   for (const auto& source : document.features()) {
     if (!source.body_result_context() ||
-        source.body_result_context()->effective_produced_body() != body)
+        !detail::validate_history_source(document, source.id().value(), &cache))
       continue;
+    if (source.body_result_context()->effective_produced_body() != body) {
+      const auto descendants =
+          document.dependency_graph().transitive_dependents(source.id().value());
+      if (std::find(descendants.begin(), descendants.end(), result->source_feature_id.value()) ==
+          descendants.end())
+        continue;
+    }
     if (edge) {
       for (int i = 0; i < 12; ++i) {
         auto semantic = SemanticEdgeReference::create(source.id(), static_cast<SemanticEdge>(i));

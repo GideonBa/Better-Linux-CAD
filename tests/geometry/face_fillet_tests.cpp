@@ -5,6 +5,7 @@
 #include "../support/surface_offset_fixture.hpp"
 #include "blcad/core/advanced_fillet_intent.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/result_face_support.hpp"
@@ -298,6 +299,14 @@ TEST_CASE("Full-round consumes normal Thicken output and retains its source Body
   auto c = cache();
   execute(p, c);
   const auto before = volume(c, BodyId("thick.body")), retained = volume(c, BodyId("base.body"));
+  const auto picks = f::checked(FinishingSelectionBuilder::build(
+      p, c, BodyId("thick.body"), PartFeatureInputRole::FilletSupportFace));
+  for (const auto side : {SemanticFace::Front, SemanticFace::Back})
+    CHECK(std::any_of(picks.begin(), picks.end(), [&](const auto& pick) {
+      const auto& source = std::get<FaceReference>(pick.reference).source();
+      const auto* face = std::get_if<SemanticFaceReference>(&source);
+      return face && face->source_feature() == FeatureId("base.feature") && face->face() == side;
+    }));
   const auto selected =
       f::checked(ResultFaceSupportGeometry::selectable_faces(p, c, BodyId("thick.body")));
   REQUIRE(selected.size() == 2);
@@ -349,9 +358,28 @@ TEST_CASE("Full-round consumes a stitched closed shell and preserves its origina
   REQUIRE(p.add_surface_feature(f::checked(ClosedShellToSolidFeature::create(
       FeatureId("close"), "Close quilt", f::checked(SurfaceReference::create_body(BodyId("quilt"))),
       BodyId("solid")))));
+  auto unrelated = p.features().front().with_body_result_context(f::new_body(p, "unrelated"));
+  REQUIRE(unrelated);
+  const auto& old = unrelated.value();
+  auto other = f::checked(
+      Feature::create_additive_extrude(FeatureId("unrelated"), "Coincident unrelated body",
+                                       old.input_sketch(), old.length_parameter()));
+  if (old.profile())
+    other = f::checked(other.with_profile(*old.profile()));
+  other = f::checked(other.with_body_result_context(*old.body_result_context()));
+  REQUIRE(p.add_feature(other));
   auto c = cache();
   execute(p, c);
   const auto before = volume(c, BodyId("solid")), retained = volume(c);
+  const auto picks = f::checked(FinishingSelectionBuilder::build(
+      p, c, BodyId("solid"), PartFeatureInputRole::FilletSupportFace));
+  CHECK(picks.size() == 6);
+  for (const auto& pick : picks) {
+    const auto& reference = std::get<FaceReference>(pick.reference);
+    REQUIRE(std::holds_alternative<SemanticFaceReference>(reference.source()));
+    CHECK(std::get<SemanticFaceReference>(reference.source()).source_feature() ==
+          FeatureId("base"));
+  }
   REQUIRE(p.add_fillet_feature(f::checked(
       FilletFeature::create_full_round(FeatureId("finish"), "Quilt full round", BodyId("solid"),
                                        round(FilletContinuity::Curvature)))));
