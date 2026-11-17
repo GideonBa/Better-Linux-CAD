@@ -847,7 +847,8 @@ parameter/evaluation/Project authorities; the PN scenarios are future obligation
 - **Prerequisites:** 205,194–195. Reuse/extend the existing expression resolver, reference intent,
   Assembly bindings and atomic Project evaluation for cross-document/Assembly formulas.
 - **Contract:** stable IDs, explicit source/context, unit checks, one driver, cycles across the Project and
-  strict necessary schema compatibility. Freeze exact syntax/fields before writer changes.
+  strict necessary schema compatibility. Native source identity, root-relative location and accepted
+  revision stay separate; standalone Parts retain their own references. Freeze fields before writing.
 - **Proof:** PN02; collisions, chains, missing sources, binding conflicts, rollback and exact replay.
 
 ### Block 207 Typed reverse parameter usage
@@ -870,6 +871,8 @@ parameter/evaluation/Project authorities; the PN scenarios are future obligation
   source picking and use a complete Project candidate for Preview and one atomic Apply.
 - **Proof:** PN05; source/derived values and physical geometry, failed hidden consumer, formula/
   binding ownership, shared definitions, exact root Undo/Redo, Save/Open and immutable resources.
+  Include bounded Locate Source/Relink, moved files, duplicate identities, changed revisions and
+  standalone consumers; reference metadata Undo never implies undoing an OS file move.
 
 ### Block 210 State freshness and scalable navigation
 

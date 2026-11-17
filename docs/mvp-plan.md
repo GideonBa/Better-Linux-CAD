@@ -1227,3 +1227,8 @@ Double-click folds descendants while retaining the selected Assembly card; the s
 shows its parameter table. Selecting a parameter highlights exact formula consumers and marks
 hidden hits on folded ancestors without unfolding them automatically. Hierarchy folding never
 changes CAD visibility/suppression or formula evaluation. The complete 185–204 plan remains intact.
+
+The same plan requires standalone native Part source references and verified file relocation:
+source identity, locator and accepted revision stay separate. 206 defines the reference contract,
+209 adds Locate Source/Relink, and 210 handles root/index freshness. Missing files, ambiguous copies
+and changed revisions have explicit recovery; a file move cannot silently change a formula's source.
