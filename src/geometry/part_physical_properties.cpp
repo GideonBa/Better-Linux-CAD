@@ -1,3 +1,4 @@
+#include "effective_part_source.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
@@ -68,7 +69,7 @@ PartPhysicalProperties::PartPhysicalProperties(PartPhysicalPropertiesData data, 
 Result<std::size_t>
 PartPhysicalProperties::validate_current(const PartDocument& document,
                                          StepImportTopologyContext* imports) const {
-  const auto source = serialize_part_document_to_json(document);
+  const auto source = detail::effective_part_source(document);
   if (!source)
     return Result<std::size_t>::failure(source.error());
   if (source.value() != source_ || document.executable_generation() != generation_)
@@ -87,7 +88,7 @@ Result<PartPhysicalProperties>
 BodyResultInspector::inspect_physical_properties(const PartDocument& document,
                                                  const PartPhysicalProperties& previous,
                                                  StepImportTopologyContext* imports) const {
-  const auto source = serialize_part_document_to_json(document);
+  const auto source = detail::effective_part_source(document);
   if (!source)
     return Result<PartPhysicalProperties>::failure(source.error());
   const auto before = detail::material_independent_geometry_source(previous.source_);
@@ -125,7 +126,7 @@ Result<PartPhysicalProperties>
 BodyResultInspector::inspect_physical_properties(const PartDocument& document,
                                                  StepImportTopologyContext* imports) const {
   try {
-    const auto source = serialize_part_document_to_json(document);
+    const auto source = detail::effective_part_source(document);
     if (!source)
       return Result<PartPhysicalProperties>::failure(source.error());
     auto cache = ShapeCache::create(ShapeCacheId("physical.part." + document.id().value()));

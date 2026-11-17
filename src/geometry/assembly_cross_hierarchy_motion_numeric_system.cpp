@@ -30,8 +30,8 @@ append_local_joint_drive_residuals(const Project& project,
                                    const AssemblyLocalJointIdentity& identity,
                                    double length_residual_scale_mm, NumericVector& residuals,
                                    StepImportTopologyContext* import_context) {
-  auto local_project =
-      make_cross_hierarchy_local_evaluation_view(project, identity.assembly_document);
+  auto local_project = make_cross_hierarchy_local_evaluation_view(
+      project, identity.assembly_document, identity.occurrence_path);
   if (local_project.has_error()) {
     return Result<std::size_t>::failure(local_project.error());
   }

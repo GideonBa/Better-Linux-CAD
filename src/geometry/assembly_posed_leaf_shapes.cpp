@@ -86,15 +86,15 @@ Result<PosedLeafShapesBuild> AssemblyPosedLeafShapeBuilder::build(const Project&
       return Result<PosedLeafShapesBuild>::failure(leaves.error());
     }
 
-    std::vector<DocumentId> referenced_part_ids;
+    std::vector<std::pair<DocumentId, ModelStateId>> referenced_part_ids;
     referenced_part_ids.reserve(leaves.value().size());
     for (const AssemblyLeafOccurrenceDescriptor& leaf : leaves.value()) {
-      referenced_part_ids.push_back(leaf.referenced_part_document);
+      referenced_part_ids.emplace_back(leaf.referenced_part_document, leaf.selected_model_state);
     }
 
     const AssemblyPartShapeDefinitionBuilder part_definition_builder(import_context_);
     auto part_definitions =
-        part_definition_builder.build(project, std::move(referenced_part_ids));
+        part_definition_builder.build_for_states(project, std::move(referenced_part_ids));
     if (part_definitions.has_error()) {
       return Result<PosedLeafShapesBuild>::failure(part_definitions.error());
     }
@@ -104,7 +104,7 @@ Result<PosedLeafShapesBuild> AssemblyPosedLeafShapeBuilder::build(const Project&
     build.leaves.reserve(leaves.value().size());
     for (AssemblyLeafOccurrenceDescriptor& leaf : leaves.value()) {
       const AssemblyPartShapeDefinition* part = find_assembly_part_shape_definition(
-          part_definitions.value().definitions, leaf.referenced_part_document);
+          part_definitions.value().definitions, leaf.referenced_part_document, leaf.selected_model_state);
       if (part == nullptr || part->shape.IsNull()) {
         return Result<PosedLeafShapesBuild>::failure(Error::geometry(
             leaf_occurrence_key(leaf),

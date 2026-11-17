@@ -43,6 +43,10 @@ AssemblyInteractionGeometry::targets(const Project& project,
       const auto* part = project.find_part_document(component.referenced_part_document());
       if (!part)
         continue;
+      auto effective = part->evaluate_model_state(component.selected_model_state());
+      if (!effective)
+        return Result<std::vector<AssemblyInteractionTarget>>::failure(effective.error());
+      part = &effective.value();
       auto cache =
           ShapeCache::create(ShapeCacheId("assembly.interaction." + component.id().value()));
       if (!cache)

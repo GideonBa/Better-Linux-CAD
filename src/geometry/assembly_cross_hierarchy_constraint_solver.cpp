@@ -28,20 +28,32 @@ namespace {
   return quantity.has_value() ? std::optional<double>(quantity->degrees()) : std::nullopt;
 }
 
-[[nodiscard]] AssemblyLocalRelationshipInputSnapshot make_local_relationship_snapshot(
-    const DocumentId& assembly_document, const AssemblyConstraint& constraint) {
-  return AssemblyLocalRelationshipInputSnapshot{
-      assembly_document, constraint.id(), constraint.name(), constraint.type(),
-      constraint.target_a(), constraint.target_b(), constraint.state(),
-      distance_mm(constraint.distance()), angle_deg(constraint.angle())};
+[[nodiscard]] AssemblyLocalRelationshipInputSnapshot
+make_local_relationship_snapshot(const DocumentId& assembly_document,
+                                 const AssemblyConstraint& constraint,
+                                 const std::vector<SubassemblyInstanceId>& scope) {
+  return AssemblyLocalRelationshipInputSnapshot{assembly_document,
+                                                constraint.id(),
+                                                constraint.name(),
+                                                constraint.type(),
+                                                constraint.target_a(),
+                                                constraint.target_b(),
+                                                constraint.state(),
+                                                distance_mm(constraint.distance()),
+                                                angle_deg(constraint.angle()),
+                                                scope};
 }
 
 [[nodiscard]] AssemblyProjectCrossHierarchyRelationshipInputSnapshot
 make_cross_hierarchy_relationship_snapshot(const AssemblyHierarchyConstraint& constraint) {
-  return AssemblyProjectCrossHierarchyRelationshipInputSnapshot{
-      constraint.id(), constraint.name(), constraint.type(), constraint.target_a(),
-      constraint.target_b(), constraint.state(), distance_mm(constraint.distance()),
-      angle_deg(constraint.angle())};
+  return AssemblyProjectCrossHierarchyRelationshipInputSnapshot{constraint.id(),
+                                                                constraint.name(),
+                                                                constraint.type(),
+                                                                constraint.target_a(),
+                                                                constraint.target_b(),
+                                                                constraint.state(),
+                                                                distance_mm(constraint.distance()),
+                                                                angle_deg(constraint.angle())};
 }
 
 [[nodiscard]] Result<AssemblyCrossHierarchyRelationshipInputSnapshot>
@@ -49,37 +61,38 @@ make_relationship_snapshot(const Project& project, const AssemblyRelationshipIde
   if (const auto* local = std::get_if<AssemblyLocalRelationshipIdentity>(&identity)) {
     const AssemblyDocument* assembly = project.find_assembly_document(local->assembly_document);
     if (assembly == nullptr) {
-      return Result<AssemblyCrossHierarchyRelationshipInputSnapshot>::failure(validation_error(
-          local->assembly_document.value(),
-          "cross-hierarchy relationship snapshot assembly document must exist"));
+      return Result<AssemblyCrossHierarchyRelationshipInputSnapshot>::failure(
+          validation_error(local->assembly_document.value(),
+                           "cross-hierarchy relationship snapshot assembly document must exist"));
     }
     const AssemblyConstraint* constraint = assembly->find_constraint(local->constraint);
     if (constraint == nullptr) {
-      return Result<AssemblyCrossHierarchyRelationshipInputSnapshot>::failure(validation_error(
-          local->constraint.value(),
-          "cross-hierarchy relationship snapshot local constraint must exist"));
+      return Result<AssemblyCrossHierarchyRelationshipInputSnapshot>::failure(
+          validation_error(local->constraint.value(),
+                           "cross-hierarchy relationship snapshot local constraint must exist"));
     }
     return Result<AssemblyCrossHierarchyRelationshipInputSnapshot>::success(
-        make_local_relationship_snapshot(local->assembly_document, *constraint));
+        make_local_relationship_snapshot(local->assembly_document, *constraint,
+                                         local->occurrence_path));
   }
 
-  const auto& cross =
-      std::get<AssemblyProjectCrossHierarchyRelationshipIdentity>(identity);
+  const auto& cross = std::get<AssemblyProjectCrossHierarchyRelationshipIdentity>(identity);
   const AssemblyHierarchyConstraint* constraint =
       project.find_cross_hierarchy_constraint(cross.constraint);
   if (constraint == nullptr) {
-    return Result<AssemblyCrossHierarchyRelationshipInputSnapshot>::failure(validation_error(
-        cross.constraint.value(),
-        "cross-hierarchy relationship snapshot project constraint must exist"));
+    return Result<AssemblyCrossHierarchyRelationshipInputSnapshot>::failure(
+        validation_error(cross.constraint.value(),
+                         "cross-hierarchy relationship snapshot project constraint must exist"));
   }
   return Result<AssemblyCrossHierarchyRelationshipInputSnapshot>::success(
       make_cross_hierarchy_relationship_snapshot(*constraint));
 }
 
-[[nodiscard]] AssemblyRelationshipIdentity relationship_identity(
-    const AssemblyCrossHierarchyRelationshipInputSnapshot& snapshot) {
+[[nodiscard]] AssemblyRelationshipIdentity
+relationship_identity(const AssemblyCrossHierarchyRelationshipInputSnapshot& snapshot) {
   if (const auto* local = std::get_if<AssemblyLocalRelationshipInputSnapshot>(&snapshot)) {
-    return AssemblyLocalRelationshipIdentity{local->assembly_document, local->constraint};
+    return AssemblyLocalRelationshipIdentity{local->assembly_document, local->constraint,
+                                             local->occurrence_path};
   }
   return AssemblyProjectCrossHierarchyRelationshipIdentity{
       std::get<AssemblyProjectCrossHierarchyRelationshipInputSnapshot>(snapshot).constraint};
@@ -115,8 +128,9 @@ make_relationship_snapshots(const Project& project,
   return endpoints;
 }
 
-[[nodiscard]] Result<std::size_t> validate_relationship_freshness(
-    const Project& project, const AssemblyCrossHierarchySolveResult& result) {
+[[nodiscard]] Result<std::size_t>
+validate_relationship_freshness(const Project& project,
+                                const AssemblyCrossHierarchySolveResult& result) {
   if (result.relationship_snapshots.size() != result.relationships.size()) {
     return Result<std::size_t>::failure(validation_error(
         "assembly.cross_hierarchy_application",
@@ -129,9 +143,9 @@ make_relationship_snapshots(const Project& project,
     const AssemblyRelationshipIdentity& identity = result.relationships[index];
     if (std::find(seen_relationships.begin(), seen_relationships.end(), identity) !=
         seen_relationships.end()) {
-      return Result<std::size_t>::failure(validation_error(
-          "assembly.cross_hierarchy_application",
-          "cross-hierarchy solve result contains duplicate relationships"));
+      return Result<std::size_t>::failure(
+          validation_error("assembly.cross_hierarchy_application",
+                           "cross-hierarchy solve result contains duplicate relationships"));
     }
     seen_relationships.push_back(identity);
     if (relationship_identity(result.relationship_snapshots[index]) != identity) {
@@ -152,9 +166,9 @@ make_relationship_snapshots(const Project& project,
   return Result<std::size_t>::success(result.relationships.size());
 }
 
-[[nodiscard]] Result<std::size_t> validate_group_freshness(
-    const Project& project, const AssemblyCrossHierarchySolveResult& result,
-    const std::vector<ComponentTransformAuthority>& current_authorities) {
+[[nodiscard]] Result<std::size_t>
+validate_group_freshness(const Project& project, const AssemblyCrossHierarchySolveResult& result,
+                         const std::vector<ComponentTransformAuthority>& current_authorities) {
   auto graph = AssemblyCrossHierarchyConstraintGraph::build(project);
   if (graph.has_error()) {
     return Result<std::size_t>::failure(graph.error());
@@ -189,8 +203,7 @@ make_solve_result(const Project& source_project, const Project& solved_project,
   auto hierarchy_boundary_snapshots = detail::make_cross_hierarchy_boundary_snapshots(
       source_project, hierarchy_endpoints_from(relationship_snapshots.value()));
   if (hierarchy_boundary_snapshots.has_error()) {
-    return Result<AssemblyCrossHierarchySolveResult>::failure(
-        hierarchy_boundary_snapshots.error());
+    return Result<AssemblyCrossHierarchySolveResult>::failure(hierarchy_boundary_snapshots.error());
   }
   auto semantic_target_part_snapshots = detail::make_semantic_target_part_snapshots(
       source_project,
@@ -214,8 +227,14 @@ make_solve_result(const Project& source_project, const Project& solved_project,
     if (solved_component.has_error()) {
       return Result<AssemblyCrossHierarchySolveResult>::failure(solved_component.error());
     }
+    auto source_transform = detail::cross_hierarchy_authority_transform(source_project, authority);
+    auto solved_transform = detail::cross_hierarchy_authority_transform(solved_project, authority);
+    if (!source_transform)
+      return Result<AssemblyCrossHierarchySolveResult>::failure(source_transform.error());
+    if (!solved_transform)
+      return Result<AssemblyCrossHierarchySolveResult>::failure(solved_transform.error());
     proposals.push_back(ProposedAssemblyCrossHierarchyAuthorityTransform{
-        authority, source_component.value()->transform(), solved_component.value()->transform()});
+        authority, source_transform.value(), solved_transform.value()});
   }
 
   auto fresh = detail::revalidate_semantic_target_part_sources(
@@ -223,15 +242,10 @@ make_solve_result(const Project& source_project, const Project& solved_project,
   if (!fresh)
     return Result<AssemblyCrossHierarchySolveResult>::failure(fresh.error());
   return Result<AssemblyCrossHierarchySolveResult>::success(AssemblyCrossHierarchySolveResult{
-      outcome.state,
-      outcome.iterations,
-      solve_group.relationships,
-      fixed_authorities,
-      std::move(authority_snapshots.value()),
-      std::move(relationship_snapshots.value()),
+      outcome.state, outcome.iterations, solve_group.relationships, fixed_authorities,
+      std::move(authority_snapshots.value()), std::move(relationship_snapshots.value()),
       std::move(hierarchy_boundary_snapshots.value()),
-      std::move(semantic_target_part_snapshots.value()),
-      std::move(proposals),
+      std::move(semantic_target_part_snapshots.value()), std::move(proposals),
       AssemblySolveResidualSummary{outcome.final_residuals.size(),
                                    detail::residual_rms(outcome.initial_residuals),
                                    detail::residual_rms(outcome.final_residuals),
@@ -240,9 +254,10 @@ make_solve_result(const Project& source_project, const Project& solved_project,
 
 } // namespace
 
-Result<AssemblyCrossHierarchySolveResult> AssemblyCrossHierarchyConstraintSolver::solve(
-    const Project& project, const AssemblyCrossHierarchySolveGroup& solve_group,
-    AssemblyRigidBodySolverOptions options) const {
+Result<AssemblyCrossHierarchySolveResult>
+AssemblyCrossHierarchyConstraintSolver::solve(const Project& project,
+                                              const AssemblyCrossHierarchySolveGroup& solve_group,
+                                              AssemblyRigidBodySolverOptions options) const {
   auto graph = AssemblyCrossHierarchyConstraintGraph::build(project);
   if (graph.has_error()) {
     return Result<AssemblyCrossHierarchySolveResult>::failure(graph.error());
@@ -262,9 +277,9 @@ Result<AssemblyCrossHierarchySolveResult> AssemblyCrossHierarchyConstraintSolver
       return Result<AssemblyCrossHierarchySolveResult>::failure(component.error());
     }
     if (component.value()->suppression_state() != ComponentSuppressionState::Active) {
-      return Result<AssemblyCrossHierarchySolveResult>::failure(validation_error(
-          authority.component_instance.value(),
-          "cross-hierarchy solve-group authority must remain active"));
+      return Result<AssemblyCrossHierarchySolveResult>::failure(
+          validation_error(authority.component_instance.value(),
+                           "cross-hierarchy solve-group authority must remain active"));
     }
     if (component.value()->grounding_state() == ComponentGroundingState::Grounded) {
       fixed_authorities.push_back(authority);
@@ -313,9 +328,9 @@ Result<AssemblyCrossHierarchySolveResult> AssemblyCrossHierarchyConstraintSolver
 Result<std::size_t> AssemblyCrossHierarchySolveResultApplier::apply(
     Project& project, const AssemblyCrossHierarchySolveResult& result) const {
   if (!result.converged()) {
-    return Result<std::size_t>::failure(validation_error(
-        "assembly.cross_hierarchy_application",
-        "only a converged cross-hierarchy solve result can be applied"));
+    return Result<std::size_t>::failure(
+        validation_error("assembly.cross_hierarchy_application",
+                         "only a converged cross-hierarchy solve result can be applied"));
   }
 
   auto structure = project.validate_assembly_structure();

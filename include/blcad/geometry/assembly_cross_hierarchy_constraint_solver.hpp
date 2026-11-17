@@ -36,6 +36,7 @@ struct AssemblyLocalRelationshipInputSnapshot {
   AssemblyConstraintState state = AssemblyConstraintState::Inactive;
   std::optional<double> distance_mm;
   std::optional<double> angle_deg;
+  std::vector<SubassemblyInstanceId> occurrence_path{};
 
   friend bool operator==(const AssemblyLocalRelationshipInputSnapshot&,
                          const AssemblyLocalRelationshipInputSnapshot&) = default;

@@ -112,6 +112,8 @@ public:
 
   [[nodiscard]] Result<std::size_t>
   execute_fillet(const PartDocument& document, FeatureId feature_id, ShapeCache& shape_cache) const;
+  [[nodiscard]] Result<std::size_t> execute_direct_edit(const PartDocument&, FeatureId,
+                                                       ShapeCache&) const;
   [[nodiscard]] Result<std::size_t> execute_sketch_driven(const PartDocument& document,
                                                           FeatureId feature_id,
                                                           ShapeCache& shape_cache) const;

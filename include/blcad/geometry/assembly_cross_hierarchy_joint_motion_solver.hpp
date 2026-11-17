@@ -28,6 +28,7 @@ struct AssemblyLocalJointMotionInputSnapshot {
   AssemblyJointLimits limits;
   double coordinate_deg = 0.0;
   std::vector<AssemblyJointCoordinateSlot> coordinate_slots;
+  std::vector<SubassemblyInstanceId> occurrence_path{};
 
   friend bool operator==(const AssemblyLocalJointMotionInputSnapshot&,
                          const AssemblyLocalJointMotionInputSnapshot&) = default;

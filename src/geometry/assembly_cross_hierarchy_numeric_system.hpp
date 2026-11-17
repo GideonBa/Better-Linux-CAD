@@ -12,8 +12,8 @@
 namespace blcad::geometry::detail {
 
 [[nodiscard]] Result<Project> make_cross_hierarchy_local_evaluation_view(
-    const Project& project,
-    const DocumentId& assembly_document);
+    const Project& project, const DocumentId& assembly_document,
+    const std::vector<SubassemblyInstanceId>& occurrence_path = {});
 
 [[nodiscard]] Result<std::size_t> append_cross_hierarchy_local_relationship_residuals(
     const Project& project, const AssemblyLocalRelationshipIdentity& identity,
@@ -25,17 +25,21 @@ namespace blcad::geometry::detail {
     double length_residual_scale_mm, NumericVector& residuals,
     StepImportTopologyContext* import_context = nullptr);
 
-[[nodiscard]] Result<const ComponentInstance*> resolve_cross_hierarchy_authority_component(
-    const Project& project,
-    const ComponentTransformAuthority& authority);
+[[nodiscard]] Result<const ComponentInstance*>
+resolve_cross_hierarchy_authority_component(const Project& project,
+                                            const ComponentTransformAuthority& authority);
+
+[[nodiscard]] Result<RigidTransform>
+cross_hierarchy_authority_transform(const Project&, const ComponentTransformAuthority&);
+[[nodiscard]] Result<std::size_t>
+set_cross_hierarchy_authority_transform(Project&, const ComponentTransformAuthority&,
+                                        RigidTransform);
 
 [[nodiscard]] Result<NumericVector> read_cross_hierarchy_authority_variables(
-    const Project& project,
-    const std::vector<ComponentTransformAuthority>& variable_authorities);
+    const Project& project, const std::vector<ComponentTransformAuthority>& variable_authorities);
 
 [[nodiscard]] Result<std::size_t> apply_cross_hierarchy_authority_variables(
-    Project& project,
-    const std::vector<ComponentTransformAuthority>& variable_authorities,
+    Project& project, const std::vector<ComponentTransformAuthority>& variable_authorities,
     const NumericVector& values);
 
 [[nodiscard]] Result<NumericVector> evaluate_cross_hierarchy_group_residuals(

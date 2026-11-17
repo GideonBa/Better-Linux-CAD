@@ -33,7 +33,8 @@ namespace {
 
 [[nodiscard]] AssemblyLocalRelationshipInputSnapshot
 make_local_constraint_snapshot(const DocumentId& assembly_document,
-                               const AssemblyConstraint& constraint) {
+                               const AssemblyConstraint& constraint,
+                               const std::vector<SubassemblyInstanceId>& scope) {
   return AssemblyLocalRelationshipInputSnapshot{assembly_document,
                                                 constraint.id(),
                                                 constraint.name(),
@@ -42,7 +43,8 @@ make_local_constraint_snapshot(const DocumentId& assembly_document,
                                                 constraint.target_b(),
                                                 constraint.state(),
                                                 distance_mm(constraint.distance()),
-                                                angle_deg(constraint.angle())};
+                                                angle_deg(constraint.angle()),
+                                                scope};
 }
 
 [[nodiscard]] AssemblyProjectCrossHierarchyRelationshipInputSnapshot
@@ -58,12 +60,19 @@ make_cross_constraint_snapshot(const AssemblyHierarchyConstraint& constraint) {
 }
 
 [[nodiscard]] AssemblyLocalJointMotionInputSnapshot
-make_local_joint_snapshot(const DocumentId& assembly_document, const AssemblyJoint& joint) {
-  return AssemblyLocalJointMotionInputSnapshot{assembly_document,      joint.id(),
-                                               joint.name(),           joint.type(),
-                                               joint.target_a(),       joint.target_b(),
-                                               joint.state(),          joint.limits(),
-                                               joint.coordinate_deg(), joint.coordinate_slots()};
+make_local_joint_snapshot(const DocumentId& assembly_document, const AssemblyJoint& joint,
+                          const std::vector<SubassemblyInstanceId>& scope) {
+  return AssemblyLocalJointMotionInputSnapshot{assembly_document,
+                                               joint.id(),
+                                               joint.name(),
+                                               joint.type(),
+                                               joint.target_a(),
+                                               joint.target_b(),
+                                               joint.state(),
+                                               joint.limits(),
+                                               joint.coordinate_deg(),
+                                               joint.coordinate_slots(),
+                                               scope};
 }
 
 [[nodiscard]] AssemblyProjectCrossHierarchyJointMotionInputSnapshot
@@ -95,7 +104,8 @@ make_motion_relationship_snapshot(const Project& project,
                                  "cross-hierarchy motion local constraint must exist"));
           }
           return Result<AssemblyCrossHierarchyMotionRelationshipInputSnapshot>::success(
-              make_local_constraint_snapshot(value.assembly_document, *constraint));
+              make_local_constraint_snapshot(value.assembly_document, *constraint,
+                                             value.occurrence_path));
         } else if constexpr (std::is_same_v<Identity, AssemblyLocalJointIdentity>) {
           const AssemblyDocument* assembly =
               project.find_assembly_document(value.assembly_document);
@@ -110,8 +120,19 @@ make_motion_relationship_snapshot(const Project& project,
                 validation_error(value.joint.value(),
                                  "cross-hierarchy motion local joint must exist"));
           }
+          if (!value.occurrence_path.empty()) {
+            auto local = detail::make_cross_hierarchy_local_evaluation_view(
+                project, value.assembly_document, value.occurrence_path);
+            if (!local)
+              return Result<AssemblyCrossHierarchyMotionRelationshipInputSnapshot>::failure(
+                  local.error());
+            return Result<AssemblyCrossHierarchyMotionRelationshipInputSnapshot>::success(
+                make_local_joint_snapshot(value.assembly_document,
+                                          *local.value().assembly().find_joint(value.joint),
+                                          value.occurrence_path));
+          }
           return Result<AssemblyCrossHierarchyMotionRelationshipInputSnapshot>::success(
-              make_local_joint_snapshot(value.assembly_document, *joint));
+              make_local_joint_snapshot(value.assembly_document, *joint, value.occurrence_path));
         } else if constexpr (std::is_same_v<Identity,
                                             AssemblyProjectCrossHierarchyRelationshipIdentity>) {
           const AssemblyHierarchyConstraint* constraint =
@@ -143,9 +164,11 @@ make_motion_relationship_snapshot(const Project& project,
       [](const auto& value) -> AssemblyMotionRelationshipIdentity {
         using Snapshot = std::decay_t<decltype(value)>;
         if constexpr (std::is_same_v<Snapshot, AssemblyLocalRelationshipInputSnapshot>) {
-          return AssemblyLocalRelationshipIdentity{value.assembly_document, value.constraint};
+          return AssemblyLocalRelationshipIdentity{value.assembly_document, value.constraint,
+                                                   value.occurrence_path};
         } else if constexpr (std::is_same_v<Snapshot, AssemblyLocalJointMotionInputSnapshot>) {
-          return AssemblyLocalJointIdentity{value.assembly_document, value.joint};
+          return AssemblyLocalJointIdentity{value.assembly_document, value.joint,
+                                            value.occurrence_path};
         } else if constexpr (std::is_same_v<
                                  Snapshot,
                                  AssemblyProjectCrossHierarchyRelationshipInputSnapshot>) {
@@ -348,8 +371,14 @@ make_motion_result(const Project& source_project, const Project& solved_project,
     if (solved_component.has_error()) {
       return Result<AssemblyCrossHierarchyJointMotionResult>::failure(solved_component.error());
     }
+    auto source_transform = detail::cross_hierarchy_authority_transform(source_project, authority);
+    auto solved_transform = detail::cross_hierarchy_authority_transform(solved_project, authority);
+    if (!source_transform)
+      return Result<AssemblyCrossHierarchyJointMotionResult>::failure(source_transform.error());
+    if (!solved_transform)
+      return Result<AssemblyCrossHierarchyJointMotionResult>::failure(solved_transform.error());
     proposals.push_back(ProposedAssemblyCrossHierarchyAuthorityTransform{
-        authority, source_component.value()->transform(), solved_component.value()->transform()});
+        authority, source_transform.value(), solved_transform.value()});
   }
 
   auto fresh = detail::revalidate_semantic_target_part_sources(

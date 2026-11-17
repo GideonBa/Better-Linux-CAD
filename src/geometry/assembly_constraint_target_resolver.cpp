@@ -1,3 +1,4 @@
+#include <memory>
 #include "blcad/geometry/assembly_constraint_target_resolver.hpp"
 #include "assembly_hole_geometry_scope.hpp"
 
@@ -27,6 +28,7 @@ namespace {
 struct ResolvedTargetContext {
   const ComponentInstance* component = nullptr;
   const PartDocument* part = nullptr;
+  std::shared_ptr<const PartDocument> effective;
 };
 
 struct ResolvedCircularFeatureGeometry {
@@ -74,7 +76,11 @@ resolve_target_context(const Project& project, const AssemblyConstraintTarget& t
                                                   "resolve to an owned project part document"));
   }
 
-  return Result<ResolvedTargetContext>::success(ResolvedTargetContext{component, part});
+  auto evaluated = part->evaluate_model_state(component->selected_model_state());
+  if (!evaluated)
+    return Result<ResolvedTargetContext>::failure(evaluated.error());
+  auto owned = std::make_shared<const PartDocument>(std::move(evaluated.value()));
+  return Result<ResolvedTargetContext>::success(ResolvedTargetContext{component, owned.get(), std::move(owned)});
 }
 
 [[nodiscard]] Result<SemanticFaceReference>

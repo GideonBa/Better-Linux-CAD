@@ -1,3 +1,4 @@
+#include "effective_part_source.hpp"
 #include "assembly_hole_geometry_scope.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
@@ -18,7 +19,7 @@ assembly_hole_part_geometry(const PartDocument& part, StepImportTopologyContext*
   auto fresh = observe_imported_part_sources(part, imports);
   if (!fresh)
     return R::failure(fresh.error());
-  auto intent = serialize_part_document_to_json(part);
+  auto intent = detail::effective_part_source(part);
   if (!intent)
     return R::failure(intent.error());
   auto* scope = AssemblyHoleGeometryScope::current_;

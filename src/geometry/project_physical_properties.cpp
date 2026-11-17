@@ -83,7 +83,10 @@ ProjectPhysicalProperties::validate_current(const Project& project,
     if (!part)
       return Result<std::size_t>::failure(
           Error::dependency(snapshot.document.value(), "Physical Part source is missing"));
-    const auto valid = snapshot.properties.validate_current(*part, imports);
+    auto effective = part->evaluate_model_state(snapshot.selected_model_state);
+    if (!effective)
+      return Result<std::size_t>::failure(effective.error());
+    const auto valid = snapshot.properties.validate_current(effective.value(), imports);
     if (!valid)
       return valid;
   }
@@ -124,19 +127,23 @@ BodyResultInspector::inspect_project_physical_properties(const Project& project,
     if (!leaves)
       return Result<ProjectPhysicalProperties>::failure(leaves.error());
     std::vector<ProjectPhysicalProperties::PartSnapshot> parts;
-    std::map<std::string, std::size_t> by_id;
+    std::map<std::pair<std::string, std::string>, std::size_t> by_id;
     ProjectPhysicalPropertiesData data;
     std::vector<BodyPhysicalProperties> flattened;
     for (const auto& leaf : leaves.value()) {
-      auto found = by_id.find(leaf.referenced_part_document.value());
+      const auto key = std::pair{leaf.referenced_part_document.value(), leaf.selected_model_state.value()};
+      auto found = by_id.find(key);
       if (found == by_id.end()) {
         const auto* part = project.find_part_document(leaf.referenced_part_document);
         if (!part)
           return Result<ProjectPhysicalProperties>::failure(
               error(leaf.referenced_part_document.value(), "Physical Part definition is missing"));
+        auto effective = part->evaluate_model_state(leaf.selected_model_state);
+        if (!effective)
+          return Result<ProjectPhysicalProperties>::failure(effective.error());
         const auto* old = previous ? [&]() -> const PartPhysicalProperties* {
           for (const auto& snapshot : previous->parts_)
-            if (snapshot.document == part->id())
+            if (snapshot.document == part->id() && snapshot.selected_model_state == leaf.selected_model_state)
               return &snapshot.properties;
           return nullptr;
         }()
@@ -144,12 +151,12 @@ BodyResultInspector::inspect_project_physical_properties(const Project& project,
         if (previous && !old)
           return Result<ProjectPhysicalProperties>::failure(Error::dependency(
               part->id().value(), "Physical reuse requires a matching integrated Part snapshot"));
-        auto properties = old ? inspect_physical_properties(*part, *old, imports)
-                              : inspect_physical_properties(*part, imports);
+        auto properties = old ? inspect_physical_properties(effective.value(), *old, imports)
+                              : inspect_physical_properties(effective.value(), imports);
         if (!properties)
           return Result<ProjectPhysicalProperties>::failure(properties.error());
-        found = by_id.emplace(part->id().value(), parts.size()).first;
-        parts.push_back({part->id(), std::move(properties.value())});
+        found = by_id.emplace(key, parts.size()).first;
+        parts.push_back({part->id(), std::move(properties.value()), leaf.selected_model_state});
       }
       const auto* assembly = project.find_assembly_document(leaf.assembly_document);
       const auto* component =

@@ -40,6 +40,7 @@ struct AssemblyOccurrenceLabel {
 struct PartDefinitionLabel {
   DocumentId part_document;
   TDF_Label label;
+  ModelStateId selected_model_state{primary_model_state_id()};
 };
 
 [[nodiscard]] Error make_export_error(std::string message) {
@@ -62,11 +63,11 @@ void set_label_name(const TDF_Label& label, const std::string& name) {
 }
 
 [[nodiscard]] const TDF_Label* find_part_label(
-    const std::vector<PartDefinitionLabel>& labels, const DocumentId& part_document) {
+    const std::vector<PartDefinitionLabel>& labels, const DocumentId& part_document, const ModelStateId& state) {
   const auto found = std::find_if(
       labels.begin(), labels.end(),
-      [&part_document](const PartDefinitionLabel& entry) {
-        return entry.part_document == part_document;
+      [&](const PartDefinitionLabel& entry) {
+        return entry.part_document == part_document && entry.selected_model_state == state;
       });
   return found == labels.end() ? nullptr : &found->label;
 }
@@ -92,15 +93,15 @@ Result<AssemblyStructuredStepExportSummary> AssemblyStructuredStepExporter::writ
         "structured step export requires at least one visible active component"));
   }
 
-  std::vector<DocumentId> part_documents;
+  std::vector<std::pair<DocumentId, ModelStateId>> part_documents;
   part_documents.reserve(exchange_graph.value().part_product_definitions().size());
   for (const AssemblyExchangePartProductDefinition& definition :
        exchange_graph.value().part_product_definitions()) {
-    part_documents.push_back(definition.identity.part_document);
+    part_documents.emplace_back(definition.identity.part_document, definition.identity.selected_model_state);
   }
 
   const detail::AssemblyPartShapeDefinitionBuilder part_definition_builder(import_context_);
-  auto part_shapes = part_definition_builder.build(project, std::move(part_documents));
+  auto part_shapes = part_definition_builder.build_for_states(project, std::move(part_documents));
   if (part_shapes.has_error()) {
     return Result<AssemblyStructuredStepExportSummary>::failure(part_shapes.error());
   }
@@ -121,7 +122,7 @@ Result<AssemblyStructuredStepExportSummary> AssemblyStructuredStepExporter::writ
          exchange_graph.value().part_product_definitions()) {
       const detail::AssemblyPartShapeDefinition* part_shape =
           detail::find_assembly_part_shape_definition(
-              part_shapes.value().definitions, definition.identity.part_document);
+              part_shapes.value().definitions, definition.identity.part_document, definition.identity.selected_model_state);
       if (part_shape == nullptr || part_shape->shape.IsNull()) {
         return Result<AssemblyStructuredStepExportSummary>::failure(make_export_error(
             "structured step part product definition shape is unavailable"));
@@ -134,7 +135,7 @@ Result<AssemblyStructuredStepExportSummary> AssemblyStructuredStepExporter::writ
       }
       set_label_name(label, definition.product_name);
       part_labels.push_back(
-          PartDefinitionLabel{definition.identity.part_document, label});
+          PartDefinitionLabel{definition.identity.part_document, label, definition.identity.selected_model_state});
     }
 
     std::vector<AssemblyOccurrenceLabel> assembly_labels;
@@ -156,7 +157,7 @@ Result<AssemblyStructuredStepExportSummary> AssemblyStructuredStepExporter::writ
           find_assembly_label(assembly_labels,
                               occurrence.identity.containing_assembly_occurrence);
       const TDF_Label* part_label =
-          find_part_label(part_labels, occurrence.part_product.part_document);
+          find_part_label(part_labels, occurrence.part_product.part_document, occurrence.part_product.selected_model_state);
       if (assembly_label == nullptr || part_label == nullptr ||
           occurrence.transforms_inner_to_outer.empty()) {
         return Result<AssemblyStructuredStepExportSummary>::failure(make_export_error(

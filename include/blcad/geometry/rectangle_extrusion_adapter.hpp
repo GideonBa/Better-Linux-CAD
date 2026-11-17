@@ -63,6 +63,7 @@ private:
   friend class LoftAdapter;
   friend class FilletAdapter;
   friend class SketchDrivenAdapter;
+  friend class DirectEditAdapter;
   friend class ChamferAdapter;
   friend class ShellAdapter;
   friend class DraftAdapter;

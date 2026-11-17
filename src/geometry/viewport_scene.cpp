@@ -1,3 +1,4 @@
+#include <map>
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/core/sketch_contour.hpp"
 #include "blcad/geometry/equation_curve_geometry.hpp"
@@ -981,26 +982,30 @@ ViewportSceneBuilder::build_project(const Project& project) const {
     auto leaves = AssemblyLeafOccurrenceResolver{}.resolve(project);
     if (!leaves)
       return Result<std::vector<ViewportSceneItem>>::failure(leaves.error());
-    std::unordered_map<std::string, ShapeCache> caches;
+    std::map<std::pair<std::string, std::string>, ShapeCache> caches;
     for (const auto& leaf : leaves.value()) {
       const auto id = leaf.referenced_part_document;
-      if (caches.contains(id.value()))
+      const auto key = std::pair{id.value(), leaf.selected_model_state.value()};
+      if (caches.contains(key))
         continue;
       const auto* part = project.find_part_document(id);
       if (!part)
         return Result<std::vector<ViewportSceneItem>>::failure(
             scene_error("Thread member is unavailable"));
+      auto effective = part->evaluate_model_state(leaf.selected_model_state);
+      if (!effective)
+        return Result<std::vector<ViewportSceneItem>>::failure(effective.error());
       auto cache = ShapeCache::create(ShapeCacheId("scene.thread." + id.value()));
       if (!cache)
         return Result<std::vector<ViewportSceneItem>>::failure(cache.error());
       auto result =
-          GeometryRecomputeExecutor{import_context_}.execute_document(*part, cache.value());
+          GeometryRecomputeExecutor{import_context_}.execute_document(effective.value(), cache.value());
       if (!result)
         return Result<std::vector<ViewportSceneItem>>::failure(result.error());
-      caches.emplace(id.value(), std::move(cache.value()));
+      caches.emplace(key, std::move(cache.value()));
     }
-    return build_project(project, [&](DocumentId id) -> const ShapeCache* {
-      const auto found = caches.find(id.value());
+    return build_project_for_states(project, [&](DocumentId id, ModelStateId state) -> const ShapeCache* {
+      const auto found = caches.find({id.value(), state.value()});
       return found == caches.end() ? nullptr : &found->second;
     });
   }
@@ -1021,6 +1026,13 @@ ViewportSceneBuilder::build_project(const Project& project) const {
 Result<std::vector<ViewportSceneItem>> ViewportSceneBuilder::build_project(
     const Project& project,
     const std::function<const ShapeCache*(DocumentId)>& member_cache) const {
+  return build_project_for_states(project, [&](DocumentId id, ModelStateId) {
+    return member_cache ? member_cache(id) : nullptr;
+  });
+}
+Result<std::vector<ViewportSceneItem>> ViewportSceneBuilder::build_project_for_states(
+    const Project& project,
+    const std::function<const ShapeCache*(DocumentId, ModelStateId)>& member_cache) const {
   const auto valid = project.validate_assembly_structure();
   if (!valid)
     return Result<std::vector<ViewportSceneItem>>::failure(valid.error());
@@ -1032,16 +1044,21 @@ Result<std::vector<ViewportSceneItem>> ViewportSceneBuilder::build_project(
       TopoDS_Shape shape;
       std::vector<ViewportSceneItem> annotations;
     };
-    std::unordered_map<std::string, Definition> definitions;
+    std::map<std::pair<std::string, std::string>, Definition> definitions;
     std::vector<ViewportSceneItem> items;
     for (const auto& leaf : leaves.value()) {
       const auto id = leaf.referenced_part_document;
-      if (!definitions.contains(id.value())) {
+      const auto key = std::pair{id.value(), leaf.selected_model_state.value()};
+      if (!definitions.contains(key)) {
         const auto* part = project.find_part_document(id);
-        const auto* cache = member_cache ? member_cache(id) : nullptr;
+        const auto* cache = member_cache ? member_cache(id, leaf.selected_model_state) : nullptr;
         if (!part || !cache)
           return Result<std::vector<ViewportSceneItem>>::failure(
               scene_error("Complete member results are unavailable"));
+        auto effective = part->evaluate_model_state(leaf.selected_model_state);
+        if (!effective)
+          return Result<std::vector<ViewportSceneItem>>::failure(effective.error());
+        part = &effective.value();
         if (part->is_reference_part()) {
           // Reference geometry has its own complete source/catalog/body owner;
           // native feature/body provenance does not describe that storage.
@@ -1071,10 +1088,10 @@ Result<std::vector<ViewportSceneItem>> ViewportSceneBuilder::build_project(
             any = true;
           }
         }
-        definitions.emplace(id.value(), Definition{any ? TopoDS_Shape(compound) : TopoDS_Shape{},
+        definitions.emplace(key, Definition{any ? TopoDS_Shape(compound) : TopoDS_Shape{},
                                                    std::move(annotations)});
       }
-      const auto& definition = definitions.at(id.value());
+      const auto& definition = definitions.at(key);
       if (definition.shape.IsNull())
         continue;
       gp_Trsf transform;
