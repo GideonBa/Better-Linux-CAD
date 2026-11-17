@@ -2,10 +2,12 @@
 #include "../support/geometry_volume_oracle.hpp"
 #include "../support/hole_feature_fixture.hpp"
 #include "../support/part_history_fixture.hpp"
+#include "../support/surface_offset_fixture.hpp"
 #include "blcad/core/advanced_fillet_intent.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/result_face_support.hpp"
 #include "blcad/geometry/step_exporter.hpp"
 #include "blcad/geometry/step_import_reader.hpp"
 #include "imported_body_test_fixture.hpp"
@@ -287,4 +289,73 @@ TEST_CASE("Full-round resolves tiny middle widths and rejects insufficient side 
   const auto last = *OcctShapeView::get(*c.find_body_shape(BodyId("body.base")));
   CHECK_FALSE(GeometryRecomputeExecutor{}.execute_document(p, c));
   CHECK(OcctShapeView::get(*c.find_body_shape(BodyId("body.base")))->IsSame(last));
+}
+
+TEST_CASE("Full-round consumes normal Thicken output and retains its source Body",
+          "[geometry][face-fillet][parity-b178]") {
+  auto p = blcad::test::surface_offset::thickened();
+  REQUIRE(p.set_parameter_value(ParameterId("distance"), f::checked(Quantity::length_mm(8))));
+  auto c = cache();
+  execute(p, c);
+  const auto before = volume(c, BodyId("thick.body")), retained = volume(c, BodyId("base.body"));
+  const auto selected =
+      f::checked(ResultFaceSupportGeometry::selectable_faces(p, c, BodyId("thick.body")));
+  REQUIRE(selected.size() == 2);
+  const auto upper =
+      std::max_element(selected.begin(), selected.end(),
+                       [](const auto& a, const auto& b) { return a.anchor.z < b.anchor.z; });
+  const auto support = [&](SemanticFace side) {
+    return f::checked(FaceReference::create_planar(
+        PartFeatureInputRole::FilletSupportFace,
+        f::checked(SemanticFaceReference::create(FeatureId("base.feature"), side))));
+  };
+  FullRoundIntent intent{{"first", "Front", {support(SemanticFace::Front)}},
+                         {"second", "Back", {support(SemanticFace::Back)}},
+                         {"middle",
+                          "Upper skin",
+                          {f::checked(FaceReference::create_result(
+                              PartFeatureInputRole::FilletMiddleFace, upper->reference))}},
+                         FilletContinuity::Curvature,
+                         {}};
+  REQUIRE(p.add_fillet_feature(f::checked(FilletFeature::create_full_round(
+      FeatureId("finish"), "Thickened full round", BodyId("thick.body"), intent))));
+  execute(p, c);
+  CHECK(volume(c, BodyId("thick.body")) ==
+        Catch::Approx(before - (2. / 7) * 3 * 3 * 8).margin(2e-5));
+  CHECK(volume(c, BodyId("base.body")) == Catch::Approx(retained).margin(1e-8));
+  auto opened = f::checked(
+      deserialize_part_document_from_json(f::checked(serialize_part_document_to_json(p))));
+  auto fresh = cache();
+  execute(opened, fresh);
+  CHECK(volume(fresh, BodyId("thick.body")) ==
+        Catch::Approx(volume(c, BodyId("thick.body"))).margin(1e-7));
+}
+
+TEST_CASE("Full-round consumes a stitched closed shell and preserves its original Body",
+          "[geometry][face-fillet][parity-b178]") {
+  auto p = f::native_base();
+  REQUIRE(p.add_parameter(
+      f::checked(Parameter::create_length(ParameterId("stitch.tolerance"), "Stitch tolerance",
+                                          f::checked(Quantity::length_mm(1e-6))))));
+  REQUIRE(p.add_body(f::checked(Body::create(BodyId("quilt"), "Quilt", BodyKind::Surface))));
+  REQUIRE(p.add_body(f::checked(Body::create(BodyId("solid"), "Closed quilt", BodyKind::Solid))));
+  std::vector<SurfaceReference> inputs;
+  for (const auto side : {SemanticFace::Top, SemanticFace::Bottom, SemanticFace::Front,
+                          SemanticFace::Back, SemanticFace::Left, SemanticFace::Right})
+    inputs.push_back(f::checked(SurfaceReference::create_semantic_face(
+        f::checked(SemanticFaceReference::create(FeatureId("base"), side)))));
+  REQUIRE(p.add_surface_feature(f::checked(SurfaceStitchFeature::create(
+      FeatureId("stitch"), "Stitch", inputs, ParameterId("stitch.tolerance"), BodyId("quilt")))));
+  REQUIRE(p.add_surface_feature(f::checked(ClosedShellToSolidFeature::create(
+      FeatureId("close"), "Close quilt", f::checked(SurfaceReference::create_body(BodyId("quilt"))),
+      BodyId("solid")))));
+  auto c = cache();
+  execute(p, c);
+  const auto before = volume(c, BodyId("solid")), retained = volume(c);
+  REQUIRE(p.add_fillet_feature(f::checked(
+      FilletFeature::create_full_round(FeatureId("finish"), "Quilt full round", BodyId("solid"),
+                                       round(FilletContinuity::Curvature)))));
+  execute(p, c);
+  CHECK(volume(c, BodyId("solid")) == Catch::Approx(before - (2. / 7) * 25 * 20).margin(2e-4));
+  CHECK(volume(c) == Catch::Approx(retained).margin(1e-8));
 }

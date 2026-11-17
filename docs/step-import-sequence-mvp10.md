@@ -349,6 +349,15 @@ All five targets and the reader regression **14 / 751** passed, including the in
 radial-envelope volume and unchanged-byte rejection of a displaced seam vertex in
 `step_import_reader_tests.cpp`. The connected native milestone remains the separate 174 gate.
 
+Block 178 extends that same guarded conversion to a bounded spherical patch with one finite
+circular trim loop. Every circular boundary lies analytically on the actual sphere; any existing
+degenerate edge must lie at its actual coordinate pole. Independent edge/face accuracy checks
+reject displaced vertices even when basic transfer inflated their tolerances. Before UV completion,
+a latitude pcurve may span a shifted angular period. Only the existing face-unorientability and
+associated wire-closure statuses qualify. Existing 3D curves/ranges, surfaces, vertex positions,
+orientations and tolerances remain unchanged. A spherical-octant oracle and displaced-vertex
+negative case accompany the normal Setback STEP workflow; general supplier healing stays disabled.
+
 Definitions retain XDE sharing only in transient maps. Canonical recursive geometry/topology
 signatures and sorted direct child-transform signatures determine runtime ordering. Names are
 metadata/secondary presentation order, never unique product identity. Distinct equal products

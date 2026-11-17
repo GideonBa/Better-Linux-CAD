@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 177
-current_block: 178
-current_boundary: Block 178 in progress; checked face blends, full rounds and corners
-current_tag: "[parity-b178]"
+implemented_through: Block 178
+current_block: 179
+current_boundary: Block 179 in progress; shared advanced finishing interaction
+current_tag: "[parity-b179]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–177 accepted; Block 178 in progress; Blocks 179–204 planned"
+  advanced_modeling_workflows: "Blocks 145–178 accepted; Block 179 in progress; Blocks 180–204 planned"
 ---
 
 # MVP Plan
@@ -34,10 +34,10 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 177
-current block        Block 178 (in progress)
+implemented through  Block 178
+current block        Block 179 (in progress)
 current phase        Advanced finishing and sketch-driven features
-current boundary     Checked face blends, full rounds and corners
+current boundary     Shared advanced finishing interaction
 ```
 
 The assigned sequence continues through Block 184. Blocks 168–169 were delivered by normal
@@ -84,7 +84,8 @@ this assignment does not change acceptance status. Keep the detailed requirement
 | 174 | Accepted connected curve/Surface model, exact sidecar history, independent native/STEP checks and both native scales. |
 | 175–176 | Accepted typed variable-radius laws, ordered chains, physical station mapping and F01 Core/Geometry history/repair/STEP proof; native authoring remains 179. |
 | 177 | Accepted typed face/full-round/setback intent and atomic Core ownership/history/persistence. |
-| 178–179 | Checked supported blends/corners and native shared finishing controls. |
+| 178 | Accepted checked face/full-round construction and analytic G1 setback relief, native differential/material/history/STEP proof. |
+| 179 | Shared native advanced finishing creation, editing, grips and recovery. |
 | 180–181 | Typed Rib/Web skeleton, side/draft/termination intent, checked connected thin volumes and semantic consumers. |
 | 182–184 | Typed planar/cylindrical/conical Emboss/Engrave, checked mapping and native Rib/Web/Emboss/Engrave workflows. |
 
@@ -1074,14 +1075,33 @@ Geometry **22 / 9,939**. The complete feature-replacement graph rejects a downst
 cycle before publication. Logs and runtime manifest: `build/verification/block177/`.
 Runtime: **1239 files**, `b7ff9d34890b5262817d8c056e49192f2d7e54a40ec0d015fb9f17980f44b551`.
 
-### Block 178 checked finishing construction — in progress
+### Block 178 checked finishing construction — accepted
 
-Implement actual supported face blends, full-round middle replacement and setback corners.
-Independent trimmed-contact and differential checks govern publication; native solver success
-alone is insufficient. The [first checked Geometry slice](geometry-face-fillet-mvp8.md) supplies
-G1 face blends, planar G2 blends and planar/coaxial full-round middle replacement. All five targets
-built; focused face/variable/contact regression **29 / 9,555**. Setback construction and complete
-regression remain open before numbered acceptance. Continue through 184 and retain all 185–204 scope.
+The [checked finishing contract and capability table](geometry-face-fillet-mvp8.md) define G1
+face blends, planar G2 blends, planar/coaxial full-round middle replacement and orthogonal convex
+G1 setback relief networks. Actual generated faces establish oriented trimmed contact. Full-round
+preserves unrelated material and replaces its complete selected middle. Hold lines constrain the
+actual contact. Native spheres prove the setback independently of the construction settings;
+unsupported support/continuity combinations fail explicitly.
+
+F02 proof covers analytic mass, curved supports, tiny middles, upstream Hole edits, normal
+Stitch/closed-shell/Thicken inputs, unchanged source BReps, far edge radii, edits/reopening, physical
+STEP and atomic failure. Bounded spherical-pole decoding preserves all existing 3D geometry,
+orientation and tolerances; corrupted source vertices reject without healing. G1 analytic sphere
+normals remain defined at coordinate poles; singular native G2 charts still reject.
+
+All five targets built. Focused finishing/contact/exchange **48 / 10,434**; complete Core
+**798 / 35,311**; complete Geometry **815 / 91,195**, isolated from other CAD/build activity.
+Qt documentation audit **5 / 751**. Logs/manifest: `build/verification/block178/`; unchanged
+runtime **1,244 files**, `f590ef7bfea79674bd30ef001da27dc3eb979ded6fdeb13c0e86e3fbd462b79d`.
+
+### Block 179 shared advanced finishing interaction — in progress
+
+Extend the existing owned Fillet panel/controller with typed constant/variable/face/full-round
+creation and editing, ordered stations/groups, actual radius grips, propagation/corner controls,
+role selection and repair. Preserve untouched literals and bindings, validate full downstream
+history and prove native workflows at 100%/150% compact scales. Continue through 184; retain all
+planned scope after 184.
 
 ### Implementation route for the assigned continuation
 

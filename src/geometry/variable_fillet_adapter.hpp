@@ -13,6 +13,10 @@ struct NativeFilletResult {
   TopoDS_Shape shape;
   std::vector<FaceLineage> lineage;
 };
+Result<NativeFilletResult> setback_fillet(const PartDocument&, const FilletFeature&,
+                                          const TopoDS_Shape&, const ShapeCache&,
+                                          StepImportTopologyContext*,
+                                          const std::vector<FaceLineage>&);
 Result<NativeFilletResult> variable_fillet(const PartDocument&, const FilletFeature&,
                                            const TopoDS_Shape&, const ShapeCache&,
                                            StepImportTopologyContext*,

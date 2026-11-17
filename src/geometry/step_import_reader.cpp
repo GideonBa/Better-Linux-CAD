@@ -484,6 +484,64 @@ bool regular_toroidal_strip(const TopoDS_Shape& shape) {
   return seams == 1;
 }
 
+// A bounded spherical patch can end at a coordinate pole. STEP carries its
+// physical circular boundary, while OCCT additionally needs a zero-length UV
+// edge at that pole. Before completion a latitude pcurve may span a full shifted
+// angular period. The exact 3D circles bound the patch; all existing geometry,
+// orientation and tolerances must survive the conversion unchanged.
+bool bounded_spherical_patch(const TopoDS_Shape& shape) {
+  if (shape.ShapeType() != TopAbs_FACE)
+    return false;
+  const auto face = TopoDS::Face(shape);
+  BRepAdaptor_Surface surface(face);
+  if (surface.GetType() != GeomAbs_Sphere || surface.Sphere().Radius() <= 1e-7)
+    return false;
+  const auto sphere = surface.Sphere();
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(face, u0, u1, v0, v1);
+  if (!std::isfinite(u0) || !std::isfinite(u1) || !std::isfinite(v0) || !std::isfinite(v1) ||
+      u1 - u0 <= 1e-9 || u1 - u0 > 2 * std::numbers::pi + 1e-9 || v1 - v0 <= 1e-9 ||
+      v1 - v0 > 2 * std::numbers::pi + 1e-9)
+    return false;
+  int wires = 0;
+  for (TopExp_Explorer w(face, TopAbs_WIRE); w.More(); w.Next())
+    ++wires;
+  if (wires != 1)
+    return false;
+  TopTools_IndexedMapOfShape edges;
+  TopExp::MapShapes(face, TopAbs_EDGE, edges);
+  if (edges.Extent() < 3 || edges.Extent() > 8)
+    return false;
+  int physical = 0;
+  for (int i = 1; i <= edges.Extent(); ++i) {
+    const auto edge = TopoDS::Edge(edges(i));
+    const double tolerance = std::max(BRep_Tool::Tolerance(face), BRep_Tool::Tolerance(edge));
+    if (BRep_Tool::Degenerated(edge)) {
+      for (TopExp_Explorer vertex(edge, TopAbs_VERTEX); vertex.More(); vertex.Next()) {
+        const gp_Vec radial(sphere.Location(), BRep_Tool::Pnt(TopoDS::Vertex(vertex.Current())));
+        if (std::abs(radial.Magnitude() - sphere.Radius()) > tolerance ||
+            radial.Crossed(gp_Vec(sphere.Position().Axis().Direction())).Magnitude() > tolerance)
+          return false;
+      }
+      continue;
+    }
+    BRepAdaptor_Curve curve(edge);
+    if (curve.GetType() != GeomAbs_Circle || !std::isfinite(curve.FirstParameter()) ||
+        !std::isfinite(curve.LastParameter()) ||
+        curve.LastParameter() - curve.FirstParameter() <= 1e-10 ||
+        curve.LastParameter() - curve.FirstParameter() > 2 * std::numbers::pi + 1e-9)
+      return false;
+    const auto circle = curve.Circle();
+    const gp_Vec offset(circle.Location(), sphere.Location());
+    if (offset.Crossed(gp_Vec(circle.Axis().Direction())).Magnitude() > tolerance ||
+        std::abs(std::hypot(offset.Magnitude(), circle.Radius()) - sphere.Radius()) > tolerance)
+      return false;
+    if (!BRep_Tool::IsClosed(edge, face))
+      ++physical;
+  }
+  return physical >= 3;
+}
+
 // A full periodic torus has no physical trimming boundary. Prove its material arrangement from
 // the actual analytic surfaces before allowing the consequential solid-classification statuses.
 bool regular_torus_shells(const TopoDS_Shape& input) {
@@ -543,6 +601,8 @@ bool regular_torus_shells(const TopoDS_Shape& input) {
 bool accurate_strip_vertices(const TopoDS_Shape& face) {
   for (TopExp_Explorer it(face, TopAbs_EDGE); it.More(); it.Next()) {
     const auto edge = TopoDS::Edge(it.Current().Oriented(TopAbs_FORWARD));
+    if (BRep_Tool::Degenerated(edge))
+      continue;
     BRepAdaptor_Curve curve(edge);
     const double tolerance =
         std::max(BRep_Tool::Tolerance(edge), BRep_Tool::Tolerance(TopoDS::Face(face)));
@@ -559,7 +619,8 @@ TopoDS_Shape complete_analytic_uv_boundaries(const TopoDS_Shape& input) {
   if (input.IsNull())
     return {};
   for (TopExp_Explorer face(input, TopAbs_FACE); face.More(); face.Next())
-    if (regular_toroidal_strip(face.Current()) && !accurate_strip_vertices(face.Current()))
+    if ((regular_toroidal_strip(face.Current()) || bounded_spherical_patch(face.Current())) &&
+        !accurate_strip_vertices(face.Current()))
       return {};
   BRepCheck_Analyzer initial(input, true);
   if (initial.IsValid())
@@ -568,8 +629,8 @@ TopoDS_Shape complete_analytic_uv_boundaries(const TopoDS_Shape& input) {
     if (shape.ShapeType() != TopAbs_FACE)
       return false;
     const auto type = BRepAdaptor_Surface(TopoDS::Face(shape)).GetType();
-    return type == GeomAbs_Cylinder || type == GeomAbs_Cone || complete_regular_torus_face(shape) ||
-           regular_toroidal_strip(shape);
+    return type == GeomAbs_Cylinder || type == GeomAbs_Cone || bounded_spherical_patch(shape) ||
+           complete_regular_torus_face(shape) || regular_toroidal_strip(shape);
   };
   const bool torus_material = regular_torus_shells(input);
   const auto allowed = [&](const TopoDS_Shape& shape, const TopoDS_Shape& context,
@@ -675,7 +736,8 @@ TopoDS_Shape complete_analytic_uv_boundaries(const TopoDS_Shape& input) {
       return {};
     const auto face = TopoDS::Face(updated);
     TopLoc_Location location;
-    if (((complete_regular_torus_face(f.face) || regular_toroidal_strip(f.face)) &&
+    if (((complete_regular_torus_face(f.face) || regular_toroidal_strip(f.face) ||
+          bounded_spherical_patch(f.face)) &&
          face.Orientation() != f.face.Orientation()) ||
         BRep_Tool::Surface(face, location) != f.surface || location != f.location ||
         BRep_Tool::Tolerance(face) != f.tolerance)

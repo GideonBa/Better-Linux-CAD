@@ -27,8 +27,10 @@
 #include <algorithm>
 #include <cmath>
 #include <gp_Pnt2d.hxx>
+#include <gp_Sphere.hxx>
 #include <iomanip>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -82,6 +84,7 @@ struct TrimProjection {
   std::vector<double> uknots, vknots;
   double u_min, u_max, v_min, v_max;
   double u_period = 0, v_period = 0;
+  std::optional<gp_Sphere> analytic_sphere;
   void derivatives(double u, double v, int u0, int u1, int v0, int v1, gp_Pnt& p, gp_Vec& du,
                    gp_Vec& dv, gp_Vec& duu, gp_Vec& dvv, gp_Vec& duv, bool second_order) const {
     if (!spline.IsNull())
@@ -110,6 +113,9 @@ struct TrimProjection {
     if (surface.IsNull() || !std::isfinite(u0) || !std::isfinite(u1) || !std::isfinite(v0) ||
         !std::isfinite(v1))
       throw std::runtime_error("Surface continuity requires a finite native support domain");
+    const BRepAdaptor_Surface native(face);
+    if (native.GetType() == GeomAbs_Sphere)
+      analytic_sphere = native.Sphere();
     auto carrier = surface;
     if (const auto trimmed = Handle(Geom_RectangularTrimmedSurface)::DownCast(carrier);
         !trimmed.IsNull())
@@ -157,6 +163,7 @@ std::vector<Jet> projected_jets(TrimProjection& trim, const gp_Pnt& point, doubl
       !std::isfinite(trim.distance.Value()) || trim.distance.Value() > tolerance)
     throw std::runtime_error("Boundary is not incident to the finite trim in model units");
   const auto& face = trim.face;
+  const auto& surface = trim.surface;
   std::vector<Jet> jets;
   const auto append = [&](const TopoDS_Edge& edge, double parameter, const gp_Pnt& boundary_point) {
     double first, last;
@@ -167,7 +174,17 @@ std::vector<Jet> projected_jets(TrimProjection& trim, const gp_Pnt& point, doubl
     const double u = uv.X(), v = uv.Y();
     if (!std::isfinite(u) || !std::isfinite(v))
       throw std::runtime_error("Nonfinite native trim parameter");
-    if (!jets.empty()) {
+    // A sphere has a regular physical G1 normal at its coordinate poles. G2
+    // continues to require a regular native differential chart.
+    bool spherical_pole = false;
+    if (!second_order && trim.analytic_sphere) {
+      const auto& sphere = *trim.analytic_sphere;
+      const auto radial = gp_Vec(sphere.Location(), surface->Value(u, v));
+      spherical_pole = radial.Magnitude() > 0 &&
+                       radial.Crossed(gp_Vec(sphere.Position().Axis().Direction())).Magnitude() <=
+                           1e-12 * sphere.Radius();
+    }
+    if (!jets.empty() && !spherical_pole) {
       const BRepAdaptor_Surface adaptor(face);
       const auto equivalent = [](double a, double b, double period, double resolution) {
         constexpr double rounding = 64 * std::numeric_limits<double>::epsilon();
@@ -202,8 +219,13 @@ std::vector<Jet> projected_jets(TrimProjection& trim, const gp_Pnt& point, doubl
         jet.G = jet.dv.SquareMagnitude();
         jet.normal = jet.du.Crossed(jet.dv);
         jet.determinant = jet.normal.SquareMagnitude();
-        if (!std::isfinite(jet.determinant) || jet.E <= 1e-24 || jet.G <= 1e-24 ||
-            jet.determinant <= 1e-20 * jet.E * jet.G)
+        if (spherical_pole) {
+          jet.normal = gp_Vec(trim.analytic_sphere->Location(), jet.point);
+          jet.normal.Normalize();
+          if (!trim.analytic_sphere->Direct())
+            jet.normal.Reverse();
+        } else if (!std::isfinite(jet.determinant) || jet.E <= 1e-24 || jet.G <= 1e-24 ||
+                   jet.determinant <= 1e-20 * jet.E * jet.G)
           throw std::runtime_error(
               "Singular surface frame/pole cannot establish boundary continuity");
         jet.normal.Normalize();
