@@ -3,6 +3,12 @@
 Status: implemented bounded Part parameters, expressions, Assembly bindings and replacement-shell
 parameter management. The wider scope/navigation model below remains target architecture.
 
+The [post-204 parameter dependency tree plan](parameter-dependency-tree-plan.md) assigns the
+requested E view, rooted Assembly/Part tables and exact formula-use highlighting to **205–211**.
+It extends these authorities and the 194–195 reference/Project engine once delivered; current bounded
+Part formulas/bindings do not already provide general cross-document expressions. Inspection
+keeps definition parameters separate from occurrence paths and does not mutate model visibility.
+
 The wider assigned execution order is consolidated in [Blocks 189–198](inventor-parity-sequence.md):
 model states/variants, cross-document adaptive references and contextual Assembly authoring.
 Material dimensional types/resources are assigned earlier to 149–151, and curve-local equation

@@ -904,6 +904,26 @@ gasket_thickness         2      mm    -                Gasket
 
 `Used by` comes from parameter usage tracking.
 
+### Planned E parameter dependency tree after 204
+
+The [205–211 plan](parameter-dependency-tree-plan.md) adds an explicitly owned central Assembly/Part
+diagram over the existing parameters and Project authorities. E enters/leaves it from the canvas;
+text fields and active editing commands retain their input. The root is the active document/edit
+context. Opening Assembly2 alone never adds assemblies that happen to contain the same definition.
+
+Double-click an Assembly header to fold/unfold descendants while retaining its card. Folding
+Assembly1 leaves that root card; folding Assembly2 hides only its Part3/Part4 branch. A separate
+per-node dropdown opens a parameter table with Name, Formula, Value, Units, Dimensionality/Type and
+Source/Status columns. Multiple tables can stay open. Clicking a row highlights its actual formula
+consumers; a folded affected branch receives a badge and stays folded until explicitly revealed.
+
+Hierarchy connectors and selected formula dependency arrows have different meanings/styles.
+Definition sharing and occurrence-local folding remain distinct. Formula references use qualified
+IDs, not matching display names. Preview/Apply in 209 shares the normal parameter transaction layer,
+including hidden consumers; navigation/folding never changes CAD suppression, values or history.
+[PN01–PN07](inventor-parity-test-plan.md#post-204-parameter-navigation-scenarios) reserve native
+100%/compact 150% and exact usage/history/root-scope acceptance. This UI is planned, not present.
+
 ## Feature and Assembly command surfaces
 
 Feature-creation workflows share consistent task/preview/commit structure and consume existing Core/

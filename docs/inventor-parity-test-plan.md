@@ -770,6 +770,34 @@ widgets from workers or publish stale intermediate results. Preserve determinist
 Choose realistic workload-specific budgets from the baseline before optimizing. Fixed tolerances,
 semantic identity, final-release accuracy and failure atomicity cannot be relaxed to meet latency.
 
+## Post-204 parameter navigation scenarios
+
+Requested 2026-11-17; **planned 205–211 only**, after 204. The
+[parameter dependency tree plan](parameter-dependency-tree-plan.md) owns the architecture and UX.
+The original 145–204 gate and combination matrix retain their scope. Reserved tags
+`[parity-b205]` through `[parity-b211]` become proof only when real tests execute.
+
+Use the supplied hierarchy: Assembly1 contains Assembly2 (Part3, Part4), Assembly3 (Assembly4,
+Part5), Part1 and Part2. Reuse the same Assembly2 under another occurrence/root. Include identical
+parameter names and unrelated equal numeric values. Define Part2.Dia = 20 mm and
+Part3.Dia3 = qualified(Part2.Dia) * 4 = 80 mm; a Part4 formula reads Dia3 indirectly. A separate
+formula can use Part5.Dia so selecting Part5 demonstrates exact source identity too.
+
+| Scenario / owner | Required evidence and independent oracle |
+| --- | --- |
+| PN01 / 205 — roots and identity | Assembly1 shows only reachable occurrences; standalone/active-root Assembly2 shows itself and Part3/Part4, with no parent assemblies. Repeated definitions retain distinct paths/folds; unplaced members are not fabricated. Include empty assemblies, standalone Parts and hidden/suppressed status. Inspecting changes no canonical JSON, dirty state or history. |
+| PN02 / 206 — qualified evaluation | Local and qualified Assembly/Part chains produce 20×4 = 80, then 25×4 = 100. Same names in different documents do not alias. Reject missing/ambiguous sources, wrong units, conflicting drivers and cycles through formulas/bindings/adaptivity/state. Verify old formula bytes, new strict necessary envelopes and complete rollback/reopen. |
+| PN03 / 207 — exact usage | Selecting Part2.Dia marks Part3's correct formula and, only in indirect mode, Part4's chain. Equal values and similar names are decoys. Test existing binding/curve-expression metadata, separate ordinary feature uses, multiple rows and repeated occurrences. Folded ancestors count hidden occurrences without becoming formula consumers or unfolding. Outside-root refs do not add parents. |
+| PN04 / 208 — actual Qt navigation | Real E input enters/leaves from canvas/tree but types e inside fields/search. Real Assembly-header double-clicks fold root/subtrees without affecting siblings or CAD visibility. Independent dropdowns show full table columns; multiple tables do not overlap. Check focus, Esc, active-task/grip conflicts, zoom/search and restored camera/selection at 100%/compact 150%. |
+| PN05 / 209 — atomic editing | Edit a qualified source via the shared task; independently verify numeric results and physical diameter/volume in consumers, including a folded consumer. One root Undo/Redo restores every child, formula, sidecar and result. Invalid geometry/cycles/read-only resources preserve the entire Project. Save during draft writes committed intent; source picking preserves target and correction text. |
+| PN06 / 210 — states and workload | Change source/binding/state/root/reference revisions; late jobs cannot publish into the new view. Shared definition values and explicit state/driver context remain distinct from occurrence poses. Use deterministic 10/100/1,000-occurrence fixtures with equal/repeated names, deep folds and many parameters. Record cold/warm query/expand/highlight time, memory, cancellation and budgets before tuning; no OCCT recompute on inspection. |
+| PN07 / 211 — continuous acceptance | In one native workflow open Assembly1, fold Assembly2, inspect Part2/Part5, reveal exact formula hits, edit/Preview/Apply, Undo/Redo, return to CAD, Save/Open and open standalone Assembly2. Verify root-only scope, exact definitions/shared occurrences, unresolved external-source diagnostics and independent physical results. Complete relevant/full regressions, 100%/150% captures, startup, inventories and runtime identity. |
+
+A skip is not evidence. Controller/query tests alone do not close PN04/PN07. Collapsing/filtering
+must not remove real dependency edges or skip a hidden consumer during evaluation. Navigation is
+read-only until the explicit edit workflow; no global project-parameter scope or invented STEP
+parameters are implied. Keep all original later combinations and deferred capabilities intact.
+
 ## Running and recording acceptance
 
 Use existing presets and paths from `development-setup.md`. Future focused invocations, after the
