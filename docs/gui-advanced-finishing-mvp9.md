@@ -27,6 +27,19 @@ binding and reconstructs the same typed record. Every station sharing that bindi
 same new parameter. Existing formulas and other consumers retain their original parameters.
 New parameters, scalar changes and the typed add/update belong to one transaction.
 
+## Physical guides and explicit modeling scope
+
+`FilletGuideQuery` measures the same expanded, oriented source contours as execution, in true
+curve length. It returns stable group/station bindings, physical anchors and original-basis
+directions. Reversing a group preserves the authored law's physical station positions. Closed
+contours retain their seam. Full-round size is read from actual planar/coaxial side supports;
+G2 displays half-width rather than claiming a constant circular radius.
+
+Queries require a matching evaluated model or explicit input-history prefix. A stale cache or
+unqualified prefix rejects. Returned data is transient canvas geometry and never becomes
+persistent topology identity. Independent imported cubic/periodic oracles exercise actual native
+curves and physical length rather than production parameterization.
+
 ## Remaining native integration
 
 Connect the typed candidate to the existing owned property panel: constant/variable/face/full-round
@@ -42,7 +55,9 @@ and compact property panels at both 100% and 150%. These gates remain open.
 
 ## Verification status
 
-All five targets built. The controller foundation plus legacy Fillet/Chamfer/Shell/Draft and
-edge-chain picking regression pass **10 cases / 191 assertions** with offscreen Qt. Logs:
-`build/verification/block179/{build-draft-final,draft-final}.log`. No native property-panel
-acceptance is implied by these controller tests. Continue through 184 and retain 185–204 scope.
+All five targets built. Typed-draft and legacy finishing/shell/draft/edge-chain regression:
+**10 cases / 191 assertions** (`build/verification/block179/draft-final.log`). Guide and variable
+Geometry regression: **17 / 9,424** (`guides-final.log`). Five guide cases cover straight/reversed
+stations, original basis, explicit edit scope, a nonuniform imported split cubic with independent
+Bernstein/Simpson length, periodic seams, stale sources and derived full-round size. Native panel
+acceptance remains open; continue through 184 and retain 185–204 scope.

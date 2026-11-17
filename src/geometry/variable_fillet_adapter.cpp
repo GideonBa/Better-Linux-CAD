@@ -1,5 +1,6 @@
 #include "variable_fillet_adapter.hpp"
 #include "blcad/core/advanced_fillet_intent.hpp"
+#include "blcad/geometry/fillet_guides.hpp"
 #include "blcad/geometry/semantic_reference_evaluator.hpp"
 #include "checked_fillet_builder.hpp"
 #include "fillet_radius_law.hpp"
@@ -11,6 +12,7 @@
 #include <BRepGProp.hxx>
 #include <BRep_Tool.hxx>
 #include <ChFiDS_Spine.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
 #include <GProp_GProps.hxx>
 #include <TopExp.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
@@ -298,4 +300,138 @@ Result<NativeFilletResult> variable_fillet(const PartDocument& document,
     return Result<NativeFilletResult>::failure(error(failing, ex.what()));
   }
 }
+Result<std::vector<FilletStationGuide>> fillet_station_guides(const PartDocument& document,
+                                                              const FilletFeature& feature,
+                                                              const TopoDS_Shape& target,
+                                                              const ShapeCache& cache,
+                                                              StepImportTopologyContext* context) {
+  std::string failing = feature.id().value();
+  try {
+    const auto& intent = std::get<VariableFilletIntent>(feature.advanced_intent()->definition);
+    BRepBuilderAPI_Copy copy(target, true, false);
+    if (!copy.IsDone())
+      throw std::runtime_error("Cannot isolate Fillet guide source");
+    CheckedFilletBuilder builder(copy.Shape());
+    std::vector<FilletStationGuide> guides;
+    TopTools_IndexedMapOfShape used;
+    for (const auto& group : intent.groups) {
+      failing = group.id;
+      std::vector<TopoDS_Edge> members;
+      for (const auto& member : group.edges) {
+        auto resolved = resolve_semantic_edge(document, cache, target, member.edge, feature.id(),
+                                              "Fillet station guide", context);
+        if (!resolved)
+          return Result<std::vector<FilletStationGuide>>::failure(resolved.error());
+        auto reverse = authored_reverse(document, cache, member.edge, resolved.value());
+        if (!reverse)
+          return Result<std::vector<FilletStationGuide>>::failure(reverse.error());
+        auto edge = TopoDS::Edge(copy.ModifiedShape(resolved.value()));
+        edge.Orientation(reverse.value() != member.reversed ? TopAbs_REVERSED : TopAbs_FORWARD);
+        members.push_back(edge);
+      }
+      builder.Add(members.front());
+      const int contour = builder.Contains(members.front());
+      if (contour <= 0)
+        throw std::runtime_error("No sharp contour for this station group");
+      const auto spine = builder.Value(contour);
+      check_contour(*spine, copy.Shape());
+      if (group.propagation == FilletPropagation::Explicit &&
+          spine->NbEdges() != int(members.size()))
+        throw std::runtime_error("Explicit group does not declare its complete tangent contour");
+      int first_index = 0, previous = 0;
+      bool forward = true;
+      for (const auto& member : members) {
+        int index = 0;
+        for (int i = 1; i <= spine->NbEdges(); ++i)
+          if (spine->Edges(i).IsSame(member))
+            index = i;
+        if (!index)
+          throw std::runtime_error("Disconnected station-group member");
+        const bool same = member.Orientation() == spine->Edges(index).Orientation();
+        if (!first_index) {
+          first_index = index;
+          forward = same;
+        } else {
+          int expected = previous + (forward ? 1 : -1);
+          if (spine->IsClosed())
+            expected = (expected + spine->NbEdges() - 1) % spine->NbEdges() + 1;
+          if (same != forward || index != expected)
+            throw std::runtime_error("Station members are not an ordered oriented contour");
+        }
+        previous = index;
+      }
+      std::vector<double> prefix{0};
+      for (int i = 1; i <= spine->NbEdges(); ++i) {
+        const auto& edge = spine->Edges(i);
+        if (used.Contains(edge))
+          throw std::runtime_error("Station groups overlap after tangent expansion");
+        used.Add(edge);
+        BRepAdaptor_Curve curve(edge);
+        prefix.push_back(prefix.back() + GCPnts_AbscissaPoint::Length(curve, 1e-10));
+      }
+      const double length = prefix.back();
+      if (!std::isfinite(length) || length <= 1e-7)
+        throw std::runtime_error("Unresolved station-group length");
+      const double phase = spine->IsClosed()
+                               ? (forward ? prefix[first_index - 1] : prefix[first_index])
+                               : (forward ? 0 : length);
+      const auto at = [&](double fraction) {
+        double distance = phase + (forward ? 1 : -1) * fraction * length;
+        if (spine->IsClosed()) {
+          distance = std::fmod(distance, length);
+          if (distance < 0)
+            distance += length;
+        }
+        distance = std::clamp(distance, 0., length);
+        auto it = std::upper_bound(prefix.begin(), prefix.end(), distance);
+        const int index = std::clamp(int(it - prefix.begin()), 1, spine->NbEdges());
+        const auto& edge = spine->Edges(index);
+        BRepAdaptor_Curve curve(edge);
+        const bool reverse = edge.Orientation() == TopAbs_REVERSED;
+        const double start = reverse ? curve.LastParameter() : curve.FirstParameter(),
+                     end = reverse ? curve.FirstParameter() : curve.LastParameter(),
+                     local = distance - prefix[index - 1], span = prefix[index] - prefix[index - 1];
+        double parameter = start;
+        if (local >= span)
+          parameter = end;
+        else if (local > 0) {
+          GCPnts_AbscissaPoint point(1e-10, curve, (reverse ? -1 : 1) * local, start);
+          if (!point.IsDone())
+            throw std::runtime_error("Station arc-length inversion failed");
+          parameter = point.Parameter();
+        }
+        gp_Pnt point;
+        gp_Vec tangent;
+        curve.D1(parameter, point, tangent);
+        if (reverse)
+          tangent.Reverse();
+        tangent *= forward ? 1 : -1;
+        tangent.Normalize();
+        return std::pair{point, tangent};
+      };
+      const auto [origin, tangent] = at(group.station_basis_reversed ? 1 : 0);
+      const auto basis = group.station_basis_reversed ? -tangent : tangent;
+      for (const auto& station : group.stations) {
+        const auto [point, along] = at(fillet_chain_fraction(group, station));
+        gp_Vec reference = std::abs(along.Z()) < .9 ? gp_Vec(0, 0, 1) : gp_Vec(1, 0, 0);
+        auto axis = along.Crossed(reference).Normalized();
+        guides.push_back({group.id,
+                          station.id,
+                          station.radius,
+                          {point.X(), point.Y(), point.Z()},
+                          {origin.X(), origin.Y(), origin.Z()},
+                          {axis.X(), axis.Y(), axis.Z()},
+                          {basis.X(), basis.Y(), basis.Z()},
+                          length});
+      }
+    }
+    return Result<std::vector<FilletStationGuide>>::success(std::move(guides));
+  } catch (const Standard_Failure& e) {
+    return Result<std::vector<FilletStationGuide>>::failure(Error::geometry(
+        failing, e.GetMessageString() ? e.GetMessageString() : "Native station query failed"));
+  } catch (const std::exception& e) {
+    return Result<std::vector<FilletStationGuide>>::failure(Error::geometry(failing, e.what()));
+  }
+}
+
 } // namespace blcad::geometry::detail
