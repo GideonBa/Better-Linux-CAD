@@ -1078,7 +1078,10 @@ Runtime: **1239 files**, `b7ff9d34890b5262817d8c056e49192f2d7e54a40ec0d015fb9f17
 
 Implement actual supported face blends, full-round middle replacement and setback corners.
 Independent trimmed-contact and differential checks govern publication; native solver success
-alone is insufficient. Continue through 184 and retain every planned 185–204 capability.
+alone is insufficient. The [first checked Geometry slice](geometry-face-fillet-mvp8.md) supplies
+G1 face blends, planar G2 blends and planar/coaxial full-round middle replacement. All five targets
+built; focused face/variable/contact regression **29 / 9,555**. Setback construction and complete
+regression remain open before numbered acceptance. Continue through 184 and retain all 185–204 scope.
 
 ### Implementation route for the assigned continuation
 
