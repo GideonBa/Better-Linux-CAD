@@ -2,12 +2,16 @@
 
 #include "blcad/core/part_feature_input_reference.hpp"
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace blcad {
+
+struct AdvancedFilletIntent;
+struct VariableFilletIntent;
 
 enum class ChamferMode { EqualDistance, TwoDistance, DistanceAngle };
 
@@ -20,6 +24,10 @@ public:
                                                     std::vector<EdgeReference> edges,
                                                     ParameterId radius_parameter);
 
+  [[nodiscard]] static Result<FilletFeature> create_variable(FeatureId, std::string name, BodyId,
+                                                             VariableFilletIntent);
+  [[nodiscard]] const AdvancedFilletIntent* advanced_intent() const noexcept;
+  [[nodiscard]] std::vector<ParameterId> parameter_dependencies() const;
   [[nodiscard]] const FeatureId& id() const noexcept;
   [[nodiscard]] const std::string& name() const noexcept;
   [[nodiscard]] const BodyId& target_body() const noexcept;
@@ -35,6 +43,7 @@ private:
   BodyId target_body_;
   std::vector<EdgeReference> edges_;
   ParameterId radius_parameter_;
+  std::shared_ptr<const AdvancedFilletIntent> advanced_;
 };
 
 class ChamferFeature {
