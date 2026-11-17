@@ -4,6 +4,8 @@ Planning baseline: 2026-11-06, main `e08280c`, after merged PR #137. This is the
 implementation plan for closing the identified gaps inside the existing Sketch, 3D Model,
 Surface, Assembly, Inspect and Manage workspaces. It allocates Blocks 145–204;
 `mvp-plan.md` alone owns current numbered implementation and serial-slice status.
+The separately requested [parameter dependency tree](parameter-dependency-tree-plan.md) reserves
+205–211 strictly after 204; the original 145–204 program and its final gate retain their scope.
 
 The delivery target is an Inventor-like engineering workflow backed by BLCAD's existing semantic
 model, transactional editing and OCCT boundary. It is a bounded capability program, not a claim
@@ -52,6 +54,7 @@ test plan owns scenario composition and evidence rules; it does not redefine fea
 | Adaptive design and assembly holes | `parameter-model.md`, `assembly-parameters-mvp4.md`, `assembly-system.md`, `hole-wizard.md` | 194–198 |
 | Motion/contact extensions | `assembly-contact-swept-motion-mvp5.md`, `gui-interactive-assembly-mvp9.md` | 199 |
 | Finite measurement and quality analysis | `gui-measure-mvp9.md`, `gui-analysis-step-export-workbench-mvp7.md` | 200–202 |
+| Parameter dependency tree and qualified usage | `parameter-dependency-tree-plan.md`, `parameter-model.md`, `assembly-parameters-mvp4.md`, `user-interface.md` | 205–211, after 204 |
 | Shared UI and native proof | `user-interface.md`, `gui-shell-acceptance-mvp9r.md`, `development-setup.md` | 145 and every UI/integration block |
 
 New mathematical contracts may be extracted from an oversized owner during implementation, but
@@ -824,6 +827,63 @@ this plan are reservations, not claims that tests exist today.
 - **Done:** reviewed tree/staged diff, focused commits, normal push, protected PR delivery and tested
   merged-main reconciliation. Record exact versions, commands, results, skips, captures and unresolved
   scope. Increment implemented status only after the complete block passes; retain historical results.
+
+## Post-204 parameter dependency navigation
+
+Planned extension requested 2026-11-17. Execute only after the original 204 gate. The
+[owning plan](parameter-dependency-tree-plan.md) defines identity, roots, reference semantics,
+folding/table controls, highlighting and the expected application walkthrough. Keep current
+parameter/evaluation/Project authorities; the PN scenarios are future obligations, not results.
+
+### Block 205 Rooted occurrence and parameter query
+
+- **Prerequisite:** 204. Audit the delivered 189–198 APIs, then extend hierarchy traversal with an
+  explicit active root and stable occurrence/parameter rows, including hidden/suppressed status.
+- **Proof:** PN01; Assembly1 versus standalone Assembly2, shared definitions with distinct paths,
+  no inverse-parent search, unplaced members and zero document mutation.
+
+### Block 206 Qualified parameter formulas and Project evaluation
+
+- **Prerequisites:** 205,194–195. Reuse/extend the existing expression resolver, reference intent,
+  Assembly bindings and atomic Project evaluation for cross-document/Assembly formulas.
+- **Contract:** stable IDs, explicit source/context, unit checks, one driver, cycles across the Project and
+  strict necessary schema compatibility. Freeze exact syntax/fields before writer changes.
+- **Proof:** PN02; collisions, chains, missing sources, binding conflicts, rollback and exact replay.
+
+### Block 207 Typed reverse parameter usage
+
+- **Prerequisite:** 206. Query actual expression/binding references and project consumers into
+  occurrences. Separate direct/transitive formula uses, ordinary feature uses and ancestor badges.
+- **Proof:** PN03; exact semantic targets, repeated placements, folded hits, outside-root sources
+  and no substring/equal-value false positives. Reuse curve-expression reference metadata.
+
+### Block 208 Native E tree view and node tables
+
+- **Prerequisites:** 205,207. One owned ShellWindow tool provides rooted cards, independent
+  hierarchy/table controls, pan/zoom/search, selected usage and folded badges at both scales.
+- **Proof:** PN04; E routing versus text input/active tasks, real double-click/dropdown actions,
+  root/sibling folding, multiple tables, focus, accessible controls and restored 3D state.
+
+### Block 209 Shared parameter editing in the tree
+
+- **Prerequisites:** 206,208. Share the existing parameter draft/mutation layer, add qualified
+  source picking and use a complete Project candidate for Preview and one atomic Apply.
+- **Proof:** PN05; source/derived values and physical geometry, failed hidden consumer, formula/
+  binding ownership, shared definitions, exact root Undo/Redo, Save/Open and immutable resources.
+
+### Block 210 State freshness and scalable navigation
+
+- **Prerequisites:** 209,189–198,203. Use revision/root/state/driver-qualified snapshots, invalidate
+  stale jobs, virtualize cards/tables and update exact reverse usage without geometry recompute.
+- **Proof:** PN06; context/state/source changes, 10/100/1,000 occurrences, retained independent
+  folds, measured cold/warm timings/memory and cancellation with declared budgets.
+
+### Block 211 Combined parameter-navigation acceptance
+
+- **Prerequisites:** all 205–210. Run PN01–PN07, relevant/full regressions, native 100%/compact 150%,
+  startup, real persistence/reference flows and current command/API/inventory reconciliation.
+- **Done:** exact rooted scope, formula/geometry/transaction oracles, captures, measured workloads,
+  runtime identity and actual skips recorded. This closes the extension, not a replacement for 204.
 
 ## Delivery discipline and per-block handoff
 

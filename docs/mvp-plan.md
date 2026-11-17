@@ -22,6 +22,7 @@ phase_status:
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
   advanced_modeling_workflows: "Blocks 145–184 accepted; Blocks 185–204 planned"
+  parameter_dependency_navigation: "Blocks 205–211 planned after 204; not started"
 ---
 
 # MVP Plan
@@ -50,11 +51,17 @@ contains dependencies and implementation criteria; [the test plan](inventor-pari
 contains individual and combined acceptance; [the UI contract](user-interface.md) owns the
 Inventor-like workflows and layout. These plans retain their full unimplemented scope.
 
+The 2026-11-17 planning request reserves the [E parameter dependency tree](parameter-dependency-tree-plan.md)
+as Blocks **205–211 after 204**. Rooted Assembly/Part navigation, per-node parameter tables and exact
+formula-use highlighting extend the existing parameter and Project authorities. Blocks 185–204
+retain their order and full acceptance; the next implementation block remains 185.
+
 ## Delivery discipline
 
-The current user request requires complete implementation through 184, focused professional commits
-with at most 1,500 added lines each, appropriate verification and synchronized planning/progress
-documentation. The earlier AGENTS.md agreement was withdrawn on 2026-11-16; its automatic
+The implementation assignment through 184 is complete. Current work records the requested
+post-204 parameter-navigation plan; its 205–211 status remains planned. Keep focused professional
+commits with at most 1,500 added lines each, appropriate verification and synchronized documentation.
+The earlier AGENTS.md agreement was withdrawn on 2026-11-16; its automatic
 push/serial-PR workflow is no longer the current working instruction. Existing merged deliveries
 and their verified trees remain historical evidence.
 
@@ -204,6 +211,7 @@ negative cases, combination matrix, native proof and performance protocol live i
 | F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
 | G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
 | H | 199–204 | Motion/contact extensions, finite measurement, quality/thickness analysis, measured performance and final combined acceptance | Planned; not started |
+| I | 205–211 | Rooted parameter dependency tree, qualified formulas, per-node tables, impact navigation and shared editing | Planned after 204; not started |
 
 Advance individual completed blocks or named slices only after their full criteria and relevant
 native checks pass. A phase range remains incomplete while any constituent block is open.
@@ -1195,3 +1203,27 @@ The assignment through 184 is complete. Keep 185–204 planned and unstarted.
 These are implementation notes, not block acceptance. The detailed 174–184 criteria in
 `inventor-parity-sequence.md` and `inventor-parity-test-plan.md` remain authoritative.
 Preserve the complete 185–204 sequence and all explicitly deferred capabilities.
+
+## Post-204 parameter dependency navigation — planned
+
+Planning request: 2026-11-17. The [detailed implementation and application plan](parameter-dependency-tree-plan.md)
+extends the existing parameter/formula system, Assembly bindings, occurrence hierarchy and atomic
+Project transactions. [The sequence](inventor-parity-sequence.md#post-204-parameter-dependency-navigation)
+and [PN01–PN07](inventor-parity-test-plan.md#post-204-parameter-navigation-scenarios) define execution
+and acceptance. Implemented status stays at 184; all blocks below wait for 204.
+
+| Block | Planned completion boundary | Status |
+| --- | --- | --- |
+| 205 | Explicit document/root occurrence projection, stable parameter identities and read-only query | Planned |
+| 206 | Qualified cross-document/Assembly formulas through existing evaluation/reference authorities | Planned |
+| 207 | Typed reverse usage, direct/transitive impact and folded-branch aggregates | Planned |
+| 208 | Native E view, independent hierarchy folds and per-node parameter tables | Planned |
+| 209 | Shared parameter editing/source picker, complete Preview and atomic Project Apply | Planned |
+| 210 | Model-state/source freshness, large-tree virtualization and measured responsiveness | Planned |
+| 211 | Combined root/reuse/formula/native/history/persistence acceptance and inventory audit | Planned |
+
+Opening Assembly2 alone displays only its subtree, irrespective of other assemblies that reuse it.
+Double-click folds descendants while retaining the selected Assembly card; the separate dropdown
+shows its parameter table. Selecting a parameter highlights exact formula consumers and marks
+hidden hits on folded ancestors without unfolding them automatically. Hierarchy folding never
+changes CAD visibility/suppression or formula evaluation. The complete 185–204 plan remains intact.
