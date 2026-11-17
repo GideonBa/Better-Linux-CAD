@@ -438,6 +438,9 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_parameter_tools.cpp
     src/gui/shell/shell_material_tools.cpp
     src/gui/shell/shell_physical_properties_tools.cpp
+    src/gui/shell/shell_sketch_driven_model.cpp
+    src/gui/shell/shell_sketch_driven_tools.cpp
+    src/gui/shell/shell_sketch_driven_preview.cpp
     src/gui/shell/shell_hole_tools.cpp
     src/gui/shell/shell_step_import_tools.cpp
     src/gui/shell/shell_sketch_3d_tools.cpp

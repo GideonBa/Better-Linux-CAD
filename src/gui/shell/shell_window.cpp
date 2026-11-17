@@ -27,6 +27,7 @@
 #include "blcad/gui/shell/shell_ribbon.hpp"
 #include "blcad/gui/shell/shell_sketch_3d_tools.hpp"
 #include "blcad/gui/shell/shell_sketch_diagnostics_tools.hpp"
+#include "blcad/gui/shell/shell_sketch_driven_tools.hpp"
 #include "blcad/gui/shell/shell_sketch_tools.hpp"
 #include "blcad/gui/shell/shell_step_import_tools.hpp"
 
@@ -346,6 +347,7 @@ ShellWindow::ShellWindow() {
   physical_properties_tools_ =
       std::make_unique<ShellPhysicalPropertiesTools>(*this, *ribbon_, tab_inspect_);
   hole_tools_ = std::make_unique<ShellHoleTools>(*this, *ribbon_, tab_model_);
+  sketch_driven_tools_ = std::make_unique<ShellSketchDrivenTools>(*this, *ribbon_, tab_model_);
   step_import_tools_ =
       std::make_unique<ShellStepImportTools>(*this, *ribbon_, tab_manage_, tab_assembly_);
   context_tools_ = std::make_unique<ShellContextTools>(*this);
@@ -366,6 +368,7 @@ ShellWindow::~ShellWindow() {
   parameter_tools_.reset();
   material_tools_.reset();
   physical_properties_tools_.reset();
+  sketch_driven_tools_.reset();
   hole_tools_.reset();
   sketch_diagnostics_tools_.reset();
   reference_repair_tools_.reset();
@@ -937,6 +940,8 @@ void ShellWindow::reset_document_interaction(bool cancel_history) {
     history_tools_->cancel();
   if (step_import_tools_)
     step_import_tools_->cancel();
+  if (sketch_driven_tools_)
+    sketch_driven_tools_->cancel();
   if (hole_tools_)
     hole_tools_->cancel();
   if (physical_properties_tools_)
@@ -1073,6 +1078,8 @@ bool ShellWindow::cancel_face_supported_sketch() {
   if (editing_feature_source_sketch()) {
     if (feature_edit_tools_ && feature_edit_tools_->editing_source_sketch())
       feature_edit_tools_->cancel();
+    else if (sketch_driven_tools_ && sketch_driven_tools_->editing_source_sketch())
+      sketch_driven_tools_->cancel();
     else
       feature_tools_->cancel();
     return true;
@@ -1185,7 +1192,8 @@ bool ShellWindow::enter_sketch(SketchId sketch) {
 
 bool ShellWindow::editing_feature_source_sketch() const noexcept {
   return (feature_tools_ && feature_tools_->editing_source_sketch()) ||
-         (feature_edit_tools_ && feature_edit_tools_->editing_source_sketch());
+         (feature_edit_tools_ && feature_edit_tools_->editing_source_sketch()) ||
+         (sketch_driven_tools_ && sketch_driven_tools_->editing_source_sketch());
 }
 
 bool ShellWindow::enter_feature_source_sketch(SketchId sketch) {
@@ -1322,6 +1330,8 @@ bool ShellWindow::finish_active_sketch() {
   if (editing_feature_source_sketch()) {
     if (feature_edit_tools_ && feature_edit_tools_->editing_source_sketch())
       feature_edit_tools_->resume_source_sketch(finished_sketch);
+    else if (sketch_driven_tools_ && sketch_driven_tools_->editing_source_sketch())
+      sketch_driven_tools_->resume_source_sketch(finished_sketch);
     else
       feature_tools_->resume_extrude_source_sketch(finished_sketch);
     return true;
@@ -1367,6 +1377,8 @@ bool ShellWindow::undo() {
   }
   if (step_import_tools_)
     step_import_tools_->cancel();
+  if (sketch_driven_tools_)
+    sketch_driven_tools_->cancel();
   if (hole_tools_)
     hole_tools_->cancel();
   if (physical_properties_tools_)
@@ -1427,6 +1439,8 @@ bool ShellWindow::redo() {
   }
   if (step_import_tools_)
     step_import_tools_->cancel();
+  if (sketch_driven_tools_)
+    sketch_driven_tools_->cancel();
   if (hole_tools_)
     hole_tools_->cancel();
   if (physical_properties_tools_)
@@ -1490,6 +1504,8 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& in
     }
     if (step_import_tools_)
       (void)step_import_tools_->accept_selection(*selection);
+    if (sketch_driven_tools_)
+      (void)sketch_driven_tools_->accept_selection(*selection);
     if (hole_tools_)
       (void)hole_tools_->accept_selection(*selection);
     if (construction_tools_)
@@ -1545,6 +1561,9 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
     if (const auto& selected = viewport_->selected_semantic())
       if (session_.selection().add(*selected))
         selected_semantic_id_ = selected->semantic_id;
+    if (sketch_driven_tools_)
+      for (const auto& selected : session_.selection().entries())
+        (void)sketch_driven_tools_->accept_selection(selected);
     if (hole_tools_)
       for (const auto& selected : session_.selection().entries())
         (void)hole_tools_->accept_selection(selected);
@@ -1766,6 +1785,8 @@ void ShellWindow::refresh() {
   synchronize_navigation();
   if (step_import_tools_)
     step_import_tools_->refresh();
+  if (sketch_driven_tools_)
+    sketch_driven_tools_->refresh();
   if (hole_tools_)
     hole_tools_->refresh();
   if (physical_properties_tools_)
