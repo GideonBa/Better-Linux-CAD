@@ -1,6 +1,6 @@
 # Shared advanced finishing interaction — Block 179
 
-Implementation is in progress; `mvp-plan.md` owns numbered acceptance. The accepted
+The shared interaction is accepted in Block 179; `mvp-plan.md` owns numbered status. The accepted
 [typed intent](part-face-full-round-intent-mvp6.md) and
 [Geometry capability table](geometry-face-fillet-mvp8.md) remain authoritative.
 
@@ -64,26 +64,6 @@ the drag, and release refreshes physical anchors from the updated source prefix.
 also resolves actual surviving semantic faces from selected Stitch/Thicken ancestry; coincident
 unrelated Body producers cannot supply those references.
 
-The connected panel passed its first native create/edit/drag/role matrix at both scales;
-explicit reopening into failed-Geometry repair and scrolled compact controls remain under verification. The implementation route continues
-through Block 184; none of this advances later blocks.
-
-## Verification status
-
-All five targets built. Typed-draft and legacy finishing/shell/draft/edge-chain regression:
-**10 cases / 191 assertions** (`build/verification/block179/draft-final.log`). Guide and variable
-Geometry regression: **17 / 9,424** (`guides-final.log`). Five guide cases cover straight/reversed
-stations, original basis, explicit edit scope, a nonuniform imported split cubic with independent
-Bernstein/Simpson length, periodic seams, stale sources and derived full-round size. Native panel
-acceptance remains open; continue through 184 and retain 185–204 scope.
-
-The first owned-panel matrix passes **10 offscreen cases / 190 assertions** and **11 native cases /
-221 assertions** at 100% and compact 150%. Selection/face Geometry passes **14 / 494**, including
-actual Stitch/Thicken ancestors and a coincident unrelated Body negative. Captures confirm fixed
-Apply/Cancel and the physical source-direction guide; scrolled station/role captures and failed
-reopening are the remaining native checks. Logs: `panel-focused.log`, `selection-final.log`,
-`native100.log`, `native150.log` in the same Block-179 verification directory.
-
 ## Failed Geometry, history scope and model changes
 
 Open for Repair initially owns the ordinary References task. Close that task, then double-click
@@ -99,14 +79,24 @@ Creation at End of Part prepares the normal history insertion before deriving so
 later Body placement cannot move grips ahead of the marker. Existing History context commands,
 feature renaming and suppressed-Fillet value correction use this same owned panel.
 
-The broad native regression passes **37 cases / 2,681 assertions** at 100%, including legacy
-History/feature-editor commands, normal grip interaction, failed reopening and exact stations at
-an earlier End-of-Part prefix. Offscreen focused regression passes **26 cases / 1,813 assertions**
-with **2 native skips**. The same native selection passes **37 / 2,701** in compact 150% mode
-(`QT_SCALE_FACTOR=1.5`, repository `BLCAD_UI_COMPACT=1`; the advanced-panel fixture also uses
-`BLCAD_COMPACT_UI=1`). Full-suite gates remain open; this is no block acceptance claim.
+## Verification
+
+The final native matrix passes **38 cases / 2,745 assertions** at 100% and **38 / 2,765**
+at compact 150%. After settling posted Qt layout events before scrolling, the affected 100% subset
+passes **14 / 349**. Captures show station values, face roles, fixed Apply/Cancel, repair inputs and
+Setback controls. Coverage includes linked radius drags, repeated selection, mode changes, exact
+history/Save/Open, failed reopening, earlier End of Part, stale drafts, suppressed edits and atomic
+Setback correction. Logs and captures live in `build/verification/block179/`:
+`native100-final-all.log`, `native150-layout-final.log`, `native100-layout-final.log`.
+
+Full Core **798 / 35,311** and full Geometry **820 / 91,308** pass. Their binary digests remain
+unchanged after the final UI-only corrections. Full offscreen GUI passes **899 cases, 83 skips / 104,660 assertions** (982 total, exit 0);
+`gui-full.log`. The native filters above establish the relevant finishing workflows, not the entire
+native-only suite. All five targets build successfully. The final runtime manifest contains **1,255 files**, SHA-256
+`ece7fcb2929f3e76bb2dea6ce844a339a4eb02405a3e034bf802b454eab9ded0`.
 
 An additional large-window 150% run passed 35 of 37 cases; two existing History size-preservation
 cases observed desktop resizing from 1232×651 to 1280×674. The complete compact repeat passes
-without changing those assertions. The native evidence qualifies the stated screen/scale setup;
+without changing those assertions. Compact verification uses `QT_SCALE_FACTOR=1.5`, repository
+`BLCAD_UI_COMPACT=1` and fixture `BLCAD_COMPACT_UI=1`. This evidence qualifies the stated setup;
 it does not claim every desktop/window-manager geometry.

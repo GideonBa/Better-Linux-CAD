@@ -531,6 +531,14 @@ creation, station drags and compact/scaled interaction retain their Block-179 ga
 - Oracle: support contact, removed middle face region, real tangent/G2 checks and solid connectivity.
   Test tiny middle faces, invalid face roles, impossible corners and intended failure diagnostics.
 
+**179 native F01–F02/UI01 gate accepted — 2026-11-17.**
+[Shared interaction proof](gui-advanced-finishing-mvp9.md#verification) records native create/edit,
+linked station drags, ordered face roles, repeated selection, exact history/reopening, failed-input
+repair, Setback correction and compact 150% controls. Native finishing/history/edit matrix:
+**38 / 2,745** at 100%, **38 / 2,765** at compact 150%. Full Core **798 / 35,311**, full Geometry
+**820 / 91,308**, offscreen GUI **899 passed / 83 skipped / 104,660 assertions**. Native filters
+cover the relevant workflows; they do not establish every skipped offscreen case.
+
 ### F03 Rib web emboss and engrave combinations
 
 - **First gate:** 180–184.

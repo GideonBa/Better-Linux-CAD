@@ -16,7 +16,24 @@ Result<std::size_t> ShellFeatureTools::begin_fillet_edit(FeatureId id) {
 void ShellFeatureTools::show_fillet_failure(const Error& error) {
   auto& controls = *advanced_fillet_;
   controls.failure = true;
-  controls.capability->setText(QString::fromStdString(error.object_id() + ": " + error.message()));
+  std::string location = controls.name;
+  if (controls.current_mode() == 1)
+    for (const auto& group : controls.groups) {
+      if (group.id == error.object_id())
+        location = group.name;
+      for (std::size_t row = 0; row < group.stations.size(); ++row)
+        if (group.stations[row].id == error.object_id())
+          location = group.name + " / Station " + std::to_string(row + 1);
+    }
+  if (controls.current_mode() >= 2)
+    for (const auto* role : {&controls.first, &controls.second, &controls.middle})
+      if (role->id == error.object_id())
+        location = role->name;
+  if (controls.policy && controls.policy->id == error.object_id())
+    location = "Setback";
+  controls.capability->setToolTip(QString::fromStdString(error.object_id()));
+  controls.capability->setText(QString::fromStdString(location + ": " + error.message()));
+  bool focus_changed = false;
   for (std::size_t i = 0; i < controls.groups.size(); ++i) {
     const auto& group = controls.groups[i];
     auto station = std::find_if(group.stations.begin(), group.stations.end(),
@@ -27,11 +44,26 @@ void ShellFeatureTools::show_fillet_failure(const Error& error) {
       QSignalBlocker block(controls.group);
       controls.group->setCurrentIndex(int(i));
       controls.configure();
+      focus_changed = true;
     }
     if (station != group.stations.end())
       controls.stations->setCurrentCell(int(station - group.stations.begin()), 1);
     break;
   }
+  if (controls.current_mode() >= 2) {
+    const std::array<const FilletFaceSet*, 3> roles{&controls.first, &controls.second,
+                                                    &controls.middle};
+    for (int i = 0; i < controls.group->count(); ++i)
+      if (roles[i]->id == error.object_id() && controls.group->currentIndex() != i) {
+        QSignalBlocker block(controls.group);
+        controls.group->setCurrentIndex(i);
+        controls.configure();
+        focus_changed = true;
+        break;
+      }
+  }
+  if (focus_changed)
+    reload_finishing_targets(false);
   std::vector<GuiViewportManipulatorHandle> markers;
   if (controls.live && controls.input_cache && controls.input_document &&
       controls.live->record.advanced_intent() &&
@@ -46,22 +78,40 @@ void ShellFeatureTools::show_fillet_failure(const Error& error) {
       const bool exact =
           std::any_of(guides.value().begin(), guides.value().end(),
                       [&](const auto& guide) { return guide.station == error.object_id(); });
+      const bool exact_group =
+          std::any_of(guides.value().begin(), guides.value().end(),
+                      [&](const auto& guide) { return guide.group == error.object_id(); });
       for (const auto& guide : guides.value()) {
         if ((exact && guide.station != error.object_id()) ||
-            (!exact && controls.active_group() && guide.group != controls.active_group()->id))
+            (!exact && exact_group && guide.group != error.object_id()))
           continue;
         GuiViewportManipulatorHandle marker;
-        marker.id = "fillet.failure/" + guide.station;
+        marker.id = "fillet.failure/" + std::to_string(guide.group.size()) + ":" + guide.group +
+                    "/" + guide.station;
         marker.origin = guide.anchor;
         marker.axis = guide.radius_axis;
         marker.interactive = false;
-        marker.label = "Failure: " + error.object_id();
+        marker.label = "Failure: " + location;
         markers.push_back(marker);
       }
     }
   }
   if (markers.empty()) {
-    const auto keys = controls.selected_keys();
+    std::vector<std::string> keys;
+    if (controls.current_mode() == 1) {
+      for (const auto& group : controls.groups)
+        for (const auto& edge : group.edges)
+          keys.push_back(interactive_edge_identity(edge.edge));
+    } else if (controls.current_mode() >= 2) {
+      for (const auto& face : controls.first.faces)
+        keys.push_back(interactive_face_identity(face));
+      for (const auto& face : controls.second.faces)
+        keys.push_back(interactive_face_identity(face));
+      if (controls.current_mode() == 3)
+        for (const auto& face : controls.middle.faces)
+          keys.push_back(interactive_face_identity(face));
+    } else
+      keys = controls.selected_keys();
     for (const auto& target : finishing_targets_) {
       const auto key = std::visit(
           [](const auto& reference) {
@@ -75,15 +125,15 @@ void ShellFeatureTools::show_fillet_failure(const Error& error) {
       if (std::find(keys.begin(), keys.end(), key) == keys.end())
         continue;
       GuiViewportManipulatorHandle marker;
-      marker.id = "fillet.failure/input";
+      marker.id = "fillet.failure/input/" + key;
       marker.origin = target.anchor;
       marker.interactive = false;
-      marker.label = "Failure: " + error.object_id();
+      marker.label = "Failure: " + location;
       markers.push_back(marker);
     }
   }
   (void)layer_.set_handles(std::move(markers));
-  controls.capability->setText(QString::fromStdString(error.object_id() + ": " + error.message()));
+  controls.capability->setText(QString::fromStdString(location + ": " + error.message()));
 }
 Result<std::size_t> ShellFeatureTools::rebuild_advanced_fillet_controller() {
   auto& controls = *advanced_fillet_;
