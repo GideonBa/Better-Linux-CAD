@@ -21,6 +21,7 @@ struct AssemblyHierarchyOccurrenceDescriptor {
   std::vector<RigidTransform> parent_transforms_inner_to_outer;
   bool visible_path = true;
   bool active_path = true;
+  ModelStateId selected_model_state{primary_model_state_id()};
 
   friend bool operator==(const AssemblyHierarchyOccurrenceDescriptor&,
                          const AssemblyHierarchyOccurrenceDescriptor&) = default;
@@ -31,10 +32,11 @@ struct AssemblyHierarchyOccurrenceDescriptor {
 // Repeated occurrences of one child AssemblyDocument remain distinct entries.
 class AssemblyHierarchyTraversal {
 public:
-  [[nodiscard]] static Result<AssemblyHierarchyTraversal> build(const Project& project);
+  [[nodiscard]] static Result<AssemblyHierarchyTraversal>
+  build(const Project& project, ModelStateId root_state = primary_model_state_id());
 
-  [[nodiscard]] const std::vector<AssemblyHierarchyOccurrenceDescriptor>& occurrences() const
-      noexcept;
+  [[nodiscard]] const std::vector<AssemblyHierarchyOccurrenceDescriptor>&
+  occurrences() const noexcept;
   [[nodiscard]] std::size_t occurrence_count() const noexcept;
 
 private:

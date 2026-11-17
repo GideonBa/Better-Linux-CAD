@@ -1,6 +1,7 @@
 #include "blcad/core/project_json.hpp"
 
 #include "assembly_joint_json.hpp"
+#include "assembly_occurrence_pose_json.hpp"
 #include "blcad/core/assembly_document_json.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "engineering_resource_json.hpp"
@@ -28,6 +29,7 @@ using json = nlohmann::json;
 constexpr std::string_view k_schema = "blcad.project.mvp4";
 constexpr int k_version = 1;
 constexpr int k_resource_version = 2;
+constexpr int k_occurrence_pose_version = 3;
 
 [[nodiscard]] Error json_error(std::string message) {
   return Error::validation("project_json", std::move(message));
@@ -355,7 +357,10 @@ Result<std::string> serialize_project_to_json(const Project& project) {
   const auto valid_resources = project.validate_engineering_resources();
   if (!valid_resources)
     return Result<std::string>::failure(valid_resources.error());
-  const bool has_resources = !project.engineering_resources().entries().empty();
+  auto valid_poses = project.validate_occurrence_poses();
+  if (!valid_poses) return Result<std::string>::failure(valid_poses.error());
+  const bool has_poses = !project.occurrence_poses().empty();
+  const bool has_resources = has_poses || !project.engineering_resources().entries().empty();
   auto root_assembly_json = assembly_to_json(project.assembly());
   if (root_assembly_json.has_error())
     return Result<std::string>::failure(root_assembly_json.error());
@@ -387,13 +392,14 @@ Result<std::string> serialize_project_to_json(const Project& project) {
   }
 
   json root{{"schema", k_schema},
-            {"version", has_resources ? k_resource_version : k_version},
+            {"version", has_poses ? k_occurrence_pose_version : has_resources ? k_resource_version : k_version},
             {"project", json{{"id", project.id().value()}, {"name", project.name()}}},
             {"assembly", std::move(root_assembly_json.value())},
             {"assemblies", std::move(assemblies)},
             {"cross_hierarchy_constraints", std::move(cross_hierarchy_constraints)},
             {"cross_hierarchy_joints", std::move(cross_hierarchy_joints)},
             {"parts", std::move(parts)}};
+  if (has_poses) root["occurrence_poses"] = detail::occurrence_poses_to_json(project);
   if (has_resources)
     root["engineering_resources"] =
         detail::engineering_resources_to_json(project.engineering_resources());
@@ -417,10 +423,14 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
       return Result<Project>::failure(json_error("unsupported project schema"));
     }
     if (!root.at("version").is_number_integer() ||
-        (root.at("version") != k_version && root.at("version") != k_resource_version)) {
+        (root.at("version") != k_version && root.at("version") != k_resource_version &&
+         root.at("version") != k_occurrence_pose_version)) {
       return Result<Project>::failure(json_error("unsupported project version"));
     }
-    const bool has_resources = root.at("version") == k_resource_version;
+    const bool has_poses = root.at("version") == k_occurrence_pose_version;
+    const bool has_resources = root.at("version") != k_version;
+    if (has_poses != root.contains("occurrence_poses"))
+      return Result<Project>::failure(json_error("Occurrence poses require necessary Project version 3"));
     if (!has_resources && root.contains("engineering_resources"))
       return Result<Project>::failure(
           json_error("Project engineering resources require a newer Project version"));
@@ -491,6 +501,10 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
         return Result<Project>::failure(added.error());
     }
 
+    if (has_poses) {
+      auto poses = detail::load_occurrence_poses(root.at("occurrence_poses"), project.value());
+      if (!poses) return Result<Project>::failure(poses.error());
+    }
     auto valid_structure = project.value().validate_assembly_structure();
     if (valid_structure.has_error())
       return Result<Project>::failure(valid_structure.error());

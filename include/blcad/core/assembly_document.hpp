@@ -74,7 +74,8 @@ public:
          ComponentVisibility visibility = ComponentVisibility::Visible,
          ComponentSuppressionState suppression_state = ComponentSuppressionState::Active,
          ComponentGroundingState grounding_state = ComponentGroundingState::Free,
-         RigidTransform transform = identity_rigid_transform());
+         RigidTransform transform = identity_rigid_transform(),
+         ModelStateId selected_state = primary_model_state_id());
 
   // Copy-style updates preserve component identity and referenced part model
   // intent while replacing one explicit free-placement/state field.
@@ -91,12 +92,17 @@ public:
   [[nodiscard]] ComponentVisibility visibility() const noexcept;
   [[nodiscard]] ComponentSuppressionState suppression_state() const noexcept;
   [[nodiscard]] ComponentGroundingState grounding_state() const noexcept;
+  [[nodiscard]] Result<ComponentInstance> with_model_state(ModelStateId state) const;
+  [[nodiscard]] const ModelStateId& selected_model_state() const noexcept {
+    return selected_state_;
+  }
   [[nodiscard]] const RigidTransform& transform() const noexcept;
 
 private:
   ComponentInstance(ComponentInstanceId id, std::string name, DocumentId referenced_part_document,
                     ComponentVisibility visibility, ComponentSuppressionState suppression_state,
-                    ComponentGroundingState grounding_state, RigidTransform transform);
+                    ComponentGroundingState grounding_state, RigidTransform transform,
+                    ModelStateId selected_state);
 
   ComponentInstanceId id_;
   std::string name_;
@@ -105,6 +111,7 @@ private:
   ComponentSuppressionState suppression_state_;
   ComponentGroundingState grounding_state_;
   RigidTransform transform_;
+  ModelStateId selected_state_;
 };
 
 // Persistent rigid occurrence of one project-owned child AssemblyDocument.
@@ -116,7 +123,8 @@ public:
   create(SubassemblyInstanceId id, std::string name, DocumentId referenced_assembly_document,
          ComponentVisibility visibility = ComponentVisibility::Visible,
          ComponentSuppressionState suppression_state = ComponentSuppressionState::Active,
-         RigidTransform transform = identity_rigid_transform());
+         RigidTransform transform = identity_rigid_transform(),
+         ModelStateId selected_state = primary_model_state_id());
 
   [[nodiscard]] Result<SubassemblyInstance> with_transform(RigidTransform transform) const;
   [[nodiscard]] Result<SubassemblyInstance> with_visibility(ComponentVisibility visibility) const;
@@ -128,12 +136,17 @@ public:
   [[nodiscard]] const DocumentId& referenced_assembly_document() const noexcept;
   [[nodiscard]] ComponentVisibility visibility() const noexcept;
   [[nodiscard]] ComponentSuppressionState suppression_state() const noexcept;
+  [[nodiscard]] Result<SubassemblyInstance> with_model_state(ModelStateId state) const;
+  [[nodiscard]] const ModelStateId& selected_model_state() const noexcept {
+    return selected_state_;
+  }
   [[nodiscard]] const RigidTransform& transform() const noexcept;
 
 private:
   SubassemblyInstance(SubassemblyInstanceId id, std::string name,
                       DocumentId referenced_assembly_document, ComponentVisibility visibility,
-                      ComponentSuppressionState suppression_state, RigidTransform transform);
+                      ComponentSuppressionState suppression_state, RigidTransform transform,
+                      ModelStateId selected_state);
 
   SubassemblyInstanceId id_;
   std::string name_;
@@ -141,6 +154,7 @@ private:
   ComponentVisibility visibility_;
   ComponentSuppressionState suppression_state_;
   RigidTransform transform_;
+  ModelStateId selected_state_;
 };
 
 // MVP-4/5 assembly document: owns assembly-scoped parameters, member parts,
@@ -150,6 +164,15 @@ private:
 class AssemblyDocument {
 public:
   [[nodiscard]] static Result<AssemblyDocument> create(DocumentId id, std::string name);
+
+  [[nodiscard]] const std::vector<ModelState>& model_states() const noexcept {
+    return model_states_;
+  }
+  [[nodiscard]] Result<std::size_t> replace_model_states(std::vector<ModelState> states);
+  [[nodiscard]] Result<AssemblyDocument> evaluate_model_state(ModelStateId state) const;
+  [[nodiscard]] Result<std::size_t> set_component_model_state(ComponentInstanceId, ModelStateId);
+  [[nodiscard]] Result<std::size_t> set_subassembly_model_state(SubassemblyInstanceId,
+                                                                ModelStateId);
 
   // Only assembly-scoped parameters are allowed.
   [[nodiscard]] Result<std::size_t> add_parameter(Parameter parameter);
@@ -240,6 +263,7 @@ private:
 
   DocumentId id_;
   std::string name_;
+  std::vector<ModelState> model_states_;
   std::vector<Parameter> parameters_;
   std::vector<DocumentId> member_parts_;
   std::vector<ParameterBinding> bindings_;

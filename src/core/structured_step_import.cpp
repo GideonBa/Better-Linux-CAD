@@ -132,7 +132,8 @@ Result<std::size_t> fresh_part(const PartDocument& part, const StepImportSource&
       !part.loft_features().empty() || !part.surface_features().empty() ||
       !part.linear_pattern_features().empty() || !part.circular_pattern_features().empty() ||
       !part.mirror_features().empty() || !part.fillet_features().empty() ||
-      !part.sketch_driven_features().empty() || !part.chamfer_features().empty() ||
+      !part.sketch_driven_features().empty() || !part.direct_edit_features().empty() ||
+      !part.model_states().empty() || !part.chamfer_features().empty() ||
       !part.shell_features().empty() || !part.hole_features().empty() ||
       !part.thread_features().empty() || !part.draft_features().empty() ||
       !part.body_boolean_features().empty() || !part.sketch_ownerships().empty() ||

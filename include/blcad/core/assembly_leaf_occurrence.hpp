@@ -17,6 +17,7 @@ struct AssemblyLeafOccurrenceDescriptor {
   ComponentInstanceId component_instance;
   DocumentId referenced_part_document;
   std::vector<RigidTransform> transforms_inner_to_outer;
+  ModelStateId selected_model_state{primary_model_state_id()};
 
   friend bool operator==(const AssemblyLeafOccurrenceDescriptor&,
                          const AssemblyLeafOccurrenceDescriptor&) = default;
@@ -30,7 +31,8 @@ class AssemblyLeafOccurrenceResolver {
 public:
   [[nodiscard]] Result<std::vector<AssemblyLeafOccurrenceDescriptor>>
   resolve(const Project& project,
-          AssemblyLeafParticipation participation = AssemblyLeafParticipation::VisibleActive) const;
+          AssemblyLeafParticipation participation = AssemblyLeafParticipation::VisibleActive,
+          ModelStateId root_state = primary_model_state_id()) const;
 };
 
 } // namespace blcad

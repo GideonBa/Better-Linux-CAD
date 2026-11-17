@@ -127,7 +127,8 @@ Result<ComponentInstance> ComponentInstance::create(ComponentInstanceId id, std:
                                                     ComponentVisibility visibility,
                                                     ComponentSuppressionState suppression_state,
                                                     ComponentGroundingState grounding_state,
-                                                    RigidTransform transform) {
+                                                    RigidTransform transform,
+                                                    ModelStateId selected_state) {
   const auto object_id = id.empty() ? std::string("component_instance") : id.value();
   if (id.empty()) {
     return Result<ComponentInstance>::failure(
@@ -141,35 +142,38 @@ Result<ComponentInstance> ComponentInstance::create(ComponentInstanceId id, std:
     return Result<ComponentInstance>::failure(Error::validation(
         object_id, "component instance referenced part document must not be empty"));
   }
+  if (selected_state.empty())
+    return Result<ComponentInstance>::failure(
+        Error::validation(object_id, "Selected model-state identity must not be empty"));
   if (!is_finite(transform)) {
     return Result<ComponentInstance>::failure(
         Error::validation(object_id, "component instance transform values must be finite"));
   }
-  return Result<ComponentInstance>::success(
-      ComponentInstance(std::move(id), std::move(name), std::move(referenced_part_document),
-                        visibility, suppression_state, grounding_state, transform));
+  return Result<ComponentInstance>::success(ComponentInstance(
+      std::move(id), std::move(name), std::move(referenced_part_document), visibility,
+      suppression_state, grounding_state, transform, std::move(selected_state)));
 }
 
 Result<ComponentInstance> ComponentInstance::with_transform(RigidTransform transform) const {
   return create(id_, name_, referenced_part_document_, visibility_, suppression_state_,
-                grounding_state_, transform);
+                grounding_state_, transform, selected_state_);
 }
 
 Result<ComponentInstance> ComponentInstance::with_visibility(ComponentVisibility visibility) const {
   return create(id_, name_, referenced_part_document_, visibility, suppression_state_,
-                grounding_state_, transform_);
+                grounding_state_, transform_, selected_state_);
 }
 
 Result<ComponentInstance>
 ComponentInstance::with_suppression_state(ComponentSuppressionState suppression_state) const {
   return create(id_, name_, referenced_part_document_, visibility_, suppression_state,
-                grounding_state_, transform_);
+                grounding_state_, transform_, selected_state_);
 }
 
 Result<ComponentInstance>
 ComponentInstance::with_grounding_state(ComponentGroundingState grounding_state) const {
   return create(id_, name_, referenced_part_document_, visibility_, suppression_state_,
-                grounding_state, transform_);
+                grounding_state, transform_, selected_state_);
 }
 
 ComponentInstance::ComponentInstance(ComponentInstanceId id, std::string name,
@@ -177,11 +181,11 @@ ComponentInstance::ComponentInstance(ComponentInstanceId id, std::string name,
                                      ComponentVisibility visibility,
                                      ComponentSuppressionState suppression_state,
                                      ComponentGroundingState grounding_state,
-                                     RigidTransform transform)
+                                     RigidTransform transform, ModelStateId selected_state)
     : id_(std::move(id)), name_(std::move(name)),
       referenced_part_document_(std::move(referenced_part_document)), visibility_(visibility),
       suppression_state_(suppression_state), grounding_state_(grounding_state),
-      transform_(transform) {}
+      transform_(transform), selected_state_(std::move(selected_state)) {}
 
 const ComponentInstanceId& ComponentInstance::id() const noexcept {
   return id_;

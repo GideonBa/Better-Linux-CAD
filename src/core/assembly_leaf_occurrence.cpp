@@ -19,9 +19,8 @@ ordered_components(const AssemblyDocument& assembly) {
   for (const ComponentInstance& component : assembly.component_instances()) {
     components.push_back(&component);
   }
-  std::sort(components.begin(), components.end(), [](const auto* lhs, const auto* rhs) {
-    return lhs->id().value() < rhs->id().value();
-  });
+  std::sort(components.begin(), components.end(),
+            [](const auto* lhs, const auto* rhs) { return lhs->id().value() < rhs->id().value(); });
   return components;
 }
 
@@ -29,13 +28,14 @@ ordered_components(const AssemblyDocument& assembly) {
 
 Result<std::vector<AssemblyLeafOccurrenceDescriptor>>
 AssemblyLeafOccurrenceResolver::resolve(const Project& project,
-                                        AssemblyLeafParticipation participation) const {
+                                        AssemblyLeafParticipation participation,
+                                        ModelStateId root_state) const {
   if (participation != AssemblyLeafParticipation::VisibleActive &&
       participation != AssemblyLeafParticipation::PhysicalActive)
     return Result<std::vector<AssemblyLeafOccurrenceDescriptor>>::failure(
         Error::validation(project.id().value(), "Unknown assembly leaf participation policy"));
   const bool physical = participation == AssemblyLeafParticipation::PhysicalActive;
-  auto hierarchy = AssemblyHierarchyTraversal::build(project);
+  auto hierarchy = AssemblyHierarchyTraversal::build(project, std::move(root_state));
   if (hierarchy.has_error()) {
     return Result<std::vector<AssemblyLeafOccurrenceDescriptor>>::failure(hierarchy.error());
   }
@@ -54,19 +54,27 @@ AssemblyLeafOccurrenceResolver::resolve(const Project& project,
           "assembly leaf occurrence must resolve to a project assembly document"));
     }
 
-    for (const ComponentInstance* component : ordered_components(*assembly)) {
+    auto effective = assembly->evaluate_model_state(assembly_occurrence.selected_model_state);
+    if (!effective)
+      return Result<std::vector<AssemblyLeafOccurrenceDescriptor>>::failure(effective.error());
+    for (const ComponentInstance* component : ordered_components(effective.value())) {
       if (component->suppression_state() != ComponentSuppressionState::Active ||
           (!physical && !is_visible_active(*component))) {
         continue;
       }
 
-      std::vector<RigidTransform> transforms{component->transform()};
+      auto effective = project.effective_component_transform(assembly_occurrence.occurrence_path,
+                                                             component->id());
+      if (!effective)
+        return Result<std::vector<AssemblyLeafOccurrenceDescriptor>>::failure(effective.error());
+      std::vector<RigidTransform> transforms{effective.value()};
       transforms.insert(transforms.end(),
                         assembly_occurrence.parent_transforms_inner_to_outer.begin(),
                         assembly_occurrence.parent_transforms_inner_to_outer.end());
       leaves.push_back(AssemblyLeafOccurrenceDescriptor{
           assembly_occurrence.assembly_document, assembly_occurrence.occurrence_path,
-          component->id(), component->referenced_part_document(), std::move(transforms)});
+          component->id(), component->referenced_part_document(), std::move(transforms),
+          component->selected_model_state()});
     }
   }
 

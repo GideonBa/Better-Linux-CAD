@@ -163,3 +163,47 @@ evidence live in `docs/development-setup.md` and `docs/gui-shell-acceptance-mvp9
 
 - global/Assembly parameter table navigation and parameter identity/category changes.
 - global project-level parameter sharing before the multi-document project file exists (`docs/file-format.md`).
+
+
+## Model-state authority and effective evaluation — 189/190
+
+`ModelState` adds sparse named siblings to a permanent implicit `primary` identity. Primary is the
+existing Part or Assembly definition; named states carry stable ids and unique display names.
+The reserved id/name cannot be authored, renamed or removed. Empty catalogs are absent from
+legacy files. `replace_model_states` validates the whole table against Primary before publication;
+there is no state inheritance and no duplicated complete document per inactive state.
+
+Part overrides address stable parameters, executable history ids and material assignments. A typed
+literal may replace only a literal parameter of the same quantity category. An explicit formula
+string may replace only an existing expression parameter. Final formulas are rebuilt together
+through the existing unit-aware dependency authority: changed dependencies, missing names and
+cycles are checked on the complete candidate, including simultaneous rewiring that would be
+invalid as a sequence of intermediate edits. Parameter identity, authored table order, scope and
+category survive evaluation. Feature suppression may explicitly suppress or reactivate an existing
+row; normal history ownership rules still apply. A material record selects a pinned resource for
+a Body or the Part default; a null assignment explicitly clears it. Missing targets or resources
+fail validation. Reference Parts require explicit conversion before named-state authoring.
+
+Assembly states may override existing Assembly literals, component/subassembly suppression and
+selected child states. Part features and material assignments remain Part-owned. Component and
+subassembly selections persist independently of display visibility, grounding and authored poses;
+all copy-style changes preserve the selection. Project validation resolves selected child states
+in Primary and every named Assembly state, including suppressed occurrences. Removing or renaming
+a referenced state requires a coordinated Project candidate that repairs every reference.
+The existing Assembly hierarchy cycle validation remains mandatory; no recursive state
+inheritance or shape/pose feedback solver is introduced.
+
+`evaluate_model_state` returns a disposable effective definition while preserving Primary and its
+catalog. Named Part results clear the sibling catalog because it belongs to the original Primary,
+and carry a transient `effective_model_state()` identity. `model_state_source_key(Primary, state)`
+includes the complete authored source and selected id; numerically identical siblings therefore
+remain distinct contexts. Hierarchy traversal evaluates the selected Assembly at each occurrence;
+leaf descriptors retain the selected Part state. Activation and derived geometry stay session data.
+A caller must retain Primary for Save and state editing, and certify Geometry/cache results against
+the effective document and explicit selected state. Full Geometry, export and native acceptance
+remain separate numbered gates in [the MVP plan](mvp-plan.md).
+
+Focused Core proof is `tests/core/model_state_tests.cpp` (`[model-state]`): sparse typed evaluation,
+formula rewiring/cycles, atomic invalid tables, materials/suppression, strict JSON, repeated nested
+child selections, hidden physical participation and dangling-reference rejection. These tests do
+not claim physical or native acceptance for 190/191/198.

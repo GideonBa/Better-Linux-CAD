@@ -8,6 +8,7 @@
 #include "blcad/core/datum_plane.hpp"
 #include "blcad/core/dependency_graph.hpp"
 #include "blcad/core/draft_feature.hpp"
+#include "blcad/core/direct_edit_feature.hpp"
 #include "blcad/core/edge_treatment_feature.hpp"
 #include "blcad/core/feature.hpp"
 #include "blcad/core/hole_feature.hpp"
@@ -17,6 +18,7 @@
 #include "blcad/core/invalidation_state.hpp"
 #include "blcad/core/loft_feature.hpp"
 #include "blcad/core/mirror_feature.hpp"
+#include "blcad/core/model_state.hpp"
 #include "blcad/core/parameter.hpp"
 #include "blcad/core/part_feature_history.hpp"
 #include "blcad/core/part_pattern_feature.hpp"
@@ -91,6 +93,14 @@ public:
   convert_reference_to_editable(DocumentId new_id, std::string new_name, FeatureId base_feature_id,
                                 std::vector<BodyId> new_body_ids) const;
 
+  [[nodiscard]] const std::vector<ModelState>& model_states() const noexcept { return model_states_; }
+  // Whole-table replacement validates every sibling against Primary atomically.
+  [[nodiscard]] Result<std::size_t> replace_model_states(std::vector<ModelState> states);
+  [[nodiscard]] Result<std::size_t> validate_model_states() const;
+  [[nodiscard]] Result<PartDocument> evaluate_model_state(ModelStateId state) const;
+  [[nodiscard]] const ModelStateId& effective_model_state() const noexcept {
+    return effective_model_state_;
+  }
   [[nodiscard]] Result<std::size_t> add_parameter(Parameter parameter);
   // Adds a computed parameter whose value derives from a unit-aware formula
   // over already-existing parameters of this document. Evaluation happens
@@ -152,6 +162,12 @@ public:
   [[nodiscard]] Result<std::size_t> add_shell_feature(ShellFeature feature);
   [[nodiscard]] Result<std::size_t> add_hole_feature(HoleFeature feature);
   [[nodiscard]] Result<std::size_t> add_thread_feature(ThreadFeature feature);
+  [[nodiscard]] Result<std::size_t> add_direct_edit_feature(DirectEditFeature feature);
+  [[nodiscard]] Result<std::size_t> update_direct_edit_feature(DirectEditFeature feature);
+  [[nodiscard]] Result<std::size_t> remove_direct_edit_feature(FeatureId id);
+  [[nodiscard]] const std::vector<DirectEditFeature>& direct_edit_features() const noexcept;
+  [[nodiscard]] const DirectEditFeature* find_direct_edit_feature(FeatureId id) const noexcept;
+  [[nodiscard]] std::size_t direct_edit_feature_count() const noexcept;
   [[nodiscard]] Result<std::size_t> add_draft_feature(DraftFeature feature);
   [[nodiscard]] Result<std::size_t> add_body_boolean_feature(BodyBooleanFeature feature);
 
@@ -498,6 +514,9 @@ private:
   std::vector<ImportedBodyFeature> imported_body_features_;
   DocumentId id_;
   std::string name_;
+  std::vector<ModelState> model_states_;
+  // Transient evaluation context; saving always writes authored definitions.
+  ModelStateId effective_model_state_{primary_model_state_id()};
   std::vector<Parameter> parameters_;
   std::vector<DatumPlane> datum_planes_;
   std::vector<DatumAxis> datum_axes_;
@@ -515,6 +534,7 @@ private:
   std::vector<LoftFeature> loft_features_;
   std::vector<SurfaceFeature> surface_features_;
   std::vector<SketchDrivenFeature> sketch_driven_features_;
+  std::vector<DirectEditFeature> direct_edit_features_;
   std::vector<LinearPatternFeature> linear_pattern_features_;
   std::vector<CircularPatternFeature> circular_pattern_features_;
   std::vector<MirrorFeature> mirror_features_;

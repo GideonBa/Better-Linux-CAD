@@ -129,7 +129,8 @@ template <typename Record> ExecutionContract execution_contract(const Record& re
     if (!record.keep_tool_bodies())
       contract.consumed = record.tool_bodies();
   } else {
-    if constexpr (std::is_same_v<Record, SketchDrivenFeature>) {
+    if constexpr (std::is_same_v<Record, SketchDrivenFeature> ||
+                  std::is_same_v<Record, DirectEditFeature>) {
       for (const auto& input : record.input_nodes()) {
         if (input.starts_with("body:")) {
           if (input != "body:" + record.target_body().value())
@@ -228,6 +229,8 @@ template <typename Visitor> void PartDocument::visit_executable_families(Visitor
   visitor(&PartDocument::sweep_features_, &PartDocument::add_sweep_feature,
           PartFeatureFamily::Sweep);
   visitor(&PartDocument::loft_features_, &PartDocument::add_loft_feature, PartFeatureFamily::Loft);
+  visitor(&PartDocument::direct_edit_features_, &PartDocument::add_direct_edit_feature,
+          PartFeatureFamily::DirectEdit);
   visitor(&PartDocument::sketch_driven_features_, &PartDocument::add_sketch_driven_feature,
           PartFeatureFamily::SketchDriven);
   visitor(&PartDocument::surface_features_, &PartDocument::add_surface_feature,

@@ -1,4 +1,5 @@
 #include "blcad/core/project.hpp"
+#include "blcad/core/model_state.hpp"
 
 #include <algorithm>
 #include <utility>
@@ -267,6 +268,12 @@ Result<std::size_t> Project::validate_assembly_structure() const {
 
   auto hierarchy = validate_assembly_hierarchy();
   if (hierarchy.has_error()) return hierarchy;
+
+  auto states = validate_project_model_states(*this);
+  if (!states) return states;
+
+  auto poses = validate_occurrence_poses();
+  if (!poses) return poses;
 
   auto cross_hierarchy_constraints = validate_cross_hierarchy_constraints();
   if (cross_hierarchy_constraints.has_error()) return cross_hierarchy_constraints;
