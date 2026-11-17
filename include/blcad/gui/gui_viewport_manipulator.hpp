@@ -80,6 +80,8 @@ struct GuiViewportManipulatorHandle {
   // Linear/radial world distance represented by one authored value unit.
   // Numeric overrides remain in authored units (e.g. diameter on a posed Body).
   double model_units_per_value{1.0};
+  bool interactive{true};
+  std::string label{};
 };
 
 struct GuiViewportManipulatorCandidate {
@@ -107,6 +109,7 @@ struct GuiViewportManipulatorPresentation {
   GuiSketchScreenPoint endpoint;
   double ring_radius_dip{0.0};
   bool active{false};
+  bool interactive{true};
   std::string value_text;
 };
 
@@ -379,7 +382,8 @@ public:
     if (!finite(pointer)) return hits;
     for (const auto& presentation : presentations()) {
       const auto* handle = find_handle(presentation.handle_id);
-      if (!handle) continue;
+      if (!handle || !handle->interactive)
+        continue;
       const double distance = is_ring(handle->kind)
                                   ? std::abs(screen_distance(pointer, presentation.anchor) -
                                              presentation.ring_radius_dip)
@@ -573,7 +577,9 @@ private:
     p.endpoint = {p.anchor.x + direction.x * h.display_size_dip,
                   p.anchor.y + direction.y * h.display_size_dip};
     p.ring_radius_dip = is_ring(h.kind) ? h.display_size_dip : 0.0;
-    p.active = active_handle_id_ && *active_handle_id_ == h.id;
+    p.interactive = h.interactive;
+    p.value_text = h.label;
+    p.active = h.interactive && active_handle_id_ && *active_handle_id_ == h.id;
     if (p.active && candidate_) p.value_text = format_candidate(*candidate_);
     return p;
   }

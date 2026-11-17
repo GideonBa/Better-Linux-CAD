@@ -917,6 +917,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_interactive_sketcher_acceptance_tests.cpp
       tests/gui/gui_spatial_surface_workbench_tests.cpp
       tests/gui/gui_interactive_modeling_mvp9_acceptance_tests.cpp
+      tests/gui/gui_advanced_fillet_controls_tests.cpp
       tests/gui/gui_advanced_fillet_draft_tests.cpp
       tests/gui/gui_interactive_finishing_tests.cpp
       tests/gui/gui_complex_part_performance_tests.cpp
