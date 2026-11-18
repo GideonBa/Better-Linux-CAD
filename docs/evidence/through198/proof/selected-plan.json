@@ -1,0 +1,388 @@
+{
+  "evidence_root": "/tmp",
+  "runtime": {
+    "path": "/tmp/blcad-runtime-manifest-23.json",
+    "sha256": "c9c948844c19763aed68a5ebc160b6faa66d8b7ace182b48b5923a0bd2bcb97a",
+    "expected_files": 1412,
+    "freeze": "runtime23 (optional profiler only; functional correctness remains runtime22)"
+  },
+  "builds": {
+    "build20": {
+      "log": "/tmp/blcad-through198-build-20.log",
+      "process_json": "/tmp/blcad-through198-build-20.log.process.json",
+      "expected_targets": [
+        "blcad_core_tests",
+        "blcad_geometry_tests",
+        "blcad_gui_tests",
+        "blcad_app",
+        "blcad_export_step",
+        "blcad_variant_assembly_profile"
+      ]
+    },
+    "build26": {
+      "log": "/tmp/blcad-through198-build-26.log",
+      "process_json": "/tmp/blcad-through198-build-26.log.process.json",
+      "expected_targets": [
+        "blcad_core_tests",
+        "blcad_geometry_tests",
+        "blcad_gui_tests",
+        "blcad_app",
+        "blcad_export_step",
+        "blcad_variant_assembly_profile"
+      ]
+    },
+    "build27": {
+      "log": "/tmp/blcad-through198-build-27.log",
+      "process_json": "/tmp/blcad-through198-build-27.log.process.json",
+      "expected_targets": [
+        "blcad_core_tests",
+        "blcad_geometry_tests",
+        "blcad_gui_tests",
+        "blcad_app",
+        "blcad_export_step",
+        "blcad_variant_assembly_profile"
+      ]
+    },
+    "build28": {
+      "log": "/tmp/blcad-through198-build-28.log",
+      "process_json": "/tmp/blcad-through198-build-28.log.process.json",
+      "expected_targets": [
+        "blcad_core_tests",
+        "blcad_geometry_tests",
+        "blcad_gui_tests",
+        "blcad_app",
+        "blcad_export_step",
+        "blcad_variant_assembly_profile"
+      ]
+    }
+  },
+  "binaries": {
+    "core": {
+      "path": "build/dev-gui/blcad_core_tests",
+      "verified_build": "build20",
+      "saved_identity": "/tmp/blcad-through198-binaries-build20.json",
+      "execution_context": "Core full06 executed the retained build20 binary; exact byte identity persists in build27/build28."
+    },
+    "geometry": {
+      "path": "build/dev-gui/blcad_geometry_tests",
+      "verified_build": "build27",
+      "saved_identity": "/tmp/blcad-through198-binaries-build28.json",
+      "execution_context": "Functional/native execution was recorded on runtime22; current build28 bytes match saved build27-final identity."
+    },
+    "gui": {
+      "path": "build/dev-gui/blcad_gui_tests",
+      "verified_build": "build26",
+      "saved_identity": "/tmp/blcad-through198-binaries-build28.json",
+      "execution_context": "Functional/native execution was recorded on runtime22; current build28 bytes match saved build27-final identity."
+    },
+    "app": {
+      "path": "build/dev-gui/blcad",
+      "verified_build": "build26",
+      "saved_identity": "/tmp/blcad-through198-binaries-build28.json",
+      "execution_context": "Functional/native execution was recorded on runtime22; current build28 bytes match saved build27-final identity."
+    },
+    "step_exporter": {
+      "path": "build/dev-gui/blcad_export_step",
+      "verified_build": "build26",
+      "saved_identity": "/tmp/blcad-through198-binaries-build28.json",
+      "execution_context": "Functional/native execution was recorded on runtime22; current build28 bytes match saved build27-final identity."
+    },
+    "p01_profile": {
+      "path": "build/dev-gui/blcad_variant_assembly_profile",
+      "verified_build": "build28",
+      "saved_identity": "/tmp/blcad-through198-binaries-build28.json",
+      "execution_context": "Optional P01 profiler rebuilt in build28 on runtime23; this is not a rerun of functional suites."
+    }
+  },
+  "gui_registry": {
+    "partition": "/tmp/blcad-through198-gui-registry-runtime22/partition.json",
+    "default": "/tmp/blcad-through198-gui-registry-runtime22/default.txt",
+    "broad": "/tmp/blcad-through198-gui-registry-runtime22/broad.txt",
+    "audit": "/tmp/blcad-through198-gui-registry-runtime22/audit.txt",
+    "housing": "/tmp/blcad-through198-gui-registry-runtime22/housing.txt"
+  },
+  "suites": {
+    "core_full": {
+      "log": "/tmp/blcad-through198-core-full-06.log",
+      "binary": "core",
+      "expected_cases": 838,
+      "exit_code": 0,
+      "exit_evidence": "root-confirmed completed inherited tool session; complete838/36902 Catch footer; binary verified unchanged from build20",
+      "platform": "headless",
+      "expected_assertions": 36902,
+      "expected_skipped": 0,
+      "execution_context": "Retained earlier build20 Core run, verified byte-identical through build28; no rerun on runtime22/runtime23 claimed."
+    },
+    "geometry_full": {
+      "log": "/tmp/blcad-through198-geometry-full-03.log",
+      "binary": "geometry",
+      "expected_cases": 891,
+      "exit_code": 0,
+      "exit_evidence": "Completed direct exec session50375 exit0 on final build27; default specification excludes only optional step-import-profile",
+      "platform": "headless",
+      "expected_skipped": 0,
+      "expected_assertions": 95967,
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28."
+    },
+    "gui_broad": {
+      "log": "/tmp/blcad-through198-gui-broad-final-04.log",
+      "binary": "gui",
+      "expected_cases": 1022,
+      "exit_code": 0,
+      "exit_evidence": "Completed direct exec session96262 exit0 on frozen runtime22",
+      "platform": "offscreen",
+      "filter": "~[complex-part-profile]~[gui-feature-coverage]~[configurable-housing]",
+      "expected_assertions": 105912,
+      "expected_skipped": 98,
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28."
+    },
+    "gui_audit": {
+      "log": "/tmp/blcad-through198-gui-audit-final-01.log",
+      "binary": "gui",
+      "expected_cases": 5,
+      "exit_code": 0,
+      "exit_evidence": "Root-confirmed completed direct exec session88685 exit0 after actual MVP198 and neutral workflow-manifest update; no adjacent process JSON is asserted.",
+      "platform": "offscreen",
+      "filter": "[gui-feature-coverage]~[complex-part-profile]",
+      "purpose": "final mvp-plan/inventory synchronization audit",
+      "expected_skipped": 0,
+      "execution_context": "Runtime23 documentation/workflow metadata audit only; functional/native evidence remains recorded runtime22.",
+      "expected_assertions": 934
+    },
+    "native_core_100": {
+      "log": "/tmp/blcad-through198-native100-core-08.log",
+      "binary": "gui",
+      "expected_cases": 8,
+      "process_json": "/tmp/blcad-through198-native-core22-final.process.json",
+      "platform": "xcb",
+      "scale": "100",
+      "filter": "[native-direct-edit],[model-state-native],[native-advanced-assembly],[project-part-context-native],[occurrence-state-placement-native]",
+      "environment": {
+        "QT_SCALE_FACTOR": "1"
+      },
+      "expected_skipped": 0,
+      "expected_assertions": 1319,
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28."
+    },
+    "native_core_150": {
+      "log": "/tmp/blcad-through198-native150-core-05.log",
+      "binary": "gui",
+      "expected_cases": 8,
+      "process_json": "/tmp/blcad-through198-native-core22-final.process.json",
+      "platform": "xcb",
+      "scale": "150",
+      "filter": "[native-direct-edit],[model-state-native],[native-advanced-assembly],[project-part-context-native],[occurrence-state-placement-native]",
+      "environment": {
+        "QT_SCALE_FACTOR": "1.5",
+        "BLCAD_UI_COMPACT": "1",
+        "BLCAD_COMPACT_UI": "1"
+      },
+      "expected_skipped": 0,
+      "expected_assertions": 1319,
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28."
+    },
+    "gui_housing": {
+      "log": "/tmp/blcad-through198-native100-housing-final-01.log",
+      "binary": "gui",
+      "expected_cases": 1,
+      "exit_code": null,
+      "exit_evidence": null,
+      "platform": "xcb",
+      "filter": "[configurable-housing]~[complex-part-profile]",
+      "expected_skipped": 0,
+      "scale": "100",
+      "process_json": "/tmp/blcad-through198-native-integrated22-final.process.json",
+      "purpose": "Default GUI housing registry case executed natively with all functional assertions and additional real controls",
+      "expected_assertions": 164,
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28."
+    },
+    "gui_cache_surface_focused": {
+      "log": "/tmp/blcad-through198-gui-cache-surface-01.log",
+      "binary": "gui",
+      "expected_cases": 9,
+      "expected_assertions": 1026,
+      "expected_skipped": 0,
+      "exit_code": 0,
+      "exit_evidence": "Completed direct exec session65587 exit0 on build26; GUI byte-identity retained after Geometry-test-only build27",
+      "platform": "offscreen",
+      "filter": "[preview-cache]~[complex-part-profile],[part-history-cache]~[complex-part-profile],[advanced-surface-controller]~[complex-part-profile]",
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28."
+    },
+    "geometry_transition_focused": {
+      "log": "/tmp/blcad-through198-geometry-transition-02.log",
+      "binary": "geometry",
+      "expected_cases": 3,
+      "expected_assertions": 87,
+      "expected_skipped": 0,
+      "exit_code": 0,
+      "exit_evidence": "Completed direct exec after build27 exit0",
+      "platform": "headless",
+      "filter": "[verified-transition]",
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28."
+    },
+    "native_housing_100": {
+      "log": "/tmp/blcad-through198-native100-housing-final-01.log",
+      "binary": "gui",
+      "expected_cases": 1,
+      "expected_skipped": 0,
+      "platform": "xcb",
+      "scale": "100",
+      "filter": "[configurable-housing]~[complex-part-profile]",
+      "process_json": "/tmp/blcad-through198-native-integrated22-final.process.json",
+      "environment": {
+        "QT_SCALE_FACTOR": "1"
+      },
+      "expected_assertions": 164,
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28."
+    },
+    "native_part_100": {
+      "log": "/tmp/blcad-through198-native100-part-final-01.log",
+      "binary": "gui",
+      "expected_cases": 1,
+      "expected_skipped": 0,
+      "platform": "xcb",
+      "scale": "100",
+      "filter": "[advanced-part-direct]~[complex-part-profile]",
+      "process_json": "/tmp/blcad-through198-native-integrated22-final.process.json",
+      "environment": {
+        "QT_SCALE_FACTOR": "1"
+      },
+      "expected_assertions": 91,
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28."
+    },
+    "native_housing_150": {
+      "log": "/tmp/blcad-through198-native150-housing-final-01.log",
+      "binary": "gui",
+      "expected_cases": 1,
+      "expected_skipped": 0,
+      "platform": "xcb",
+      "scale": "150",
+      "filter": "[configurable-housing]~[complex-part-profile]",
+      "process_json": "/tmp/blcad-through198-native-integrated22-final.process.json",
+      "environment": {
+        "QT_SCALE_FACTOR": "1.5",
+        "BLCAD_UI_COMPACT": "1",
+        "BLCAD_COMPACT_UI": "1"
+      },
+      "expected_assertions": 164,
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28."
+    },
+    "native_part_150": {
+      "log": "/tmp/blcad-through198-native150-part-final-01.log",
+      "binary": "gui",
+      "expected_cases": 1,
+      "expected_skipped": 0,
+      "platform": "xcb",
+      "scale": "150",
+      "filter": "[advanced-part-direct]~[complex-part-profile]",
+      "process_json": "/tmp/blcad-through198-native-integrated22-final.process.json",
+      "environment": {
+        "QT_SCALE_FACTOR": "1.5",
+        "BLCAD_UI_COMPACT": "1",
+        "BLCAD_COMPACT_UI": "1"
+      },
+      "expected_assertions": 91,
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28."
+    }
+  },
+  "native_captures": {
+    "100": {
+      "directory": "/tmp/blcad-through198-native100-runtime22-proof",
+      "scale": "100",
+      "required_files": [
+        "a01-cross-solve-diagnostic.png",
+        "assembly-adaptive-preview.png",
+        "assembly-design-view-active.png",
+        "assembly-design-view-preview.png",
+        "assembly-hole-participants-preview.png",
+        "direct-edit-import-healed.png",
+        "direct-edit-rotate.png",
+        "flexible-hierarchy-axis-pick.png",
+        "flexible-hierarchy-solve-preview.png",
+        "flexible-occurrence-preview.png",
+        "in-context-source-sketch.png",
+        "model-states-preview.png",
+        "model-states-primary.png",
+        "named-position-measure.png",
+        "occurrence-model-states-preview.png"
+      ]
+    },
+    "150": {
+      "directory": "/tmp/blcad-through198-native150-runtime22-proof",
+      "scale": "150",
+      "required_files": [
+        "a01-cross-solve-diagnostic.png",
+        "assembly-adaptive-preview.png",
+        "assembly-design-view-active.png",
+        "assembly-design-view-preview.png",
+        "assembly-hole-participants-preview.png",
+        "direct-edit-import-healed.png",
+        "direct-edit-rotate.png",
+        "flexible-hierarchy-axis-pick.png",
+        "flexible-hierarchy-solve-preview.png",
+        "flexible-occurrence-preview.png",
+        "in-context-source-sketch.png",
+        "model-states-preview.png",
+        "model-states-primary.png",
+        "named-position-measure.png",
+        "occurrence-model-states-preview.png"
+      ]
+    },
+    "integrated100": {
+      "directory": "/tmp/blcad-through198-native100-integrated-final-proof",
+      "scale": "100",
+      "required_files": [
+        "configurable-housing-X02.png",
+        "advanced-part-direct.png"
+      ]
+    },
+    "integrated150": {
+      "directory": "/tmp/blcad-through198-native150-integrated-final-proof",
+      "scale": "150",
+      "required_files": [
+        "configurable-housing-X02.png",
+        "advanced-part-direct.png"
+      ]
+    }
+  },
+  "startup": {
+    "record": "/tmp/blcad-through198-native-startup-final-04/startup.json",
+    "log": "/tmp/blcad-through198-native-startup-final-04/app.log",
+    "capture": "/tmp/blcad-through198-native-startup-final-04/startup.png"
+  },
+  "notes": [
+    "Current runtime23/build28 changes only the optional profile source/executable from runtime22/build27; explicit retained-source proof and both binary identity snapshots are independently compared and archived.",
+    "Core full06 remains the actual earlier build20 execution, retained by exact executable and Core-library byte identity. Functional/native GUI and Geometry facts remain attributed to runtime22; no functional runtime23 rerun is invented.",
+    "Default GUI registry is exactly1028=broad1022+housing1+audit5 with three disjoint name sets. Actual mixed-platform total is930 passed,98 skipped,107010 assertions; it is neither1028 passing cases nor a full native suite.",
+    "Native8 plus connected2 cases per scale establish the required focused delivery scenarios. Advanced Part X01 and connected partial X02 retain their complete204 boundaries.",
+    "P01 raw/derived benchmark artifacts are archived separately. This correctness/native collector does not imply full P01/Block203 budget or native-latency acceptance."
+  ],
+  "retained_profile_transition": {
+    "record": "/tmp/blcad-through198-profile-only-retained-proof.json",
+    "before_runtime": "/tmp/blcad-runtime-manifest-22.json",
+    "after_runtime": "/tmp/blcad-runtime-manifest-23.json",
+    "before_binaries": "/tmp/blcad-through198-binaries-build27-final.json",
+    "after_binaries": "/tmp/blcad-through198-binaries-build28.json",
+    "expected_changed_inputs": [
+      "tests/geometry/variant_assembly_profile.cpp"
+    ],
+    "expected_changed_artifacts": [
+      "build/dev-gui/blcad_variant_assembly_profile"
+    ],
+    "retained_artifact_origins": [
+      {
+        "name": "Core full06 retained build20 executable and Core library",
+        "snapshot": "/tmp/blcad-through198-binaries-build20.json",
+        "artifacts": [
+          "build/dev-gui/blcad_core_tests",
+          "build/dev-gui/libblcad_core.a"
+        ]
+      }
+    ],
+    "record_sha256": "1238689e22de5a03d1eee0546ca4d55900ee8da59819325e8101ccfa1828dbd4",
+    "before_runtime_sha256": "01fb290ba84981fead592c5e013458c2e264aaee63a6f3b21bc2f9238db929fc",
+    "before_binaries_sha256": "36aa3989409d5bc3dd151c83442ca95df863cbd7cd3a31601211b8463b3e40fd",
+    "after_binaries_sha256": "70910b71201de722b8cdae08f77e33219727d8fd3c75c809ace9daa7cbc1d7c9"
+  },
+  "selection_plan_path": "/tmp/blcad-through198-proof-plan.json"
+}
