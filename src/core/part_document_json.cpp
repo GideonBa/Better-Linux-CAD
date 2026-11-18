@@ -1,14 +1,14 @@
 #include "blcad/core/part_document_json.hpp"
 #include "advanced_fillet_json.hpp"
+#include "direct_edit_json.hpp"
 #include "engineering_resource_json.hpp"
 #include "equation_curve_json.hpp"
 #include "face_fillet_json.hpp"
 #include "imported_part_json.hpp"
 #include "imported_topology_json.hpp"
+#include "model_state_json.hpp"
 #include "part_material_json.hpp"
 #include "sketch_driven_json.hpp"
-#include "direct_edit_json.hpp"
-#include "model_state_json.hpp"
 #include "step_import_json.hpp"
 #include "thread_json.hpp"
 
@@ -7011,5 +7011,18 @@ Result<PartDocument> read_part_document_json_file(const std::filesystem::path& p
         json_file_error(path, "could not read part document json file"));
   return deserialize_part_document_from_json(buffer.str(), mode);
 }
+
+namespace detail {
+nlohmann::json shared_hole_to_json(const HoleFeature& feature) {
+  return hole_feature_to_json(feature);
+}
+Result<HoleFeature> shared_hole_from_json(const nlohmann::json& value) {
+  try {
+    return hole_feature_from_json(value);
+  } catch (const std::exception& e) {
+    return Result<HoleFeature>::failure(Error::validation("assembly_hole.recipe", e.what()));
+  }
+}
+} // namespace detail
 
 } // namespace blcad

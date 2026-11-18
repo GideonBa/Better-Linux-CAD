@@ -1,4 +1,5 @@
 #include "blcad/core/assembly_occurrence_pose.hpp"
+#include "blcad/core/assembly_hierarchy.hpp"
 #include "blcad/core/project.hpp"
 
 #include <algorithm>
@@ -207,11 +208,28 @@ Project::set_occurrence_joint_coordinate(const std::vector<SubassemblyInstanceId
 
 std::vector<std::vector<SubassemblyInstanceId>>
 assembly_transform_scopes(const Project& project, const DocumentId& document) {
-  std::vector<std::vector<SubassemblyInstanceId>> result{{}};
-  for (const auto& pose : project.occurrence_poses())
-    if (pose.assembly_document() == document &&
-        pose.rigidity() == AssemblyOccurrenceRigidity::Flexible)
-      result.push_back(pose.path());
+  std::vector<std::vector<SubassemblyInstanceId>> result;
+  auto hierarchy = AssemblyHierarchyTraversal::build(project);
+  bool shared = false, seen = false, extended = false;
+  if (hierarchy)
+    for (const auto& occurrence : hierarchy.value().occurrences()) {
+      if (occurrence.assembly_document != document)
+        continue;
+      seen = true;
+      extended = extended || project.flexible_occurrence(occurrence.occurrence_path) ||
+                 occurrence.selected_model_state != primary_model_state_id();
+      if (!occurrence.active_path)
+        continue;
+      if (project.flexible_occurrence(occurrence.occurrence_path) ||
+          occurrence.selected_model_state != primary_model_state_id())
+      result.push_back(occurrence.occurrence_path);
+      else
+        shared = true;
+    }
+  if (!extended)
+    return {std::vector<SubassemblyInstanceId>{}};
+  if (shared || !seen)
+    result.insert(result.begin(), std::vector<SubassemblyInstanceId>{});
   return result;
 }
 } // namespace blcad

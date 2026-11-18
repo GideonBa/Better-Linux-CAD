@@ -2,7 +2,9 @@
 
 #include "assembly_constraint_graph_participation.hpp"
 
+#include "blcad/core/assembly_hierarchy.hpp"
 #include "blcad/core/project.hpp"
+#include <memory>
 
 #include <algorithm>
 #include <cstddef>
@@ -19,6 +21,7 @@ struct ResolvedMotionEndpoint {
   const ComponentInstance* component = nullptr;
   bool active = false;
   std::vector<SubassemblyInstanceId> scope;
+  std::shared_ptr<const AssemblyDocument> effective;
 };
 
 [[nodiscard]] bool authority_less(const ComponentTransformAuthority& lhs,
@@ -107,22 +110,22 @@ ordered_assembly_documents(const Project& project) {
 [[nodiscard]] Result<ResolvedMotionEndpoint>
 resolve_endpoint(const Project& project, const AssemblyHierarchyConstraintEndpoint& endpoint,
                  const std::string& relationship_id) {
-  const AssemblyDocument* assembly = &project.assembly();
-  bool active = true;
-
-  for (const SubassemblyInstanceId& occurrence : endpoint.occurrence_path()) {
-    const SubassemblyInstance* instance = assembly->find_subassembly_instance(occurrence);
-    if (instance == nullptr) {
-      return Result<ResolvedMotionEndpoint>::failure(Error::validation(
-          relationship_id, "cross-hierarchy motion endpoint occurrence path must resolve"));
-    }
-    active = active && instance->suppression_state() == ComponentSuppressionState::Active;
-    assembly = project.find_assembly_document(instance->referenced_assembly_document());
-    if (assembly == nullptr) {
-      return Result<ResolvedMotionEndpoint>::failure(Error::validation(
-          relationship_id, "cross-hierarchy motion endpoint assembly document must resolve"));
-    }
-  }
+  auto hierarchy = AssemblyHierarchyTraversal::build(project);
+  if (!hierarchy)
+    return Result<ResolvedMotionEndpoint>::failure(hierarchy.error());
+  const auto found = std::find_if(
+      hierarchy.value().occurrences().begin(), hierarchy.value().occurrences().end(),
+      [&](const auto& value) { return value.occurrence_path == endpoint.occurrence_path(); });
+    if (found == hierarchy.value().occurrences().end())
+    return Result<ResolvedMotionEndpoint>::failure(Error::validation(
+          relationship_id, "Cross-hierarchy occurrence must resolve"));
+  const auto* definition = project.find_assembly_document(found->assembly_document);
+  auto evaluated = definition->evaluate_model_state(found->selected_model_state);
+    if (!evaluated)
+    return Result<ResolvedMotionEndpoint>::failure(evaluated.error());
+  auto owned = std::make_shared<const AssemblyDocument>(std::move(evaluated.value()));
+  const AssemblyDocument* assembly = owned.get();
+  bool active = found->active_path;
 
   const ComponentInstance* component =
       assembly->find_component_instance(endpoint.component_instance());
@@ -135,7 +138,8 @@ resolve_endpoint(const Project& project, const AssemblyHierarchyConstraintEndpoi
       ResolvedMotionEndpoint{assembly, component, active,
                              project.flexible_occurrence(endpoint.occurrence_path())
                                  ? endpoint.occurrence_path()
-                                 : std::vector<SubassemblyInstanceId>{}});
+                                 : std::vector<SubassemblyInstanceId>{},
+                             std::move(owned)});
 }
 
 void add_relationship(std::vector<AssemblyMotionRelationshipIdentity>& relationships,
@@ -312,7 +316,23 @@ AssemblyCrossHierarchyMotionGraph::build(const Project& project) {
 
   for (const AssemblyDocument* assembly : ordered_assembly_documents(project)) {
     for (const auto& scope : assembly_transform_scopes(project, assembly->id())) {
-      for (const AssemblyConstraint& constraint : assembly->constraints()) {
+      auto scoped = *assembly;
+      if (!scope.empty()) {
+        auto hierarchy = AssemblyHierarchyTraversal::build(project);
+        if (!hierarchy)
+          return Result<AssemblyCrossHierarchyMotionGraph>::failure(hierarchy.error());
+        auto occurrence = std::find_if(
+            hierarchy.value().occurrences().begin(), hierarchy.value().occurrences().end(),
+            [&](const auto& value) { return value.occurrence_path == scope; });
+        if (occurrence == hierarchy.value().occurrences().end() || !occurrence->active_path)
+          continue;
+        auto evaluated = assembly->evaluate_model_state(occurrence->selected_model_state);
+        if (!evaluated)
+          return Result<AssemblyCrossHierarchyMotionGraph>::failure(evaluated.error());
+        scoped = std::move(evaluated.value());
+      }
+      const auto* local_assembly = &scoped;
+      for (const AssemblyConstraint& constraint : local_assembly->constraints()) {
         if (constraint.state() != AssemblyConstraintState::Active) {
           continue;
         }
@@ -320,9 +340,9 @@ AssemblyCrossHierarchyMotionGraph::build(const Project& project) {
           continue;
         }
         const ComponentInstance* component_a =
-            assembly->find_component_instance(constraint.target_a().component_instance());
+            local_assembly->find_component_instance(constraint.target_a().component_instance());
         const ComponentInstance* component_b =
-            assembly->find_component_instance(constraint.target_b().component_instance());
+            local_assembly->find_component_instance(constraint.target_b().component_instance());
         if (component_a == nullptr || component_b == nullptr) {
           return Result<AssemblyCrossHierarchyMotionGraph>::failure(
               Error::validation(constraint.id().value(),
@@ -334,18 +354,19 @@ AssemblyCrossHierarchyMotionGraph::build(const Project& project) {
         }
         add_local_dependency(
             relationships, authorities, incidences,
-            AssemblyLocalRelationshipIdentity{assembly->id(), constraint.id(), scope},
-            assembly->id(), *component_a, *component_b, scope);
+            AssemblyLocalRelationshipIdentity{local_assembly->id(), constraint.id(), scope},
+            local_assembly->id(), *component_a, *component_b,
+            project.flexible_occurrence(scope) ? scope : std::vector<SubassemblyInstanceId>{});
       }
 
-      for (const AssemblyJoint& joint : assembly->joints()) {
+      for (const AssemblyJoint& joint : local_assembly->joints()) {
         if (joint.state() != AssemblyJointState::Active) {
           continue;
         }
         const ComponentInstance* component_a =
-            assembly->find_component_instance(joint.target_a().component_instance());
+            local_assembly->find_component_instance(joint.target_a().component_instance());
         const ComponentInstance* component_b =
-            assembly->find_component_instance(joint.target_b().component_instance());
+            local_assembly->find_component_instance(joint.target_b().component_instance());
         if (component_a == nullptr || component_b == nullptr) {
           return Result<AssemblyCrossHierarchyMotionGraph>::failure(
               Error::validation(joint.id().value(), "local motion joint components must resolve"));
@@ -355,8 +376,9 @@ AssemblyCrossHierarchyMotionGraph::build(const Project& project) {
           continue;
         }
         add_local_dependency(relationships, authorities, incidences,
-                             AssemblyLocalJointIdentity{assembly->id(), joint.id(), scope},
-                             assembly->id(), *component_a, *component_b, scope);
+                             AssemblyLocalJointIdentity{local_assembly->id(), joint.id(), scope},
+            local_assembly->id(), *component_a, *component_b,
+            project.flexible_occurrence(scope) ? scope : std::vector<SubassemblyInstanceId>{});
       }
     }
   }

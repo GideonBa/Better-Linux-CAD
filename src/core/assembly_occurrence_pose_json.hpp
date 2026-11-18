@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blcad/core/project.hpp"
+#include <algorithm>
 #include <nlohmann/json.hpp>
 #include <set>
 

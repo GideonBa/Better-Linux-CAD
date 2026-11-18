@@ -1,11 +1,15 @@
 #include "blcad/core/project_json.hpp"
 
+#include "assembly_hole_json.hpp"
+
 #include "assembly_joint_json.hpp"
 #include "assembly_occurrence_pose_json.hpp"
+#include "assembly_representation_json.hpp"
 #include "blcad/core/assembly_document_json.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "engineering_resource_json.hpp"
 #include "imported_topology_json.hpp"
+#include "project_design_reference_json.hpp"
 #include "project_engineering_resource_json.hpp"
 #include "step_import_json.hpp"
 
@@ -30,6 +34,9 @@ constexpr std::string_view k_schema = "blcad.project.mvp4";
 constexpr int k_version = 1;
 constexpr int k_resource_version = 2;
 constexpr int k_occurrence_pose_version = 3;
+constexpr int k_design_reference_version = 4;
+constexpr int k_assembly_hole_version = 5;
+constexpr int k_representation_version = 6;
 
 [[nodiscard]] Error json_error(std::string message) {
   return Error::validation("project_json", std::move(message));
@@ -359,8 +366,21 @@ Result<std::string> serialize_project_to_json(const Project& project) {
     return Result<std::string>::failure(valid_resources.error());
   auto valid_poses = project.validate_occurrence_poses();
   if (!valid_poses) return Result<std::string>::failure(valid_poses.error());
+  auto valid_designs = project.validate_design_references();
+  if (!valid_designs)
+    return Result<std::string>::failure(valid_designs.error());
+  auto valid_holes = validate_assembly_hole_features(project);
+  if (!valid_holes)
+    return Result<std::string>::failure(valid_holes.error());
+  auto valid_representations = project.validate_assembly_representations();
+  if (!valid_representations)
+    return Result<std::string>::failure(valid_representations.error());
+  const bool has_representations =
+      !project.assembly_positions().empty() || !project.assembly_design_views().empty();
+  const bool has_holes = !project.assembly_hole_features().empty();
+  const bool has_designs = !project.design_references().empty();
   const bool has_poses = !project.occurrence_poses().empty();
-  const bool has_resources = has_poses || !project.engineering_resources().entries().empty();
+  const bool has_resources = has_representations || has_holes || has_designs || has_poses || !project.engineering_resources().entries().empty();
   auto root_assembly_json = assembly_to_json(project.assembly());
   if (root_assembly_json.has_error())
     return Result<std::string>::failure(root_assembly_json.error());
@@ -392,13 +412,21 @@ Result<std::string> serialize_project_to_json(const Project& project) {
   }
 
   json root{{"schema", k_schema},
-            {"version", has_poses ? k_occurrence_pose_version : has_resources ? k_resource_version : k_version},
+            {"version", has_representations ? k_representation_version
+                        : has_holes         ? k_assembly_hole_version
+                        : has_designs       ? k_design_reference_version
+                        : has_poses ? k_occurrence_pose_version : has_resources ? k_resource_version : k_version},
             {"project", json{{"id", project.id().value()}, {"name", project.name()}}},
             {"assembly", std::move(root_assembly_json.value())},
             {"assemblies", std::move(assemblies)},
             {"cross_hierarchy_constraints", std::move(cross_hierarchy_constraints)},
             {"cross_hierarchy_joints", std::move(cross_hierarchy_joints)},
             {"parts", std::move(parts)}};
+  if (has_representations) root["representations"] = detail::representations_to_json(project);
+  if (has_designs)
+    root["design_references"] = detail::design_references_to_json(project);
+  if (has_holes)
+    root["assembly_hole_features"] = detail::assembly_holes_to_json(project);
   if (has_poses) root["occurrence_poses"] = detail::occurrence_poses_to_json(project);
   if (has_resources)
     root["engineering_resources"] =
@@ -424,12 +452,30 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
     }
     if (!root.at("version").is_number_integer() ||
         (root.at("version") != k_version && root.at("version") != k_resource_version &&
-         root.at("version") != k_occurrence_pose_version)) {
+         root.at("version") != k_occurrence_pose_version &&
+         root.at("version") != k_design_reference_version &&
+         root.at("version") != k_assembly_hole_version &&
+         root.at("version") != k_representation_version)) {
       return Result<Project>::failure(json_error("unsupported project version"));
     }
-    const bool has_poses = root.at("version") == k_occurrence_pose_version;
+    const bool has_holes = root.contains("assembly_hole_features");
+    const bool has_representations = root.contains("representations");
+    if ((root.at("version") == k_representation_version) != has_representations)
+      return Result<Project>::failure(
+          json_error("Named representations require necessary Project version 6"));
+    if ((root.at("version").get<int>() < k_assembly_hole_version && has_holes) ||
+        (root.at("version") == k_assembly_hole_version && !has_holes))
+      return Result<Project>::failure(
+          json_error("Assembly Hole requires necessary Project version 5"));
+    const bool has_designs = root.contains("design_references");
+    const bool has_poses = root.contains("occurrence_poses");
+    if ((root.at("version").get<int>() < k_design_reference_version && has_designs) ||
+        (root.at("version") == k_design_reference_version && !has_designs))
+      return Result<Project>::failure(
+          json_error("Design references require necessary Project version 4"));
     const bool has_resources = root.at("version") != k_version;
-    if (has_poses != root.contains("occurrence_poses"))
+    if ((root.at("version").get<int>() < k_occurrence_pose_version && has_poses) ||
+        (root.at("version") == k_occurrence_pose_version && !has_poses))
       return Result<Project>::failure(json_error("Occurrence poses require necessary Project version 3"));
     if (!has_resources && root.contains("engineering_resources"))
       return Result<Project>::failure(
@@ -504,6 +550,21 @@ Result<Project> deserialize_project_from_json(std::string_view content) {
     if (has_poses) {
       auto poses = detail::load_occurrence_poses(root.at("occurrence_poses"), project.value());
       if (!poses) return Result<Project>::failure(poses.error());
+    }
+    if (has_designs) {
+      auto links = detail::load_design_references(root.at("design_references"), project.value());
+      if (!links)
+        return Result<Project>::failure(links.error());
+    }
+    if (has_holes) {
+      auto holes = detail::load_assembly_holes(root.at("assembly_hole_features"), project.value());
+      if (!holes)
+        return Result<Project>::failure(holes.error());
+    }
+    if (has_representations) {
+      auto loaded = detail::load_representations(root.at("representations"), project.value());
+      if (!loaded)
+        return Result<Project>::failure(loaded.error());
     }
     auto valid_structure = project.value().validate_assembly_structure();
     if (valid_structure.has_error())

@@ -272,8 +272,20 @@ Result<std::size_t> Project::validate_assembly_structure() const {
   auto states = validate_project_model_states(*this);
   if (!states) return states;
 
+  auto coordinated_holes = validate_assembly_hole_features(*this);
+  if (!coordinated_holes)
+    return coordinated_holes;
+
   auto poses = validate_occurrence_poses();
   if (!poses) return poses;
+
+  auto designs = validate_design_references();
+  if (!designs)
+    return designs;
+
+  auto representations = validate_assembly_representations();
+  if (!representations)
+    return representations;
 
   auto cross_hierarchy_constraints = validate_cross_hierarchy_constraints();
   if (cross_hierarchy_constraints.has_error()) return cross_hierarchy_constraints;

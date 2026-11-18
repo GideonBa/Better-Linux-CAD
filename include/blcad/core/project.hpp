@@ -2,9 +2,12 @@
 
 #include "blcad/core/assembly_constraint.hpp"
 #include "blcad/core/assembly_document.hpp"
+#include "blcad/core/assembly_hole_feature.hpp"
 #include "blcad/core/assembly_joint.hpp"
 #include "blcad/core/assembly_occurrence_pose.hpp"
+#include "blcad/core/assembly_representation.hpp"
 #include "blcad/core/part_document.hpp"
+#include "blcad/core/project_design_reference.hpp"
 #include "blcad/core/recompute_plan.hpp"
 #include "blcad/core/result.hpp"
 #include "blcad/core/step_import_source.hpp"
@@ -78,6 +81,12 @@ public:
   [[nodiscard]] Result<std::size_t> validate_assembly_hierarchy() const;
   [[nodiscard]] Result<std::size_t> validate_assembly_structure() const;
 
+  [[nodiscard]] const std::vector<AssemblyHoleFeature>& assembly_hole_features() const noexcept {
+    return assembly_hole_features_;
+  }
+  [[nodiscard]] Result<std::size_t>
+      replace_assembly_hole_features(std::vector<AssemblyHoleFeature>);
+
   [[nodiscard]] const std::vector<AssemblyOccurrencePose>& occurrence_poses() const noexcept {
     return occurrence_poses_;
   }
@@ -99,6 +108,41 @@ public:
   set_occurrence_joint_coordinate(const std::vector<SubassemblyInstanceId>& path,
                                   AssemblyJointId joint, AssemblyJointCoordinateRole role,
                                   Quantity value);
+
+  [[nodiscard]] const std::vector<ProjectDesignReference>& design_references() const noexcept {
+    return design_references_;
+  }
+  [[nodiscard]] const ProjectDesignReference*
+      find_design_reference(ProjectDesignReferenceId) const noexcept;
+  [[nodiscard]] Result<std::size_t> set_design_reference(ProjectDesignReference);
+  // Remove the link while retaining the last checked target-local construction.
+  [[nodiscard]] Result<std::size_t> detach_design_reference(ProjectDesignReferenceId);
+  [[nodiscard]] Result<std::size_t> validate_design_references() const;
+
+  [[nodiscard]] const std::vector<AssemblyPosition>& assembly_positions() const noexcept {
+    return assembly_positions_;
+  }
+  [[nodiscard]] const std::vector<AssemblyDesignView>& assembly_design_views() const noexcept {
+    return assembly_design_views_;
+  }
+  [[nodiscard]] const AssemblyPosition* find_assembly_position(AssemblyPositionId) const noexcept;
+  [[nodiscard]] const AssemblyDesignView*
+      find_assembly_design_view(AssemblyDesignViewId) const noexcept;
+  [[nodiscard]] Result<std::size_t> replace_assembly_positions(std::vector<AssemblyPosition>);
+  [[nodiscard]] Result<std::size_t> replace_assembly_design_views(std::vector<AssemblyDesignView>);
+  [[nodiscard]] Result<std::size_t> validate_assembly_representations() const;
+  [[nodiscard]] Result<Project> evaluate_assembly_position(AssemblyPositionId) const;
+  [[nodiscard]] const AssemblyPositionId& effective_position() const noexcept {
+    return effective_position_;
+  }
+  [[nodiscard]] const AssemblyDesignViewId& effective_design_view() const noexcept {
+    return effective_design_view_;
+  }
+  [[nodiscard]] Result<Project> evaluate_assembly_design_view(AssemblyDesignViewId) const;
+  [[nodiscard]] bool design_component_visible(const std::vector<SubassemblyInstanceId>&,
+                                              ComponentInstanceId, bool inherited) const noexcept;
+  [[nodiscard]] bool design_subassembly_visible(const std::vector<SubassemblyInstanceId>&,
+                                                bool inherited) const noexcept;
 
   // Changes one root-assembly parameter, applies all root assembly bindings to
   // owned member parts, and returns per-part recompute plans for affected parts.
@@ -186,6 +230,13 @@ private:
   std::vector<AssemblyHierarchyJoint> cross_hierarchy_joints_;
   std::vector<PartDocument> part_documents_;
   std::vector<AssemblyOccurrencePose> occurrence_poses_;
+  std::vector<AssemblyHoleFeature> assembly_hole_features_;
+  std::vector<ProjectDesignReference> design_references_;
+  std::vector<AssemblyPosition> assembly_positions_;
+  std::vector<AssemblyDesignView> assembly_design_views_;
+  // Derived display selection; JSON stores definitions only.
+  AssemblyDesignViewId effective_design_view_{default_design_view_id()};
+  AssemblyPositionId effective_position_{master_position_id()};
 };
 
 } // namespace blcad
