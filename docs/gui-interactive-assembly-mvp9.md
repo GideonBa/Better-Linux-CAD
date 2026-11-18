@@ -42,6 +42,15 @@ member in the same atomic transaction. Six Block-123 handles expose XYZ translat
 typed values use the same candidate transform. Component grounding, visibility, and suppression and
 subassembly visibility/suppression are carried by the candidate and remain one Apply transaction.
 
+The owned placement form also chooses the referenced Part or child Assembly model state with
+`blcad.assembly.model_state`. New insertions and definition changes start at Primary; occurrence
+edits retain the existing selected state. The controller validates the definition-local state ID
+before applying its typed Core setter to the disposable candidate. State, transform, membership
+and visibility/suppression commit together through the existing publication owner. Repeated shared
+definitions can therefore select different states without definition copies. The new GUI filters
+`[occurrence-state-placement]` and `[occurrence-state-placement-native]` check explicit state choices,
+Cancel/Apply/Undo, mass, flat/structured STEP and independent member/source identities.
+
 Preview validates a throwaway `Project` and never changes the live Assembly. Insert and edit preserve
 the existing `ComponentInstance` / `SubassemblyInstance` placement and state formats.
 

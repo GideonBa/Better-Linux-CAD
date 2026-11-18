@@ -174,6 +174,9 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
   occurrence_ = new QComboBox(panel);
   occurrence_->setObjectName("blcad.assembly.occurrence");
   placement_form->addRow(QStringLiteral("Occurrence"), occurrence_);
+  model_state_ = new QComboBox(panel);
+  model_state_->setObjectName("blcad.assembly.model_state");
+  placement_form->addRow(QStringLiteral("Model State"), model_state_);
   placement_drag_ = new QComboBox(panel);
   placement_drag_->addItems({QStringLiteral("Translate XYZ"), QStringLiteral("Rotate X"),
                              QStringLiteral("Rotate Y"), QStringLiteral("Rotate Z")});
@@ -319,6 +322,12 @@ ShellAssemblyTools::ShellAssemblyTools(ShellWindow& window, GuiDocumentSession& 
       changed();
   });
   connect(definition_, &QComboBox::currentIndexChanged, this, [this] {
+    if (!sync_ && placement()) {
+      load_model_states();
+      changed();
+    }
+  });
+  connect(model_state_, &QComboBox::currentIndexChanged, this, [this] {
     if (!sync_ && placement())
       changed();
   });
@@ -568,6 +577,7 @@ Result<std::size_t> ShellAssemblyTools::begin(Command command) {
   pick_->setCurrentIndex(0);
   value_->setValue(0);
   command_ = command;
+  load_model_states();
   auto* form = static_cast<QFormLayout*>(placement_controls_->layout());
   form->setRowVisible(definition_, command != Command::Placement);
   form->setRowVisible(occurrence_, command == Command::Placement);
@@ -620,6 +630,49 @@ const geometry::AssemblyInteractionTarget* ShellAssemblyTools::selected(QComboBo
   const int i = combo->currentData().toInt();
   return i >= 0 && static_cast<std::size_t>(i) < targets_.size() ? &targets_[i] : nullptr;
 }
+void ShellAssemblyTools::load_model_states(ModelStateId selected_state) {
+  const auto* project = session_.project();
+  const std::vector<ModelState>* states = nullptr;
+  if (project) {
+    auto definition = definition_->currentData().toString().toStdString();
+    bool component = command_ == Command::InsertComponent;
+    if (command_ == Command::Placement) {
+      const auto key = occurrence_->currentData().toString();
+      component = key.startsWith("component:");
+      if (component) {
+        const auto* instance = project->assembly().find_component_instance(
+            ComponentInstanceId(key.mid(10).toStdString()));
+        definition = instance ? instance->referenced_part_document().value() : std::string{};
+      } else {
+        const auto* instance = project->assembly().find_subassembly_instance(
+            SubassemblyInstanceId(key.mid(12).toStdString()));
+        definition = instance ? instance->referenced_assembly_document().value() : std::string{};
+      }
+    }
+    if (component) {
+      if (const auto* part = project->find_part_document(DocumentId(definition)))
+        states = &part->model_states();
+    } else if (const auto* assembly = project->find_assembly_document(DocumentId(definition)))
+      states = &assembly->model_states();
+  }
+  const QSignalBlocker block(model_state_);
+  model_state_->clear();
+  model_state_->addItem(QStringLiteral("Primary"),
+                        QString::fromStdString(primary_model_state_id().value()));
+  if (states)
+    for (const auto& state : *states)
+      model_state_->addItem(QString::fromStdString(state.name),
+                            QString::fromStdString(state.id.value()));
+  auto selected = model_state_->findData(QString::fromStdString(selected_state.value()));
+  if (selected < 0) {
+    model_state_->addItem(QStringLiteral("Unavailable: ") +
+                              QString::fromStdString(selected_state.value()),
+                          QString::fromStdString(selected_state.value()));
+    selected = model_state_->count() - 1;
+  }
+  model_state_->setCurrentIndex(selected);
+  model_state_->setEnabled(states != nullptr);
+}
 void ShellAssemblyTools::load_placement() {
   const auto key = occurrence_->currentData().toString();
   const auto* project = session_.project();
@@ -630,10 +683,13 @@ void ShellAssemblyTools::load_placement() {
                                         session_, ComponentInstanceId(key.mid(10).toStdString()))
                                   : coordinator_.placement().begin_edit_subassembly(
                                         session_, SubassemblyInstanceId(key.mid(12).toStdString()));
-  if (!begun)
+  if (!begun) {
+    load_model_states();
     return;
+  }
   sync_ = true;
   const auto& p = coordinator_.placement();
+  load_model_states(p.selected_model_state());
   name_->setText(occurrence_->currentText());
   const auto t = p.transform();
   std::array<double, 6> values{t.translation_mm.x, t.translation_mm.y, t.translation_mm.z,
@@ -835,6 +891,7 @@ Result<std::size_t> ShellAssemblyTools::rebuild_controller() {
     if (!begun)
       return begun;
     auto& p = coordinator_.placement();
+    p.set_model_state(ModelStateId(model_state_->currentData().toString().toStdString()));
     p.set_transform(transform());
     p.set_grounding(grounding_->isChecked() ? ComponentGroundingState::Grounded
                                             : ComponentGroundingState::Free);
@@ -1264,7 +1321,8 @@ void ShellAssemblyTools::refresh_presentation() {
 }
 void ShellAssemblyTools::refresh() {
   const auto* project = session_.project();
-  const bool idle = session_.active_model_state() == primary_model_state_id() && project && !active() && !session_.task().active() && session_.derived_results_fresh();
+  const bool idle = session_.active_model_state() == primary_model_state_id() && project &&
+                    !active() && !session_.task().active() && session_.derived_results_fresh();
   import_action_->setEnabled(idle);
   for (const auto& [command, action] : actions_)
     action->setEnabled(

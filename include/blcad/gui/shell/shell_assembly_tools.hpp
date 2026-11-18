@@ -85,6 +85,9 @@ public:
   [[nodiscard]] QComboBox& occurrence_editor() noexcept {
     return *occurrence_;
   }
+  [[nodiscard]] QComboBox& model_state_editor() noexcept {
+    return *model_state_;
+  }
   [[nodiscard]] QDoubleSpinBox& placement_editor(std::size_t i) noexcept {
     return *placement_values_.at(i);
   }
@@ -158,6 +161,7 @@ private:
   void update_second_choices();
   void update_pick_scope();
   void load_placement();
+  void load_model_states(ModelStateId selected = primary_model_state_id());
   void load_joint();
   void load_slots();
   void synchronize_values();
@@ -188,6 +192,7 @@ private:
   QWidget* motion_controls_{};
   QComboBox* definition_{};
   QComboBox* occurrence_{};
+  QComboBox* model_state_{};
   QComboBox* placement_drag_{};
   QLineEdit* name_{};
   std::array<QDoubleSpinBox*, 6> placement_values_{};
