@@ -819,6 +819,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/curved_surface_geometry_tests.cpp
       tests/geometry/curved_surface_combination_tests.cpp
       tests/geometry/curve_surface_milestone_tests.cpp
+      tests/geometry/advanced_rotor_tests.cpp
       tests/geometry/surface_gap_native_breaks_tests.cpp
       tests/geometry/surface_stitch_pipeline_tests.cpp
       tests/geometry/surface_close_shell_pipeline_tests.cpp
@@ -857,7 +858,8 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/workplane_resolver_recovery_tests.cpp
     )
 
-    set_source_files_properties(tests/geometry/emboss_text_tests.cpp PROPERTIES
+    set_source_files_properties(tests/geometry/emboss_text_tests.cpp
+      tests/geometry/advanced_rotor_tests.cpp PROPERTIES
       INCLUDE_DIRECTORIES "${FREETYPE_INCLUDE_DIRS}"
       COMPILE_DEFINITIONS "BLCAD_TEST_OUTLINE_FONT=\"${CMAKE_CURRENT_SOURCE_DIR}/assets/gui/fonts/Barlow-Regular.ttf\"")
     target_link_libraries(blcad_geometry_tests PRIVATE BLCAD::geometry Catch2::Catch2WithMain)
