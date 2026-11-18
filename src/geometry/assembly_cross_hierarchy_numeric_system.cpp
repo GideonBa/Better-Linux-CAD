@@ -1,5 +1,7 @@
 #include "assembly_cross_hierarchy_numeric_system.hpp"
 
+#include "blcad/core/assembly_hierarchy.hpp"
+
 #include "blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp"
 
 #include <algorithm>
@@ -38,7 +40,24 @@ Result<Project> make_cross_hierarchy_local_evaluation_view(
                          "cross-hierarchy local relationship assembly document must exist"));
   }
 
-  auto local_project = Project::create(project.id(), project.name(), *assembly);
+  AssemblyDocument effective = *assembly;
+  if (!occurrence_path.empty()) {
+    auto hierarchy = AssemblyHierarchyTraversal::build(project);
+    if (!hierarchy)
+      return Result<Project>::failure(hierarchy.error());
+    const auto found = std::find_if(
+        hierarchy.value().occurrences().begin(), hierarchy.value().occurrences().end(),
+        [&](const auto& occurrence) { return occurrence.occurrence_path == occurrence_path; });
+    if (found == hierarchy.value().occurrences().end() || !found->active_path ||
+        found->assembly_document != assembly_document)
+      return Result<Project>::failure(
+          validation_error(assembly_document.value(), "Occurrence evaluation scope is stale"));
+    auto evaluated = assembly->evaluate_model_state(found->selected_model_state);
+    if (!evaluated)
+      return Result<Project>::failure(evaluated.error());
+    effective = std::move(evaluated.value());
+  }
+  auto local_project = Project::create(project.id(), project.name(), effective);
   if (local_project.has_error()) {
     return local_project;
   }
@@ -68,7 +87,7 @@ Result<Project> make_cross_hierarchy_local_evaluation_view(
     for (const auto& occurrence : descendant->subassembly_instances())
       pending.push_back(occurrence.referenced_assembly_document());
   }
-  if (!occurrence_path.empty()) {
+  if (project.flexible_occurrence(occurrence_path)) {
     const auto* pose = project.find_occurrence_pose(occurrence_path);
     if (!pose || !project.flexible_occurrence(occurrence_path) ||
         pose->assembly_document() != assembly_document)

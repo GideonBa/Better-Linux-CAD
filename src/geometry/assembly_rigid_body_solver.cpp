@@ -1,6 +1,9 @@
 #include "blcad/geometry/assembly_flexible_subassembly_solver.hpp"
+#include "blcad/geometry/project_evaluation.hpp"
+#include "project_evaluation_internal.hpp"
 
 #include "assembly_constraint_numeric_system.hpp"
+#include "assembly_cross_hierarchy_freshness.hpp"
 #include "assembly_cross_hierarchy_numeric_system.hpp"
 #include "assembly_numeric_solve_engine.hpp"
 #include "assembly_semantic_target_freshness.hpp"
@@ -20,6 +23,10 @@ namespace {
 [[nodiscard]] Result<std::size_t>
 validate_application_snapshot(const Project& project, const AssemblySolveResult& result,
                               StepImportTopologyContext* import_context) {
+  auto context = detail::validate_cross_hierarchy_context_snapshot(
+      project, result.occurrence_context_snapshot);
+  if (!context)
+    return context;
   if (result.component_snapshots.size() != result.component_group.size()) {
     return Result<std::size_t>::failure(validation_error(
         "assembly.solver",
@@ -50,7 +57,11 @@ validate_application_snapshot(const Project& project, const AssemblySolveResult&
     if (component->referenced_part_document() != snapshot.referenced_part_document ||
         component->transform() != snapshot.source_transform ||
         component->grounding_state() != snapshot.grounding_state ||
-        component->suppression_state() != snapshot.suppression_state) {
+        component->suppression_state() != snapshot.suppression_state ||
+        component->selected_model_state() != snapshot.selected_model_state ||
+        project.assembly().effective_model_state() != snapshot.assembly_model_state ||
+        project.effective_position() != snapshot.position ||
+        project.effective_design_view() != snapshot.design_view) {
       return Result<std::size_t>::failure(
           validation_error(snapshot.component_instance.value(),
                            "assembly solve result is stale because component solve input changed"));
@@ -94,11 +105,11 @@ validate_application_snapshot(const Project& project, const AssemblySolveResult&
           "assembly solve result proposal order does not match active free component snapshots"));
     }
 
-    const AssemblySolveComponentSnapshot& snapshot = *std::find_if(
-        result.component_snapshots.begin(), result.component_snapshots.end(),
-        [&proposal](const AssemblySolveComponentSnapshot& candidate) {
-          return candidate.component_instance == proposal.component_instance;
-        });
+    const AssemblySolveComponentSnapshot& snapshot =
+        *std::find_if(result.component_snapshots.begin(), result.component_snapshots.end(),
+                      [&proposal](const AssemblySolveComponentSnapshot& candidate) {
+                        return candidate.component_instance == proposal.component_instance;
+                      });
     if (snapshot.source_transform != proposal.source_transform) {
       return Result<std::size_t>::failure(validation_error(
           proposal.component_instance.value(),
@@ -120,20 +131,21 @@ struct ResolvedFlexibleSubassemblyOccurrence {
   DocumentId assembly_document;
 };
 
-[[nodiscard]] std::string occurrence_object_id(
-    const std::vector<SubassemblyInstanceId>& occurrence_path) {
+[[nodiscard]] std::string
+occurrence_object_id(const std::vector<SubassemblyInstanceId>& occurrence_path) {
   if (occurrence_path.empty()) {
     return "assembly.flexible_subassembly";
   }
   return occurrence_path.back().value();
 }
 
-[[nodiscard]] Result<ResolvedFlexibleSubassemblyOccurrence> resolve_flexible_occurrence(
-    const Project& project, const std::vector<SubassemblyInstanceId>& occurrence_path) {
+[[nodiscard]] Result<ResolvedFlexibleSubassemblyOccurrence>
+resolve_flexible_occurrence(const Project& project,
+                            const std::vector<SubassemblyInstanceId>& occurrence_path) {
   if (occurrence_path.empty()) {
-    return Result<ResolvedFlexibleSubassemblyOccurrence>::failure(validation_error(
-        "assembly.flexible_subassembly",
-        "flexible subassembly solving requires a non-root occurrence path"));
+    return Result<ResolvedFlexibleSubassemblyOccurrence>::failure(
+        validation_error("assembly.flexible_subassembly",
+                         "flexible subassembly solving requires a non-root occurrence path"));
   }
 
   auto hierarchy = AssemblyHierarchyTraversal::build(project);
@@ -141,34 +153,34 @@ struct ResolvedFlexibleSubassemblyOccurrence {
     return Result<ResolvedFlexibleSubassemblyOccurrence>::failure(hierarchy.error());
   }
 
-  const auto found = std::find_if(
-      hierarchy.value().occurrences().begin(), hierarchy.value().occurrences().end(),
-      [&occurrence_path](const AssemblyHierarchyOccurrenceDescriptor& occurrence) {
-        return occurrence.occurrence_path == occurrence_path;
-      });
+  const auto found =
+      std::find_if(hierarchy.value().occurrences().begin(), hierarchy.value().occurrences().end(),
+                   [&occurrence_path](const AssemblyHierarchyOccurrenceDescriptor& occurrence) {
+                     return occurrence.occurrence_path == occurrence_path;
+                   });
   if (found == hierarchy.value().occurrences().end()) {
     return Result<ResolvedFlexibleSubassemblyOccurrence>::failure(validation_error(
         occurrence_object_id(occurrence_path),
         "flexible subassembly occurrence path must exist in the rooted assembly hierarchy"));
   }
   if (!found->active_path) {
-    return Result<ResolvedFlexibleSubassemblyOccurrence>::failure(validation_error(
-        occurrence_object_id(occurrence_path),
-        "flexible subassembly occurrence path must be active"));
+    return Result<ResolvedFlexibleSubassemblyOccurrence>::failure(
+        validation_error(occurrence_object_id(occurrence_path),
+                         "flexible subassembly occurrence path must be active"));
   }
   if (!found->parent_assembly_document.has_value() ||
       !found->via_subassembly_instance.has_value()) {
-    return Result<ResolvedFlexibleSubassemblyOccurrence>::failure(validation_error(
-        occurrence_object_id(occurrence_path),
-        "flexible subassembly occurrence must have a parent occurrence boundary"));
+    return Result<ResolvedFlexibleSubassemblyOccurrence>::failure(
+        validation_error(occurrence_object_id(occurrence_path),
+                         "flexible subassembly occurrence must have a parent occurrence boundary"));
   }
 
   const AssemblyDocument* parent =
       project.find_assembly_document(found->parent_assembly_document.value());
   if (parent == nullptr) {
-    return Result<ResolvedFlexibleSubassemblyOccurrence>::failure(validation_error(
-        occurrence_object_id(occurrence_path),
-        "flexible subassembly parent assembly must resolve in project"));
+    return Result<ResolvedFlexibleSubassemblyOccurrence>::failure(
+        validation_error(occurrence_object_id(occurrence_path),
+                         "flexible subassembly parent assembly must resolve in project"));
   }
   const SubassemblyInstance* instance =
       parent->find_subassembly_instance(found->via_subassembly_instance.value());
@@ -182,8 +194,9 @@ struct ResolvedFlexibleSubassemblyOccurrence {
       ResolvedFlexibleSubassemblyOccurrence{found->assembly_document});
 }
 
-[[nodiscard]] Result<Project> make_child_solve_view(
-    const Project& project, const ResolvedFlexibleSubassemblyOccurrence& occurrence) {
+[[nodiscard]] Result<Project>
+make_child_solve_view(const Project& project,
+                      const ResolvedFlexibleSubassemblyOccurrence& occurrence) {
   const AssemblyDocument* child = project.find_assembly_document(occurrence.assembly_document);
   if (child == nullptr || child->id() == project.assembly().id()) {
     return Result<Project>::failure(validation_error(
@@ -200,6 +213,12 @@ Result<AssemblySolveResult>
 AssemblyRigidBodySolver::solve(const Project& project,
                                const std::vector<ComponentInstanceId>& connected_group,
                                AssemblyRigidBodySolverOptions options) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<AssemblySolveResult>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return solve(evaluation_scope.value()->project(), connected_group, options);
+
   auto graph = AssemblyConstraintGraph::build(project.assembly());
   if (graph.has_error()) {
     return Result<AssemblySolveResult>::failure(graph.error());
@@ -236,6 +255,22 @@ AssemblyRigidBodySolver::solve(const Project& project,
 
 Result<std::size_t> AssemblySolveResultApplier::apply(Project& project,
                                                       const AssemblySolveResult& result) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<std::size_t>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->outer()) {
+    Project candidate =
+        evaluation_scope.value()->changed() ? evaluation_scope.value()->project() : project;
+    auto applied = apply(candidate, result);
+    if (!applied)
+      return applied;
+    auto checked = evaluate_project_geometry(candidate, import_context_);
+    if (!checked)
+      return Result<std::size_t>::failure(checked.error());
+    project = std::move(checked.value());
+    return applied;
+  }
+
   if (!result.converged()) {
     return Result<std::size_t>::failure(validation_error(
         "assembly.solver", "only a converged assembly solve result can be applied"));
@@ -263,10 +298,19 @@ Result<std::size_t> AssemblySolveResultApplier::apply(Project& project,
   return Result<std::size_t>::success(result.proposed_transforms.size());
 }
 
-Result<AssemblyFlexibleSubassemblySolveResult> AssemblyFlexibleSubassemblySolver::solve(
-    const Project& project, const std::vector<SubassemblyInstanceId>& occurrence_path,
-    const std::vector<ComponentInstanceId>& connected_group,
-    AssemblyRigidBodySolverOptions options) const {
+Result<AssemblyFlexibleSubassemblySolveResult>
+AssemblyFlexibleSubassemblySolver::solve(const Project& project,
+                                         const std::vector<SubassemblyInstanceId>& occurrence_path,
+                                         const std::vector<ComponentInstanceId>& connected_group,
+                                         AssemblyRigidBodySolverOptions options) const {
+  auto scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!scope)
+    return Result<AssemblyFlexibleSubassemblySolveResult>::failure(scope.error());
+  if (scope.value()->changed())
+    return solve(scope.value()->project(), occurrence_path, connected_group, options);
+  auto context = detail::cross_hierarchy_context_snapshot(project);
+  if (!context)
+    return Result<AssemblyFlexibleSubassemblySolveResult>::failure(context.error());
   auto occurrence = resolve_flexible_occurrence(project, occurrence_path);
   if (occurrence.has_error()) {
     return Result<AssemblyFlexibleSubassemblySolveResult>::failure(occurrence.error());
@@ -289,11 +333,30 @@ Result<AssemblyFlexibleSubassemblySolveResult> AssemblyFlexibleSubassemblySolver
     return Result<AssemblyFlexibleSubassemblySolveResult>::failure(fresh.error());
   return Result<AssemblyFlexibleSubassemblySolveResult>::success(
       AssemblyFlexibleSubassemblySolveResult{occurrence_path, occurrence.value().assembly_document,
-                                             std::move(local_result.value())});
+                                             std::move(local_result.value()),
+                                             std::move(context.value())});
 }
 
 Result<std::size_t> AssemblyFlexibleSubassemblySolveResultApplier::apply(
     Project& project, const AssemblyFlexibleSubassemblySolveResult& result) const {
+  auto scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!scope)
+    return Result<std::size_t>::failure(scope.error());
+  if (scope.value()->outer()) {
+    Project candidate = scope.value()->changed() ? scope.value()->project() : project;
+    auto applied = apply(candidate, result);
+    if (!applied)
+      return applied;
+    auto checked = evaluate_project_geometry(candidate, import_context_);
+    if (!checked)
+      return Result<std::size_t>::failure(checked.error());
+    project = std::move(checked.value());
+    return applied;
+  }
+  auto context = detail::validate_cross_hierarchy_context_snapshot(
+      project, result.occurrence_context_snapshot);
+  if (!context)
+    return context;
   auto occurrence = resolve_flexible_occurrence(project, result.occurrence_path);
   if (occurrence.has_error()) {
     return Result<std::size_t>::failure(occurrence.error());

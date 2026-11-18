@@ -1,4 +1,5 @@
 #include "blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp"
+#include "project_evaluation_internal.hpp"
 
 #include "blcad/geometry/assembly_constraint_target_resolver.hpp"
 #include "blcad/geometry/assembly_hierarchy_transform_evaluator.hpp"
@@ -6,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <numbers>
 #include <string>
 #include <type_traits>
@@ -17,7 +19,7 @@ namespace {
 
 struct ResolvedOccurrenceContext {
   AssemblyHierarchyOccurrenceDescriptor occurrence;
-  const AssemblyDocument* assembly = nullptr;
+  std::shared_ptr<const AssemblyDocument> assembly;
 };
 
 struct ResolvedHierarchyGeometricTarget {
@@ -66,7 +68,13 @@ resolve_occurrence(const Project& project,
                          "cross-hierarchy relationship target assembly must resolve in project"));
   }
 
-  return Result<ResolvedOccurrenceContext>::success(ResolvedOccurrenceContext{*found, assembly});
+  if (!found->active_path)
+    return Result<ResolvedOccurrenceContext>::failure(validation_error(
+        found->assembly_document.value(), "Suppressed occurrence targets are unavailable"));
+  auto evaluated = assembly->evaluate_model_state(found->selected_model_state);
+  if (!evaluated)
+    return Result<ResolvedOccurrenceContext>::failure(evaluated.error());
+  return Result<ResolvedOccurrenceContext>::success(ResolvedOccurrenceContext{*found, std::make_shared<const AssemblyDocument>(std::move(evaluated.value()))});
 }
 
 [[nodiscard]] Result<Project> make_local_target_view(const Project& project,
@@ -356,10 +364,21 @@ const std::optional<Quantity>& AssemblyHierarchyConstraintQuery::angle() const n
 Result<AssemblyResolvedGeometricTarget>
 AssemblyHierarchyConstraintTargetResolver::resolve_geometric(
     const Project& project, const AssemblyHierarchyConstraintTarget& target) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<AssemblyResolvedGeometricTarget>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return resolve_geometric(evaluation_scope.value()->project(), target);
+
   auto occurrence = resolve_occurrence(project, target.occurrence_path());
   if (occurrence.has_error()) {
     return Result<AssemblyResolvedGeometricTarget>::failure(occurrence.error());
   }
+  const auto* component =
+      occurrence.value().assembly->find_component_instance(target.component_instance());
+  if (component && component->suppression_state() != ComponentSuppressionState::Active)
+    return Result<AssemblyResolvedGeometricTarget>::failure(validation_error(
+        target.component_instance().value(), "Suppressed component targets are unavailable"));
   auto local_project = make_local_target_view(project, *occurrence.value().assembly);
   if (local_project.has_error()) {
     return Result<AssemblyResolvedGeometricTarget>::failure(local_project.error());

@@ -1,4 +1,3 @@
-#include <map>
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/core/sketch_contour.hpp"
 #include "blcad/geometry/equation_curve_geometry.hpp"
@@ -6,6 +5,8 @@
 #include "blcad/geometry/thread_adapter.hpp"
 #include "derived_curve_internal.hpp"
 #include "part_history_evaluation.hpp"
+#include "project_evaluation_internal.hpp"
+#include <map>
 
 #include "assembly_occt_rigid_transform.hpp"
 #include "assembly_posed_leaf_shapes.hpp"
@@ -523,7 +524,7 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
         poles.SetValue(3, point(spline.control2()));
         poles.SetValue(4, point(spline.end()));
         TColStd_Array1OfReal weights(1, 4);
-        for (int i = 1; i <= 4; ++i) weights.SetValue(i, spline.weights()[i-1]);
+        for (int i = 1; i <= 4; ++i) weights.SetValue(i, spline.weights()[i - 1]);
         const Handle(Geom_BezierCurve) curve = new Geom_BezierCurve(poles, weights);
         items.push_back(
             {ViewportSceneKind::SketchEntity, sketch_entity_id(sketch, spline.id()),
@@ -966,6 +967,12 @@ ViewportSceneBuilder::build_part(const PartDocument& document, const ShapeCache&
 
 Result<std::vector<ViewportSceneItem>>
 ViewportSceneBuilder::build_project(const Project& project) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<std::vector<ViewportSceneItem>>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return build_project(evaluation_scope.value()->project());
+
   const bool cosmetic = std::any_of(
       project.part_documents().begin(), project.part_documents().end(), [](const auto& part) {
         return std::any_of(part.thread_features().begin(), part.thread_features().end(),
@@ -1033,6 +1040,12 @@ Result<std::vector<ViewportSceneItem>> ViewportSceneBuilder::build_project(
 Result<std::vector<ViewportSceneItem>> ViewportSceneBuilder::build_project_for_states(
     const Project& project,
     const std::function<const ShapeCache*(DocumentId, ModelStateId)>& member_cache) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<std::vector<ViewportSceneItem>>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return build_project_for_states(evaluation_scope.value()->project(), member_cache);
+
   const auto valid = project.validate_assembly_structure();
   if (!valid)
     return Result<std::vector<ViewportSceneItem>>::failure(valid.error());

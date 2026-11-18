@@ -2,8 +2,10 @@
 #include "blcad/core/project_json.hpp"
 #include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
+#include "effective_project_source.hpp"
 #include "occt_failure_message.hpp"
 #include "physical_property_math.hpp"
+#include "project_evaluation_internal.hpp"
 
 #include <Standard_Failure.hxx>
 #include <gp_Pnt.hxx>
@@ -71,7 +73,13 @@ ProjectPhysicalProperties::ProjectPhysicalProperties(ProjectPhysicalPropertiesDa
 Result<std::size_t>
 ProjectPhysicalProperties::validate_current(const Project& project,
                                             StepImportTopologyContext* imports) const {
-  const auto source = serialize_project_to_json(project);
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, imports);
+  if (!evaluation_scope)
+    return Result<std::size_t>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return validate_current(evaluation_scope.value()->project(), imports);
+
+  const auto source = detail::effective_project_source(project);
   if (!source)
     return Result<std::size_t>::failure(source.error());
   if (source.value() != source_)
@@ -110,11 +118,18 @@ Result<ProjectPhysicalProperties>
 BodyResultInspector::inspect_project_physical_properties(const Project& project,
                                                          const ProjectPhysicalProperties* previous,
                                                          StepImportTopologyContext* imports) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, imports);
+  if (!evaluation_scope)
+    return Result<ProjectPhysicalProperties>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return inspect_project_physical_properties(evaluation_scope.value()->project(), previous,
+                                               imports);
+
   try {
     const auto structure = project.validate_assembly_structure();
     if (!structure)
       return Result<ProjectPhysicalProperties>::failure(structure.error());
-    const auto source = serialize_project_to_json(project);
+    const auto source = detail::effective_project_source(project);
     if (!source)
       return Result<ProjectPhysicalProperties>::failure(source.error());
     std::unordered_set<std::string> owned;

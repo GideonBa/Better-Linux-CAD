@@ -1,5 +1,6 @@
 #include "blcad/geometry/adaptive_project.hpp"
 #include "assembly_cross_hierarchy_numeric_system.hpp"
+#include "assembly_posed_leaf_shapes.hpp"
 #include "blcad/core/assembly_constraint_graph.hpp"
 #include "blcad/core/assembly_hierarchy.hpp"
 #include "blcad/core/assembly_leaf_occurrence.hpp"
@@ -9,7 +10,6 @@
 #include "blcad/geometry/assembly_cross_hierarchy_joint_motion_solver.hpp"
 #include "blcad/geometry/assembly_hierarchy_transform_evaluator.hpp"
 #include "blcad/geometry/assembly_joint_motion_solver.hpp"
-#include "blcad/geometry/assembly_step_exporter.hpp"
 #include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/project_evaluation.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
@@ -751,7 +751,8 @@ Result<AdaptiveProjectEvaluation> AdaptiveProjectEvaluator::evaluate(const Proje
   auto physical = BodyResultInspector{}.inspect_physical_properties(candidate, imports_);
   if (!physical)
     return R::failure(physical.error());
-  auto posed = AssemblyStepExporter{imports_}.build_posed_shape(candidate);
+  auto posed = detail::build_posed_leaf_shapes(candidate, imports_,
+                                               AssemblyLeafParticipation::PhysicalActive);
   if (!posed)
     return R::failure(posed.error());
   if (imports_) {

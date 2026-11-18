@@ -1,6 +1,7 @@
-#include <memory>
 #include "blcad/geometry/assembly_constraint_target_resolver.hpp"
 #include "assembly_hole_geometry_scope.hpp"
+#include "project_evaluation_internal.hpp"
+#include <memory>
 
 #include "blcad/core/assembly_reference_target.hpp"
 #include "blcad/core/generated_topology_reference.hpp"
@@ -605,6 +606,12 @@ Result<AssemblyResolvedGeometricTarget>
 AssemblyConstraintTargetResolver::resolve_geometric(const Project& project,
                                                     const AssemblyConstraintTarget& target,
                                                     const ShapeCache* verified_part_cache) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<AssemblyResolvedGeometricTarget>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return resolve_geometric(evaluation_scope.value()->project(), target, verified_part_cache);
+
   auto context = resolve_target_context(project, target);
   if (context.has_error()) {
     return Result<AssemblyResolvedGeometricTarget>::failure(context.error());
@@ -821,6 +828,12 @@ AssemblyConstraintTargetResolver::resolve_geometric(const Project& project,
 Result<ResolvedAssemblyConstraintTarget>
 AssemblyConstraintTargetResolver::resolve(const Project& project,
                                           const AssemblyConstraintTarget& target) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<ResolvedAssemblyConstraintTarget>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return resolve(evaluation_scope.value()->project(), target);
+
   auto context = resolve_target_context(project, target);
   if (context.has_error()) {
     return Result<ResolvedAssemblyConstraintTarget>::failure(context.error());
@@ -848,6 +861,12 @@ AssemblyConstraintTargetResolver::resolve(const Project& project,
 Result<ResolvedAssemblyAxisConstraintTarget>
 AssemblyConstraintTargetResolver::resolve_axis(const Project& project,
                                                const AssemblyConstraintTarget& target) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<ResolvedAssemblyAxisConstraintTarget>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return resolve_axis(evaluation_scope.value()->project(), target);
+
   auto context = resolve_target_context(project, target);
   if (context.has_error()) {
     return Result<ResolvedAssemblyAxisConstraintTarget>::failure(context.error());
@@ -879,6 +898,12 @@ AssemblyConstraintTargetResolver::resolve_axis(const Project& project,
 Result<ResolvedAssemblyInsertConstraintTarget>
 AssemblyConstraintTargetResolver::resolve_insert(const Project& project,
                                                  const AssemblyConstraintTarget& target) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<ResolvedAssemblyInsertConstraintTarget>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return resolve_insert(evaluation_scope.value()->project(), target);
+
   auto context = resolve_target_context(project, target);
   if (context.has_error()) {
     return Result<ResolvedAssemblyInsertConstraintTarget>::failure(context.error());

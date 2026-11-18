@@ -1,4 +1,5 @@
 #include "blcad/geometry/assembly_structured_step_exporter.hpp"
+#include "project_evaluation_internal.hpp"
 
 #include "blcad/core/assembly_exchange_graph.hpp"
 
@@ -76,6 +77,12 @@ void set_label_name(const TDF_Label& label, const std::string& name) {
 
 Result<AssemblyStructuredStepExportSummary> AssemblyStructuredStepExporter::write_step(
     const Project& project, const std::string& path) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<AssemblyStructuredStepExportSummary>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return write_step(evaluation_scope.value()->project(), path);
+
   if (path.empty()) {
     return Result<AssemblyStructuredStepExportSummary>::failure(
         make_export_error("structured step export path must not be empty"));

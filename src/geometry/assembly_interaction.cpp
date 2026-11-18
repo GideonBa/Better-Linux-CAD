@@ -6,6 +6,7 @@
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/geometry/surface_adapter.hpp"
 #include "geometry_shape_internal.hpp"
+#include "project_evaluation_internal.hpp"
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
@@ -34,10 +35,17 @@ Point3 along(Point3 p, Vector3 v, double scale) {
 Result<std::vector<AssemblyInteractionTarget>>
 AssemblyInteractionGeometry::targets(const Project& project,
                                      StepImportTopologyContext* import_context) {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context);
+  if (!evaluation_scope)
+    return Result<std::vector<AssemblyInteractionTarget>>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return targets(evaluation_scope.value()->project(), import_context);
+
   std::vector<AssemblyInteractionTarget> results;
   try {
     for (const auto& component : project.assembly().component_instances()) {
-      if (component.visibility() != ComponentVisibility::Visible ||
+      if (!project.design_component_visible({}, component.id(),
+                                            component.visibility() == ComponentVisibility::Visible) ||
           component.suppression_state() != ComponentSuppressionState::Active)
         continue;
       const auto* part = project.find_part_document(component.referenced_part_document());

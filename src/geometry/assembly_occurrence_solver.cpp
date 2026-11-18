@@ -2,6 +2,9 @@
 #include "assembly_cross_hierarchy_numeric_system.hpp"
 #include "blcad/core/assembly_hierarchy.hpp"
 #include "blcad/core/project_json.hpp"
+#include "blcad/geometry/project_evaluation.hpp"
+#include "effective_project_source.hpp"
+#include "project_evaluation_internal.hpp"
 #include <algorithm>
 
 namespace blcad::geometry {
@@ -28,7 +31,7 @@ Result<Project> view(const Project& project, const std::vector<SubassemblyInstan
                                                             path);
 }
 Result<std::size_t> fresh(const Project& project, const std::string& snapshot) {
-  auto current = serialize_project_to_json(project);
+  auto current = detail::effective_project_source(project);
   if (!current)
     return Result<std::size_t>::failure(current.error());
   if (current.value() != snapshot)
@@ -51,10 +54,15 @@ Result<AssemblyOccurrenceSolveResult> AssemblyOccurrenceSolver::solve(
     const Project& project, const std::vector<SubassemblyInstanceId>& path,
     const std::vector<ComponentInstanceId>& group, AssemblyRigidBodySolverOptions options) const {
   using R = Result<AssemblyOccurrenceSolveResult>;
+  auto scope = detail::ProjectGeometryScope::create(project, imports_);
+  if (!scope)
+    return R::failure(scope.error());
+  if (scope.value()->changed())
+    return solve(scope.value()->project(), path, group, options);
   auto local = view(project, path);
   if (!local)
     return R::failure(local.error());
-  auto snapshot = serialize_project_to_json(project);
+  auto snapshot = detail::effective_project_source(project);
   if (!snapshot)
     return R::failure(snapshot.error());
   auto result = AssemblyRigidBodySolver{imports_}.solve(local.value(), group, options);
@@ -67,10 +75,15 @@ Result<AssemblyOccurrenceMotionResult> AssemblyOccurrenceSolver::move(
     const Project& project, const std::vector<SubassemblyInstanceId>& path,
     AssemblyJointDrive drive, AssemblyRigidBodySolverOptions options) const {
   using R = Result<AssemblyOccurrenceMotionResult>;
+  auto scope = detail::ProjectGeometryScope::create(project, imports_);
+  if (!scope)
+    return R::failure(scope.error());
+  if (scope.value()->changed())
+    return move(scope.value()->project(), path, std::move(drive), options);
   auto local = view(project, path);
   if (!local)
     return R::failure(local.error());
-  auto snapshot = serialize_project_to_json(project);
+  auto snapshot = detail::effective_project_source(project);
   if (!snapshot)
     return R::failure(snapshot.error());
   auto result = AssemblyJointMotionSolver{imports_}.move(local.value(), std::move(drive), options);
@@ -82,6 +95,20 @@ Result<AssemblyOccurrenceMotionResult> AssemblyOccurrenceSolver::move(
 Result<std::size_t>
 AssemblyOccurrenceSolver::apply(Project& project,
                                 const AssemblyOccurrenceSolveResult& result) const {
+  auto scope = detail::ProjectGeometryScope::create(project, imports_);
+  if (!scope)
+    return Result<std::size_t>::failure(scope.error());
+  if (scope.value()->outer()) {
+    Project candidate = scope.value()->changed() ? scope.value()->project() : project;
+    auto applied = apply(candidate, result);
+    if (!applied)
+      return applied;
+    auto checked = evaluate_project_geometry(candidate, imports_);
+    if (!checked)
+      return Result<std::size_t>::failure(checked.error());
+    project = std::move(checked.value());
+    return applied;
+  }
   auto valid = fresh(project, result.source_project_json);
   if (!valid)
     return valid;
@@ -101,6 +128,20 @@ AssemblyOccurrenceSolver::apply(Project& project,
 Result<std::size_t>
 AssemblyOccurrenceSolver::apply(Project& project,
                                 const AssemblyOccurrenceMotionResult& result) const {
+  auto scope = detail::ProjectGeometryScope::create(project, imports_);
+  if (!scope)
+    return Result<std::size_t>::failure(scope.error());
+  if (scope.value()->outer()) {
+    Project candidate = scope.value()->changed() ? scope.value()->project() : project;
+    auto applied = apply(candidate, result);
+    if (!applied)
+      return applied;
+    auto checked = evaluate_project_geometry(candidate, imports_);
+    if (!checked)
+      return Result<std::size_t>::failure(checked.error());
+    project = std::move(checked.value());
+    return applied;
+  }
   auto valid = fresh(project, result.source_project_json);
   if (!valid)
     return valid;

@@ -1,4 +1,8 @@
+#include "../support/adaptive_project_fixture.hpp"
+#include "blcad/core/project_json.hpp"
+#include "blcad/geometry/adaptive_project.hpp"
 #include "blcad/geometry/assembly_solve_diagnostics.hpp"
+#include "blcad/geometry/project_evaluation.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -378,4 +382,84 @@ TEST_CASE("Assembly solve diagnostics preserve semantic target failures and enum
         "fixed_geometry_inconsistent");
   CHECK(to_string(AssemblyResidualRankStructure::RedundantResidualComponents) ==
         "redundant_residual_components");
+}
+
+TEST_CASE("Public local and cross-hierarchy diagnostics normalize adaptive geometry before "
+          "freshness and rank checks",
+          "[geometry][assembly-diagnostics-normalized][parity-b195]") {
+  auto linked = AdaptiveProjectEvaluator{}.bind(blcad::test::adaptive_project(),
+                                                blcad::test::adaptive_plane_reference());
+  REQUIRE(linked);
+  auto project = std::move(linked.value().project);
+  REQUIRE(project.assembly().set_component_instance_grounding_state(
+      ComponentInstanceId("irrelevant"), ComponentGroundingState::Free));
+  const auto targets =
+      std::pair{make_target("cover", "base.top"), make_target("irrelevant", "base.bottom")};
+  bool cross{};
+  SECTION("root-local diagnostics") {
+    auto mate =
+        AssemblyConstraint::create(AssemblyConstraintId("follow.cover"), "Follow cover",
+                                   AssemblyConstraintType::Mate, targets.first, targets.second);
+    REQUIRE(mate);
+    REQUIRE(project.assembly().add_constraint(mate.value()));
+  }
+  SECTION("project cross-hierarchy diagnostics") {
+    cross = true;
+    auto a =
+        AssemblyHierarchyConstraintEndpoint::create({}, ComponentInstanceId("cover"), "base.top");
+    auto b = AssemblyHierarchyConstraintEndpoint::create({}, ComponentInstanceId("irrelevant"),
+                                                         "base.bottom");
+    REQUIRE(a);
+    REQUIRE(b);
+    auto mate =
+        AssemblyHierarchyConstraint::create(AssemblyConstraintId("follow.cover"), "Follow cover",
+                                            AssemblyConstraintType::Mate, a.value(), b.value());
+    REQUIRE(mate);
+    REQUIRE(project.add_cross_hierarchy_constraint(mate.value()));
+  }
+  REQUIRE(project.find_part_document(DocumentId("source"))
+              ->set_parameter_value(ParameterId("length"), Quantity::length_mm(8).value()));
+  const auto original = serialize_project_to_json(project);
+  REQUIRE(original);
+  auto normalized = evaluate_project_geometry(project);
+  INFO((normalized ? std::string{} : normalized.error().message()));
+  REQUIRE(normalized);
+  CHECK(normalized.value()
+            .find_part_document(DocumentId("cover"))
+            ->find_construction_plane(ConstructionPlaneId("linked.plane"))
+            ->origin()
+            .z == Approx(8));
+  CHECK(normalized.value()
+            .assembly()
+            .find_component_instance(ComponentInstanceId("irrelevant"))
+            ->transform()
+            .translation_mm.z == Approx(12).margin(1e-6));
+  if (cross) {
+    auto graph = AssemblyCrossHierarchyConstraintGraph::build(project);
+    REQUIRE(graph);
+    REQUIRE(graph.value().solve_groups().size() == 1);
+    const AssemblyCrossHierarchySolveDiagnosticsAnalyzer analyzer;
+    auto direct = analyzer.analyze(project, graph.value().solve_groups().front());
+    INFO((direct ? std::string{} : direct.error().message()));
+    REQUIRE(direct);
+    auto explicit_normalized =
+        analyzer.analyze(normalized.value(), graph.value().solve_groups().front());
+    REQUIRE(explicit_normalized);
+    CHECK(direct.value() == explicit_normalized.value());
+    CHECK(direct.value().rank_summary.jacobian_rank == 3);
+    CHECK(direct.value().rank_summary.remaining_dof == 3);
+  } else {
+    const AssemblySolveDiagnosticsAnalyzer analyzer;
+    auto direct = analyzer.analyze(project, group({"cover", "irrelevant"}));
+    INFO((direct ? std::string{} : direct.error().message()));
+    REQUIRE(direct);
+    auto explicit_normalized = analyzer.analyze(normalized.value(), group({"cover", "irrelevant"}));
+    REQUIRE(explicit_normalized);
+    CHECK(direct.value() == explicit_normalized.value());
+    CHECK(direct.value().rank_summary.jacobian_rank == 3);
+    CHECK(direct.value().rank_summary.remaining_dof == 3);
+  }
+  auto unchanged = serialize_project_to_json(project);
+  REQUIRE(unchanged);
+  CHECK(unchanged.value() == original.value());
 }

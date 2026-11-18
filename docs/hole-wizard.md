@@ -1328,7 +1328,10 @@ The hole wizard binds part modeling, assembly modeling, the standards/fastener l
 `AssemblyHoleFeature` owns a stable Project command id, one explicit rooted layout occurrence and
 selected state, an existing authored Hole, an optional existing linear/circular Hole Pattern, and
 nonempty typed participants. Each participant names a rooted occurrence, selected state, stable
-participant id and the existing complete `HoleFeature` recipe. Clearance, Threaded and Seat roles
+participant id and the existing complete `HoleFeature` recipe. Each captured state must match the
+selected rooted occurrence state. A state switch that changes this contract requires an explicit
+coordinated-command repair and rejects atomically until repaired; no implicit per-state machining
+catalog is inferred. Clearance, Threaded and Seat roles
 validate against that recipe. Diameter, depth, tip, seat, cosmetic/modeled thread and pinned standard
 cells continue through the ordinary Part Hole/Thread interpreters and resource catalogs.
 

@@ -2,10 +2,12 @@
 
 #include "blcad/core/step_import_freshness.hpp"
 #include "blcad/geometry/assembly_import_validation.hpp"
+#include "blcad/geometry/project_evaluation.hpp"
 #include "blcad/geometry/reference_part_geometry.hpp"
 #include "blcad/geometry/step_editable_commands.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include <algorithm>
+#include <optional>
 
 namespace blcad::geometry {
 namespace {
@@ -28,12 +30,25 @@ Result<std::size_t> validate_part(const PartDocument& part, const std::filesyste
   }
   return context.validate_sources();
 }
-Result<std::size_t> validate_project(const Project& project, const std::filesystem::path& root) {
+Result<std::size_t> validate_project(Project& project, const std::filesystem::path& root) {
   auto structure = project.validate_assembly_structure();
   if (!structure)
     return structure;
   StepImportTopologyContext context(root);
-  return validate_imported_assembly_inputs(project, context);
+  std::optional<Project> normalized;
+  if (!project.design_references().empty() || !project.assembly_hole_features().empty()) {
+    auto evaluated = evaluate_project_geometry(project, &context);
+    if (!evaluated)
+      return Result<std::size_t>::failure(evaluated.error());
+    normalized = std::move(evaluated.value());
+  }
+  const auto& candidate = normalized ? *normalized : project;
+  auto inputs = validate_imported_assembly_inputs(candidate, context);
+  if (!inputs)
+    return inputs;
+  if (normalized)
+    project = std::move(*normalized);
+  return inputs;
 }
 Result<std::size_t> append_occurrence(Project& project, DocumentId part, DocumentId assembly,
                                       ComponentInstanceId id, RigidTransform transform) {

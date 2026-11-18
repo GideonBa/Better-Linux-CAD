@@ -262,3 +262,75 @@ TEST_CASE("Cross hierarchy solving assigns separate authorities to repeated flex
   REQUIRE(right);
   CHECK(left.value() != right.value());
 }
+
+TEST_CASE("Cross-hierarchy apply rejects changed occurrence state without baking Primary",
+          "[parity-b193][occurrence-pose][occurrence-state-freshness]") {
+  using namespace blcad::geometry::test_support;
+  auto project = distance_project();
+  ModelState alternate{ModelStateId("alternate"), "Alternate", {}, {}, {}, {}, {}};
+  REQUIRE(project.find_part_document(DocumentId("part.block27_plate"))
+              ->replace_model_states({alternate}));
+  auto result = AssemblyCrossHierarchyConstraintSolver{}.solve(project, only_group(project));
+  REQUIRE(result);
+  REQUIRE(result.value().converged());
+  REQUIRE(project.find_assembly_document(DocumentId("assembly.child"))
+              ->set_component_model_state(ComponentInstanceId("component.child"), alternate.id));
+  const auto before = serialize_project_to_json(project);
+  REQUIRE(before);
+  CHECK_FALSE(AssemblyCrossHierarchySolveResultApplier{}.apply(project, result.value()));
+  CHECK(serialize_project_to_json(project).value() == before.value());
+}
+#include "blcad/geometry/assembly_hierarchy_constraint_equation_builder.hpp"
+
+TEST_CASE("Named child Assembly state and flexible pose share exact hierarchy target context",
+          "[parity-b193][occurrence-pose][occurrence-state-targets]") {
+  using namespace blcad::geometry::test_support;
+  auto project = distance_project(20, true);
+  ModelState thick{ModelStateId("thick"),
+                   "Thick",
+                   {{ParameterId("part.thickness"), Quantity::length_mm(16).value()}},
+                   {},
+                   {},
+                   {},
+                   {}};
+  REQUIRE(
+      project.find_part_document(DocumentId("part.block27_plate"))->replace_model_states({thick}));
+  ModelState selected{ModelStateId("selected"),
+                      "Selected child state",
+                      {},
+                      {},
+                      {},
+                      {{ComponentInstanceId("component.child"), std::nullopt, thick.id}},
+                      {}};
+  auto* child = project.find_assembly_document(DocumentId("assembly.child"));
+  REQUIRE(child->replace_model_states({selected}));
+  REQUIRE(project.assembly().set_subassembly_model_state(SubassemblyInstanceId("subassembly.left"),
+                                                         selected.id));
+  auto pose =
+      AssemblyOccurrencePose::create({SubassemblyInstanceId("subassembly.left")}, child->id(),
+                                     AssemblyOccurrenceRigidity::Flexible,
+                                     {{ComponentInstanceId("component.child"), {{0, 0, 5}, {}}}});
+  REQUIRE(pose);
+  REQUIRE(project.set_occurrence_pose(pose.value()));
+  auto left = AssemblyHierarchyConstraintTarget::create({SubassemblyInstanceId("subassembly.left")},
+                                                        ComponentInstanceId("component.child"),
+                                                        "feature.base_extrude.top");
+  auto right = AssemblyHierarchyConstraintTarget::create(
+      {SubassemblyInstanceId("subassembly.right")}, ComponentInstanceId("component.child"),
+      "feature.base_extrude.top");
+  REQUIRE(left);
+  REQUIRE(right);
+  auto a = AssemblyHierarchyConstraintTargetResolver{}.resolve_geometric(project, left.value());
+  REQUIRE(a);
+  auto b = AssemblyHierarchyConstraintTargetResolver{}.resolve_geometric(project, right.value());
+  REQUIRE(b);
+  CHECK(project_plane(a.value()).value().origin.z == Approx(21).margin(1e-7));
+  CHECK(project_plane(b.value()).value().origin.z == Approx(18).margin(1e-7));
+  selected.components[0].suppressed = true;
+  REQUIRE(project.find_assembly_document(DocumentId("assembly.child"))
+              ->replace_model_states({selected}));
+  CHECK_FALSE(AssemblyHierarchyConstraintTargetResolver{}.resolve_geometric(project, left.value()));
+  auto graph = AssemblyCrossHierarchyConstraintGraph::build(project);
+  REQUIRE(graph);
+  CHECK(graph.value().endpoint_mapping_count() == 0);
+}
