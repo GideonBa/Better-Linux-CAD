@@ -1,5 +1,7 @@
 #include "../support/part_history_fixture.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/part_feature_json_commands.hpp"
+#include "blcad/core/sketch_driven_intent.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -184,4 +186,96 @@ TEST_CASE("Shared history replay rejects incomplete corrupt and backward produce
   const auto valid = legacy("all-families");
   CHECK(checked(serialize_part_document_to_json(
             checked(deserialize_part_document_from_json(valid)))) == valid);
+}
+
+TEST_CASE("Canonical Pattern and Mirror record updates rebind later Direct Edit and Emboss sources",
+          "[core][feature-update-command][generic-source-rebind][parity-b187]") {
+  const auto family =
+      GENERATE(std::string("linear"), std::string("circular"), std::string("mirror"));
+  CAPTURE(family);
+  auto part = fixture::native_base();
+  for (const auto& [id, value] : {std::pair{"direct.distance", 1.}, {"label.depth", .5}})
+    REQUIRE(part.add_parameter(checked(
+        Parameter::create_length(ParameterId(id), id, checked(Quantity::length_mm(value))))));
+  REQUIRE(part.add_direct_edit_feature(checked(DirectEditFeature::create(
+      FeatureId("direct"), "Direct top", BodyId("body.base"), FeatureId("base"),
+      {{fixture::face(PartFeatureInputRole::SurfaceSourceFace), DirectEditFaceCapability::Planar}},
+      DirectFaceOffset{ParameterId("direct.distance")}))));
+  auto sketch =
+      checked(Sketch::create(SketchId("label.sketch"), "Label", DatumPlaneId("datum.xy")));
+  REQUIRE(sketch.add_profile(checked(RectangleProfile::create(
+      ProfileId("label.profile"), ParameterId("radius"), ParameterId("radius")))));
+  REQUIRE(part.add_sketch(sketch));
+  const auto face = checked(ResultFaceReference::create(FeatureId("direct"), BodyId("body.base"),
+                                                        {{FeatureId("direct"), "face/0"}}));
+  const EmbossIntent label{
+      checked(ProfileRegionReference::create(sketch.id(), ProfileId("label.profile"))),
+      {checked(FaceReference::create_result(PartFeatureInputRole::SurfaceSourceFace, face))},
+      EmbossOperation::Raise,
+      ParameterId("label.depth"),
+      EmbossMapping::Planar,
+      {},
+      0,
+      {}};
+  REQUIRE(part.add_sketch_driven_feature(checked(SketchDrivenFeature::create(
+      FeatureId("label"), "Label", BodyId("body.base"), SketchDrivenDefinition{label}))));
+  const auto context = fixture::new_body(part, "pattern");
+  const auto source = checked(PatternSourceReference::feature(FeatureId("base")));
+  if (family == "linear")
+    REQUIRE(part.add_linear_pattern_feature(checked(LinearPatternFeature::create(
+        FeatureId("source.pattern"), "Source pattern", {source},
+        fixture::axis(PartFeatureInputRole::PatternAxis), ParameterId("count"),
+        LinearPatternExtentMode::Spacing, ParameterId("depth"), PatternDirectionSign::Positive,
+        context))));
+  else if (family == "circular")
+    REQUIRE(part.add_circular_pattern_feature(checked(
+        CircularPatternFeature::create(FeatureId("source.pattern"), "Source pattern", {source},
+                                       fixture::axis(PartFeatureInputRole::PatternAxis),
+                                       ParameterId("count"), 360, true, context))));
+  else
+    REQUIRE(part.add_mirror_feature(checked(
+        MirrorFeature::create(FeatureId("source.pattern"), "Source mirror",
+                              {checked(MirrorSourceReference::feature(FeatureId("base")))},
+                              fixture::plane(PartFeatureInputRole::MirrorPlane), context))));
+  const auto original = checked(serialize_part_document_to_json(part));
+  const auto root = nlohmann::json::parse(original);
+  const std::string collection = family == "mirror" ? "mirror_features" : "part_patterns";
+  const auto replace = [&](const PartDocument& document, const nlohmann::json& record) {
+    return family == "mirror" ? replace_part_mirror_from_json(document, record.dump())
+                              : replace_part_pattern_from_json(document, record.dump());
+  };
+  CHECK(ids(part) == std::vector<std::string>{"base", "direct", "source.pattern", "label"});
+  for (const char* target : {"direct", "label"}) {
+    CAPTURE(target);
+    auto record = root.at(collection).front();
+    record["sources"][0]["feature"] = target;
+    const auto updated =
+        checked(replace(checked(deserialize_part_document_from_json(original)), record));
+    CHECK(updated.dependency_graph().has_dependency(target, "source.pattern"));
+    CHECK_FALSE(updated.dependency_graph().has_dependency("base", "source.pattern"));
+    const auto encoded = checked(serialize_part_document_to_json(updated));
+    CHECK(checked(serialize_part_document_to_json(
+              checked(deserialize_part_document_from_json(encoded)))) == encoded);
+    CHECK(checked(serialize_part_document_to_json(part)) == original);
+    if (std::string(target) == "label") {
+      CHECK(ids(updated) == std::vector<std::string>{"base", "direct", "label", "source.pattern"});
+      auto corrupt = root;
+      corrupt[collection][0] = record;
+      CHECK_FALSE(deserialize_part_document_from_json(corrupt.dump()));
+      auto authored = part;
+      REQUIRE(authored.apply_history_intent({ids(authored), {}}));
+      const auto authored_before = checked(serialize_part_document_to_json(authored));
+      CHECK_FALSE(replace(authored, record));
+      CHECK(checked(serialize_part_document_to_json(authored)) == authored_before);
+    }
+  }
+  for (const auto& target :
+       {nlohmann::json("source.pattern"), nlohmann::json("missing"), nlohmann::json(42)}) {
+    auto record = root.at(collection).front();
+    record["sources"][0]["feature"] = target;
+    CHECK_FALSE(replace(part, record));
+    CHECK(checked(serialize_part_document_to_json(part)) == original);
+  }
+  CHECK_FALSE((family == "mirror" ? replace_part_mirror_from_json(part, "{")
+                                  : replace_part_pattern_from_json(part, "{")));
 }
