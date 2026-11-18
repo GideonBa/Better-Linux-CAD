@@ -882,9 +882,22 @@ if(BLCAD_BUILD_TESTS)
       BLCAD_PHASE_B_PROFILE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
       BLCAD_PHASE_B_PROFILE_OCCT_VERSION="${OpenCASCADE_MAJOR_VERSION}.${OpenCASCADE_MINOR_VERSION}.${OpenCASCADE_MAINTENANCE_VERSION}")
 
+    add_executable(blcad_variant_assembly_profile EXCLUDE_FROM_ALL
+      tests/geometry/variant_assembly_profile.cpp)
+    target_link_libraries(blcad_variant_assembly_profile PRIVATE BLCAD::geometry)
+    set(blcad_p01_qt_version "not-configured")
+    if(Qt6Core_VERSION)
+      set(blcad_p01_qt_version "${Qt6Core_VERSION}")
+    endif()
+    target_compile_definitions(blcad_variant_assembly_profile PRIVATE
+      BLCAD_P01_PROFILE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
+      BLCAD_P01_PROFILE_OCCT_VERSION="${OpenCASCADE_MAJOR_VERSION}.${OpenCASCADE_MINOR_VERSION}.${OpenCASCADE_MAINTENANCE_VERSION}"
+      BLCAD_P01_PROFILE_QT_VERSION="${blcad_p01_qt_version}")
+
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
       target_compile_options(blcad_geometry_tests PRIVATE -Wall -Wextra -Wpedantic)
       target_compile_options(blcad_phase_b_profile PRIVATE -Wall -Wextra -Wpedantic)
+      target_compile_options(blcad_variant_assembly_profile PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
     catch_discover_tests(blcad_geometry_tests TEST_SPEC "~[step-import-profile]")

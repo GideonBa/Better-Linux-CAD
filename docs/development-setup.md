@@ -98,6 +98,35 @@ Do not weaken the export assertions. If an incremental build crashes after a pub
 change, inspect Ninja's header-dependency records: stale objects with zero recorded dependencies
 have caused stack corruption here. Rebuild affected artifacts and rerun the relevant suites.
 
+Assembly representation authority uses Core `[assembly-representation]` and GUI
+`[assembly-representation-session]`. New native Assembly controls use
+`[native-advanced-assembly]` (cylinders, adaptive cover and coordinated Hole participants), at both
+100% and compact 150%. `BLCAD_UI_CAPTURE_DIR` retains original previews, recalled-position Measure
+and design-view captures. The cases compare immutable child definitions, exact root Undo/Redo,
+physical section points, mass/contact, and independent flat/structured STEP reopening. Run these
+with the context and model-state native filters below; registration alone does not close 198.
+
+In-context Part/root history and Project child-Sketch sidecars use GUI `[project-part-context]`;
+native reopened Source Sketch coverage is `[project-part-context-native]` at both scales. The
+context tests include exact cancellation, root Undo/Redo, owned frame/catalog restoration,
+read-only linked sources, failed downstream rebuild and failed multi-file Save/Open. See
+[the context contract](parameter-model.md#in-context-part-editing-and-root-publication--198).
+Public Project candidate normalization uses Geometry `[step-candidate-normalization]`; adaptive
+solver/DOF entry consistency uses `[assembly-diagnostics-normalized]`. Stateful visible Solid/Surface
+Body compounds and their separate physical participation use `[assembly-multi-body]`.
+Geometry `[project-physical-visibility]` covers all-hidden design views and available Bodies in
+adaptive/coordinated-hole Projects: physical normalization and mass remain valid while explicit
+Scene/STEP visibility behavior is retained.
+The connected partial X02 housing/cover Project uses GUI `[configurable-housing]` (the same test
+uses the native table/context controls when running on xcb). Its housing-owned patterned Thread
+layout preserves the directed adaptive graph; this does not complete the later Block 204 gate.
+
+Model-state authority and evaluation use Core `[model-state]`; native table/session/export coverage
+uses GUI `[model-state]`, with native-only `[model-state-native]` at both 100% and compact 150%.
+Use `BLCAD_UI_CAPTURE_DIR` for original table-preview and reopened-Primary captures. The
+[parameter model](parameter-model.md#native-table-selected-views-and-independent-member-copies--191)
+owns state-view, member-copy and proof semantics; numbered acceptance remains in `mvp-plan.md`.
+
 Sketch-driven interaction uses GUI filter `[parity-b184]` (owned controls plus complete workflows)
 and native-only `[native-sketch-driven]`. Run the same filter with `QT_QPA_PLATFORM=xcb` at 100%
 and `QT_SCALE_FACTOR=1.5 BLCAD_UI_COMPACT=1 BLCAD_COMPACT_UI=1` for compact 150%. Set
