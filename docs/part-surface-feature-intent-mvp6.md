@@ -164,6 +164,22 @@ invalid topology, self-interference and nonpositive Solid volume reject without 
 Thicken explicitly orients its one closed Solid before validation. Holes remain free boundaries
 whose generated walls close the material region; symmetric distance is total skin separation.
 
+Single planar-face Thicken uses an exact native prism along the constant normal computed from
+native plane derivatives and the oriented face use. Construction therefore preserves indirect
+analytic frames and does not depend on finding a representative interior sample in a narrow or
+annular trim. AlongNormal, OppositeNormal and symmetric separation retain analytic circular/linear
+side-wall carriers, existing source/positive/negative skin lineage and thickness, topology and
+self-interference checks. Curved faces and quilts retain their existing construction path; the
+strict reader continues to reject invalid unhealed transfer geometry.
+
+`[surface-offset-planar-step]` in
+[the planar Thicken regression](../tests/geometry/planar_thicken_step_tests.cpp) covers upper and
+lower perforated source faces, Offset→Thicken in all three side modes, and a thin annulus in
+original, oblique and reflected placements. Independent analytic volume, centroid, annular central
+inertia and circular-wall oracles accompany unchanged input geometry, resolvable semantic skins,
+measured thickness and strict physical STEP reimport. The integrated D02/native consumers retain
+their existing independent volume formulas.
+
 Source regularity/curvature checks include native knot cells and their boundaries, with **17**
 subdivisions per cell and signed focal factors `1-offset*curvature`. Trimmed/offset surface wrappers
 and native extrusion/revolution generating-curve knots retain their actual differential geometry.

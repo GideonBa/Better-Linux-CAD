@@ -153,12 +153,17 @@ There is no guessed density or silent zero. Surface rows do not make a complete 
 partial; their excluded solid-mass status remains explicit. A legacy aggregate has no invented Body ID.
 
 Shape integration uses analytic OCCT geometry, adaptive requested relative tolerance 10⁻⁹ and reports
-the returned area/volume error estimates. Closed valid solids are measured individually, normalizing
-reversed orientation consistently for volume and inertia. Integration uses a disposable shape copy
-translated near the origin; central tensors are computed there and centroids translated back, avoiding
+the returned area/volume error estimates. Solid integration uses adaptive Gauss–Kronrod with centroid
+and inertia evaluation explicitly enabled against a fixed local coordinate plane: convergence of
+volume alone does not certify moments on circular STEP trims. Closed valid solids are measured
+individually, normalizing reversed orientation consistently for volume and inertia. Integration uses
+a disposable shape copy translated near the origin; central tensors are computed there and centroids translated back, avoiding
 large-coordinate subtraction inside global moment calculations. Open/invalid Solid results, free faces in
 a Solid Body, missing participating shapes, non-finite or unrepresentable derived numbers fail closed.
 Surface-only area remains valid. No triangulation approximation certifies the numeric result.
+The thin-annulus regression in `[surface-offset-planar-step]` checks independent analytic volume,
+centroid and central inertia before and after strict STEP reimport, including oblique rotation and
+reflection; the expected tensor uses the exact annular principal moments and its physical axis.
 
 Part results are immutable derived snapshots with a private exact canonical source/generation stamp.
 `validate_current` rechecks that source and actual imported inputs through an explicit import context;

@@ -14,6 +14,7 @@
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS_Shape.hxx>
+#include <gp_Pln.hxx>
 #include <gp_Trsf.hxx>
 #include <gp_Vec.hxx>
 
@@ -67,8 +68,13 @@ Result<ShapePhysicalProperties> inspect_shape_physical_properties(const Geometry
       if (!localized.IsDone())
         throw std::runtime_error("Could not prepare a local physical integration frame");
       GProp_GProps properties;
-      const auto estimate = BRepGProp::VolumeProperties(
-          localized.Shape(), properties, physical_relative_integration_tolerance, true, false);
+      // The mass-only Gauss stopping criterion can converge while first/second
+      // moments remain inaccurate on circular STEP trims. Request centroid and
+      // inertia explicitly and decompose against a fixed local coordinate
+      // plane to avoid unnecessary refinement around a symmetric apex.
+      const auto estimate = BRepGProp::VolumePropertiesGK(
+          localized.Shape(), properties, gp_Pln(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)),
+          physical_relative_integration_tolerance, true, true, true, true, false);
       const auto signed_volume = properties.Mass();
       if (!std::isfinite(estimate) || estimate < 0 || !std::isfinite(signed_volume) ||
           signed_volume == 0)
