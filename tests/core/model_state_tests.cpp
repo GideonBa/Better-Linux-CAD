@@ -276,3 +276,44 @@ TEST_CASE("Assembly state suppression differs from display and positional intent
   root["version"] = 1;
   CHECK_FALSE(deserialize_assembly_document_from_json(root.dump()));
 }
+
+TEST_CASE("Primary mutations preserve inactive state references and parameter domains atomically",
+          "[core][model-state][parity-b189]") {
+  auto part = parameter_part();
+  resources::annotate(part);
+  auto state = named();
+  SECTION("feature suppression pins executable") {
+    state.features = {{"base", false}};
+    REQUIRE(part.replace_model_states({state}));
+    const auto before = text(part);
+    CHECK_FALSE(part.remove_feature(FeatureId("base")));
+    CHECK(text(part) == before);
+    REQUIRE(part.replace_model_states({}));
+    CHECK(part.remove_feature(FeatureId("base")));
+  }
+  SECTION("unused Body material override pins Body") {
+    REQUIRE(part.add_body(checked(Body::create(BodyId("unused"), "Unused", BodyKind::Solid))));
+    state.materials = {{BodyId("unused"), resources::key("synthetic.material", "r2")}};
+    REQUIRE(part.replace_model_states({state}));
+    const auto before = text(part);
+    CHECK_FALSE(part.remove_body(BodyId("unused")));
+    CHECK(text(part) == before);
+  }
+  SECTION("state-only material revision cannot be removed") {
+    state.materials = {{std::nullopt, resources::key("synthetic.material", "r2")}};
+    REQUIRE(part.replace_model_states({state}));
+    const auto before = text(part);
+    CHECK_FALSE(part.remove_engineering_resource(resources::key("synthetic.material", "r2")));
+    CHECK(text(part) == before);
+  }
+  SECTION("Primary parameter edit cannot invalidate an inactive count formula") {
+    REQUIRE(part.add_expression_parameter(ParameterId("computed"), "Computed", ParameterType::Count,
+                                          "width / 1 mm"));
+    state.parameters = {{ParameterId("computed"), std::string("width / 2 mm")}};
+    REQUIRE(part.replace_model_states({state}));
+    const auto before = text(part);
+    CHECK_FALSE(part.set_parameter_value(ParameterId("width"), checked(Quantity::length_mm(21))));
+    CHECK(text(part) == before);
+    CHECK(mm(part, "width") == 20);
+  }
+}

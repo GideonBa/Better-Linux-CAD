@@ -69,6 +69,11 @@ PartDocument::adopt_engineering_resource_revision(const EngineeringResourceKey& 
   return Result<std::size_t>::success(changed);
 }
 Result<std::size_t> PartDocument::remove_engineering_resource(const EngineeringResourceKey& key) {
+  for (const auto& state : model_states_)
+    for (const auto& override : state.materials)
+      if (override.material == key)
+        return Result<std::size_t>::failure(Error::dependency(
+            state.id.value(), "Material revision is pinned by a model-state override"));
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
   if (default_material_ == key ||

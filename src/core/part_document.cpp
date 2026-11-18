@@ -36,7 +36,7 @@ struct ParameterIntentRollback {
   std::optional<PartDocument> before;
   bool accepted{false};
   explicit ParameterIntentRollback(PartDocument& value) : document(value) {
-    if (has_transactional_parameter_intent(value))
+    if (has_transactional_parameter_intent(value) || !value.model_states().empty())
       before = value;
   }
   ~ParameterIntentRollback() {
@@ -4193,6 +4193,11 @@ Result<std::size_t> PartDocument::add_body(Body body) {
 }
 
 Result<std::size_t> PartDocument::remove_body(BodyId id) {
+  for (const auto& state : model_states_)
+    for (const auto& override : state.materials)
+      if (override.body == id)
+        return Result<std::size_t>::failure(
+            Error::dependency(id.value(), "Body is referenced by a model-state material override"));
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
   if (id.empty()) {
@@ -4536,6 +4541,11 @@ Result<std::vector<std::string>> PartDocument::set_parameter_value(ParameterId i
     if (!domains)
       return Result<std::vector<std::string>>::failure(domains.error());
   }
+  if (!model_states_.empty()) {
+    auto states = validate_model_states();
+    if (!states)
+      return Result<std::vector<std::string>>::failure(states.error());
+  }
   rollback.accepted = true;
   return affected;
 }
@@ -4602,6 +4612,11 @@ Result<std::vector<std::string>> PartDocument::set_parameter_formula(ParameterId
     auto domains = validate_parameter_intent(*this, affected.value());
     if (!domains)
       return Result<std::vector<std::string>>::failure(domains.error());
+  }
+  if (!model_states_.empty()) {
+    auto states = validate_model_states();
+    if (!states)
+      return Result<std::vector<std::string>>::failure(states.error());
   }
   rollback.accepted = true;
   return affected;
@@ -5348,6 +5363,11 @@ Result<std::size_t> PartDocument::remove_feature_record(std::vector<FeatureT> Pa
                                                         const FeatureId& id) {
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
+  for (const auto& state : model_states_)
+    for (const auto& override : state.features)
+      if (override.executable == id.value())
+        return Result<std::size_t>::failure(Error::dependency(
+            id.value(), "Feature is referenced by a model-state suppression override"));
   std::vector<FeatureT>& records = this->*member;
   const auto found = std::find_if(records.begin(), records.end(), [&id](const FeatureT& item) {
     return record_feature_id(item) == id;

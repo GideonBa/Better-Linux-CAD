@@ -274,6 +274,12 @@ Result<std::size_t> AssemblyDocument::replace_model_states(std::vector<ModelStat
 }
 
 Result<AssemblyDocument> AssemblyDocument::evaluate_model_state(ModelStateId selected) const {
+  if (effective_model_state_ != primary_model_state_id()) {
+    if (selected == effective_model_state_)
+      return Result<AssemblyDocument>::success(*this);
+    return Result<AssemblyDocument>::failure(
+        error(id().value(), "Select a state from the authored Primary Assembly"));
+  }
   if (selected == primary_model_state_id())
     return Result<AssemblyDocument>::success(*this);
   const auto* state = find_state(model_states_, selected);
@@ -330,6 +336,8 @@ Result<AssemblyDocument> AssemblyDocument::evaluate_model_state(ModelStateId sel
         return Result<AssemblyDocument>::failure(applied.error());
     }
   }
+  result.model_states_.clear();
+  result.effective_model_state_ = std::move(selected);
   return Result<AssemblyDocument>::success(std::move(result));
 }
 
@@ -339,7 +347,7 @@ Result<std::size_t> validate_project_model_states(const Project& project) {
     assemblies.push_back(&child);
   std::size_t count = 0;
   for (const auto* assembly : assemblies) {
-    std::vector<ModelStateId> states{primary_model_state_id()};
+    std::vector<ModelStateId> states{assembly->effective_model_state()};
     for (const auto& state : assembly->model_states())
       states.push_back(state.id);
     for (const auto& state : states) {

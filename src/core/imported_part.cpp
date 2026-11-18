@@ -285,6 +285,11 @@ const ImportedBodyFeature* PartDocument::find_imported_body_feature(FeatureId id
 }
 
 Result<std::size_t> PartDocument::remove_imported_body_feature(FeatureId id) {
+  for (const auto& state : model_states_)
+    for (const auto& override : state.features)
+      if (override.executable == id.value())
+        return Result<std::size_t>::failure(Error::dependency(
+            id.value(), "Imported base is referenced by a model-state suppression override"));
   if (is_reference_part())
     return Result<std::size_t>::failure(reference_part_edit_error());
   const auto* feature = find_imported_body_feature(id);
