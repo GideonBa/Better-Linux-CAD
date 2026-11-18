@@ -1,6 +1,6 @@
 #include "blcad/gui/gui_analysis_export_workbench.hpp"
-#include "blcad/gui/gui_step_import_workbench.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
+#include "blcad/gui/gui_step_import_workbench.hpp"
 
 #include "blcad/core/assembly_constraint_graph.hpp"
 #include "blcad/geometry/assembly_step_exporter.hpp"
@@ -13,8 +13,8 @@
 namespace blcad::gui {
 namespace {
 Result<const Project*> require_project(const GuiDocumentSession& session, std::string_view operation) {
-  return session.project()
-      ? Result<const Project*>::success(session.project())
+  return session.effective_project()
+      ? Result<const Project*>::success(session.effective_project())
       : Result<const Project*>::failure(Error::validation("gui.analysis", std::string(operation) + " requires an active Project"));
 }
 } // namespace
@@ -77,13 +77,13 @@ Result<std::size_t> GuiAnalysisExportWorkbench::preflight_step_export(
   return query_with_step_import_context(session, [&](auto* context) -> Result<std::size_t> {
     switch (request.mode) {
     case GuiStepExportMode::PartMultiBody: {
-      if (!session.part_document() || !session.part_shape_cache())
+      if (!session.effective_part_document() || !session.part_shape_cache())
         return Result<std::size_t>::failure(Error::export_error(
             "gui.step_export", "Part multi-body export requires an active recomputed Part"));
-      if (auto valid = geometry::observe_imported_part_sources(*session.part_document(), context);
+      if (auto valid = geometry::observe_imported_part_sources(*session.effective_part_document(), context);
           !valid)
         return valid;
-      const auto inspection = geometry::BodyResultInspector{}.inspect(*session.part_document(),
+      const auto inspection = geometry::BodyResultInspector{}.inspect(*session.effective_part_document(),
                                                                       *session.part_shape_cache());
       if (!inspection)
         return Result<std::size_t>::failure(inspection.error());
@@ -98,14 +98,14 @@ Result<std::size_t> GuiAnalysisExportWorkbench::preflight_step_export(
     }
     case GuiStepExportMode::AssemblyFlattened:
     case GuiStepExportMode::AssemblyStructured:
-      if (!session.project())
+      if (!session.effective_project())
         return Result<std::size_t>::failure(
             Error::export_error("gui.step_export", "Assembly export requires an active Project"));
-      if (auto valid = session.project()->validate_assembly_structure(); valid.has_error())
+      if (auto valid = session.effective_project()->validate_assembly_structure(); valid.has_error())
         return Result<std::size_t>::failure(valid.error());
-      if (auto valid = validate_visible_step_imports(*session.project(), context); !valid)
+      if (auto valid = validate_visible_step_imports(*session.effective_project(), context); !valid)
         return valid;
-      return Result<std::size_t>::success(session.project()->assembly().component_instance_count());
+      return Result<std::size_t>::success(session.effective_project()->assembly().component_instance_count());
     }
     return Result<std::size_t>::failure(
         Error::internal("gui.step_export", "unsupported export mode"));
@@ -127,21 +127,21 @@ Result<GuiStepExportResult> GuiAnalysisExportWorkbench::export_step(
   GuiStepExportResult result{request.mode, preflight.value(), 0, {}};
   if (request.mode == GuiStepExportMode::PartMultiBody) {
     auto exported = geometry::StepExporter{context.value().get()}.write_part_step(
-        *session.part_document(), *session.part_shape_cache(), request.output.string());
+        *session.effective_part_document(), *session.part_shape_cache(), request.output.string());
     if (exported.has_error()) return Result<GuiStepExportResult>::failure(exported.error());
     result.exported_item_count = exported.value().exported_body_count;
     result.written_bytes = exported.value().written_bytes;
     result.diagnostic = "visible Part Bodies exported with deterministic BodyId names";
   } else if (request.mode == GuiStepExportMode::AssemblyFlattened) {
     auto exported = geometry::AssemblyStepExporter{context.value().get()}.write_step(
-        *session.project(), request.output.string());
+        *session.effective_project(), request.output.string());
     if (exported.has_error()) return Result<GuiStepExportResult>::failure(exported.error());
     result.exported_item_count = exported.value().exported_component_count;
     result.written_bytes = exported.value().written_bytes;
     result.diagnostic = "flattened posed Assembly exported";
   } else {
     auto exported = geometry::AssemblyStructuredStepExporter{context.value().get()}.write_step(
-        *session.project(), request.output.string());
+        *session.effective_project(), request.output.string());
     if (exported.has_error()) return Result<GuiStepExportResult>::failure(exported.error());
     result.exported_item_count = exported.value().exported_component_occurrence_count;
     result.written_bytes = exported.value().written_bytes;

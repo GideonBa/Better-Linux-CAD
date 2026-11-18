@@ -83,6 +83,15 @@ are independently selected session contexts and compose from the immutable autho
 order. Their active choices are never saved; Open starts at Primary/Master/Default. Complete source
 freshness includes each selected context, including equal numeric results with different identities.
 
+Common and adaptive Project validation request physical-active posed definitions, including hidden
+active occurrences and every available Body. Hiding all components in a design view or all Bodies
+for display therefore preserves valid manufacturing geometry and physical mass. Suppression and
+source/recipe validity retain their physical meaning. Scene and STEP keep visible-active scope and
+their empty/no-visible diagnostics; contact, clearance and interference retain their existing
+visibility scope. Physical validation does not use the export-only no-visible-geometry gate.
+Geometry `[project-physical-visibility]` checks these boundaries for adaptive references and
+coordinated machining.
+
 The existing Assembly ribbon owns Flexible Occurrence, Adaptive Reference, Assembly Hole, Positions
 and Design Views, and Edit Part in Context. Each uses the common root Project transaction and
 complete candidate validation. Preview retains invalid inputs for correction; Apply publishes one

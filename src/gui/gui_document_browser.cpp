@@ -458,6 +458,7 @@ GuiBrowserNode build_part(const PartDocument& part, const GuiDocumentSession& se
   append_part_nodes(features, part, part.loft_features(), GuiBrowserNodeKind::Feature);
   append_surface_nodes(features, part);
   append_part_nodes(features, part, part.sketch_driven_features(), GuiBrowserNodeKind::Feature);
+  append_part_nodes(features, part, part.direct_edit_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.linear_pattern_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.circular_pattern_features(), GuiBrowserNodeKind::Feature);
   append_part_nodes(features, part, part.mirror_features(), GuiBrowserNodeKind::Feature);
@@ -642,13 +643,13 @@ Result<std::size_t> unsupported(std::string_view id, std::string_view key) {
 
 GuiDocumentBrowser GuiDocumentBrowser::build(const GuiDocumentSession& session) {
   GuiDocumentBrowser browser;
-  if (const auto* part = session.part_document()) {
+  if (const auto* part = session.effective_part_document()) {
     browser.roots_.push_back(build_part(*part, session));
     for (auto& field : browser.roots_.back().properties)
       if (field.key == "status")
         field.value = recompute_status(session.recompute_status());
     append_session_diagnostics(browser.roots_.back(), session);
-  } else if (const auto* project = session.project()) {
+  } else if (const auto* project = session.effective_project()) {
     GuiBrowserNode project_root{GuiBrowserNodeKind::Document, project->id().value(), project->id().value(), project->name()};
     project_root.properties = {property("id", "Identifier", project->id().value(), GuiPropertyKind::Identifier, false, {}, "Persistent identifiers are read-only"),
                                property("name", "Name", project->name()),
@@ -672,7 +673,67 @@ GuiDocumentBrowser GuiDocumentBrowser::build(const GuiDocumentSession& session) 
     append_session_diagnostics(project_root, session);
     browser.roots_.push_back(std::move(project_root));
   }
+  const auto append_states = [&](GuiBrowserNode& node, const DocumentId& owner,
+                                 const std::vector<ModelState>& states, bool active_owner) {
+    auto catalog = group("Model States");
+    const auto add = [&](ModelStateId id, const std::string& name) {
+      const bool active = active_owner && session.active_model_state() == id;
+      catalog.children.push_back({GuiBrowserNodeKind::Group, "model-state/" + id.value(),
+                                  owner.value(), name + (active ? " (active)" : "")});
+    };
+    add(primary_model_state_id(), "Primary");
+    for (const auto& state : states)
+      add(state.id, state.name);
+    node.children.insert(node.children.begin(), std::move(catalog));
+  };
+  if (!browser.roots_.empty()) {
+    if (const auto* primary = session.part_document())
+      append_states(browser.roots_.front(), primary->id(), primary->model_states(), true);
+    else if (const auto* primary = session.project()) {
+      append_states(browser.roots_.front(), primary->assembly().id(),
+                    primary->assembly().model_states(), true);
+      auto positions = group("Positions");
+      positions.children.push_back(
+          {GuiBrowserNodeKind::Group, "assembly-position/" + master_position_id().value(),
+           primary->id().value(),
+           "Master" + (session.active_position() == master_position_id() ? std::string(" (active)")
+                                                                         : std::string())});
+      for (const auto& position : primary->assembly_positions())
+        positions.children.push_back(
+            {GuiBrowserNodeKind::Group, "assembly-position/" + position.id.value(),
+             primary->id().value(),
+             position.name + (session.active_position() == position.id ? " (active)" : "")});
+      auto views = group("Design Views");
+      views.children.push_back(
+          {GuiBrowserNodeKind::Group, "assembly-view/" + default_design_view_id().value(),
+           primary->id().value(),
+           "Default" + (session.active_design_view() == default_design_view_id()
+                            ? std::string(" (active)")
+                            : std::string())});
+      for (const auto& view : primary->assembly_design_views())
+        views.children.push_back(
+            {GuiBrowserNodeKind::Group, "assembly-view/" + view.id.value(), primary->id().value(),
+             view.name + (session.active_design_view() == view.id ? " (active)" : "")});
+      browser.roots_.front().children.insert(browser.roots_.front().children.begin(),
+                                             std::move(positions));
+      browser.roots_.front().children.insert(browser.roots_.front().children.begin(),
+                                             std::move(views));
+      for (auto& branch : browser.roots_.front().children)
+        for (auto& document : branch.children)
+          if (const auto* part =
+                  primary->find_part_document(DocumentId(document.owner_document_id));
+              part && document.kind == GuiBrowserNodeKind::Document)
+            append_states(document, part->id(), part->model_states(), false);
+    }
+  }
   const auto annotate_visibility = [&](auto&& self, GuiBrowserNode& node) -> void {
+    if (session.active_model_state() != primary_model_state_id() ||
+        session.active_position() != master_position_id())
+      for (auto& field : node.properties) {
+        field.editable = false;
+        field.read_only_reason =
+            "Named state view; edit typed overrides in Model States or return to Primary";
+      }
     if (node.visibility_semantic_id.empty())
       node.visibility_semantic_id = node.viewport_semantic_id;
     if (!node.visibility_semantic_id.empty())
@@ -683,9 +744,9 @@ GuiDocumentBrowser GuiDocumentBrowser::build(const GuiDocumentSession& session) 
     if (visibility != node.properties.end() && visibility->value == "false")
       node.presentation_visible = false;
     if (node.visibility_semantic_id.starts_with("body/")) {
-      const auto* part = session.part_document();
-      if (session.project())
-        part = session.project()->find_part_document(DocumentId(node.owner_document_id));
+      const auto* part = session.effective_part_document();
+      if (session.effective_project())
+        part = session.effective_project()->find_part_document(DocumentId(node.owner_document_id));
       const auto* body =
           part ? part->find_body(BodyId(node.visibility_semantic_id.substr(5U))) : nullptr;
       if (body && body->visibility() == BodyVisibility::Hidden)
@@ -718,6 +779,11 @@ const GuiBrowserNode* GuiDocumentBrowser::find(std::string_view semantic_id,
 
 Result<std::size_t> set_browser_presentation_visible(GuiDocumentSession& session,
                                                      const GuiBrowserNode& node, bool visible) {
+  if (session.active_design_view() != default_design_view_id())
+    return Result<std::size_t>::failure(Error::validation(
+        "gui.design_view",
+        "Edit rooted display choices in Positions and Design Views or recall Default"));
+
   if (node.visibility_semantic_id.empty())
     return unsupported(node.semantic_id, "presentation_visibility");
   std::size_t changed_count = 0U;
@@ -758,6 +824,10 @@ Result<std::size_t> set_browser_presentation_visible(GuiDocumentSession& session
 Result<std::size_t> edit_browser_property(GuiDocumentSession& session,
                                           const GuiBrowserNode& node, std::string_view key,
                                           std::string_view value, bool commit) {
+  if (session.active_model_state() != primary_model_state_id())
+    return Result<std::size_t>::failure(Error::validation(
+        "gui.model_states",
+        "Return to Primary before editing properties; use Model States for variant overrides"));
   const bool bool_value = value == "true";
   if (key == "presentation_visibility") {
     if (node.visibility_semantic_id.empty() || (value != "true" && value != "false"))

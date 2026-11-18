@@ -93,7 +93,7 @@ Result<std::size_t> GuiPhysicalPropertiesController::refresh(const GuiDocumentSe
   return query_with_step_import_context(
       s, [&](StepImportTopologyContext* imports) -> Result<std::size_t> {
         const BodyResultInspector inspector;
-        if (const auto* p = s.part_document()) {
+        if (const auto* p = s.effective_part_document()) {
           const auto* old = std::get_if<PartPhysicalProperties>(&snapshot_);
           auto result = old ? inspector.inspect_physical_properties(*p, *old, imports)
                             : inspector.inspect_physical_properties(*p, imports);
@@ -105,12 +105,12 @@ Result<std::size_t> GuiPhysicalPropertiesController::refresh(const GuiDocumentSe
           snapshot_ = std::move(result.value());
         } else {
           const auto* old = std::get_if<ProjectPhysicalProperties>(&snapshot_);
-          auto result = old ? inspector.inspect_physical_properties(*s.project(), *old, imports)
-                            : inspector.inspect_physical_properties(*s.project(), imports);
+          auto result = old ? inspector.inspect_physical_properties(*s.effective_project(), *old, imports)
+                            : inspector.inspect_physical_properties(*s.effective_project(), imports);
           if (result && old)
             geometry_reused_ = true;
           if (!result && old)
-            result = inspector.inspect_physical_properties(*s.project(), imports);
+            result = inspector.inspect_physical_properties(*s.effective_project(), imports);
           if (!result)
             return Result<std::size_t>::failure(result.error());
           snapshot_ = std::move(result.value());
@@ -129,10 +129,10 @@ Result<std::size_t> GuiPhysicalPropertiesController::validate(const GuiDocumentS
         error("Physical Properties is stale; refresh the current model"));
   return query_with_step_import_context(
       s, [&](StepImportTopologyContext* imports) -> Result<std::size_t> {
-        if (const auto* p = std::get_if<PartPhysicalProperties>(&snapshot_); p && s.part_document())
-          return p->validate_current(*s.part_document(), imports);
-        if (const auto* p = std::get_if<ProjectPhysicalProperties>(&snapshot_); p && s.project())
-          return p->validate_current(*s.project(), imports);
+        if (const auto* p = std::get_if<PartPhysicalProperties>(&snapshot_); p && s.effective_part_document())
+          return p->validate_current(*s.effective_part_document(), imports);
+        if (const auto* p = std::get_if<ProjectPhysicalProperties>(&snapshot_); p && s.effective_project())
+          return p->validate_current(*s.effective_project(), imports);
         return Result<std::size_t>::failure(error("The physical document context changed"));
       });
 }
@@ -140,16 +140,16 @@ Result<GuiPhysicalPropertiesController::Selection>
 GuiPhysicalPropertiesController::selected(const GuiDocumentSession& s,
                                           const GuiPhysicalScope& scope) const {
   Selection choice;
-  if (const auto* p = std::get_if<PartPhysicalProperties>(&snapshot_); p && s.part_document()) {
+  if (const auto* p = std::get_if<PartPhysicalProperties>(&snapshot_); p && s.effective_part_document()) {
     if (scope.occurrence)
       return Result<Selection>::failure(error("Part scope cannot identify an assembly occurrence"));
     choice.totals = p->data();
-    choice.label = "Part / " + s.part_document()->name();
+    choice.label = "Part / " + s.effective_part_document()->name();
     for (const auto& body : p->data().bodies)
       choice.bodies.push_back(&body);
-  } else if (const auto* p = std::get_if<ProjectPhysicalProperties>(&snapshot_); p && s.project()) {
+  } else if (const auto* p = std::get_if<ProjectPhysicalProperties>(&snapshot_); p && s.effective_project()) {
     choice.totals = p->data();
-    choice.label = "Root Assembly / " + s.project()->assembly().name();
+    choice.label = "Root Assembly / " + s.effective_project()->assembly().name();
     if (scope.occurrence) {
       const auto& rows = p->data().occurrences;
       const auto row = std::find_if(rows.begin(), rows.end(), [&](const auto& item) {
@@ -159,7 +159,7 @@ GuiPhysicalPropertiesController::selected(const GuiDocumentSession& s,
         return Result<Selection>::failure(
             error("The physical occurrence is unavailable; choose a current scope"));
       choice.totals = *row;
-      choice.label = occurrence_label(*s.project(), *row);
+      choice.label = occurrence_label(*s.effective_project(), *row);
       for (const auto& body : row->bodies)
         choice.bodies.push_back(&body);
     } else {
@@ -202,14 +202,14 @@ GuiPhysicalPropertiesController::scopes(const GuiDocumentSession& s) const {
   if (!valid)
     return Result<std::vector<GuiPhysicalScopeChoice>>::failure(valid.error());
   std::vector<GuiPhysicalScopeChoice> choices;
-  choices.push_back({{}, s.part_document() ? "Whole Part" : "Root Assembly"});
+  choices.push_back({{}, s.effective_part_document() ? "Whole Part" : "Root Assembly"});
   if (const auto* p = std::get_if<PartPhysicalProperties>(&snapshot_)) {
     for (const auto& body : p->data().bodies)
       if (body.body)
         choices.push_back({{body.body, {}}, body.name});
   } else {
     for (const auto& row : std::get<ProjectPhysicalProperties>(snapshot_).data().occurrences) {
-      const auto label = occurrence_label(*s.project(), row);
+      const auto label = occurrence_label(*s.effective_project(), row);
       choices.push_back({{{}, row.occurrence}, label});
       for (const auto& body : row.bodies)
         if (body.body)
@@ -244,7 +244,7 @@ GuiPhysicalPropertiesController::view(const GuiDocumentSession& s) const {
     GuiPhysicalPropertiesView out;
     out.canonical = totals;
     out.scope_label = chosen.value().label;
-    out.coordinate_frame = s.part_document() ? "Part coordinates" : "Root assembly coordinates";
+    out.coordinate_frame = s.effective_part_document() ? "Part coordinates" : "Root assembly coordinates";
     out.length_unit = units_.length == GuiPhysicalLengthUnit::Millimeter   ? "mm"
                       : units_.length == GuiPhysicalLengthUnit::Centimeter ? "cm"
                                                                            : "m";
@@ -288,8 +288,8 @@ GuiPhysicalPropertiesController::view(const GuiDocumentSession& s) const {
         ++found->body_count;
         continue;
       }
-      const auto& catalog = s.part_document() ? s.part_document()->engineering_resources()
-                                              : s.project()->engineering_resources();
+      const auto& catalog = s.effective_part_document() ? s.effective_part_document()->engineering_resources()
+                                              : s.effective_project()->engineering_resources();
       const auto* material = catalog.find_material(*body->material);
       if (!material)
         return Result<GuiPhysicalPropertiesView>::failure(

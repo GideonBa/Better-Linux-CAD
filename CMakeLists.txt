@@ -414,6 +414,10 @@ if(BLCAD_BUILD_GUI)
     src/gui/gui_appearance.cpp
     src/gui/gui_icons.cpp
     src/gui/gui_fillet_draft.cpp
+    src/gui/gui_model_state_session.cpp
+    src/gui/gui_assembly_representation_session.cpp
+    src/gui/gui_project_part_context.cpp
+    src/gui/gui_project_part_sketch_catalogs.cpp
     src/gui/gui_document_session.cpp
     src/gui/gui_part_foundation_workbench.cpp
     src/gui/gui_part_operations_workbench.cpp

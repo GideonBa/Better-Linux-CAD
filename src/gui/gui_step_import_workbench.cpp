@@ -2,8 +2,8 @@
 
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
-#include "blcad/geometry/reference_part_geometry.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
+#include "blcad/geometry/reference_part_geometry.hpp"
 #include "blcad/geometry/step_editable_commands.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
@@ -89,6 +89,10 @@ std::vector<std::filesystem::path> save_files(const GuiDocumentSession& session,
   if (session.part_document()) {
     values.emplace_back(path.string() + ".sketch-constraints.json");
     values.emplace_back(path.string() + ".sketch-dimensions.json");
+  } else if (session.project() && !(session.project_part_sketch_catalogs().empty() &&
+                                    project_sketch_catalog_target_is_step_asset(
+                                        *session.project(), session.file_path(), path))) {
+    values.push_back(project_part_sketch_catalog_sidecar(path));
   }
   return values;
 }
