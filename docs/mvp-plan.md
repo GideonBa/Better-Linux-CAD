@@ -4,10 +4,10 @@ role: >-
   Implementation-sequence source of truth. Feature-specific documents remain
   canonical for exact contracts, formulas, persistence details, failure
   policies, ordering, and focused proofs.
-implemented_through: Block 184
-current_block: 185
-current_boundary: Block 185 in progress; continuation through 198 authorized
-current_tag: "[parity-b185]"
+implemented_through: Block 198
+current_block: 199
+current_boundary: Assigned continuation through 198 accepted; 199–211 remain planned
+current_tag: "[parity-b199]"
 phase_status:
   mvp_1: "Single-part modeling — implemented"
   mvp_2: "Semantic references and richer sketch workflows — implemented"
@@ -21,7 +21,7 @@ phase_status:
   mvp_9r: "GUI Shell Reset — Blocks 132–136 implemented; MVP complete"
   mvp_10: "STEP Import — Blocks 137–143 implemented; MVP complete"
   gui_workflow_revision: "Inventor-inspired desktop workflows — Block 144 implemented and accepted"
-  advanced_modeling_workflows: "Blocks 145–184 accepted; Blocks 185–204 planned"
+  advanced_modeling_workflows: "Blocks 145–198 accepted; Blocks 199–204 planned"
   parameter_dependency_navigation: "Blocks 205–211 planned after 204; not started"
 ---
 
@@ -35,17 +35,15 @@ Historical delivery details remain in the linked PRs and Git history.
 ## Current status
 
 ```text
-implemented through  Block 184
-current block        Block 185 (in progress; not yet accepted)
-current phase        Direct editing of existing and imported geometry
-current boundary     DirectEditFeature authority and topology lineage
+implemented through  Block 198
+current block        Block 199 (planned; not started)
+current phase        Inspection performance and final acceptance
+current boundary     Assigned continuation through 198 complete within its linked contracts
 ```
 
-The assigned sequence through Block 184 is complete. Blocks 168–169 were delivered by normal
-rebase in [PR #192](https://github.com/GideonBa/Better-Linux-CAD/pull/192). Main was updated cleanly
-to `8e6304e7ca188ffa10435ed346ea40a6f8ab9592`; its tree exactly matches the reviewed delivery
-`75c7c15de99d61a7d0c25e17f9570642057caf5d`. The serial `feat/offset-thicken-surfaces` branch starts
-there for 170–172. Blocks 173–174 retain their complete native and integrated acceptance.
+The authorized sequence through Block 198 is complete within the linked capability and failure
+boundaries. The acceptance index below records the checked contracts, physical/native proof and
+frozen identities. Delivery: reviewed, verified and normally pushed for protected-branch rebase delivery in [PR #195](https://github.com/GideonBa/Better-Linux-CAD/pull/195). Detailed run chronology stays in Git/PR history.
 [The consolidated sequence](inventor-parity-sequence.md)
 contains dependencies and implementation criteria; [the test plan](inventor-parity-test-plan.md)
 contains individual and combined acceptance; [the UI contract](user-interface.md) owns the
@@ -53,12 +51,12 @@ Inventor-like workflows and layout. These plans retain their full unimplemented 
 
 The 2026-11-17 planning request reserves the [E parameter dependency tree](parameter-dependency-tree-plan.md)
 as Blocks **205–211 after 204**. Rooted Assembly/Part navigation, per-node parameter tables and exact
-formula-use highlighting extend the existing parameter and Project authorities. Blocks 185–204
-retain their order and full acceptance; the next implementation block remains 185.
+formula-use highlighting extend the existing parameter and Project authorities. Blocks 199–204
+retain their order and complete acceptance criteria; no work after 198 is started by this delivery.
 
 ## Delivery discipline
 
-The current assignment continues through **Block 198**. Keep focused professional commits with
+The authorized assignment through **Block 198** is complete. Keep focused professional commits with
 at most 1,500 added lines each, appropriate verification and synchronized documentation. The
 current repository working agreement authorizes normal pushes and serial protected-branch PR
 delivery. The preceding delivery, [PR #194](https://github.com/GideonBa/Better-Linux-CAD/pull/194),
@@ -66,34 +64,72 @@ is verified merged. Main was fast-forwarded to `8db9605e743418a6a54de1ff068bf271
 before starting `feat/direct-edit-authority`; its tree matches the preceding reviewed delivery.
 Blocks 199–211 retain their complete planned scope.
 
-### Assigned continuation through Block 198 — 2026-11-17
+### Blocks 185–198 — accepted
 
-| Delivery scope | Required completion boundary | Status |
+The complete D01/D02, V01/V02, A01–A04 and UI01 gates are accepted within the existing contracts.
+The advanced Part portion of X01 and connected X02 partial-198 case are included; their complete
+204 scenarios and all 199–211 requirements remain planned. Whole-Part recursive shape/pose feedback
+continues to reject. Earlier planning/delivery records below retain their original implementation
+baseline verbatim; the current header and phase table own present status.
+
+| Block | Accepted boundary and canonical contract | Focused proof sources |
 | --- | --- | --- |
-| 185–188 | Direct Edit authority, checked native execution, owned Qt authoring and integrated Advanced Part scenarios D01/D02/X01 | Core/backend foundation verified; native and integrated gates pending |
-| 189–191 | Sparse model-state intent, immutable effective evaluation, isolated consumers and native variant/member workflows V01/V02 | Core/effective Geometry foundation verified; native workflows pending |
-| 192–195 | Independent rooted flexible poses, common posed consumers and directed adaptive Project transactions A01/A02 | Independent pose foundation verified; extended state/solver and adaptive gates pending |
-| 196–198 | Coordinated Assembly Hole participants and execution, distinct representations and native Assembly lifecycle A03/A04/UI01 | Planned |
+| 185 | Typed Direct Edit, predecessor/face ownership, strict V16 and immutable bases; [contract](part-direct-edit-mvp6.md#core-authority) | [Core](../tests/core/direct_edit_intent_tests.cpp), D01 |
+| 186 | Checked supported Move/Rotate/Size/Delete-Heal, provenance, replay and rollback; [construction](part-direct-edit-mvp6.md#checked-native-construction) | [Geometry](../tests/geometry/direct_edit_tests.cpp), D01–D02 |
+| 187 | Owned native Direct Edit task, bindings, frame/grips and explicit conversion; [workflow](part-direct-edit-mvp6.md#owned-native-workflow) | [Tools](../tests/gui/gui_direct_edit_tools_tests.cpp), [imported workflow](../tests/gui/gui_direct_edit_import_tests.cpp), UI01 |
+| 188 | Native/imported advanced Part chains and a separate literal rotor advanced-Part bridge, physical consumers, history/refresh/STEP; [combined contract](part-direct-edit-mvp6.md#advanced-part-combination-fixture) | [Native combination](../tests/gui/gui_advanced_part_direct_tests.cpp), [rotor](../tests/geometry/advanced_rotor_tests.cpp), D02/X01 Part |
+| 189 | Stable Primary and sparse typed parameter/formula/suppression/material/child-state intent; [contract](parameter-model.md) | [Core states](../tests/core/model_state_tests.cpp), V01 |
+| 190 | Immutable effective states and isolated geometry/topology/material/freshness consumers; [evaluation](parameter-model.md) | [Geometry states](../tests/geometry/model_state_tests.cpp), [session isolation](../tests/gui/gui_model_state_tests.cpp), V01–V02 |
+| 191 | Atomic typed variant table, explicit Part/child-Assembly state selectors in Insert/Place, transient activation and independent member identity/resources; [native contract](parameter-model.md#native-table-selected-views-and-independent-member-copies--191) | [Native/session/member proof](../tests/gui/gui_model_state_tests.cpp), V02/UI01 |
+| 192 | Rooted occurrence-local pose authority, strict compatibility and shared-definition protection; [contract](assembly-flexible-subassembly-solving-mvp5.md) | [Core poses](../tests/core/assembly_occurrence_pose_tests.cpp), A01 |
+| 193 | Independent occurrence solve/motion and common posed targets/Measure/mass/contact/STEP; [contract](assembly-flexible-subassembly-solving-mvp5.md) | [Physical poses/freshness](../tests/geometry/assembly_occurrence_pose_tests.cpp), A01 |
+| 194 | Explicit directed source occurrence/state/frame, definition driver, detach and cycle checks; [contract](assembly-system.md) | [Core references](../tests/core/project_design_reference_tests.cpp), A02 |
+| 195 | Checked adaptive rebuild and complete normalized Project publication; [contract](assembly-system.md) | [Adaptive Geometry](../tests/geometry/adaptive_project_tests.cpp), [diagnostics](../tests/geometry/assembly_solve_diagnostics_tests.cpp), [STEP candidates](../tests/geometry/step_editable_commands_tests.cpp), A02 |
+| 196 | Shared Hole/Thread recipes, pinned rows and explicit participant/state/shared-definition policy; [contract](hole-wizard.md#coordinated-project-machining--196197) | [Core machining](../tests/core/assembly_hole_tests.cpp), A03 |
+| 197 | Exact participant-local cuts, semantic bores/seats, replay and whole-Project rollback; [execution](hole-wizard.md#coordinated-project-machining--196197) | [Physical machining/normalization](../tests/geometry/assembly_hole_tests.cpp), A03 |
+| 198 | Distinct position/display/manufacturing scopes, native Assembly tools and atomic Part/Sketch context lifecycle; [Assembly contract](assembly-system.md), [Part context](parameter-model.md#in-context-part-editing-and-root-publication--198) | [Representations](../tests/core/assembly_representation_tests.cpp), [native Assembly](../tests/gui/gui_advanced_assembly_tests.cpp), [context/sidecars](../tests/gui/gui_project_part_context_tests.cpp), [connected housing](../tests/gui/gui_configurable_housing_tests.cpp), A01–A04/V02/UI01/X02 partial |
 
-The initial foundation has [checked Core/backend evidence](part-direct-edit-mvp6.md#backend-foundation-verification)
-and independent [variant](../tests/geometry/model_state_tests.cpp) /
-[occurrence](../tests/geometry/assembly_occurrence_pose_tests.cpp) physical scenarios. This slice
-advances no entire numbered block; remaining native/integrated requirements are unchanged.
+| Final verification and retained artifact scope | Checked result |
+| --- | --- |
+| Required Debug/dev-gui builds | All six required targets built; subsequent Geometry test-only and optional-profiler-only rebuilds passed; includes the retained-history lifetime and verified Geometry transition fixes |
+| Complete Core | **838 cases / 36,902 assertions**, all passed; Core executable and library are byte-identical to verified Freeze20 artifacts |
+| Complete isolated Geometry | **891 cases / 95,967 assertions**, all passed; the complete post-fix run exited 0 |
+| Focused ownership/transition regression | Public verified transitions **3 cases / 87 assertions**; GUI history/cache/Surface **9 cases / 1,026 assertions**, all passed |
+| Mixed-platform default GUI registry partition | Exact registry identities and disjoint union checked; [acceptance evidence](evidence/through198/README.md); exact disjoint union **1,022 offscreen broad + 1 native xcb housing + 5 offscreen inventory = 1,028 configured default cases**; optional complex profile excluded as configured |
+| Complete offscreen broad GUI partition | **1,022 cases: 924 passed / 98 native-only skips; 105,912 assertions**, zero failures, exit 0 |
+| Complete native xcb housing default partition | **1 case / 164 assertions**, passed natively with zero failures/skips, exit 0; the complete native 100% run supplies this one default case, including functional and UI assertions |
+| Complete offscreen inventory/workflow partition | **5 cases / 934 assertions**, passed; zero failures/skips, exit 0 |
+| Complete mixed-platform configured default GUI total | **1,028 cases: 930 passed / 98 native-only skips; 107,010 assertions**, zero failures; all three completed runs have zero failures, with registry completeness checked independently |
+| Native 100% focused core workflows | **8 cases / 1,319 assertions**, zero failures/skips, exit 0; Freeze22 captures match the reviewed Freeze20 images byte-for-byte; includes corrected generic/footer Part-context Cancel and exact root/Sketch restoration |
+| Native compact 150% focused core workflows | **8 cases / 1,319 assertions**, zero failures/skips, exit 0; all 30 images across both scales match the reviewed Freeze20 images byte-for-byte; same complete affected interaction scope |
+| Connected native D02 and X02 partial-198, 100% | **2 cases / 255 assertions**: housing 1/164 and Part 1/91, zero failures/skips, exit 0 |
+| Connected native D02 and X02 partial-198, compact 150% | **2 cases / 255 assertions**: housing 1/164 and Part 1/91, zero failures/skips, exit 0; native captures reviewed |
+| X01 advanced-Part/rotor physical proof | Included in the complete Geometry suite; [bounded rotor/Part split](part-direct-edit-mvp6.md#literal-rotor-advanced-part-bridge); full combined X01 remains 204 |
+| Physical properties/exchange | [Fixed-plane adaptive Gauss–Kronrod](engineering-modules.md#physical-properties--block-150-contract), thin-annulus moments and strict planar-Thicken STEP regression are included in complete Geometry; display visibility remains independent of physical validation |
+| Inventory and persistence/publication | Included in the complete GUI/connected gates above; historical 18-family shell record retained |
+| Isolated P01 state/occurrence baseline | **18 fresh processes** across six workload sizes, all passed without failures/timeouts; each metric has **3 cold / 30 warm** observations; [published summary](benchmarks/through198-state-assembly/derived/p01-summary.md); [scope and methodology](state-assembly-profile-mvp6.md); no native UI-latency or Block203 budget claim |
+| Separate native startup | Startup04 passed: visible healthy 1440×900 native window; WM_DELETE closed with exit 0 |
+| Final frozen runtime | **1,412 runtime inputs**, 1,414 manifest lines, Freeze23 SHA256 `c9c948844c19763aed68a5ebc160b6faa66d8b7ace182b48b5923a0bd2bcb97a` |
+| Final source/binary identity recheck | Only optional profiler source/executable changed after Freeze22; all functional inputs, executables and libraries are byte-identical in the [retained proof](evidence/through198/profile-only-retained-proof.json); Core unchanged artifacts are confirmed and Geometry is rerun; the [final collector](evidence/through198/proof/proof.json) verifies all 1,412 inputs, nine artifacts and registry identities with no pending gates |
+| Final working/staged review and delivery | reviewed, verified and normally pushed for protected-branch rebase delivery in [PR #195](https://github.com/GideonBa/Better-Linux-CAD/pull/195); all new commits at most 1,500 additions, normal push/merge |
 
-Acceptance follows the existing sequence and test-plan oracles, including native Qt/OCCT at both
-scales for interaction changes. Implementation slices do not close a whole block. Each verified
-coherent change is reviewed, committed with its validation evidence, and pushed normally; PR merge
-must preserve the 1,500-addition commit boundaries. Frozen runtime manifests and focused proof
-belong to the affected contracts; Git and PR history retain execution chronology.
+The complete configured default GUI scope is assembled from three disjoint completed partitions:
+offscreen broad, native xcb housing at 100%, and offscreen inventory. It is mixed-platform coverage;
+no complete all-offscreen run is claimed. The separate 150% housing and both native Part runs
+provide additional interaction proof without being counted twice in default totals.
+The complete test/capture gate covers native Qt/OCCT at both scales. Counts distinguish executed
+native cases from offscreen skips. Source and executable identities match the final verification;
+any later runtime change requires the affected checks again. The canonical contracts retain exact
+numeric/capability limits and deferred scope; Git/PR history retains delivery chronology.
 
-### Assigned continuation through Block 184 — updated 2026-11-17
+### Earlier assignment through Block 184
 
-The current request extends the complete sequence through 184. Keep each commit below 1,500 added lines;
-this assignment does not change acceptance status. Keep the detailed requirements in
+The earlier assignment through 184 is complete. Its contract/proof index remains below; current
+acceptance continues through 198 above. Detailed requirements remain in
 [the sequence](inventor-parity-sequence.md) and the scenario oracles in
 [the test plan](inventor-parity-test-plan.md).
 
-| Next delivery | Completion boundary / proof |
+| Earlier delivery | Completion boundary / proof |
 | --- | --- |
 | 156 | Delivered in PR #175: shared placements, Hole consumers, full suites, native 100%/150% and startup verified. |
 | 157 | Delivered in PR #181: semantic Hole/Thread creation/editing, explicit conversion, presets and native B01–B04/UI01. |
@@ -122,12 +158,11 @@ this assignment does not change acceptance status. Keep the detailed requirement
 
 The active Surface branch has [complete checked G03 construction, consumers and exchange proof](part-surface-feature-intent-mvp6.md#g03-consumers-and-exchange-proof).
 Curved Trim/Extend and complete G04 are accepted in 172; the [bounded construction contract](part-trim-extend-surface-geometry-mvp6.md#curved-boundary-construction--172) is retained.
-Blocks 182–184 are accepted. The active boundary is 185; implementation is in progress and acceptance is pending. The original
-sequence and scenario oracles retain every prerequisite, supported-capability requirement and
-deferred extension.
+Blocks 182–184 remain accepted; the current accepted boundary is 198. The original sequence and
+scenario oracles retain every prerequisite, supported-capability requirement and deferred extension.
 
 Each row retains its full numbered prerequisites and acceptance criteria; grouped rows do not
-authorize partial acceptance of any block. Preserve all planned scope after 184.
+authorize partial acceptance of any block. Preserve all planned scope after 198.
 
 Every new commit must contain at most **1,500 added lines**, checked from the staged numstat. Split
 large deliveries into coherent commits and use an allowed merge method that preserves this limit.
@@ -213,8 +248,8 @@ raw samples, benchmark limits and future performance scope remain in their exist
 
 ## Blocks 145–204 — Advanced modeling workflows
 
-Status authority: Blocks 145–174 are **Implemented and accepted**;
-Block 175 is **In progress**; Blocks 176–204 are **Planned; not started**.
+Status authority: Blocks 145–198 are **Implemented and accepted**;
+Blocks 199–204 are **Planned; not started**.
 The explicit 2026-11-09 resume led to whole-154 acceptance on 2026-11-10.
 The 2026-11-06 implementation request starts the serial slices below. Detailed block dependencies,
 contract owners and completion criteria live in `inventor-parity-sequence.md`. Scenario definitions,
@@ -229,8 +264,8 @@ negative cases, combination matrix, native proof and performance protocol live i
 | C | 159–165 | Planar G2/equation curves, spatial constraint model/solver and interactive 3D curves | Implemented and accepted |
 | D | 166–174 | Curve-preserving paths, multi-wire/semantic-edge Sweep, verified G2 Loft, Offset/Thicken, curved Trim/Extend and Surface acceptance | Implemented and accepted |
 | E | 175–184 | Variable/face/full-round Fillet and corners, Rib/Web, Emboss/Engrave and their property workflows | Implemented and accepted |
-| F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Planned; not started |
-| G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Planned; not started |
+| F | 185–188 | Direct face edits, checked healing, immutable imported bases and integrated advanced Part acceptance | Implemented and accepted |
+| G | 189–198 | Model states/variants, occurrence-local flexibility, adaptive cross-document design, coordinated Assembly holes and UI | Implemented and accepted |
 | H | 199–204 | Motion/contact extensions, finite measurement, quality/thickness analysis, measured performance and final combined acceptance | Planned; not started |
 | I | 205–211 | Rooted parameter dependency tree, qualified formulas, per-node tables, impact navigation and shared editing | Planned after 204; not started |
 
@@ -1231,7 +1266,7 @@ Planning request: 2026-11-17. The [detailed implementation and application plan]
 extends the existing parameter/formula system, Assembly bindings, occurrence hierarchy and atomic
 Project transactions. [The sequence](inventor-parity-sequence.md#post-204-parameter-dependency-navigation)
 and [PN01–PN07](inventor-parity-test-plan.md#post-204-parameter-navigation-scenarios) define execution
-and acceptance. Implemented status stays at 184; all blocks below wait for 204.
+and acceptance. Implemented status stays at 198; all blocks below wait for 204.
 
 | Block | Planned completion boundary | Status |
 | --- | --- | --- |
