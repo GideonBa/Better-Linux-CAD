@@ -1,4 +1,5 @@
 #include "blcad/gui/gui_document_session.hpp"
+#include "blcad/geometry/project_evaluation.hpp"
 
 #include "blcad/core/assembly_document.hpp"
 #include "blcad/core/part_document_json.hpp"
@@ -417,6 +418,7 @@ std::optional<std::vector<std::string>> transaction_geometry_roots(const PartDoc
                                                 "loft_features",
                                                 "surface_features",
                                                 "sketch_driven_features",
+                                                "direct_edit_features",
                                                 "part_patterns",
                                                 "mirror_features",
                                                 "edge_treatments",
@@ -792,7 +794,13 @@ Result<std::size_t> GuiDocumentSession::create_part(DocumentId id, std::string n
     record_error(created.error());
     return Result<std::size_t>::failure(created.error());
   }
+  active_position_ = master_position_id();
+  active_design_view_ = default_design_view_id();
+  active_model_state_ = primary_model_state_id();
+  effective_part_document_.reset();
+  effective_project_.reset();
   document_ = std::move(created.value());
+  project_part_sketch_catalogs_.clear();
   sketch_constraint_catalogs_.clear();
   sketch_dimension_catalogs_.clear();
   display_name_ = std::get<PartDocument>(document_).name();
@@ -823,7 +831,13 @@ Result<std::size_t> GuiDocumentSession::create_project(DocumentId id, std::strin
     record_error(created.error());
     return Result<std::size_t>::failure(created.error());
   }
+  active_position_ = master_position_id();
+  active_design_view_ = default_design_view_id();
+  active_model_state_ = primary_model_state_id();
+  effective_part_document_.reset();
+  effective_project_.reset();
   document_ = std::move(created.value());
+  project_part_sketch_catalogs_.clear();
   sketch_constraint_catalogs_.clear();
   sketch_dimension_catalogs_.clear();
   display_name_ = std::get<Project>(document_).name();
@@ -852,6 +866,7 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
   Document candidate;
   std::vector<SketchConstraintCatalog> candidate_constraints;
   std::vector<SketchDimensionCatalog> candidate_dimensions;
+  std::vector<GuiProjectPartSketchCatalogs> candidate_project_catalogs;
   if (is_project_path(path)) {
     auto read = read_project_json_file(path);
     if (read.has_error()) {
@@ -859,6 +874,12 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
       return Result<std::size_t>::failure(read.error());
     }
     candidate = std::move(read.value());
+    auto catalogs = read_project_part_sketch_catalogs(std::get<Project>(candidate), path);
+    if (!catalogs) {
+      record_error(catalogs.error());
+      return Result<std::size_t>::failure(catalogs.error());
+    }
+    candidate_project_catalogs = std::move(catalogs.value());
   } else {
     auto read = read_part_document_json_file(path, mode == GuiDocumentOpenMode::ReferenceRepair
                                                        ? PartDocumentReadMode::ReferenceRepair
@@ -954,7 +975,13 @@ Result<std::size_t> GuiDocumentSession::open_file(const std::filesystem::path& p
     project_caches = std::move(caches.value());
   }
 
+  active_position_ = master_position_id();
+  active_design_view_ = default_design_view_id();
+  active_model_state_ = primary_model_state_id();
+  effective_part_document_.reset();
+  effective_project_.reset();
   document_ = std::move(candidate);
+  project_part_sketch_catalogs_ = std::move(candidate_project_catalogs);
   sketch_constraint_catalogs_ = std::move(candidate_constraints);
   sketch_dimension_catalogs_ = std::move(candidate_dimensions);
   file_path_ = path;
@@ -994,6 +1021,16 @@ Result<std::uintmax_t> GuiDocumentSession::save() {
 }
 
 Result<std::uintmax_t> GuiDocumentSession::save_as(const std::filesystem::path& path) {
+  if (project_part_context_base_) {
+    auto root = *project_part_context_base_;
+    auto written = root.save_as(path);
+    if (!written)
+      return written;
+    project_part_context_base_ = std::make_shared<const GuiDocumentSession>(std::move(root));
+    file_path_ = project_part_context_base_->file_path_;
+    record_information(path.string(), "committed Assembly saved; in-context Part draft retained");
+    return written;
+  }
   if (part_workflow_base_) {
     // Reuse the complete existing save transaction, including both sidecars and
     // protected imported assets. Draft Sketch commands must never leak to disk.
@@ -1007,6 +1044,7 @@ Result<std::uintmax_t> GuiDocumentSession::save_as(const std::filesystem::path& 
     saved_json_ = std::move(committed.saved_json_);
     saved_sketch_constraint_catalogs_ = std::move(committed.saved_sketch_constraint_catalogs_);
     saved_sketch_dimension_catalogs_ = std::move(committed.saved_sketch_dimension_catalogs_);
+    saved_project_part_sketch_catalogs_ = std::move(committed.saved_project_part_sketch_catalogs_);
     record_information(path.string(), "committed document saved; workflow draft retained");
     return saved;
   }
@@ -1017,6 +1055,15 @@ Result<std::uintmax_t> GuiDocumentSession::save_as(const std::filesystem::path& 
   }
   if (path.empty()) {
     const auto error = session_error("document path must not be empty");
+    record_error(error);
+    return Result<std::uintmax_t>::failure(error);
+  }
+
+  if (project() && !project_part_sketch_catalogs_.empty() &&
+      project_sketch_catalog_target_is_step_asset(*project(), file_path_, path)) {
+    const auto error = session_error(
+        "Project child-Sketch sidecar path is owned by an immutable STEP source; choose Save As or "
+        "relocate that source");
     record_error(error);
     return Result<std::uintmax_t>::failure(error);
   }
@@ -1072,6 +1119,17 @@ Result<std::uintmax_t> GuiDocumentSession::save_as(const std::filesystem::path& 
     files.push_back({constraint_sidecar_path(path), std::move(constraint_json)});
     files.push_back({dimension_sidecar_path(path), std::move(dimension_json)});
   }
+  if (const auto* root = project()) {
+    std::optional<std::string> catalogs;
+    if (!project_part_sketch_catalogs_.empty()) {
+      auto encoded = serialize_project_part_sketch_catalogs(*root);
+      if (!encoded)
+        return Result<std::uintmax_t>::failure(encoded.error());
+      catalogs = std::move(encoded.value());
+    }
+    if (catalogs || !project_sketch_catalog_target_is_step_asset(*root, file_path_, path))
+      files.push_back({project_part_sketch_catalog_sidecar(path), std::move(catalogs)});
+  }
   auto written = write_save_transaction(std::move(files));
   if (written.has_error()) {
     record_error(written.error());
@@ -1081,12 +1139,16 @@ Result<std::uintmax_t> GuiDocumentSession::save_as(const std::filesystem::path& 
   saved_json_ = main_json.value();
   saved_sketch_constraint_catalogs_ = sketch_constraint_catalogs_;
   saved_sketch_dimension_catalogs_ = sketch_dimension_catalogs_;
+  saved_project_part_sketch_catalogs_ = project_part_sketch_catalogs_;
   record_information(path.string(), "document saved");
   diagnose_step_import_sources();
   return written;
 }
 
 Result<std::size_t> GuiDocumentSession::recompute() {
+  if (active_model_state_ != primary_model_state_id() || active_position_ != master_position_id() ||
+      active_design_view_ != default_design_view_id())
+    return rebuild_model_state_view(active_model_state_);
   if (auto* part = part_document()) {
     auto valid_constraints = validate_constraint_catalogs(*part, sketch_constraint_catalogs_);
     if (valid_constraints.has_error()) {
@@ -1147,6 +1209,9 @@ Result<std::size_t> GuiDocumentSession::recompute() {
 
 Result<std::size_t> GuiDocumentSession::commit_part_transaction(std::string label,
                                                                 const GuiPartMutation& mutation) {
+  if (active_model_state_ != primary_model_state_id())
+    return Result<std::size_t>::failure(
+        session_error("Return to Primary before modeling; edit variant overrides in Model States"));
   if (reference_repair_mode_)
     return Result<std::size_t>::failure(session_error("complete reference repair before modeling"));
   return commit_part_repair_transaction(std::move(label), mutation);
@@ -1155,6 +1220,9 @@ Result<std::size_t> GuiDocumentSession::commit_part_transaction(std::string labe
 Result<std::size_t>
 GuiDocumentSession::commit_part_repair_transaction(std::string label,
                                                    const GuiPartMutation& mutation) {
+  if (active_model_state_ != primary_model_state_id())
+    return Result<std::size_t>::failure(
+        session_error("Return to Primary before modeling; edit variant overrides in Model States"));
   if (!part_document() || !mutation || label.empty())
     return Result<std::size_t>::failure(session_error("invalid Part transaction"));
   const auto serialized = serialize_current();
@@ -1181,6 +1249,9 @@ GuiDocumentSession::commit_part_repair_transaction(std::string label,
 Result<std::size_t>
 GuiDocumentSession::commit_part_constraint_transaction(std::string label,
                                                        const GuiPartConstraintMutation& mutation) {
+  if (active_model_state_ != primary_model_state_id())
+    return Result<std::size_t>::failure(
+        session_error("Return to Primary before modeling; edit variant overrides in Model States"));
   if (reference_repair_mode_)
     return Result<std::size_t>::failure(session_error("complete reference repair before modeling"));
   if (!part_document() || !mutation || label.empty())
@@ -1205,6 +1276,9 @@ GuiDocumentSession::commit_part_constraint_transaction(std::string label,
 Result<std::size_t>
 GuiDocumentSession::commit_part_dimension_transaction(std::string label,
                                                       const GuiPartDimensionMutation& mutation) {
+  if (active_model_state_ != primary_model_state_id())
+    return Result<std::size_t>::failure(
+        session_error("Return to Primary before modeling; edit variant overrides in Model States"));
   if (reference_repair_mode_)
     return Result<std::size_t>::failure(session_error("complete reference repair before modeling"));
   if (!part_document() || !mutation || label.empty())
@@ -1227,6 +1301,9 @@ GuiDocumentSession::commit_part_dimension_transaction(std::string label,
 
 Result<std::size_t> GuiDocumentSession::commit_part_sketch_intent_transaction(
     std::string label, const GuiPartSketchIntentMutation& mutation) {
+  if (active_model_state_ != primary_model_state_id())
+    return Result<std::size_t>::failure(
+        session_error("Return to Primary before modeling; edit variant overrides in Model States"));
   if (reference_repair_mode_)
     return Result<std::size_t>::failure(session_error("complete reference repair before modeling"));
   if (!part_document() || !mutation || label.empty())
@@ -1251,6 +1328,12 @@ Result<std::size_t> GuiDocumentSession::commit_part_sketch_intent_transaction(
 Result<std::size_t>
 GuiDocumentSession::commit_project_transaction(std::string label,
                                                const GuiProjectMutation& mutation) {
+  if (active_position_ != master_position_id())
+    return Result<std::size_t>::failure(session_error(
+        "Return to Master before editing model intent; Store a named position separately"));
+  if (active_model_state_ != primary_model_state_id())
+    return Result<std::size_t>::failure(
+        session_error("Return to Primary before modeling; edit variant overrides in Model States"));
   if (!project() || !mutation || label.empty())
     return Result<std::size_t>::failure(session_error("invalid Project transaction"));
   const auto serialized = serialize_current();
@@ -1291,6 +1374,10 @@ GuiDocumentSession::commit_project_transaction(std::string label,
       if (!valid)
         return valid;
     }
+  auto child_catalogs =
+      validate_project_part_sketch_catalogs(cloned.value(), project_part_sketch_catalogs_);
+  if (!child_catalogs)
+    return child_catalogs;
   auto caches = recompute_project(cloned.value());
   if (caches.has_error()) {
     recompute_status_ = GuiRecomputeStatus::Failed;
@@ -1302,7 +1389,22 @@ GuiDocumentSession::commit_project_transaction(std::string label,
   const auto json = serialize_project_to_json(cloned.value());
   if (json.has_error())
     return Result<std::size_t>::failure(json.error());
+  std::optional<Project> selected_project;
+  if (active_model_state_ != primary_model_state_id() || active_position_ != master_position_id() ||
+      active_design_view_ != default_design_view_id()) {
+    auto view = *this;
+    view.document_ = cloned.value();
+    auto computed = view.rebuild_model_state_view(active_model_state_);
+    if (!computed)
+      return Result<std::size_t>::failure(computed.error());
+    active_position_ = view.active_position_;
+    active_design_view_ = view.active_design_view_;
+    selected_project = std::move(view.effective_project_);
+    caches.value() = std::move(view.project_part_caches_);
+  }
   document_ = std::move(cloned.value());
+  effective_project_ = std::move(selected_project);
+  effective_part_document_.reset();
   sketch_constraint_catalogs_.clear();
   sketch_dimension_catalogs_.clear();
   project_part_caches_ = std::move(caches.value());
@@ -1316,10 +1418,13 @@ GuiDocumentSession::commit_project_transaction(std::string label,
 }
 
 void GuiDocumentSession::restore_creation_checkpoint(GuiDocumentSession checkpoint) {
+  if (project_part_context_base_ && checkpoint.project_part_context_base_)
+    checkpoint.project_part_context_base_ = project_part_context_base_;
   checkpoint.file_path_ = std::move(file_path_);
   checkpoint.saved_json_ = std::move(saved_json_);
   checkpoint.saved_sketch_constraint_catalogs_ = std::move(saved_sketch_constraint_catalogs_);
   checkpoint.saved_sketch_dimension_catalogs_ = std::move(saved_sketch_dimension_catalogs_);
+  checkpoint.saved_project_part_sketch_catalogs_ = std::move(saved_project_part_sketch_catalogs_);
   const auto next_model_revision = std::max(model_revision(), checkpoint.model_revision()) + 1;
   checkpoint.visibility_revision_ = std::max(visibility_revision_, checkpoint.visibility_revision_);
   checkpoint.presentation_revision_ = checkpoint.visibility_revision_ + next_model_revision;
@@ -1327,6 +1432,9 @@ void GuiDocumentSession::restore_creation_checkpoint(GuiDocumentSession checkpoi
 }
 
 Result<std::size_t> GuiDocumentSession::begin_part_workflow() {
+  if (active_model_state_ != primary_model_state_id())
+    return Result<std::size_t>::failure(
+        session_error("Return to Primary before modeling; edit variant overrides in Model States"));
   if (part_workflow_base_ || !part_document() || part_document()->is_reference_part() ||
       reference_repair_mode_ || task_.active() || workspace_ != GuiWorkspace::Part ||
       !derived_results_fresh())
@@ -1362,9 +1470,12 @@ Result<std::size_t> GuiDocumentSession::publish_part_workflow(std::string label)
   // Save/Save As can have happened while the draft was open. Keep its actual
   // committed path/metadata when replacing the working session.
   accepted.file_path_ = file_path_;
+  if (project_part_context_base_ && accepted.project_part_context_base_)
+    accepted.project_part_context_base_ = project_part_context_base_;
   accepted.saved_json_ = saved_json_;
   accepted.saved_sketch_constraint_catalogs_ = saved_sketch_constraint_catalogs_;
   accepted.saved_sketch_dimension_catalogs_ = saved_sketch_dimension_catalogs_;
+  accepted.saved_project_part_sketch_catalogs_ = saved_project_part_sketch_catalogs_;
   const auto& entry = accepted.history_[accepted.history_index_];
   const bool changed = json.value() != entry.json ||
                        sketch_constraint_catalogs_ != entry.sketch_constraints ||
@@ -1466,7 +1577,7 @@ bool GuiDocumentSession::history_prefix_ready() const {
 }
 
 bool GuiDocumentSession::part_modeling_ready() const {
-  return part_document() && (derived_results_fresh() || history_prefix_ready());
+  return active_model_state_ == primary_model_state_id() && part_document() && (derived_results_fresh() || history_prefix_ready());
 }
 
 Result<std::size_t> GuiDocumentSession::begin_part_history_command(std::string command_id) {
@@ -1495,9 +1606,12 @@ Result<std::size_t> GuiDocumentSession::publish_part_history_command(std::string
     return Result<std::size_t>::failure(source.error());
   auto accepted = *history_command_base_;
   accepted.file_path_ = file_path_;
+  if (project_part_context_base_ && accepted.project_part_context_base_)
+    accepted.project_part_context_base_ = project_part_context_base_;
   accepted.saved_json_ = saved_json_;
   accepted.saved_sketch_constraint_catalogs_ = saved_sketch_constraint_catalogs_;
   accepted.saved_sketch_dimension_catalogs_ = saved_sketch_dimension_catalogs_;
+  accepted.saved_project_part_sketch_catalogs_ = saved_project_part_sketch_catalogs_;
   const auto& entry = accepted.history_[accepted.history_index_];
   const bool changed = source.value() != entry.json ||
                        sketch_constraint_catalogs_ != entry.sketch_constraints ||
@@ -1594,7 +1708,7 @@ Result<std::size_t> GuiDocumentSession::redo() {
 }
 
 bool GuiDocumentSession::close(bool discard_dirty) noexcept {
-  if (part_workflow_base_ || task_.active() || (dirty() && !discard_dirty))
+  if (project_part_context_active() || part_workflow_base_ || task_.active() || (dirty() && !discard_dirty))
     return false;
   reset_document();
   return true;
@@ -1650,6 +1764,8 @@ bool GuiDocumentSession::has_document() const noexcept {
 }
 
 bool GuiDocumentSession::dirty() const noexcept {
+  if (project_part_context_base_ && project_part_context_base_->dirty())
+    return true;
   const auto& committed = part_workflow_base_ ? *part_workflow_base_ : *this;
   if (!committed.has_document() || committed.history_.empty())
     return false;
@@ -1657,7 +1773,9 @@ bool GuiDocumentSession::dirty() const noexcept {
   return !saved_json_ || current.json != *saved_json_ || !saved_sketch_constraint_catalogs_ ||
          current.sketch_constraints != *saved_sketch_constraint_catalogs_ ||
          !saved_sketch_dimension_catalogs_ ||
-         current.sketch_dimensions != *saved_sketch_dimension_catalogs_;
+         current.sketch_dimensions != *saved_sketch_dimension_catalogs_ ||
+         !saved_project_part_sketch_catalogs_ ||
+         current.project_catalogs != *saved_project_part_sketch_catalogs_;
 }
 
 bool GuiDocumentSession::reference_repair_mode() const noexcept {
@@ -1824,6 +1942,22 @@ GuiDocumentSession::recompute_project(Project& active_project,
                     : file_path_.empty()
                         ? std::filesystem::path{}
                         : std::filesystem::absolute(file_path_).lexically_normal().parent_path();
+  if (!active_project.design_references().empty() ||
+      !active_project.assembly_hole_features().empty()) {
+    std::optional<geometry::StepImportTopologyContext> context;
+    if (!root.empty())
+      context.emplace(root);
+    auto normalized =
+        geometry::evaluate_project_geometry(active_project, context ? &*context : nullptr);
+    if (!normalized) {
+      if (import_failure) {
+        *import_failure = normalized.error();
+        return Result<std::vector<ProjectPartCache>>::success({});
+      }
+      return Result<std::vector<ProjectPartCache>>::failure(normalized.error());
+    }
+    active_project = std::move(normalized.value());
+  }
   std::vector<ProjectPartCache> caches;
   caches.reserve(active_project.part_document_count());
   for (auto& part : active_project.part_documents()) {
@@ -1833,8 +1967,11 @@ GuiDocumentSession::recompute_project(Project& active_project,
     const auto result = [&]() -> Result<std::size_t> {
       if (!import_failure && derived_results_fresh() && project()) {
         const auto* previous = project()->find_part_document(part.id());
-        const auto old = std::find_if(project_part_caches_.begin(), project_part_caches_.end(),
-                                      [&](const auto& item) { return item.part_id == part.id(); });
+        const auto old = std::find_if(
+            project_part_caches_.begin(), project_part_caches_.end(), [&](const auto& item) {
+              return item.part_id == part.id() &&
+                     item.selected_model_state == primary_model_state_id();
+            });
         if (previous && old != project_part_caches_.end()) {
           auto reused = old->cache;
           std::optional<geometry::StepImportTopologyContext> context;
@@ -1864,6 +2001,32 @@ GuiDocumentSession::recompute_project(Project& active_project,
     }
     caches.push_back(ProjectPartCache{part.id(), std::move(cache.value())});
   }
+  if (!import_failure || !*import_failure) {
+    auto leaves = AssemblyLeafOccurrenceResolver{}.resolve(
+        active_project, AssemblyLeafParticipation::PhysicalActive);
+    if (!leaves)
+      return Result<std::vector<ProjectPartCache>>::failure(leaves.error());
+    for (const auto& leaf : leaves.value()) {
+      if (leaf.selected_model_state == primary_model_state_id() ||
+          std::any_of(caches.begin(), caches.end(), [&](const auto& c) {
+            return c.part_id == leaf.referenced_part_document &&
+                   c.selected_model_state == leaf.selected_model_state;
+          }))
+        continue;
+      const auto* primary = active_project.find_part_document(leaf.referenced_part_document);
+      auto effective = primary->evaluate_model_state(leaf.selected_model_state);
+      if (!effective)
+        return Result<std::vector<ProjectPartCache>>::failure(effective.error());
+      auto cache =
+          geometry::ShapeCache::create(ShapeCacheId("gui.project.state." + primary->id().value()));
+      if (!cache)
+        return Result<std::vector<ProjectPartCache>>::failure(cache.error());
+      auto computed = recompute_part(effective.value(), cache.value(), root);
+      if (!computed)
+        return Result<std::vector<ProjectPartCache>>::failure(computed.error());
+      caches.push_back({primary->id(), std::move(cache.value()), leaf.selected_model_state});
+    }
+  }
   if ((!import_failure || !*import_failure) && !root.empty()) {
     geometry::StepImportTopologyContext context(root);
     auto valid = geometry::validate_imported_assembly_inputs(active_project, context);
@@ -1881,9 +2044,9 @@ GuiDocumentSession::recompute_project(Project& active_project,
 }
 
 const geometry::ShapeCache*
-GuiDocumentSession::project_part_shape_cache(DocumentId part) const noexcept {
+GuiDocumentSession::project_part_shape_cache(DocumentId part, ModelStateId state) const noexcept {
   const auto found = std::find_if(project_part_caches_.begin(), project_part_caches_.end(),
-                                  [&](const auto& item) { return item.part_id == part; });
+                                  [&](const auto& item) { return item.part_id == part && item.selected_model_state == state; });
   return found == project_part_caches_.end() ? nullptr : &found->cache;
 }
 
@@ -1908,6 +2071,12 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
     if (active_project.has_error())
       return Result<std::size_t>::failure(active_project.error());
     restored = std::move(active_project.value());
+  }
+
+  if (const auto* root = std::get_if<Project>(&restored)) {
+    auto catalogs = validate_project_part_sketch_catalogs(*root, entry.project_catalogs);
+    if (!catalogs)
+      return catalogs;
   }
 
   std::optional<geometry::ShapeCache> restored_cache;
@@ -1968,7 +2137,50 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
     for (auto& part : std::get<Project>(restored).part_documents())
       part.mark_all_clean();
   }
+  std::optional<PartDocument> selected_part;
+  std::optional<Project> selected_project;
+  auto selected_state = active_model_state_;
+  auto selected_position = active_position_;
+  auto selected_view = active_design_view_;
+  const auto* restored_part = std::get_if<PartDocument>(&restored);
+  const auto* restored_root = std::get_if<Project>(&restored);
+  const auto& catalog =
+      restored_part ? restored_part->model_states() : restored_root->assembly().model_states();
+  if (!has_model_state(catalog, selected_state) || repair_failure || import_failure)
+    selected_state = primary_model_state_id();
+  if (!restored_root || repair_failure || import_failure) {
+    selected_position = master_position_id();
+    selected_view = default_design_view_id();
+  } else {
+    if (!restored_root->find_assembly_position(selected_position))
+      selected_position = master_position_id();
+    if (!restored_root->find_assembly_design_view(selected_view))
+      selected_view = default_design_view_id();
+  }
+  if (!repair_failure && !import_failure &&
+      (selected_state != primary_model_state_id() || selected_position != master_position_id() ||
+       selected_view != default_design_view_id())) {
+    auto view = *this;
+    view.document_ = restored;
+    view.active_position_ = selected_position;
+    view.active_design_view_ = selected_view;
+    auto computed = view.rebuild_model_state_view(selected_state);
+    if (!computed)
+      return Result<std::size_t>::failure(computed.error());
+    selected_position = view.active_position_;
+    selected_view = view.active_design_view_;
+    selected_part = std::move(view.effective_part_document_);
+    selected_project = std::move(view.effective_project_);
+    restored_cache = std::move(view.part_shape_cache_);
+    restored_project_caches = std::move(view.project_part_caches_);
+  }
   document_ = std::move(restored);
+  project_part_sketch_catalogs_ = entry.project_catalogs;
+  active_model_state_ = std::move(selected_state);
+  active_position_ = std::move(selected_position);
+  active_design_view_ = std::move(selected_view);
+  effective_part_document_ = std::move(selected_part);
+  effective_project_ = std::move(selected_project);
   sketch_constraint_catalogs_ = entry.sketch_constraints;
   sketch_dimension_catalogs_ = entry.sketch_dimensions;
   part_shape_cache_ = std::move(restored_cache);
@@ -2009,6 +2221,9 @@ void GuiDocumentSession::diagnose_step_import_sources() {
 }
 
 Result<std::size_t> GuiDocumentSession::reject_replacement_if_needed(bool discard_dirty) const {
+  if (project_part_context_active())
+    return Result<std::size_t>::failure(
+        session_error("Finish or cancel Edit Part before replacing the root document"));
   if (part_workflow_base_)
     return Result<std::size_t>::failure(session_error("apply or cancel the active Part workflow"));
   if (task_.active())
@@ -2084,6 +2299,9 @@ Result<std::size_t> GuiDocumentSession::validate_dimension_catalogs(
 Result<std::size_t> GuiDocumentSession::publish_part_state(
     PartDocument document, std::vector<SketchConstraintCatalog> constraints,
     std::vector<SketchDimensionCatalog> dimensions, std::string label, std::size_t changed_count) {
+  auto context_owned = validate_project_part_context_mutation(document);
+  if (!context_owned)
+    return context_owned;
   if (const auto* current = part_document()) {
     auto valid = validate_reference_update(*current, document);
     if (!valid)
@@ -2129,7 +2347,19 @@ Result<std::size_t> GuiDocumentSession::publish_part_state(
   if (!candidate_prefix)
     document.mark_all_clean();
 
+  std::optional<PartDocument> selected_part;
+  if (active_model_state_ != primary_model_state_id()) {
+    auto view = *this;
+    view.document_ = document;
+    auto computed = view.rebuild_model_state_view(active_model_state_);
+    if (!computed)
+      return Result<std::size_t>::failure(computed.error());
+    selected_part = std::move(view.effective_part_document_);
+    cache.value() = std::move(*view.part_shape_cache_);
+  }
   document_ = std::move(document);
+  effective_part_document_ = std::move(selected_part);
+  effective_project_.reset();
   sketch_constraint_catalogs_ = std::move(constraints);
   sketch_dimension_catalogs_ = std::move(dimensions);
   part_shape_cache_ = std::move(cache.value());
@@ -2189,17 +2419,31 @@ GuiDocumentSession::recompute_part_candidate(PartDocument& document,
   auto roots = transaction_geometry_roots(*current, document, baseline.value(), json);
   if (!roots)
     return full();
+  const auto current_source = part_shape_cache_->validate_complete_geometry_result(*current);
+  if (!current_source)
+    return Result<geometry::ShapeCache>::failure(current_source.error());
   auto candidate = document;
   candidate.mark_all_clean();
-  return detail::recompute_preview_geometry(*this, candidate, *roots);
+  auto incremental = detail::recompute_preview_geometry(*this, candidate, *roots);
+  if (!incremental)
+    return incremental;
+  const auto current_history = incremental.value().validate_complete_history_result(document);
+  if (!current_history)
+    return Result<geometry::ShapeCache>::failure(current_history.error());
+  // Legacy subset execution cannot certify a cache against changed intent.
+  // Publication requires the same complete provenance as full-history replay.
+  if (!incremental.value().validate_complete_geometry_result(document))
+    return full();
+  return incremental;
 }
 
 void GuiDocumentSession::remember_part_history_geometry() {
   std::erase_if(part_history_geometry_, [&](const auto& item) {
     return item.history_index == history_index_ || item.history_index >= history_.size();
   });
-  if (!part_document() || !part_shape_cache_ || recompute_status_ != GuiRecomputeStatus::Fresh ||
-      reference_repair_mode_ || !part_document()->step_import_sources().empty())
+  if (active_model_state_ != primary_model_state_id() || !part_document() || !part_shape_cache_ ||
+      recompute_status_ != GuiRecomputeStatus::Fresh || reference_repair_mode_ ||
+      !part_document()->step_import_sources().empty())
     return;
   // Derived BReps are runtime-only and shared immutably with the working cache.
   // Retain four recently visited states, never the entire unbounded history.
@@ -2214,6 +2458,9 @@ void GuiDocumentSession::initialize_history(std::string json, std::string label,
   history_ = {{document_kind(), std::move(json), sketch_constraint_catalogs_,
                sketch_dimension_catalogs_, std::move(label), reference_repair_mode_, std::nullopt}};
   history_index_ = 0U;
+  history_.front().project_catalogs = project_part_sketch_catalogs_;
+  saved_project_part_sketch_catalogs_ =
+      saved ? std::optional(project_part_sketch_catalogs_) : std::nullopt;
   part_history_geometry_.clear();
   remember_part_history_geometry();
   saved_json_ = saved ? std::optional<std::string>(history_.front().json) : std::nullopt;
@@ -2233,6 +2480,7 @@ void GuiDocumentSession::append_history(std::string json, std::string label) {
   history_.push_back({document_kind(), std::move(json), sketch_constraint_catalogs_,
                       sketch_dimension_catalogs_, std::move(label), false, history_prefix_count_});
   history_index_ = history_.size() - 1U;
+  history_.back().project_catalogs = project_part_sketch_catalogs_;
   remember_part_history_geometry();
 }
 
@@ -2251,6 +2499,11 @@ void GuiDocumentSession::record_information(std::string object_id, std::string m
 void GuiDocumentSession::reset_document() noexcept {
   ++presentation_revision_;
   document_ = std::monostate{};
+  active_position_ = master_position_id();
+  active_design_view_ = default_design_view_id();
+  active_model_state_ = primary_model_state_id();
+  effective_part_document_.reset();
+  effective_project_.reset();
   history_command_base_.reset();
   history_command_id_.clear();
   history_prefix_count_.reset();
@@ -2269,6 +2522,13 @@ void GuiDocumentSession::reset_document() noexcept {
   saved_json_.reset();
   saved_sketch_constraint_catalogs_.reset();
   saved_sketch_dimension_catalogs_.reset();
+  project_part_context_base_.reset();
+  project_part_context_occurrence_.reset();
+  project_part_context_scene_.reset();
+  project_part_context_initial_.reset();
+  project_part_context_transforms_.clear();
+  project_part_sketch_catalogs_.clear();
+  saved_project_part_sketch_catalogs_.reset();
   diagnostics_.clear();
   selection_.clear();
   hidden_presentations_.clear();

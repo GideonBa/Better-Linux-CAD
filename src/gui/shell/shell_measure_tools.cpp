@@ -255,18 +255,18 @@ Result<std::size_t> ShellMeasureTools::rebuild_catalogue() {
   fresh_ = session_.derived_results_fresh();
   if (!fresh_)
     return fail("Geometry is stale. Recompute and select again.");
-  if (session_.project()) {
+  if (session_.effective_project()) {
     auto catalogue =
-        geometry::MeasureSelectionBuilder::build_project(*session_.project(), ++generation_);
+        geometry::MeasureSelectionBuilder::build_project(*session_.effective_project(), ++generation_);
     if (!catalogue)
       return Result<std::size_t>::failure(catalogue.error());
     targets_ = std::move(catalogue.value());
     return Result<std::size_t>::success(targets_.size());
   }
   geometry::ViewportSceneBuilder builder;
-  auto scene = session_.part_document() && session_.part_shape_cache()
-                   ? builder.build_part(*session_.part_document(), *session_.part_shape_cache())
-               : session_.project() ? builder.build_project(*session_.project())
+  auto scene = session_.effective_part_document() && session_.part_shape_cache()
+                   ? builder.build_part(*session_.effective_part_document(), *session_.part_shape_cache())
+               : session_.effective_project() ? builder.build_project(*session_.effective_project())
                                     : Result<std::vector<geometry::ViewportSceneItem>>::success({});
   if (!scene)
     return Result<std::size_t>::failure(scene.error());
@@ -280,9 +280,9 @@ Result<std::size_t> ShellMeasureTools::rebuild_catalogue() {
     std::string label = owner_label(window_.browser_model().roots(), item.semantic_id);
     if (label.empty())
       label = item.semantic_id;
-    if (session_.part_document() && item.semantic_id.starts_with("body/")) {
+    if (session_.effective_part_document() && item.semantic_id.starts_with("body/")) {
       body = BodyId(item.semantic_id.substr(5));
-      if (const auto* record = session_.part_document()->find_body(*body))
+      if (const auto* record = session_.effective_part_document()->find_body(*body))
         label = record->name();
     }
     owners.push_back({item.semantic_id, label, item.shape, body});
@@ -481,7 +481,7 @@ void ShellMeasureTools::refresh() {
     action->setEnabled(available &&
                        (kind == GuiMeasureKind::BodySummary
                             ? part_shapes && session_.part_shape_cache()->body_shape_count() > 0
-                            : part_shapes || session_.project()));
+                            : part_shapes || session_.effective_project()));
     action->setToolTip(
         session_.history_prefix_count()
             ? "Apply or cancel End of Part before measuring the complete model."

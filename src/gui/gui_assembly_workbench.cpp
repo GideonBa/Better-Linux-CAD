@@ -1,6 +1,6 @@
 #include "blcad/gui/gui_assembly_workbench.hpp"
-#include "blcad/gui/gui_step_import_workbench.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
+#include "blcad/gui/gui_step_import_workbench.hpp"
 
 #include "blcad/geometry/assembly_rigid_body_solver.hpp"
 
@@ -16,6 +16,9 @@ Result<std::size_t> commit(GuiDocumentSession& session, std::string label, Mutat
 }
 template <typename Mutation>
 Result<std::size_t> preview(const GuiDocumentSession& session, Mutation mutation) {
+  if (session.active_model_state() != primary_model_state_id())
+    return Result<std::size_t>::failure(
+        Error::validation("gui.assembly", "Return to Primary before editing Assembly intent"));
   if (!session.project())
     return Result<std::size_t>::failure(Error::validation("gui.assembly", "preview requires an active Project"));
   return query_with_step_import_context(session, [&](auto* context) {
@@ -138,21 +141,21 @@ Result<std::size_t> GuiAssemblyWorkbench::set_root_joint_coordinate(GuiDocumentS
 Result<geometry::AssemblySolveDiagnostics>
 GuiAssemblyWorkbench::inspect_root_group(const GuiDocumentSession& s,
                                          std::vector<ComponentInstanceId> group) const {
-  if (!s.project())
+  if (!s.effective_project())
     return Result<geometry::AssemblySolveDiagnostics>::failure(
         Error::validation("gui.assembly", "inspection requires Project"));
   return query_with_step_import_context(s, [&](auto* context) {
-    return geometry::AssemblySolveDiagnosticsAnalyzer{context}.analyze(*s.project(), group);
+    return geometry::AssemblySolveDiagnosticsAnalyzer{context}.analyze(*s.effective_project(), group);
   });
 }
 Result<geometry::AssemblySolveResult>
 GuiAssemblyWorkbench::solve_root_group(const GuiDocumentSession& s,
                                        std::vector<ComponentInstanceId> group) const {
-  if (!s.project())
+  if (!s.effective_project())
     return Result<geometry::AssemblySolveResult>::failure(
         Error::validation("gui.assembly", "solve requires Project"));
   return query_with_step_import_context(s, [&](auto* context) {
-    return geometry::AssemblyRigidBodySolver{context}.solve(*s.project(), group);
+    return geometry::AssemblyRigidBodySolver{context}.solve(*s.effective_project(), group);
   });
 }
 Result<std::size_t>
@@ -168,11 +171,11 @@ GuiAssemblyWorkbench::apply_solve(GuiDocumentSession& s,
 Result<geometry::AssemblyJointMotionResult>
 GuiAssemblyWorkbench::preview_joint_motion(const GuiDocumentSession& s, AssemblyJointId id,
                                            Quantity q) const {
-  if (!s.project())
+  if (!s.effective_project())
     return Result<geometry::AssemblyJointMotionResult>::failure(
         Error::validation("gui.assembly", "motion requires Project"));
   return query_with_step_import_context(s, [&](auto* context) {
-    return geometry::AssemblyJointMotionSolver{context}.move(*s.project(), id, q);
+    return geometry::AssemblyJointMotionSolver{context}.move(*s.effective_project(), id, q);
   });
 }
 Result<std::size_t>

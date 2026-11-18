@@ -42,6 +42,24 @@ using GuiPartSketchIntentMutation = std::function<Result<std::size_t>(
     PartDocument&, std::vector<SketchConstraintCatalog>&, std::vector<SketchDimensionCatalog>&)>;
 using GuiProjectMutation = std::function<Result<std::size_t>(Project&)>;
 
+[[nodiscard]] inline std::filesystem::path
+project_part_sketch_catalog_sidecar(const std::filesystem::path& path) {
+  return std::filesystem::path(path.string() + ".part-sketch-catalogs.json");
+}
+
+[[nodiscard]] bool
+project_sketch_catalog_target_is_step_asset(const Project&,
+                                            const std::filesystem::path& source_document,
+                                            const std::filesystem::path& destination_document);
+
+struct GuiProjectPartSketchCatalogs {
+  DocumentId part;
+  std::vector<SketchConstraintCatalog> constraints;
+  std::vector<SketchDimensionCatalog> dimensions;
+  friend bool operator==(const GuiProjectPartSketchCatalogs&,
+                         const GuiProjectPartSketchCatalogs&) = default;
+};
+
 class GuiDocumentSession {
 public:
   [[nodiscard]] Result<std::size_t> create_part(DocumentId id, std::string name,
@@ -54,6 +72,37 @@ public:
   [[nodiscard]] Result<std::uintmax_t> save();
   [[nodiscard]] Result<std::uintmax_t> save_as(const std::filesystem::path& path);
   [[nodiscard]] Result<std::size_t> recompute();
+  [[nodiscard]] Result<std::size_t> begin_project_part_context(ProjectDesignOccurrence occurrence);
+  [[nodiscard]] Result<std::size_t> finish_project_part_context(std::string label);
+  void cancel_project_part_context();
+  [[nodiscard]] bool project_part_context_active() const noexcept;
+  [[nodiscard]] const Project* project_part_context_root() const noexcept;
+  [[nodiscard]] const std::optional<ProjectDesignOccurrence>& context_occurrence() const noexcept;
+  [[nodiscard]] const std::vector<RigidTransform>& project_part_context_transforms() const noexcept;
+  [[nodiscard]] const std::vector<GuiProjectPartSketchCatalogs>&
+  project_part_sketch_catalogs() const noexcept {
+    return project_part_sketch_catalogs_;
+  }
+  [[nodiscard]] const AssemblyPositionId& active_position() const noexcept {
+    return active_position_;
+  }
+  [[nodiscard]] const AssemblyDesignViewId& active_design_view() const noexcept {
+    return active_design_view_;
+  }
+  [[nodiscard]] Result<std::size_t> activate_assembly_position(AssemblyPositionId);
+  [[nodiscard]] Result<std::size_t> activate_assembly_design_view(AssemblyDesignViewId);
+  [[nodiscard]] Result<std::size_t>
+  commit_assembly_representations(std::vector<AssemblyPosition>, std::vector<AssemblyDesignView>,
+                                  std::string label = "Manage Assembly Representations");
+  [[nodiscard]] const ModelStateId& active_model_state() const noexcept;
+  [[nodiscard]] Result<std::size_t> activate_model_state(ModelStateId state);
+  [[nodiscard]] Result<std::size_t> commit_model_state_table(DocumentId owner,
+                                                             std::vector<ModelState> states);
+  [[nodiscard]] const PartDocument* effective_part_document() const noexcept;
+  [[nodiscard]] const Project* effective_project() const noexcept;
+  [[nodiscard]] Result<std::uintmax_t>
+  save_model_state_member(const std::filesystem::path&, ModelStateId, DocumentId new_id,
+                          std::string new_name, std::optional<DocumentId> project_part = {}) const;
   [[nodiscard]] Result<std::size_t> commit_part_transaction(std::string label,
                                                             const GuiPartMutation& mutation);
   [[nodiscard]] Result<std::size_t> commit_part_repair_transaction(std::string label,
@@ -132,7 +181,8 @@ public:
   [[nodiscard]] const Project* project() const noexcept;
   [[nodiscard]] const geometry::ShapeCache* part_shape_cache() const noexcept;
   [[nodiscard]] const geometry::ShapeCache*
-  project_part_shape_cache(DocumentId part) const noexcept;
+  project_part_shape_cache(DocumentId part,
+                           ModelStateId state = primary_model_state_id()) const noexcept;
   [[nodiscard]] const std::vector<GuiDiagnostic>& diagnostics() const noexcept;
   [[nodiscard]] std::size_t presentation_revision() const noexcept;
   // Excludes transient presentation visibility changes while preserving all
@@ -159,11 +209,13 @@ private:
     std::string label;
     bool allow_failed_recompute{false};
     std::optional<std::size_t> history_prefix;
+    std::vector<GuiProjectPartSketchCatalogs> project_catalogs{};
   };
 
   struct ProjectPartCache {
     DocumentId part_id;
     geometry::ShapeCache cache;
+    ModelStateId selected_model_state{primary_model_state_id()};
   };
 
   struct PartHistoryGeometry {
@@ -174,6 +226,15 @@ private:
   using Document = std::variant<std::monostate, PartDocument, Project>;
 
   [[nodiscard]] Result<std::string> serialize_current() const;
+  [[nodiscard]] Result<std::size_t>
+  validate_project_part_context_mutation(const PartDocument&) const;
+  [[nodiscard]] Result<std::size_t>
+  validate_project_part_sketch_catalogs(const Project&,
+                                        const std::vector<GuiProjectPartSketchCatalogs>&) const;
+  [[nodiscard]] Result<std::vector<GuiProjectPartSketchCatalogs>>
+  read_project_part_sketch_catalogs(const Project&, const std::filesystem::path&) const;
+  [[nodiscard]] Result<std::string> serialize_project_part_sketch_catalogs(const Project&) const;
+  [[nodiscard]] Result<std::size_t> rebuild_model_state_view(ModelStateId state);
   [[nodiscard]] Result<std::size_t>
   recompute_part(PartDocument& document, geometry::ShapeCache& cache,
                  const std::filesystem::path& asset_root = {},
@@ -204,6 +265,18 @@ private:
   void reset_document() noexcept;
 
   Document document_;
+  std::shared_ptr<const GuiDocumentSession> project_part_context_base_;
+  std::optional<ProjectDesignOccurrence> project_part_context_occurrence_;
+  std::optional<Project> project_part_context_scene_;
+  std::optional<PartDocument> project_part_context_initial_;
+  std::vector<RigidTransform> project_part_context_transforms_;
+  std::vector<GuiProjectPartSketchCatalogs> project_part_sketch_catalogs_;
+  std::optional<std::vector<GuiProjectPartSketchCatalogs>> saved_project_part_sketch_catalogs_;
+  AssemblyPositionId active_position_{master_position_id()};
+  AssemblyDesignViewId active_design_view_{default_design_view_id()};
+  ModelStateId active_model_state_{primary_model_state_id()};
+  std::optional<PartDocument> effective_part_document_;
+  std::optional<Project> effective_project_;
   std::shared_ptr<const GuiDocumentSession> part_workflow_base_;
   std::shared_ptr<const GuiDocumentSession> history_command_base_;
   std::string history_command_id_;

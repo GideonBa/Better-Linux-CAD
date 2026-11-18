@@ -205,10 +205,131 @@ includes the complete authored source and selected id; numerically identical sib
 remain distinct contexts. Hierarchy traversal evaluates the selected Assembly at each occurrence;
 leaf descriptors retain the selected Part state. Activation and derived geometry stay session data.
 A caller must retain Primary for Save and state editing, and certify Geometry/cache results against
-the effective document and explicit selected state. Full Geometry, export and native acceptance
-remain separate numbered gates in [the MVP plan](mvp-plan.md).
+the effective document and explicit selected state. Assembly shape definitions combine each state's
+visible, available Solid and Surface Bodies in stable Body-id order after complete cache validation.
+Suppressed creators contribute no unavailable Body; hidden source Bodies remain available to their
+downstream operations and physical mass. Presentation geometry, scene and STEP use the visible
+definition; mass integrates every available participating solid, and Project physical validation
+includes every available Body.
+Common and adaptive Project validators use physical-active posed definitions independently of
+display visibility, including an all-hidden design view or all-hidden Bodies. Reference and
+zero-Body legacy Parts
+retain their established complete-result authority. The separate historical final-shape API keeps
+its single-available-Solid compatibility contract. Focused coverage is Geometry
+`[assembly-multi-body]`, including distinct states, a surface from a hidden solid, physical mass and
+flat/structured STEP reopening. Full Geometry, export and native acceptance remain separate
+numbered gates in [the MVP plan](mvp-plan.md).
 
 Focused Core proof is `tests/core/model_state_tests.cpp` (`[model-state]`): sparse typed evaluation,
 formula rewiring/cycles, atomic invalid tables, materials/suppression, strict JSON, repeated nested
 child selections, hidden physical participation and dangling-reference rejection. These tests do
 not claim physical or native acceptance for 190/191/198.
+
+
+### Native table, selected views and independent member copies — 191
+
+Manage → Model States owns a native table for the current Part, the root Assembly or an owned
+editable Project Part. New/Duplicate/Rename/Delete operate on stable state identities. Parameter
+rows expose an explicit Use checkbox and the existing quantity category or authored formula;
+unchecked rows inherit Primary. Separate selectors edit executable suppression, pinned Body/default
+materials and child occurrence suppression/state. Invalid cells remain editable. Accept Locally
+checks the Core table; Preview evaluates every state and the complete candidate; Apply publishes
+one `Manage Model States` history entry. Apply, Undo and Redo retain a valid selected view; Undo
+returns to Primary when it precedes creation of the selected state.
+
+The browser's Model States group and the table's View/Primary controls select transient effective
+views. Activation rejects a pending foreign task or partial Part workflow. A named view is read-only
+for ordinary modeling; return to Primary to author its definition, or edit the named overrides in
+Model States. The viewport, browser values, Measure, Physical Properties, analysis and ordinary STEP
+export consume the same selected effective document. Save writes Primary and the sparse catalog;
+it never persists the currently activated view or changes dirty/Undo state merely because a view
+was selected. Root Assembly state literals propagate through changed existing parameter bindings
+before occurrence Part states are evaluated; explicit Part state overrides then apply to that
+effective definition. The authored Project and shared Part definitions remain unchanged.
+
+A state-table change validates inactive geometry before publication. Primary parameter edits also
+validate inactive state formulas and roll back if a sibling becomes invalid. State suppression and
+material records protect referenced executable/Body/resource identities against direct removal;
+remove or repair those overrides explicitly in a disposable complete candidate first. Project
+state-reference validation protects externally selected state identities independently of labels.
+
+Save Member Copy chooses a new document identity, evaluates the explicitly selected Part state and
+writes an independent Part without sibling states. Pinned resources survive, and standalone Sketch
+sidecar catalogs are rebound to the new document owner. The existing atomic Save As transaction and
+STEP asset-root rules apply: imported assets must remain available at matching relative paths in
+the destination root. Existing document/sidecar paths and the live source document are preserved on
+failure. This is an explicit member copy, without a factory or release/BOM authority.
+
+Implementation proof lives in `tests/gui/gui_model_state_tests.cpp`, `[model-state]` and native-only
+`[model-state-native]`. Native pointer input covers table editing, Preview/Apply, view switching and
+reopening, with optional original captures under `BLCAD_UI_CAPTURE_DIR`. Current executed acceptance
+and any remaining integration obligations belong to [the MVP plan](mvp-plan.md); source presence
+alone does not close a numbered gate.
+
+
+Undo/Redo stages the restored model, selected IDs and certified caches before publication. If the
+active manufacturing state disappears, it falls back to Primary and recomposes every surviving
+named position and design view. Missing representations fall back to Master/Default; repair or
+missing-source results reset all effective scopes consistently. A failed selected-state rebuild
+retains the accepted model, selected contexts and certified geometry. GUI `[history-scope-fallback]`
+checks both surviving/deleted catalogs and an actual failed cut under the retained state.
+
+### In-context Part editing and root publication — 198
+
+Edit Part retains an immutable authored root-session checkpoint and opens the selected rooted
+editable Part in a disposable Part session. Entry requires the complete idle Project in Primary,
+Master position and Default design view, and the occurrence must actively select the Part's
+Primary state. Reference Parts require explicit conversion. The initial definition comes from the
+checked normalized Project so downstream editing sees current linked constructions and coordinated
+Hole placements. Root/Part breadcrumb identity and the exact local-to-root transform chain remain
+transient context data; ordinary Part tools author in Part coordinates. Adaptive source selectors
+use the rooted occurrence identities and the Geometry frame-conversion authority.
+
+Save during this context writes the committed root checkpoint while retaining the Part draft.
+Root Save/Save As metadata survives nested Part/Sketch workflow cancellation and publication.
+Cancel restores the complete root definition, resource/catalog ownership, history, visibility and
+saved-state boundary; only presentation revisions advance. Finish requires complete fresh Part
+geometry and no pending child task or partial history workflow, then replaces that Part and its
+owned Sketch catalogs in one normalized Project candidate. Every affected downstream Part and
+Assembly relationship must validate before one clearly labelled root Undo entry is published.
+Failure retains the root checkpoint and the editable draft for correction.
+The negative downstream-rebuild proof starts with an independently verified finite fixed-datum
+cut, changes its adaptive source thickness from 1 to 8 mm, and rejects Finish when the moved target
+no longer intersects that finite cut. The test retains the exact root checkpoint and saved bytes;
+Through All cuts keep their normal target-following semantics.
+
+Project-linked constructions/derived paths and Assembly-owned Hole recipes are read-only through
+ordinary child editing: edit the owning Project command or explicitly detach at the root. Hole
+placement coordinates continue to be derived by their existing layout authority. Part parameters
+bound to Assembly parameters route to that Assembly driver. Ordinary candidate publication checks
+these ownership rules before any child history change, and Finish repeats the check against the
+initial normalized definition. Named view and representation switching cannot change the active
+manufacturing/edit scope mid-context.
+
+Child constraint/dimension catalogs have a durable Project-owned GUI sidecar and follow the root
+history/dirty/publication boundary; they are never dropped on return to the Assembly. The
+[file-format contract](file-format.md#project-owned-child-sketch-catalogs--198-gui-sidecar) owns the
+exact envelope and atomic publication. Focused proof is `[project-part-context]`; native-only
+`[project-part-context-native]` reopens the child Source Sketch and its owned catalogs. These proof
+sources do not by themselves claim the complete 198 acceptance gate; current executed evidence
+and remaining combinations stay in [the MVP plan](mvp-plan.md).
+
+The connected partial X02 proof in `tests/gui/gui_configurable_housing_tests.cpp` uses the imported
+advanced housing's actual boss-Hole Entry to drive the adaptive cover support. The housing owns
+the patterned blind-Thread mounting layout; coordinated cover clearance consumes that layout.
+Both cross-Part edges therefore run from housing to cover. A reverse cover-driven machining
+command rejects atomically as a whole-Part dependency cycle. This proof does not introduce
+feature-level feedback or snapshot authority to bypass the directed graph.
+Within the housing, the mounting Hole and its feature Pattern precede the Body Pattern through
+the current Body dependency. Both translated copies inherit the two bores. The proof checks this
+history order, bore voids and adjacent retained material in all three solids; the hand volume
+formula subtracts the analytic pair-cut volume from each solid.
+
+The same connected Project combines sparse boss-size/material state edits, driver-spacing updates,
+compatible and lost-face supplier revisions, a failed downstream participant, native state-table
+and context/Source Sketch navigation, root Undo/Redo, save/open and structured STEP reimport.
+Hand volume/density formulas and independently converted bore-axis frames supply physical oracles;
+Primary intent and the immutable imported base remain separately checked. Block 204's complete
+X02 scope, including real text and the later interaction/acceptance combinations, remains assigned
+there. Registration of this proof does not claim that its native runs have executed; the MVP plan
+records actual verification and numbered acceptance.

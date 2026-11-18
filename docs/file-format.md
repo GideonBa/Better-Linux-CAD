@@ -1940,6 +1940,45 @@ semantic identities and target-local derived definitions; evaluated world frames
 objects are never source identity. The [adaptive contract](assembly-system.md#directed-design-references-and-adaptive-candidates--194195)
 owns ordering, frame conversion, detach and atomic evaluation, with focused Core/Geometry proof links.
 
+
+## Project-owned child Sketch catalogs — 198 GUI sidecar
+
+A Project with interactive child-Part Sketch intent stores one optional sibling file named
+`<project-file>.part-sketch-catalogs.json`. Its exact envelope is `schema:
+blcad.project_part_sketch_catalogs.mvp9`, integer `version: 1`, the stable `project` id and a nonempty
+`parts` array. Each owner record has exactly `part`, `constraints` and `dimensions`. The nested
+values use the existing canonical standalone constraint/dimension sidecar codecs, including their
+own Part document id and operation-version dispatch. Owners are unique editable Project Parts;
+at least one catalog must exist in each record. Nested catalog owners, Sketch ids, targets and
+parameter references must resolve against that owned Part. Unknown fields, mismatched project or
+Part ids, duplicate owners, empty envelopes and unsupported versions reject the complete Open.
+Part owners serialize in stable id order; no geometry, composed pose or cache data is added.
+
+The absent file means no child catalogs. Save removes an orphan when the collection becomes empty.
+A registered immutable STEP source may already own this exact sibling path in a legacy Project.
+Open gives that existing asset role precedence and reads no child catalogs there; Save with no
+child catalogs omits the path entirely. Publishing actual child catalogs at the same path rejects
+atomically with a role-conflict diagnostic until Save As chooses another document path or the
+source is explicitly relocated. Existing source bytes are never parsed as catalog JSON, replaced
+or deleted.
+
+The main Project and this sidecar use the existing multi-file staging/backup/publication transaction;
+every output, including the optional deletion target, passes the existing immutable STEP-source
+alias/overwrite guards before staging. A failed publication retains the complete previous model
+and sidecar set. Root history entries and saved-state comparisons capture the exact per-Part
+catalog collection, so an edit affecting only constraints/dimensions still has one correct root
+Undo/Redo and dirty-state boundary. Legacy Projects without this sidecar retain their existing
+Core JSON shape and version.
+
+In-context Part sessions borrow their owned catalogs from this collection. Until Finish, Save
+publishes the committed root checkpoint; Cancel restores root definitions/resources/catalogs and
+history. Finish validates and publishes the child definition plus catalog delta as one root
+transaction. Member export rebinds the selected child's catalog owners to the independent new
+Part identity and writes ordinary standalone sidecars. See
+[context lifecycle](parameter-model.md#in-context-part-editing-and-root-publication--198) and
+`tests/gui/gui_project_part_context_tests.cpp`; numbered acceptance remains in [the MVP plan](mvp-plan.md).
+
+
 ## Coordinated Assembly Hole intent — Project V5
 
 A Project with nonempty coordinated commands uses necessary `blcad.project.mvp4` **version 5**,

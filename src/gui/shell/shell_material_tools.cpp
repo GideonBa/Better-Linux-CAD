@@ -93,7 +93,7 @@ struct ShellMaterialTools::Impl {
   }
   bool available() const {
     const auto& session = window.session();
-    return !window.active_sketch() && !session.task().active() &&
+    return session.active_model_state() == primary_model_state_id() && !window.active_sketch() && !session.task().active() &&
            ((session.part_modeling_ready() &&
              (!session.part_workflow_active() || session.history_prefix_count())) ||
             (session.project() && session.derived_results_fresh()));
