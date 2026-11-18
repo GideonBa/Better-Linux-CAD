@@ -1,0 +1,25 @@
+{
+  "pid": 261950,
+  "command": [
+    "./build/dev-gui/blcad"
+  ],
+  "display": ":0",
+  "platform": "xcb",
+  "window_id": "0xc00013",
+  "window_title": "0xc00013 \"BLCAD\": (\"blcad\" \"BLCAD\")  1440x900+14+49  +0+69",
+  "geometry": {
+    "x": 0,
+    "y": 69,
+    "width": 1440,
+    "height": 900
+  },
+  "healthy_before_close": true,
+  "capture_method": "xwd exact own client window; lossless BGRX-to-PNG encoding",
+  "capture_dimensions": {
+    "width": 1440,
+    "height": 900
+  },
+  "close": "WM_DELETE_WINDOW",
+  "exit_code": 0,
+  "status": "passed"
+}
