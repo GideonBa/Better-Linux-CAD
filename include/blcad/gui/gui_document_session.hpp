@@ -220,6 +220,7 @@ private:
 
   struct PartHistoryGeometry {
     std::size_t history_index;
+    PartDocument document;
     geometry::ShapeCache cache;
   };
 

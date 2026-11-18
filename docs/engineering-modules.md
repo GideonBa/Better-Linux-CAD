@@ -217,6 +217,12 @@ normalization behavior. Removed/re-added features still invalidate reuse. Refere
 transactions retain their existing repair-read policy. Read-only Project member-cache access
 mirrors the existing Part-cache access and does not certify source freshness on its own.
 
+The four retained native Part history results keep their originating document with each cache.
+Undo/Redo reuses that pair only when canonical JSON matches the requested history entry and the
+complete geometry certificate validates the retained document. Restoring the originating runtime
+lifetime preserves immutable BRep identity; a parsed JSON alias cannot borrow its certificate.
+Imported sources continue through fresh recomputation, and discarded Redo entries are evicted.
+
 Legacy full execution may retain prefilled reference-transform inputs. It records complete
 provenance only from an initially empty cache (including transient transform state) or an already
 verified complete cache for the same exact source. Untrusted prefilled execution retains its legacy

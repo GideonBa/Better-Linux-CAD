@@ -744,6 +744,14 @@ replace intent or clear its dirty flags; changed roots therefore come from suppo
 records, not only dirty bookkeeping. Parameter, Sketch, path, construction and supported feature
 records identify graph roots; the normal root-inclusive plan executes their complete consumer chains.
 
+Geometry's `execute_transition(before, after, cache)` owns publication of a reused complete result.
+It first validates the executor certificate for the exact baseline and derives the actual canonical
+change plan internally, including inputs whose dirty flags were cleared. Only this checked path
+can certify the complete changed cache. Generic caller-supplied `execute_plan` subsets remain
+transient and cannot mint complete provenance. Unsupported deltas and unexplained executable
+lifetime changes use fresh full replay; an invalid baseline or failed transition publishes nothing.
+Clean independent producer handles survive supported parameter edits and appended features.
+
 Appending a feature redirects its Body result alias from the previous producer to the new one.
 That expected alias change seeds both the alias and its new producer; it does not invalidate the
 unchanged upstream branch. If an existing producer becomes final through reordering, that producer
