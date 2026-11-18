@@ -2,6 +2,8 @@
 #include "blcad/core/part_document.hpp"
 
 #include <algorithm>
+#include <array>
+#include <charconv>
 #include <cmath>
 #include <set>
 
@@ -30,6 +32,37 @@ std::string identity(const FaceReference& face) {
 }
 bool protected_origin(const PartDocument& part, FeatureId id) {
   return part.find_hole_feature(id) || part.find_thread_feature(id);
+}
+bool protected_origin(const PartDocument& part, ResultFaceOrigin origin) {
+  // Pattern/Mirror origins encode their exact authored source, including nested
+  // copies. Preserve manufacturing authority through that semantic lineage.
+  for (std::size_t depth = 0; depth < 1024; ++depth) {
+    if (protected_origin(part, origin.feature))
+      return true;
+    if (!origin.role.starts_with("copy/"))
+      return false;
+    std::string_view remaining(origin.role);
+    remaining.remove_prefix(5);
+    std::array<std::string, 3> segments;
+    for (auto& segment : segments) {
+      const auto colon = remaining.find(':');
+      if (colon == std::string_view::npos)
+        return true;
+      std::size_t count = 0;
+      const auto parsed = std::from_chars(remaining.data(), remaining.data() + colon, count);
+      if (parsed.ec != std::errc{} || parsed.ptr != remaining.data() + colon)
+        return true;
+      remaining.remove_prefix(colon + 1);
+      if (count >= remaining.size() || remaining[count] != '/')
+        return true;
+      segment.assign(remaining.substr(0, count));
+      remaining.remove_prefix(count + 1);
+    }
+    if (!remaining.empty() || segments[1].empty() || segments[2].empty())
+      return true;
+    origin = {FeatureId(std::move(segments[1])), std::move(segments[2])};
+  }
+  return true;
 }
 } // namespace
 
@@ -182,7 +215,7 @@ Result<std::size_t> validate_direct_edit_inputs(const PartDocument& p, const Dir
             if (protected_origin(p, ref.producer()))
               return false;
             for (const auto& origin : ref.origins())
-              if (protected_origin(p, origin.feature))
+              if (protected_origin(p, origin))
                 return false;
             return ref.body() == f.target_body();
           } else if constexpr (std::is_same_v<T, ImportedTopologyReference>) {

@@ -41,6 +41,8 @@ updates. Geometry still owns physical feasibility and operation effects. Referen
 mutation until explicitly converted into a separate Editable Part. No direct edit rewrites the imported
 base feature, original STEP asset or source registry. Faces authored by a semantic Hole or Thread
 reject Direct Edit with an instruction to edit the authored parameters, preserving thread metadata.
+That protection follows exact length-prefixed Pattern/Mirror copy origins, including nested copies;
+malformed or over-limit ancestry rejects instead of losing manufacturing authority.
 
 ## Persistence and focused proof
 

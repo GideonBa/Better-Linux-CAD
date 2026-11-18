@@ -1,9 +1,12 @@
 #include "../support/hole_feature_fixture.hpp"
+#include "../support/hole_pattern_fixture.hpp"
 #include "../support/part_history_fixture.hpp"
 #include "blcad/core/direct_edit_feature.hpp"
+#include "blcad/core/hole_instance_reference.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <limits>
 #include <nlohmann/json.hpp>
 
@@ -254,4 +257,61 @@ TEST_CASE("Direct Edit imported selections retain catalog ownership and immutabl
   const auto text = f::checked(serialize_project_to_json(project));
   const auto opened = f::checked(deserialize_project_from_json(text));
   CHECK(f::checked(serialize_project_to_json(opened)) == text);
+}
+
+TEST_CASE("Direct Edit protects Hole provenance through real Pattern and nested Mirror copies",
+          "[core][direct-edit][direct-edit-copy-protection][parity-b185]") {
+  const bool nested = GENERATE(false, true);
+  namespace hp = blcad::test::hole_pattern_fixture;
+  auto p = hp::part(false, false);
+  f::accept(p.add_linear_pattern_feature(hp::linear(hp::options(false))));
+  const auto seed = f::checked(HoleInstanceReference::create(
+      FeatureId("holes"), HolePlacementId("first"), HoleReferenceRole::Axis));
+  const auto copy_key = pattern_source_occurrence_key(
+      f::checked(PatternSourceReference::feature(FeatureId("holes"))), {1, 0});
+  auto origin = copy_result_face_origin(FeatureId("pattern"), copy_key, seed.origin("wall"));
+  BodyId body("body.base");
+  FeatureId producer("pattern");
+  if (nested) {
+    body = BodyId("body.mirrored");
+    producer = FeatureId("mirror");
+    f::accept(p.add_body(f::checked(Body::create(body, "Mirror", BodyKind::Solid))));
+    auto source = f::checked(MirrorSourceReference::body(BodyId("body.base")));
+    f::accept(p.add_mirror_feature(f::checked(MirrorFeature::create(
+        producer, "Mirror copied holes", {source}, f::plane(PartFeatureInputRole::MirrorPlane),
+        f::checked(FeatureBodyResultContext::create(FeatureBodyOperationMode::NewBody, std::nullopt,
+                                                    body))))));
+    origin =
+        copy_result_face_origin(producer, "body/" + source.source_node_id() + "/mirror", origin);
+  }
+  const auto captured = f::checked(ResultFaceReference::create(producer, body, {origin}));
+  REQUIRE(validate_result_face_reference(p, captured));
+  const auto support =
+      f::checked(FaceReference::create_result(PartFeatureInputRole::SurfaceSourceFace, captured));
+  const auto before = saved(p);
+  for (const auto& operation : std::vector<DirectEditOperation>{
+           DirectFaceSize{ParameterId("diameter"), DirectEditSizeMode::Diameter},
+           DirectFaceOffset{ParameterId("radius")}}) {
+    auto edit = f::checked(
+        DirectEditFeature::create(FeatureId("unsafe"), "Resize copied bore", body, producer,
+                                  {{support, DirectEditFaceCapability::Cylindrical}}, operation));
+    CHECK_FALSE(p.add_direct_edit_feature(edit));
+    CHECK(saved(p) == before);
+  }
+  const auto malformed = f::checked(
+      ResultFaceReference::create(producer, body, {{producer, "copy/invalid-length-prefix"}}));
+  auto broken = f::checked(DirectEditFeature::create(
+      FeatureId("malformed"), "Malformed copy", body, producer,
+      {{f::checked(
+            FaceReference::create_result(PartFeatureInputRole::SurfaceSourceFace, malformed)),
+        DirectEditFaceCapability::Cylindrical}},
+      DirectFaceSize{ParameterId("diameter"), DirectEditSizeMode::Diameter}));
+  CHECK_FALSE(p.add_direct_edit_feature(broken));
+  CHECK(saved(p) == before);
+  REQUIRE(p.set_parameter_value(ParameterId("diameter"), f::checked(Quantity::length_mm(2.8))));
+  CHECK(p.find_hole_feature(FeatureId("holes"))->diameter() ==
+        HoleDiameter{ParameterId("diameter")});
+  CHECK(p.find_parameter(ParameterId("diameter"))->value().millimeters() == 2.8);
+  CHECK(p.find_linear_pattern_feature(FeatureId("pattern"))->sources().front().source_node_id() ==
+        "holes");
 }
