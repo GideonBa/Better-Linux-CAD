@@ -1,0 +1,50 @@
+{
+  "schema": "blcad.gui-feature-extension.v1",
+  "family": "direct_edit",
+  "owner": 187,
+  "numbered_status_authority": "docs/mvp-plan.md",
+  "contract": "docs/part-direct-edit-mvp6.md",
+  "modes": [
+    "Move",
+    "Rotate",
+    "Offset",
+    "Size",
+    "Delete and Heal"
+  ],
+  "core": {
+    "type": "DirectEditFeature",
+    "commands": [
+      "PartDocument::add_direct_edit_feature",
+      "PartDocument::update_direct_edit_feature",
+      "PartDocument::remove_direct_edit_feature"
+    ]
+  },
+  "shell": {
+    "owner": "ShellDirectEditTools",
+    "entry_points": [
+      "Model action",
+      "face preselection",
+      "browser double-click",
+      "History Edit"
+    ],
+    "controls": "src/gui/shell/direct_edit_controls.cpp",
+    "proofs": [
+      {
+        "filter": "[direct-edit-tools]",
+        "source": "tests/gui/gui_direct_edit_tools_tests.cpp"
+      },
+      {
+        "filter": "[native-direct-edit]",
+        "source": "tests/gui/gui_direct_edit_import_tests.cpp"
+      },
+      {
+        "filter": "[advanced-part-direct]",
+        "source": "tests/gui/gui_advanced_part_direct_tests.cpp"
+      }
+    ],
+    "actions": [
+      "blcad.action.direct_edit"
+    ]
+  },
+  "boundary": "Extends current coverage without changing historical accepted counts. Numbered acceptance and checked limitations remain in the owning contract and MVP plan."
+}

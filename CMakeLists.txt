@@ -453,8 +453,13 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_reference_repair_tools.cpp
     src/gui/shell/shell_sketch_diagnostics_tools.cpp
     src/gui/shell/shell_parameter_tools.cpp
+    src/gui/shell/shell_model_state_tools.cpp
     src/gui/shell/shell_material_tools.cpp
     src/gui/shell/shell_physical_properties_tools.cpp
+    src/gui/shell/direct_edit_controls.cpp
+    src/gui/shell/shell_direct_edit_model.cpp
+    src/gui/shell/shell_direct_edit_tools.cpp
+    src/gui/shell/shell_direct_edit_preview.cpp
     src/gui/shell/shell_sketch_driven_model.cpp
     src/gui/shell/shell_sketch_driven_tools.cpp
     src/gui/shell/shell_sketch_driven_preview.cpp
@@ -469,6 +474,9 @@ if(BLCAD_BUILD_GUI)
     src/gui/shell/shell_construction_tools.cpp
     src/gui/shell/shell_construction_manipulators.cpp
     src/gui/shell/shell_assembly_tools.cpp
+    src/gui/shell/shell_project_part_context.cpp
+    src/gui/shell/shell_advanced_assembly_model.cpp
+    src/gui/shell/shell_advanced_assembly_tools.cpp
     src/gui/shell/shell_assembly_context.cpp
     src/gui/shell/shell_assembly_advanced.cpp
     src/gui/shell/shell_feature_edit_tools.cpp
@@ -881,6 +889,7 @@ if(BLCAD_BUILD_TESTS)
   endif()
 
   if(BLCAD_BUILD_GUI)
+    find_package(Qt6 COMPONENTS Test REQUIRED)
     add_library(blcad_geometry_test_support STATIC
       tests/support/geometry_volume_oracle.cpp
       tests/support/curve_surface_milestone_oracle.cpp)
@@ -929,6 +938,10 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_shell_reference_repair_tests.cpp
       tests/gui/gui_shell_sketch_diagnostics_tests.cpp
       tests/gui/gui_shell_parameter_tests.cpp
+      tests/gui/gui_model_state_tests.cpp
+      tests/gui/gui_project_part_context_tests.cpp
+      tests/gui/gui_configurable_housing_tests.cpp
+      tests/gui/gui_advanced_assembly_tests.cpp
       tests/gui/gui_shell_material_tests.cpp
       tests/gui/gui_shell_physical_properties_tests.cpp
       tests/gui/gui_shell_hole_tests.cpp
@@ -984,6 +997,9 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_spatial_surface_workbench_tests.cpp
       tests/gui/gui_interactive_modeling_mvp9_acceptance_tests.cpp
       tests/gui/gui_advanced_fillet_panel_tests.cpp
+      tests/gui/gui_advanced_part_direct_tests.cpp
+      tests/gui/gui_direct_edit_tools_tests.cpp
+      tests/gui/gui_direct_edit_import_tests.cpp
       tests/gui/gui_sketch_driven_tools_tests.cpp
       tests/gui/gui_sketch_driven_controls_tests.cpp
       tests/gui/gui_advanced_fillet_controls_tests.cpp
@@ -1007,7 +1023,7 @@ if(BLCAD_BUILD_TESTS)
       tests/gui/gui_interactive_assembly_tests.cpp
       tests/gui/gui_startup_splash_tests.cpp
     )
-    target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2 blcad_geometry_test_support)
+    target_link_libraries(blcad_gui_tests PRIVATE BLCAD::gui Catch2::Catch2 Qt6::Test blcad_geometry_test_support)
     target_compile_definitions(blcad_gui_tests PRIVATE BLCAD_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     set_source_files_properties(tests/gui/gui_complex_part_performance_tests.cpp PROPERTIES
       COMPILE_DEFINITIONS "BLCAD_PROFILE_BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\"")

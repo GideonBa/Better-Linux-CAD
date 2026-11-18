@@ -50,6 +50,84 @@
       "shell_owner": 184,
       "contract": "docs/gui-sketch-driven-features-mvp9.md",
       "coverage": "docs/gui-sketch-driven-coverage-mvp9.json"
+    },
+    {
+      "family": "direct_edit",
+      "modes": [
+        "Move",
+        "Rotate",
+        "Offset",
+        "Size",
+        "Delete and Heal"
+      ],
+      "type": "DirectEditFeature",
+      "add": "add_direct_edit_feature",
+      "update": "update_direct_edit_feature",
+      "remove": "remove_direct_edit_feature",
+      "intent_blocks": [
+        185
+      ],
+      "shell_owner": 187,
+      "contract": "docs/part-direct-edit-mvp6.md",
+      "coverage": "docs/gui-direct-edit-coverage-mvp9.json"
+    },
+    {
+      "family": "occurrence_pose",
+      "type": "AssemblyOccurrencePose",
+      "owner_type": "Project",
+      "add": "set_occurrence_pose",
+      "update": "set_occurrence_pose",
+      "remove": "remove_occurrence_pose",
+      "intent_blocks": [
+        192,
+        193
+      ],
+      "shell_owner": 198,
+      "contract": "docs/assembly-flexible-subassembly-solving-mvp5.md"
+    },
+    {
+      "family": "directed_design_reference",
+      "type": "ProjectDesignReference",
+      "owner_type": "Project",
+      "add": "set_design_reference",
+      "update": "set_design_reference",
+      "remove": "detach_design_reference",
+      "intent_blocks": [
+        194,
+        195
+      ],
+      "shell_owner": 198,
+      "contract": "docs/assembly-system.md"
+    },
+    {
+      "family": "assembly_hole",
+      "type": "AssemblyHoleFeature",
+      "owner_type": "Project",
+      "add": "replace_assembly_hole_features",
+      "update": "replace_assembly_hole_features",
+      "remove": "replace_assembly_hole_features",
+      "intent_blocks": [
+        196,
+        197
+      ],
+      "shell_owner": 198,
+      "contract": "docs/hole-wizard.md",
+      "note": "Geometry bind/evaluate/detach validates a disposable complete Project; the Core catalog replacement remains strict intent authority."
+    },
+    {
+      "family": "assembly_representations",
+      "type": "AssemblyPosition / AssemblyDesignView",
+      "owner_type": "Project",
+      "replace": [
+        "replace_assembly_positions",
+        "replace_assembly_design_views"
+      ],
+      "intent_blocks": [
+        198
+      ],
+      "shell_owner": 198,
+      "contract": "docs/assembly-system.md",
+      "note": "Publish catalogs only on authored Primary/Master/Default. Evaluation and session activation remain separate transient read paths."
     }
   ]
 }

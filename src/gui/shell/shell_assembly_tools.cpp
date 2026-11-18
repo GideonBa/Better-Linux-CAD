@@ -1,9 +1,9 @@
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
-#include "blcad/gui/gui_icons.hpp"
 #include "blcad/core/assembly_leaf_occurrence.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/gui/gui_assembly_workbench.hpp"
+#include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/gui_step_import_workbench.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
@@ -530,7 +530,7 @@ Result<std::size_t> ShellAssemblyTools::begin(Command command) {
   hierarchy_targets_.clear();
   if (command == Command::Relationship || command == Command::Joint) {
     auto targets = query_with_step_import_context(session_, [&](auto* context) {
-      return geometry::AssemblyInteractionGeometry::targets(*project, context);
+      return geometry::AssemblyInteractionGeometry::targets(*session_.effective_project(), context);
     });
     if (!targets) {
       sync_ = false;
@@ -1174,7 +1174,7 @@ std::vector<geometry::ViewportSceneItem> ShellAssemblyTools::selection_items() c
       session_.derived_results_fresh() &&
       viewport_.selection_filter_mask() == selection_kind_bit(GuiSelectionKind::AssemblyTarget)) {
     auto targets = query_with_step_import_context(session_, [&](auto* context) {
-      return geometry::AssemblyInteractionGeometry::targets(*session_.project(), context);
+      return geometry::AssemblyInteractionGeometry::targets(*session_.effective_project(), context);
     });
     if (targets)
       for (auto& target : targets.value())
@@ -1264,8 +1264,7 @@ void ShellAssemblyTools::refresh_presentation() {
 }
 void ShellAssemblyTools::refresh() {
   const auto* project = session_.project();
-  const bool idle =
-      project && !active() && !session_.task().active() && session_.derived_results_fresh();
+  const bool idle = session_.active_model_state() == primary_model_state_id() && project && !active() && !session_.task().active() && session_.derived_results_fresh();
   import_action_->setEnabled(idle);
   for (const auto& [command, action] : actions_)
     action->setEnabled(

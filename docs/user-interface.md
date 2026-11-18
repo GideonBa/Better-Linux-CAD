@@ -541,8 +541,13 @@ arrows cannot intercept station grips. Face roles, hold lines, derived full-roun
 setbacks use the same task and fixed completion actions. Open for Repair first owns References;
 close that task before opening the Fillet editor from History. A successful repair validates the
 complete model and remains undoable. External document/model changes invalidate the local draft.
-Direct Edit exposes its
-Move/Rotate/Size/Delete choice beside the existing triad and provides matching numeric fields.
+The owned [Direct Edit panel](part-direct-edit-mvp6.md#owned-native-workflow) exposes
+Move/Rotate/Offset/Size/Delete and Heal beside its physical triad, with matching typed numeric
+bindings, explicit reference origin/orientation and radius/diameter choice. Face preselection and
+History Edit use the same owner. Failed healing retains the draft and marks selected supports;
+Preview checks the complete downstream history before one reversible Apply. Reference Parts
+explain explicit STEP Sources conversion. Creation appends at the current complete history end;
+editing reconstructs the selected feature's actual input prefix.
 In-context Assembly editing always shows the root and edited definition/occurrence in the breadcrumb.
 An Assembly Hole participant table makes every affected Part and recipe visible before Apply.
 
@@ -1168,3 +1173,63 @@ displaying the feature at its input position. Invalid candidates disable Apply a
 source/support. Existing broken features retain explicit repair inputs. Completion actions stay
 outside the scrolling properties. See the [workflow contract](gui-sketch-driven-features-mvp9.md)
 for evidence and supported Geometry boundaries.
+
+
+## Model-state table and selected document views — 191
+
+Manage → Model States opens an owned task for a standalone Part, root Assembly or editable Project
+Part. The permanent Primary row is read-only. Named siblings support New, Duplicate, Rename and
+Delete; the table distinguishes typed literal/formula overrides, suppression, pinned materials and
+child-state selections. Accept Locally retains validated draft intent, Preview checks every member
+and the complete model, and Apply publishes the table together. Invalid input remains visible for
+correction; changing the owner requires applying or explicitly discarding local changes.
+
+The browser's Model States group supports direct root-state activation and Project Part table
+navigation. View selected state and Return to Primary are explicit navigation actions. Pending
+foreign commands must be applied or cancelled before activation. Named views expose their selected
+state in the window title and keep ordinary modeling read-only; property values, viewport, Measure,
+Physical Properties and STEP export use that selected view. The table remains the authoring surface
+for named overrides. Saving preserves Primary and catalog definitions, with activation kept in the
+session. Assembly occurrence state selection remains distinct from visibility and pose.
+
+Save Member Copy creates an independent Part with a new identity, selected effective values and
+pinned resources. It preserves the original document and follows the existing imported-asset and
+sidecar publication rules. See [parameter authority](parameter-model.md#native-table-selected-views-and-independent-member-copies--191)
+for exact lifecycle/failure semantics and focused proof. Numbered acceptance remains in
+[the MVP plan](mvp-plan.md); advanced positions and in-context Assembly interaction retain their
+separate 198 scope.
+
+## Advanced Assembly interaction and distinct representations — 198
+
+Assembly → Design Context contains Flexible Occurrence, Adaptive Reference, Assembly Hole,
+Positions and Design Views, and Edit Part in Context. The owned scrollable task keeps Preview,
+Apply and Cancel reachable. Invalid previews retain inputs and show an inline explanation. A
+checked Apply publishes one root Undo with the operation's label. Changing modes or cancelling
+clears candidate geometry and restores the preceding selection filter/scope.
+
+Flexible Occurrence chooses a rooted subassembly, Rigid or Flexible, a local joint and a typed
+coordinate. The selected occurrence's internal pose remains independent from repeated instances.
+Adaptive Reference chooses source occurrence/state and semantic geometry or native path, one target
+driver and a compatible linked construction. The visible driver and directed downstream chain are
+shown alongside the inputs. Existing links can be edited or explicitly detached as local snapshots.
+Assembly Hole chooses an authored Hole layout and optional pattern, then checks participant rows
+with an existing Hole recipe, selected state, role and explicit all-occurrences policy. Create a
+participant recipe through ordinary Hole authoring in its Part context, then return to coordination.
+
+Positions store pose/joint settings; design views store display; Model States retain manufacturing
+choices. Store captures the checked current position, Recall selects it without rewriting Master,
+and named positions support Rename/Delete. The independent design-view table includes rooted
+components and subassemblies, with Preview/Apply, Recall and Delete. The browser lists both
+catalogs, and selected names appear in the window title. Master and Default are permanent; generic
+Assembly modeling returns to Master. Save retains authored definitions and catalogs; Open restores
+Primary/Master/Default. Hidden active members still contribute to physical totals.
+
+Edit Part in Context requires Primary/Master/Default and an explicit rooted Part. The persistent
+root/Part breadcrumb states Part coordinates and shared Primary definition scope. Source Sketch
+editing remains in the existing Part workbench. Finish Part returns one fully checked root edit;
+Cancel restores the exact root. Both restore the root camera, selection filter/scope and Assembly
+ribbon. Pending child commands must be applied or cancelled before Finish. Root Save while editing
+publishes the committed Assembly checkpoint. See
+[context lifecycle](parameter-model.md#in-context-part-editing-and-root-publication--198) and
+[representation authority/proof](assembly-system.md#positions-design-views-and-native-assembly-tasks--198).
+Numbered/native acceptance remains in [the MVP plan](mvp-plan.md).

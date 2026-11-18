@@ -1,5 +1,6 @@
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/part_feature_json_commands.hpp"
 #include "blcad/geometry/body_boolean_adapter.hpp"
 #include "blcad/geometry/finishing_selection.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
@@ -15,6 +16,7 @@
 #include "blcad/gui/gui_icons.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/gui_thread_recipe.hpp"
+#include "blcad/gui/shell/shell_direct_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_manipulator_overlay.hpp"
 #include "blcad/gui/shell/shell_property_controls.hpp"
@@ -56,9 +58,10 @@ using Json = nlohmann::json;
 using Kind = GuiFeatureEditKind;
 constexpr const char* task_id = "part.feature_edit";
 constexpr const char* collections[] = {
-    "features",      "revolve_features", "sweep_features",  "loft_features",  "surface_features",
-    "part_patterns", "mirror_features",  "edge_treatments", "shell_features", "draft_features",
-    "body_booleans", "hole_features",    "thread_features"};
+    "features",         "revolve_features",     "sweep_features",        "loft_features",
+    "surface_features", "part_patterns",        "mirror_features",       "edge_treatments",
+    "shell_features",   "draft_features",       "body_booleans",         "hole_features",
+    "thread_features",  "direct_edit_features", "sketch_driven_features"};
 QString label(const std::string& key) {
   static const std::map<std::string, QString> labels = {
       {"id", "Identifier"},
@@ -243,6 +246,8 @@ QString family(Kind kind) {
     return "Hole";
   case Kind::Thread:
     return "Thread";
+  case Kind::DirectEdit:
+    return "Direct Edit";
   case Kind::SketchDriven:
     return "Sketch-driven Feature";
   }
@@ -268,6 +273,7 @@ auto with_record(const PartDocument& part, FeatureId id, Kind kind, Callback cal
     BLCAD_EDIT_RECORD(Chamfer, find_chamfer_feature, update_chamfer_feature)
     BLCAD_EDIT_RECORD(Shell, find_shell_feature, update_shell_feature)
     BLCAD_EDIT_RECORD(Draft, find_draft_feature, update_draft_feature)
+    BLCAD_EDIT_RECORD(DirectEdit, find_direct_edit_feature, update_direct_edit_feature)
     BLCAD_EDIT_RECORD(SketchDriven, find_sketch_driven_feature, update_sketch_driven_feature)
     BLCAD_EDIT_RECORD(BodyBoolean, find_body_boolean_feature, update_body_boolean_feature)
   case Kind::Hole:
@@ -2808,7 +2814,13 @@ struct ShellFeatureEditTools::Impl {
   Result<PartDocument> decode(bool parameter_edits = true,
                               bool canonical_thread_profile = false) const {
     Json root = source;
-    root.at(collection).at(record_index) = record;
+    const bool source_rebind = edit.kind() == Kind::LinearPattern ||
+                               edit.kind() == Kind::CircularPattern || edit.kind() == Kind::Mirror;
+    // A new source can follow this consumer in the previous dependency-derived
+    // replay order. Parse the original history, then let the typed Core update
+    // rebuild its dependencies; the persisted reader must remain strict.
+    if (!source_rebind)
+      root.at(collection).at(record_index) = record;
     if (canonical_thread_profile && record.contains("thread"))
       root.at(collection).at(record_index).at("thread").at("profile") =
           source.at(collection).at(record_index).at("thread").at("profile");
@@ -2819,7 +2831,12 @@ struct ShellFeatureEditTools::Impl {
           parameter_edits && found != parameter_values.end() && used.contains(id))
         p["value"] = found->second;
     }
-    return deserialize_part_document_from_json(root.dump());
+    auto decoded = deserialize_part_document_from_json(root.dump());
+    if (!decoded || !source_rebind)
+      return decoded;
+    if (edit.kind() == Kind::Mirror)
+      return replace_part_mirror_from_json(decoded.value(), record.dump());
+    return replace_part_pattern_from_json(decoded.value(), record.dump());
   }
   bool fresh() const {
     if (!edit.active() || !session.part_document() || !session.part_modeling_ready() ||
@@ -3428,6 +3445,9 @@ Result<std::size_t> ShellFeatureEditTools::begin_legacy_hole_conversion(FeatureI
 }
 Result<std::size_t> ShellFeatureEditTools::begin(FeatureId id) {
   auto& p = *impl_;
+  if (!active() && !p.window.active_sketch() && !p.session.task().active() &&
+      p.session.part_document() && p.session.part_document()->find_direct_edit_feature(id))
+    return p.window.direct_edit_tools().begin_edit(id);
   if (!active() && !p.window.active_sketch() && !p.session.task().active() &&
       p.session.part_document() && p.session.part_document()->find_sketch_driven_feature(id))
     return p.window.sketch_driven_tools().begin_edit(id);
