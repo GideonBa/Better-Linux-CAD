@@ -1,0 +1,40 @@
+{
+  "controller_source_file": "controller-source.py",
+  "controller_source_sha256": "d08e726bf1e02e9387d23977e52be8c19e6b7d1fa8bad4c6befaa2483db9022a",
+  "finished_utc": "2026-11-18T08:34:55.709455+00:00",
+  "jobs": [
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/gideon/Dokumente/andere Projekte/BLCAD/scripts/run_variant_assembly_profile.py",
+        "--repo",
+        "/home/gideon/Dokumente/andere Projekte/BLCAD",
+        "--executable",
+        "/home/gideon/Dokumente/andere Projekte/BLCAD/build/dev-gui/blcad_variant_assembly_profile",
+        "--output",
+        "/tmp/blcad-through198-p01-runtime23/publication/series",
+        "--mode",
+        "all",
+        "--processes",
+        "3",
+        "--timeout",
+        "600.0"
+      ],
+      "elapsed_seconds": 679.3971655339992,
+      "finished_utc": "2026-11-18T08:34:55.708636+00:00",
+      "name": "series",
+      "outer_deadline_seconds": 12000.0,
+      "owned_group_absence_confirmed": true,
+      "returncode": 0,
+      "started_utc": "2026-11-18T08:23:36.311437+00:00",
+      "status": "passed",
+      "stdout_stderr": "series.controller.log"
+    }
+  ],
+  "per_process_timeout_seconds": 600.0,
+  "phase": "series",
+  "policy": "one process group at a time; root confirms no concurrent builds/tests/apps; smoke is never pooled with publication",
+  "schema": "blcad.p01-exclusive-controller.v1",
+  "started_utc": "2026-11-18T08:23:36.311315+00:00",
+  "status": "passed"
+}

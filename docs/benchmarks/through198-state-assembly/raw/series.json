@@ -1,0 +1,191 @@
+{
+  "executable_sha256": "859b317c10453c2916f367df42c3807ccb3ed84d515c1861513cdcff4cab27ca",
+  "finished_utc": "2026-11-18T08:34:55.659329+00:00",
+  "policy": "separate sequential processes; one first sample and ten warm repeats in each; no portable budget or UI latency claim",
+  "processes": [
+    {
+      "artifact": "states-2-process-1.json",
+      "artifact_sha256": "b8311b4d627ca87999242867170b8965ae2bfc6fb81309b8a70080101e0e52dc",
+      "elapsed_seconds": 14.89601984100591,
+      "mode": "states",
+      "process_index": 1,
+      "returncode": 0,
+      "size": 2,
+      "status": "passed"
+    },
+    {
+      "artifact": "states-2-process-2.json",
+      "artifact_sha256": "bafae81748248a5f5a04290453c285d12db82ce31f454d7efaf86b0918f633fe",
+      "elapsed_seconds": 14.729849921001005,
+      "mode": "states",
+      "process_index": 2,
+      "returncode": 0,
+      "size": 2,
+      "status": "passed"
+    },
+    {
+      "artifact": "states-2-process-3.json",
+      "artifact_sha256": "a10c15e6152d1986a29988a426348bee1432467d89a9ea566854691ec53341f2",
+      "elapsed_seconds": 14.80006723999395,
+      "mode": "states",
+      "process_index": 3,
+      "returncode": 0,
+      "size": 2,
+      "status": "passed"
+    },
+    {
+      "artifact": "states-10-process-1.json",
+      "artifact_sha256": "0a274975cda2eadb0bcc4e450a339e6a17d7c32f190874562679c850af23b439",
+      "elapsed_seconds": 21.259806820002268,
+      "mode": "states",
+      "process_index": 1,
+      "returncode": 0,
+      "size": 10,
+      "status": "passed"
+    },
+    {
+      "artifact": "states-10-process-2.json",
+      "artifact_sha256": "b67172ad221aae7ca070fe0f2d1c33684067a4efd5442cdaca09f781bf7cbf86",
+      "elapsed_seconds": 21.242490648990497,
+      "mode": "states",
+      "process_index": 2,
+      "returncode": 0,
+      "size": 10,
+      "status": "passed"
+    },
+    {
+      "artifact": "states-10-process-3.json",
+      "artifact_sha256": "8963793be1d9042e329950799e0e178c5fef2799d4e159a0bfb03a849e465825",
+      "elapsed_seconds": 21.1972277140012,
+      "mode": "states",
+      "process_index": 3,
+      "returncode": 0,
+      "size": 10,
+      "status": "passed"
+    },
+    {
+      "artifact": "states-50-process-1.json",
+      "artifact_sha256": "3d08ab5c832d1b9ad1617e437f5573071760954f1f79f37e8648699a7b64e6e9",
+      "elapsed_seconds": 140.9567584710021,
+      "mode": "states",
+      "process_index": 1,
+      "returncode": 0,
+      "size": 50,
+      "status": "passed"
+    },
+    {
+      "artifact": "states-50-process-2.json",
+      "artifact_sha256": "54aadce81a8e1854ef2e6046575a66e7c8492cbd92c1e5afa597899d4b547f2d",
+      "elapsed_seconds": 141.39162394800223,
+      "mode": "states",
+      "process_index": 2,
+      "returncode": 0,
+      "size": 50,
+      "status": "passed"
+    },
+    {
+      "artifact": "states-50-process-3.json",
+      "artifact_sha256": "9550d5e88ddbb59b068baf24459fdae0b0e3d5cb804a29cbc3ad6c8f38e43bd5",
+      "elapsed_seconds": 141.0411267610034,
+      "mode": "states",
+      "process_index": 3,
+      "returncode": 0,
+      "size": 50,
+      "status": "passed"
+    },
+    {
+      "artifact": "assembly-10-process-1.json",
+      "artifact_sha256": "b9587b695f682c84522efca1d65edd883c1d9ce9368e1ba010485612ecf6a659",
+      "elapsed_seconds": 14.281786032006494,
+      "mode": "assembly",
+      "process_index": 1,
+      "returncode": 0,
+      "size": 10,
+      "status": "passed"
+    },
+    {
+      "artifact": "assembly-10-process-2.json",
+      "artifact_sha256": "2875ddcdb8dcbbf9d35bb8ab0aa9025d339e521f5b26b8b09e369b684958f446",
+      "elapsed_seconds": 14.47729265500675,
+      "mode": "assembly",
+      "process_index": 2,
+      "returncode": 0,
+      "size": 10,
+      "status": "passed"
+    },
+    {
+      "artifact": "assembly-10-process-3.json",
+      "artifact_sha256": "9a1c6b83e74126eb3ea15f7a476af99962f035cf35245469a04f7d817fef8d57",
+      "elapsed_seconds": 14.389201313009835,
+      "mode": "assembly",
+      "process_index": 3,
+      "returncode": 0,
+      "size": 10,
+      "status": "passed"
+    },
+    {
+      "artifact": "assembly-100-process-1.json",
+      "artifact_sha256": "70531c098b61342696844c1d1a600e3f028d3129eca9e5e3cd23585de8d9f305",
+      "elapsed_seconds": 14.561253531006514,
+      "mode": "assembly",
+      "process_index": 1,
+      "returncode": 0,
+      "size": 100,
+      "status": "passed"
+    },
+    {
+      "artifact": "assembly-100-process-2.json",
+      "artifact_sha256": "142343ad5b436b3d301360f19b454eef91cbc3e47b718934542baad36737f06c",
+      "elapsed_seconds": 14.559890660995734,
+      "mode": "assembly",
+      "process_index": 2,
+      "returncode": 0,
+      "size": 100,
+      "status": "passed"
+    },
+    {
+      "artifact": "assembly-100-process-3.json",
+      "artifact_sha256": "37ffb58816920763c8608b90c81b70a2bd0d212ba5013f923d353694e879f4e5",
+      "elapsed_seconds": 14.890541682994808,
+      "mode": "assembly",
+      "process_index": 3,
+      "returncode": 0,
+      "size": 100,
+      "status": "passed"
+    },
+    {
+      "artifact": "assembly-1000-process-1.json",
+      "artifact_sha256": "fe83c6a69900f1a701ddcb7cf1d098178edba375809e946b49e04c77b852618c",
+      "elapsed_seconds": 18.06344231100229,
+      "mode": "assembly",
+      "process_index": 1,
+      "returncode": 0,
+      "size": 1000,
+      "status": "passed"
+    },
+    {
+      "artifact": "assembly-1000-process-2.json",
+      "artifact_sha256": "5f281d036b055fd60f223e1d8c3ceb02cd3c517f00ceaafe017d6fd17e05cd63",
+      "elapsed_seconds": 17.994074725997052,
+      "mode": "assembly",
+      "process_index": 2,
+      "returncode": 0,
+      "size": 1000,
+      "status": "passed"
+    },
+    {
+      "artifact": "assembly-1000-process-3.json",
+      "artifact_sha256": "d70f9144ae13f7e61baa225eb171afdc2623e9b3e22a9cc1aa47f3c96a2f35e8",
+      "elapsed_seconds": 18.17635400799918,
+      "mode": "assembly",
+      "process_index": 3,
+      "returncode": 0,
+      "size": 1000,
+      "status": "passed"
+    }
+  ],
+  "publication_complete": true,
+  "runtime_manifest_sha256": "396d70c6988508f81ceec7f76b5f8a642dc67454d5bd7d5c09b7c056781224c6",
+  "schema": "blcad.profile-process-series.v1",
+  "status": "passed"
+}
