@@ -1,0 +1,1 @@
+assembly 100: first sample and 10 warm samples passed independent checks.
