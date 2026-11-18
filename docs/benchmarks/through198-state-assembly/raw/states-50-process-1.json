@@ -1,0 +1,169 @@
+{
+  "budget_policy": "baseline only; no portable latency assertions",
+  "build_type": "Debug",
+  "compiler": "13.3.0",
+  "cpp_standard": 202002,
+  "cpu_model": " 13th Gen Intel(R) Core(TM) i7-1370P",
+  "executable_sha256": "859b317c10453c2916f367df42c3807ccb3ed84d515c1861513cdcff4cab27ca",
+  "finished_utc": "2026-11-18T08:27:48Z",
+  "hardware_threads": 20,
+  "kernel": "7.0.0-43-generic",
+  "machine": "x86_64",
+  "memory_total": "       32467540 kB",
+  "mode": "states",
+  "occt_version": "7.6.3",
+  "os": "Linux",
+  "peak_rss_kib": 523732,
+  "peak_rss_measurement_point": "after workload generation, all timed batches and independent checks; before source and result artifact serialization/publication",
+  "peak_rss_scope": "Linux process-lifetime getrusage(RUSAGE_SELF).ru_maxrss in KiB; includes provenance reads, setup, caches/snapshots and checks; no baseline subtraction",
+  "process_id": 268628,
+  "qt_configured_version": "6.4.2",
+  "runtime_manifest_sha256": "396d70c6988508f81ceec7f76b5f8a642dc67454d5bd7d5c09b7c056781224c6",
+  "schema": "blcad.state-assembly-profile.v1",
+  "scope": "synchronous headless calls; no native UI or interactive latency claim",
+  "size": 50,
+  "source_intent_file": "states-50-process-1.json.source.json",
+  "source_intent_sha256": "73ba2ce62e7bea269d33e919206fce13d22e2486f8f20b732c0f9be3aa1acf6d",
+  "started_utc": "2026-11-18T08:25:41Z",
+  "status": "passed",
+  "wall_ms_including_setup_and_checks": 126728.651266,
+  "warm_repeats": 10,
+  "workload": {
+    "cold_definition": "first measured batch after Core catalog validation; all state Geometry caches empty; no OS cache flush",
+    "effective_evaluation_warm_summary": {
+      "max_ms": 212.365909,
+      "median_ms": 202.8177975,
+      "min_ms": 196.689941,
+      "p95_method": "nearest-rank",
+      "p95_ms": 212.365909,
+      "sample_count": 10
+    },
+    "equal_geometry_pair_policy": "consecutive state pairs share width but differ in identity and density",
+    "excluded_from_timing": [
+      "fixture and catalog validation",
+      "source serialization",
+      "independent volume/mass/freshness checks and retained Primary cache"
+    ],
+    "geometry_cache_policy": "one independent persistent ShapeCache per named state",
+    "geometry_warm_summary": {
+      "max_ms": 281.061258,
+      "median_ms": 267.200182,
+      "min_ms": 263.850068,
+      "p95_method": "nearest-rank",
+      "p95_ms": 281.061258,
+      "sample_count": 10
+    },
+    "named_states": 50,
+    "samples": [
+      {
+        "checked_state_count": 50,
+        "effective_evaluation_batch_ms": 200.761644,
+        "executed_feature_count": 50,
+        "geometry_batch_ms": 166.512113,
+        "iteration": 0,
+        "phase": "first-cold",
+        "reused_complete_geometry_state_count": 0
+      },
+      {
+        "checked_state_count": 50,
+        "effective_evaluation_batch_ms": 208.789306,
+        "executed_feature_count": 50,
+        "geometry_batch_ms": 279.807413,
+        "iteration": 1,
+        "phase": "warm",
+        "reused_complete_geometry_state_count": 0
+      },
+      {
+        "checked_state_count": 50,
+        "effective_evaluation_batch_ms": 202.932228,
+        "executed_feature_count": 50,
+        "geometry_batch_ms": 273.366797,
+        "iteration": 2,
+        "phase": "warm",
+        "reused_complete_geometry_state_count": 0
+      },
+      {
+        "checked_state_count": 50,
+        "effective_evaluation_batch_ms": 200.419168,
+        "executed_feature_count": 50,
+        "geometry_batch_ms": 266.595569,
+        "iteration": 3,
+        "phase": "warm",
+        "reused_complete_geometry_state_count": 0
+      },
+      {
+        "checked_state_count": 50,
+        "effective_evaluation_batch_ms": 205.038058,
+        "executed_feature_count": 50,
+        "geometry_batch_ms": 266.890693,
+        "iteration": 4,
+        "phase": "warm",
+        "reused_complete_geometry_state_count": 0
+      },
+      {
+        "checked_state_count": 50,
+        "effective_evaluation_batch_ms": 202.192092,
+        "executed_feature_count": 50,
+        "geometry_batch_ms": 273.675981,
+        "iteration": 5,
+        "phase": "warm",
+        "reused_complete_geometry_state_count": 0
+      },
+      {
+        "checked_state_count": 50,
+        "effective_evaluation_batch_ms": 200.566589,
+        "executed_feature_count": 50,
+        "geometry_batch_ms": 266.961415,
+        "iteration": 6,
+        "phase": "warm",
+        "reused_complete_geometry_state_count": 0
+      },
+      {
+        "checked_state_count": 50,
+        "effective_evaluation_batch_ms": 202.742869,
+        "executed_feature_count": 50,
+        "geometry_batch_ms": 266.984806,
+        "iteration": 7,
+        "phase": "warm",
+        "reused_complete_geometry_state_count": 0
+      },
+      {
+        "checked_state_count": 50,
+        "effective_evaluation_batch_ms": 196.689941,
+        "executed_feature_count": 50,
+        "geometry_batch_ms": 263.850068,
+        "iteration": 8,
+        "phase": "warm",
+        "reused_complete_geometry_state_count": 0
+      },
+      {
+        "checked_state_count": 50,
+        "effective_evaluation_batch_ms": 212.365909,
+        "executed_feature_count": 50,
+        "geometry_batch_ms": 281.061258,
+        "iteration": 9,
+        "phase": "warm",
+        "reused_complete_geometry_state_count": 0
+      },
+      {
+        "checked_state_count": 50,
+        "effective_evaluation_batch_ms": 202.892726,
+        "executed_feature_count": 50,
+        "geometry_batch_ms": 267.415558,
+        "iteration": 10,
+        "phase": "warm",
+        "reused_complete_geometry_state_count": 0
+      }
+    ],
+    "scene": "shared native box with sparse width and material sibling states",
+    "timed": [
+      "effective evaluation of every state",
+      "Geometry execute_document of every state"
+    ],
+    "unmeasured": [
+      "native UI state switching",
+      "undo/history transaction",
+      "STEP export"
+    ]
+  }
+}
