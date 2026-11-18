@@ -2,6 +2,7 @@
 #include "blcad/geometry/surface_boundary_query.hpp"
 #include "geometry_shape_internal.hpp"
 #include "surface_offset_verification.hpp"
+#include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_Check.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepCheck_Analyzer.hxx>
@@ -9,6 +10,7 @@
 #include <BRepLib.hxx>
 #include <BRepOffsetAPI_MakeOffsetShape.hxx>
 #include <BRepOffsetAPI_MakeThickSolid.hxx>
+#include <BRepPrimAPI_MakePrism.hxx>
 #include <BRep_Builder.hxx>
 #include <GProp_GProps.hxx>
 #include <Standard_Failure.hxx>
@@ -17,6 +19,7 @@
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Solid.hxx>
 #include <cmath>
+#include <optional>
 #include <stdexcept>
 namespace blcad::geometry {
 namespace {
@@ -123,14 +126,44 @@ SurfaceOffsetAdapter::construct(FeatureId id, const GeometryShape& source, Surfa
     }
     BRepOffsetAPI_MakeThickSolid thicken;
     BRepOffsetAPI_MakeOffsetShape offset;
-    BRepOffsetAPI_MakeOffsetShape* operation;
+    BRepOffsetAPI_MakeOffsetShape* operation = nullptr;
+    std::optional<BRepPrimAPI_MakePrism> planar_prism;
     TopoDS_Shape candidate;
     if (thick) {
-      thicken.MakeThickSolidBySimple(base, symmetric ? distance : last);
-      if (!thicken.IsDone())
-        return fail("OCCT could not close the offset skins and free side walls");
-      candidate = thicken.Shape();
-      operation = &thicken;
+      TopoDS_Face planar_face;
+      if (faces.Extent() == 1) {
+        TopExp_Explorer one(base, TopAbs_FACE);
+        if (one.More() &&
+            BRepAdaptor_Surface(TopoDS::Face(one.Current())).GetType() == GeomAbs_Plane)
+          planar_face = TopoDS::Face(one.Current());
+      }
+      if (!planar_face.IsNull()) {
+        // A plane has one constant normal even when narrow/annular trimming
+        // contains none of the transient direction helper's sample stations.
+        // Derivatives retain indirect native axes and the located face frame.
+        gp_Pnt position;
+        gp_Vec du, dv;
+        BRepAdaptor_Surface(planar_face).D1(0, 0, position, du, dv);
+        auto normal = du.Crossed(dv);
+        if (!std::isfinite(normal.SquareMagnitude()) || normal.SquareMagnitude() < 1e-24)
+          return fail("Planar Thicken requires a regular native plane normal");
+        normal.Normalize();
+        if (planar_face.Orientation() == TopAbs_REVERSED)
+          normal.Reverse();
+        // Exact planar extrusion preserves circular/linear trim carriers. The
+        // generic offset builder can turn circular side walls into closed
+        // nonperiodic B-splines that require healing after STEP transfer.
+        planar_prism.emplace(planar_face, normal * (symmetric ? distance : last), false, true);
+        if (!planar_prism->IsDone())
+          return fail("OCCT could not close the planar skins and free side walls");
+        candidate = planar_prism->Shape();
+      } else {
+        thicken.MakeThickSolidBySimple(base, symmetric ? distance : last);
+        if (!thicken.IsDone())
+          return fail("OCCT could not close the offset skins and free side walls");
+        candidate = thicken.Shape();
+        operation = &thicken;
+      }
       if (candidate.ShapeType() != TopAbs_SOLID)
         return fail("Thicken did not form exactly one Solid");
       auto solid = TopoDS::Solid(candidate);
@@ -159,7 +192,8 @@ SurfaceOffsetAdapter::construct(FeatureId id, const GeometryShape& source, Surfa
       const auto original_face = TopoDS::Face(faces(i));
       const auto owned = TopoDS::Face(copy.ModifiedShape(original_face));
       const auto low = symmetric ? image(lower, owned) : owned;
-      const auto high = image(*operation, thick ? low : owned);
+      const auto high = planar_prism ? TopoDS::Face(planar_prism->LastShape(low))
+                                     : image(*operation, thick ? low : owned);
       pairs.push_back({original_face, low, high, first, last});
       for (const auto& entry : source.impl_->face_lineage)
         if (entry.face.IsSame(original_face)) {

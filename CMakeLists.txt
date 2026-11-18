@@ -808,6 +808,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/surface_trim_extend_pipeline_tests.cpp
       tests/geometry/measure_selection_tests.cpp
       tests/geometry/surface_offset_geometry_tests.cpp
+      tests/geometry/planar_thicken_step_tests.cpp
       tests/geometry/surface_offset_consumer_tests.cpp
       tests/geometry/curved_surface_geometry_tests.cpp
       tests/geometry/curved_surface_combination_tests.cpp
