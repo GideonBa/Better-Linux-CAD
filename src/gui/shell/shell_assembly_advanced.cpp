@@ -4,9 +4,9 @@
 #include "blcad/geometry/assembly_joint_target_compatibility.hpp"
 #include "blcad/geometry/assembly_solve_diagnostics.hpp"
 #include "blcad/geometry/body_transform_adapter.hpp"
+#include "blcad/gui/gui_step_import_context.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
-#include "blcad/gui/gui_step_import_context.hpp"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -65,6 +65,59 @@ Result<std::size_t> validate_hierarchy_joint(const Project& project,
   return compatible ? Result<std::size_t>::success(2)
                     : Result<std::size_t>::failure(compatible.error());
 }
+Result<Project> occurrence_target_view(const Project& project,
+                                       const AssemblyHierarchyOccurrenceDescriptor& occurrence) {
+  const auto* definition = project.find_assembly_document(occurrence.assembly_document);
+  if (!definition)
+    return Result<Project>::failure(invalid("Assembly definition missing"));
+  auto assembly = definition->evaluate_model_state(occurrence.selected_model_state);
+  if (!assembly)
+    return Result<Project>::failure(assembly.error());
+  const auto components = assembly.value().component_instances();
+  for (const auto& component : components) {
+    auto transform =
+        project.effective_component_transform(occurrence.occurrence_path, component.id());
+    if (!transform)
+      return Result<Project>::failure(transform.error());
+    auto applied =
+        assembly.value().set_component_instance_transform(component.id(), transform.value());
+    if (!applied)
+      return Result<Project>::failure(applied.error());
+    auto display = assembly.value().set_component_instance_visibility(
+        component.id(), project.design_component_visible(
+                            occurrence.occurrence_path, component.id(),
+                            component.visibility() == ComponentVisibility::Visible)
+                            ? ComponentVisibility::Visible
+                            : ComponentVisibility::Hidden);
+    if (!display)
+      return Result<Project>::failure(display.error());
+  }
+  auto local = Project::create(DocumentId("gui.hierarchy.targets"), "Targets", assembly.value());
+  if (!local)
+    return local;
+  for (const auto& part : project.part_documents()) {
+    auto added = local.value().add_part_document(part);
+    if (!added)
+      return Result<Project>::failure(added.error());
+  }
+  std::vector<DocumentId> visited{definition->id()}, pending;
+  for (const auto& child : assembly.value().subassembly_instances())
+    pending.push_back(child.referenced_assembly_document());
+  for (std::size_t i = 0; i < pending.size(); ++i) {
+    if (std::find(visited.begin(), visited.end(), pending[i]) != visited.end())
+      continue;
+    const auto* child = project.find_assembly_document(pending[i]);
+    if (!child)
+      return Result<Project>::failure(invalid("Descendant Assembly definition missing"));
+    auto added = local.value().add_child_assembly_document(*child);
+    if (!added)
+      return Result<Project>::failure(added.error());
+    visited.push_back(child->id());
+    for (const auto& nested : child->subassembly_instances())
+      pending.push_back(nested.referenced_assembly_document());
+  }
+  return local;
+}
 } // namespace
 bool ShellAssemblyTools::advanced() const noexcept {
   return command_ == Command::ValidateHierarchy || command_ == Command::CrossRelationship ||
@@ -104,34 +157,21 @@ Result<std::size_t> ShellAssemblyTools::build_hierarchy_targets() {
   auto context = make_step_import_context(session_);
   if (!context)
     return Result<std::size_t>::failure(context.error());
-  const auto& project = *session_.project();
+  const auto& project = *session_.effective_project();
   auto hierarchy = AssemblyHierarchyTraversal::build(project);
   if (!hierarchy)
     return Result<std::size_t>::failure(hierarchy.error());
-  std::map<std::string, std::vector<geometry::AssemblyInteractionTarget>> local_targets;
   for (const auto& occurrence : hierarchy.value().occurrences()) {
     if (!occurrence.active_path || !occurrence.visible_path)
       continue;
-    const auto* assembly = project.find_assembly_document(occurrence.assembly_document);
-    if (!assembly)
-      return Result<std::size_t>::failure(invalid("Assembly definition missing"));
-    auto found = local_targets.find(assembly->id().value());
-    if (found == local_targets.end()) {
-      auto local = Project::create(DocumentId("gui.hierarchy.targets"), "Targets", *assembly);
-      if (!local)
-        return Result<std::size_t>::failure(local.error());
-      for (const auto& part : project.part_documents()) {
-        auto added = local.value().add_part_document(part);
-        if (!added)
-          return added;
-      }
-      auto targets =
-          geometry::AssemblyInteractionGeometry::targets(local.value(), context.value().get());
-      if (!targets)
-        return Result<std::size_t>::failure(targets.error());
-      found = local_targets.emplace(assembly->id().value(), std::move(targets.value())).first;
-    }
-    for (auto target : found->second) {
+    auto local = occurrence_target_view(project, occurrence);
+    if (!local)
+      return Result<std::size_t>::failure(local.error());
+    auto targets =
+        geometry::AssemblyInteractionGeometry::targets(local.value(), context.value().get());
+    if (!targets)
+      return Result<std::size_t>::failure(targets.error());
+    for (auto target : targets.value()) {
       auto endpoint = AssemblyHierarchyConstraintEndpoint::create(
           occurrence.occurrence_path, target.reference.component_instance(),
           target.reference.semantic_reference());
@@ -542,11 +582,10 @@ Result<QString> ShellAssemblyTools::preview_advanced(Project& candidate) {
     if (!applied)
       return Result<QString>::failure(applied.error());
     cross_solved_ = std::move(solved.value());
-    return finish(QStringLiteral(
-                      "Hierarchy group solved. Remaining degrees of freedom: %1; RMS: %2. Repeated "
-                      "definitions share their internal placement.")
-                      .arg(diagnostics.value().rank_summary.remaining_dof)
-                      .arg(cross_solved_->residual_summary.final_rms, 0, 'g', 4));
+    return finish(
+        QStringLiteral("Hierarchy group solved. Remaining degrees of freedom: %1; RMS: %2.")
+            .arg(diagnostics.value().rank_summary.remaining_dof)
+            .arg(cross_solved_->residual_summary.final_rms, 0, 'g', 4));
   } else if (command_ == Command::CrossMotion) {
     const auto* joint = candidate.find_cross_hierarchy_joint(
         AssemblyJointId(joint_->currentData().toString().toStdString()));

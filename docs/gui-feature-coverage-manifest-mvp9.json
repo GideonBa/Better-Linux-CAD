@@ -1986,5 +1986,8 @@
       }
     ]
   },
-  "extension_manifests": ["docs/gui-sketch-driven-coverage-mvp9.json"]
+  "extension_manifests": [
+    "docs/gui-sketch-driven-coverage-mvp9.json",
+    "docs/gui-direct-edit-coverage-mvp9.json"
+  ]
 }

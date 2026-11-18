@@ -91,6 +91,7 @@
     "blcad.action.create_construction": "shapes",
     "blcad.action.create_sketch": "pen-square",
     "blcad.action.create_workplane": "section",
+    "blcad.action.direct_edit": "move",
     "blcad.action.finish_sketch": "check-double",
     "blcad.action.fit": "aspect-ratio",
     "blcad.action.new_part": "file",

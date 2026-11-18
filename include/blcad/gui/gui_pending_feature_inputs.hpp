@@ -6,9 +6,9 @@
 
 #include <algorithm>
 #include <optional>
-#include <vector>
-#include <unordered_set>
 #include <type_traits>
+#include <unordered_set>
+#include <vector>
 
 namespace blcad::gui {
 namespace detail {
@@ -79,6 +79,7 @@ recompute_preview_geometry_with_context(const GuiDocumentSession& session,
     collect(part.mirror_features());
     collect(part.fillet_features());
     collect(part.sketch_driven_features());
+    collect(part.direct_edit_features());
     collect(part.chamfer_features());
     collect(part.shell_features());
     collect(part.draft_features());

@@ -108,5 +108,115 @@ and `/tmp/blcad-through198-runtime-02.json`. Focused sources are
 [Direct Edit Geometry](../tests/geometry/direct_edit_tests.cpp),
 [variant Geometry](../tests/geometry/model_state_tests.cpp) and
 [occurrence Geometry](../tests/geometry/assembly_occurrence_pose_tests.cpp).
-The complete 186–188 downstream/refresh/native gates remain pending; numbered status stays in the
-MVP plan.
+These initial results establish the backend foundation only. Subsequent complete/native
+acceptance and delivery are recorded in the MVP plan.
+
+## Owned native workflow
+
+`ShellDirectEditTools` owns the Model → Direct Edit action, compact mode toolbar, scrollable property
+form and pinned Preview/Apply/Cancel controls. Available and selected faces retain semantic keys;
+human labels show analytic carrier type and physical location. Move/Rotate/Offset/Size/Delete modes
+retain inactive values while candidates include only the active operation. Radius and diameter are
+explicit Size choices. Reference Parts explain the existing STEP Sources conversion action; they
+never convert as a side effect of an edit attempt.
+
+Move uses signed XYZ numeric fields in the authored frame. Rotate exposes a local axis, reference
+origin and Angle binding. **Align frame to selected face** explicitly places the triad at a current
+face station and assigns a right-handed orientation; **Use world frame** restores the world origin
+and axes. Users can edit exact origin and X/Y directions. Formula values are read-only until the
+user explicitly selects New value. New positive Length parameters plus operation signs represent
+zero/negative displacement without weakening the existing parameter contract.
+An inactive zero Move component preserves its bound parameter magnitude and records a zero axis
+sign. Offset and Size reject zero; other finite magnitudes are preserved without silent clamping.
+
+The task captures its entry model revision, filter/scope and selection. Preselection and command-first
+face capture use the same target catalog. Double-click/History Edit restore the exact Direct Edit
+record and its real input prefix. The task previews the complete candidate history, shows every
+visible final Body and reports the number of checked downstream features. Apply rechecks that history
+and publishes one normal document/history transaction. Failed edits retain fields and original intent,
+disable Apply and mark the actual selected faces. Cancel restores selection/filter/scope and releases
+the preview. Task changes or external model revisions invalidate the draft.
+
+The physical triad shares the normal viewport manipulator mapping and numeric-unit parser. Move has
+three axis handles; Rotate has an angular handle; Offset/Size use the selected face's physical station
+and normal, with a half-unit factor for diameter. Numeric release retains the last exact candidate.
+Escape, lost capture, window deactivation, wheel and resize restore the starting draft sample.
+Ctrl+Enter applies only a current valid preview; Repeat restarts the normal creation owner.
+
+Creation currently appends at the end of the authored history; an earlier End of Part position asks
+the user to move it to the end first. Editing a feature before the marker still validates its complete
+suffix. This boundary does not change Core reorder/suppression authority or allow partial execution
+to certify the complete model.
+
+The [extension inventory](gui-direct-edit-coverage-mvp9.json) adds current creation/editing and
+mutation proof to the existing inventories without changing historical accepted counts.
+
+## GUI proof sources
+
+`[direct-edit-tools]` in [the owned-tool tests](../tests/gui/gui_direct_edit_tools_tests.cpp) covers
+disposable preview, normal Apply/Undo/Redo, edit dispatch, failed/corrected inputs, parameter binding,
+exact save/open and filter restoration. `[native-direct-edit]` additionally exercises physical triad
+and numeric release, capture loss, frame alignment, Rotate correction and compact completion controls.
+`[generic-direct-edit-source]` selects Direct Edit and Emboss through the normal generic Pattern
+source field, checks the independently expected copied volume and Undo/Redo, and returns to each
+feature's owned History/Edit workflow without changing its record.
+The [imported workflow tests](../tests/gui/gui_direct_edit_import_tests.cpp) exercise native
+radius/diameter Size, checked bore healing, failed exterior healing/oversize, immutable source bytes,
+normal shared-source refresh, failed removed-face refresh and physical STEP reimport. Execution counts,
+capture review and the frozen source identity belong to the acceptance record added after testing.
+
+
+## Advanced Part combination fixture
+
+[The shared fixture](../tests/support/direct_edit_integrated_fixture.hpp) combines native and
+EditableBody 20×10×8 plates, a direct underside offset, an actually captured top-support Sketch/boss,
+a cosmetic threaded Hole, cross Web and side Hole, G2 Full Round, an independent variable-radius
+outer edge, planar Emboss, Body Pattern/placement, an offset skin and its Thicken consumer, and a
+pinned material. Each consumer is created after actual predecessor execution. Trimmed-face footprint
+queries select the intended physical patch while persisted references remain semantic.
+
+[The integrated test](../tests/gui/gui_advanced_part_direct_tests.cpp), `[advanced-part-direct]`,
+uses analytic removed/added volumes, a quadratic integral of the linear radius law, the independent
+G2 round coefficient, density-derived mass and physical STEP reimport. It checks native and imported
+fixtures, normal native Direct Edit suffix preview/editing, exact Undo/Redo/save/open, full versus
+planned recompute, safe suppression and independent reordering, unchanged imported base records and
+compatible versus removed-selected-face source refresh. This preserves the original 188 D02/X01
+requirements; the fixture source alone is not a passing numbered acceptance record.
+
+
+The focused `[direct-edit-copy-protection]` Core regression constructs actual Hole Pattern and
+nested Mirror ancestors, rejects direct Size/Offset and malformed lineage atomically, then changes
+the original Hole parameter successfully. `[direct-edit-existing-blend]` Geometry proof uses a real
+imported box/bore with an existing radius-1 outer fillet: bore Size and Delete-and-Heal retain the
+unselected fillet's cylinder axis, radius and quarter-cylinder area, while analytic material change,
+base BRep bytes, source bytes/catalog and exact replay remain checked.
+
+## Literal rotor advanced Part bridge
+
+[The separate rotor fixture](../tests/support/advanced_rotor_fixture.hpp) reuses the existing
+performance rotor's revolved hub and circular blade-pattern intent without changing that historical
+fixture. Its local blade uses an exact 10 × 4 mm rectangular root neck followed by translated
+circular sides, 4 mm apart and tangent to the neck. A real variable-radius root/top fillet is
+authored on the rectangular neck before the curved tip joins the same editable source Body. A
+Direct Edit offsets the analytic hub underside. The actually selected hub top receives a semantic
+cosmetic-threaded mounting Hole, circular Hole Pattern, raised bundled-outline **R** and engraved
+parameter-bound blade count before the final curved-blade pattern. This order preserves the
+identification support's contributor set when blade count changes. The final visible result is
+one connected rotor; the editable source blade remains hidden. Material assignments are pinned.
+
+[The Geometry regression](../tests/geometry/advanced_rotor_tests.cpp), `[advanced-rotor]`, uses an
+independent circle section, the circle/rectangular-neck intersection integral, the quarter-circle
+integral of the linear radius law, and the existing Green-integral outline oracle for glyph volume.
+It checks native validity and self-interference, curved blade sections and root circle witnesses
+on every blade, patterned Hole axes and voids, rotor Body mass and the separately retained hidden
+source contribution to Part totals. Blade count, root radius, hub height and direct depth edits
+replay the complete suffix; rejected radius geometry preserves the certified cache. Independent
+Body reordering, invalid producer reordering, engraving suppression, planned/fresh replay, strict
+file reopen and visible-body STEP reimport retain the same physical oracle. Test source is not
+execution evidence.
+
+This arc-blade rotor is separate from the plate/housing fixture above. The actual equation/3D-guide,
+constrained Loft, Offset/Thicken and differential proofs remain in the Block-174 curve/surface
+milestone. The Full Round proof remains in the integrated plate. They are not represented as one
+rotor; the complete combined X01/model-state/native end-to-end scope remains for Block 204.
+Numbered acceptance remains owned by the MVP plan.

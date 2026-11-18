@@ -1,16 +1,18 @@
 #include "blcad/gui/shell/shell_window.hpp"
 #include "blcad/geometry/result_face_support.hpp"
-#include "blcad/gui/gui_presentation_visibility.hpp"
 #include "blcad/gui/gui_icons.hpp"
+#include "blcad/gui/gui_presentation_visibility.hpp"
 
 #include "blcad/geometry/sketch_finish.hpp"
 #include "blcad/geometry/viewport_scene.hpp"
 #include "blcad/gui/gui_interactive_profile_materialization.hpp"
 #include "blcad/gui/gui_sketch_intent_remap.hpp"
 #include "blcad/gui/gui_step_import_context.hpp"
+#include "blcad/gui/shell/shell_advanced_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_construction_tools.hpp"
 #include "blcad/gui/shell/shell_context_tools.hpp"
+#include "blcad/gui/shell/shell_direct_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_edit_tools.hpp"
 #include "blcad/gui/shell/shell_feature_tools.hpp"
 #include "blcad/gui/shell/shell_history_tools.hpp"
@@ -18,6 +20,7 @@
 #include "blcad/gui/shell/shell_inspect_tools.hpp"
 #include "blcad/gui/shell/shell_material_tools.hpp"
 #include "blcad/gui/shell/shell_measure_tools.hpp"
+#include "blcad/gui/shell/shell_model_state_tools.hpp"
 #include "blcad/gui/shell/shell_navigation_tools.hpp"
 #include "blcad/gui/shell/shell_origin.hpp"
 #include "blcad/gui/shell/shell_parameter_tools.hpp"
@@ -333,6 +336,8 @@ ShellWindow::ShellWindow() {
       std::make_unique<ShellMeasureTools>(*this, session_, *viewport_, *ribbon_, tab_inspect_);
   assembly_tools_ =
       std::make_unique<ShellAssemblyTools>(*this, session_, *viewport_, *ribbon_, tab_assembly_);
+  advanced_assembly_tools_ =
+      std::make_unique<ShellAdvancedAssemblyTools>(*this, *ribbon_, tab_assembly_);
   feature_edit_tools_ = std::make_unique<ShellFeatureEditTools>(*this, *ribbon_, tab_model_);
   history_tools_ = std::make_unique<ShellHistoryTools>(*this, *ribbon_, tab_model_);
   inspect_tools_ = std::make_unique<ShellInspectTools>(*this, *ribbon_, tab_manage_, tab_inspect_);
@@ -343,11 +348,13 @@ ShellWindow::ShellWindow() {
       std::make_unique<ShellSketchDiagnosticsTools>(*this, *ribbon_, tab_inspect_, tab_sketch_);
   sketch_3d_tools_ = std::make_unique<ShellSketch3DTools>(*this, *ribbon_, tab_model_);
   parameter_tools_ = std::make_unique<ShellParameterTools>(*this, *ribbon_, tab_manage_);
+  model_state_tools_ = std::make_unique<ShellModelStateTools>(*this, *ribbon_, tab_manage_);
   material_tools_ = std::make_unique<ShellMaterialTools>(*this, *ribbon_, tab_manage_);
   physical_properties_tools_ =
       std::make_unique<ShellPhysicalPropertiesTools>(*this, *ribbon_, tab_inspect_);
   hole_tools_ = std::make_unique<ShellHoleTools>(*this, *ribbon_, tab_model_);
   sketch_driven_tools_ = std::make_unique<ShellSketchDrivenTools>(*this, *ribbon_, tab_model_);
+  direct_edit_tools_ = std::make_unique<ShellDirectEditTools>(*this, *ribbon_, tab_model_);
   step_import_tools_ =
       std::make_unique<ShellStepImportTools>(*this, *ribbon_, tab_manage_, tab_assembly_);
   context_tools_ = std::make_unique<ShellContextTools>(*this);
@@ -363,11 +370,14 @@ ShellWindow::~ShellWindow() {
   navigation_tools_.reset();
   repeat_tools_.reset();
   context_tools_.reset();
+  advanced_assembly_tools_.reset();
   step_import_tools_.reset();
   sketch_3d_tools_.reset();
+  model_state_tools_.reset();
   parameter_tools_.reset();
   material_tools_.reset();
   physical_properties_tools_.reset();
+  direct_edit_tools_.reset();
   sketch_driven_tools_.reset();
   hole_tools_.reset();
   sketch_diagnostics_tools_.reset();
@@ -441,7 +451,8 @@ void ShellWindow::build_ribbon() {
   connect(action_save_as_, &QAction::triggered, this, [this] {
     const QString path =
         QFileDialog::getSaveFileName(this, QStringLiteral("Save BLCAD Document"), {},
-                                     session_.document_kind() == GuiDocumentKind::Project
+                                     (session_.document_kind() == GuiDocumentKind::Project ||
+                                      session_.project_part_context_active())
                                          ? QStringLiteral("BLCAD Project (*.blcad.project.json)")
                                          : QStringLiteral("BLCAD Part (*.blcad.json)"));
     if (!path.isEmpty())
@@ -940,6 +951,8 @@ void ShellWindow::reset_document_interaction(bool cancel_history) {
     history_tools_->cancel();
   if (step_import_tools_)
     step_import_tools_->cancel();
+  if (direct_edit_tools_)
+    direct_edit_tools_->cancel();
   if (sketch_driven_tools_)
     sketch_driven_tools_->cancel();
   if (hole_tools_)
@@ -948,6 +961,8 @@ void ShellWindow::reset_document_interaction(bool cancel_history) {
     physical_properties_tools_->cancel();
   if (material_tools_)
     material_tools_->cancel();
+  if (model_state_tools_)
+    model_state_tools_->cancel();
   if (parameter_tools_)
     parameter_tools_->cancel();
   if (sketch_3d_tools_)
@@ -962,6 +977,8 @@ void ShellWindow::reset_document_interaction(bool cancel_history) {
     inspect_tools_->cancel();
   if (feature_edit_tools_)
     feature_edit_tools_->cancel();
+  if (advanced_assembly_tools_)
+    advanced_assembly_tools_->cancel();
   if (assembly_tools_)
     assembly_tools_->cancel();
   if (measure_tools_)
@@ -1154,6 +1171,8 @@ bool ShellWindow::create_sketch_on_selection() {
 }
 
 bool ShellWindow::enter_sketch(SketchId sketch) {
+  if (session_.active_model_state() != primary_model_state_id())
+    return false;
   if (session_.reference_repair_mode())
     return false;
   sketch_camera_bookmark_ = viewport_->camera_bookmark();
@@ -1377,6 +1396,8 @@ bool ShellWindow::undo() {
   }
   if (step_import_tools_)
     step_import_tools_->cancel();
+  if (direct_edit_tools_)
+    direct_edit_tools_->cancel();
   if (sketch_driven_tools_)
     sketch_driven_tools_->cancel();
   if (hole_tools_)
@@ -1385,6 +1406,8 @@ bool ShellWindow::undo() {
     physical_properties_tools_->cancel();
   if (material_tools_)
     material_tools_->cancel();
+  if (model_state_tools_)
+    model_state_tools_->cancel();
   if (parameter_tools_)
     parameter_tools_->cancel();
   if (sketch_3d_tools_)
@@ -1399,6 +1422,8 @@ bool ShellWindow::undo() {
     inspect_tools_->cancel();
   if (feature_edit_tools_)
     feature_edit_tools_->cancel();
+  if (advanced_assembly_tools_)
+    advanced_assembly_tools_->cancel();
   if (assembly_tools_)
     assembly_tools_->cancel();
   if (measure_tools_)
@@ -1439,6 +1464,8 @@ bool ShellWindow::redo() {
   }
   if (step_import_tools_)
     step_import_tools_->cancel();
+  if (direct_edit_tools_)
+    direct_edit_tools_->cancel();
   if (sketch_driven_tools_)
     sketch_driven_tools_->cancel();
   if (hole_tools_)
@@ -1447,6 +1474,8 @@ bool ShellWindow::redo() {
     physical_properties_tools_->cancel();
   if (material_tools_)
     material_tools_->cancel();
+  if (model_state_tools_)
+    model_state_tools_->cancel();
   if (parameter_tools_)
     parameter_tools_->cancel();
   if (sketch_3d_tools_)
@@ -1461,6 +1490,8 @@ bool ShellWindow::redo() {
     inspect_tools_->cancel();
   if (feature_edit_tools_)
     feature_edit_tools_->cancel();
+  if (advanced_assembly_tools_)
+    advanced_assembly_tools_->cancel();
   if (assembly_tools_)
     assembly_tools_->cancel();
   if (measure_tools_)
@@ -1504,6 +1535,8 @@ void ShellWindow::apply_viewport_selection(const std::optional<GuiSelection>& in
     }
     if (step_import_tools_)
       (void)step_import_tools_->accept_selection(*selection);
+    if (direct_edit_tools_)
+      (void)direct_edit_tools_->accept_selection(*selection);
     if (sketch_driven_tools_)
       (void)sketch_driven_tools_->accept_selection(*selection);
     if (hole_tools_)
@@ -1561,6 +1594,9 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
     if (const auto& selected = viewport_->selected_semantic())
       if (session_.selection().add(*selected))
         selected_semantic_id_ = selected->semantic_id;
+    if (direct_edit_tools_)
+      for (const auto& selected : session_.selection().entries())
+        (void)direct_edit_tools_->accept_selection(selected);
     if (sketch_driven_tools_)
       for (const auto& selected : session_.selection().entries())
         (void)sketch_driven_tools_->accept_selection(selected);
@@ -1606,6 +1642,42 @@ void ShellWindow::handle_tree_selection(QTreeWidgetItem* current) {
 }
 
 void ShellWindow::handle_tree_activation(QTreeWidgetItem* item) {
+  if (item && !active_sketch_ && !session_.task().active()) {
+    const auto id = item->data(0, kSemanticIdRole).toString().toStdString();
+    if (id.starts_with("assembly-position/")) {
+      const auto selected = advanced_assembly_tools_->recall_position(
+          AssemblyPositionId(id.substr(std::string("assembly-position/").size())));
+      if (!selected)
+        show_error(selected.error());
+      return;
+    }
+    if (id.starts_with("assembly-view/")) {
+      const auto selected = advanced_assembly_tools_->recall_design_view(
+          AssemblyDesignViewId(id.substr(std::string("assembly-view/").size())));
+      if (!selected)
+        show_error(selected.error());
+      return;
+    }
+    if (id.starts_with("model-state/")) {
+      const auto owner = item->data(0, ShellHistoryBrowser::owner_role).toString().toStdString();
+      const auto state = ModelStateId(id.substr(std::string("model-state/").size()));
+      const bool root =
+          session_.part_document() ||
+          (session_.project() && owner == session_.project()->assembly().id().value());
+      const auto result = root ? model_state_tools_->activate_state(state)
+                               : model_state_tools_->begin(DocumentId(owner));
+      if (!result)
+        show_error(result.error());
+      else if (!root) {
+        const auto selected = model_state_tools_->select_state(state);
+        if (!selected)
+          show_error(selected.error());
+      }
+      return;
+    }
+  }
+  if (session_.active_model_state() != primary_model_state_id())
+    return;
   // Feature activation opens the update task; planar Sketch activation retains
   // its existing editing route. Both are scoped to the current Part context.
   if (item == nullptr || active_sketch_ || session_.task().active() ||
@@ -1749,7 +1821,8 @@ void ShellWindow::refresh() {
   action_redo_->setEnabled(session_.can_redo() ||
                            (step_import_tools_ && step_import_tools_->can_redo_after_cancel()));
   action_create_sketch_->setEnabled(
-      has_document && !session_.reference_repair_mode() && !sketch_active &&
+      has_document && session_.active_model_state() == primary_model_state_id() &&
+      !session_.reference_repair_mode() && !sketch_active &&
       session_.part_document() && !session_.part_document()->is_reference_part() &&
       !session_.task().active() &&
       (selected_datum_plane().has_value() || selected_result_face().has_value()));
@@ -1764,6 +1837,32 @@ void ShellWindow::refresh() {
   setWindowTitle(has_document ? QStringLiteral("%1%2 — BLCAD")
                                     .arg(name, session_.dirty() ? QStringLiteral(" *") : QString())
                               : QStringLiteral("BLCAD"));
+
+  if (session_.active_model_state() != primary_model_state_id()) {
+    const auto* catalog = session_.part_document() ? &session_.part_document()->model_states()
+                          : session_.project()     ? &session_.project()->assembly().model_states()
+                                                   : nullptr;
+    auto state_name = session_.active_model_state().value();
+    if (catalog)
+      for (const auto& state : *catalog)
+        if (state.id == session_.active_model_state()) {
+          state_name = state.name;
+          break;
+        }
+    setWindowTitle(windowTitle() +
+                   QStringLiteral(" [State: %1]").arg(QString::fromStdString(state_name)));
+  }
+  if (const auto* project = session_.project()) {
+    if (const auto* position = project->find_assembly_position(session_.active_position()))
+      setWindowTitle(windowTitle() +
+                     QStringLiteral(" [Position: %1]").arg(QString::fromStdString(position->name)));
+    if (const auto* view = project->find_assembly_design_view(session_.active_design_view()))
+      setWindowTitle(windowTitle() +
+                     QStringLiteral(" [View: %1]").arg(QString::fromStdString(view->name)));
+  }
+  if (const auto* root = session_.project_part_context_root())
+    setWindowTitle(QString::fromStdString(root->name()) + QStringLiteral(" / ") + windowTitle() +
+                   QStringLiteral(" [Part coordinates]"));
 
   if (session_.reference_repair_mode())
     setWindowTitle(windowTitle() + QStringLiteral(" [Repair]"));
@@ -1785,6 +1884,8 @@ void ShellWindow::refresh() {
   synchronize_navigation();
   if (step_import_tools_)
     step_import_tools_->refresh();
+  if (direct_edit_tools_)
+    direct_edit_tools_->refresh();
   if (sketch_driven_tools_)
     sketch_driven_tools_->refresh();
   if (hole_tools_)
@@ -1793,6 +1894,8 @@ void ShellWindow::refresh() {
     physical_properties_tools_->refresh();
   if (material_tools_)
     material_tools_->refresh();
+  if (model_state_tools_)
+    model_state_tools_->refresh();
   if (parameter_tools_)
     parameter_tools_->refresh();
   if (sketch_3d_tools_)
@@ -1807,6 +1910,8 @@ void ShellWindow::refresh() {
     inspect_tools_->refresh();
   if (measure_tools_)
     measure_tools_->refresh();
+  if (advanced_assembly_tools_)
+    advanced_assembly_tools_->refresh();
   if (assembly_tools_)
     assembly_tools_->refresh();
   if (feature_edit_tools_)
@@ -1901,7 +2006,7 @@ void ShellWindow::refresh_feature_selection_scene() {
 void ShellWindow::refresh_viewport_scene() {
   const auto selection_targets_mask =
       (feature_tools_ ? feature_tools_->idle_finishing_selection_mask() : 0U) |
-      (session_.project() && !session_.task().active() &&
+      (session_.effective_project() && !session_.task().active() &&
                viewport_->selection_filter_mask() ==
                    selection_kind_bit(GuiSelectionKind::AssemblyTarget)
            ? selection_kind_bit(GuiSelectionKind::AssemblyTarget)
@@ -1928,9 +2033,9 @@ void ShellWindow::refresh_viewport_scene() {
     return part.is_reference_part() || !part.imported_body_features().empty();
   };
   if (session_.recompute_status() == GuiRecomputeStatus::Failed &&
-      ((session_.part_document() && imported(*session_.part_document())) ||
-       (session_.project() && std::any_of(session_.project()->part_documents().begin(),
-                                          session_.project()->part_documents().end(), imported)))) {
+      ((session_.effective_part_document() && imported(*session_.effective_part_document())) ||
+       (session_.effective_project() && std::any_of(session_.effective_project()->part_documents().begin(),
+                                          session_.effective_project()->part_documents().end(), imported)))) {
     // Open/history can retain valid intent with lost imported endpoints. Keep
     // the authored scene empty while explicit, revalidated Source previews stay usable.
     (void)viewport_->set_scene({});
@@ -1939,13 +2044,13 @@ void ShellWindow::refresh_viewport_scene() {
   auto scene =
       query_with_step_import_context(session_, [&](geometry::StepImportTopologyContext* context) {
         const geometry::ViewportSceneBuilder builder{context};
-        return session_.part_document() && session_.part_shape_cache()
-                   ? builder.build_part(*session_.part_document(), *session_.part_shape_cache(),
+        return session_.effective_part_document() && session_.part_shape_cache()
+                   ? builder.build_part(*session_.effective_part_document(), *session_.part_shape_cache(),
                                         session_.history_prefix_count())
-               : session_.project()
-                   ? builder.build_project(
-                         *session_.project(),
-                         [this](DocumentId id) { return session_.project_part_shape_cache(id); })
+               : session_.effective_project()
+                   ? builder.build_project_for_states(
+                         *session_.effective_project(),
+                         [this](DocumentId id, ModelStateId state) { return session_.project_part_shape_cache(id, state); })
                    : Result<std::vector<geometry::ViewportSceneItem>>::success({});
       });
   if (scene.has_error()) {
@@ -1953,7 +2058,7 @@ void ShellWindow::refresh_viewport_scene() {
     append_diagnostic(scene.error());
     return;
   }
-  if (feature_tools_) {
+  if (feature_tools_ && session_.active_model_state() == primary_model_state_id()) {
     auto extrude_targets = feature_tools_->extrude_selection_items();
     scene.value().insert(scene.value().end(), extrude_targets.begin(), extrude_targets.end());
     auto targets = feature_tools_->finishing_selection_items();
@@ -1963,11 +2068,11 @@ void ShellWindow::refresh_viewport_scene() {
     auto targets = measure_tools_->selection_items();
     scene.value().insert(scene.value().end(), targets.begin(), targets.end());
   }
-  if (assembly_tools_) {
+  if (assembly_tools_ && session_.active_model_state() == primary_model_state_id()) {
     auto targets = assembly_tools_->selection_items();
     scene.value().insert(scene.value().end(), targets.begin(), targets.end());
   }
-  if (construction_tools_) {
+  if (construction_tools_ && session_.active_model_state() == primary_model_state_id()) {
     auto targets = construction_tools_->selection_items();
     scene.value().insert(scene.value().end(), targets.begin(), targets.end());
   }

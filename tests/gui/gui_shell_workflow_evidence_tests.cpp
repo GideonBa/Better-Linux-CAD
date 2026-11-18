@@ -160,7 +160,7 @@ QStringList audit(const QJsonObject& candidate) {
               "proof execution kind: " + id);
       require(QRegularExpression(R"(^(\[[A-Za-z0-9_-]+\])+$)").match(filter).hasMatch(),
               "single positive proof filter: " + id);
-      require(source.startsWith("tests/gui/gui_shell_") && repository_file(source),
+      require(source.startsWith("tests/gui/gui_") && repository_file(source),
               "proof source: " + id);
       const auto spec = Catch::TestSpecParser(registry.getTagAliasRegistry())
                             .parse(filter.toStdString())

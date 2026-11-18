@@ -34,6 +34,7 @@ class ShellSketchTools;
 class ShellMeasureTools;
 class ShellInspectTools;
 class ShellAssemblyTools;
+class ShellAdvancedAssemblyTools;
 class ShellFeatureEditTools;
 class ShellHistoryTools;
 class ShellConstructionTools;
@@ -41,10 +42,12 @@ class ShellReferenceRepairTools;
 class ShellSketchDiagnosticsTools;
 class ShellSketch3DTools;
 class ShellParameterTools;
+class ShellModelStateTools;
 class ShellMaterialTools;
 class ShellPhysicalPropertiesTools;
 class ShellHoleTools;
 class ShellSketchDrivenTools;
+class ShellDirectEditTools;
 class ShellStepImportTools;
 
 // GUI Shell Reset MVP-9R Block 133: the single Qt shell window (replaces the
@@ -75,6 +78,9 @@ public:
     return *measure_tools_;
   }
 
+  [[nodiscard]] ShellAdvancedAssemblyTools& advanced_assembly_tools() noexcept {
+    return *advanced_assembly_tools_;
+  }
   [[nodiscard]] ShellAssemblyTools& assembly_tools() noexcept {
     return *assembly_tools_;
   }
@@ -113,8 +119,14 @@ public:
     return *material_tools_;
   }
 
+  [[nodiscard]] ShellModelStateTools& model_state_tools() noexcept {
+    return *model_state_tools_;
+  }
   [[nodiscard]] ShellParameterTools& parameter_tools() noexcept {
     return *parameter_tools_;
+  }
+  [[nodiscard]] ShellDirectEditTools& direct_edit_tools() noexcept {
+    return *direct_edit_tools_;
   }
   [[nodiscard]] ShellSketchDrivenTools& sketch_driven_tools() noexcept {
     return *sketch_driven_tools_;
@@ -144,6 +156,8 @@ public:
   [[nodiscard]] bool create_sketch_on_selection();
   [[nodiscard]] bool finish_active_sketch();
   [[nodiscard]] bool cancel_face_supported_sketch();
+  [[nodiscard]] bool enter_project_part_context(const ProjectDesignOccurrence&);
+  [[nodiscard]] bool finish_project_part_context(bool apply);
   // Narrow transition surface used only by the existing Extrude owner.
   [[nodiscard]] bool enter_feature_source_sketch(SketchId sketch);
   void abort_feature_source_sketch_view();
@@ -198,6 +212,7 @@ private:
   std::unique_ptr<ShellMeasureTools> measure_tools_;
   std::unique_ptr<ShellInspectTools> inspect_tools_;
   std::unique_ptr<ShellAssemblyTools> assembly_tools_;
+  std::unique_ptr<ShellAdvancedAssemblyTools> advanced_assembly_tools_;
   std::unique_ptr<ShellFeatureEditTools> feature_edit_tools_;
   std::unique_ptr<ShellHistoryTools> history_tools_;
   std::unique_ptr<ShellConstructionTools> construction_tools_;
@@ -205,10 +220,12 @@ private:
   std::unique_ptr<ShellSketchDiagnosticsTools> sketch_diagnostics_tools_;
   std::unique_ptr<ShellSketch3DTools> sketch_3d_tools_;
   std::unique_ptr<ShellParameterTools> parameter_tools_;
+  std::unique_ptr<ShellModelStateTools> model_state_tools_;
   std::unique_ptr<ShellMaterialTools> material_tools_;
   std::unique_ptr<ShellPhysicalPropertiesTools> physical_properties_tools_;
   std::unique_ptr<ShellHoleTools> hole_tools_;
   std::unique_ptr<ShellSketchDrivenTools> sketch_driven_tools_;
+  std::unique_ptr<ShellDirectEditTools> direct_edit_tools_;
   std::unique_ptr<ShellStepImportTools> step_import_tools_;
 
   OcctViewport* viewport_{nullptr};
@@ -250,6 +267,9 @@ private:
   std::optional<SketchId> active_sketch_;
   std::optional<GuiViewportCameraBookmark> sketch_camera_bookmark_;
   std::uint32_t model_selection_filter_mask_{0xFFFFFFFFU};
+  std::optional<std::uint32_t> project_context_filter_;
+  std::optional<std::vector<std::string>> project_context_scope_;
+  std::optional<GuiViewportCameraBookmark> project_context_camera_;
   std::string selected_semantic_id_;
   // Semantic id of the browser node shown in the property inspector (a node
   // may have no viewport id — e.g. parameters — so this is tracked separately).

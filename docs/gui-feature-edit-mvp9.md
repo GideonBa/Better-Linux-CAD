@@ -56,6 +56,15 @@ When rebinding to a different result Body, the direct/released-co-producer valid
 result body or its intent, mirroring the existing `remove_surface_feature` protection. Both fail
 closed and never partially mutate the document.
 
+Pattern and Mirror source edits decode their replacement through the canonical Core record parser,
+then call the same typed update authority on a disposable Part. A later Direct Edit or
+Emboss/Engrave source may move before its consumer in dependency-derived history. Explicit authored
+history still rejects a backward dependency. The persisted document reader continues to require a
+valid saved `feature_order`; the editor does not reinterpret malformed saved history as an edit.
+`[generic-source-rebind]` covers linear/circular/Mirror records, stable roundtrips, fixed-order
+rejection and failed malformed or cyclic sources; `[generic-direct-edit-source]` checks the actual
+Qt source choices, independently calculated material, one Undo/Redo and retained source bytes.
+
 Parameter-value edits keep their existing path: changing a bound `Length`/`Angle`/`Count` parameter
 re-drives every referencing feature on recompute without any feature update.
 

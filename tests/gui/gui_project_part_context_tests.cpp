@@ -434,6 +434,63 @@ TEST_CASE("Native root-to-Part navigation reopens owned Sketch constraints and d
     QApplication::processEvents();
     REQUIRE_FALSE(window.session().project_part_context_active());
   };
+  const auto activate_source_sketch = [&](const char* branch) {
+    INFO("Context activation branch: " << branch);
+    window.refresh();
+    REQUIRE(window.session().project_part_context_active());
+    REQUIRE(window.session().part_modeling_ready());
+    INFO("Child task: " << window.session().task().command_id());
+    QTreeWidgetItem* target = nullptr;
+    for (QTreeWidgetItemIterator it(&window.model_browser()); *it; ++it)
+      if ((*it)->text(0) == "Source Sketch") {
+        target = *it;
+        break;
+      }
+    REQUIRE(target);
+    const auto semantic = target->data(0, Qt::UserRole).toString();
+    REQUIRE_FALSE(semantic.isEmpty());
+    const auto find_row = [&]() -> QTreeWidgetItem* {
+      for (QTreeWidgetItemIterator it(&window.model_browser()); *it; ++it)
+        if ((*it)->data(0, Qt::UserRole).toString() == semantic)
+          return *it;
+      return nullptr;
+    };
+    const auto point = [&] {
+      auto* row = find_row();
+      REQUIRE(row);
+      for (auto* parent = row->parent(); parent; parent = parent->parent())
+        parent->setExpanded(true);
+      window.model_browser().scrollToItem(row);
+      QApplication::processEvents();
+      row = find_row();
+      REQUIRE(row);
+      const auto rectangle = window.model_browser().visualItemRect(row);
+      const auto position = rectangle.center();
+      REQUIRE(!rectangle.isEmpty());
+      REQUIRE(window.model_browser().viewport()->rect().contains(position));
+      REQUIRE(window.model_browser().viewport()->visibleRegion().contains(position));
+      REQUIRE(window.screen()->availableGeometry().contains(
+          window.model_browser().viewport()->mapToGlobal(position)));
+      REQUIRE(window.model_browser().itemAt(position) == row);
+      return position;
+    };
+    window.model_browser().setFocus();
+    QApplication::processEvents();
+    REQUIRE(window.model_browser().hasFocus());
+    QTest::mouseClick(window.model_browser().viewport(), Qt::LeftButton, Qt::NoModifier, point());
+    QApplication::processEvents();
+    // The selection callback rebuilds the tree. Resolve both identity and row
+    // geometry again before issuing the real double-click and release.
+    const auto source_sketch_point = point();
+    QTest::mouseDClick(window.model_browser().viewport(), Qt::LeftButton, Qt::NoModifier,
+                       source_sketch_point);
+    QTest::mouseRelease(window.model_browser().viewport(), Qt::LeftButton, Qt::NoModifier,
+                        source_sketch_point);
+    QApplication::processEvents();
+    INFO("Active Sketch: " << (window.active_sketch() ? window.active_sketch()->value() : "none"));
+    REQUIRE(
+        QTest::qWaitFor([&] { return window.active_sketch() == SketchId("source.sketch"); }, 2000));
+  };
   const auto finish_camera = configure_idle();
   const auto finish_mask = window.viewport().selection_filter_mask();
   REQUIRE(window.enter_project_part_context(occurrence()));
@@ -453,25 +510,7 @@ TEST_CASE("Native root-to-Part navigation reopens owned Sketch constraints and d
   REQUIRE(window.enter_project_part_context(occurrence()));
   REQUIRE(window.session().sketch_constraint_catalogs().size() == 1);
   REQUIRE(window.session().sketch_dimension_catalogs().size() == 1);
-  QTreeWidgetItem* target = nullptr;
-  for (QTreeWidgetItemIterator it(&window.model_browser()); *it; ++it)
-    if ((*it)->text(0) == "Source Sketch") {
-      target = *it;
-      break;
-    }
-  REQUIRE(target);
-  for (auto* parent = target->parent(); parent; parent = parent->parent())
-    parent->setExpanded(true);
-  window.model_browser().scrollToItem(target);
-  QApplication::processEvents();
-  const auto source_sketch_point = window.model_browser().visualItemRect(target).center();
-  QTest::mouseClick(window.model_browser().viewport(), Qt::LeftButton, Qt::NoModifier,
-                    source_sketch_point);
-  QTest::mouseDClick(window.model_browser().viewport(), Qt::LeftButton, Qt::NoModifier,
-                     source_sketch_point);
-  QTest::mouseRelease(window.model_browser().viewport(), Qt::LeftButton, Qt::NoModifier,
-                      source_sketch_point);
-  REQUIRE(window.active_sketch() == SketchId("source.sketch"));
+  activate_source_sketch("retained catalogs / dedicated Cancel Part");
   CHECK(window.viewport().sketch_interaction_active());
   CHECK(checked(window.session().sketch_constraint_catalog(SketchId("source.sketch")))
             .constraints()
@@ -491,6 +530,35 @@ TEST_CASE("Native root-to-Part navigation reopens owned Sketch constraints and d
   CHECK_FALSE(window.active_sketch());
   CHECK(window.session().project());
   CHECK(window.session().project_part_sketch_catalogs().size() == 1);
+
+  const auto root_before_footer = snapshot(*window.session().project());
+  const auto saved_root = bytes(path.toStdString());
+  const auto sidecar = project_part_sketch_catalog_sidecar(path.toStdString());
+  const auto saved_catalogs = bytes(sidecar);
+  const auto undo_before = window.session().undo_label();
+  const auto redo_before = window.session().redo_label();
+  const auto dirty_before = window.session().dirty();
+  const auto footer_camera = configure_idle();
+  const auto footer_mask = window.viewport().selection_filter_mask();
+  REQUIRE(window.enter_project_part_context(occurrence()));
+  width(window.session(), 45);
+  CHECK(current_width(window.session()) == 45);
+  activate_source_sketch("edited Part / generic footer Cancel");
+  REQUIRE(window.viewport().sketch_interaction_active());
+  click_context("cancel");
+  restored_idle(footer_camera, footer_mask);
+  REQUIRE(window.session().project());
+  CHECK(snapshot(*window.session().project()) == root_before_footer);
+  CHECK(bytes(path.toStdString()) == saved_root);
+  CHECK(bytes(sidecar) == saved_catalogs);
+  CHECK(window.session().project_part_sketch_catalogs().size() == 1);
+  CHECK(window.session().undo_label() == undo_before);
+  CHECK(window.session().redo_label() == redo_before);
+  CHECK(window.session().dirty() == dirty_before);
+  CHECK_FALSE(window.session().task().active());
+  CHECK(window.session().task().command_id().empty());
+  CHECK_FALSE(window.active_sketch());
+  CHECK_FALSE(window.viewport().sketch_interaction_active());
 }
 
 TEST_CASE("A legacy STEP source retains the Project child-Sketch sidecar path until real catalogs "

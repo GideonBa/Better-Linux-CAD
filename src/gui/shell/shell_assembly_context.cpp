@@ -23,14 +23,15 @@ QAction* ShellAssemblyTools::context_action(Command command) const noexcept {
 
 std::optional<ShellAssemblyTools::Context>
 ShellAssemblyTools::context_for(Command command, const GuiSelection& selection) const {
-  const auto* project = session_.project();
+  const auto* project = session_.effective_project();
   if (!project || !session_.derived_results_fresh() || !context_action(command))
     return std::nullopt;
   if (selection.kind == GuiSelectionKind::Component) {
     for (const auto& component : project->assembly().component_instances()) {
       if (selection.semantic_id !=
               "component/" + project->assembly().id().value() + "/" + component.id().value() ||
-          component.visibility() != ComponentVisibility::Visible ||
+          !project->design_component_visible(
+              {}, component.id(), component.visibility() == ComponentVisibility::Visible) ||
           component.suppression_state() != ComponentSuppressionState::Active)
         continue;
       if (command == Command::Placement || command == Command::Solve)
