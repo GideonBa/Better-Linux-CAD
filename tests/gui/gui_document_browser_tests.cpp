@@ -44,12 +44,19 @@ TEST_CASE("Block 98 Part browser exposes deterministic groups and typed editable
   const auto& root = browser.roots().front();
   // datum.xy is an origin id and lands in the MVP-9R "Origin" folder that
   // precedes "Datums / Workplanes".
-  REQUIRE(root.children.size() == 10);
-  CHECK(root.children[0].label == "Parameters");
-  CHECK(root.children[1].label == "Origin");
-  CHECK(root.children[2].label == "Datums / Workplanes");
-  CHECK(root.children[7].label == "Bodies");
-  CHECK(root.children[9].label == "Session diagnostics");
+  REQUIRE(root.children.size() == 11);
+  CHECK(root.children[0].label == "Model States");
+  CHECK(root.children[1].label == "Parameters");
+  CHECK(root.children[2].label == "Origin");
+  CHECK(root.children[3].label == "Datums / Workplanes");
+  CHECK(root.children[8].label == "Bodies");
+  CHECK(root.children[10].label == "Session diagnostics");
+  REQUIRE(root.children[0].children.size() == 1);
+  const auto* primary = browser.find("model-state/primary", "part.browser");
+  REQUIRE(primary);
+  CHECK(primary->kind == GuiBrowserNodeKind::Group);
+  CHECK(primary->label == "Primary (active)");
+  CHECK(primary->properties.empty());
 
   const auto* parameter = browser.find("parameter.width");
   REQUIRE(parameter != nullptr);
