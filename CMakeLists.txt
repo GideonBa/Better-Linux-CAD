@@ -774,6 +774,8 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/rib_web_geometry_tests.cpp
       tests/geometry/fillet_guide_tests.cpp
       tests/geometry/assembly_occurrence_pose_tests.cpp
+      tests/geometry/assembly_hole_tests.cpp
+      tests/geometry/adaptive_project_tests.cpp
       tests/geometry/model_state_tests.cpp
       tests/geometry/direct_edit_tests.cpp
       tests/geometry/face_fillet_tests.cpp
