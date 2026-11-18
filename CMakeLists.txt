@@ -546,6 +546,8 @@ if(BLCAD_BUILD_TESTS)
   add_executable(
     blcad_core_tests
     tests/core/part_feature_history_tests.cpp
+    tests/core/assembly_hole_tests.cpp
+    tests/core/project_design_reference_tests.cpp
     tests/core/model_state_tests.cpp
     tests/core/part_history_intent_tests.cpp
     tests/core/part_history_evaluation_plan_tests.cpp
@@ -563,6 +565,7 @@ if(BLCAD_BUILD_TESTS)
     tests/core/assembly_cross_hierarchy_constraint_tests.cpp
     tests/core/assembly_cross_hierarchy_joint_tests.cpp
     tests/core/assembly_occurrence_pose_tests.cpp
+    tests/core/assembly_representation_tests.cpp
     tests/core/assembly_document_tests.cpp
     tests/core/assembly_exchange_graph_tests.cpp
     tests/core/assembly_exchange_name_tests.cpp
