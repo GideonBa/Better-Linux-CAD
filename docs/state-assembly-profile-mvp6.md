@@ -100,3 +100,9 @@ sidecars. Large source sidecars and the source manifest use compact JSON so
 evidence remains practical within the repository's commit-size limit. It creates
 measurements only by executing the actual benchmark;
 no checked-in measurement is implied by this source contract.
+
+The [published through-198 baseline](benchmarks/through198-state-assembly/derived/p01-summary.md)
+summarizes the completed six-size [series](benchmarks/through198-state-assembly/raw/series.json)
+and its unchanged raw records. In that Debug series, warm
+state calls execute every feature; retained cache objects do not establish BRep cache hits or
+native state-activation latency. The recorded RSS includes executable/provenance hashing.

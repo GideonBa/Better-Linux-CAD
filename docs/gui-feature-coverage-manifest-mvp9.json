@@ -1887,64 +1887,238 @@
       {
         "capability": "direct-edit",
         "owner": 185,
-        "disposition": "planned",
-        "contract": "docs/step-import-sequence-mvp10.md",
-        "planned_commands": [
-          "Direct Edit"
+        "disposition": "implemented",
+        "acceptance": "Numbered/native acceptance and frozen evidence are recorded in docs/mvp-plan.md.",
+        "contract": "docs/part-direct-edit-mvp6.md",
+        "commands": [
+          "blcad.action.direct_edit"
         ],
-        "commands": [],
-        "apis": [],
-        "proofs": []
+        "apis": [
+          {
+            "source": "include/blcad/gui/shell/shell_direct_edit_tools.hpp",
+            "type": "ShellDirectEditTools",
+            "methods": [
+              "begin",
+              "begin_edit",
+              "preview",
+              "apply",
+              "cancel"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[gui][direct-edit-tools]",
+            "source": "tests/gui/gui_direct_edit_tools_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][native-direct-edit][direct-edit-import]",
+            "source": "tests/gui/gui_direct_edit_import_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][advanced-part-direct]",
+            "source": "tests/gui/gui_advanced_part_direct_tests.cpp"
+          }
+        ]
       },
       {
         "capability": "model-states",
         "owner": 189,
-        "disposition": "planned",
+        "disposition": "implemented",
         "contract": "docs/parameter-model.md",
-        "planned_commands": [
-          "Model States",
-          "Variants"
+        "commands": [
+          "blcad.action.model_states"
         ],
-        "commands": [],
-        "apis": [],
-        "proofs": []
+        "apis": [
+          {
+            "source": "include/blcad/gui/shell/shell_model_state_tools.hpp",
+            "type": "ShellModelStateTools",
+            "methods": [
+              "begin",
+              "create_state",
+              "rename_state",
+              "delete_state",
+              "stage",
+              "preview",
+              "apply",
+              "activate_state",
+              "export_member"
+            ]
+          },
+          {
+            "source": "include/blcad/gui/gui_document_session.hpp",
+            "type": "GuiDocumentSession",
+            "methods": [
+              "active_model_state",
+              "activate_model_state",
+              "commit_model_state_table",
+              "save_model_state_member"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[gui][model-state]",
+            "source": "tests/gui/gui_model_state_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[gui][model-state-native]",
+            "source": "tests/gui/gui_model_state_tests.cpp"
+          }
+        ]
       },
       {
         "capability": "flexible-occurrences",
         "owner": 192,
-        "disposition": "planned",
+        "disposition": "implemented",
+        "acceptance": "Native execution and complete numbered acceptance remain governed by docs/mvp-plan.md.",
         "contract": "docs/assembly-flexible-subassembly-solving-mvp5.md",
-        "planned_commands": [
-          "Flexible Occurrence"
+        "commands": [
+          "blcad.action.assembly_flexible_occurrence",
+          "blcad.action.assembly_representations"
         ],
-        "commands": [],
-        "apis": [],
-        "proofs": []
+        "apis": [
+          {
+            "source": "include/blcad/gui/shell/shell_advanced_assembly_tools.hpp",
+            "type": "ShellAdvancedAssemblyTools",
+            "methods": [
+              "begin",
+              "preview",
+              "apply",
+              "store_position",
+              "recall_position",
+              "recall_design_view",
+              "cancel"
+            ]
+          },
+          {
+            "source": "include/blcad/gui/gui_document_session.hpp",
+            "type": "GuiDocumentSession",
+            "methods": [
+              "activate_assembly_position",
+              "activate_assembly_design_view",
+              "commit_assembly_representations"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[advanced-flex-controls]",
+            "source": "tests/gui/gui_advanced_assembly_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[native-assembly-flex]",
+            "source": "tests/gui/gui_advanced_assembly_tests.cpp"
+          }
+        ]
       },
       {
         "capability": "adaptive-design",
         "owner": 194,
-        "disposition": "planned",
+        "disposition": "implemented",
+        "acceptance": "Native execution and complete numbered acceptance remain governed by docs/mvp-plan.md.",
         "contract": "docs/assembly-system.md",
-        "planned_commands": [
-          "Edit Part in Context",
-          "Adaptive Reference"
+        "commands": [
+          "blcad.action.assembly_adaptive_reference",
+          "blcad.action.assembly_edit_part_context"
         ],
-        "commands": [],
-        "apis": [],
-        "proofs": []
+        "apis": [
+          {
+            "source": "include/blcad/gui/shell/shell_advanced_assembly_tools.hpp",
+            "type": "ShellAdvancedAssemblyTools",
+            "methods": [
+              "begin",
+              "preview",
+              "apply",
+              "cancel"
+            ]
+          },
+          {
+            "source": "include/blcad/gui/gui_document_session.hpp",
+            "type": "GuiDocumentSession",
+            "methods": [
+              "begin_project_part_context",
+              "finish_project_part_context",
+              "cancel_project_part_context"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[advanced-adaptive-controls]",
+            "source": "tests/gui/gui_advanced_assembly_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[native-assembly-adaptive]",
+            "source": "tests/gui/gui_advanced_assembly_tests.cpp"
+          },
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[project-part-context]",
+            "source": "tests/gui/gui_project_part_context_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[project-part-context-native]",
+            "source": "tests/gui/gui_project_part_context_tests.cpp"
+          }
+        ]
       },
       {
         "capability": "assembly-holes",
         "owner": 196,
-        "disposition": "planned",
+        "disposition": "implemented",
+        "acceptance": "Native execution and complete numbered acceptance remain governed by docs/mvp-plan.md.",
         "contract": "docs/hole-wizard.md",
-        "planned_commands": [
-          "Assembly Hole"
+        "commands": [
+          "blcad.action.assembly_hole"
         ],
-        "commands": [],
-        "apis": [],
-        "proofs": []
+        "apis": [
+          {
+            "source": "include/blcad/gui/shell/shell_advanced_assembly_tools.hpp",
+            "type": "ShellAdvancedAssemblyTools",
+            "methods": [
+              "begin",
+              "preview",
+              "apply",
+              "cancel"
+            ]
+          }
+        ],
+        "proofs": [
+          {
+            "kind": "headless",
+            "platform": "any",
+            "filter": "[advanced-hole-controls]",
+            "source": "tests/gui/gui_advanced_assembly_tests.cpp"
+          },
+          {
+            "kind": "native",
+            "platform": "xcb",
+            "filter": "[native-assembly-holes]",
+            "source": "tests/gui/gui_advanced_assembly_tests.cpp"
+          }
+        ]
       },
       {
         "capability": "motion-analysis",
