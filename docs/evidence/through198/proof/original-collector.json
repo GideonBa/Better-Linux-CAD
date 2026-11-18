@@ -1,0 +1,1028 @@
+{
+  "binaries": {
+    "app": {
+      "bytes": 736502296,
+      "execution_context": "Functional/native execution was recorded on runtime22; current build28 bytes match saved build27-final identity.",
+      "identity_source": {
+        "bytes": 1345,
+        "path": "blcad-through198-binaries-build28.json",
+        "sha256": "70910b71201de722b8cdae08f77e33219727d8fd3c75c809ace9daa7cbc1d7c9"
+      },
+      "path": "build/dev-gui/blcad",
+      "sha256": "aab0bd81d5df9c58ce67128f8dbc531ace1b8b4f10c6cc415af9436b742026e1",
+      "status": "verified",
+      "verified_build": "build26"
+    },
+    "core": {
+      "bytes": 590804448,
+      "execution_context": "Core full06 executed the retained build20 binary; exact byte identity persists in build27/build28.",
+      "identity_source": {
+        "bytes": 1345,
+        "path": "blcad-through198-binaries-build20.json",
+        "sha256": "53204658537d8a0a99ed3b01c83630f74c889a00840ddf8d7b217cc46fd89209"
+      },
+      "path": "build/dev-gui/blcad_core_tests",
+      "sha256": "942859e92dbcf07296900c8273061e53f85251692a15f400cdd8d1b3418e75a7",
+      "status": "verified",
+      "verified_build": "build20"
+    },
+    "geometry": {
+      "bytes": 920878200,
+      "execution_context": "Functional/native execution was recorded on runtime22; current build28 bytes match saved build27-final identity.",
+      "identity_source": {
+        "bytes": 1345,
+        "path": "blcad-through198-binaries-build28.json",
+        "sha256": "70910b71201de722b8cdae08f77e33219727d8fd3c75c809ace9daa7cbc1d7c9"
+      },
+      "path": "build/dev-gui/blcad_geometry_tests",
+      "sha256": "9c1872a016738f4b4d3f17d65b7c15e549d1bca792dc1a7aea786b8bf73bd2be",
+      "status": "verified",
+      "verified_build": "build27"
+    },
+    "gui": {
+      "bytes": 1300146072,
+      "execution_context": "Functional/native execution was recorded on runtime22; current build28 bytes match saved build27-final identity.",
+      "identity_source": {
+        "bytes": 1345,
+        "path": "blcad-through198-binaries-build28.json",
+        "sha256": "70910b71201de722b8cdae08f77e33219727d8fd3c75c809ace9daa7cbc1d7c9"
+      },
+      "path": "build/dev-gui/blcad_gui_tests",
+      "sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63",
+      "status": "verified",
+      "verified_build": "build26"
+    },
+    "p01_profile": {
+      "bytes": 352721848,
+      "execution_context": "Optional P01 profiler rebuilt in build28 on runtime23; this is not a rerun of functional suites.",
+      "identity_source": {
+        "bytes": 1345,
+        "path": "blcad-through198-binaries-build28.json",
+        "sha256": "70910b71201de722b8cdae08f77e33219727d8fd3c75c809ace9daa7cbc1d7c9"
+      },
+      "path": "build/dev-gui/blcad_variant_assembly_profile",
+      "sha256": "859b317c10453c2916f367df42c3807ccb3ed84d515c1861513cdcff4cab27ca",
+      "status": "verified",
+      "verified_build": "build28"
+    },
+    "step_exporter": {
+      "bytes": 243014616,
+      "execution_context": "Functional/native execution was recorded on runtime22; current build28 bytes match saved build27-final identity.",
+      "identity_source": {
+        "bytes": 1345,
+        "path": "blcad-through198-binaries-build28.json",
+        "sha256": "70910b71201de722b8cdae08f77e33219727d8fd3c75c809ace9daa7cbc1d7c9"
+      },
+      "path": "build/dev-gui/blcad_export_step",
+      "sha256": "597e280742e1a23e193aba56feb9bb99ef1274d0202c2b8583599cf2877a7f42",
+      "status": "verified",
+      "verified_build": "build26"
+    }
+  },
+  "builds": {
+    "build20": {
+      "completion": {
+        "exit_code": 0,
+        "record": {
+          "bytes": 336,
+          "path": "blcad-through198-build-20.log.process.json",
+          "sha256": "f8473386afd4789d164fc09f7163af541d29560af6b743fb549e3808bc1ca66d"
+        },
+        "source": "completed supervisor record"
+      },
+      "log": {
+        "bytes": 299,
+        "path": "blcad-through198-build-20.log",
+        "sha256": "2442f1c351779c425130b5b9fb28226af7d513b6b84ad4664e39dacea2bf16d9"
+      },
+      "status": "passed"
+    },
+    "build26": {
+      "completion": {
+        "exit_code": 0,
+        "record": {
+          "bytes": 336,
+          "path": "blcad-through198-build-26.log.process.json",
+          "sha256": "cf237c0c49c892b0b15941cb6bfc303e127ab1e49b89e3fe9ed9852a584f03c6"
+        },
+        "source": "completed supervisor record"
+      },
+      "log": {
+        "bytes": 68869,
+        "path": "blcad-through198-build-26.log",
+        "sha256": "983336a975da0e0bfb4d78d582b80ec1c04f08e1743515587f39f7bb84075d1e"
+      },
+      "status": "passed"
+    },
+    "build27": {
+      "completion": {
+        "exit_code": 0,
+        "record": {
+          "bytes": 336,
+          "path": "blcad-through198-build-27.log.process.json",
+          "sha256": "f0773bb7568ea8ae912fe18833cee80646d0cd0358ccec923d27c390ebb1e947"
+        },
+        "source": "completed supervisor record"
+      },
+      "log": {
+        "bytes": 160,
+        "path": "blcad-through198-build-27.log",
+        "sha256": "650c4d973dbe4e7eddc48edaf8dac46f6b9b3f81fc89276f87d6475cd66b4ba4"
+      },
+      "status": "passed"
+    },
+    "build28": {
+      "completion": {
+        "exit_code": 0,
+        "record": {
+          "bytes": 336,
+          "path": "blcad-through198-build-28.log.process.json",
+          "sha256": "13a52a30d51100a386fb0b1d0c25f70166db49290f81d4155fb7493285841272"
+        },
+        "source": "completed supervisor record"
+      },
+      "log": {
+        "bytes": 178,
+        "path": "blcad-through198-build-28.log",
+        "sha256": "3897d9a0d7d8c715a10cdb30eae5250b2203bd03d057733e4c44227748037e81"
+      },
+      "status": "passed"
+    }
+  },
+  "collector": {
+    "bytes": 20091,
+    "path": "blcad-collect-through198-proof.py",
+    "sha256": "f36d129d2f520743e1747e27df80518efe4d26e0b0c2a38da395472ce976235b"
+  },
+  "evidence_root_at_collection": "/tmp",
+  "gui_default_execution": {
+    "partitions": {
+      "audit": {
+        "status": "passed",
+        "suite": "gui_audit"
+      },
+      "broad": {
+        "status": "passed",
+        "suite": "gui_broad"
+      },
+      "housing": {
+        "status": "passed",
+        "suite": "gui_housing"
+      }
+    },
+    "policy": "Disjoint mixed-platform default registry coverage: offscreen broad, native xcb housing100, offscreen metadata audit. Native8 plus connected2 per scale is focused coverage, not a full native suite.",
+    "registered_cases": 1028,
+    "status": "complete",
+    "totals": {
+      "assertions": 107010,
+      "cases": 1028,
+      "passed": 930,
+      "skipped": 98
+    }
+  },
+  "gui_registry": {
+    "complete_union": true,
+    "disjoint": true,
+    "groups": {
+      "audit": {
+        "bytes": 429,
+        "count": 5,
+        "path": "blcad-through198-gui-registry-runtime22/audit.txt",
+        "sha256": "5ca296895f86ccc79158fc70b7818116062047d39763aa718c5e8acad465487a"
+      },
+      "broad": {
+        "bytes": 83592,
+        "count": 1022,
+        "path": "blcad-through198-gui-registry-runtime22/broad.txt",
+        "sha256": "fe3e28322aad9fc643ac7fe975905a9eba052af30c41faa794bb230ffa80acc0"
+      },
+      "default": {
+        "bytes": 84123,
+        "count": 1028,
+        "path": "blcad-through198-gui-registry-runtime22/default.txt",
+        "sha256": "920a3e9f6292b1d38eaf6e9ebc2d981663c9aa84f684408b6a49bd2572f990d7"
+      },
+      "housing": {
+        "bytes": 102,
+        "count": 1,
+        "path": "blcad-through198-gui-registry-runtime22/housing.txt",
+        "sha256": "affa8fdd5817395dafdbc20067e7d8bd2740dff4293ef551f9eaeea33b1f3a78"
+      }
+    },
+    "partition": {
+      "bytes": 1870,
+      "path": "blcad-through198-gui-registry-runtime22/partition.json",
+      "sha256": "de494b8545175a6eb9d2ee7720ecb9c9993420df0a2f457cc5e0727352da0e7b"
+    },
+    "specifications": {
+      "audit": "[gui-feature-coverage]~[complex-part-profile]",
+      "broad": "~[complex-part-profile]~[gui-feature-coverage]~[configurable-housing]",
+      "default": "~[complex-part-profile]",
+      "housing": "[configurable-housing]~[complex-part-profile]"
+    },
+    "status": "verified"
+  },
+  "native_captures": {
+    "100": {
+      "boundary": "capture hashes complement executed native assertions; screenshots alone do not prove interaction or geometry",
+      "files": [
+        {
+          "bytes": 104132,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/a01-cross-solve-diagnostic.png",
+          "sha256": "8b935f71cedbcf1dacc69495c04d32df99107cf29ebee824604e07084091fbb3",
+          "width_px": 1280
+        },
+        {
+          "bytes": 95694,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/assembly-adaptive-preview.png",
+          "sha256": "e04d1fd279344b59813804ab81a2badda0565e15b33f2738c64b323b07d5b32e",
+          "width_px": 1280
+        },
+        {
+          "bytes": 83223,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/assembly-design-view-active.png",
+          "sha256": "898617afa10b03b9cfba713aa740dc37231a3dbd699a1aa39dd91d63ed02d054",
+          "width_px": 1280
+        },
+        {
+          "bytes": 131672,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/assembly-design-view-preview.png",
+          "sha256": "400d2d454b846cbea08dac3fb03f2770c13d4fef11bdf731eacfc4080147f24c",
+          "width_px": 1280
+        },
+        {
+          "bytes": 103180,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/assembly-hole-participants-preview.png",
+          "sha256": "bce8a57f98fc871d05794a3392d119d77833316539f67201ef5fbc46a793e990",
+          "width_px": 1280
+        },
+        {
+          "bytes": 69502,
+          "height_px": 850,
+          "path": "blcad-through198-native100-runtime22-proof/direct-edit-import-healed.png",
+          "sha256": "c3075cfca820baa78c0d0f28871c72e10a89f3f2afd133dc1946ba23b3b46f9b",
+          "width_px": 1380
+        },
+        {
+          "bytes": 116976,
+          "height_px": 850,
+          "path": "blcad-through198-native100-runtime22-proof/direct-edit-rotate.png",
+          "sha256": "6d009ee5701610aa524d8bd67259c3dac06d5c95147694f77d34490822e822fe",
+          "width_px": 1380
+        },
+        {
+          "bytes": 120369,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/flexible-hierarchy-axis-pick.png",
+          "sha256": "33d086b46dc1ba1744559a7926019ffdaeec9636bb2e843e6798a779683933af",
+          "width_px": 1280
+        },
+        {
+          "bytes": 104132,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/flexible-hierarchy-solve-preview.png",
+          "sha256": "8b935f71cedbcf1dacc69495c04d32df99107cf29ebee824604e07084091fbb3",
+          "width_px": 1280
+        },
+        {
+          "bytes": 114270,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/flexible-occurrence-preview.png",
+          "sha256": "78314a8819d41faa8501aa674b0cfbeab4d30aceb7b33f236a8c07f154e1ebd0",
+          "width_px": 1280
+        },
+        {
+          "bytes": 100193,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/in-context-source-sketch.png",
+          "sha256": "98bab073408a04a93f3746ddf78d5e0bbcf4915d7553534eb445ce83c1b97fd5",
+          "width_px": 1280
+        },
+        {
+          "bytes": 83923,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/model-states-preview.png",
+          "sha256": "fdd8e884095cad14ca792dd7919791f5bd1ea548eb7f6f12ed26f1de57d6a14f",
+          "width_px": 1280
+        },
+        {
+          "bytes": 62617,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/model-states-primary.png",
+          "sha256": "0eb517fcae334135140edfabfa34ed8e3c9ef28993d91eee06fe48af63814bdb",
+          "width_px": 1280
+        },
+        {
+          "bytes": 117241,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/named-position-measure.png",
+          "sha256": "6a41585804d633bf09d53456f1370b65551fda770fd48f3d0ee8754b6b0556ca",
+          "width_px": 1280
+        },
+        {
+          "bytes": 105707,
+          "height_px": 800,
+          "path": "blcad-through198-native100-runtime22-proof/occurrence-model-states-preview.png",
+          "sha256": "bb1c4ecc62a11ba038ae94164a17b63d938b911527ee0afb94ec49fe434171c6",
+          "width_px": 1280
+        }
+      ],
+      "platform": "xcb",
+      "scale": "100",
+      "status": "hashed"
+    },
+    "150": {
+      "boundary": "capture hashes complement executed native assertions; screenshots alone do not prove interaction or geometry",
+      "files": [
+        {
+          "bytes": 165846,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/a01-cross-solve-diagnostic.png",
+          "sha256": "078376c2ff4ca26fb31bf39dfee390dc8e4dc94a69773b295e07fbf62253d95a",
+          "width_px": 1536
+        },
+        {
+          "bytes": 145054,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/assembly-adaptive-preview.png",
+          "sha256": "63984842c42aa5d2d164f3972994d9d88e307082ffebc530b482b2fed6d84ffd",
+          "width_px": 1536
+        },
+        {
+          "bytes": 116699,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/assembly-design-view-active.png",
+          "sha256": "7d7cfe94728c2827e3803f6ec1f9a616e8760f1c2419a3ab2c9a9946f572e85e",
+          "width_px": 1536
+        },
+        {
+          "bytes": 181157,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/assembly-design-view-preview.png",
+          "sha256": "7b9903f32253cce17d6f4aee2f3d423a029390f74e745645bc86558b4399785c",
+          "width_px": 1536
+        },
+        {
+          "bytes": 147363,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/assembly-hole-participants-preview.png",
+          "sha256": "baf9f6af187709edfbcad357c47b6b597adfe160d6549ac504bcd038dcc83f0e",
+          "width_px": 1536
+        },
+        {
+          "bytes": 100772,
+          "height_px": 989,
+          "path": "blcad-through198-native150-runtime22-proof/direct-edit-import-healed.png",
+          "sha256": "87dd9666b7255613b20e150ecdb424a233be8889fc62fcaf7094dd6a9fd70028",
+          "width_px": 1574
+        },
+        {
+          "bytes": 168963,
+          "height_px": 1011,
+          "path": "blcad-through198-native150-runtime22-proof/direct-edit-rotate.png",
+          "sha256": "ca02445a3722ba21686f7bc126d7653323295a9ce9b01717a19188fe1d9041f2",
+          "width_px": 1920
+        },
+        {
+          "bytes": 162863,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/flexible-hierarchy-axis-pick.png",
+          "sha256": "a0dc0f2e4d251c192889748805216f24e3bfc5954e813f891a36edec6416dda0",
+          "width_px": 1536
+        },
+        {
+          "bytes": 165846,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/flexible-hierarchy-solve-preview.png",
+          "sha256": "078376c2ff4ca26fb31bf39dfee390dc8e4dc94a69773b295e07fbf62253d95a",
+          "width_px": 1536
+        },
+        {
+          "bytes": 171717,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/flexible-occurrence-preview.png",
+          "sha256": "4e1ee44c738332c2e692f1682d7a460f306f361bc750196d5073db98bc82a96b",
+          "width_px": 1536
+        },
+        {
+          "bytes": 150955,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/in-context-source-sketch.png",
+          "sha256": "98a96024214b493ffa712ad38c1f6ffd4f0770675a6b995a517e9338ffc7690c",
+          "width_px": 1536
+        },
+        {
+          "bytes": 133620,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/model-states-preview.png",
+          "sha256": "45808d93034230d4815accea4ee1b1f6868232b24eb2ac1780a38287f896bac1",
+          "width_px": 1536
+        },
+        {
+          "bytes": 93439,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/model-states-primary.png",
+          "sha256": "2462e4f1dbe25e75030f97d58906525ca835914fbf7458fa32ecb7af081393ac",
+          "width_px": 1536
+        },
+        {
+          "bytes": 178901,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/named-position-measure.png",
+          "sha256": "c006ea14630cabdcc962d97eef620dae29a27a1e568d536011bc855a24d1dc85",
+          "width_px": 1536
+        },
+        {
+          "bytes": 154757,
+          "height_px": 960,
+          "path": "blcad-through198-native150-runtime22-proof/occurrence-model-states-preview.png",
+          "sha256": "b23d01d547d09c762bb9f285abc9aaa630189a5d73d92b9def2a50e9b4d4ac39",
+          "width_px": 1536
+        }
+      ],
+      "platform": "xcb",
+      "scale": "150",
+      "status": "hashed"
+    },
+    "integrated100": {
+      "boundary": "capture hashes complement executed native assertions; screenshots alone do not prove interaction or geometry",
+      "files": [
+        {
+          "bytes": 76999,
+          "height_px": 850,
+          "path": "blcad-through198-native100-integrated-final-proof/advanced-part-direct.png",
+          "sha256": "07444c75089afc6efa6300738ca6abeb51333716ef6dd53190c66e5edb2e8a49",
+          "width_px": 1380
+        },
+        {
+          "bytes": 75399,
+          "height_px": 800,
+          "path": "blcad-through198-native100-integrated-final-proof/configurable-housing-X02.png",
+          "sha256": "c837ff2884ed0084b9858b285dc7ceb29077e4d5728f0912a841b900d003458d",
+          "width_px": 1280
+        }
+      ],
+      "platform": "xcb",
+      "scale": "100",
+      "status": "hashed"
+    },
+    "integrated150": {
+      "boundary": "capture hashes complement executed native assertions; screenshots alone do not prove interaction or geometry",
+      "files": [
+        {
+          "bytes": 109031,
+          "height_px": 989,
+          "path": "blcad-through198-native150-integrated-final-proof/advanced-part-direct.png",
+          "sha256": "a25e050ae6b6880d1304b8c57a1881b3dea6db136550f33d57c574366bfb12d4",
+          "width_px": 1574
+        },
+        {
+          "bytes": 114844,
+          "height_px": 960,
+          "path": "blcad-through198-native150-integrated-final-proof/configurable-housing-X02.png",
+          "sha256": "06feb255ed9b36541a861c784904892f129c4efa4056dde68750b0bcddd75f87",
+          "width_px": 1536
+        }
+      ],
+      "platform": "xcb",
+      "scale": "150",
+      "status": "hashed"
+    }
+  },
+  "notes": [
+    "Current runtime23/build28 changes only the optional profile source/executable from runtime22/build27; explicit retained-source proof and both binary identity snapshots are independently compared and archived.",
+    "Core full06 remains the actual earlier build20 execution, retained by exact executable and Core-library byte identity. Functional/native GUI and Geometry facts remain attributed to runtime22; no functional runtime23 rerun is invented.",
+    "Default GUI registry is exactly1028=broad1022+housing1+audit5 with three disjoint name sets. Actual mixed-platform total is930 passed,98 skipped,107010 assertions; it is neither1028 passing cases nor a full native suite.",
+    "Native8 plus connected2 cases per scale establish the required focused delivery scenarios. Advanced Part X01 and connected partial X02 retain their complete204 boundaries.",
+    "P01 raw/derived benchmark artifacts are archived separately. This correctness/native collector does not imply full P01/Block203 budget or native-latency acceptance."
+  ],
+  "numbered_acceptance_authority": "docs/mvp-plan.md; collector reports evidence only",
+  "pending_gates": [],
+  "policy": "Only explicit finalized runs are eligible; no interrupted run, diagnostic override, unrecorded timing or inferred binary identity establishes acceptance.",
+  "retained_profile_transition": {
+    "after_binaries": {
+      "bytes": 1345,
+      "path": "blcad-through198-binaries-build28.json",
+      "sha256": "70910b71201de722b8cdae08f77e33219727d8fd3c75c809ace9daa7cbc1d7c9"
+    },
+    "after_runtime": {
+      "bytes": 164528,
+      "path": "blcad-runtime-manifest-23.json",
+      "sha256": "c9c948844c19763aed68a5ebc160b6faa66d8b7ace182b48b5923a0bd2bcb97a"
+    },
+    "before_binaries": {
+      "bytes": 1345,
+      "path": "blcad-through198-binaries-build27-final.json",
+      "sha256": "36aa3989409d5bc3dd151c83442ca95df863cbd7cd3a31601211b8463b3e40fd"
+    },
+    "before_runtime": {
+      "bytes": 164528,
+      "path": "blcad-runtime-manifest-22.json",
+      "sha256": "01fb290ba84981fead592c5e013458c2e264aaee63a6f3b21bc2f9238db929fc"
+    },
+    "boundary": "Functional runs retain their recorded runtime22/earlier attribution; build28 does not imply a functional rerun on runtime23.",
+    "changed_artifacts": [
+      "build/dev-gui/blcad_variant_assembly_profile"
+    ],
+    "changed_runtime_inputs": [
+      "tests/geometry/variant_assembly_profile.cpp"
+    ],
+    "identity_only_artifacts": {
+      "build/dev-gui/blcad": {
+        "bytes": 736502296,
+        "path": "build/dev-gui/blcad",
+        "sha256": "aab0bd81d5df9c58ce67128f8dbc531ace1b8b4f10c6cc415af9436b742026e1"
+      },
+      "build/dev-gui/blcad_core_tests": {
+        "bytes": 590804448,
+        "path": "build/dev-gui/blcad_core_tests",
+        "sha256": "942859e92dbcf07296900c8273061e53f85251692a15f400cdd8d1b3418e75a7"
+      },
+      "build/dev-gui/blcad_export_step": {
+        "bytes": 243014616,
+        "path": "build/dev-gui/blcad_export_step",
+        "sha256": "597e280742e1a23e193aba56feb9bb99ef1274d0202c2b8583599cf2877a7f42"
+      },
+      "build/dev-gui/blcad_geometry_tests": {
+        "bytes": 920878200,
+        "path": "build/dev-gui/blcad_geometry_tests",
+        "sha256": "9c1872a016738f4b4d3f17d65b7c15e549d1bca792dc1a7aea786b8bf73bd2be"
+      },
+      "build/dev-gui/blcad_gui_tests": {
+        "bytes": 1300146072,
+        "path": "build/dev-gui/blcad_gui_tests",
+        "sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63"
+      },
+      "build/dev-gui/blcad_variant_assembly_profile": {
+        "bytes": 352721848,
+        "path": "build/dev-gui/blcad_variant_assembly_profile",
+        "sha256": "859b317c10453c2916f367df42c3807ccb3ed84d515c1861513cdcff4cab27ca"
+      },
+      "build/dev-gui/libblcad_core.a": {
+        "bytes": 790779390,
+        "path": "build/dev-gui/libblcad_core.a",
+        "sha256": "a7a3765da9e6040d996e421e8b6347b72ad54304683d8d8c65b077d7a403948a"
+      },
+      "build/dev-gui/libblcad_geometry.a": {
+        "bytes": 1084470258,
+        "path": "build/dev-gui/libblcad_geometry.a",
+        "sha256": "39b53b785704f94d8dffc6fd39da70dd4c805a4498bfb440cc8bd4c806d187e0"
+      },
+      "build/dev-gui/libblcad_gui.a": {
+        "bytes": 1822697328,
+        "path": "build/dev-gui/libblcad_gui.a",
+        "sha256": "5397d09485ff84495eddbab663b47c6b5084d740dbe48802f2b3b50d51ae900b"
+      }
+    },
+    "record": {
+      "bytes": 765,
+      "path": "blcad-through198-profile-only-retained-proof.json",
+      "sha256": "1238689e22de5a03d1eee0546ca4d55900ee8da59819325e8101ccfa1828dbd4"
+    },
+    "retained_artifact_origins": [
+      {
+        "artifacts": [
+          "build/dev-gui/blcad_core_tests",
+          "build/dev-gui/libblcad_core.a"
+        ],
+        "name": "Core full06 retained build20 executable and Core library",
+        "snapshot": {
+          "bytes": 1345,
+          "path": "blcad-through198-binaries-build20.json",
+          "sha256": "53204658537d8a0a99ed3b01c83630f74c889a00840ddf8d7b217cc46fd89209"
+        }
+      }
+    ],
+    "status": "verified",
+    "unchanged_artifacts": [
+      "build/dev-gui/blcad",
+      "build/dev-gui/blcad_core_tests",
+      "build/dev-gui/blcad_export_step",
+      "build/dev-gui/blcad_geometry_tests",
+      "build/dev-gui/blcad_gui_tests",
+      "build/dev-gui/libblcad_core.a",
+      "build/dev-gui/libblcad_geometry.a",
+      "build/dev-gui/libblcad_gui.a"
+    ]
+  },
+  "runtime": {
+    "bytes": 164528,
+    "file_count": 1412,
+    "freeze": "runtime23 (optional profiler only; functional correctness remains runtime22)",
+    "path": "blcad-runtime-manifest-23.json",
+    "sha256": "c9c948844c19763aed68a5ebc160b6faa66d8b7ace182b48b5923a0bd2bcb97a",
+    "status": "verified"
+  },
+  "schema": "blcad.through198-final-proof.v2",
+  "selection_plan": {
+    "bytes": 17067,
+    "path": "blcad-through198-proof-plan.json",
+    "sha256": "85802c115cfa67d0849964a61b7665d9473e316b46390d6038183cbdcf000a4d"
+  },
+  "startup": {
+    "binary_sha256": "aab0bd81d5df9c58ce67128f8dbc531ace1b8b4f10c6cc415af9436b742026e1",
+    "capture": {
+      "bytes": 51107,
+      "path": "blcad-through198-native-startup-final-04/startup.png",
+      "sha256": "939a6f0170b6673f7e6b01861c8090b09caee99bb1b7a0e7f3f32eb7e4116a94"
+    },
+    "log": {
+      "bytes": 167,
+      "path": "blcad-through198-native-startup-final-04/app.log",
+      "sha256": "13886852e7b8995fd73203cc1237ebb6fd7daa518331fd407e396dff1e08f43a"
+    },
+    "record": {
+      "bytes": 557,
+      "path": "blcad-through198-native-startup-final-04/startup.json",
+      "sha256": "fabb941a35b7c118b2924c3ae981d0dbb3ab890a3c847332f03cdc5b21254a5d"
+    },
+    "status": "passed"
+  },
+  "status": "passed",
+  "suites": {
+    "core_full": {
+      "assertions": 36902,
+      "binary": "core",
+      "binary_sha256": "942859e92dbcf07296900c8273061e53f85251692a15f400cdd8d1b3418e75a7",
+      "cases": 838,
+      "completion": {
+        "exit_code": 0,
+        "source": "root-confirmed completed inherited tool session; complete838/36902 Catch footer; binary verified unchanged from build20"
+      },
+      "environment": {},
+      "execution_context": "Retained earlier build20 Core run, verified byte-identical through build28; no rerun on runtime22/runtime23 claimed.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": null,
+      "log": {
+        "bytes": 166,
+        "path": "blcad-through198-core-full-06.log",
+        "sha256": "f16e4e78be9fdce8f32d8a88879c04c6b12e68e38dcbfd55d3fffc6edbe9fb20"
+      },
+      "passed": 838,
+      "platform": "headless",
+      "scale": null,
+      "skipped": 0,
+      "status": "passed"
+    },
+    "geometry_full": {
+      "assertions": 95967,
+      "binary": "geometry",
+      "binary_sha256": "9c1872a016738f4b4d3f17d65b7c15e549d1bca792dc1a7aea786b8bf73bd2be",
+      "cases": 891,
+      "completion": {
+        "exit_code": 0,
+        "source": "Completed direct exec session50375 exit0 on final build27; default specification excludes only optional step-import-profile"
+      },
+      "environment": {},
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": null,
+      "log": {
+        "bytes": 337280,
+        "path": "blcad-through198-geometry-full-03.log",
+        "sha256": "cc90e5be800f2834ab5a4e91ff75b4cccccf3d7bfa03cc67d34badb916b96afa"
+      },
+      "passed": 891,
+      "platform": "headless",
+      "scale": null,
+      "skipped": 0,
+      "status": "passed"
+    },
+    "geometry_transition_focused": {
+      "assertions": 87,
+      "binary": "geometry",
+      "binary_sha256": "9c1872a016738f4b4d3f17d65b7c15e549d1bca792dc1a7aea786b8bf73bd2be",
+      "cases": 3,
+      "completion": {
+        "exit_code": 0,
+        "source": "Completed direct exec after build27 exit0"
+      },
+      "environment": {},
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": "[verified-transition]",
+      "log": {
+        "bytes": 483,
+        "path": "blcad-through198-geometry-transition-02.log",
+        "sha256": "05e4aeac9a36cd1b4fa2eb8741fbcfae3cf7d05c6b9f46dff6f6291ba4e961db"
+      },
+      "passed": 3,
+      "platform": "headless",
+      "scale": null,
+      "skipped": 0,
+      "status": "passed"
+    },
+    "gui_audit": {
+      "assertions": 934,
+      "binary": "gui",
+      "binary_sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63",
+      "cases": 5,
+      "completion": {
+        "exit_code": 0,
+        "source": "Root-confirmed completed direct exec session88685 exit0 after actual MVP198 and neutral workflow-manifest update; no adjacent process JSON is asserted."
+      },
+      "environment": {},
+      "execution_context": "Runtime23 documentation/workflow metadata audit only; functional/native evidence remains recorded runtime22.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": "[gui-feature-coverage]~[complex-part-profile]",
+      "log": {
+        "bytes": 694,
+        "path": "blcad-through198-gui-audit-final-01.log",
+        "sha256": "5bab59afa7460a64f2e462a219065aa011c3c980adaabab90858f7c5b5f5f1d8"
+      },
+      "passed": 5,
+      "platform": "offscreen",
+      "scale": null,
+      "skipped": 0,
+      "status": "passed"
+    },
+    "gui_broad": {
+      "assertions": 105912,
+      "binary": "gui",
+      "binary_sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63",
+      "cases": 1022,
+      "completion": {
+        "exit_code": 0,
+        "source": "Completed direct exec session96262 exit0 on frozen runtime22"
+      },
+      "environment": {},
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": "~[complex-part-profile]~[gui-feature-coverage]~[configurable-housing]",
+      "log": {
+        "bytes": 530717,
+        "path": "blcad-through198-gui-broad-final-04.log",
+        "sha256": "4da0b060d0849dff7ac95f41357f3ef792d30a0f498302aa17549e48ee3078ee"
+      },
+      "passed": 924,
+      "platform": "offscreen",
+      "scale": null,
+      "skipped": 98,
+      "status": "passed"
+    },
+    "gui_cache_surface_focused": {
+      "assertions": 1026,
+      "binary": "gui",
+      "binary_sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63",
+      "cases": 9,
+      "completion": {
+        "exit_code": 0,
+        "source": "Completed direct exec session65587 exit0 on build26; GUI byte-identity retained after Geometry-test-only build27"
+      },
+      "environment": {},
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": "[preview-cache]~[complex-part-profile],[part-history-cache]~[complex-part-profile],[advanced-surface-controller]~[complex-part-profile]",
+      "log": {
+        "bytes": 1102,
+        "path": "blcad-through198-gui-cache-surface-01.log",
+        "sha256": "7aa5ce337764d842c7d4756755c0a68ad7680d934925295a489694a90dd4e174"
+      },
+      "passed": 9,
+      "platform": "offscreen",
+      "scale": null,
+      "skipped": 0,
+      "status": "passed"
+    },
+    "gui_housing": {
+      "assertions": 164,
+      "binary": "gui",
+      "binary_sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63",
+      "cases": 1,
+      "completion": {
+        "exit_code": 0,
+        "record": {
+          "bytes": 1042,
+          "path": "blcad-through198-native-integrated22-final.process.json",
+          "sha256": "ce1712ee70a09cc6fe3582e13447c9c30a53df0a35a7bc0c347ffcc602c2d111"
+        },
+        "source": "completed supervisor record"
+      },
+      "environment": {},
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": "[configurable-housing]~[complex-part-profile]",
+      "log": {
+        "bytes": 1070051,
+        "path": "blcad-through198-native100-housing-final-01.log",
+        "sha256": "1cc6ffefd9ac4a60842f4682777adb0e3ceb53580466ff0c77fd9691d8e63dd9"
+      },
+      "passed": 1,
+      "platform": "xcb",
+      "scale": "100",
+      "skipped": 0,
+      "status": "passed"
+    },
+    "native_core_100": {
+      "assertions": 1319,
+      "binary": "gui",
+      "binary_sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63",
+      "cases": 8,
+      "completion": {
+        "exit_code": 0,
+        "record": {
+          "bytes": 356,
+          "path": "blcad-through198-native-core22-final.process.json",
+          "sha256": "760c734861ad4aff034b8e40d97ec1690db7d87cb8e4157ce1a08617f67aa97f"
+        },
+        "source": "completed supervisor record"
+      },
+      "environment": {
+        "QT_SCALE_FACTOR": "1"
+      },
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": "[native-direct-edit],[model-state-native],[native-advanced-assembly],[project-part-context-native],[occurrence-state-placement-native]",
+      "log": {
+        "bytes": 6358,
+        "path": "blcad-through198-native100-core-08.log",
+        "sha256": "f19fafe6404d5b5b347b714cbfb1656faaade9230d8936cb28ac09b6928feae2"
+      },
+      "passed": 8,
+      "platform": "xcb",
+      "scale": "100",
+      "skipped": 0,
+      "status": "passed"
+    },
+    "native_core_150": {
+      "assertions": 1319,
+      "binary": "gui",
+      "binary_sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63",
+      "cases": 8,
+      "completion": {
+        "exit_code": 0,
+        "record": {
+          "bytes": 356,
+          "path": "blcad-through198-native-core22-final.process.json",
+          "sha256": "760c734861ad4aff034b8e40d97ec1690db7d87cb8e4157ce1a08617f67aa97f"
+        },
+        "source": "completed supervisor record"
+      },
+      "environment": {
+        "BLCAD_COMPACT_UI": "1",
+        "BLCAD_UI_COMPACT": "1",
+        "QT_SCALE_FACTOR": "1.5"
+      },
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": "[native-direct-edit],[model-state-native],[native-advanced-assembly],[project-part-context-native],[occurrence-state-placement-native]",
+      "log": {
+        "bytes": 6358,
+        "path": "blcad-through198-native150-core-05.log",
+        "sha256": "daa0822b2dc9274c3bbc8da612893666d69b1e0776ba39eaa105cfff0e0aac7c"
+      },
+      "passed": 8,
+      "platform": "xcb",
+      "scale": "150",
+      "skipped": 0,
+      "status": "passed"
+    },
+    "native_housing_100": {
+      "assertions": 164,
+      "binary": "gui",
+      "binary_sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63",
+      "cases": 1,
+      "completion": {
+        "exit_code": 0,
+        "record": {
+          "bytes": 1042,
+          "path": "blcad-through198-native-integrated22-final.process.json",
+          "sha256": "ce1712ee70a09cc6fe3582e13447c9c30a53df0a35a7bc0c347ffcc602c2d111"
+        },
+        "source": "completed supervisor record"
+      },
+      "environment": {
+        "QT_SCALE_FACTOR": "1"
+      },
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": "[configurable-housing]~[complex-part-profile]",
+      "log": {
+        "bytes": 1070051,
+        "path": "blcad-through198-native100-housing-final-01.log",
+        "sha256": "1cc6ffefd9ac4a60842f4682777adb0e3ceb53580466ff0c77fd9691d8e63dd9"
+      },
+      "passed": 1,
+      "platform": "xcb",
+      "scale": "100",
+      "skipped": 0,
+      "status": "passed"
+    },
+    "native_housing_150": {
+      "assertions": 164,
+      "binary": "gui",
+      "binary_sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63",
+      "cases": 1,
+      "completion": {
+        "exit_code": 0,
+        "record": {
+          "bytes": 1042,
+          "path": "blcad-through198-native-integrated22-final.process.json",
+          "sha256": "ce1712ee70a09cc6fe3582e13447c9c30a53df0a35a7bc0c347ffcc602c2d111"
+        },
+        "source": "completed supervisor record"
+      },
+      "environment": {
+        "BLCAD_COMPACT_UI": "1",
+        "BLCAD_UI_COMPACT": "1",
+        "QT_SCALE_FACTOR": "1.5"
+      },
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": "[configurable-housing]~[complex-part-profile]",
+      "log": {
+        "bytes": 1070049,
+        "path": "blcad-through198-native150-housing-final-01.log",
+        "sha256": "1f84a47c9d624ada238b0d61ea6aab76dab9b168b77a21c685e2e2e0ad454f94"
+      },
+      "passed": 1,
+      "platform": "xcb",
+      "scale": "150",
+      "skipped": 0,
+      "status": "passed"
+    },
+    "native_part_100": {
+      "assertions": 91,
+      "binary": "gui",
+      "binary_sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63",
+      "cases": 1,
+      "completion": {
+        "exit_code": 0,
+        "record": {
+          "bytes": 1042,
+          "path": "blcad-through198-native-integrated22-final.process.json",
+          "sha256": "ce1712ee70a09cc6fe3582e13447c9c30a53df0a35a7bc0c347ffcc602c2d111"
+        },
+        "source": "completed supervisor record"
+      },
+      "environment": {
+        "QT_SCALE_FACTOR": "1"
+      },
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": "[advanced-part-direct]~[complex-part-profile]",
+      "log": {
+        "bytes": 1026701,
+        "path": "blcad-through198-native100-part-final-01.log",
+        "sha256": "8fac820a613703ee3850db97e989ae128cf0b152a624821a3a3ae7edb3cdf6e0"
+      },
+      "passed": 1,
+      "platform": "xcb",
+      "scale": "100",
+      "skipped": 0,
+      "status": "passed"
+    },
+    "native_part_150": {
+      "assertions": 91,
+      "binary": "gui",
+      "binary_sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63",
+      "cases": 1,
+      "completion": {
+        "exit_code": 0,
+        "record": {
+          "bytes": 1042,
+          "path": "blcad-through198-native-integrated22-final.process.json",
+          "sha256": "ce1712ee70a09cc6fe3582e13447c9c30a53df0a35a7bc0c347ffcc602c2d111"
+        },
+        "source": "completed supervisor record"
+      },
+      "environment": {
+        "BLCAD_COMPACT_UI": "1",
+        "BLCAD_UI_COMPACT": "1",
+        "QT_SCALE_FACTOR": "1.5"
+      },
+      "execution_context": "Recorded functional/native run on runtime22, retained through optional-profile-only runtime23/build28.",
+      "failed": 0,
+      "failed_assertions": 0,
+      "filter": "[advanced-part-direct]~[complex-part-profile]",
+      "log": {
+        "bytes": 1026702,
+        "path": "blcad-through198-native150-part-final-01.log",
+        "sha256": "95388295db908b1507bee66f21c99ce200a8dd2cdf7a2bf90eb292e903923b41"
+      },
+      "passed": 1,
+      "platform": "xcb",
+      "scale": "150",
+      "skipped": 0,
+      "status": "passed"
+    }
+  },
+  "validation_errors": []
+}
