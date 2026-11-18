@@ -170,6 +170,9 @@ public:
   }
   [[nodiscard]] Result<std::size_t> replace_model_states(std::vector<ModelState> states);
   [[nodiscard]] Result<AssemblyDocument> evaluate_model_state(ModelStateId state) const;
+  [[nodiscard]] const ModelStateId& effective_model_state() const noexcept {
+    return effective_model_state_;
+  }
   [[nodiscard]] Result<std::size_t> set_component_model_state(ComponentInstanceId, ModelStateId);
   [[nodiscard]] Result<std::size_t> set_subassembly_model_state(SubassemblyInstanceId,
                                                                 ModelStateId);
@@ -264,6 +267,7 @@ private:
   DocumentId id_;
   std::string name_;
   std::vector<ModelState> model_states_;
+  ModelStateId effective_model_state_{primary_model_state_id()};
   std::vector<Parameter> parameters_;
   std::vector<DocumentId> member_parts_;
   std::vector<ParameterBinding> bindings_;

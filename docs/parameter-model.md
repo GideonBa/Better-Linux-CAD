@@ -184,6 +184,11 @@ row; normal history ownership rules still apply. A material record selects a pin
 a Body or the Part default; a null assignment explicitly clears it. Missing targets or resources
 fail validation. Reference Parts require explicit conversion before named-state authoring.
 
+Inactive state references protect their executable, Body and pinned material targets from removal.
+Primary parameter edits validate every named state before publication and roll back atomically if a
+state domain becomes invalid. Named Assembly results clear sibling definitions and carry their
+effective state identity; they cannot be reinterpreted as Primary by evaluating a default id.
+
 Assembly states may override existing Assembly literals, component/subassembly suppression and
 selected child states. Part features and material assignments remain Part-owned. Component and
 subassembly selections persist independently of display visibility, grounding and authored poses;
