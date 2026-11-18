@@ -10,6 +10,12 @@
 
 namespace blcad::geometry::detail {
 
+// Legacy documents retain focused historical freshness. Extended state/pose
+// projects conservatively require the entire canonical context to be unchanged.
+[[nodiscard]] Result<std::string> cross_hierarchy_context_snapshot(const Project&);
+[[nodiscard]] Result<std::size_t> validate_cross_hierarchy_context_snapshot(const Project&,
+                                                                            const std::string&);
+
 [[nodiscard]] Result<std::vector<AssemblyCrossHierarchyTransformAuthoritySnapshot>>
 make_cross_hierarchy_authority_snapshots(
     const Project& project,

@@ -2,10 +2,12 @@
 
 #include "blcad/core/step_import_freshness.hpp"
 #include "blcad/geometry/assembly_import_validation.hpp"
+#include "blcad/geometry/project_evaluation.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
 
 #include <algorithm>
+#include <optional>
 #include <set>
 
 namespace blcad::geometry {
@@ -24,17 +26,30 @@ Result<std::size_t> validate_part(const PartDocument& part, StepImportTopologyCo
   return context.validate_sources();
 }
 
-Result<std::size_t> validate_project(const Project& project, const std::filesystem::path& root) {
+Result<std::size_t> validate_project(Project& project, const std::filesystem::path& root) {
   auto structure = project.validate_assembly_structure();
   if (!structure)
     return structure;
   StepImportTopologyContext context(root);
-  for (const auto& part : project.part_documents()) {
+  std::optional<Project> normalized;
+  if (!project.design_references().empty() || !project.assembly_hole_features().empty()) {
+    auto evaluated = evaluate_project_geometry(project, &context);
+    if (!evaluated)
+      return Result<std::size_t>::failure(evaluated.error());
+    normalized = std::move(evaluated.value());
+  }
+  const auto& candidate = normalized ? *normalized : project;
+  for (const auto& part : candidate.part_documents()) {
     auto valid = validate_part(part, context);
     if (!valid)
       return valid;
   }
-  return validate_imported_assembly_inputs(project, context);
+  auto inputs = validate_imported_assembly_inputs(candidate, context);
+  if (!inputs)
+    return inputs;
+  if (normalized)
+    project = std::move(*normalized);
+  return inputs;
 }
 
 Result<StepImportSource> consumed_source(const PartDocument& part, StepImportSourceId id) {

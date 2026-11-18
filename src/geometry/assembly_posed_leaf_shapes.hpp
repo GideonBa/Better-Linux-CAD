@@ -15,7 +15,7 @@ class StepImportTopologyContext;
 
 namespace blcad::geometry::detail {
 
-// One flattened visible-active leaf occurrence together with its posed OCCT
+// One flattened requested leaf occurrence together with its posed OCCT
 // shape. Derived data only; nothing here is persisted.
 struct PosedLeafShape {
   AssemblyLeafOccurrenceDescriptor leaf;
@@ -29,7 +29,8 @@ struct PosedLeafShapesBuild {
 
 // Shared posed-geometry boundary for assembly-level consumers (posed STEP
 // export, interference analysis). Validates the project hierarchy, flattens
-// visible-active leaves, recomputes each unique referenced part document
+// visible-active leaves by default or all physical-active leaves explicitly,
+// recomputes each unique requested Part/state
 // exactly once, and poses every leaf shape through its exact inner-to-outer
 // authored transform chain with X-then-Y-then-Z semantics per level.
 class AssemblyPosedLeafShapeBuilder {
@@ -37,15 +38,17 @@ public:
   AssemblyPosedLeafShapeBuilder() = default;
   explicit AssemblyPosedLeafShapeBuilder(StepImportTopologyContext* import_context)
       : import_context_(import_context) {}
-  [[nodiscard]] Result<PosedLeafShapesBuild> build(const Project& project) const;
+  [[nodiscard]] Result<PosedLeafShapesBuild>
+  build(const Project& project,
+        AssemblyLeafParticipation participation = AssemblyLeafParticipation::VisibleActive) const;
 
 private:
   StepImportTopologyContext* import_context_{};
 };
 
-[[nodiscard]] Result<PosedLeafShapesBuild>
-build_posed_leaf_shapes(const Project& project,
-                        StepImportTopologyContext* import_context = nullptr);
+[[nodiscard]] Result<PosedLeafShapesBuild> build_posed_leaf_shapes(
+    const Project& project, StepImportTopologyContext* import_context = nullptr,
+    AssemblyLeafParticipation participation = AssemblyLeafParticipation::VisibleActive);
 
 // Stable leaf occurrence identity key: assembly id, subassembly path, and
 // component id joined with '/'. Never an OCCT topology id.

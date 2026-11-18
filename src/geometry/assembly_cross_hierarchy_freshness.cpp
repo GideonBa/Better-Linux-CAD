@@ -1,6 +1,9 @@
 #include "assembly_cross_hierarchy_freshness.hpp"
 
+#include "effective_project_source.hpp"
+
 #include "assembly_cross_hierarchy_numeric_system.hpp"
+#include "blcad/core/project_json.hpp"
 
 #include <algorithm>
 #include <string>
@@ -58,6 +61,34 @@ same_boundary_identity(const AssemblyCrossHierarchyBoundaryInputSnapshot& lhs,
 }
 
 } // namespace
+
+Result<std::string> cross_hierarchy_context_snapshot(const Project& project) {
+  bool extended = !project.design_references().empty() || !project.occurrence_poses().empty() ||
+                  !project.assembly().model_states().empty() ||
+                  project.assembly().effective_model_state() != primary_model_state_id() ||
+                  !project.assembly_hole_features().empty() ||
+                  !project.assembly_positions().empty() ||
+                  !project.assembly_design_views().empty() ||
+                  project.effective_position() != master_position_id() ||
+                  project.effective_design_view() != default_design_view_id();
+  for (const auto& part : project.part_documents())
+    extended = extended || !part.model_states().empty();
+  for (const auto& child : project.child_assembly_documents())
+    extended = extended || !child.model_states().empty();
+  if (!extended)
+    return Result<std::string>::success({});
+  return effective_project_source(project);
+}
+Result<std::size_t> validate_cross_hierarchy_context_snapshot(const Project& project,
+                                                              const std::string& snapshot) {
+  auto current = cross_hierarchy_context_snapshot(project);
+  if (!current)
+    return Result<std::size_t>::failure(current.error());
+  if (current.value() != snapshot)
+    return Result<std::size_t>::failure(
+        validation_error("assembly.context", "State or occurrence pose solve context is stale"));
+  return Result<std::size_t>::success(1);
+}
 
 Result<std::vector<AssemblyCrossHierarchyTransformAuthoritySnapshot>>
 make_cross_hierarchy_authority_snapshots(

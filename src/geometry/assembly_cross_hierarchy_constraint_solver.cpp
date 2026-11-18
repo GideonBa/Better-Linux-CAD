@@ -1,4 +1,6 @@
+#include "blcad/geometry/project_evaluation.hpp"
 #include "blcad/geometry/assembly_cross_hierarchy_constraint_solver.hpp"
+#include "project_evaluation_internal.hpp"
 
 #include "assembly_cross_hierarchy_freshness.hpp"
 #include "assembly_cross_hierarchy_numeric_system.hpp"
@@ -241,6 +243,9 @@ make_solve_result(const Project& source_project, const Project& solved_project,
       source_project, semantic_target_part_snapshots.value(), import_context);
   if (!fresh)
     return Result<AssemblyCrossHierarchySolveResult>::failure(fresh.error());
+  auto context = detail::cross_hierarchy_context_snapshot(source_project);
+  if (!context)
+    return Result<AssemblyCrossHierarchySolveResult>::failure(context.error());
   return Result<AssemblyCrossHierarchySolveResult>::success(AssemblyCrossHierarchySolveResult{
       outcome.state, outcome.iterations, solve_group.relationships, fixed_authorities,
       std::move(authority_snapshots.value()), std::move(relationship_snapshots.value()),
@@ -249,7 +254,8 @@ make_solve_result(const Project& source_project, const Project& solved_project,
       AssemblySolveResidualSummary{outcome.final_residuals.size(),
                                    detail::residual_rms(outcome.initial_residuals),
                                    detail::residual_rms(outcome.final_residuals),
-                                   detail::residual_max_abs(outcome.final_residuals)}});
+                                   detail::residual_max_abs(outcome.final_residuals)},
+      std::move(context.value())});
 }
 
 } // namespace
@@ -258,6 +264,12 @@ Result<AssemblyCrossHierarchySolveResult>
 AssemblyCrossHierarchyConstraintSolver::solve(const Project& project,
                                               const AssemblyCrossHierarchySolveGroup& solve_group,
                                               AssemblyRigidBodySolverOptions options) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<AssemblyCrossHierarchySolveResult>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return solve(evaluation_scope.value()->project(), solve_group, options);
+
   auto graph = AssemblyCrossHierarchyConstraintGraph::build(project);
   if (graph.has_error()) {
     return Result<AssemblyCrossHierarchySolveResult>::failure(graph.error());
@@ -327,11 +339,32 @@ AssemblyCrossHierarchyConstraintSolver::solve(const Project& project,
 
 Result<std::size_t> AssemblyCrossHierarchySolveResultApplier::apply(
     Project& project, const AssemblyCrossHierarchySolveResult& result) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<std::size_t>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->outer()) {
+    Project candidate =
+        evaluation_scope.value()->changed() ? evaluation_scope.value()->project() : project;
+    auto applied = apply(candidate, result);
+    if (!applied)
+      return applied;
+    auto checked = evaluate_project_geometry(candidate, import_context_);
+    if (!checked)
+      return Result<std::size_t>::failure(checked.error());
+    project = std::move(checked.value());
+    return applied;
+  }
+
   if (!result.converged()) {
     return Result<std::size_t>::failure(
         validation_error("assembly.cross_hierarchy_application",
                          "only a converged cross-hierarchy solve result can be applied"));
   }
+
+  auto context = detail::validate_cross_hierarchy_context_snapshot(
+      project, result.occurrence_context_snapshot);
+  if (!context)
+    return context;
 
   auto structure = project.validate_assembly_structure();
   if (structure.has_error()) {

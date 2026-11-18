@@ -1,6 +1,6 @@
 #include "blcad/geometry/project_evaluation.hpp"
+#include "assembly_posed_leaf_shapes.hpp"
 #include "blcad/geometry/adaptive_project.hpp"
-#include "blcad/geometry/assembly_step_exporter.hpp"
 #include "blcad/geometry/body_result_inspector.hpp"
 #include "blcad/geometry/recompute_executor.hpp"
 #include "blcad/geometry/step_import_topology_context.hpp"
@@ -100,7 +100,8 @@ Result<Project> evaluate_project_geometry(const Project& project,
   auto physical = BodyResultInspector{}.inspect_physical_properties(candidate, imports);
   if (!physical)
     return Result<Project>::failure(physical.error());
-  auto posed = AssemblyStepExporter{imports}.build_posed_shape(candidate);
+  auto posed = detail::build_posed_leaf_shapes(candidate, imports,
+                                               AssemblyLeafParticipation::PhysicalActive);
   if (!posed)
     return Result<Project>::failure(posed.error());
   auto checked = detail::verify_assembly_holes(candidate, imports);

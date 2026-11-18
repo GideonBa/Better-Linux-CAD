@@ -49,6 +49,10 @@ struct AssemblySolveComponentSnapshot {
   ComponentGroundingState grounding_state = ComponentGroundingState::Free;
   ComponentSuppressionState suppression_state = ComponentSuppressionState::Active;
   RigidTransform source_transform;
+  ModelStateId selected_model_state{primary_model_state_id()};
+  ModelStateId assembly_model_state{primary_model_state_id()};
+  AssemblyPositionId position{master_position_id()};
+  AssemblyDesignViewId design_view{default_design_view_id()};
 
   friend bool operator==(const AssemblySolveComponentSnapshot&,
                          const AssemblySolveComponentSnapshot&) = default;
@@ -84,6 +88,9 @@ struct AssemblySolveResult {
   std::vector<AssemblySemanticTargetPartSnapshot> semantic_target_part_snapshots;
   std::vector<ProposedComponentTransform> proposed_transforms;
   AssemblySolveResidualSummary residual_summary;
+  // Extended Projects retain exact directed/state/pose authority. Legacy
+  // Projects keep the historical selective Part/component snapshot contract.
+  std::string occurrence_context_snapshot{};
 
   [[nodiscard]] bool converged() const noexcept {
     return state == AssemblySolveState::Converged;
@@ -100,10 +107,9 @@ public:
   AssemblyRigidBodySolver() = default;
   explicit AssemblyRigidBodySolver(StepImportTopologyContext* import_context)
       : import_context_(import_context) {}
-  [[nodiscard]] Result<AssemblySolveResult> solve(
-      const Project& project,
-      const std::vector<ComponentInstanceId>& connected_group,
-      AssemblyRigidBodySolverOptions options = {}) const;
+  [[nodiscard]] Result<AssemblySolveResult>
+  solve(const Project& project, const std::vector<ComponentInstanceId>& connected_group,
+        AssemblyRigidBodySolverOptions options = {}) const;
 
 private:
   StepImportTopologyContext* import_context_{};

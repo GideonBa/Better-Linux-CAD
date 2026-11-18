@@ -1,4 +1,5 @@
 #include "assembly_posed_leaf_shapes.hpp"
+#include "project_evaluation_internal.hpp"
 
 #include "assembly_occt_rigid_transform.hpp"
 #include "assembly_part_shape_definitions.hpp"
@@ -25,7 +26,7 @@ constexpr const char* kPosedLeafShapesId = "geometry.assembly_posed_leaf_shapes"
 }
 
 [[nodiscard]] Result<TopoDS_Shape> apply_occt_transform(const TopoDS_Shape& shape,
-                                                         const gp_Trsf& transform) {
+                                                        const gp_Trsf& transform) {
   BRepBuilderAPI_Transform transformer(shape, transform, true);
   if (!transformer.IsDone()) {
     return Result<TopoDS_Shape>::failure(
@@ -68,12 +69,21 @@ std::string leaf_occurrence_key(const AssemblyLeafOccurrenceDescriptor& leaf) {
 }
 
 Result<PosedLeafShapesBuild> build_posed_leaf_shapes(const Project& project,
-                                                     StepImportTopologyContext* import_context) {
+                                                     StepImportTopologyContext* import_context,
+                                                     AssemblyLeafParticipation participation) {
   const AssemblyPosedLeafShapeBuilder builder(import_context);
-  return builder.build(project);
+  return builder.build(project, participation);
 }
 
-Result<PosedLeafShapesBuild> AssemblyPosedLeafShapeBuilder::build(const Project& project) const {
+Result<PosedLeafShapesBuild>
+AssemblyPosedLeafShapeBuilder::build(const Project& project,
+                                     AssemblyLeafParticipation participation) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<PosedLeafShapesBuild>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return build(evaluation_scope.value()->project(), participation);
+
   const auto valid_structure = project.validate_assembly_structure();
   if (valid_structure.has_error()) {
     return Result<PosedLeafShapesBuild>::failure(valid_structure.error());
@@ -81,7 +91,7 @@ Result<PosedLeafShapesBuild> AssemblyPosedLeafShapeBuilder::build(const Project&
 
   try {
     const AssemblyLeafOccurrenceResolver leaf_resolver;
-    auto leaves = leaf_resolver.resolve(project);
+    auto leaves = leaf_resolver.resolve(project, participation);
     if (leaves.has_error()) {
       return Result<PosedLeafShapesBuild>::failure(leaves.error());
     }
@@ -93,8 +103,8 @@ Result<PosedLeafShapesBuild> AssemblyPosedLeafShapeBuilder::build(const Project&
     }
 
     const AssemblyPartShapeDefinitionBuilder part_definition_builder(import_context_);
-    auto part_definitions =
-        part_definition_builder.build_for_states(project, std::move(referenced_part_ids));
+    auto part_definitions = part_definition_builder.build_for_states(
+        project, std::move(referenced_part_ids), participation);
     if (part_definitions.has_error()) {
       return Result<PosedLeafShapesBuild>::failure(part_definitions.error());
     }
@@ -104,11 +114,11 @@ Result<PosedLeafShapesBuild> AssemblyPosedLeafShapeBuilder::build(const Project&
     build.leaves.reserve(leaves.value().size());
     for (AssemblyLeafOccurrenceDescriptor& leaf : leaves.value()) {
       const AssemblyPartShapeDefinition* part = find_assembly_part_shape_definition(
-          part_definitions.value().definitions, leaf.referenced_part_document, leaf.selected_model_state);
+          part_definitions.value().definitions, leaf.referenced_part_document,
+          leaf.selected_model_state);
       if (part == nullptr || part->shape.IsNull()) {
         return Result<PosedLeafShapesBuild>::failure(Error::geometry(
-            leaf_occurrence_key(leaf),
-            "assembly export leaf component part shape is unavailable"));
+            leaf_occurrence_key(leaf), "assembly export leaf component part shape is unavailable"));
       }
 
       auto posed = pose_shape_chain(part->shape, leaf.transforms_inner_to_outer);

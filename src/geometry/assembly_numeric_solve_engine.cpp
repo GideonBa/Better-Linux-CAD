@@ -1,5 +1,6 @@
 #include "assembly_numeric_solve_engine.hpp"
 
+#include "assembly_cross_hierarchy_freshness.hpp"
 #include "assembly_hole_geometry_scope.hpp"
 #include "assembly_semantic_target_freshness.hpp"
 
@@ -33,8 +34,9 @@ constexpr double kPivotTolerance = 1.0e-14;
         validation_error("assembly.solver", "solver convergence RMS must be finite and positive"));
   }
   if (!positive_finite(options.finite_difference_translation_step_mm)) {
-    return Result<std::size_t>::failure(validation_error(
-        "assembly.solver", "solver translation finite-difference step must be finite and positive"));
+    return Result<std::size_t>::failure(
+        validation_error("assembly.solver",
+                         "solver translation finite-difference step must be finite and positive"));
   }
   if (!positive_finite(options.finite_difference_rotation_step_deg)) {
     return Result<std::size_t>::failure(validation_error(
@@ -115,9 +117,8 @@ constexpr double kPivotTolerance = 1.0e-14;
   return true;
 }
 
-[[nodiscard]] bool gauss_newton_step(const NumericMatrix& jacobian,
-                                     const NumericVector& residuals, double damping,
-                                     NumericVector& step) {
+[[nodiscard]] bool gauss_newton_step(const NumericMatrix& jacobian, const NumericVector& residuals,
+                                     double damping, NumericVector& step) {
   if (jacobian.size() != residuals.size()) {
     return false;
   }
@@ -143,21 +144,22 @@ constexpr double kPivotTolerance = 1.0e-14;
   return solve_linear_system(std::move(normal_matrix), std::move(right_hand_side), step);
 }
 
-[[nodiscard]] AssemblyNumericSolveOutcome make_numeric_outcome(
-    AssemblySolveState state, std::size_t iterations,
-    const NumericVector& initial_residuals, NumericVector final_residuals,
-    NumericVector final_variables) {
+[[nodiscard]] AssemblyNumericSolveOutcome
+make_numeric_outcome(AssemblySolveState state, std::size_t iterations,
+                     const NumericVector& initial_residuals, NumericVector final_residuals,
+                     NumericVector final_variables) {
   return AssemblyNumericSolveOutcome{state, iterations, initial_residuals,
-                                     std::move(final_residuals),
-                                     std::move(final_variables)};
+                                     std::move(final_residuals), std::move(final_variables)};
 }
 
-[[nodiscard]] AssemblySolveResult make_solve_result(
-    const AssemblyNumericSolveOutcome& outcome, const Project& source_project,
-    const Project& solved_project, const std::vector<ComponentInstanceId>& connected_group,
-    const std::vector<ComponentInstanceId>& fixed_components,
-    const std::vector<ComponentInstanceId>& variable_components,
-    std::vector<AssemblySemanticTargetPartSnapshot> semantic_target_part_snapshots) {
+[[nodiscard]] AssemblySolveResult
+make_solve_result(const AssemblyNumericSolveOutcome& outcome, const Project& source_project,
+                  const Project& solved_project,
+                  const std::vector<ComponentInstanceId>& connected_group,
+                  const std::vector<ComponentInstanceId>& fixed_components,
+                  const std::vector<ComponentInstanceId>& variable_components,
+                  std::vector<AssemblySemanticTargetPartSnapshot> semantic_target_part_snapshots,
+                  std::string occurrence_context_snapshot) {
   std::vector<AssemblySolveComponentSnapshot> snapshots;
   snapshots.reserve(connected_group.size());
   for (const auto& component_id : connected_group) {
@@ -165,7 +167,9 @@ constexpr double kPivotTolerance = 1.0e-14;
         source_project.assembly().find_component_instance(component_id);
     snapshots.push_back(AssemblySolveComponentSnapshot{
         component_id, component->referenced_part_document(), component->grounding_state(),
-        component->suppression_state(), component->transform()});
+        component->suppression_state(), component->transform(), component->selected_model_state(),
+        source_project.assembly().effective_model_state(), source_project.effective_position(),
+        source_project.effective_design_view()});
   }
 
   std::vector<ProposedComponentTransform> proposals;
@@ -187,17 +191,18 @@ constexpr double kPivotTolerance = 1.0e-14;
       std::move(snapshots),
       std::move(semantic_target_part_snapshots),
       std::move(proposals),
-      AssemblySolveResidualSummary{outcome.final_residuals.size(),
-                                   residual_rms(outcome.initial_residuals),
-                                   residual_rms(outcome.final_residuals),
-                                   residual_max_abs(outcome.final_residuals)}};
+      AssemblySolveResidualSummary{
+          outcome.final_residuals.size(), residual_rms(outcome.initial_residuals),
+          residual_rms(outcome.final_residuals), residual_max_abs(outcome.final_residuals)},
+      std::move(occurrence_context_snapshot)};
 }
 
 } // namespace
 
-Result<AssemblyNumericSolveOutcome> solve_numeric_variables(
-    const NumericVector& initial_variables, bool has_fixed_reference,
-    const AssemblyNumericResidualEvaluator& evaluator, AssemblyRigidBodySolverOptions options) {
+Result<AssemblyNumericSolveOutcome>
+solve_numeric_variables(const NumericVector& initial_variables, bool has_fixed_reference,
+                        const AssemblyNumericResidualEvaluator& evaluator,
+                        AssemblyRigidBodySolverOptions options) {
   const AssemblyHoleGeometryScope hole_geometry;
   auto options_validation = validate_options(options);
   if (options_validation.has_error()) {
@@ -213,9 +218,9 @@ Result<AssemblyNumericSolveOutcome> solve_numeric_variables(
   NumericVector current_residuals = initial_residuals.value();
 
   if (current_residuals.empty()) {
-    return Result<AssemblyNumericSolveOutcome>::success(make_numeric_outcome(
-        AssemblySolveState::Converged, 0U, initial_residuals.value(),
-        std::move(current_residuals), std::move(variables)));
+    return Result<AssemblyNumericSolveOutcome>::success(
+        make_numeric_outcome(AssemblySolveState::Converged, 0U, initial_residuals.value(),
+                             std::move(current_residuals), std::move(variables)));
   }
 
   if (!has_fixed_reference) {
@@ -228,13 +233,12 @@ Result<AssemblyNumericSolveOutcome> solve_numeric_variables(
                                          ? AssemblySolveState::Converged
                                          : AssemblySolveState::FixedGeometryInconsistent;
     return Result<AssemblyNumericSolveOutcome>::success(make_numeric_outcome(
-        state, 0U, initial_residuals.value(), std::move(current_residuals),
-        std::move(variables)));
+        state, 0U, initial_residuals.value(), std::move(current_residuals), std::move(variables)));
   }
 
-  const AssemblyNumericSystemOptions numeric_options{
-      options.length_residual_scale_mm, options.finite_difference_translation_step_mm,
-      options.finite_difference_rotation_step_deg};
+  const AssemblyNumericSystemOptions numeric_options{options.length_residual_scale_mm,
+                                                     options.finite_difference_translation_step_mm,
+                                                     options.finite_difference_rotation_step_deg};
 
   std::size_t completed_iterations = 0U;
   for (std::size_t iteration = 0U; iteration < options.maximum_iterations; ++iteration) {
@@ -244,8 +248,8 @@ Result<AssemblyNumericSolveOutcome> solve_numeric_variables(
           std::move(current_residuals), std::move(variables)));
     }
 
-    auto jacobian = build_central_difference_jacobian(
-        variables, current_residuals, numeric_options, evaluator);
+    auto jacobian =
+        build_central_difference_jacobian(variables, current_residuals, numeric_options, evaluator);
     if (jacobian.has_error()) {
       return Result<AssemblyNumericSolveOutcome>::failure(jacobian.error());
     }
@@ -297,9 +301,9 @@ Result<AssemblyNumericSolveOutcome> solve_numeric_variables(
   const AssemblySolveState final_state = residual_rms(current_residuals) <= options.convergence_rms
                                              ? AssemblySolveState::Converged
                                              : AssemblySolveState::MaximumIterationsReached;
-  return Result<AssemblyNumericSolveOutcome>::success(make_numeric_outcome(
-      final_state, completed_iterations, initial_residuals.value(),
-      std::move(current_residuals), std::move(variables)));
+  return Result<AssemblyNumericSolveOutcome>::success(
+      make_numeric_outcome(final_state, completed_iterations, initial_residuals.value(),
+                           std::move(current_residuals), std::move(variables)));
 }
 
 Result<AssemblySolveResult> solve_numeric_relationships(
@@ -310,6 +314,10 @@ Result<AssemblySolveResult> solve_numeric_relationships(
   if (options_validation.has_error()) {
     return Result<AssemblySolveResult>::failure(options_validation.error());
   }
+
+  auto context = cross_hierarchy_context_snapshot(project);
+  if (!context)
+    return Result<AssemblySolveResult>::failure(context.error());
 
   std::vector<ComponentInstanceId> fixed_components;
   std::vector<ComponentInstanceId> variable_components;
@@ -351,15 +359,15 @@ Result<AssemblySolveResult> solve_numeric_relationships(
         return evaluate_residuals(candidate_project, relationships, length_scale, import_context);
       };
 
-  auto outcome = solve_numeric_variables(initial_variables, !fixed_components.empty(), evaluator,
-                                         options);
+  auto outcome =
+      solve_numeric_variables(initial_variables, !fixed_components.empty(), evaluator, options);
   if (outcome.has_error()) {
     return Result<AssemblySolveResult>::failure(outcome.error());
   }
 
   Project solved_project = project;
-  auto applied = apply_variables(solved_project, variable_components,
-                                 outcome.value().final_variables);
+  auto applied =
+      apply_variables(solved_project, variable_components, outcome.value().final_variables);
   if (applied.has_error()) {
     return Result<AssemblySolveResult>::failure(applied.error());
   }
@@ -369,9 +377,10 @@ Result<AssemblySolveResult> solve_numeric_relationships(
                                                        import_context);
   if (!fresh)
     return Result<AssemblySolveResult>::failure(fresh.error());
-  return Result<AssemblySolveResult>::success(make_solve_result(
-      outcome.value(), project, solved_project, connected_group, fixed_components,
-      variable_components, std::move(semantic_target_part_snapshots.value())));
+  return Result<AssemblySolveResult>::success(
+      make_solve_result(outcome.value(), project, solved_project, connected_group, fixed_components,
+                        variable_components, std::move(semantic_target_part_snapshots.value()),
+                        std::move(context.value())));
 }
 
 } // namespace blcad::geometry::detail

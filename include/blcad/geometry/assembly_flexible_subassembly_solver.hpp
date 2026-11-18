@@ -6,6 +6,7 @@
 #include "blcad/geometry/assembly_rigid_body_solver.hpp"
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
 namespace blcad::geometry {
@@ -20,8 +21,11 @@ struct AssemblyFlexibleSubassemblySolveResult {
   std::vector<SubassemblyInstanceId> occurrence_path;
   DocumentId assembly_document;
   AssemblySolveResult local_result;
+  std::string occurrence_context_snapshot{};
 
-  [[nodiscard]] bool converged() const noexcept { return local_result.converged(); }
+  [[nodiscard]] bool converged() const noexcept {
+    return local_result.converged();
+  }
 
   friend bool operator==(const AssemblyFlexibleSubassemblySolveResult&,
                          const AssemblyFlexibleSubassemblySolveResult&) = default;
@@ -36,11 +40,10 @@ public:
   AssemblyFlexibleSubassemblySolver() = default;
   explicit AssemblyFlexibleSubassemblySolver(StepImportTopologyContext* import_context)
       : import_context_(import_context) {}
-  [[nodiscard]] Result<AssemblyFlexibleSubassemblySolveResult> solve(
-      const Project& project,
-      const std::vector<SubassemblyInstanceId>& occurrence_path,
-      const std::vector<ComponentInstanceId>& connected_group,
-      AssemblyRigidBodySolverOptions options = {}) const;
+  [[nodiscard]] Result<AssemblyFlexibleSubassemblySolveResult>
+  solve(const Project& project, const std::vector<SubassemblyInstanceId>& occurrence_path,
+        const std::vector<ComponentInstanceId>& connected_group,
+        AssemblyRigidBodySolverOptions options = {}) const;
 
 private:
   StepImportTopologyContext* import_context_{};

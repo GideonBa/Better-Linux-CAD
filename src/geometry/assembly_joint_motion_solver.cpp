@@ -1,4 +1,6 @@
+#include "blcad/geometry/project_evaluation.hpp"
 #include "blcad/geometry/assembly_joint_motion_solver.hpp"
+#include "project_evaluation_internal.hpp"
 
 #include "assembly_constraint_numeric_system.hpp"
 #include "assembly_joint_drive_validation.hpp"
@@ -120,6 +122,12 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointId joint_id
 Result<AssemblyJointMotionResult>
 AssemblyJointMotionSolver::move(const Project& project, AssemblyJointDrive drive,
                                 AssemblyRigidBodySolverOptions options) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<AssemblyJointMotionResult>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return move(evaluation_scope.value()->project(), std::move(drive), options);
+
   const AssemblyJointId& joint_id = drive.joint;
   auto valid_structure = project.validate_assembly_structure();
   if (valid_structure.has_error()) {
@@ -246,6 +254,22 @@ AssemblyJointMotionSolver::move(const Project& project, AssemblyJointDrive drive
 Result<std::size_t>
 AssemblyJointMotionResultApplier::apply(Project& project,
                                         const AssemblyJointMotionResult& result) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<std::size_t>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->outer()) {
+    Project candidate =
+        evaluation_scope.value()->changed() ? evaluation_scope.value()->project() : project;
+    auto applied = apply(candidate, result);
+    if (!applied)
+      return applied;
+    auto checked = evaluate_project_geometry(candidate, import_context_);
+    if (!checked)
+      return Result<std::size_t>::failure(checked.error());
+    project = std::move(checked.value());
+    return applied;
+  }
+
   if (!result.converged()) {
     return Result<std::size_t>::failure(validation_error(
         result.joint.value(), "only a converged joint motion result can be applied"));

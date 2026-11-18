@@ -95,6 +95,8 @@ struct AssemblyCrossHierarchySolveResult {
   std::vector<ProposedAssemblyCrossHierarchyAuthorityTransform> proposed_transforms;
   AssemblySolveResidualSummary residual_summary;
 
+  std::string occurrence_context_snapshot{};
+
   [[nodiscard]] bool converged() const noexcept {
     return state == AssemblySolveState::Converged;
   }

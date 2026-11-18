@@ -1,4 +1,6 @@
+#include "blcad/geometry/project_evaluation.hpp"
 #include "blcad/geometry/assembly_cross_hierarchy_joint_motion_solver.hpp"
+#include "project_evaluation_internal.hpp"
 
 #include "assembly_cross_hierarchy_freshness.hpp"
 #include "assembly_cross_hierarchy_motion_numeric_system.hpp"
@@ -385,6 +387,9 @@ make_motion_result(const Project& source_project, const Project& solved_project,
       source_project, semantic_snapshots.value(), import_context);
   if (!fresh)
     return Result<AssemblyCrossHierarchyJointMotionResult>::failure(fresh.error());
+  auto context = detail::cross_hierarchy_context_snapshot(source_project);
+  if (!context)
+    return Result<AssemblyCrossHierarchyJointMotionResult>::failure(context.error());
   return Result<AssemblyCrossHierarchyJointMotionResult>::success(
       AssemblyCrossHierarchyJointMotionResult{
           selected_joint.id(), selected_joint.coordinate_deg(), requested_coordinate_deg,
@@ -396,7 +401,7 @@ make_motion_result(const Project& source_project, const Project& solved_project,
                                        detail::residual_rms(outcome.initial_residuals),
                                        detail::residual_rms(outcome.final_residuals),
                                        detail::residual_max_abs(outcome.final_residuals)},
-          std::move(requested_coordinates)});
+          std::move(requested_coordinates), std::move(context.value())});
 }
 
 } // namespace
@@ -418,6 +423,12 @@ AssemblyCrossHierarchyJointMotionSolver::move(const Project& project, AssemblyJo
 Result<AssemblyCrossHierarchyJointMotionResult>
 AssemblyCrossHierarchyJointMotionSolver::move(const Project& project, AssemblyJointDrive drive,
                                               AssemblyRigidBodySolverOptions options) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<AssemblyCrossHierarchyJointMotionResult>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->changed())
+    return move(evaluation_scope.value()->project(), std::move(drive), options);
+
   const AssemblyJointId& joint_id = drive.joint;
   auto structure = project.validate_assembly_structure();
   if (structure.has_error()) {
@@ -540,10 +551,31 @@ AssemblyCrossHierarchyJointMotionSolver::move(const Project& project, AssemblyJo
 
 Result<std::size_t> AssemblyCrossHierarchyJointMotionResultApplier::apply(
     Project& project, const AssemblyCrossHierarchyJointMotionResult& result) const {
+  auto evaluation_scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!evaluation_scope)
+    return Result<std::size_t>::failure(evaluation_scope.error());
+  if (evaluation_scope.value()->outer()) {
+    Project candidate =
+        evaluation_scope.value()->changed() ? evaluation_scope.value()->project() : project;
+    auto applied = apply(candidate, result);
+    if (!applied)
+      return applied;
+    auto checked = evaluate_project_geometry(candidate, import_context_);
+    if (!checked)
+      return Result<std::size_t>::failure(checked.error());
+    project = std::move(checked.value());
+    return applied;
+  }
+
   if (!result.converged()) {
     return Result<std::size_t>::failure(validation_error(
         result.joint.value(), "only a converged cross-hierarchy motion result can be applied"));
   }
+
+  auto context = detail::validate_cross_hierarchy_context_snapshot(
+      project, result.occurrence_context_snapshot);
+  if (!context)
+    return context;
 
   auto structure = project.validate_assembly_structure();
   if (structure.has_error()) {

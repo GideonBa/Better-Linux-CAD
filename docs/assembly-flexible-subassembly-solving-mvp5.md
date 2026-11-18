@@ -31,6 +31,11 @@ independent component variable. Cross-hierarchy graphs and numeric solve/applica
 these identities through the same effective pose boundary. Local constraints/joints evaluate in a
 disposable child-root view with the selected occurrence's transforms and joint coordinates.
 Grounding, semantic source freshness, stale proposal rejection and atomic application are retained.
+Named child Assembly states supply their actual component selections and suppression to hierarchy
+queries and scoped relationships. Direct queries reject suppressed occurrence/component targets.
+State/pose Projects conservatively snapshot complete canonical Project context for cross-hierarchy
+solve/motion application; changing a selected state, dependency or unrelated authored Project field
+invalidates that pending extended result. Legacy Projects retain their focused historical checks.
 
 `AssemblyOccurrenceSolver::solve/move/apply` exposes independent local solving and typed joint
 motion. Applying stores only the selected occurrence's transforms/coordinate values on a Project
@@ -38,6 +43,18 @@ candidate. The complete canonical Project snapshot plus ordinary local solver/so
 application; an unrelated authored Project change conservatively invalidates a pending local
 occurrence result. Shared child JSON and other occurrence overrides remain unchanged. The earlier
 `AssemblyFlexibleSubassemblySolver` API continues to update the shared child definition explicitly.
+
+With directed references or coordinated machining, every solver first consumes a normalized
+complete Project. Ordinary and shared-child results retain the complete extended authority context,
+including equal-geometry source rebinding and position/view catalogs; Motion embeds the same
+ordinary result. The shared-child wrapper additionally snapshots its parent Project. A plain
+legacy Project keeps the original selective Part/component freshness boundary. Independent,
+shared-child, root and cross-hierarchy appliers validate a disposable complete output before
+publication; a locally valid free pose that makes a downstream bore miss its Part is rejected with
+all prior definitions and poses retained. Nested evaluator-internal applies use the current candidate
+without recursive normalization. The Geometry regressions are `[assembly-context-freshness]`,
+`[assembly-hole-normalization]` and `[legacy-flex-normalization]` in the existing adaptive and
+Assembly Hole test sources; execution and numbered gates remain MVP-owned.
 
 Project JSON selects necessary version 3 only while occurrence-pose records exist. Each record
 uses strict version 1 dispatch and exact fields; older envelopes cannot carry the extension. Removing

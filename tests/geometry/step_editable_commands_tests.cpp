@@ -1,7 +1,10 @@
+#include "../support/adaptive_project_fixture.hpp"
 #include "imported_body_test_fixture.hpp"
 
 #include "blcad/core/project_json.hpp"
+#include "blcad/geometry/adaptive_project.hpp"
 #include "blcad/geometry/step_editable_commands.hpp"
+#include "blcad/geometry/step_reference_commands.hpp"
 
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <cmath>
@@ -156,4 +159,70 @@ TEST_CASE(
   const auto project_before = checked(serialize_project_to_json(owner));
   CHECK_FALSE(StepEditableCommands{}.refresh(owner, part.id(), {}, fixture.root));
   CHECK(checked(serialize_project_to_json(owner)) == project_before);
+}
+
+TEST_CASE(
+    "Public STEP Project candidates materialize current directed definitions before returning",
+    "[geometry][step-candidate-normalization][parity-b195]") {
+  bool reference{};
+  SECTION("Editable import and refresh") {}
+  SECTION("Reference insert and shared refresh") {
+    reference = true;
+  }
+  Fixture fixture;
+  fixture.write(BRepPrimAPI_MakeBox(20, 20, 10).Shape());
+  const auto registered = fixture.editable();
+  const auto& old_source = registered.step_import_sources().front();
+  const auto source = checked(StepImportSource::create(
+      old_source.id(), old_source.name(), old_source.project_relative_asset_path(),
+      old_source.sha256_digest(),
+      reference ? StepImportMode::Reference : StepImportMode::EditableBody));
+  const auto catalog = registered.imported_topology_catalogs().front();
+  auto owner = checked(AdaptiveProjectEvaluator{}.bind(blcad::test::adaptive_project(),
+                                                       blcad::test::adaptive_plane_reference()))
+                   .project;
+  REQUIRE(owner.add_step_import_source(source));
+  REQUIRE(owner.add_imported_topology_catalog(catalog));
+  REQUIRE(owner.find_part_document(DocumentId("source"))
+              ->set_parameter_value(ParameterId("length"), checked(Quantity::length_mm(8))));
+  const auto before = checked(serialize_project_to_json(owner));
+  const auto inserted =
+      reference
+          ? checked(StepReferenceCommands{}.insert(
+                owner, catalog.id(), DocumentId("inserted"), "Imported", owner.assembly().id(),
+                ComponentInstanceId("imported"), {{500, 0, 0}, {}}, fixture.root))
+          : checked(StepEditableCommands{}.insert(
+                owner, catalog.id(), DocumentId("inserted"), "Imported", FeatureId("imported.base"),
+                owner.assembly().id(), ComponentInstanceId("imported"), {{500, 0, 0}, {}},
+                fixture.root));
+  const auto height = [](const Project& p) {
+    return p.find_part_document(DocumentId("cover"))
+        ->find_construction_plane(ConstructionPlaneId("linked.plane"))
+        ->origin()
+        .z;
+  };
+  CHECK(height(owner) == Approx(4));
+  CHECK(height(inserted.project) == Approx(8));
+  CHECK(checked(serialize_project_to_json(owner)) == before);
+  auto pending = inserted.project;
+  REQUIRE(pending.find_part_document(DocumentId("source"))
+              ->set_parameter_value(ParameterId("length"), checked(Quantity::length_mm(10))));
+  const auto pending_json = checked(serialize_project_to_json(pending));
+  auto revision = fixture.source_bytes();
+  revision.insert(revision.find("ENDSEC;"), "/* accepted directed Project revision */\n");
+  fixture.write_bytes(revision);
+  const auto refreshed =
+      reference ? checked(StepReferenceCommands{}.refresh(pending, inserted.part, fixture.root))
+                : checked(StepEditableCommands{}.refresh(pending, inserted.part, source.id(),
+                                                         fixture.root));
+  CHECK(height(refreshed.project) == Approx(10));
+  CHECK(height(pending) == Approx(8));
+  CHECK(checked(serialize_project_to_json(pending)) == pending_json);
+  const auto* imported = refreshed.project.find_part_document(inserted.part);
+  REQUIRE(imported);
+  const auto digest = checked(step_import_sha256(revision));
+  CHECK(imported->step_import_sources().front().sha256_digest() == digest);
+  CHECK(refreshed.project.find_step_import_source(source.id())->sha256_digest() == digest);
+  CHECK(imported->imported_topology_catalogs().front() == catalog);
+  CHECK(fixture.source_bytes() == revision);
 }

@@ -4,6 +4,7 @@
 #include "assembly_cross_hierarchy_numeric_system.hpp"
 #include "assembly_matrix_rank.hpp"
 #include "assembly_semantic_target_freshness.hpp"
+#include "project_evaluation_internal.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -124,6 +125,12 @@ Result<AssemblySolveDiagnostics>
 AssemblySolveDiagnosticsAnalyzer::analyze(const Project& project,
                                           const std::vector<ComponentInstanceId>& connected_group,
                                           AssemblySolveDiagnosticsOptions options) const {
+  auto scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!scope)
+    return Result<AssemblySolveDiagnostics>::failure(scope.error());
+  if (scope.value()->changed())
+    return analyze(scope.value()->project(), connected_group, options);
+
   auto options_validation = validate_options(options);
   if (options_validation.has_error()) {
     return Result<AssemblySolveDiagnostics>::failure(options_validation.error());
@@ -242,6 +249,12 @@ Result<AssemblyCrossHierarchySolveDiagnostics>
 AssemblyCrossHierarchySolveDiagnosticsAnalyzer::analyze(
     const Project& project, const AssemblyCrossHierarchySolveGroup& solve_group,
     AssemblySolveDiagnosticsOptions options) const {
+  auto scope = detail::ProjectGeometryScope::create(project, import_context_);
+  if (!scope)
+    return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(scope.error());
+  if (scope.value()->changed())
+    return analyze(scope.value()->project(), solve_group, options);
+
   auto options_validation = validate_options(options);
   if (options_validation.has_error()) {
     return Result<AssemblyCrossHierarchySolveDiagnostics>::failure(options_validation.error());

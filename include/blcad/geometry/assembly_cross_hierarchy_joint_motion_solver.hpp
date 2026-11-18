@@ -70,6 +70,8 @@ struct AssemblyCrossHierarchyJointMotionResult {
   AssemblySolveResidualSummary residual_summary;
   std::vector<AssemblyJointCoordinateDrive> requested_coordinates;
 
+  std::string occurrence_context_snapshot{};
+
   [[nodiscard]] bool converged() const noexcept {
     return state == AssemblySolveState::Converged;
   }
