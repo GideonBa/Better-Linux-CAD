@@ -66,11 +66,24 @@ Offset uses signed outward normal distance; Size changes the absolute cylinder r
 Adjacent supports extend/intersect to rebuild the trimmed domain. Delete-and-Heal must remove every
 selected face without kernel errors or warnings; partial healing rejects the entire candidate.
 
-Every result must have exactly one valid solid and finite positive material. Selected continuations
+Every result must have exactly one valid solid and finite positive material. Source and candidate
+native edge/pcurve consistency over the complete parameter domain and both actual curve/vertex
+endpoints must satisfy the explicit tolerance budget, with matching edge parameter ranges.
+Face approximation and degenerate edge/vertex tolerances must also fit that budget. OCCT may
+conservatively inflate ordinary edge/vertex tolerance metadata; those bounds are not treated as
+measured geometric error or used to replace the actual consistency checks. Selected continuations
 must satisfy the requested analytic support uniquely. Every unselected face must retain its complete
 underlying support: planes/cylinders use analytic equality; other surfaces require identical native
 surface definitions. Sparse samples do not establish that invariant. Unexpected support deletion,
 creation, split or blend changes reject, preserving the previous certified cache and immutable base.
+
+The result must also pass the shared native self-interference authority
+(`BRepAlgoAPI_Check` with self-interference enabled), and every unselected input face must have
+exactly one output continuation. `[direct-edit-native-si]` imports a 20×20×8 two-bore Part:
+resizing the left radius from 1 to 2 preserves the right radius 1 and gives analytic volume
+`3200 − 40π`; resizing to 5 produces one topologically valid Solid with positive volume but native
+self-interference, and must reject before model/cache/source publication. This fixture proves the
+self-interference guard; an independent unselected-split fixture remains outside its proof.
 
 Kernel provenance retains surviving/modified continuations. The offset algorithm's generated
 surfaces are accepted as continuations only after the complete support checks above. A selected

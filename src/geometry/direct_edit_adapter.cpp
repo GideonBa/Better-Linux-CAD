@@ -3,11 +3,15 @@
 #include "geometry_shape_internal.hpp"
 #include "semantic_face_resolution.hpp"
 
+#include <BRepAdaptor_Curve.hxx>
+
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepAlgoAPI_Check.hxx>
 #include <BRepAlgoAPI_Defeaturing.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
+#include <BRepLib_CheckCurveOnSurface.hxx>
 #include <BRepOffsetAPI_DraftAngle.hxx>
 #include <BRepOffset_MakeOffset.hxx>
 #include <BRep_Tool.hxx>
@@ -18,6 +22,8 @@
 #include <Geom_Surface.hxx>
 #include <TopExp.hxx>
 #include <TopoDS.hxx>
+#include <TopoDS_Edge.hxx>
+#include <TopoDS_Vertex.hxx>
 #include <gp_Ax1.hxx>
 #include <gp_Lin.hxx>
 #include <gp_Trsf.hxx>
@@ -54,12 +60,49 @@ double volume(const TopoDS_Shape& s) {
   BRepGProp::VolumeProperties(s, p);
   return p.Mass();
 }
+void require_native_accuracy(const TopoDS_Shape& shape, double tolerance) {
+  // OCCT may conservatively enlarge stored edge/vertex tolerances during
+  // intersection even when the actual curves agree to machine precision. Check
+  // the complete native pcurve domain and both real endpoints against the
+  // authored budget rather than treating those metadata bounds as measured error.
+  for (TopExp_Explorer faces(shape, TopAbs_FACE); faces.More(); faces.Next()) {
+    const auto face = TopoDS::Face(faces.Current());
+    require(BRep_Tool::Tolerance(face) <= tolerance,
+            "Direct Edit support approximation exceeds the explicit tolerance budget");
+    for (TopExp_Explorer edges(face, TopAbs_EDGE); edges.More(); edges.Next()) {
+      const auto edge = TopoDS::Edge(edges.Current());
+      if (BRep_Tool::Degenerated(edge)) {
+        require(BRep_Tool::Tolerance(edge) <= tolerance,
+                "Direct Edit degenerate edge exceeds the explicit tolerance budget");
+        for (TopExp_Explorer vertices(edge, TopAbs_VERTEX); vertices.More(); vertices.Next())
+          require(BRep_Tool::Tolerance(TopoDS::Vertex(vertices.Current())) <= tolerance,
+                  "Direct Edit degenerate vertex exceeds the explicit tolerance budget");
+        continue;
+      }
+      require(BRep_Tool::SameParameter(edge) && BRep_Tool::SameRange(edge),
+              "Direct Edit requires matching native edge parameterizations");
+      BRepLib_CheckCurveOnSurface check(edge, face);
+      check.Perform(false);
+      require(check.IsDone() && std::isfinite(check.MaxDistance()) &&
+                  check.MaxDistance() <= tolerance,
+              "Direct Edit edge/support disagreement exceeds the explicit tolerance budget");
+      TopoDS_Vertex start, finish;
+      TopExp::Vertices(edge, start, finish);
+      require(!start.IsNull() && !finish.IsNull(), "Direct Edit native edge has no endpoints");
+      BRepAdaptor_Curve curve(edge);
+      require(curve.Value(curve.FirstParameter()).Distance(BRep_Tool::Pnt(start)) <= tolerance &&
+                  curve.Value(curve.LastParameter()).Distance(BRep_Tool::Pnt(finish)) <= tolerance,
+              "Direct Edit endpoint disagreement exceeds the explicit tolerance budget");
+    }
+  }
+}
 bool contains(const std::vector<TopoDS_Face>& faces, const TopoDS_Face& f) {
   return std::any_of(faces.begin(), faces.end(), [&](const auto& a) { return a.IsSame(f); });
 }
 gp_Vec outward(const TopoDS_Face& face) {
-  auto n = gp_Vec(BRepAdaptor_Surface(face).Plane().Axis().Direction());
-  if (face.Orientation() == TopAbs_REVERSED)
+  const auto plane = BRepAdaptor_Surface(face).Plane();
+  auto n = gp_Vec(plane.Axis().Direction());
+  if ((face.Orientation() == TopAbs_REVERSED) == plane.Position().Direct())
     n.Reverse();
   return n;
 }
@@ -125,7 +168,10 @@ NativeResult checked(Algorithm& op, const TopoDS_Shape& source,
   TopExp::MapShapes(result, TopAbs_SOLID, solids);
   require(solids.Extent() == 1 && BRepCheck_Analyzer(result, true).IsValid(),
           "Direct Edit must produce one checked solid");
+  require(BRepAlgoAPI_Check(result, false, true).IsValid(),
+          "Direct Edit produced self-interfering material");
   const double tol = f.policy().tolerance_mm;
+  require_native_accuracy(result, tol);
   const double after = volume(result);
   require(std::isfinite(after) && after > tol * tol * tol,
           "Direct Edit produced no positive finite material");
@@ -147,14 +193,29 @@ NativeResult checked(Algorithm& op, const TopoDS_Shape& source,
         continue;
       }
       require(next.size() == 1, "Direct Edit selected face continuation is missing or ambiguous");
-      require(same_support(next.front(), requested[index], tol * 5),
+      require(same_support(next.front(), requested[index], tol),
               "Direct Edit result does not satisfy the requested face support");
     } else {
-      require(!next.empty(), "Direct Edit unexpectedly removed an unselected support");
-      for (const auto& face : next)
+      require(next.size() == 1,
+              "Direct Edit unselected support continuation is missing, split or ambiguous");
+      for (const auto& face : next) {
         require(
-            same_support(face, BRep_Tool::Surface(original), tol * 5),
+            same_support(face, BRep_Tool::Surface(original), tol),
             "Direct Edit changed an unselected support; include or remove its blend explicitly");
+        const BRepAdaptor_Surface old_support(original), new_support(face);
+        if (old_support.GetType() == GeomAbs_Plane)
+          require(outward(original).Dot(outward(face)) >= 1 - 1e-10,
+                  "Direct Edit inverted an unselected material half-space");
+        else if (old_support.GetType() == GeomAbs_Cylinder)
+          require(((original.Orientation() == TopAbs_REVERSED) !=
+                   old_support.Cylinder().Position().Direct()) ==
+                      ((face.Orientation() == TopAbs_REVERSED) !=
+                       new_support.Cylinder().Position().Direct()),
+                  "Direct Edit inverted an unselected cylinder material side");
+        else
+          require(original.Orientation() == face.Orientation(),
+                  "Direct Edit inverted an unselected support orientation");
+      }
     }
     accounted.insert(accounted.end(), next.begin(), next.end());
   }
@@ -186,6 +247,7 @@ Result<GeometryShape> DirectEditAdapter::apply(const PartDocument& p, const Dire
                                                StepImportTopologyContext* imports) const {
   try {
     require(!target.empty(), "Direct Edit target Body is missing");
+    require_native_accuracy(target.impl_->shape, f.policy().tolerance_mm);
     if (auto valid = validate_direct_edit_parameters(p, f); !valid)
       return Result<GeometryShape>::failure(valid.error());
     // Every native algorithm works on a private copy; even failed OCCT recovery
@@ -278,7 +340,9 @@ Result<GeometryShape> DirectEditAdapter::apply(const PartDocument& p, const Dire
                   "Direct Edit radius is below modeling tolerance");
           const auto cylinder = surface.Cylinder();
           const double delta = radius - cylinder.Radius();
-          distance = face.Orientation() == TopAbs_REVERSED ? -delta : delta;
+          const bool radial_outward =
+              (face.Orientation() == TopAbs_REVERSED) != cylinder.Position().Direct();
+          distance = radial_outward ? delta : -delta;
           auto resized = cylinder;
           resized.SetRadius(radius);
           support = new Geom_CylindricalSurface(resized);
@@ -291,8 +355,9 @@ Result<GeometryShape> DirectEditAdapter::apply(const PartDocument& p, const Dire
             support->Translate(outward(face) * distance);
           else {
             auto cylinder = surface.Cylinder();
-            const auto radius =
-                cylinder.Radius() + (face.Orientation() == TopAbs_REVERSED ? -distance : distance);
+            const bool radial_outward =
+                (face.Orientation() == TopAbs_REVERSED) != cylinder.Position().Direct();
+            const auto radius = cylinder.Radius() + (radial_outward ? distance : -distance);
             require(radius > f.policy().tolerance_mm, "Direct Edit Offset collapses a cylinder");
             cylinder.SetRadius(radius);
             support = new Geom_CylindricalSurface(cylinder);

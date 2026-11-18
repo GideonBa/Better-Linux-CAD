@@ -228,6 +228,10 @@ void add_operation(PartDocument& part, PartFeatureFamily family) {
   }
   case PartFeatureFamily::ImportedBody:
     FAIL("Imported source uses a real STEP asset fixture in a separate test");
+  case PartFeatureFamily::SketchDriven:
+    FAIL("Sketch-driven execution boundaries use their dedicated fixtures");
+  case PartFeatureFamily::DirectEdit:
+    FAIL("Direct Edit execution boundaries use their dedicated immutable-face fixtures");
   case PartFeatureFamily::Thread:
     FAIL("Thread execution boundaries use their dedicated fixtures");
   }
