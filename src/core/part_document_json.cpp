@@ -1,4 +1,5 @@
 #include "blcad/core/part_document_json.hpp"
+#include "blcad/core/part_feature_json_commands.hpp"
 #include "advanced_fillet_json.hpp"
 #include "direct_edit_json.hpp"
 #include "engineering_resource_json.hpp"
@@ -5092,6 +5093,47 @@ spline_continuity_spelling(SketchSpline3DContinuity continuity) noexcept {
 }
 
 } // namespace
+
+Result<PartDocument> replace_part_pattern_from_json(const PartDocument& document,
+                                                    std::string_view record) {
+  try {
+    auto parsed = part_pattern_from_json(json::parse(record));
+    if (!parsed)
+      return Result<PartDocument>::failure(parsed.error());
+    PartDocument candidate = document;
+    auto changed = std::visit(
+        [&](const auto& feature) {
+          if constexpr (std::is_same_v<std::decay_t<decltype(feature)>, LinearPatternFeature>)
+            return candidate.update_linear_pattern_feature(feature);
+          else
+            return candidate.update_circular_pattern_feature(feature);
+        },
+        parsed.value());
+    if (!changed)
+      return Result<PartDocument>::failure(changed.error());
+    return Result<PartDocument>::success(std::move(candidate));
+  } catch (const std::exception& exception) {
+    return Result<PartDocument>::failure(
+        json_error(std::string("invalid replacement pattern json: ") + exception.what()));
+  }
+}
+
+Result<PartDocument> replace_part_mirror_from_json(const PartDocument& document,
+                                                   std::string_view record) {
+  try {
+    auto parsed = mirror_feature_from_json(json::parse(record));
+    if (!parsed)
+      return Result<PartDocument>::failure(parsed.error());
+    PartDocument candidate = document;
+    auto changed = candidate.update_mirror_feature(parsed.value());
+    if (!changed)
+      return Result<PartDocument>::failure(changed.error());
+    return Result<PartDocument>::success(std::move(candidate));
+  } catch (const std::exception& exception) {
+    return Result<PartDocument>::failure(
+        json_error(std::string("invalid replacement mirror json: ") + exception.what()));
+  }
+}
 
 Result<PartDocument> replace_part_extrude_with_hole(const PartDocument& document,
                                                     const HoleFeature& replacement) {
