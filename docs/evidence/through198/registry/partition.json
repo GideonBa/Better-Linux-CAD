@@ -1,0 +1,53 @@
+{
+  "schema": "blcad.gui-default-registry-partition.v2",
+  "policy": "Three disjoint root-captured registry groups cover the exact configured default suite; optional complex profile excluded. Selection proof only; completed execution is recorded separately.",
+  "specifications": {
+    "default": "~[complex-part-profile]",
+    "broad": "~[complex-part-profile]~[gui-feature-coverage]~[configurable-housing]",
+    "housing": "[configurable-housing]~[complex-part-profile]",
+    "audit": "[gui-feature-coverage]~[complex-part-profile]"
+  },
+  "expected_counts": {
+    "default": 1028,
+    "broad": 1022,
+    "housing": 1,
+    "audit": 5
+  },
+  "counts": {
+    "default": 1028,
+    "broad": 1022,
+    "housing": 1,
+    "audit": 5
+  },
+  "disjoint": true,
+  "complete_union": true,
+  "registry_files": {
+    "default": {
+      "path": "/tmp/blcad-through198-gui-registry-runtime22/default.txt",
+      "sha256": "920a3e9f6292b1d38eaf6e9ebc2d981663c9aa84f684408b6a49bd2572f990d7",
+      "count": 1028
+    },
+    "broad": {
+      "path": "/tmp/blcad-through198-gui-registry-runtime22/broad.txt",
+      "sha256": "fe3e28322aad9fc643ac7fe975905a9eba052af30c41faa794bb230ffa80acc0",
+      "count": 1022
+    },
+    "housing": {
+      "path": "/tmp/blcad-through198-gui-registry-runtime22/housing.txt",
+      "sha256": "affa8fdd5817395dafdbc20067e7d8bd2740dff4293ef551f9eaeea33b1f3a78",
+      "count": 1
+    },
+    "audit": {
+      "path": "/tmp/blcad-through198-gui-registry-runtime22/audit.txt",
+      "sha256": "5ca296895f86ccc79158fc70b7818116062047d39763aa718c5e8acad465487a",
+      "count": 5
+    }
+  },
+  "binary": {
+    "path": "/home/gideon/Dokumente/andere Projekte/BLCAD/build/dev-gui/blcad_gui_tests",
+    "sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63"
+  },
+  "failures": [],
+  "execution_claimed": false,
+  "repository_modified": false
+}

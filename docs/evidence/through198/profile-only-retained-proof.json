@@ -1,0 +1,21 @@
+{
+  "changed_runtime_inputs": [
+    "tests/geometry/variant_assembly_profile.cpp"
+  ],
+  "changed_artifacts": [
+    "build/dev-gui/blcad_variant_assembly_profile"
+  ],
+  "unchanged_artifacts": [
+    "build/dev-gui/blcad_core_tests",
+    "build/dev-gui/blcad_geometry_tests",
+    "build/dev-gui/blcad_gui_tests",
+    "build/dev-gui/blcad",
+    "build/dev-gui/blcad_export_step",
+    "build/dev-gui/libblcad_core.a",
+    "build/dev-gui/libblcad_geometry.a",
+    "build/dev-gui/libblcad_gui.a"
+  ],
+  "source_manifest_before": "/tmp/blcad-runtime-manifest-22.json",
+  "source_manifest_after": "/tmp/blcad-runtime-manifest-23.json",
+  "policy": "Only optional profile source/executable changed; all completed correctness/native targets retain exact inputs and bytes"
+}

@@ -1,0 +1,38 @@
+{
+  "build/dev-gui/blcad_core_tests": {
+    "sha256": "942859e92dbcf07296900c8273061e53f85251692a15f400cdd8d1b3418e75a7",
+    "bytes": 590804448
+  },
+  "build/dev-gui/blcad_geometry_tests": {
+    "sha256": "9c1872a016738f4b4d3f17d65b7c15e549d1bca792dc1a7aea786b8bf73bd2be",
+    "bytes": 920878200
+  },
+  "build/dev-gui/blcad_gui_tests": {
+    "sha256": "bd2ef142ad9c559fed43f611c77b0f7bf76d5a592fe06dc0f00e7f9cf07b9d63",
+    "bytes": 1300146072
+  },
+  "build/dev-gui/blcad": {
+    "sha256": "aab0bd81d5df9c58ce67128f8dbc531ace1b8b4f10c6cc415af9436b742026e1",
+    "bytes": 736502296
+  },
+  "build/dev-gui/blcad_export_step": {
+    "sha256": "597e280742e1a23e193aba56feb9bb99ef1274d0202c2b8583599cf2877a7f42",
+    "bytes": 243014616
+  },
+  "build/dev-gui/blcad_variant_assembly_profile": {
+    "sha256": "859b317c10453c2916f367df42c3807ccb3ed84d515c1861513cdcff4cab27ca",
+    "bytes": 352721848
+  },
+  "build/dev-gui/libblcad_core.a": {
+    "sha256": "a7a3765da9e6040d996e421e8b6347b72ad54304683d8d8c65b077d7a403948a",
+    "bytes": 790779390
+  },
+  "build/dev-gui/libblcad_geometry.a": {
+    "sha256": "39b53b785704f94d8dffc6fd39da70dd4c805a4498bfb440cc8bd4c806d187e0",
+    "bytes": 1084470258
+  },
+  "build/dev-gui/libblcad_gui.a": {
+    "sha256": "5397d09485ff84495eddbab663b47c6b5084d740dbe48802f2b3b50d51ae900b",
+    "bytes": 1822697328
+  }
+}

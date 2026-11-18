@@ -1,0 +1,1 @@
+{"supervisor": 261643, "finished": true, "records": [{"scale": "100", "exit_code": 0, "log": "/tmp/blcad-through198-native100-core-08.log", "captures": "/tmp/blcad-through198-native100-runtime22-proof"}, {"scale": "150", "exit_code": 0, "log": "/tmp/blcad-through198-native150-core-05.log", "captures": "/tmp/blcad-through198-native150-runtime22-proof"}]}

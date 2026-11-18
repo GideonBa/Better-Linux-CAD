@@ -1,0 +1,1 @@
+{"supervisor": 236959, "build": 236960, "command": ["cmake", "--build", "--preset", "dev-gui", "--target", "blcad_core_tests", "blcad_geometry_tests", "blcad_gui_tests", "blcad_app", "blcad_export_step", "blcad_variant_assembly_profile", "-j10"], "cwd": "/home/gideon/Dokumente/andere Projekte/BLCAD", "exit_code": 0, "finished": true}
