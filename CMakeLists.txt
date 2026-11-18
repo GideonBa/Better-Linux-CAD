@@ -198,6 +198,9 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/assembly_numeric_solve_engine.cpp
     src/geometry/assembly_occt_rigid_transform.cpp
     src/geometry/assembly_part_shape_definitions.cpp
+    src/geometry/project_evaluation.cpp
+    src/geometry/assembly_hole_coordinator.cpp
+    src/geometry/adaptive_project.cpp
     src/geometry/assembly_occurrence_solver.cpp
     src/geometry/assembly_posed_leaf_shapes.cpp
     src/geometry/assembly_revolute_joint_equation_builder.cpp
