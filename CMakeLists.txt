@@ -269,6 +269,7 @@ if(BLCAD_BUILD_GEOMETRY)
     src/geometry/sweep_material_region.cpp
     src/geometry/closed_sweep_validation.cpp
     src/geometry/recompute_executor.cpp
+    src/geometry/recompute_transition.cpp
     src/geometry/circular_pattern_adapter.cpp
     src/geometry/linear_pattern_adapter.cpp
     src/geometry/loft_adapter.cpp
@@ -759,6 +760,7 @@ if(BLCAD_BUILD_TESTS)
       tests/geometry/physical_properties_tests.cpp
       tests/geometry/assembly_physical_properties_tests.cpp
       tests/geometry/physical_properties_reuse_tests.cpp
+      tests/geometry/recompute_transition_tests.cpp
       tests/geometry/body_transform_pipeline_tests.cpp
       tests/geometry/body_boolean_pipeline_tests.cpp
       tests/geometry/bolt_circle_pattern_pipeline_tests.cpp

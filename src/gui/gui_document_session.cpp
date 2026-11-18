@@ -347,127 +347,6 @@ Result<std::size_t> validate_reference_update(const PartDocument& before,
   return Result<std::size_t>::success(1);
 }
 
-// Compare canonical intent, rather than trusting a mutation callback's dirty
-// flags. Unknown fields, removals and changed existing input edges fall back
-// to full execution. A Body result alias follows its new producing feature.
-std::optional<std::vector<std::string>> transaction_geometry_roots(const PartDocument& before,
-                                                                   const PartDocument& after,
-                                                                   const std::string& before_json,
-                                                                   const std::string& after_json) {
-  const auto& previous_graph = before.dependency_graph();
-  const auto& next_graph = after.dependency_graph();
-  const std::unordered_set<std::string> previous_nodes(previous_graph.nodes().begin(),
-                                                       previous_graph.nodes().end());
-  for (const auto& node : previous_nodes)
-    if (!next_graph.has_node(node))
-      return std::nullopt;
-  auto previous_edges = previous_graph.dependencies();
-  auto next_edges = next_graph.dependencies();
-  std::vector<std::string> roots;
-  std::unordered_set<std::string> body_aliases;
-  for (const auto& body : after.bodies()) {
-    const auto alias = "body:" + body.id().value();
-    body_aliases.insert(alias);
-    const auto producers = [&](const auto& edges) {
-      std::vector<std::string> result;
-      for (const auto& [source, target] : edges)
-        if (target == alias)
-          result.push_back(source);
-      std::sort(result.begin(), result.end());
-      return result;
-    };
-    const auto old_producers = producers(previous_edges);
-    const auto new_producers = producers(next_edges);
-    if (old_producers != new_producers) {
-      roots.push_back(alias);
-      // Recompute the new final producer even when it already existed (for
-      // example, reordered intent); an alias is not itself an executable node.
-      roots.insert(roots.end(), new_producers.begin(), new_producers.end());
-    }
-  }
-  std::erase_if(previous_edges,
-                [&](const auto& edge) { return body_aliases.contains(edge.second); });
-  std::erase_if(next_edges, [&](const auto& edge) {
-    return body_aliases.contains(edge.second) || !previous_nodes.contains(edge.first) ||
-           !previous_nodes.contains(edge.second);
-  });
-  std::sort(previous_edges.begin(), previous_edges.end());
-  std::sort(next_edges.begin(), next_edges.end());
-  if (previous_edges != next_edges)
-    return std::nullopt;
-
-  using Json = nlohmann::json;
-  const auto previous = Json::parse(before_json, nullptr, false);
-  const auto next = Json::parse(after_json, nullptr, false);
-  if (!previous.is_object() || !next.is_object())
-    return std::nullopt;
-  const std::unordered_set<std::string> records{"parameters",
-                                                "datum_planes",
-                                                "datum_axes",
-                                                "construction_points",
-                                                "construction_lines",
-                                                "construction_planes",
-                                                "derived_workplanes",
-                                                "result_face_workplanes",
-                                                "sketches",
-                                                "sketches_3d",
-                                                "path_curves",
-                                                "features",
-                                                "revolve_features",
-                                                "sweep_features",
-                                                "loft_features",
-                                                "surface_features",
-                                                "sketch_driven_features",
-                                                "direct_edit_features",
-                                                "part_patterns",
-                                                "mirror_features",
-                                                "edge_treatments",
-                                                "shell_features",
-                                                "draft_features",
-                                                "body_booleans",
-                                                "body_transforms"};
-  std::unordered_set<std::string> keys;
-  for (const auto& [key, value] : previous.items())
-    keys.insert(key);
-  for (const auto& [key, value] : next.items())
-    keys.insert(key);
-  for (const auto& key : keys) {
-    if (previous.contains(key) && next.contains(key) && previous.at(key) == next.at(key))
-      continue;
-    // Core reconstructs feature ordering as dependency edges. Existing edges
-    // were checked above; newly inserted producers are included below.
-    if (key == "feature_order")
-      continue;
-    if (!records.contains(key))
-      return std::nullopt;
-    const auto old_records = previous.value(key, Json::array());
-    const auto new_records = next.value(key, Json::array());
-    if (!old_records.is_array() || !new_records.is_array())
-      return std::nullopt;
-    std::unordered_map<std::string, Json> old_by_id;
-    for (const auto& record : old_records) {
-      if (!record.is_object() || !record.contains("id") || !record.at("id").is_string() ||
-          !old_by_id.emplace(record.at("id").get<std::string>(), record).second)
-        return std::nullopt;
-    }
-    std::unordered_set<std::string> seen;
-    for (const auto& record : new_records) {
-      if (!record.is_object() || !record.contains("id") || !record.at("id").is_string())
-        return std::nullopt;
-      const auto id = record.at("id").get<std::string>();
-      if (!next_graph.has_node(id) || !seen.insert(id).second)
-        return std::nullopt;
-      const auto old = old_by_id.find(id);
-      if (old == old_by_id.end() || old->second != record)
-        roots.push_back(id);
-    }
-    for (const auto& [id, record] : old_by_id)
-      if (!seen.contains(id))
-        return std::nullopt;
-  }
-  return roots;
-}
-
 bool is_project_path(const std::filesystem::path& path) {
   return path.filename().string().ends_with(".blcad.project.json");
 }
@@ -2090,10 +1969,19 @@ Result<std::size_t> GuiDocumentSession::restore_history(std::size_t index) {
     const auto retained =
         std::find_if(part_history_geometry_.begin(), part_history_geometry_.end(),
                      [&](const auto& item) { return item.history_index == index; });
-    const bool reuse = !history_prefix_count_ && !entry.allow_failed_recompute &&
-                       part->step_import_sources().empty() &&
-                       retained != part_history_geometry_.end() &&
-                       retained->cache.validate_complete_history_result(*part).has_value();
+    const bool reuse = [&]() {
+      if (history_prefix_count_ || entry.allow_failed_recompute ||
+          !part->step_import_sources().empty() || retained == part_history_geometry_.end() ||
+          !retained->document.step_import_sources().empty())
+        return false;
+      const auto source = serialize_part_document_to_json(retained->document);
+      return source && source.value() == entry.json &&
+             retained->cache.validate_complete_geometry_result(retained->document).has_value();
+    }();
+    // Deserialization creates a new executable lifetime. A retained result may
+    // only travel with its validated originating document, never a parsed alias.
+    if (reuse)
+      *part = retained->document;
     auto cache = reuse
                      ? Result<geometry::ShapeCache>::success(retained->cache)
                      : geometry::ShapeCache::create(ShapeCacheId("gui.part." + part->id().value()));
@@ -2374,8 +2262,7 @@ Result<std::size_t> GuiDocumentSession::publish_part_state(
 }
 
 Result<geometry::ShapeCache>
-GuiDocumentSession::recompute_part_candidate(PartDocument& document,
-                                             const std::string& json) const {
+GuiDocumentSession::recompute_part_candidate(PartDocument& document, const std::string&) const {
   const auto full = [&]() -> Result<geometry::ShapeCache> {
     auto cache = geometry::ShapeCache::create(ShapeCacheId("gui.part." + document.id().value()));
     if (!cache)
@@ -2416,25 +2303,17 @@ GuiDocumentSession::recompute_part_candidate(PartDocument& document,
   const auto baseline = serialize_current();
   if (!baseline || baseline.value() != history_[history_index_].json)
     return full();
-  auto roots = transaction_geometry_roots(*current, document, baseline.value(), json);
-  if (!roots)
-    return full();
-  const auto current_source = part_shape_cache_->validate_complete_geometry_result(*current);
-  if (!current_source)
-    return Result<geometry::ShapeCache>::failure(current_source.error());
-  auto candidate = document;
-  candidate.mark_all_clean();
-  auto incremental = detail::recompute_preview_geometry(*this, candidate, *roots);
-  if (!incremental)
-    return incremental;
-  const auto current_history = incremental.value().validate_complete_history_result(document);
-  if (!current_history)
-    return Result<geometry::ShapeCache>::failure(current_history.error());
-  // Legacy subset execution cannot certify a cache against changed intent.
-  // Publication requires the same complete provenance as full-history replay.
-  if (!incremental.value().validate_complete_geometry_result(document))
-    return full();
-  return incremental;
+  return query_with_step_import_context(*this, [&](auto* context) -> Result<geometry::ShapeCache> {
+    auto cache = *part_shape_cache_;
+    const auto computed =
+        geometry::GeometryRecomputeExecutor{context}.execute_transition(*current, document, cache);
+    if (!computed)
+      return Result<geometry::ShapeCache>::failure(computed.error());
+    const auto complete = cache.validate_complete_geometry_result(document);
+    if (!complete)
+      return Result<geometry::ShapeCache>::failure(complete.error());
+    return Result<geometry::ShapeCache>::success(std::move(cache));
+  });
 }
 
 void GuiDocumentSession::remember_part_history_geometry() {
@@ -2443,14 +2322,15 @@ void GuiDocumentSession::remember_part_history_geometry() {
   });
   if (active_model_state_ != primary_model_state_id() || !part_document() || !part_shape_cache_ ||
       recompute_status_ != GuiRecomputeStatus::Fresh || reference_repair_mode_ ||
-      !part_document()->step_import_sources().empty())
+      !part_document()->step_import_sources().empty() ||
+      !part_shape_cache_->validate_complete_geometry_result(*part_document()))
     return;
   // Derived BReps are runtime-only and shared immutably with the working cache.
   // Retain four recently visited states, never the entire unbounded history.
   constexpr std::size_t retained_states = 4;
   if (part_history_geometry_.size() == retained_states)
     part_history_geometry_.erase(part_history_geometry_.begin());
-  part_history_geometry_.push_back({history_index_, *part_shape_cache_});
+  part_history_geometry_.push_back({history_index_, *part_document(), *part_shape_cache_});
 }
 
 void GuiDocumentSession::initialize_history(std::string json, std::string label, bool saved) {

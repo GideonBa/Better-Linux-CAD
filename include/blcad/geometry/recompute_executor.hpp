@@ -149,6 +149,11 @@ public:
 
   [[nodiscard]] Result<GeometryRecomputeSummary> execute_document(const PartDocument& document,
                                                                   ShapeCache& shape_cache) const;
+  // Validate the certified baseline and derive the complete canonical change
+  // plan internally. An arbitrary caller-supplied subset cannot certify output.
+  [[nodiscard]] Result<GeometryRecomputeSummary> execute_transition(const PartDocument& before,
+                                                                    const PartDocument& after,
+                                                                    ShapeCache& cache) const;
   [[nodiscard]] Result<GeometryRecomputeSummary>
   execute_history_prefix(const PartDocument& document, std::size_t prefix_count,
                          ShapeCache& shape_cache) const;

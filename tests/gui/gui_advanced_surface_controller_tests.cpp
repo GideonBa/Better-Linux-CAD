@@ -1,6 +1,7 @@
 #include "../support/curved_surface_fixture.hpp"
 #include "../support/geometry_volume_oracle.hpp"
 #include "../support/loft_section_refinement_fixture.hpp"
+#include "blcad/geometry/occt_shape_view.hpp"
 #include "blcad/gui/gui_interactive_path_sweep_loft.hpp"
 #include "blcad/gui/gui_interactive_surface.hpp"
 #include <catch2/catch_approx.hpp>
@@ -49,6 +50,8 @@ TEST_CASE("Advanced Surface creation and editing share signed thickness "
                                         GuiViewportManipulatorInputSource::Drag, 2}));
   REQUIRE(controller.apply(session));
   const auto created = saved(session);
+  const auto created_generation = session.part_document()->executable_generation();
+  const auto created_shape = *session.part_shape_cache()->find_body_shape(BodyId("modern.body"));
   CHECK(blcad::test::integrated_solid_volume(
             *session.part_shape_cache()->find_body_shape(BodyId("modern.body")))
             .volume_mm3 == Catch::Approx(200 * std::numbers::pi).margin(1e-5));
@@ -60,23 +63,44 @@ TEST_CASE("Advanced Surface creation and editing share signed thickness "
   controller.set_distance(3);
   REQUIRE(controller.apply(session));
   const auto edited = saved(session);
+  const auto edited_generation = session.part_document()->executable_generation();
+  const auto edited_shape = *session.part_shape_cache()->find_body_shape(BodyId("modern.body"));
+  CHECK(edited_generation > created_generation);
   CHECK(blcad::test::integrated_solid_volume(
             *session.part_shape_cache()->find_body_shape(BodyId("modern.body")))
             .volume_mm3 == Catch::Approx(255 * std::numbers::pi).margin(1e-5));
   REQUIRE(session.undo());
   CHECK(saved(session) == created);
+  CHECK(session.part_document()->executable_generation() == created_generation);
+  CHECK(session.part_shape_cache()->validate_complete_geometry_result(*session.part_document()));
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_body_shape(
+            BodyId("modern.body"))) == geometry::OcctShapeView::get(created_shape));
   REQUIRE(session.undo());
   CHECK(saved(session) == original);
+  CHECK(session.part_shape_cache()->validate_complete_geometry_result(*session.part_document()));
   REQUIRE(session.redo());
+  CHECK(session.part_document()->executable_generation() == created_generation);
+  CHECK(session.part_shape_cache()->validate_complete_geometry_result(*session.part_document()));
   REQUIRE(session.redo());
   CHECK(saved(session) == edited);
+  CHECK(session.part_document()->executable_generation() == edited_generation);
+  CHECK(session.part_shape_cache()->validate_complete_geometry_result(*session.part_document()));
+  CHECK(geometry::OcctShapeView::get(*session.part_shape_cache()->find_body_shape(
+            BodyId("modern.body"))) == geometry::OcctShapeView::get(edited_shape));
   REQUIRE(controller.begin_edit(session, FeatureId("modern")));
   controller.set_distance(20);
   REQUIRE_FALSE(controller.apply(session));
   CHECK(saved(session) == edited);
   CHECK(controller.active());
+  CHECK(session.part_shape_cache()->validate_complete_geometry_result(*session.part_document()));
   controller.set_distance(2);
-  REQUIRE(controller.apply(session));
+  const auto corrected = controller.apply(session);
+  INFO((corrected ? std::string("corrected thickness accepted") : corrected.error().message()));
+  REQUIRE(corrected);
+  CHECK(session.part_shape_cache()->validate_complete_geometry_result(*session.part_document()));
+  CHECK(blcad::test::integrated_solid_volume(
+            *session.part_shape_cache()->find_body_shape(BodyId("modern.body")))
+            .volume_mm3 == Catch::Approx(180 * std::numbers::pi).margin(1e-5));
 }
 TEST_CASE("Modern Trim and Extend options share creation/edit controls without "
           "losing parameter formulas",
