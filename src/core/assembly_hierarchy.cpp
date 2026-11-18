@@ -51,7 +51,8 @@ ordered_subassembly_instances(const AssemblyDocument& assembly) {
 
     auto appended = append_occurrence_tree(
         project, *child, assembly.id(), instance->id(), child_path, child_parent_transforms,
-        visible_path && instance->visibility() == ComponentVisibility::Visible,
+        visible_path && project.design_subassembly_visible(
+                            child_path, instance->visibility() == ComponentVisibility::Visible),
         active_path && instance->suppression_state() == ComponentSuppressionState::Active,
         occurrences, instance->selected_model_state());
     if (appended.has_error()) {
@@ -71,6 +72,9 @@ Result<AssemblyHierarchyTraversal> AssemblyHierarchyTraversal::build(const Proje
     return Result<AssemblyHierarchyTraversal>::failure(valid_structure.error());
   }
 
+  if (root_state == primary_model_state_id() &&
+      project.assembly().effective_model_state() != primary_model_state_id())
+    root_state = project.assembly().effective_model_state();
   std::vector<AssemblyHierarchyOccurrenceDescriptor> occurrences;
   auto appended = append_occurrence_tree(project, project.assembly(), std::nullopt, std::nullopt,
                                          {}, {}, true, true, occurrences, std::move(root_state));

@@ -38,6 +38,9 @@ add_library(
   src/core/assembly_constraint_graph.cpp
   src/core/assembly_cross_hierarchy_constraint_graph.cpp
   src/core/assembly_cross_hierarchy_motion_graph.cpp
+  src/core/assembly_representation.cpp
+  src/core/assembly_hole_feature.cpp
+  src/core/project_design_reference.cpp
   src/core/assembly_occurrence_pose.cpp
   src/core/assembly_document.cpp
   src/core/assembly_document_json.cpp

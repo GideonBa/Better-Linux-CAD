@@ -7,11 +7,6 @@
 namespace blcad {
 namespace {
 
-[[nodiscard]] bool is_visible_active(const ComponentInstance& component) noexcept {
-  return component.visibility() == ComponentVisibility::Visible &&
-         component.suppression_state() == ComponentSuppressionState::Active;
-}
-
 [[nodiscard]] std::vector<const ComponentInstance*>
 ordered_components(const AssemblyDocument& assembly) {
   std::vector<const ComponentInstance*> components;
@@ -59,7 +54,9 @@ AssemblyLeafOccurrenceResolver::resolve(const Project& project,
       return Result<std::vector<AssemblyLeafOccurrenceDescriptor>>::failure(effective.error());
     for (const ComponentInstance* component : ordered_components(effective.value())) {
       if (component->suppression_state() != ComponentSuppressionState::Active ||
-          (!physical && !is_visible_active(*component))) {
+          (!physical && !project.design_component_visible(
+                            assembly_occurrence.occurrence_path, component->id(),
+                            component->visibility() == ComponentVisibility::Visible))) {
         continue;
       }
 

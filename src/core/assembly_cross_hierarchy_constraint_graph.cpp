@@ -2,7 +2,9 @@
 
 #include "assembly_constraint_graph_participation.hpp"
 
+#include "blcad/core/assembly_hierarchy.hpp"
 #include "blcad/core/project.hpp"
+#include <memory>
 
 #include <algorithm>
 #include <cstddef>
@@ -18,6 +20,7 @@ struct ResolvedHierarchyEndpoint {
   const ComponentInstance* component = nullptr;
   bool active = false;
   std::vector<SubassemblyInstanceId> scope;
+  std::shared_ptr<const AssemblyDocument> effective;
 };
 
 [[nodiscard]] bool authority_less(const ComponentTransformAuthority& lhs,
@@ -91,25 +94,23 @@ ordered_assembly_documents(const Project& project) {
 [[nodiscard]] Result<ResolvedHierarchyEndpoint>
 resolve_endpoint(const Project& project, const AssemblyHierarchyConstraintEndpoint& endpoint,
                  const AssemblyConstraintId& constraint_id) {
-  const AssemblyDocument* assembly = &project.assembly();
-  bool active = true;
-
-  for (const SubassemblyInstanceId& occurrence : endpoint.occurrence_path()) {
-    const SubassemblyInstance* instance = assembly->find_subassembly_instance(occurrence);
-    if (instance == nullptr) {
-      return Result<ResolvedHierarchyEndpoint>::failure(
+  auto hierarchy = AssemblyHierarchyTraversal::build(project);
+  if (!hierarchy)
+    return Result<ResolvedHierarchyEndpoint>::failure(hierarchy.error());
+  const auto found = std::find_if(
+      hierarchy.value().occurrences().begin(), hierarchy.value().occurrences().end(),
+      [&](const auto& value) { return value.occurrence_path == endpoint.occurrence_path(); });
+    if (found == hierarchy.value().occurrences().end())
+    return Result<ResolvedHierarchyEndpoint>::failure(
           Error::validation(constraint_id.value(),
-                            "cross-hierarchy incidence endpoint occurrence path must resolve"));
-    }
-    active = active && instance->suppression_state() == ComponentSuppressionState::Active;
-
-    assembly = project.find_assembly_document(instance->referenced_assembly_document());
-    if (assembly == nullptr) {
-      return Result<ResolvedHierarchyEndpoint>::failure(
-          Error::validation(constraint_id.value(),
-                            "cross-hierarchy incidence endpoint assembly document must resolve"));
-    }
-  }
+                            "Cross-hierarchy occurrence must resolve"));
+  const auto* definition = project.find_assembly_document(found->assembly_document);
+  auto evaluated = definition->evaluate_model_state(found->selected_model_state);
+    if (!evaluated)
+    return Result<ResolvedHierarchyEndpoint>::failure(evaluated.error());
+  auto owned = std::make_shared<const AssemblyDocument>(std::move(evaluated.value()));
+  const AssemblyDocument* assembly = owned.get();
+  bool active = found->active_path;
 
   const ComponentInstance* component =
       assembly->find_component_instance(endpoint.component_instance());
@@ -124,7 +125,8 @@ resolve_endpoint(const Project& project, const AssemblyHierarchyConstraintEndpoi
       ResolvedHierarchyEndpoint{assembly, component, active,
                                 project.flexible_occurrence(endpoint.occurrence_path())
                                     ? endpoint.occurrence_path()
-                                    : std::vector<SubassemblyInstanceId>{}});
+                                    : std::vector<SubassemblyInstanceId>{},
+                                std::move(owned)});
 }
 
 void add_relationship(std::vector<AssemblyRelationshipIdentity>& relationships,
@@ -271,7 +273,23 @@ AssemblyCrossHierarchyConstraintGraph::build(const Project& project) {
 
   for (const AssemblyDocument* assembly : ordered_assembly_documents(project)) {
     for (const auto& scope : assembly_transform_scopes(project, assembly->id())) {
-      for (const AssemblyConstraint& constraint : assembly->constraints()) {
+      auto scoped = *assembly;
+      if (!scope.empty()) {
+        auto hierarchy = AssemblyHierarchyTraversal::build(project);
+        if (!hierarchy)
+          return Result<AssemblyCrossHierarchyConstraintGraph>::failure(hierarchy.error());
+        auto occurrence = std::find_if(
+            hierarchy.value().occurrences().begin(), hierarchy.value().occurrences().end(),
+            [&](const auto& value) { return value.occurrence_path == scope; });
+        if (occurrence == hierarchy.value().occurrences().end() || !occurrence->active_path)
+          continue;
+        auto evaluated = assembly->evaluate_model_state(occurrence->selected_model_state);
+        if (!evaluated)
+          return Result<AssemblyCrossHierarchyConstraintGraph>::failure(evaluated.error());
+        scoped = std::move(evaluated.value());
+      }
+      const auto* local_assembly = &scoped;
+      for (const AssemblyConstraint& constraint : local_assembly->constraints()) {
         if (constraint.state() != AssemblyConstraintState::Active) {
           continue;
         }
@@ -280,9 +298,9 @@ AssemblyCrossHierarchyConstraintGraph::build(const Project& project) {
         }
 
         const ComponentInstance* component_a =
-            assembly->find_component_instance(constraint.target_a().component_instance());
+            local_assembly->find_component_instance(constraint.target_a().component_instance());
         const ComponentInstance* component_b =
-            assembly->find_component_instance(constraint.target_b().component_instance());
+            local_assembly->find_component_instance(constraint.target_b().component_instance());
         if (component_a == nullptr || component_b == nullptr) {
           return Result<AssemblyCrossHierarchyConstraintGraph>::failure(Error::validation(
               constraint.id().value(),
@@ -294,9 +312,13 @@ AssemblyCrossHierarchyConstraintGraph::build(const Project& project) {
         }
 
         const AssemblyRelationshipIdentity relationship =
-            AssemblyLocalRelationshipIdentity{assembly->id(), constraint.id(), scope};
-        const ComponentTransformAuthority authority_a{assembly->id(), component_a->id(), scope};
-        const ComponentTransformAuthority authority_b{assembly->id(), component_b->id(), scope};
+            AssemblyLocalRelationshipIdentity{local_assembly->id(), constraint.id(), scope};
+        const ComponentTransformAuthority authority_a{
+            local_assembly->id(), component_a->id(),
+            project.flexible_occurrence(scope) ? scope : std::vector<SubassemblyInstanceId>{}};
+        const ComponentTransformAuthority authority_b{
+            local_assembly->id(), component_b->id(),
+            project.flexible_occurrence(scope) ? scope : std::vector<SubassemblyInstanceId>{}};
 
         add_relationship(relationships, relationship);
         add_authority(authorities, authority_a);
