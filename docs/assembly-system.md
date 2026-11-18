@@ -10,6 +10,105 @@ occurrence poses, directed adaptive cross-document references, coordinated Assem
 broader motion/contact analysis. Existing shared-child local solving and Assembly parameter bindings
 remain supported; they are extended rather than replaced by viewer transforms or a second solver.
 
+## Directed design references and adaptive candidates — 194–195
+
+`ProjectDesignReference` owns one directed cross-Part link. Its source stores an exact rooted
+component occurrence, expected Part identity, explicit model state and either a semantic datum/
+face/axis/point spelling or a source PathCurve ID. Its target stores one exact driving occurrence,
+expected editable Part and a ConstructionPoint/Line/Plane or a generated Sketch3D/PathCurve pair.
+A shared adaptive Part has one driving occurrence across all links; every occurrence uses the
+resulting definition. Repeated source occurrences remain distinct frame contexts. Reference-mode
+Parts may supply sources; they cannot receive adaptive definition edits.
+
+The Core dependency authority validates identities, selected states, active source/driver paths,
+existing target constructions, unique target ownership and deterministic cross-Part ordering.
+Part-level cycles reject conservatively. Additional directed Part dependencies may join that same
+ordering authority. Linked targets store local derived construction values alongside their Project
+source identity. `detach_design_reference` removes the directed link and leaves the last checked
+local construction as an independent snapshot. This does not invent an imported feature tree or
+persist OCCT topology, sampled world geometry or composed world transforms as source identity.
+
+`AdaptiveProjectEvaluator::bind/evaluate/detach` works on disposable Projects. The exact source
+occurrence chain maps source-local geometry into root space, then through the checked inverse of
+the target driver chain into target-local coordinates. `project_occurrence_transform` and
+`project_occurrence_mapping` expose that same mapping to coordinated Project consumers.
+
+Evaluation solves independent Assembly placement/joint contexts, applies links in directed order,
+recomputes affected Part histories and validates complete posed/physical Assembly results. A mixed
+graph includes shape inputs, connected free pose authorities and every consumed source/driver
+pose. Coordinated Hole layouts contribute cross-Part shape edges and both consumed occurrence poses
+to that same guard, including Projects without adaptive references. The source layout Hole retained
+in its own Part adds no artificial self-edge. Any recursive shape/pose dependency rejects; there is no iterative feedback solver. A final
+solve must retain the consumed frame within the explicit numeric boundary. Geometry, healing,
+boolean, relationship, source-freshness or context failure discards the complete candidate, retaining
+all committed Part definitions, resources, sidecars and root history. The existing GUI root Project
+transaction owns publication and one Undo boundary; durable multi-asset Save keeps its existing
+atomic-publication contract.
+
+Analytic semantic inputs preserve their checked capabilities. Native path derivation currently
+copies explicit Sketch3D Line/Polyline/Arc/Spline definitions with solved source control/reference
+points and unchanged degree/representation. Rigid mapping preserves their native curve family;
+there is no chord sampling. Target segment identities, source topology and execution policy must
+remain compatible. Fixed-up frames, Helix/equation paths and other source families require an
+explicit future capability and currently reject. General curve/face derivation, richer topology
+repair and every deferred requirement remain in [the full sequence](inventor-parity-sequence.md)
+and [A02 acceptance](inventor-parity-test-plan.md#a02-directed-adaptive-cover-and-duct).
+
+Unchanged canonical target content retains its executable generation. Repeated normalization can
+therefore reuse certified results without changing authored snapshots. The tests are
+[Core design references](../tests/core/project_design_reference_tests.cpp) and
+[physical adaptive Projects](../tests/geometry/adaptive_project_tests.cpp), tagged
+`[design-reference]` and `[adaptive-project]`. They cover exact rotated/translated cover support,
+repeated source ownership, sparse source-state intent, native spline consumers, actual Sweep,
+Loft/Thicken volumes, source updates, detached snapshots, exact reopening, independent STEP
+volume/centroid, no-op generations and whole-Project failure. Numbered acceptance and native
+interaction remain governed by [the MVP plan](mvp-plan.md); these test links do not close a block.
+
+## Positions, design views and native Assembly tasks — 198
+
+`AssemblyPosition` stores explicit root component/subassembly local placements, root and
+cross-hierarchy joint coordinates and the independent rooted occurrence-pose catalog. Capture reads
+the checked effective Assembly; publication replaces a catalog only on the authoritative
+Primary/Master/Default Project. `Master` is the authored Project and cannot be renamed or deleted.
+A named evaluation is disposable, preserves the shared child definitions and carries an explicit
+runtime position marker. Switching an already projected position to another position requires the
+authoritative root; resetting the marker cannot restore authored numeric placements.
+
+`AssemblyDesignView` stores rooted component/subassembly visibility with expected definition
+identities. `Default` retains authored visibility. Views do not store suppression, parameters,
+materials, manufacturing state or joint values. Presentation traversal applies view visibility;
+physical participation still includes every hidden active occurrence. Both catalogs reject duplicate
+identities/names, orphan paths and retargeted definitions. Model states, positions and display views
+are independently selected session contexts and compose from the immutable authored root in that
+order. Their active choices are never saved; Open starts at Primary/Master/Default. Complete source
+freshness includes each selected context, including equal numeric results with different identities.
+
+The existing Assembly ribbon owns Flexible Occurrence, Adaptive Reference, Assembly Hole, Positions
+and Design Views, and Edit Part in Context. Each uses the common root Project transaction and
+complete candidate validation. Preview retains invalid inputs for correction; Apply publishes one
+named root Undo. Cancellation and mode changes release task previews and restore temporary filters.
+Flexible controls select an exact rooted child, explicit rigidity and a local joint coordinate.
+Adaptive selectors show the source, one visible driving occurrence and the directed dependency chain.
+Assembly Hole selects an authored shared layout/pattern and explicit existing participant recipes,
+states, roles and shared-definition policy. Ordinary Hole authoring inside the Part context creates
+those recipes. The [coordinated machining contract](hole-wizard.md#coordinated-project-machining--196197)
+owns participant execution and common Project normalization for geometry consumers.
+
+Positions can be stored, recalled, renamed and deleted; named display views have an independent
+visibility table, Preview/Apply, Recall and Delete. The browser exposes both catalogs and the title
+shows selected names. Generic modeling requires Master; dedicated representation edits start from
+Primary/Master/Default and restore the selected checked view afterward. In-context Part editing also
+requires that explicit root scope. Its breadcrumb distinguishes Part coordinates and the shared
+Primary definition; Finish and Cancel return through the existing root lifecycle and child Sketch
+catalog authority described in [the context contract](parameter-model.md#in-context-part-editing-and-root-publication--198).
+
+Proof sources are [Core representations](../tests/core/assembly_representation_tests.cpp),
+[session/native Assembly controls](../tests/gui/gui_advanced_assembly_tests.cpp) and
+[context lifecycle](../tests/gui/gui_project_part_context_tests.cpp). Native tests use actual
+keyboard/mouse controls and independent material-point, volume, mass, Measure and reopened STEP
+checks. Test registration describes intended proof; executed results, reviewed captures and numbered
+acceptance remain in [development setup](development-setup.md) and [the MVP plan](mvp-plan.md).
+
 ## Core model
 
 A project owns one assembly and project-owned part documents. An assembly contains component occurrences referencing those parts.

@@ -1917,3 +1917,75 @@ These are local transforms and sparse joint values, never composed world matrice
 records retain the shared child definition. The [occurrence contract](assembly-flexible-subassembly-solving-mvp5.md#independent-rooted-occurrence-authority--192193)
 owns authority, stale solve/application and physical-consumer behavior; focused Core/Geometry tests
 are linked there. Named positions and their precedence are assigned to Block 198.
+
+## Directed cross-Part design-reference extension — Blocks 194–195
+
+A Project containing linked design references uses necessary **version 4** of
+`blcad.project.mvp4`. It requires a nonempty `design_references` array and the existing
+engineering-resource catalog (possibly empty). Occurrence poses may coexist using their unchanged
+strict records. Earlier envelopes reject reserved design-reference fields. Removing every link
+permits the earlier necessary envelope again; copied target-local constructions remain ordinary
+Part intent after explicit detach.
+
+Each design record has exactly `version: 1`, `id`, `name`, `source`, `source_state`, `geometry`,
+`driver` and `target`. Source/driver occurrence objects have exactly `path`, `component`, `part`;
+all identities are stable IDs. The source state is explicit. Semantic geometry has exactly
+`kind: semantic` and `reference`; path geometry has exactly `kind: path` and `path`. A point/line/
+plane target has exactly its `kind` and `id`; a path target additionally requires `sketch`.
+
+The reader rejects unknown versions, extra fields, duplicate IDs/targets, missing or suppressed
+source/driver occurrences, child-identity changes, unavailable source states, read-only targets,
+orphan target constructions, conflicting drivers and directed cycles. Persistent links retain
+semantic identities and target-local derived definitions; evaluated world frames and native BRep
+objects are never source identity. The [adaptive contract](assembly-system.md#directed-design-references-and-adaptive-candidates--194195)
+owns ordering, frame conversion, detach and atomic evaluation, with focused Core/Geometry proof links.
+
+## Coordinated Assembly Hole intent — Project V5
+
+A Project with nonempty coordinated commands uses necessary `blcad.project.mvp4` **version 5**,
+or a later necessary envelope. It adds nonempty `assembly_hole_features` and retains the existing resource
+catalog and optional strict occurrence-pose/design-reference records. Earlier envelopes reject this
+reserved field; empty catalogs are omitted, permitting the earlier necessary version again.
+
+Each command has exactly `version: 1`, `id`, `name`, `layout`, `participants`. Layout has exactly
+`occurrence`, `state`, `hole` and optional `pattern`. Occurrences retain exactly `path`, `component`,
+`part`; paths are rooted Subassembly ids. Participants have exactly `id`, `occurrence`, `state`,
+`role`, `definition_policy`, `recipe`. Roles are `clearance`, `threaded`, `seat`; policies are
+`single_occurrence`, `affect_shared_definition`. The recipe uses the existing strict canonical Part
+Hole/Thread codec, including typed bindings, semantic support, placements and pinned resource keys.
+There is no parallel machining interpreter or serialized native BRep.
+
+Unknown fields/versions/enums, duplicate command/participant/definition ownership, missing or
+suppressed sources/participants, source-state mismatch, undeclared shared-definition changes,
+conflicting existing recipes and combined adaptive/machining cycles reject the complete read.
+Reconstruction loads canonical Part recipes before validating the coordinated catalog. The
+[Hole contract](hole-wizard.md#coordinated-project-machining--196197) owns placement derivation,
+root transactions, physical consumer normalization and explicit detach. Focused strict roundtrip
+proof is [assembly_hole_tests.cpp](../tests/core/assembly_hole_tests.cpp).
+
+## Named Assembly representations — Block 198
+
+Necessary Project **version 6** adds exactly `representations`, an object containing `positions` and
+`design_views` arrays; at least one is nonempty. Optional `assembly_hole_features`, `design_references`
+and `occurrence_poses` retain their strict earlier records. Earlier envelopes reject the reserved
+representation field. Removing both catalogs permits the earlier necessary envelope again.
+
+A position record has exactly `version: 1`, `id`, `name`, `components`, `subassemblies`, `poses`,
+`joints` and `cross_joints`. Root component records store `component`, expected `part`, and three
+numeric `translation_mm`/`rotation_deg` coordinates. Root subassembly records use `subassembly` and
+expected `assembly_document`. `poses` uses the unchanged rooted occurrence-pose codec. Each joint
+coordinate stores exactly `joint`, typed `role`, `unit` (`mm`/`deg`) and numeric `value`. No shared child
+definition transform or composed world matrix is stored in a position.
+
+A design-view record has exactly `version: 1`, `id`, `name`, `components` and `subassemblies`.
+Component entries contain exact rooted `occurrence` (`path`, `component`, expected `part`) and boolean
+`visible`. Subassembly entries contain `path`, expected `assembly_document` and boolean `visible`.
+Visibility is display intent; suppression and manufacturing overrides remain model-state intent.
+
+Master (`master`) and Default (`default`) are implicit permanent baselines. Named ids/names must be
+unique within their catalog. Unknown fields/versions, mistyped values, duplicates, nonfinite poses,
+orphan paths, retargeted definitions and incompatible/limited joint coordinates reject. The active
+position, view and evaluated geometry are transient. Save writes authored Master plus catalog
+intent; Open selects Primary/Master/Default. See
+[representation authority](assembly-system.md#positions-design-views-and-native-assembly-tasks--198)
+and `tests/core/assembly_representation_tests.cpp` for strict roundtrip and isolation proof.

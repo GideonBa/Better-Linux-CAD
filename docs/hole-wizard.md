@@ -1321,3 +1321,57 @@ The hole wizard binds part modeling, assembly modeling, the standards/fastener l
 - automatic fastener/washer instances.
 - drawing-note generation.
 - through-assembly holes before the assembly document exists.
+
+
+## Coordinated Project machining — 196–197
+
+`AssemblyHoleFeature` owns a stable Project command id, one explicit rooted layout occurrence and
+selected state, an existing authored Hole, an optional existing linear/circular Hole Pattern, and
+nonempty typed participants. Each participant names a rooted occurrence, selected state, stable
+participant id and the existing complete `HoleFeature` recipe. Clearance, Threaded and Seat roles
+validate against that recipe. Diameter, depth, tip, seat, cosmetic/modeled thread and pinned standard
+cells continue through the ordinary Part Hole/Thread interpreters and resource catalogs.
+
+The source pattern must explicitly copy the shared Hole as its single feature source. Expanded
+placements retain the shared placement id and stable pattern occurrence index; the existing 1,024
+placement limit applies. The source Part may participate using that same source Hole. Every other
+participant has one definition edit and one declared recipe. Missing/suppressed paths, unavailable
+states, Reference-mode participants and conflicting recipe owners reject. If a Part definition is
+reused, the command requires explicit Affect Shared Definition, or an explicit independent member
+conversion before binding. It never silently duplicates a shared Part or gives one definition two
+incompatible occurrence-local bore layouts.
+
+`AssemblyHoleCoordinator` resolves actual source Hole axes, transforms them through source-local →
+root → participant-local frames, and intersects them with each explicit participant support plane.
+The initial execution requires axes normal to planar supports. It derives only placement coordinates;
+participant-local direction, end condition, drill tip and manufacturing recipe remain authored.
+Source Hole Pattern instances remain real source instances rather than duplicated seed holes.
+Reevaluation rebuilds the participant's input prefix and complete suffix. Final axes are checked again
+after all downstream histories and Assembly solves; lost or moved axes reject the root candidate.
+
+Ordinary child edits cannot rewrite an Assembly-owned recipe. The coordinated binding command stages
+explicit recipe changes in a disposable Project. Removing a participant removes its owned Hole only
+when ordinary dependency rules permit it; explicit Detach instead retains the last local Hole
+snapshots and releases coordination. These operations publish one root transaction or none.
+
+### Common Project evaluation
+
+`evaluate_project_geometry` combines adaptive-reference and machining edges in one directed Part
+graph. Cycles reject before publication. Each target consumes completed upstream definitions, then
+normal Assembly pose solving, full Part histories, physical properties, posed geometry, source
+freshness and coordinated axes validate the complete disposable candidate. The evaluator does not
+iterate feedback or write immutable external sources. Exact no-op updates preserve model generations.
+
+Viewport, physical properties, ordinary/cross-hierarchy constraints and motion, contact/interaction,
+Measure target resolution and flat/structured STEP all enter the same evaluation scope. Nested
+queries share its candidate instead of recursively reevaluating the Project. GUI recompute assigns
+the normalized Project only after success, preserving one root Undo/Redo and atomic failed edits.
+Typed solve snapshots include selected model states, independent occurrence poses, active position
+and design view, so a proposal cannot apply to a changed effective context.
+
+Focused proofs are [Core authority and strict persistence](../tests/core/assembly_hole_tests.cpp),
+[physical coordination and exchange](../tests/geometry/assembly_hole_tests.cpp) and the
+[shared actual-machining fixture](../tests/support/assembly_hole_fixture.hpp). The Geometry scenarios
+measure real bore axes, depths, seats, material volume/mass and STEP reimport, including transformed
+sources, shared definitions, model states, flexible contexts, failed recipes and complete rollback.
+Native participant authoring and the complete numbered gate are tracked in [the MVP plan](mvp-plan.md).
