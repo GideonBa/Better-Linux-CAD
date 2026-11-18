@@ -1,6 +1,7 @@
 #include "../support/engineering_resource_fixture.hpp"
 #include "../support/geometry_volume_oracle.hpp"
 #include "../support/part_history_fixture.hpp"
+#include "blcad/core/assembly_document_json.hpp"
 #include "blcad/core/part_document_json.hpp"
 #include "blcad/core/project_json.hpp"
 #include "blcad/core/step_import_freshness.hpp"
@@ -12,14 +13,19 @@
 #include "blcad/gui/gui_analysis_export_workbench.hpp"
 #include "blcad/gui/gui_document_session.hpp"
 #include "blcad/gui/gui_physical_properties.hpp"
+#include "blcad/gui/shell/shell_assembly_tools.hpp"
 #include "blcad/gui/shell/shell_model_state_tools.hpp"
 #include "blcad/gui/shell/shell_window.hpp"
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
+#include <QComboBox>
 #include <QDir>
+#include <QDoubleSpinBox>
 #include <QFile>
 #include <QListWidget>
 #include <QPushButton>
+#include <QScreen>
 #include <QScrollArea>
 #include <QTableWidget>
 #include <QTemporaryDir>
@@ -35,6 +41,48 @@ using namespace blcad::gui;
 namespace history = blcad::test::history_fixture;
 namespace resources = blcad::test::engineering_fixture;
 namespace {
+void show_native_window(ShellWindow& window) {
+  REQUIRE(window.screen());
+  const QSize requested =
+      qEnvironmentVariableIsSet("BLCAD_UI_COMPACT") ? QSize(1024, 640) : QSize(1280, 800);
+  auto bounds = window.screen()->availableGeometry().adjusted(12, 12, -12, -12);
+  window.resize(requested.boundedTo(bounds.size() - QSize(24, 48)));
+  window.move(bounds.topLeft());
+  window.show();
+  window.raise();
+  window.activateWindow();
+  REQUIRE(QTest::qWaitForWindowExposed(&window));
+  REQUIRE(QTest::qWaitForWindowActive(&window));
+  QApplication::processEvents();
+  bounds = window.screen()->availableGeometry().adjusted(12, 12, -12, -12);
+  const auto decoration = window.frameGeometry().size() - window.size();
+  window.resize(requested.boundedTo(bounds.size() - decoration));
+  QApplication::processEvents();
+  window.move(window.pos() + bounds.topLeft() - window.frameGeometry().topLeft());
+  REQUIRE(QTest::qWaitFor([&] { return bounds.contains(window.frameGeometry()); }, 2000));
+  REQUIRE(window.screen()->availableGeometry().contains(window.frameGeometry()));
+}
+QPoint reveal_table_cell(QTableWidget& table, int row, int column, bool checkbox = false) {
+  auto* cell = table.item(row, column);
+  REQUIRE(cell);
+  table.scrollToItem(cell, QAbstractItemView::PositionAtCenter);
+  QApplication::processEvents();
+  for (auto* parent = table.parentWidget(); parent; parent = parent->parentWidget())
+    if (auto* area = qobject_cast<QScrollArea*>(parent)) {
+      const auto center = table.visualItemRect(cell).center();
+      const auto target = table.viewport()->mapTo(area->widget(), center);
+      area->ensureVisible(target.x(), target.y(), 20, 20);
+    }
+  QApplication::processEvents();
+  const auto rectangle = table.visualItemRect(cell);
+  const auto point =
+      checkbox ? QPoint(rectangle.left() + 10, rectangle.center().y()) : rectangle.center();
+  REQUIRE(table.viewport()->rect().contains(point));
+  REQUIRE(table.viewport()->visibleRegion().contains(point));
+  REQUIRE(table.screen());
+  REQUIRE(table.screen()->availableGeometry().contains(table.viewport()->mapToGlobal(point)));
+  return point;
+}
 template <typename T> T checked(Result<T> result) {
   INFO((result ? std::string{} : result.error().message()));
   REQUIRE(result);
@@ -243,21 +291,17 @@ TEST_CASE("Native state-table interaction previews typed edits switches views an
   const auto path = dir.filePath("native-state.blcad.json");
   REQUIRE(write_part_document_json_file(part(), path.toStdString()));
   REQUIRE(window.open_path(path));
-  window.show();
-  window.raise();
-  window.activateWindow();
-  REQUIRE(QTest::qWaitForWindowActive(&window));
-  REQUIRE(QTest::qWaitForWindowExposed(&window));
+  show_native_window(window);
   window.model_state_tools().action().trigger();
   REQUIRE(window.model_state_tools().active());
   click(widget<QPushButton>(window, "create"));
   QApplication::processEvents();
   auto& table = widget<QTableWidget>(window, "parameters");
   const auto row = parameter_row(table, "width");
-  const auto override_cell = table.visualItemRect(table.item(row, 0));
-  QTest::mouseClick(table.viewport(), Qt::LeftButton, Qt::NoModifier,
-                    QPoint(override_cell.left() + 10, override_cell.center().y()));
+  const auto override_point = reveal_table_cell(table, row, 0, true);
+  QTest::mouseClick(table.viewport(), Qt::LeftButton, Qt::NoModifier, override_point);
   REQUIRE(table.item(row, 0)->checkState() == Qt::Checked);
+  (void)reveal_table_cell(table, row, 3);
   table.setCurrentCell(row, 3);
   table.editItem(table.item(row, 3));
   QApplication::processEvents();
@@ -265,6 +309,9 @@ TEST_CASE("Native state-table interaction previews typed edits switches views an
   REQUIRE(editor);
   REQUIRE(table.isAncestorOf(editor));
   REQUIRE(editor->isVisible());
+  REQUIRE(editor->visibleRegion().contains(editor->rect().center()));
+  REQUIRE(
+      editor->screen()->availableGeometry().contains(editor->mapToGlobal(editor->rect().center())));
   QTest::keyClick(editor, Qt::Key_A, Qt::ControlModifier);
   QTest::keyClicks(editor, "40");
   QTest::keyClick(editor, Qt::Key_Return);
@@ -560,4 +607,281 @@ TEST_CASE(
   CHECK(s.derived_results_fresh());
   CHECK(properties.validate_current(*s.effective_project()));
   history_scope_poses(s, true, 1);
+}
+
+namespace {
+Project occurrence_state_project() {
+  auto shared = part();
+  auto states = shared.model_states();
+  states.front().materials = {{std::nullopt, resources::key("synthetic.material", "r2")}};
+  REQUIRE(shared.replace_model_states(states));
+  auto root = checked(AssemblyDocument::create(DocumentId("placement.root"), "Placement root"));
+  auto child = checked(AssemblyDocument::create(DocumentId("placement.child"), "Stateful child"));
+  REQUIRE(child.add_member_part(shared.id()));
+  REQUIRE(child.add_component_instance(checked(ComponentInstance::create(
+      ComponentInstanceId("nested"), "Nested Part", shared.id(), ComponentVisibility::Visible,
+      ComponentSuppressionState::Active, ComponentGroundingState::Grounded))));
+  REQUIRE(child.replace_model_states({{ModelStateId("child.wide"),
+                                       "Wide child",
+                                       {},
+                                       {},
+                                       {},
+                                       {{ComponentInstanceId("nested"), {}, ModelStateId("wide")}},
+                                       {}}}));
+  auto result =
+      checked(Project::create(DocumentId("placement.project"), "Occurrence states", root));
+  REQUIRE(result.add_part_document(shared));
+  REQUIRE(result.add_child_assembly_document(child));
+  REQUIRE(result.synchronize_engineering_resources());
+  return result;
+}
+void occurrence_state_choose(QComboBox& combo, const QString& id, bool native) {
+  const auto row = combo.findData(id);
+  REQUIRE(row >= 0);
+  if (native) {
+    for (auto* parent = combo.parentWidget(); parent; parent = parent->parentWidget())
+      if (auto* scroll = qobject_cast<QScrollArea*>(parent))
+        scroll->ensureWidgetVisible(&combo);
+    combo.setFocus(Qt::OtherFocusReason);
+    QApplication::processEvents();
+    REQUIRE(QApplication::focusWidget() == &combo);
+    QTest::keyClick(&combo, Qt::Key_Home);
+    for (int i = 0; i < row; ++i) {
+      REQUIRE(QApplication::focusWidget() == &combo);
+      QTest::keyClick(&combo, Qt::Key_Down);
+    }
+  } else
+    combo.setCurrentIndex(row);
+  REQUIRE(combo.currentData().toString() == id);
+}
+void occurrence_state_mass(const Project& project, double volume, double mass) {
+  const auto physical =
+      checked(geometry::BodyResultInspector{}.inspect_physical_properties(project));
+  CHECK(physical.data().volume_mm3 == Catch::Approx(volume).margin(1e-6));
+  REQUIRE(physical.data().complete_mass());
+  CHECK(physical.data().complete_mass()->mass_kg == Catch::Approx(mass).margin(1e-10));
+}
+void occurrence_state_workflow(bool native) {
+  QTemporaryDir directory;
+  auto project = occurrence_state_project();
+  const auto part_id = project.part_documents().front().id();
+  const auto primary = text(*project.find_part_document(part_id));
+  const auto child = checked(serialize_assembly_document_to_json(
+      *project.find_assembly_document(DocumentId("placement.child"))));
+  const auto path = directory.filePath("placements.blcad.project.json");
+  REQUIRE(write_project_json_file(project, path.toStdString()));
+  const auto source_file = bytes(path);
+  ShellWindow window;
+  REQUIRE(window.open_path(path));
+  if (native) {
+    show_native_window(window);
+  }
+  auto& s = window.session();
+  auto& tools = window.assembly_tools();
+  using Command = ShellAssemblyTools::Command;
+  const auto snapshot = [&] { return checked(serialize_project_to_json(*s.project())); };
+  const auto begin = [&](Command command, const char* action) {
+    if (native) {
+      auto* control = window.findChild<QAction*>(QStringLiteral("blcad.action.") + action);
+      REQUIRE(control);
+      REQUIRE(control->isEnabled());
+      control->trigger();
+      REQUIRE(tools.command() == command);
+    } else
+      REQUIRE(tools.begin(command));
+  };
+  const auto finish = [&](bool apply) {
+    if (native) {
+      auto* button =
+          window.findChild<QPushButton*>(apply ? "blcad.assembly.apply" : "blcad.assembly.cancel");
+      REQUIRE(button);
+      click(*button);
+      REQUIRE_FALSE(tools.active());
+    } else if (apply)
+      REQUIRE(tools.apply());
+    else
+      tools.cancel();
+  };
+  const auto choose = [&](QComboBox& combo, const QString& id) {
+    occurrence_state_choose(combo, id, native);
+  };
+  const auto part_definition = QString::fromStdString(part_id.value());
+  const auto initial = snapshot();
+  begin(Command::InsertComponent, "assembly_insert_component");
+  choose(tools.definition_editor(), part_definition);
+  REQUIRE(tools.model_state_editor().objectName() == "blcad.assembly.model_state");
+  CHECK(tools.model_state_editor().currentData().toString() == "primary");
+  choose(tools.model_state_editor(), "wide");
+  const auto disposable = checked(tools.coordinator().placement().preview_project(s));
+  CHECK(disposable.assembly().component_instances().back().selected_model_state() ==
+        ModelStateId("wide"));
+  occurrence_state_mass(disposable, 2400, .0144);
+  CHECK(snapshot() == initial);
+  finish(false);
+  CHECK(snapshot() == initial);
+  CHECK_FALSE(s.can_undo());
+
+  begin(Command::InsertComponent, "assembly_insert_component");
+  choose(tools.definition_editor(), part_definition);
+  choose(tools.model_state_editor(), "wide");
+  choose(tools.definition_editor(), "");
+  choose(tools.definition_editor(), part_definition);
+  CHECK(tools.model_state_editor().currentData().toString() == "primary");
+  finish(true);
+  REQUIRE(s.project()->assembly().component_instances().size() == 1);
+  const auto first = s.project()->assembly().component_instances().front().id();
+  const auto first_snapshot = snapshot();
+  CHECK(s.project()->assembly().find_component_instance(first)->selected_model_state() ==
+        primary_model_state_id());
+  begin(Command::InsertComponent, "assembly_insert_component");
+  choose(tools.definition_editor(), part_definition);
+  choose(tools.model_state_editor(), "wide");
+  tools.placement_editor(0).setValue(40);
+  const auto preview = checked(tools.coordinator().placement().preview_project(s));
+  occurrence_state_mass(preview, 4000, .0208);
+  CHECK(snapshot() == first_snapshot);
+  if (native && !qEnvironmentVariableIsEmpty("BLCAD_UI_CAPTURE_DIR")) {
+    const auto captures = qEnvironmentVariable("BLCAD_UI_CAPTURE_DIR");
+    REQUIRE(QDir().mkpath(captures));
+    REQUIRE(window.grab().save(captures + "/occurrence-model-states-preview.png"));
+  }
+  finish(true);
+  const auto second = s.project()->assembly().component_instances().back().id();
+  const auto two_states = snapshot();
+  CHECK(s.undo_label() == "Insert Assembly occurrence");
+  REQUIRE(window.undo());
+  CHECK(snapshot() == first_snapshot);
+  REQUIRE(window.redo());
+  CHECK(snapshot() == two_states);
+  occurrence_state_mass(*s.effective_project(), 4000, .0208);
+  auto scene = checked(geometry::ViewportSceneBuilder{}.build_project_for_states(
+      *s.effective_project(),
+      [&](DocumentId id, ModelStateId state) { return s.project_part_shape_cache(id, state); }));
+  REQUIRE(scene.size() == 2);
+  for (const auto& item : scene) {
+    const bool wide = item.semantic_id.ends_with("/" + second.value());
+    CHECK(blcad::test::classify_solid_point(item.shape, {wide ? 53. : 13., 2, 4}) ==
+          (wide ? blcad::test::SolidPointLocation::Inside
+                : blcad::test::SolidPointLocation::Outside));
+  }
+  const auto wide_physical =
+      checked(geometry::BodyResultInspector{}.inspect_physical_properties(*s.effective_project()));
+  begin(Command::Placement, "assembly_placement");
+  choose(tools.occurrence_editor(), "component:" + QString::fromStdString(second.value()));
+  CHECK(tools.model_state_editor().currentData().toString() == "wide");
+  choose(tools.model_state_editor(), "same");
+  finish(true);
+  occurrence_state_mass(*s.effective_project(), 4000, .016);
+  CHECK_FALSE(wide_physical.validate_current(*s.effective_project()));
+  REQUIRE(window.undo());
+  CHECK(snapshot() == two_states);
+  begin(Command::Placement, "assembly_placement");
+  choose(tools.occurrence_editor(), "component:" + QString::fromStdString(second.value()));
+  CHECK(tools.model_state_editor().currentData().toString() == "wide");
+  choose(tools.occurrence_editor(), "component:" + QString::fromStdString(first.value()));
+  CHECK(tools.model_state_editor().currentData().toString() == "primary");
+  choose(tools.occurrence_editor(), "component:" + QString::fromStdString(second.value()));
+  choose(tools.model_state_editor(), "primary");
+  CHECK(snapshot() == two_states);
+  finish(true);
+  const auto both_primary = snapshot();
+  CHECK(s.undo_label() == "Set Assembly occurrence placement");
+  occurrence_state_mass(*s.effective_project(), 3200, .0128);
+  REQUIRE(window.undo());
+  CHECK(snapshot() == two_states);
+  REQUIRE(window.redo());
+  CHECK(snapshot() == both_primary);
+  REQUIRE(window.undo());
+  CHECK(snapshot() == two_states);
+
+  begin(Command::InsertSubassembly, "assembly_insert_subassembly");
+  choose(tools.definition_editor(), "placement.child");
+  CHECK(tools.model_state_editor().currentData().toString() == "primary");
+  choose(tools.model_state_editor(), "child.wide");
+  tools.placement_editor(0).setValue(80);
+  const auto nested_preview = checked(tools.coordinator().placement().preview_project(s));
+  occurrence_state_mass(nested_preview, 6400, .0352);
+  CHECK(snapshot() == two_states);
+  finish(true);
+  const auto subassembly = s.project()->assembly().subassembly_instances().front().id();
+  const auto nested_wide = snapshot();
+  CHECK(s.project()->assembly().find_subassembly_instance(subassembly)->selected_model_state() ==
+        ModelStateId("child.wide"));
+  begin(Command::Placement, "assembly_placement");
+  choose(tools.occurrence_editor(), "subassembly:" + QString::fromStdString(subassembly.value()));
+  CHECK(tools.model_state_editor().currentData().toString() == "child.wide");
+  choose(tools.model_state_editor(), "primary");
+  finish(true);
+  occurrence_state_mass(*s.effective_project(), 5600, .0272);
+  REQUIRE(window.undo());
+  CHECK(snapshot() == nested_wide);
+  occurrence_state_mass(*s.effective_project(), 6400, .0352);
+
+  GuiInteractiveAssemblyPlacementController controller;
+  REQUIRE(controller.begin_edit_component(s, second));
+  CHECK(controller.selected_model_state() == ModelStateId("wide"));
+  controller.set_model_state(ModelStateId("missing"));
+  CHECK_FALSE(controller.preview_project(s));
+  CHECK_FALSE(controller.apply(s));
+  CHECK(snapshot() == nested_wide);
+  controller.cancel();
+  REQUIRE(controller.begin_edit_subassembly(s, subassembly));
+  CHECK(controller.selected_model_state() == ModelStateId("child.wide"));
+  controller.set_model_state(ModelStateId("missing"));
+  CHECK_FALSE(controller.preview_project(s));
+  CHECK_FALSE(controller.apply(s));
+  CHECK(snapshot() == nested_wide);
+  controller.cancel();
+
+  const auto member_path = directory.filePath("wide-member.blcad.json");
+  REQUIRE(s.save_model_state_member(member_path.toStdString(), ModelStateId("wide"),
+                                    DocumentId("placement.member"), "Independent wide", part_id));
+  GuiDocumentSession member;
+  REQUIRE(member.open_file(member_path.toStdString()));
+  CHECK(volume(member) == Catch::Approx(2400));
+  CHECK(member.part_document()->default_material() == resources::key("synthetic.material", "r2"));
+  CHECK(member.part_document()->model_states().empty());
+  CHECK(text(*s.project()->find_part_document(part_id)) == primary);
+  CHECK(checked(serialize_assembly_document_to_json(
+            *s.project()->find_assembly_document(DocumentId("placement.child")))) == child);
+  CHECK(snapshot() == nested_wide);
+  CHECK(bytes(path) == source_file);
+  for (const auto& [mode, name] :
+       {std::pair{GuiStepExportMode::AssemblyFlattened, "flat.step"},
+        std::pair{GuiStepExportMode::AssemblyStructured, "structured.step"}}) {
+    const auto output = directory.filePath(name);
+    REQUIRE(GuiAnalysisExportWorkbench{}.export_step(s, {mode, output.toStdString()}));
+    const auto exported = checked(StepImportSource::create(
+        StepImportSourceId(name), name, name, checked(step_import_sha256(bytes(output))),
+        StepImportMode::Reference));
+    const auto imported =
+        checked(geometry::StepImportReader{}.read(exported, directory.path().toStdString()));
+    const auto shapes = checked(geometry::StepImportReader{}.preview_shapes(imported));
+    double reopened = 0;
+    for (const auto& shape : shapes)
+      reopened += blcad::test::integrated_solid_volume(shape).volume_mm3;
+    CHECK(reopened == Catch::Approx(6400).margin(1e-4));
+  }
+  REQUIRE(s.save());
+  REQUIRE(window.open_path(path));
+  CHECK(snapshot() == nested_wide);
+  CHECK(s.project()->assembly().find_component_instance(first)->selected_model_state() ==
+        primary_model_state_id());
+  CHECK(s.project()->assembly().find_component_instance(second)->selected_model_state() ==
+        ModelStateId("wide"));
+  CHECK(s.project()->assembly().find_subassembly_instance(subassembly)->selected_model_state() ==
+        ModelStateId("child.wide"));
+  occurrence_state_mass(*s.effective_project(), 6400, .0352);
+}
+} // namespace
+
+TEST_CASE("Occurrence placement explicitly selects Part and child Assembly manufacturing states",
+          "[gui][model-state][occurrence-state-placement][parity-b191]") {
+  occurrence_state_workflow(false);
+}
+TEST_CASE("Native occurrence placement chooses manufacturing states with owned keyboard controls",
+          "[gui][model-state-native][occurrence-state-placement-native][parity-b191]") {
+  if (QApplication::platformName() != "xcb")
+    SKIP("Native occurrence state selection requires xcb");
+  occurrence_state_workflow(true);
 }

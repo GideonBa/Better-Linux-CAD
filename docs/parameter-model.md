@@ -237,6 +237,17 @@ checks the Core table; Preview evaluates every state and the complete candidate;
 one `Manage Model States` history entry. Apply, Undo and Redo retain a valid selected view; Undo
 returns to Primary when it precedes creation of the selected state.
 
+Assembly Insert Part, Insert Subassembly and Place expose a Model State selector for the exact
+shared definition. New occurrences default to Primary; changing the definition resets that choice
+to Primary, while editing an occurrence loads its authored selected state. Labels display names;
+combo item data retains stable state IDs. Preview evaluates a disposable occurrence candidate;
+Apply stores its state and placement in one existing root transaction/Undo. A missing state rejects
+rather than silently selecting a sibling. This route authors Primary occurrence selections; named
+root-state child overrides remain in Model States. Geometry, mass, STEP and member export consume
+that same checked selection without rewriting shared Part/child Assembly definitions. GUI
+`[occurrence-state-placement]` and native `[occurrence-state-placement-native]` cover both kinds of
+insertion/edit, typed rejection, exact history, equal-shape context freshness and physical exchange.
+
 The browser's Model States group and the table's View/Primary controls select transient effective
 views. Activation rejects a pending foreign task or partial Part workflow. A named view is read-only
 for ordinary modeling; return to Primary to author its definition, or edit the named overrides in

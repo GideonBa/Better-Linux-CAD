@@ -90,6 +90,7 @@ public:
     visibility_ = instance->visibility();
     suppression_ = instance->suppression_state();
     grounding_ = instance->grounding_state();
+    selected_model_state_ = instance->selected_model_state();
     return Result<std::size_t>::success(1);
   }
 
@@ -108,6 +109,7 @@ public:
     transform_ = instance->transform();
     visibility_ = instance->visibility();
     suppression_ = instance->suppression_state();
+    selected_model_state_ = instance->selected_model_state();
     return Result<std::size_t>::success(1);
   }
 
@@ -132,6 +134,9 @@ public:
   [[nodiscard]] ComponentGroundingState grounding() const noexcept {
     return grounding_;
   }
+  [[nodiscard]] const ModelStateId& selected_model_state() const noexcept {
+    return selected_model_state_;
+  }
 
   void set_transform(RigidTransform value) noexcept {
     transform_ = value;
@@ -144,6 +149,9 @@ public:
   }
   void set_grounding(ComponentGroundingState value) noexcept {
     grounding_ = value;
+  }
+  void set_model_state(ModelStateId value) {
+    selected_model_state_ = std::move(value);
   }
 
   [[nodiscard]] std::vector<GuiViewportManipulatorHandle> handles() const {
@@ -245,6 +253,7 @@ private:
     visibility_ = ComponentVisibility::Visible;
     suppression_ = ComponentSuppressionState::Active;
     grounding_ = ComponentGroundingState::Free;
+    selected_model_state_ = primary_model_state_id();
     active_ = true;
   }
 
@@ -264,13 +273,17 @@ private:
   [[nodiscard]] Result<std::size_t> mutate(Project& project) const {
     auto& assembly = project.assembly();
     if (kind_ == GuiAssemblyPlacementKind::Component) {
+      const auto* definition = project.find_part_document(definition_);
+      if (!definition || !has_model_state(definition->model_states(), selected_model_state_))
+        return fail("Choose an existing model state of the selected Part definition");
       if (mode_ == GuiAssemblyPlacementMode::Edit) {
         std::size_t changed = 0U;
         for (auto result :
              {assembly.set_component_instance_transform(component_id_, transform_),
               assembly.set_component_instance_visibility(component_id_, visibility_),
               assembly.set_component_instance_suppression_state(component_id_, suppression_),
-              assembly.set_component_instance_grounding_state(component_id_, grounding_)}) {
+              assembly.set_component_instance_grounding_state(component_id_, grounding_),
+              assembly.set_component_model_state(component_id_, selected_model_state_)}) {
           if (result.has_error())
             return result;
           changed += result.value();
@@ -284,8 +297,9 @@ private:
           return member;
         changed += member.value();
       }
-      auto instance = ComponentInstance::create(component_id_, name_, definition_, visibility_,
-                                                suppression_, grounding_, transform_);
+      auto instance =
+          ComponentInstance::create(component_id_, name_, definition_, visibility_, suppression_,
+                                    grounding_, transform_, selected_model_state_);
       if (instance.has_error())
         return Result<std::size_t>::failure(instance.error());
       auto added = assembly.add_component_instance(std::move(instance.value()));
@@ -293,12 +307,16 @@ private:
         return added;
       return Result<std::size_t>::success(changed + added.value());
     }
+    const auto* definition = project.find_assembly_document(definition_);
+    if (!definition || !has_model_state(definition->model_states(), selected_model_state_))
+      return fail("Choose an existing model state of the selected child Assembly definition");
     if (mode_ == GuiAssemblyPlacementMode::Edit) {
       std::size_t changed = 0U;
       for (auto result :
            {assembly.set_subassembly_instance_transform(subassembly_id_, transform_),
             assembly.set_subassembly_instance_visibility(subassembly_id_, visibility_),
-            assembly.set_subassembly_instance_suppression_state(subassembly_id_, suppression_)}) {
+            assembly.set_subassembly_instance_suppression_state(subassembly_id_, suppression_),
+            assembly.set_subassembly_model_state(subassembly_id_, selected_model_state_)}) {
         if (result.has_error())
           return result;
         changed += result.value();
@@ -306,7 +324,7 @@ private:
       return Result<std::size_t>::success(changed);
     }
     auto instance = SubassemblyInstance::create(subassembly_id_, name_, definition_, visibility_,
-                                                suppression_, transform_);
+                                                suppression_, transform_, selected_model_state_);
     if (instance.has_error())
       return Result<std::size_t>::failure(instance.error());
     return assembly.add_subassembly_instance(std::move(instance.value()));
@@ -328,6 +346,7 @@ private:
   SubassemblyInstanceId subassembly_id_{""};
   std::string name_;
   DocumentId definition_{""};
+  ModelStateId selected_model_state_{primary_model_state_id()};
   RigidTransform transform_{};
   ComponentVisibility visibility_{ComponentVisibility::Visible};
   ComponentSuppressionState suppression_{ComponentSuppressionState::Active};
