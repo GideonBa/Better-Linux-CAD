@@ -1,0 +1,193 @@
+{
+  "budget_policy": "baseline only; no portable latency assertions",
+  "build_type": "Debug",
+  "compiler": "13.3.0",
+  "cpp_standard": 202002,
+  "cpu_model": " 13th Gen Intel(R) Core(TM) i7-1370P",
+  "executable_sha256": "859b317c10453c2916f367df42c3807ccb3ed84d515c1861513cdcff4cab27ca",
+  "finished_utc": "2026-11-18T08:33:15Z",
+  "hardware_threads": 20,
+  "kernel": "7.0.0-43-generic",
+  "machine": "x86_64",
+  "memory_total": "       32467540 kB",
+  "mode": "assembly",
+  "occt_version": "7.6.3",
+  "os": "Linux",
+  "peak_rss_kib": 524184,
+  "peak_rss_measurement_point": "after workload generation, all timed batches and independent checks; before source and result artifact serialization/publication",
+  "peak_rss_scope": "Linux process-lifetime getrusage(RUSAGE_SELF).ru_maxrss in KiB; includes provenance reads, setup, caches/snapshots and checks; no baseline subtraction",
+  "process_id": 269055,
+  "qt_configured_version": "6.4.2",
+  "runtime_manifest_sha256": "396d70c6988508f81ceec7f76b5f8a642dc67454d5bd7d5c09b7c056781224c6",
+  "schema": "blcad.state-assembly-profile.v1",
+  "scope": "synchronous headless calls; no native UI or interactive latency claim",
+  "size": 10,
+  "source_intent_file": "assembly-10-process-3.json.source.json",
+  "source_intent_sha256": "78d1f58ed48078f972c30baedd8317ebd34c024d0f802357f595434c65dc53a6",
+  "started_utc": "2026-11-18T08:33:14Z",
+  "status": "passed",
+  "wall_ms_including_setup_and_checks": 267.431569,
+  "warm_repeats": 10,
+  "workload": {
+    "cold_definition": "first timed resolver and first physical inspection after public-API fixture validation; no prior Geometry executor call; no OS cache flush",
+    "excluded_from_timing": [
+      "scene generation and structural validation",
+      "previous snapshot copy",
+      "serialization and analytic pose/volume/mass/centroid checks"
+    ],
+    "leaf_occurrences": 10,
+    "nested_flexible_occurrences": 5,
+    "physical_cache_policy": "first inspection has no previous snapshot; each warm inspection receives preceding immutable snapshot",
+    "physical_properties_warm_summary": {
+      "max_ms": 14.682785,
+      "median_ms": 13.761704,
+      "min_ms": 12.53983,
+      "p95_method": "nearest-rank",
+      "p95_ms": 14.682785,
+      "sample_count": 10
+    },
+    "resolver_warm_summary": {
+      "max_ms": 0.314358,
+      "median_ms": 0.2205455,
+      "min_ms": 0.208636,
+      "p95_method": "nearest-rank",
+      "p95_ms": 0.314358,
+      "sample_count": 10
+    },
+    "samples": [
+      {
+        "computed_part_count": 1,
+        "independent_mass_kg": 0.00015999999999999999,
+        "independent_volume_mm3": 40.0,
+        "iteration": 0,
+        "phase": "first-cold",
+        "physical_properties_ms": 15.417615,
+        "resolved_leaf_count": 10,
+        "resolver_ms": 0.249124,
+        "reused_part_count": 0
+      },
+      {
+        "computed_part_count": 0,
+        "independent_mass_kg": 0.00015999999999999999,
+        "independent_volume_mm3": 40.0,
+        "iteration": 1,
+        "phase": "warm",
+        "physical_properties_ms": 13.175409,
+        "resolved_leaf_count": 10,
+        "resolver_ms": 0.208636,
+        "reused_part_count": 1
+      },
+      {
+        "computed_part_count": 0,
+        "independent_mass_kg": 0.00015999999999999999,
+        "independent_volume_mm3": 40.0,
+        "iteration": 2,
+        "phase": "warm",
+        "physical_properties_ms": 13.889716,
+        "resolved_leaf_count": 10,
+        "resolver_ms": 0.229417,
+        "reused_part_count": 1
+      },
+      {
+        "computed_part_count": 0,
+        "independent_mass_kg": 0.00015999999999999999,
+        "independent_volume_mm3": 40.0,
+        "iteration": 3,
+        "phase": "warm",
+        "physical_properties_ms": 14.040575,
+        "resolved_leaf_count": 10,
+        "resolver_ms": 0.314358,
+        "reused_part_count": 1
+      },
+      {
+        "computed_part_count": 0,
+        "independent_mass_kg": 0.00015999999999999999,
+        "independent_volume_mm3": 40.0,
+        "iteration": 4,
+        "phase": "warm",
+        "physical_properties_ms": 14.003875,
+        "resolved_leaf_count": 10,
+        "resolver_ms": 0.258311,
+        "reused_part_count": 1
+      },
+      {
+        "computed_part_count": 0,
+        "independent_mass_kg": 0.00015999999999999999,
+        "independent_volume_mm3": 40.0,
+        "iteration": 5,
+        "phase": "warm",
+        "physical_properties_ms": 14.345061,
+        "resolved_leaf_count": 10,
+        "resolver_ms": 0.212372,
+        "reused_part_count": 1
+      },
+      {
+        "computed_part_count": 0,
+        "independent_mass_kg": 0.00015999999999999999,
+        "independent_volume_mm3": 40.0,
+        "iteration": 6,
+        "phase": "warm",
+        "physical_properties_ms": 12.53983,
+        "resolved_leaf_count": 10,
+        "resolver_ms": 0.222395,
+        "reused_part_count": 1
+      },
+      {
+        "computed_part_count": 0,
+        "independent_mass_kg": 0.00015999999999999999,
+        "independent_volume_mm3": 40.0,
+        "iteration": 7,
+        "phase": "warm",
+        "physical_properties_ms": 13.633692,
+        "resolved_leaf_count": 10,
+        "resolver_ms": 0.229259,
+        "reused_part_count": 1
+      },
+      {
+        "computed_part_count": 0,
+        "independent_mass_kg": 0.00015999999999999999,
+        "independent_volume_mm3": 40.0,
+        "iteration": 8,
+        "phase": "warm",
+        "physical_properties_ms": 14.682785,
+        "resolved_leaf_count": 10,
+        "resolver_ms": 0.218696,
+        "reused_part_count": 1
+      },
+      {
+        "computed_part_count": 0,
+        "independent_mass_kg": 0.00015999999999999999,
+        "independent_volume_mm3": 40.0,
+        "iteration": 9,
+        "phase": "warm",
+        "physical_properties_ms": 12.900686,
+        "resolved_leaf_count": 10,
+        "resolver_ms": 0.213195,
+        "reused_part_count": 1
+      },
+      {
+        "computed_part_count": 0,
+        "independent_mass_kg": 0.00015999999999999999,
+        "independent_volume_mm3": 40.0,
+        "iteration": 10,
+        "phase": "warm",
+        "physical_properties_ms": 12.602535,
+        "resolved_leaf_count": 10,
+        "resolver_ms": 0.213427,
+        "reused_part_count": 1
+      }
+    ],
+    "scene": "two-level repeated wrapper/module with two shared native Part leaves and independent flexible poses",
+    "shared_child_assembly_definitions": 2,
+    "shared_part_definitions": 1,
+    "timed": [
+      "leaf occurrence resolver",
+      "physical properties including production geometry/reuse checks"
+    ],
+    "unmeasured": [
+      "occurrence-local solve/motion",
+      "flat/structured STEP export",
+      "native UI presentation"
+    ]
+  }
+}
