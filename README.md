@@ -18,9 +18,9 @@ Three planet gears between a sun and an internal ring, with stepped hubs and a s
 
 ### Four-runner exhaust manifold
 
-<a href="docs/images/showcase/exhaust-manifold.webp"><img src="docs/images/showcase/exhaust-manifold.webp" width="100%" alt="Four curved exhaust runners between a drilled engine flange and a tapered collector in BLCAD"></a>
+<a href="docs/images/showcase/exhaust-manifold.webp"><img src="docs/images/showcase/exhaust-manifold.webp" width="100%" alt="Compact turbo manifold in BLCAD with four short curved runners, a scalloped engine flange and a rectangular top flange"></a>
 
-Four hollow sweeps follow 3D paths into a tapered collector with a loft-cut passage and drilled flanges. [Model file](examples/showcase/exhaust-manifold.blcad.json)
+Four short hollow sweeps turn up from a scalloped engine flange into a compact lofted collector and a rectangular turbo flange. [Model file](examples/showcase/exhaust-manifold.blcad.json)
 
 ### Swept airfoil
 
