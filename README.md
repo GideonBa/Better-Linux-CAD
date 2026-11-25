@@ -16,20 +16,17 @@
 
 Three planet gears between a sun and an internal ring, with stepped hubs and a sixteen-hole mounting flange. [Model file](examples/showcase/planetary-stage.blcad.json)
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <strong>Centrifugal rotor</strong><br>
-      <a href="docs/images/showcase/centrifugal-rotor.webp"><img src="docs/images/showcase/centrifugal-rotor.webp" width="100%" alt="Twelve curved blades around a revolved hub with mounting holes in BLCAD"></a>
-      Twelve curved blades around a revolved hub with threaded mounting holes and an engraved blade count. <a href="examples/showcase/centrifugal-rotor.blcad.json">Model file</a>
-    </td>
-    <td width="50%" valign="top">
-      <strong>Swept airfoil</strong><br>
-      <a href="docs/images/showcase/swept-airfoil.webp"><img src="docs/images/showcase/swept-airfoil.webp" width="100%" alt="Swept and twisted airfoil in the BLCAD Surface workbench with its loft sections shown"></a>
-      A blade that tapers, sweeps and twists along five spline sections. <a href="examples/showcase/swept-airfoil.blcad.json">Model file</a>
-    </td>
-  </tr>
-</table>
+### Four-runner exhaust manifold
+
+<a href="docs/images/showcase/exhaust-manifold.webp"><img src="docs/images/showcase/exhaust-manifold.webp" width="100%" alt="Four curved exhaust runners between a drilled engine flange and a tapered collector in BLCAD"></a>
+
+Four hollow sweeps follow 3D paths into a tapered collector with a loft-cut passage and drilled flanges. [Model file](examples/showcase/exhaust-manifold.blcad.json)
+
+### Swept airfoil
+
+<a href="docs/images/showcase/swept-airfoil.webp"><img src="docs/images/showcase/swept-airfoil.webp" width="100%" alt="Swept and twisted airfoil in the BLCAD Surface workbench with its loft sections shown"></a>
+
+A blade that tapers, sweeps and twists along five spline sections. [Model file](examples/showcase/swept-airfoil.blcad.json)
 
 ### Loft in progress
 

@@ -5,7 +5,7 @@ Open these files in BLCAD with **File → Open**. Each example has an editable f
 | Model | Features on display |
 | --- | --- |
 | [Planetary stage](planetary-stage.blcad.json) | Six solid bodies with schematic gear teeth, stepped hubs, bores and a parameter-driven flange hole pattern. The stage is a static multibody Part. |
-| [Centrifugal rotor](centrifugal-rotor.blcad.json) | Revolved hub, curved blade pattern, variable root fillet, threaded mounting holes and an engraved blade count. Adapted from the [advanced rotor fixture](../../tests/support/advanced_rotor_fixture.hpp). |
+| [Exhaust manifold](exhaust-manifold.blcad.json) | Four [hollow sweeps](../../docs/part-sweep-geometry-mvp6.md) along spatial paths with tangent bends, a tapered collector with a [loft-cut passage](../../docs/part-loft-geometry-mvp6.md), and bored flanges with multi-position Hole features. |
 | [Swept airfoil](swept-airfoil.blcad.json) | One solid loft through five spline sections on separately oriented workplanes. |
 
 The [gallery](../../README.md#gallery) shows these models in the Qt/OCCT desktop. The banner comes
@@ -19,4 +19,6 @@ To regenerate a model's STEP export, build the `blcad_export_step` target with t
 
 The three examples were reopened in the native Qt/OCCT desktop and exported with
 [`blcad_export_step`](../blcad_export_step.cpp). Reopening the STEP exports in OCCT yielded six
-valid solids for the planetary stage and one each for the rotor and airfoil.
+valid solids for the planetary stage, eight for the manifold and one for the airfoil. For the
+manifold, point classification after STEP reopening verified material at the tube walls and open
+space at the runner ends, collector passage and flange holes.
