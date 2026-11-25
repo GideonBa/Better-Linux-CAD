@@ -1,0 +1,342 @@
+{
+  "bodies": [{"id": "body.Airfoil", "kind": "solid", "name": "Airfoil", "visibility": "visible"}],
+  "body_booleans": [],
+  "body_transforms": [],
+  "construction_lines": [],
+  "construction_planes": [
+    {
+      "id": "plane.Root",
+      "kind": "explicit",
+      "name": "Root plane",
+      "normal": {"x": 0.9999999999999999, "y": 0.0, "z": -0.0},
+      "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 0.0, "y": 0.9975640502598242, "z": 0.0697564737441253},
+      "y_axis": {"x": 0.0, "y": -0.0697564737441253, "z": 0.9975640502598242}
+    },
+    {
+      "id": "plane.Inboard",
+      "kind": "explicit",
+      "name": "Inboard plane",
+      "normal": {"x": 1.0, "y": -0.0, "z": 0.0},
+      "origin": {"x": 39.0, "y": 4.0, "z": 2.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 0.0, "y": 0.9998476951563913, "z": -0.01745240643728351},
+      "y_axis": {"x": 0.0, "y": 0.01745240643728351, "z": 0.9998476951563913}
+    },
+    {
+      "id": "plane.Midspan",
+      "kind": "explicit",
+      "name": "Midspan plane",
+      "normal": {"x": 1.0, "y": -0.0, "z": 0.0},
+      "origin": {"x": 85.0, "y": 15.0, "z": 6.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 0.0, "y": 0.9876883405951378, "z": -0.15643446504023087},
+      "y_axis": {"x": 0.0, "y": 0.15643446504023087, "z": 0.9876883405951378}
+    },
+    {
+      "id": "plane.Outboard",
+      "kind": "explicit",
+      "name": "Outboard plane",
+      "normal": {"x": 0.9999999999999999, "y": -0.0, "z": 0.0},
+      "origin": {"x": 134.0, "y": 34.0, "z": 11.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 0.0, "y": 0.9510565162951535, "z": -0.3090169943749474},
+      "y_axis": {"x": 0.0, "y": 0.3090169943749474, "z": 0.9510565162951535}
+    },
+    {
+      "id": "plane.Tip",
+      "kind": "explicit",
+      "name": "Tip plane",
+      "normal": {"x": 1.0, "y": -0.0, "z": 0.0},
+      "origin": {"x": 183.0, "y": 57.0, "z": 26.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 0.0, "y": 0.882947592858927, "z": -0.4694715627858908},
+      "y_axis": {"x": 0.0, "y": 0.4694715627858908, "z": 0.882947592858927}
+    }
+  ],
+  "construction_points": [],
+  "datum_axes": [],
+  "datum_planes": [],
+  "derived_workplanes": [],
+  "document": {"id": "showcase.airfoil", "name": "Swept airfoil"},
+  "draft_features": [],
+  "edge_treatments": [],
+  "features": [],
+  "loft_features": [
+    {
+      "continuity": "c0",
+      "guide_curves": [],
+      "id": "wing.loft",
+      "name": "Five-section loft",
+      "operation_mode": "new_body",
+      "path_curve": null,
+      "produced_body": "body.Airfoil",
+      "sections": [
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "section.Root"
+        },
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "section.Inboard"
+        },
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "section.Midspan"
+        },
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "section.Outboard"
+        },
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "section.Tip"
+        }
+      ],
+      "type": "loft"
+    }
+  ],
+  "mirror_features": [],
+  "parameters": [],
+  "part_patterns": [],
+  "path_curves": [],
+  "reference_remaps": [],
+  "reference_statuses": [],
+  "revolve_features": [],
+  "schema": "blcad.part_document.mvp1",
+  "shell_features": [],
+  "sketch_origin_overrides": [],
+  "sketch_ownerships": [],
+  "sketches": [
+    {
+      "arc_closed_profiles": [{"curve_segments": ["upper", "lower"], "id": "outline"}],
+      "arc_segments": [],
+      "circle_profiles": [],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "section.Root",
+      "line_segments": [],
+      "name": "Root airfoil",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [
+        {
+          "control1": {"x": -26.64, "y": 16.0},
+          "control2": {"x": 4.32, "y": 14.0},
+          "end": {"x": 41.04, "y": 0.0},
+          "id": "upper",
+          "kind": "cubic_bezier",
+          "start": {"x": -30.96, "y": 0.0}
+        },
+        {
+          "control1": {"x": 11.52, "y": -2.0},
+          "control2": {"x": -28.8, "y": -7.0},
+          "end": {"x": -30.96, "y": 0.0},
+          "id": "lower",
+          "kind": "cubic_bezier",
+          "start": {"x": 41.04, "y": 0.0}
+        }
+      ],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "plane.Root"
+    },
+    {
+      "arc_closed_profiles": [{"curve_segments": ["upper", "lower"], "id": "outline"}],
+      "arc_segments": [],
+      "circle_profiles": [],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "section.Inboard",
+      "line_segments": [],
+      "name": "Inboard airfoil",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [
+        {
+          "control1": {"x": -25.53, "y": 15.2},
+          "control2": {"x": 4.14, "y": 13.299999999999999},
+          "end": {"x": 39.33, "y": 0.0},
+          "id": "upper",
+          "kind": "cubic_bezier",
+          "start": {"x": -29.669999999999998, "y": 0.0}
+        },
+        {
+          "control1": {"x": 11.040000000000001, "y": -1.9},
+          "control2": {"x": -27.6, "y": -6.6499999999999995},
+          "end": {"x": -29.669999999999998, "y": 0.0},
+          "id": "lower",
+          "kind": "cubic_bezier",
+          "start": {"x": 39.33, "y": 0.0}
+        }
+      ],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "plane.Inboard"
+    },
+    {
+      "arc_closed_profiles": [{"curve_segments": ["upper", "lower"], "id": "outline"}],
+      "arc_segments": [],
+      "circle_profiles": [],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "section.Midspan",
+      "line_segments": [],
+      "name": "Midspan airfoil",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [
+        {
+          "control1": {"x": -20.35, "y": 12.8},
+          "control2": {"x": 3.3, "y": 11.200000000000001},
+          "end": {"x": 31.349999999999998, "y": 0.0},
+          "id": "upper",
+          "kind": "cubic_bezier",
+          "start": {"x": -23.65, "y": 0.0}
+        },
+        {
+          "control1": {"x": 8.8, "y": -1.6},
+          "control2": {"x": -22.0, "y": -5.6000000000000005},
+          "end": {"x": -23.65, "y": 0.0},
+          "id": "lower",
+          "kind": "cubic_bezier",
+          "start": {"x": 31.349999999999998, "y": 0.0}
+        }
+      ],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "plane.Midspan"
+    },
+    {
+      "arc_closed_profiles": [{"curve_segments": ["upper", "lower"], "id": "outline"}],
+      "arc_segments": [],
+      "circle_profiles": [],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "section.Outboard",
+      "line_segments": [],
+      "name": "Outboard airfoil",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [
+        {
+          "control1": {"x": -14.8, "y": 10.88},
+          "control2": {"x": 2.4, "y": 9.520000000000001},
+          "end": {"x": 22.799999999999997, "y": 0.0},
+          "id": "upper",
+          "kind": "cubic_bezier",
+          "start": {"x": -17.2, "y": 0.0}
+        },
+        {
+          "control1": {"x": 6.4, "y": -1.36},
+          "control2": {"x": -16.0, "y": -4.760000000000001},
+          "end": {"x": -17.2, "y": 0.0},
+          "id": "lower",
+          "kind": "cubic_bezier",
+          "start": {"x": 22.799999999999997, "y": 0.0}
+        }
+      ],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "plane.Outboard"
+    },
+    {
+      "arc_closed_profiles": [{"curve_segments": ["upper", "lower"], "id": "outline"}],
+      "arc_segments": [],
+      "circle_profiles": [],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "section.Tip",
+      "line_segments": [],
+      "name": "Tip airfoil",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [
+        {
+          "control1": {"x": -8.51, "y": 8.32},
+          "control2": {"x": 1.38, "y": 7.28},
+          "end": {"x": 13.11, "y": 0.0},
+          "id": "upper",
+          "kind": "cubic_bezier",
+          "start": {"x": -9.89, "y": 0.0}
+        },
+        {
+          "control1": {"x": 3.68, "y": -1.04},
+          "control2": {"x": -9.200000000000001, "y": -3.64},
+          "end": {"x": -9.89, "y": 0.0},
+          "id": "lower",
+          "kind": "cubic_bezier",
+          "start": {"x": 13.11, "y": 0.0}
+        }
+      ],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "plane.Tip"
+    }
+  ],
+  "sketches_3d": [],
+  "surface_features": [],
+  "sweep_features": [],
+  "version": 1
+}
