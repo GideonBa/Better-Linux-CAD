@@ -1,0 +1,1382 @@
+{
+  "bodies": [
+    {"id": "body.Collector plate", "kind": "solid", "name": "Collector plate", "visibility": "visible"},
+    {"id": "body.Collector shell", "kind": "solid", "name": "Collector shell", "visibility": "visible"},
+    {"id": "body.Engine flange", "kind": "solid", "name": "Engine flange", "visibility": "visible"},
+    {"id": "body.Outlet flange", "kind": "solid", "name": "Outlet flange", "visibility": "visible"},
+    {"id": "body.Runner 1", "kind": "solid", "name": "Runner 1", "visibility": "visible"},
+    {"id": "body.Runner 2", "kind": "solid", "name": "Runner 2", "visibility": "visible"},
+    {"id": "body.Runner 3", "kind": "solid", "name": "Runner 3", "visibility": "visible"},
+    {"id": "body.Runner 4", "kind": "solid", "name": "Runner 4", "visibility": "visible"}
+  ],
+  "body_booleans": [],
+  "body_transforms": [],
+  "construction_lines": [],
+  "construction_planes": [
+    {
+      "id": "inlet.front",
+      "kind": "explicit",
+      "name": "Engine flange face",
+      "normal": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
+    },
+    {
+      "id": "inlet.back",
+      "kind": "explicit",
+      "name": "Runner start plane",
+      "normal": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "origin": {"x": 0.0, "y": 8.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
+    },
+    {
+      "id": "collector.front",
+      "kind": "explicit",
+      "name": "Collector plate face",
+      "normal": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "origin": {"x": 0.0, "y": 169.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
+    },
+    {
+      "id": "outlet.front",
+      "kind": "explicit",
+      "name": "Outlet flange face",
+      "normal": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "origin": {"x": 0.0, "y": 242.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
+    },
+    {
+      "id": "outer.1.plane",
+      "kind": "explicit",
+      "name": "Outer collector section 1 plane",
+      "normal": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "origin": {"x": 0.0, "y": 176.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
+    },
+    {
+      "id": "outer.2.plane",
+      "kind": "explicit",
+      "name": "Outer collector section 2 plane",
+      "normal": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "origin": {"x": 0.0, "y": 193.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
+    },
+    {
+      "id": "outer.3.plane",
+      "kind": "explicit",
+      "name": "Outer collector section 3 plane",
+      "normal": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "origin": {"x": 0.0, "y": 223.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
+    },
+    {
+      "id": "outer.4.plane",
+      "kind": "explicit",
+      "name": "Outer collector section 4 plane",
+      "normal": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "origin": {"x": 0.0, "y": 242.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
+    },
+    {
+      "id": "inner.1.plane",
+      "kind": "explicit",
+      "name": "Inner collector section 1 plane",
+      "normal": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "origin": {"x": 0.0, "y": 174.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
+    },
+    {
+      "id": "inner.2.plane",
+      "kind": "explicit",
+      "name": "Inner collector section 2 plane",
+      "normal": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "origin": {"x": 0.0, "y": 193.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
+    },
+    {
+      "id": "inner.3.plane",
+      "kind": "explicit",
+      "name": "Inner collector section 3 plane",
+      "normal": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "origin": {"x": 0.0, "y": 223.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
+    },
+    {
+      "id": "inner.4.plane",
+      "kind": "explicit",
+      "name": "Inner collector section 4 plane",
+      "normal": {"x": 0.0, "y": 1.0, "z": 0.0},
+      "origin": {"x": 0.0, "y": 244.0, "z": 0.0},
+      "parameter_dependencies": [],
+      "x_axis": {"x": 1.0, "y": 0.0, "z": 0.0},
+      "y_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
+    }
+  ],
+  "construction_points": [],
+  "datum_axes": [],
+  "datum_planes": [],
+  "derived_workplanes": [],
+  "document": {"id": "showcase.exhaust", "name": "Exhaust manifold"},
+  "draft_features": [],
+  "edge_treatments": [],
+  "engineering_resources": {"entries": [], "schema": "blcad.engineering_resources.mvp1", "version": 1},
+  "feature_order": [
+    "inlet.flange", "runner.1", "runner.2", "runner.3", "runner.4", "collector.plate", "collector.loft",
+    "outlet.flange", "inlet.ports", "collector.ports", "collector.passage", "outlet.bore", "inlet.bolts",
+    "outlet.bolts"
+  ],
+  "features": [
+    {
+      "direction": "+Z",
+      "id": "inlet.flange",
+      "input_sketch": "inlet.outline",
+      "length_parameter": "inlet.flange.thickness",
+      "name": "Engine flange",
+      "operation_mode": "new_body",
+      "produced_body": "body.Engine flange",
+      "profile": "outline",
+      "type": "additive_extrude"
+    },
+    {
+      "direction": "+Z",
+      "id": "collector.plate",
+      "input_sketch": "collector.inlet.outline",
+      "length_parameter": "collector.plate.thickness",
+      "name": "Collector plate",
+      "operation_mode": "new_body",
+      "produced_body": "body.Collector plate",
+      "profile": "outline",
+      "type": "additive_extrude"
+    },
+    {
+      "direction": "+Z",
+      "id": "outlet.flange",
+      "input_sketch": "outlet.outline",
+      "length_parameter": "outlet.flange.thickness",
+      "name": "Outlet flange",
+      "operation_mode": "new_body",
+      "produced_body": "body.Outlet flange",
+      "profile": "outline",
+      "type": "additive_extrude"
+    }
+  ],
+  "history_version": 1,
+  "hole_features": [
+    {
+      "diameter": {"kind": "custom", "parameter": "runner.bore"},
+      "direction": "support_normal",
+      "extent": {"kind": "through_all"},
+      "id": "inlet.ports",
+      "kind": "plain",
+      "name": "Four engine ports",
+      "placements": [
+        {"id": "bore.1", "kind": "owned_point", "position": {"x": -84.0, "y": 0.0}},
+        {"id": "bore.2", "kind": "owned_point", "position": {"x": -28.0, "y": 0.0}},
+        {"id": "bore.3", "kind": "owned_point", "position": {"x": 28.0, "y": 0.0}},
+        {"id": "bore.4", "kind": "owned_point", "position": {"x": 84.0, "y": 0.0}}
+      ],
+      "support": {"capability": "plane", "construction_plane": "inlet.front", "role": "hole_support_plane", "source_kind": "construction_plane"},
+      "target_body": "body.Engine flange",
+      "tip": {"kind": "flat"}
+    },
+    {
+      "diameter": {"kind": "custom", "parameter": "bolt.diameter"},
+      "direction": "support_normal",
+      "extent": {"kind": "through_all"},
+      "id": "inlet.bolts",
+      "kind": "plain",
+      "name": "Ten flange bolt holes",
+      "placements": [
+        {"id": "bore.1", "kind": "owned_point", "position": {"x": -104.0, "y": -17.0}},
+        {"id": "bore.2", "kind": "owned_point", "position": {"x": -104.0, "y": 17.0}},
+        {"id": "bore.3", "kind": "owned_point", "position": {"x": -56.0, "y": -17.0}},
+        {"id": "bore.4", "kind": "owned_point", "position": {"x": -56.0, "y": 17.0}},
+        {"id": "bore.5", "kind": "owned_point", "position": {"x": 0.0, "y": -17.0}},
+        {"id": "bore.6", "kind": "owned_point", "position": {"x": 0.0, "y": 17.0}},
+        {"id": "bore.7", "kind": "owned_point", "position": {"x": 56.0, "y": -17.0}},
+        {"id": "bore.8", "kind": "owned_point", "position": {"x": 56.0, "y": 17.0}},
+        {"id": "bore.9", "kind": "owned_point", "position": {"x": 104.0, "y": -17.0}},
+        {"id": "bore.10", "kind": "owned_point", "position": {"x": 104.0, "y": 17.0}}
+      ],
+      "support": {"capability": "plane", "construction_plane": "inlet.front", "role": "hole_support_plane", "source_kind": "construction_plane"},
+      "target_body": "body.Engine flange",
+      "tip": {"kind": "flat"}
+    },
+    {
+      "diameter": {"kind": "custom", "parameter": "runner.bore"},
+      "direction": "support_normal",
+      "extent": {"kind": "through_all"},
+      "id": "collector.ports",
+      "kind": "plain",
+      "name": "Four collector ports",
+      "placements": [
+        {"id": "bore.1", "kind": "owned_point", "position": {"x": -17.0, "y": 29.0}},
+        {"id": "bore.2", "kind": "owned_point", "position": {"x": -17.0, "y": -5.0}},
+        {"id": "bore.3", "kind": "owned_point", "position": {"x": 17.0, "y": -5.0}},
+        {"id": "bore.4", "kind": "owned_point", "position": {"x": 17.0, "y": 29.0}}
+      ],
+      "support": {"capability": "plane", "construction_plane": "collector.front", "role": "hole_support_plane", "source_kind": "construction_plane"},
+      "target_body": "body.Collector plate",
+      "tip": {"kind": "flat"}
+    },
+    {
+      "diameter": {"kind": "custom", "parameter": "outlet.bore.diameter"},
+      "direction": "support_normal",
+      "extent": {"kind": "through_all"},
+      "id": "outlet.bore",
+      "kind": "plain",
+      "name": "Outlet bore",
+      "placements": [{"id": "bore.1", "kind": "owned_point", "position": {"x": 9.0, "y": 23.0}}],
+      "support": {"capability": "plane", "construction_plane": "outlet.front", "role": "hole_support_plane", "source_kind": "construction_plane"},
+      "target_body": "body.Outlet flange",
+      "tip": {"kind": "flat"}
+    },
+    {
+      "diameter": {"kind": "custom", "parameter": "bolt.diameter"},
+      "direction": "support_normal",
+      "extent": {"kind": "through_all"},
+      "id": "outlet.bolts",
+      "kind": "plain",
+      "name": "Four outlet bolt holes",
+      "placements": [
+        {"id": "bore.1", "kind": "owned_point", "position": {"x": -13.0, "y": 1.0}},
+        {"id": "bore.2", "kind": "owned_point", "position": {"x": -13.0, "y": 45.0}},
+        {"id": "bore.3", "kind": "owned_point", "position": {"x": 31.0, "y": 1.0}},
+        {"id": "bore.4", "kind": "owned_point", "position": {"x": 31.0, "y": 45.0}}
+      ],
+      "support": {"capability": "plane", "construction_plane": "outlet.front", "role": "hole_support_plane", "source_kind": "construction_plane"},
+      "target_body": "body.Outlet flange",
+      "tip": {"kind": "flat"}
+    }
+  ],
+  "loft_features": [
+    {
+      "continuity": "c0",
+      "guide_curves": [],
+      "id": "collector.loft",
+      "name": "Tapered collector loft",
+      "operation_mode": "new_body",
+      "path_curve": null,
+      "produced_body": "body.Collector shell",
+      "sections": [
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "outer.1.section"
+        },
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "outer.2.section"
+        },
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "outer.3.section"
+        },
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "outer.4.section"
+        }
+      ],
+      "type": "loft"
+    },
+    {
+      "continuity": "c0",
+      "guide_curves": [],
+      "id": "collector.passage",
+      "name": "Collector passage loft cut",
+      "operation_mode": "cut",
+      "path_curve": null,
+      "sections": [
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "inner.1.section"
+        },
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "inner.2.section"
+        },
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "inner.3.section"
+        },
+        {
+          "alignment_reference": null,
+          "flip_normal": false,
+          "kind": "closed_region",
+          "path_curve": null,
+          "profile": "outline",
+          "rotation_offset": null,
+          "sketch": "inner.4.section"
+        }
+      ],
+      "target_body": "body.Collector shell",
+      "type": "loft_cut"
+    }
+  ],
+  "material_assignments": {"body_overrides": []},
+  "mirror_features": [],
+  "parameters": [
+    {"id": "runner.outer", "name": "Runner outside diameter", "scope": "part", "type": "length", "unit": "mm", "value": 25.5},
+    {"id": "runner.bore", "name": "Runner bore diameter", "scope": "part", "type": "length", "unit": "mm", "value": 21.0},
+    {"id": "bolt.diameter", "name": "Flange bolt hole diameter", "scope": "part", "type": "length", "unit": "mm", "value": 8.2},
+    {"id": "inlet.flange.thickness", "name": "Engine flange thickness", "scope": "part", "type": "length", "unit": "mm", "value": 8.0},
+    {"id": "collector.plate.diameter", "name": "Collector plate diameter", "scope": "part", "type": "length", "unit": "mm", "value": 96.0},
+    {"id": "collector.plate.thickness", "name": "Collector plate thickness", "scope": "part", "type": "length", "unit": "mm", "value": 7.0},
+    {"id": "outer.1.diameter", "name": "Outer collector section 1 diameter", "scope": "part", "type": "length", "unit": "mm", "value": 94.0},
+    {"id": "outer.2.diameter", "name": "Outer collector section 2 diameter", "scope": "part", "type": "length", "unit": "mm", "value": 85.0},
+    {"id": "outer.3.diameter", "name": "Outer collector section 3 diameter", "scope": "part", "type": "length", "unit": "mm", "value": 53.0},
+    {"id": "outer.4.diameter", "name": "Outer collector section 4 diameter", "scope": "part", "type": "length", "unit": "mm", "value": 43.0},
+    {"id": "inner.1.diameter", "name": "Inner collector section 1 diameter", "scope": "part", "type": "length", "unit": "mm", "value": 87.5},
+    {"id": "inner.2.diameter", "name": "Inner collector section 2 diameter", "scope": "part", "type": "length", "unit": "mm", "value": 79.0},
+    {"id": "inner.3.diameter", "name": "Inner collector section 3 diameter", "scope": "part", "type": "length", "unit": "mm", "value": 47.0},
+    {"id": "inner.4.diameter", "name": "Inner collector section 4 diameter", "scope": "part", "type": "length", "unit": "mm", "value": 36.5},
+    {"id": "outlet.flange.diameter", "name": "Outlet flange diameter", "scope": "part", "type": "length", "unit": "mm", "value": 78.0},
+    {"id": "outlet.flange.thickness", "name": "Outlet flange thickness", "scope": "part", "type": "length", "unit": "mm", "value": 8.0},
+    {"id": "outlet.bore.diameter", "name": "Outlet bore diameter", "scope": "part", "type": "length", "unit": "mm", "value": 36.5}
+  ],
+  "part_patterns": [],
+  "path_curves": [
+    {
+      "closure": "open",
+      "connection_tolerance_mm": 1e-07,
+      "continuity_hint": "g1",
+      "execution_policy": {"kind": "curve_preserving", "tolerance_mm": 0.025},
+      "fixed_up_vector": null,
+      "id": "runner.1.path",
+      "name": "Runner 1 path",
+      "orientation_rule": "minimum_twist",
+      "segments": [
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.1.curve", "reversed": false, "curve_kind": "line", "entity": "line.1"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.1.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.1"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.1.curve", "reversed": false, "curve_kind": "line", "entity": "line.2"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.1.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.2"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.1.curve", "reversed": false, "curve_kind": "line", "entity": "line.3"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.1.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.3"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.1.curve", "reversed": false, "curve_kind": "line", "entity": "line.4"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.1.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.4"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.1.curve", "reversed": false, "curve_kind": "line", "entity": "line.5"}
+      ]
+    },
+    {
+      "closure": "open",
+      "connection_tolerance_mm": 1e-07,
+      "continuity_hint": "g1",
+      "execution_policy": {"kind": "curve_preserving", "tolerance_mm": 0.025},
+      "fixed_up_vector": null,
+      "id": "runner.2.path",
+      "name": "Runner 2 path",
+      "orientation_rule": "minimum_twist",
+      "segments": [
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.2.curve", "reversed": false, "curve_kind": "line", "entity": "line.1"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.2.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.1"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.2.curve", "reversed": false, "curve_kind": "line", "entity": "line.2"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.2.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.2"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.2.curve", "reversed": false, "curve_kind": "line", "entity": "line.3"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.2.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.3"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.2.curve", "reversed": false, "curve_kind": "line", "entity": "line.4"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.2.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.4"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.2.curve", "reversed": false, "curve_kind": "line", "entity": "line.5"}
+      ]
+    },
+    {
+      "closure": "open",
+      "connection_tolerance_mm": 1e-07,
+      "continuity_hint": "g1",
+      "execution_policy": {"kind": "curve_preserving", "tolerance_mm": 0.025},
+      "fixed_up_vector": null,
+      "id": "runner.3.path",
+      "name": "Runner 3 path",
+      "orientation_rule": "minimum_twist",
+      "segments": [
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.3.curve", "reversed": false, "curve_kind": "line", "entity": "line.1"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.3.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.1"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.3.curve", "reversed": false, "curve_kind": "line", "entity": "line.2"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.3.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.2"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.3.curve", "reversed": false, "curve_kind": "line", "entity": "line.3"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.3.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.3"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.3.curve", "reversed": false, "curve_kind": "line", "entity": "line.4"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.3.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.4"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.3.curve", "reversed": false, "curve_kind": "line", "entity": "line.5"}
+      ]
+    },
+    {
+      "closure": "open",
+      "connection_tolerance_mm": 1e-07,
+      "continuity_hint": "g1",
+      "execution_policy": {"kind": "curve_preserving", "tolerance_mm": 0.025},
+      "fixed_up_vector": null,
+      "id": "runner.4.path",
+      "name": "Runner 4 path",
+      "orientation_rule": "minimum_twist",
+      "segments": [
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.4.curve", "reversed": false, "curve_kind": "line", "entity": "line.1"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.4.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.1"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.4.curve", "reversed": false, "curve_kind": "line", "entity": "line.2"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.4.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.2"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.4.curve", "reversed": false, "curve_kind": "line", "entity": "line.3"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.4.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.3"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.4.curve", "reversed": false, "curve_kind": "line", "entity": "line.4"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.4.curve", "reversed": false, "curve_kind": "arc", "entity": "bend.4"},
+        {"source": "sketch_3d_curve", "sketch_3d": "runner.4.curve", "reversed": false, "curve_kind": "line", "entity": "line.5"}
+      ]
+    }
+  ],
+  "reference_remaps": [],
+  "reference_statuses": [],
+  "revolve_features": [],
+  "schema": "blcad.part_document.mvp1",
+  "shell_features": [],
+  "sketch_origin_overrides": [],
+  "sketch_ownerships": [],
+  "sketches": [
+    {
+      "arc_closed_profiles": [{"curve_segments": ["edge.1", "edge.2", "edge.3", "edge.4", "edge.5", "edge.6", "edge.7", "edge.8"], "id": "outline"}],
+      "arc_segments": [
+        {"end": {"x": 113.0, "y": -21.0}, "id": "edge.2", "mid": {"x": 110.94974746830583, "y": -25.949747468305834}, "start": {"x": 106.0, "y": -28.0}},
+        {"end": {"x": 106.0, "y": 28.0}, "id": "edge.4", "mid": {"x": 110.94974746830583, "y": 25.949747468305834}, "start": {"x": 113.0, "y": 21.0}},
+        {"end": {"x": -113.0, "y": 21.0}, "id": "edge.6", "mid": {"x": -110.94974746830583, "y": 25.949747468305834}, "start": {"x": -106.0, "y": 28.0}},
+        {"end": {"x": -106.0, "y": -28.0}, "id": "edge.8", "mid": {"x": -110.94974746830583, "y": -25.949747468305834}, "start": {"x": -113.0, "y": -21.0}}
+      ],
+      "circle_profiles": [],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "inlet.outline",
+      "line_segments": [
+        {"end": {"x": 106.0, "y": -28.0}, "id": "edge.1", "role": "geometry", "start": {"x": -106.0, "y": -28.0}},
+        {"end": {"x": 113.0, "y": 21.0}, "id": "edge.3", "role": "geometry", "start": {"x": 113.0, "y": -21.0}},
+        {"end": {"x": -106.0, "y": 28.0}, "id": "edge.5", "role": "geometry", "start": {"x": 106.0, "y": 28.0}},
+        {"end": {"x": -113.0, "y": -21.0}, "id": "edge.7", "role": "geometry", "start": {"x": -113.0, "y": 21.0}}
+      ],
+      "name": "Flange outline",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "inlet.front"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [
+        {"center": {"x": -84.0, "y": 0.0}, "diameter_parameter": "runner.outer", "id": "outline"},
+        {"center": {"x": -84.0, "y": 0.0}, "diameter_parameter": "runner.bore", "id": "bore"}
+      ],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "runner.1.section",
+      "line_segments": [],
+      "name": "Runner 1 annular section",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "inlet.back"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [
+        {"center": {"x": -28.0, "y": 0.0}, "diameter_parameter": "runner.outer", "id": "outline"},
+        {"center": {"x": -28.0, "y": 0.0}, "diameter_parameter": "runner.bore", "id": "bore"}
+      ],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "runner.2.section",
+      "line_segments": [],
+      "name": "Runner 2 annular section",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "inlet.back"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [
+        {"center": {"x": 28.0, "y": 0.0}, "diameter_parameter": "runner.outer", "id": "outline"},
+        {"center": {"x": 28.0, "y": 0.0}, "diameter_parameter": "runner.bore", "id": "bore"}
+      ],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "runner.3.section",
+      "line_segments": [],
+      "name": "Runner 3 annular section",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "inlet.back"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [
+        {"center": {"x": 84.0, "y": 0.0}, "diameter_parameter": "runner.outer", "id": "outline"},
+        {"center": {"x": 84.0, "y": 0.0}, "diameter_parameter": "runner.bore", "id": "bore"}
+      ],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "runner.4.section",
+      "line_segments": [],
+      "name": "Runner 4 annular section",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "inlet.back"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [{"center": {"x": 0.0, "y": 12.0}, "diameter_parameter": "collector.plate.diameter", "id": "outline"}],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "collector.inlet.outline",
+      "line_segments": [],
+      "name": "Collector plate profile",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "collector.front"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [{"center": {"x": 0.0, "y": 12.0}, "diameter_parameter": "outer.1.diameter", "id": "outline"}],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "outer.1.section",
+      "line_segments": [],
+      "name": "Outer collector section 1",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "outer.1.plane"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [{"center": {"x": 0.0, "y": 12.0}, "diameter_parameter": "outer.2.diameter", "id": "outline"}],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "outer.2.section",
+      "line_segments": [],
+      "name": "Outer collector section 2",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "outer.2.plane"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [{"center": {"x": 5.0, "y": 18.0}, "diameter_parameter": "outer.3.diameter", "id": "outline"}],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "outer.3.section",
+      "line_segments": [],
+      "name": "Outer collector section 3",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "outer.3.plane"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [{"center": {"x": 9.0, "y": 23.0}, "diameter_parameter": "outer.4.diameter", "id": "outline"}],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "outer.4.section",
+      "line_segments": [],
+      "name": "Outer collector section 4",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "outer.4.plane"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [{"center": {"x": 0.0, "y": 12.0}, "diameter_parameter": "inner.1.diameter", "id": "outline"}],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "inner.1.section",
+      "line_segments": [],
+      "name": "Inner collector section 1",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "inner.1.plane"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [{"center": {"x": 0.0, "y": 12.0}, "diameter_parameter": "inner.2.diameter", "id": "outline"}],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "inner.2.section",
+      "line_segments": [],
+      "name": "Inner collector section 2",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "inner.2.plane"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [{"center": {"x": 5.0, "y": 18.0}, "diameter_parameter": "inner.3.diameter", "id": "outline"}],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "inner.3.section",
+      "line_segments": [],
+      "name": "Inner collector section 3",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "inner.3.plane"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [{"center": {"x": 9.2, "y": 23.2}, "diameter_parameter": "inner.4.diameter", "id": "outline"}],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "inner.4.section",
+      "line_segments": [],
+      "name": "Inner collector section 4",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "inner.4.plane"
+    },
+    {
+      "arc_closed_profiles": [],
+      "arc_segments": [],
+      "circle_profiles": [{"center": {"x": 9.0, "y": 23.0}, "diameter_parameter": "outlet.flange.diameter", "id": "outline"}],
+      "circular_hole_patterns": [],
+      "closed_profiles": [],
+      "composite_closed_profiles": [],
+      "constraints": [],
+      "driving_dimensions": [],
+      "geometric_constraints": [],
+      "id": "outlet.outline",
+      "line_segments": [],
+      "name": "Outlet flange profile",
+      "projected_lines": [],
+      "projected_points": [],
+      "rectangle_profiles": [],
+      "reference_generated_lines": [],
+      "sketch_points": [],
+      "spline_segments": [],
+      "tangent_continuities": [],
+      "trim_extend_operations": [],
+      "workplane": "outlet.front"
+    }
+  ],
+  "sketches_3d": [
+    {
+      "arcs": [
+        {
+          "id": "bend.1",
+          "start": {"source": "local_point", "point": "p2"},
+          "intermediate": {"source": "local_point", "point": "p4"},
+          "end": {"source": "local_point", "point": "p3"}
+        },
+        {
+          "id": "bend.2",
+          "start": {"source": "local_point", "point": "p5"},
+          "intermediate": {"source": "local_point", "point": "p7"},
+          "end": {"source": "local_point", "point": "p6"}
+        },
+        {
+          "id": "bend.3",
+          "start": {"source": "local_point", "point": "p8"},
+          "intermediate": {"source": "local_point", "point": "p10"},
+          "end": {"source": "local_point", "point": "p9"}
+        },
+        {
+          "id": "bend.4",
+          "start": {"source": "local_point", "point": "p11"},
+          "intermediate": {"source": "local_point", "point": "p13"},
+          "end": {"source": "local_point", "point": "p12"}
+        }
+      ],
+      "guide_curves": [],
+      "helices": [],
+      "id": "runner.1.curve",
+      "lines": [
+        {"id": "line.1", "start_point": "p1", "end_point": "p2"},
+        {"id": "line.2", "start_point": "p3", "end_point": "p5"},
+        {"id": "line.3", "start_point": "p6", "end_point": "p8"},
+        {"id": "line.4", "start_point": "p9", "end_point": "p11"},
+        {"id": "line.5", "start_point": "p12", "end_point": "p14"}
+      ],
+      "name": "Runner 1 spatial bends",
+      "points": [
+        {"id": "p1", "x": {"source": "explicit", "value_mm": -84.0}, "y": {"source": "explicit", "value_mm": 8.0}, "z": {"source": "explicit", "value_mm": 0.0}},
+        {
+          "id": "p2",
+          "x": {"source": "explicit", "value_mm": -84.0},
+          "y": {"source": "explicit", "value_mm": 30.949762292884827},
+          "z": {"source": "explicit", "value_mm": 0.0}
+        },
+        {
+          "id": "p3",
+          "x": {"source": "explicit", "value_mm": -86.69426418968132},
+          "y": {"source": "explicit", "value_mm": 51.46103929450212},
+          "z": {"source": "explicit", "value_mm": 10.362554575697386}
+        },
+        {
+          "id": "p4",
+          "x": {"source": "explicit", "value_mm": -84.71409579318085},
+          "y": {"source": "explicit", "value_mm": 42.5186222312623},
+          "z": {"source": "explicit", "value_mm": 2.7465222814647703}
+        },
+        {
+          "id": "p5",
+          "x": {"source": "explicit", "value_mm": -87.8971018070118},
+          "y": {"source": "explicit", "value_mm": 54.79197423480187},
+          "z": {"source": "explicit", "value_mm": 14.988853103891493}
+        },
+        {
+          "id": "p6",
+          "x": {"source": "explicit", "value_mm": -79.54906644397205},
+          "y": {"source": "explicit", "value_mm": 97.45093355602795},
+          "z": {"source": "explicit", "value_mm": 13.462107867066486}
+        },
+        {
+          "id": "p7",
+          "x": {"source": "explicit", "value_mm": -88.10860001767038},
+          "y": {"source": "explicit", "value_mm": 77.40258166190647},
+          "z": {"source": "explicit", "value_mm": 26.042210014300657}
+        },
+        {
+          "id": "p8",
+          "x": {"source": "explicit", "value_mm": -69.11181533210254},
+          "y": {"source": "explicit", "value_mm": 107.88818466789746},
+          "z": {"source": "explicit", "value_mm": -8.390886648410314}
+        },
+        {
+          "id": "p9",
+          "x": {"source": "explicit", "value_mm": -56.92852282162765},
+          "y": {"source": "explicit", "value_mm": 118.22176365832868},
+          "z": {"source": "explicit", "value_mm": -19.017869294593087}
+        },
+        {
+          "id": "p10",
+          "x": {"source": "explicit", "value_mm": -63.970682044761396},
+          "y": {"source": "explicit", "value_mm": 112.54848312333947},
+          "z": {"source": "explicit", "value_mm": -15.286599684865102}
+        },
+        {
+          "id": "p11",
+          "x": {"source": "explicit", "value_mm": -26.728561087538427},
+          "y": {"source": "explicit", "value_mm": 141.50090082835578},
+          "z": {"source": "explicit", "value_mm": -26.567859728115394}
+        },
+        {
+          "id": "p12",
+          "x": {"source": "explicit", "value_mm": -17.0},
+          "y": {"source": "explicit", "value_mm": 161.5218487262163},
+          "z": {"source": "explicit", "value_mm": -29.0}
+        },
+        {
+          "id": "p13",
+          "x": {"source": "explicit", "value_mm": -19.56810281484337},
+          "y": {"source": "explicit", "value_mm": 150.32588336068244},
+          "z": {"source": "explicit", "value_mm": -28.357974296289157}
+        },
+        {"id": "p14", "x": {"source": "explicit", "value_mm": -17.0}, "y": {"source": "explicit", "value_mm": 169.0}, "z": {"source": "explicit", "value_mm": -29.0}}
+      ],
+      "polylines": [],
+      "splines": []
+    },
+    {
+      "arcs": [
+        {
+          "id": "bend.1",
+          "start": {"source": "local_point", "point": "p2"},
+          "intermediate": {"source": "local_point", "point": "p4"},
+          "end": {"source": "local_point", "point": "p3"}
+        },
+        {
+          "id": "bend.2",
+          "start": {"source": "local_point", "point": "p5"},
+          "intermediate": {"source": "local_point", "point": "p7"},
+          "end": {"source": "local_point", "point": "p6"}
+        },
+        {
+          "id": "bend.3",
+          "start": {"source": "local_point", "point": "p8"},
+          "intermediate": {"source": "local_point", "point": "p10"},
+          "end": {"source": "local_point", "point": "p9"}
+        },
+        {
+          "id": "bend.4",
+          "start": {"source": "local_point", "point": "p11"},
+          "intermediate": {"source": "local_point", "point": "p13"},
+          "end": {"source": "local_point", "point": "p12"}
+        }
+      ],
+      "guide_curves": [],
+      "helices": [],
+      "id": "runner.2.curve",
+      "lines": [
+        {"id": "line.1", "start_point": "p1", "end_point": "p2"},
+        {"id": "line.2", "start_point": "p3", "end_point": "p5"},
+        {"id": "line.3", "start_point": "p6", "end_point": "p8"},
+        {"id": "line.4", "start_point": "p9", "end_point": "p11"},
+        {"id": "line.5", "start_point": "p12", "end_point": "p14"}
+      ],
+      "name": "Runner 2 spatial bends",
+      "points": [
+        {"id": "p1", "x": {"source": "explicit", "value_mm": -28.0}, "y": {"source": "explicit", "value_mm": 8.0}, "z": {"source": "explicit", "value_mm": 0.0}},
+        {
+          "id": "p2",
+          "x": {"source": "explicit", "value_mm": -28.0},
+          "y": {"source": "explicit", "value_mm": 27.816766596156477},
+          "z": {"source": "explicit", "value_mm": 0.0}
+        },
+        {
+          "id": "p3",
+          "x": {"source": "explicit", "value_mm": -29.10425818117547},
+          "y": {"source": "explicit", "value_mm": 50.62554908705283},
+          "z": {"source": "explicit", "value_mm": 14.72344241567295}
+        },
+        {
+          "id": "p4",
+          "x": {"source": "explicit", "value_mm": -28.300157176040926},
+          "y": {"source": "explicit", "value_mm": 41.402050007033026},
+          "z": {"source": "explicit", "value_mm": 4.002095680545672}
+        },
+        {
+          "id": "p5",
+          "x": {"source": "explicit", "value_mm": -31.40953462669911},
+          "y": {"source": "explicit", "value_mm": 64.45720776019466},
+          "z": {"source": "explicit", "value_mm": 45.46046168932147}
+        },
+        {
+          "id": "p6",
+          "x": {"source": "explicit", "value_mm": -21.189219907091434},
+          "y": {"source": "explicit", "value_mm": 104.11440958665142},
+          "z": {"source": "explicit", "value_mm": 53.62486451460001}
+        },
+        {
+          "id": "p7",
+          "x": {"source": "explicit", "value_mm": -29.03179107146492},
+          "y": {"source": "explicit", "value_mm": 82.76507415767253},
+          "z": {"source": "explicit", "value_mm": 60.349847231740526}
+        },
+        {
+          "id": "p8",
+          "x": {"source": "explicit", "value_mm": -18.466573881758503},
+          "y": {"source": "explicit", "value_mm": 109.23939034021929},
+          "z": {"source": "explicit", "value_mm": 48.019416815385156}
+        },
+        {
+          "id": "p9",
+          "x": {"source": "explicit", "value_mm": -17.0},
+          "y": {"source": "explicit", "value_mm": 114.95119196053056},
+          "z": {"source": "explicit", "value_mm": 41.80952220483182}
+        },
+        {
+          "id": "p10",
+          "x": {"source": "explicit", "value_mm": -17.369372549796875},
+          "y": {"source": "explicit", "value_mm": 112.04800022095696},
+          "z": {"source": "explicit", "value_mm": 44.95691643560607}
+        },
+        {
+          "id": "p11",
+          "x": {"source": "explicit", "value_mm": -17.0},
+          "y": {"source": "explicit", "value_mm": 141.577845824903},
+          "z": {"source": "explicit", "value_mm": 13.023950459564322}
+        },
+        {
+          "id": "p12",
+          "x": {"source": "explicit", "value_mm": -17.0},
+          "y": {"source": "explicit", "value_mm": 159.9303318145632},
+          "z": {"source": "explicit", "value_mm": 5.0}
+        },
+        {
+          "id": "p13",
+          "x": {"source": "explicit", "value_mm": -17.0},
+          "y": {"source": "explicit", "value_mm": 149.91537396419986},
+          "z": {"source": "explicit", "value_mm": 7.093655480294409}
+        },
+        {"id": "p14", "x": {"source": "explicit", "value_mm": -17.0}, "y": {"source": "explicit", "value_mm": 169.0}, "z": {"source": "explicit", "value_mm": 5.0}}
+      ],
+      "polylines": [],
+      "splines": []
+    },
+    {
+      "arcs": [
+        {
+          "id": "bend.1",
+          "start": {"source": "local_point", "point": "p2"},
+          "intermediate": {"source": "local_point", "point": "p4"},
+          "end": {"source": "local_point", "point": "p3"}
+        },
+        {
+          "id": "bend.2",
+          "start": {"source": "local_point", "point": "p5"},
+          "intermediate": {"source": "local_point", "point": "p7"},
+          "end": {"source": "local_point", "point": "p6"}
+        },
+        {
+          "id": "bend.3",
+          "start": {"source": "local_point", "point": "p8"},
+          "intermediate": {"source": "local_point", "point": "p10"},
+          "end": {"source": "local_point", "point": "p9"}
+        },
+        {
+          "id": "bend.4",
+          "start": {"source": "local_point", "point": "p11"},
+          "intermediate": {"source": "local_point", "point": "p13"},
+          "end": {"source": "local_point", "point": "p12"}
+        }
+      ],
+      "guide_curves": [],
+      "helices": [],
+      "id": "runner.3.curve",
+      "lines": [
+        {"id": "line.1", "start_point": "p1", "end_point": "p2"},
+        {"id": "line.2", "start_point": "p3", "end_point": "p5"},
+        {"id": "line.3", "start_point": "p6", "end_point": "p8"},
+        {"id": "line.4", "start_point": "p9", "end_point": "p11"},
+        {"id": "line.5", "start_point": "p12", "end_point": "p14"}
+      ],
+      "name": "Runner 3 spatial bends",
+      "points": [
+        {"id": "p1", "x": {"source": "explicit", "value_mm": 28.0}, "y": {"source": "explicit", "value_mm": 8.0}, "z": {"source": "explicit", "value_mm": 0.0}},
+        {
+          "id": "p2",
+          "x": {"source": "explicit", "value_mm": 28.0},
+          "y": {"source": "explicit", "value_mm": 26.648402824581453},
+          "z": {"source": "explicit", "value_mm": 0.0}
+        },
+        {
+          "id": "p3",
+          "x": {"source": "explicit", "value_mm": 29.517303571523502},
+          "y": {"source": "explicit", "value_mm": 50.06921428609401},
+          "z": {"source": "explicit", "value_mm": 16.184571429584018}
+        },
+        {
+          "id": "p4",
+          "x": {"source": "explicit", "value_mm": 28.416494620512005},
+          "y": {"source": "explicit", "value_mm": 40.90302463649901},
+          "z": {"source": "explicit", "value_mm": 4.442609285461369}
+        },
+        {
+          "id": "p5",
+          "x": {"source": "explicit", "value_mm": 32.952527191093495},
+          "y": {"source": "explicit", "value_mm": 63.81010876437399},
+          "z": {"source": "explicit", "value_mm": 52.8269567049973}
+        },
+        {
+          "id": "p6",
+          "x": {"source": "explicit", "value_mm": 22.461424791785703},
+          "y": {"source": "explicit", "value_mm": 105.8463559257143},
+          "z": {"source": "explicit", "value_mm": 60.461260602142836}
+        },
+        {
+          "id": "p7",
+          "x": {"source": "explicit", "value_mm": 30.700625607595793},
+          "y": {"source": "explicit", "value_mm": 83.27286824686257},
+          "z": {"source": "explicit", "value_mm": 69.32219373267836}
+        },
+        {
+          "id": "p8",
+          "x": {"source": "explicit", "value_mm": 20.140730508503026},
+          "y": {"source": "explicit", "value_mm": 109.97203465155017},
+          "z": {"source": "explicit", "value_mm": 54.788452354118505}
+        },
+        {
+          "id": "p9",
+          "x": {"source": "explicit", "value_mm": 18.878638948447737},
+          "y": {"source": "explicit", "value_mm": 114.24517945371689},
+          "z": {"source": "explicit", "value_mm": 49.14801528852179}
+        },
+        {
+          "id": "p10",
+          "x": {"source": "explicit", "value_mm": 19.25617284700708},
+          "y": {"source": "explicit", "value_mm": 112.05458703454075},
+          "z": {"source": "explicit", "value_mm": 51.98403398811792}
+        },
+        {
+          "id": "p11",
+          "x": {"source": "explicit", "value_mm": 17.405787942530623},
+          "y": {"source": "explicit", "value_mm": 141.4929230631835},
+          "z": {"source": "explicit", "value_mm": 14.536016649469607}
+        },
+        {
+          "id": "p12",
+          "x": {"source": "explicit", "value_mm": 17.0},
+          "y": {"source": "explicit", "value_mm": 161.14316604220443},
+          "z": {"source": "explicit", "value_mm": 5.0}
+        },
+        {
+          "id": "p13",
+          "x": {"source": "explicit", "value_mm": 17.106814196562446},
+          "y": {"source": "explicit", "value_mm": 150.22034215678192},
+          "z": {"source": "explicit", "value_mm": 7.510133619217459}
+        },
+        {"id": "p14", "x": {"source": "explicit", "value_mm": 17.0}, "y": {"source": "explicit", "value_mm": 169.0}, "z": {"source": "explicit", "value_mm": 5.0}}
+      ],
+      "polylines": [],
+      "splines": []
+    },
+    {
+      "arcs": [
+        {
+          "id": "bend.1",
+          "start": {"source": "local_point", "point": "p2"},
+          "intermediate": {"source": "local_point", "point": "p4"},
+          "end": {"source": "local_point", "point": "p3"}
+        },
+        {
+          "id": "bend.2",
+          "start": {"source": "local_point", "point": "p5"},
+          "intermediate": {"source": "local_point", "point": "p7"},
+          "end": {"source": "local_point", "point": "p6"}
+        },
+        {
+          "id": "bend.3",
+          "start": {"source": "local_point", "point": "p8"},
+          "intermediate": {"source": "local_point", "point": "p10"},
+          "end": {"source": "local_point", "point": "p9"}
+        },
+        {
+          "id": "bend.4",
+          "start": {"source": "local_point", "point": "p11"},
+          "intermediate": {"source": "local_point", "point": "p13"},
+          "end": {"source": "local_point", "point": "p12"}
+        }
+      ],
+      "guide_curves": [],
+      "helices": [],
+      "id": "runner.4.curve",
+      "lines": [
+        {"id": "line.1", "start_point": "p1", "end_point": "p2"},
+        {"id": "line.2", "start_point": "p3", "end_point": "p5"},
+        {"id": "line.3", "start_point": "p6", "end_point": "p8"},
+        {"id": "line.4", "start_point": "p9", "end_point": "p11"},
+        {"id": "line.5", "start_point": "p12", "end_point": "p14"}
+      ],
+      "name": "Runner 4 spatial bends",
+      "points": [
+        {"id": "p1", "x": {"source": "explicit", "value_mm": 84.0}, "y": {"source": "explicit", "value_mm": 8.0}, "z": {"source": "explicit", "value_mm": 0.0}},
+        {
+          "id": "p2",
+          "x": {"source": "explicit", "value_mm": 84.0},
+          "y": {"source": "explicit", "value_mm": 31.197150646751872},
+          "z": {"source": "explicit", "value_mm": 0.0}
+        },
+        {
+          "id": "p3",
+          "x": {"source": "explicit", "value_mm": 87.53351462707744},
+          "y": {"source": "explicit", "value_mm": 51.482736857340456},
+          "z": {"source": "explicit", "value_mm": 9.769128674861156}
+        },
+        {
+          "id": "p4",
+          "x": {"source": "explicit", "value_mm": 84.93475628861978},
+          "y": {"source": "explicit", "value_mm": 42.59261694472523},
+          "z": {"source": "explicit", "value_mm": 2.584326209713492}
+        },
+        {
+          "id": "p5",
+          "x": {"source": "explicit", "value_mm": 89.21723292391817},
+          "y": {"source": "explicit", "value_mm": 55.04825795653261},
+          "z": {"source": "explicit", "value_mm": 14.42411455436202}
+        },
+        {
+          "id": "p6",
+          "x": {"source": "explicit", "value_mm": 84.79079107800695},
+          "y": {"source": "explicit", "value_mm": 97.88602363806129},
+          "z": {"source": "explicit", "value_mm": 11.78689096256683}
+        },
+        {
+          "id": "p7",
+          "x": {"source": "explicit", "value_mm": 91.70233359185954},
+          "y": {"source": "explicit", "value_mm": 77.65308841820091},
+          "z": {"source": "explicit", "value_mm": 24.48356683035823}
+        },
+        {
+          "id": "p8",
+          "x": {"source": "explicit", "value_mm": 76.00808425331522},
+          "y": {"source": "explicit", "value_mm": 107.57728634116943},
+          "z": {"source": "explicit", "value_mm": -7.292782484177296}
+        },
+        {
+          "id": "p9",
+          "x": {"source": "explicit", "value_mm": 63.40473023301778},
+          "y": {"source": "explicit", "value_mm": 117.78227238869712},
+          "z": {"source": "explicit", "value_mm": -18.03160921765034}
+        },
+        {
+          "id": "p10",
+          "x": {"source": "explicit", "value_mm": 70.80618921244792},
+          "y": {"source": "explicit", "value_mm": 112.35382390208322},
+          "z": {"source": "explicit", "value_mm": -14.26267911422234}
+        },
+        {
+          "id": "p11",
+          "x": {"source": "explicit", "value_mm": 28.003249465670834},
+          "y": {"source": "explicit", "value_mm": 141.59781399582144},
+          "z": {"source": "explicit", "value_mm": -26.399231944477805}
+        },
+        {
+          "id": "p12",
+          "x": {"source": "explicit", "value_mm": 17.0},
+          "y": {"source": "explicit", "value_mm": 162.51398723259967},
+          "z": {"source": "explicit", "value_mm": -29.0}
+        },
+        {
+          "id": "p13",
+          "x": {"source": "explicit", "value_mm": 19.92686390262173},
+          "y": {"source": "explicit", "value_mm": 150.62573887389132},
+          "z": {"source": "explicit", "value_mm": -28.308195804834867}
+        },
+        {"id": "p14", "x": {"source": "explicit", "value_mm": 17.0}, "y": {"source": "explicit", "value_mm": 169.0}, "z": {"source": "explicit", "value_mm": -29.0}}
+      ],
+      "polylines": [],
+      "splines": []
+    }
+  ],
+  "surface_features": [],
+  "sweep_features": [
+    {
+      "fixed_up_vector_override": null,
+      "guide_path": null,
+      "id": "runner.1",
+      "name": "Hollow sweep 1",
+      "operation_mode": "new_body",
+      "orientation_override": null,
+      "path": "runner.1.path",
+      "produced_body": "body.Runner 1",
+      "profile": {"kind": "closed_region", "profile": "outline", "region_policy": "material_region", "sketch": "runner.1.section"},
+      "twist_parameter": null,
+      "type": "sweep"
+    },
+    {
+      "fixed_up_vector_override": null,
+      "guide_path": null,
+      "id": "runner.2",
+      "name": "Hollow sweep 2",
+      "operation_mode": "new_body",
+      "orientation_override": null,
+      "path": "runner.2.path",
+      "produced_body": "body.Runner 2",
+      "profile": {"kind": "closed_region", "profile": "outline", "region_policy": "material_region", "sketch": "runner.2.section"},
+      "twist_parameter": null,
+      "type": "sweep"
+    },
+    {
+      "fixed_up_vector_override": null,
+      "guide_path": null,
+      "id": "runner.3",
+      "name": "Hollow sweep 3",
+      "operation_mode": "new_body",
+      "orientation_override": null,
+      "path": "runner.3.path",
+      "produced_body": "body.Runner 3",
+      "profile": {"kind": "closed_region", "profile": "outline", "region_policy": "material_region", "sketch": "runner.3.section"},
+      "twist_parameter": null,
+      "type": "sweep"
+    },
+    {
+      "fixed_up_vector_override": null,
+      "guide_path": null,
+      "id": "runner.4",
+      "name": "Hollow sweep 4",
+      "operation_mode": "new_body",
+      "orientation_override": null,
+      "path": "runner.4.path",
+      "produced_body": "body.Runner 4",
+      "profile": {"kind": "closed_region", "profile": "outline", "region_policy": "material_region", "sketch": "runner.4.section"},
+      "twist_parameter": null,
+      "type": "sweep"
+    }
+  ],
+  "version": 11
+}
