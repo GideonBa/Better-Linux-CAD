@@ -2,16 +2,6 @@
   <img src="docs/images/showcase/splash.webp" width="100%" alt="Better Linux CAD — the BLCAD startup artwork of Archimedes with his lever">
 </p>
 
-<p align="center">
-  <img src="docs/images/repository-logo.png" width="96" alt="BLCAD logo showing Archimedes with his lever"><br>
-  <strong>Open-source parametric CAD for Linux</strong>
-</p>
-
-<p align="center">Constrain a sketch, shape the part, and check how it fits and moves in an assembly.<br>Bring in supplier geometry with STEP and pass on the finished model.</p>
-
-<p align="center">
-  <a href="#gallery">Gallery</a> · <a href="#what-you-can-model">What you can do</a> · <a href="#run-blcad">Run BLCAD</a> · <a href="docs/mvp-plan.md">Roadmap</a>
-</p>
 
 ## Gallery
 
