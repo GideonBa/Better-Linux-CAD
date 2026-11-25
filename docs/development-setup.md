@@ -354,6 +354,10 @@ to their numbered blocks.
 ./build/dev-geometry/blcad_analyze_assembly input.blcad.project.json
 ```
 
+The [gallery models](../examples/showcase/README.md) are useful for checking native Part opening
+and STEP export. Open each changed gallery example on the Qt desktop and check its visible bodies
+before updating its capture.
+
 ## Formatting and generated files
 
 `.editorconfig` and `.clang-format` own formatting. Format new files fully and keep legacy edits
